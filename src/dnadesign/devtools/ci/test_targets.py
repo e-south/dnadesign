@@ -15,6 +15,9 @@ import argparse
 from pathlib import Path
 
 _STUDIES_TOOL_NAME = "studies"
+_ADDITIONAL_TOOL_TEST_DIRS = {
+    "cluster": ("src/cli/tests",),
+}
 
 
 def parse_tools_csv(value: str) -> list[str]:
@@ -86,6 +89,8 @@ def resolve_test_targets(
         if not tool_root.is_dir():
             raise ValueError(f"Unknown tool in affected set: {tool_name}")
         _append_existing_target(targets, tool_root / "tests")
+        for relative_test_dir in _ADDITIONAL_TOOL_TEST_DIRS.get(tool_name, ()):
+            _append_existing_target(targets, tool_root / relative_test_dir)
         if tool_name == _STUDIES_TOOL_NAME:
             for test_dir in _study_unit_test_dirs(studies_root=tool_root, changed_files=changed_files):
                 _append_existing_target(targets, test_dir)

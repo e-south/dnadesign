@@ -21,6 +21,7 @@ from dnadesign.devtools.quality.tool_coverage import load_baseline
 _EXTERNAL_INTEGRATION_MARKERS = ("fimo", "integration")
 _EXTERNAL_INTEGRATION_GLOBAL_FILES = {
     ".github/workflows/ci.yaml",
+    ".python-version",
     "pixi.toml",
     "pixi.lock",
     "pyproject.toml",
@@ -28,12 +29,14 @@ _EXTERNAL_INTEGRATION_GLOBAL_FILES = {
 }
 _FULL_CORE_EXACT_FILES = {
     ".github/workflows/ci.yaml",
+    ".python-version",
     "pixi.toml",
     "pixi.lock",
     "pyproject.toml",
     "uv.lock",
     ".github/tool-coverage-baseline.json",
 }
+_SHARED_PACKAGE_TOOLS = {"contracts", "thread"}
 _NON_TOOL_DIRS = {
     "devtools",
     "__pycache__",
@@ -231,6 +234,9 @@ def determine_scope(
             tool_name = parts[2]
             if tool_name in tool_names:
                 affected_tools.add(tool_name)
+                if tool_name in _SHARED_PACKAGE_TOOLS:
+                    run_full_core = True
+                    run_external_integration = True
                 if tool_name in external_integration_tool_names:
                     run_external_integration = True
             else:

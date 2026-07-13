@@ -77,6 +77,20 @@ def test_determine_scope_pr_lockfile_change_triggers_full_core_and_external_inte
     assert result.external_integration_tools == ["densegen"]
 
 
+def test_determine_scope_pr_python_version_change_triggers_full_compatibility() -> None:
+    result = determine_scope(
+        event_name="pull_request",
+        changed_files=[".python-version"],
+        tool_names={"densegen", "usr"},
+        external_integration_tool_names={"densegen"},
+    )
+
+    assert result.run_full_core is True
+    assert result.run_external_integration is True
+    assert result.affected_tools == ["densegen", "usr"]
+    assert result.external_integration_tools == ["densegen"]
+
+
 def test_determine_scope_pr_docs_only_skips_tool_coverage_gate() -> None:
     result = determine_scope(
         event_name="pull_request",
@@ -117,6 +131,20 @@ def test_determine_scope_pr_shared_package_root_change_triggers_full_core_and_ex
     assert result.run_full_core is True
     assert result.run_external_integration is True
     assert result.affected_tools == ["densegen", "usr"]
+    assert result.external_integration_tools == ["densegen"]
+
+
+def test_determine_scope_pr_shared_contract_package_change_triggers_full_core() -> None:
+    result = determine_scope(
+        event_name="pull_request",
+        changed_files=["src/dnadesign/contracts/artifacts.py"],
+        tool_names={"contracts", "densegen", "usr"},
+        external_integration_tool_names={"densegen"},
+    )
+
+    assert result.run_full_core is True
+    assert result.run_external_integration is True
+    assert result.affected_tools == ["contracts", "densegen", "usr"]
     assert result.external_integration_tools == ["densegen"]
 
 

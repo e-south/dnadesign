@@ -35,6 +35,17 @@ def test_resolve_test_targets_skips_tools_without_tests(tmp_path: Path) -> None:
     assert targets == []
 
 
+def test_resolve_test_targets_includes_cluster_owned_cli_tests(tmp_path: Path) -> None:
+    cluster_tests = tmp_path / "src" / "dnadesign" / "cluster" / "tests"
+    cluster_cli_tests = tmp_path / "src" / "dnadesign" / "cluster" / "src" / "cli" / "tests"
+    cluster_tests.mkdir(parents=True, exist_ok=True)
+    cluster_cli_tests.mkdir(parents=True, exist_ok=True)
+
+    targets = resolve_test_targets(repo_root=tmp_path, tool_names=["cluster"])
+
+    assert targets == [str(cluster_tests), str(cluster_cli_tests)]
+
+
 def test_resolve_test_targets_includes_changed_study_unit_tests(tmp_path: Path) -> None:
     shared_tests = tmp_path / "src" / "dnadesign" / "studies" / "tests"
     stress_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "stress_ethanol_cipro_growth" / "tests"
