@@ -1,7 +1,7 @@
 ## Quality Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-12
 
 ### At a glance
 This index tracks quality expectations for tests, CI signal, coverage gates, and documentation parity.
@@ -19,5 +19,5 @@ This index tracks quality expectations for tests, CI signal, coverage gates, and
 - [Coverage baselines](../../.github/tool-coverage-baseline.json): required per-tool floors.
 - [Coverage summary generator](../../src/dnadesign/devtools/quality/coverage_summary.py): builds `quality-score-coverage-summary.json` from coverage + baseline contracts.
 - [Quality score input generator](../../src/dnadesign/devtools/quality/score.py): composes lane outcomes + coverage summary into `quality-score-inputs.json`.
-- [Quality entropy report artifact](../../.github/workflows/ci.yaml): scheduled report for stale SOR metadata and broken evidence links.
+- [Quality entropy report artifact](../../.github/workflows/quality-entropy.yaml): weekly/manual review-age advisories plus hard checks for malformed scorecard evidence and broken links.
 - [Developer docs](../dev/README.md): maintainer-level test and CI conventions.

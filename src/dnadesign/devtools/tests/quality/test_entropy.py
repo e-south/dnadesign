@@ -12,9 +12,30 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import datetime as dt
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from dnadesign.devtools.quality.entropy import main
+
+
+def test_module_help_runs_without_site_packages() -> None:
+    repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").exists())
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(repo_root / "src")
+
+    result = subprocess.run(
+        [sys.executable, "-S", "-m", "dnadesign.devtools.quality.entropy", "--help"],
+        cwd=repo_root,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Generate quality entropy report." in result.stdout
 
 
 def _write(path: Path, text: str) -> None:
@@ -53,7 +74,7 @@ def _write_minimal_quality_score(
     )
 
 
-def test_main_reports_stale_sor_docs_and_fails(tmp_path: Path) -> None:
+def test_main_reports_old_sor_reviews_as_nonblocking_advisories(tmp_path: Path) -> None:
     _write(tmp_path / "docs" / "README.md", "# docs\n")
     _write_minimal_quality_score(tmp_path / "QUALITY_SCORE.md")
     _write(tmp_path / "ARCHITECTURE.md", "**Owner:** maintainers\n**Last verified:** 2020-01-01\n")
@@ -67,16 +88,45 @@ def test_main_reports_stale_sor_docs_and_fails(tmp_path: Path) -> None:
         [
             "--repo-root",
             str(tmp_path),
-            "--max-sor-age-days",
+            "--review-age-advisory-days",
             "30",
             "--report-file",
             str(report_path),
         ]
     )
 
-    assert rc == 1
+    assert rc == 0
     report = report_path.read_text(encoding="utf-8")
-    assert "Stale SOR docs: 5" in report
+    assert "Review-age advisories: 5" in report
+    assert "review age is" in report
+
+
+def test_main_reports_old_scorecard_review_as_nonblocking_advisory(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    _write(tmp_path / "docs" / "README.md", "# docs\n")
+    _write_minimal_quality_score(
+        tmp_path / "QUALITY_SCORE.md",
+        last_verified="2020-01-01",
+    )
+    for name in ("ARCHITECTURE.md", "DESIGN.md", "SECURITY.md", "RELIABILITY.md", "PLANS.md"):
+        _write(tmp_path / name, f"**Owner:** maintainers\n**Last verified:** {today}\n")
+
+    report_path = tmp_path / "report.md"
+    rc = main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--review-age-advisory-days",
+            "30",
+            "--report-file",
+            str(report_path),
+        ]
+    )
+
+    assert rc == 0
+    report = report_path.read_text(encoding="utf-8")
+    assert "Review-age advisories: 2" in report
+    assert "scorecard row 1 (`usr`)" in report
 
 
 def test_main_reports_broken_evidence_links_and_fails(tmp_path: Path) -> None:

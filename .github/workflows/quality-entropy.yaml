@@ -1,0 +1,47 @@
+name: Quality entropy
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 07 * * 1"
+
+concurrency:
+  group: quality-entropy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Quality entropy report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Build quality entropy report
+        id: entropy
+        continue-on-error: true
+        run: |
+          PYTHONPATH=src python3 -S -m dnadesign.devtools.quality.entropy \
+            --repo-root . \
+            --review-age-advisory-days 180 \
+            --report-file quality-entropy-report.md
+
+      - name: Upload quality entropy artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-entropy-report
+          path: quality-entropy-report.md
+
+      - name: Enforce quality entropy checks
+        if: steps.entropy.outcome == 'failure'
+        run: exit 1
