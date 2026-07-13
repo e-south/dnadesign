@@ -64,6 +64,7 @@ def test_proteinmpnn_manifest_validator_accepts_helper_sidecars(tmp_path: Path) 
         excluded_positions=[],
         seed_set=[101],
         temperatures=[0.1, 0.3],
+        omit_aas=["C"],
         batch_id="test_batch",
         num_seq_per_target=1,
         batch_size=1,
@@ -115,6 +116,7 @@ def test_proteinmpnn_manifest_validator_accepts_colocated_sidecars_from_another_
         excluded_positions=[],
         seed_set=[101],
         temperatures=[0.1],
+        omit_aas=["C"],
         batch_id="test_batch",
         num_seq_per_target=1,
         batch_size=1,
@@ -161,6 +163,7 @@ def test_proteinmpnn_manifest_validator_rejects_rehashed_wrong_fixed_sidecar(tmp
         excluded_positions=[],
         seed_set=[101],
         temperatures=[0.1],
+        omit_aas=["C"],
         batch_id="test_batch",
         num_seq_per_target=1,
         batch_size=1,
@@ -176,6 +179,32 @@ def test_proteinmpnn_manifest_validator_rejects_rehashed_wrong_fixed_sidecar(tmp
     issues = validate_request_manifest(manifest_path)
 
     assert [issue.check_id for issue in issues] == ["thread.proteinmpnn.sidecar_payload_mismatch"]
+
+
+def test_proteinmpnn_manifest_validator_rejects_invalid_residue_omit_sidecar(tmp_path: Path) -> None:
+    manifest_without_hash = _minimal_request_manifest(
+        tmp_path,
+        omit_payload={"wrong_target": {"Z": [[[[9999]], "NOT_AA"]]}},
+    )
+    manifest = {"request_hash": request_hash(manifest_without_hash), **manifest_without_hash}
+    manifest_path = tmp_path / "request_manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+    issues = validate_request_manifest(manifest_path)
+
+    assert "thread.proteinmpnn.invalid_omit_aa_jsonl" in {issue.check_id for issue in issues}
+
+
+def test_proteinmpnn_manifest_validator_allows_partial_omit_sidecars_and_forced_mutations(tmp_path: Path) -> None:
+    manifest_without_hash = _minimal_request_manifest(
+        tmp_path,
+        omit_payload={"target": {"A": [[[2], "C"]]}},
+    )
+    manifest = {"request_hash": request_hash(manifest_without_hash), **manifest_without_hash}
+    manifest_path = tmp_path / "request_manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+    assert validate_request_manifest(manifest_path) == []
 
 
 def test_proteinmpnn_request_hash_ignores_provenance_only_fields(tmp_path: Path) -> None:
@@ -201,7 +230,13 @@ def test_proteinmpnn_request_hash_changes_for_executable_fields(tmp_path: Path) 
 
 
 def test_proteinmpnn_run_commands_use_requested_chain_id() -> None:
-    commands = proteinmpnn_run_commands(seed_set=[101], temperatures=[0.1], chain_id="B", fixed_positions=[2, 4])
+    commands = proteinmpnn_run_commands(
+        seed_set=[101],
+        temperatures=[0.1],
+        chain_id="B",
+        fixed_positions=[2, 4],
+        omit_aas=["C"],
+    )
 
     assign_command = next(command for command in commands if command["name"] == "assign_fixed_chains")
     fixed_command = next(command for command in commands if command["name"] == "make_fixed_positions")
@@ -229,6 +264,7 @@ def test_proteinmpnn_run_commands_include_optional_omit_aa_jsonl() -> None:
         temperatures=[0.1],
         chain_id="A",
         fixed_positions=[1],
+        omit_aas=[],
         omit_aa_jsonl_path="proteinmpnn_request/omit_AA.jsonl",
     )
 
@@ -237,17 +273,46 @@ def test_proteinmpnn_run_commands_include_optional_omit_aa_jsonl() -> None:
     assert run_command["argv"][run_command["argv"].index("--omit_AA_jsonl") + 1] == (
         "proteinmpnn_request/omit_AA.jsonl"
     )
+    assert "--omit_AAs" not in run_command["argv"]
 
 
-def _minimal_request_manifest(tmp_path: Path) -> dict[str, object]:
+def test_proteinmpnn_run_commands_emit_only_declared_global_omissions() -> None:
+    commands = proteinmpnn_run_commands(
+        seed_set=[101],
+        temperatures=[0.1],
+        chain_id="A",
+        fixed_positions=[1],
+        omit_aas=["C", "W"],
+    )
+
+    run_command = next(command for command in commands if command["name"] == "protein_mpnn_run_seed_101")
+
+    assert run_command["argv"][run_command["argv"].index("--omit_AAs") + 1] == "CW"
+
+
+def _minimal_request_manifest(
+    tmp_path: Path,
+    *,
+    omit_payload: dict[str, object] | None = None,
+) -> dict[str, object]:
     parsed_path = tmp_path / "parsed_pdbs.jsonl"
     assigned_path = tmp_path / "assigned_chains.jsonl"
     fixed_path = tmp_path / "fixed_positions.jsonl"
     pdb_path = tmp_path / "target.pdb"
     pdb_path.write_text("END\n", encoding="utf-8")
-    write_jsonl(parsed_path, {"name": "target", "num_of_chains": 1})
+    write_jsonl(parsed_path, {"name": "target", "num_of_chains": 1, "seq": "ACD", "seq_chain_A": "ACD"})
     write_jsonl(assigned_path, assigned_chains_payload(target_name="target", chain_id="A"))
     write_jsonl(fixed_path, fixed_positions_payload(target_name="target", chain_id="A", fixed_positions=[1, 3]))
+    sidecar_paths = {
+        "chain_a_backbone_pdb": pdb_path,
+        "parsed_pdbs_jsonl": parsed_path,
+        "assigned_chains_jsonl": assigned_path,
+        "fixed_positions_jsonl": fixed_path,
+    }
+    if omit_payload is not None:
+        omit_path = tmp_path / "omit_AA.jsonl"
+        write_jsonl(omit_path, omit_payload)
+        sidecar_paths["omit_AA_jsonl"] = omit_path
     return build_request_manifest(
         artifact_id="test.proteinmpnn_request",
         created_by="test",
@@ -255,12 +320,7 @@ def _minimal_request_manifest(tmp_path: Path) -> dict[str, object]:
         mask_policy_id="mask",
         target_name="target",
         chain_id="A",
-        sidecar_paths={
-            "chain_a_backbone_pdb": pdb_path,
-            "parsed_pdbs_jsonl": parsed_path,
-            "assigned_chains_jsonl": assigned_path,
-            "fixed_positions_jsonl": fixed_path,
-        },
+        sidecar_paths=sidecar_paths,
         upstream_artifact_hashes={"mask_set": "sha256:" + "0" * 64},
         source_thread_plan={"path": "thread_plan.yaml"},
         canonical_to_mpnn={3: 1, 4: 2, 5: 3},
@@ -269,6 +329,7 @@ def _minimal_request_manifest(tmp_path: Path) -> dict[str, object]:
         excluded_positions=[],
         seed_set=[101],
         temperatures=[0.1],
+        omit_aas=["C"],
         batch_id="test_batch",
         num_seq_per_target=1,
         batch_size=1,

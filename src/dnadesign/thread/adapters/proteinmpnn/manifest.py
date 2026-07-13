@@ -67,6 +67,7 @@ def build_request_manifest(
     excluded_positions: list[int],
     seed_set: list[int],
     temperatures: list[float],
+    omit_aas: Sequence[str],
     batch_id: str,
     num_seq_per_target: int,
     batch_size: int,
@@ -101,7 +102,7 @@ def build_request_manifest(
         "fixed_position_count": len(fixed_positions),
         "mutable_position_count": len(mutable_positions),
         "excluded_missing_backbone_positions": excluded_positions,
-        "omit_aas": ["C"],
+        "omit_aas": list(omit_aas),
         "fallback_policy": FALLBACK_POLICY,
         "seed_set": seed_set,
         "temperature_schedule": temperatures,
@@ -121,6 +122,7 @@ def build_request_manifest(
             temperatures=temperatures,
             chain_id=chain_id,
             fixed_positions=fixed_positions,
+            omit_aas=omit_aas,
             num_seq_per_target=num_seq_per_target,
             batch_size=batch_size,
             omit_aa_jsonl_path=omit_aa_jsonl_path,
@@ -134,6 +136,7 @@ def proteinmpnn_run_commands(
     temperatures: Sequence[float],
     chain_id: str,
     fixed_positions: Sequence[int],
+    omit_aas: Sequence[str],
     num_seq_per_target: int = 1,
     batch_size: int = 1,
     omit_aa_jsonl_path: str | None = None,
@@ -202,11 +205,11 @@ def proteinmpnn_run_commands(
             str(seed),
             "--batch_size",
             str(batch_size),
-            "--omit_AAs",
-            "C",
             "--save_score",
             "1",
         ]
+        if omit_aas:
+            argv.extend(["--omit_AAs", "".join(omit_aas)])
         if omit_aa_jsonl_path is not None:
             argv.extend(["--omit_AA_jsonl", omit_aa_jsonl_path])
         commands.append(

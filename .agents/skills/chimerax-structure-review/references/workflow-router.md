@@ -66,9 +66,11 @@ Use when:
 Load:
 - `natural-language-control-map.md`
 - `style-preset-contract.md`
+- `molecular-scene-contract.md` when protein, DNA, or RNA roles are present
 
 Behavior:
 - Translate natural language to a named style preset or allowlisted command template.
+- Dry-run `scripts/chimerax-apply-complex-style.py` before applying a role-aware protein-DNA-RNA scene.
 - Do not infer biological meaning from a style.
 
 ## `render-capture`
@@ -79,8 +81,10 @@ Use when:
 Load:
 - `pose-manifest-contract.md`
 - `chimerax-rest-contract.md`
+- `render-verification-contract.md`
 
 Behavior:
 - Write a command log and pose manifest.
 - Hash generated files.
+- Verify declared dimensions and representative frame corners before acceptance.
 - Report whether REST was stopped.

@@ -34,7 +34,7 @@ from dnadesign.folding import (
     publish_viennarna_structure_svg,
     run_prediction_request,
 )
-from dnadesign.folding.src.errors import FoldingConfigError
+from dnadesign.folding.src.errors import FoldingConfigError, FoldingExecutionError
 from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox, _stem_metric_label
 
 _CONTIGUOUS_STEM_SEQUENCE = "GACGATATCGTC"
@@ -367,6 +367,40 @@ printf ">demo\\nGCAU\\n(()) (-2.30)\\n"
     assert prediction.artifacts.stdout == "RNAfold.stdout.txt"
     assert prediction.artifacts.stderr == "RNAfold.stderr.txt"
     assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
+
+
+@pytest.mark.parametrize(
+    ("rnafold_output", "error_match"),
+    [
+        (">demo\nGCAU\nnot-a-structure\n", "did not contain a dot-bracket"),
+        (">demo\nGCAU\n... (-1.00)\n", "length 3 does not match input length 4"),
+    ],
+)
+def test_run_prediction_request_honors_declared_parse_failure_policy(
+    tmp_path: Path,
+    rnafold_output: str,
+    error_match: str,
+) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "--version" ]; then\n'
+        '  printf "RNAfold 2.7.0\\n"\n'
+        "  exit 0\n"
+        "fi\n"
+        "cat >/dev/null\n"
+        f"cat <<'RNAFOLD_OUTPUT'\n{rnafold_output}RNAFOLD_OUTPUT\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    request = _request(tmp_path, executable=executable.as_posix(), required=False)
+
+    with pytest.raises(FoldingExecutionError, match=error_match):
+        run_prediction_request(request, output_dir=tmp_path / "folding")
+
+    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v1.json"
+    assert prediction_path.is_file()
+    assert json.loads(prediction_path.read_text(encoding="utf-8"))["status"] == "error"
 
 
 def test_run_prediction_request_uses_viennarna_python_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

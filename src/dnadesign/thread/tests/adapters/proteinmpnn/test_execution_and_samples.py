@@ -19,6 +19,7 @@ import yaml
 
 from dnadesign.thread.adapters.proteinmpnn.execution import ProteinMpnnExecutionConfig, run_official_proteinmpnn_request
 from dnadesign.thread.adapters.proteinmpnn.execution_preflight import validate_proteinmpnn_root
+from dnadesign.thread.adapters.proteinmpnn.manifest import build_request_manifest, request_hash
 from dnadesign.thread.adapters.proteinmpnn.samples import (
     parse_proteinmpnn_fasta_samples,
     validate_sample_table,
@@ -133,6 +134,22 @@ def test_proteinmpnn_execution_config_rejects_nondivisible_batch_size() -> None:
         ProteinMpnnExecutionConfig(batch_id="bad", num_seq_per_target=10, batch_size=3)
 
 
+def test_run_official_proteinmpnn_request_rejects_invalid_manifest_before_writing_outputs(tmp_path: Path) -> None:
+    proteinmpnn_root = _write_fake_proteinmpnn_root(tmp_path / "ProteinMPNN")
+    manifest_path = tmp_path / "request_manifest.yaml"
+    manifest_path.write_text("schema_id: wrong\n", encoding="utf-8")
+    output_dir = tmp_path / "proteinmpnn_outputs"
+
+    with pytest.raises(ValueError, match="request manifest validation failed"):
+        run_official_proteinmpnn_request(
+            request_manifest_path=manifest_path,
+            proteinmpnn_root=proteinmpnn_root,
+            output_dir=output_dir,
+        )
+
+    assert not output_dir.exists()
+
+
 def test_run_official_proteinmpnn_request_resolves_colocated_sidecars(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -156,30 +173,46 @@ def test_run_official_proteinmpnn_request_resolves_colocated_sidecars(
     write_jsonl(stale_dir / "parsed_pdbs.jsonl", {"name": "target", "seq_chain_A": "ZZZ"})
     write_jsonl(stale_dir / "assigned_chains.jsonl", {"target": [["B"], []]})
     write_jsonl(stale_dir / "fixed_positions.jsonl", {"target": {"A": [2]}})
-    manifest = {
-        "request_hash": "sha256:" + "1" * 64,
-        "proteinmpnn_name": "target",
-        "proteinmpnn_design_chain": "A",
-        "sidecar_paths": {
-            "chain_a_backbone_pdb": str(stale_dir / "chain_a_backbone.pdb"),
-            "parsed_pdbs_jsonl": str(stale_dir / "parsed_pdbs.jsonl"),
-            "assigned_chains_jsonl": str(stale_dir / "assigned_chains.jsonl"),
-            "fixed_positions_jsonl": str(stale_dir / "fixed_positions.jsonl"),
+    manifest_without_hash = build_request_manifest(
+        artifact_id="test.portable_request",
+        created_by="test",
+        profile_id=None,
+        mask_policy_id=None,
+        target_name="target",
+        chain_id="A",
+        sidecar_paths={
+            "chain_a_backbone_pdb": backbone_path,
+            "parsed_pdbs_jsonl": parsed_path,
+            "assigned_chains_jsonl": assigned_path,
+            "fixed_positions_jsonl": fixed_path,
         },
-        "fixed_positions_jsonl": fixed_payload,
-        "seed_set": [101],
-        "temperature_schedule": [0.1],
-        "batch_id": "portable",
-        "num_seq_per_target": 4,
-        "batch_size": 2,
-        "expected_sample_count": 4,
+        upstream_artifact_hashes={},
+        source_thread_plan={"path": "/other/host/thread_plan.yaml"},
+        canonical_to_mpnn={1: 1, 2: 2, 3: 3},
+        fixed_positions=[1, 3],
+        mutable_positions=[2],
+        excluded_positions=[],
+        seed_set=[101],
+        temperatures=[0.1],
+        omit_aas=[],
+        batch_id="portable",
+        num_seq_per_target=4,
+        batch_size=2,
+        expected_sample_count=4,
+    )
+    manifest_without_hash["sidecar_paths"] = {
+        name: str(stale_dir / Path(str(sidecar_path)).name)
+        for name, sidecar_path in manifest_without_hash["sidecar_paths"].items()
     }
+    manifest = {"request_hash": request_hash(manifest_without_hash), **manifest_without_hash}
     manifest_path = request_dir / "request_manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
     observed_run_commands: list[list[str]] = []
+    observed_parse_inputs: list[str] = []
 
     def fake_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         if "parse_multiple_chains.py" in argv[1]:
+            observed_parse_inputs.append(argv[argv.index("--input_path") + 1])
             write_jsonl(Path(argv[argv.index("--output_path") + 1]), parsed_payload)
         elif "assign_fixed_chains.py" in argv[1]:
             write_jsonl(Path(argv[argv.index("--output_path") + 1]), assigned_payload)
@@ -190,14 +223,16 @@ def test_run_official_proteinmpnn_request_resolves_colocated_sidecars(
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.chdir(tmp_path)
 
     run_official_proteinmpnn_request(
-        request_manifest_path=manifest_path,
+        request_manifest_path=Path("proteinmpnn_request/request_manifest.yaml"),
         proteinmpnn_root=proteinmpnn_root,
         output_dir=tmp_path / "proteinmpnn_outputs",
     )
 
     assert len(observed_run_commands) == 1
+    assert observed_parse_inputs == [request_dir.as_posix().rstrip("/") + "/"]
     command = observed_run_commands[0]
     assert command[command.index("--jsonl_path") + 1] == str(parsed_path)
     assert command[command.index("--chain_id_jsonl") + 1] == str(assigned_path)

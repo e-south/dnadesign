@@ -18,7 +18,7 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructurePredictionResultV1,
 )
 
-from .errors import FoldingExecutionError
+from .errors import FoldingLengthMismatchError, FoldingMalformedOutputError
 
 _DOT_BRACKET_RE = re.compile(r"^\s*([.()\[\]{}<>]+)\s*(?:\(\s*([-+]?\d+(?:\.\d+)?)\s*\))?")
 _OPEN_TO_CLOSE = {"(": ")", "[": "]", "{": "}", "<": ">"}
@@ -33,7 +33,7 @@ def parse_rnafold_stdout(
 ) -> SecondaryStructurePredictionResultV1:
     dot_bracket, mfe = _extract_dot_bracket(stdout)
     if len(dot_bracket) != input_length:
-        raise FoldingExecutionError(
+        raise FoldingLengthMismatchError(
             f"ViennaRNA dot-bracket length {len(dot_bracket)} does not match input length {input_length}."
         )
     pair_map = _pair_map_from_dot_bracket(dot_bracket, submitted_sequence=submitted_sequence)
@@ -54,7 +54,7 @@ def _extract_dot_bracket(stdout: str) -> tuple[str, float | None]:
         dot_bracket = match.group(1)
         mfe_text = match.group(2)
         return dot_bracket, float(mfe_text) if mfe_text is not None else None
-    raise FoldingExecutionError("ViennaRNA output did not contain a dot-bracket structure line.")
+    raise FoldingMalformedOutputError("ViennaRNA output did not contain a dot-bracket structure line.")
 
 
 def _pair_map_from_dot_bracket(
@@ -63,7 +63,7 @@ def _pair_map_from_dot_bracket(
     submitted_sequence: str,
 ) -> list[SecondaryStructurePairV1]:
     if len(submitted_sequence) != len(dot_bracket):
-        raise FoldingExecutionError("Submitted sequence length does not match dot-bracket length.")
+        raise FoldingLengthMismatchError("Submitted sequence length does not match dot-bracket length.")
     stacks: dict[str, list[int]] = {opener: [] for opener in _OPEN_TO_CLOSE}
     pairs: list[SecondaryStructurePairV1] = []
     for index, char in enumerate(dot_bracket):
@@ -74,14 +74,14 @@ def _pair_map_from_dot_bracket(
             continue
         opener = _CLOSE_TO_OPEN.get(char)
         if opener is None:
-            raise FoldingExecutionError(f"Unsupported dot-bracket character '{char}'.")
+            raise FoldingMalformedOutputError(f"Unsupported dot-bracket character '{char}'.")
         if not stacks[opener]:
-            raise FoldingExecutionError("ViennaRNA dot-bracket has invalid bracket nesting.")
+            raise FoldingMalformedOutputError("ViennaRNA dot-bracket has invalid bracket nesting.")
         left = stacks[opener].pop()
         pair = submitted_sequence[left].upper() + submitted_sequence[index].upper()
         pairs.append(SecondaryStructurePairV1(left=left, right=index, pair=pair))
     if any(stack for stack in stacks.values()):
-        raise FoldingExecutionError("ViennaRNA dot-bracket has invalid bracket nesting.")
+        raise FoldingMalformedOutputError("ViennaRNA dot-bracket has invalid bracket nesting.")
     return sorted(pairs, key=lambda item: (item.left, item.right))
 
 

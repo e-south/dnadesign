@@ -129,15 +129,22 @@ if [[ -n "$TITLE" ]]; then
   printf '2dlabels text "%s" xpos 0.035 ypos 0.89 size 30 color black bgColor none\n' "$TITLE" >> "$START_SCRIPT"
 fi
 
-"$CHIMERAX_BIN_RESOLVED" --script "$START_SCRIPT" >"$CHIMERAX_LOG" 2>&1 &
-CHIMERAX_PID=$!
+CHIMERAX_PID=""
+if [[ "$(uname -s)" == "Darwin" && "$CHIMERAX_BIN_RESOLVED" == *.app/Contents/MacOS/* ]]; then
+  CHIMERAX_APP="${CHIMERAX_BIN_RESOLVED%%.app/Contents/MacOS/*}.app"
+  open -n -a "$CHIMERAX_APP" -i /dev/null -o "$CHIMERAX_LOG" --stderr "$CHIMERAX_LOG" \
+    --args --script "$START_SCRIPT"
+else
+  nohup "$CHIMERAX_BIN_RESOLVED" --script "$START_SCRIPT" </dev/null >"$CHIMERAX_LOG" 2>&1 &
+  CHIMERAX_PID=$!
+fi
 
 for i in $(seq 1 40); do
   if curl -fsS --max-time 2 -G --data-urlencode 'command=remotecontrol rest port' "http://127.0.0.1:$PORT/run" >/dev/null 2>&1; then
     break
   fi
   sleep 0.5
-  if ! kill -0 "$CHIMERAX_PID" >/dev/null 2>&1; then
+  if [[ -n "$CHIMERAX_PID" ]] && ! kill -0 "$CHIMERAX_PID" >/dev/null 2>&1; then
     printf 'FAIL: ChimeraX exited before REST was ready\n' >&2
     cat "$CHIMERAX_LOG" >&2 || true
     exit 1
@@ -148,6 +155,15 @@ for i in $(seq 1 40); do
     exit 1
   fi
 done
+
+if [[ -z "$CHIMERAX_PID" ]] && command -v lsof >/dev/null 2>&1; then
+  CHIMERAX_PID="$(lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"
+fi
+if ! [[ "$CHIMERAX_PID" =~ ^[0-9]+$ ]] || ! kill -0 "$CHIMERAX_PID" >/dev/null 2>&1; then
+  printf 'FAIL: REST became ready but the owning ChimeraX process could not be resolved\n' >&2
+  cat "$CHIMERAX_LOG" >&2 || true
+  exit 1
+fi
 
 cat > "$SESSION_MANIFEST" <<YAML
 schema_version: chimerax_control_session_v1

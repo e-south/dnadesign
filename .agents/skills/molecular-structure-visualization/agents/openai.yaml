@@ -1,0 +1,7 @@
+interface:
+  display_name: "Molecular Structure Visualization"
+  short_description: "Route and verify protein-DNA-RNA scenes across py3Dmol and ChimeraX."
+  default_prompt: "Choose the appropriate renderer, declare protein, DNA, and RNA roles, preserve source-atom connectivity, and verify the resulting molecular scene in its real runtime."
+
+policy:
+  allow_implicit_invocation: true

@@ -31,13 +31,15 @@ require_file "$SKILL_DIR/references/external-sources.md"
 require_file "$SKILL_DIR/references/workflow-router.md"
 require_file "$SKILL_DIR/references/first-run.md"
 require_file "$SKILL_DIR/references/collaboration-cadence.md"
-require_file "$SKILL_DIR/references/name-scope-decision.md"
+require_file "$SKILL_DIR/references/backend-scope.md"
 require_file "$SKILL_DIR/references/chimerax-rest-contract.md"
 require_file "$SKILL_DIR/references/live-session-contract.md"
 require_file "$SKILL_DIR/references/command-allowlist.md"
 require_file "$SKILL_DIR/references/natural-language-control-map.md"
 require_file "$SKILL_DIR/references/pose-manifest-contract.md"
 require_file "$SKILL_DIR/references/style-preset-contract.md"
+require_file "$SKILL_DIR/references/molecular-scene-contract.md"
+require_file "$SKILL_DIR/references/render-verification-contract.md"
 require_file "$SKILL_DIR/references/sibling-patterns-example.md"
 require_file "$SKILL_DIR/references/test-matrix.md"
 require_file "$SKILL_DIR/assets/pose_manifest.schema.yaml"
@@ -53,9 +55,11 @@ require_file "$SCRIPT_DIR/chimerax-session-status.sh"
 require_file "$SCRIPT_DIR/chimerax-session-stop.sh"
 require_file "$SCRIPT_DIR/chimerax-send-command.py"
 require_file "$SCRIPT_DIR/chimerax-capture-pose.py"
+require_file "$SCRIPT_DIR/chimerax-apply-complex-style.py"
+require_file "$SCRIPT_DIR/chimerax-verify-render.py"
 
 if [[ "$(basename "$SKILL_DIR")" == "chimerax-structure-review" ]]; then
-  pass "skill folder uses generic structure-review name"
+  pass "skill folder names the ChimeraX-specific backend"
 else
   fail "skill folder name is not chimerax-structure-review"
 fi
@@ -125,6 +129,35 @@ else
   fail "test matrix missing scenario table"
 fi
 
+if grep -q 'save_movie_frame' "$SKILL_DIR/references/command-allowlist.md" \
+  && grep -q 'all four corners' "$SKILL_DIR/references/molecular-scene-contract.md"; then
+  pass "fixed-size frame capture and background validation are documented"
+else
+  fail "fixed-size frame capture contract is incomplete"
+fi
+
+if grep -q 'Default ladder display' "$SKILL_DIR/references/external-sources.md" \
+  && grep -q 'system command-line options' "$SKILL_DIR/references/external-sources.md"; then
+  pass "ChimeraX nucleotide and startup claims cite official sources"
+else
+  fail "ChimeraX source provenance is incomplete"
+fi
+
+if grep -q 'open -n -a "$CHIMERAX_APP"' "$SCRIPT_DIR/chimerax-session-start.sh" \
+  && grep -q 'nohup "$CHIMERAX_BIN_RESOLVED" --script "$START_SCRIPT" </dev/null' "$SCRIPT_DIR/chimerax-session-start.sh" \
+  && grep -q 'lsof -tiTCP:"$PORT" -sTCP:LISTEN' "$SCRIPT_DIR/chimerax-session-start.sh"; then
+  pass "graphical session launcher uses detached platform paths and resolves the REST owner"
+else
+  fail "graphical session launcher must survive the invoking shell and record the REST owner"
+fi
+
+if grep -q 'uv run python .agents/skills/chimerax-structure-review/scripts/chimerax-apply-complex-style.py' \
+  "$SKILL_DIR/references/molecular-scene-contract.md"; then
+  pass "role-aware style examples use the repository Python runtime"
+else
+  fail "role-aware style examples must use the repository Python runtime"
+fi
+
 for script in "$SCRIPT_DIR"/chimerax-*.sh "$SCRIPT_DIR"/*.py "$SCRIPT_DIR"/audit-chimerax-structure-review-skill.sh; do
   if [[ -x "$script" ]]; then
     pass "script executable: ${script#$REPO_ROOT/}"
@@ -133,7 +166,7 @@ for script in "$SCRIPT_DIR"/chimerax-*.sh "$SCRIPT_DIR"/*.py "$SCRIPT_DIR"/audit
   fi
 done
 
-if python3 - "$SCRIPT_DIR/chimerax-send-command.py" "$SCRIPT_DIR/chimerax-capture-pose.py" <<'PY'
+if python3 - "$SCRIPT_DIR/chimerax-send-command.py" "$SCRIPT_DIR/chimerax-capture-pose.py" "$SCRIPT_DIR/chimerax-apply-complex-style.py" "$SCRIPT_DIR/chimerax-verify-render.py" <<'PY'
 import ast
 from pathlib import Path
 import sys
@@ -145,6 +178,36 @@ then
   pass "python helper scripts parse"
 else
   fail "python helper scripts parse"
+fi
+
+if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
+  tmp_render_dir="$(mktemp -d)"
+  ffmpeg -v error -f lavfi -i 'color=c=white:s=64x64:d=1' \
+    -vf 'drawbox=x=16:y=16:w=32:h=32:color=black:t=fill' -frames:v 1 "$tmp_render_dir/valid.png"
+  ffmpeg -v error -f lavfi -i 'color=c=black:s=64x64:d=1' \
+    -vf 'drawbox=x=16:y=16:w=32:h=32:color=white:t=fill' -frames:v 1 "$tmp_render_dir/invalid.png"
+  if "$SCRIPT_DIR/chimerax-verify-render.py" \
+    --image "$tmp_render_dir/valid.png" \
+    --expected-width 64 \
+    --expected-height 64 \
+    --background '#FFFFFF' \
+    --minimum-content-extent 0.25 >/dev/null; then
+    pass "render verifier accepts a dimensioned, framed still"
+  else
+    fail "render verifier rejected a valid still"
+  fi
+  if "$SCRIPT_DIR/chimerax-verify-render.py" \
+    --image "$tmp_render_dir/invalid.png" \
+    --expected-width 64 \
+    --expected-height 64 \
+    --background '#FFFFFF' >/dev/null 2>&1; then
+    fail "render verifier accepted wrong-background corners"
+  else
+    pass "render verifier rejects wrong-background corners"
+  fi
+  rm -rf "$tmp_render_dir"
+else
+  fail "ffmpeg and ffprobe are required for render verification"
 fi
 
 tmp_open_dir="$(mktemp -d)"
@@ -173,6 +236,24 @@ capture_spec.loader.exec_module(capture_module)
 
 assert send_module._allowed(f"open {tmp_open_dir / 'model.pdb'}")
 assert not send_module._allowed(f"open {tmp_open_dir / 'unsafe.cxc'}")
+assert send_module._allowed("nucleotides #1/D,E,F atoms")
+assert send_module._allowed("nucleotides #1/D,E,F ladder")
+assert not send_module._allowed("nucleotides #1/D,E,F slab")
+assert send_module._allowed("cartoon style nucleic xsect rectangle width 1.8 thick 0.25")
+assert not send_module._allowed("cartoon style nucleic xsect triangle width 1.8 thick 0.25")
+assert send_module._allowed("cartoon #1/D,E,F suppressBackboneDisplay true")
+assert send_module._allowed("cartoon tether nucleic shape cylinder sides 8 scale 0.65 opacity 1")
+assert send_module._allowed("label delete")
+assert send_module._allowed("hide #1 pseudobonds")
+assert send_module._allowed("size #1/D,E,F stickRadius 0.20")
+assert send_module._allowed("name dna_role #1/D")
+assert send_module._allowed("rename #1 molecular_complex")
+assert send_module._allowed("color #1/A #E8E4DA target c")
+assert send_module._allowed("color #1/D #B97700 target acf")
+assert not send_module._allowed("color #1/D #B97700 target acfx")
+assert not send_module._allowed("color #1/A #E8E4D target c")
+assert not send_module._allowed("color #1/A #E8E4DAG target c")
+assert send_module._allowed("shape ribbon #1/D@P width 1.4 height 0.12 followBonds false color gold modelId #2")
 assert capture_module._cxc_quoted_path(tmp_open_dir / "pose.png", label="image") == f'"{tmp_open_dir / "pose.png"}"'
 try:
     capture_module._cxc_quoted_path(tmp_open_dir / 'bad"name.png', label="image")
@@ -187,6 +268,66 @@ else
   fail "ChimeraX helper allowlists reject executable open paths and unsafe CXC path text"
 fi
 rm -rf "$tmp_open_dir"
+
+if "$SCRIPT_DIR/chimerax-apply-complex-style.py" \
+  --dry-run \
+  --protein-selection '#1/A' \
+  --dna-selection '#1/D' \
+  --rna-selection '#1/E,F' \
+  --nucleic-selection '#1/D,E,F' \
+  | grep -q 'nucleotides #1/D,E,F ladder'; then
+  pass "role-aware complex-style dry-run emits the default nucleotide ladder"
+else
+  fail "role-aware complex-style dry-run did not emit the default nucleotide ladder"
+fi
+
+if "$SCRIPT_DIR/chimerax-apply-complex-style.py" \
+  --dry-run \
+  --protein-selection '#1/A' \
+  --dna-selection '#1/D' \
+  --rna-selection '#1/E,F' \
+  --nucleic-selection '#1/D,E,F' \
+  | grep -q 'color #1/D #B97700 target acf' \
+  && "$SCRIPT_DIR/chimerax-apply-complex-style.py" \
+    --dry-run \
+    --protein-selection '#1/A' \
+    --dna-selection '#1/D' \
+    --rna-selection '#1/E,F' \
+    --nucleic-selection '#1/D,E,F' \
+    | grep -q 'color #1/E,F #C84C5A target acf'; then
+  pass "role-aware complex style uses stable, distinct DNA and RNA colors"
+else
+  fail "role-aware complex style lost stable DNA or RNA colors"
+fi
+
+if "$SCRIPT_DIR/chimerax-apply-complex-style.py" \
+  --dry-run \
+  --protein-selection '#1/A' \
+  --dna-selection '#1/D' \
+  --rna-selection '#1/E,F' \
+  --nucleic-selection '#1/D,E,F' \
+  | grep -q 'transparency #1/A 35 target s'; then
+  pass "role-aware complex style uses 65 percent surface alpha"
+else
+  fail "role-aware complex style lost the 65 percent surface alpha contract"
+fi
+
+if "$SCRIPT_DIR/chimerax-apply-complex-style.py" \
+  --dry-run \
+  --protein-selection '#1/A' \
+  --dna-selection '#1/D' \
+  --rna-selection '#1/E,F' \
+  --nucleic-selection '#1/D,E,F' \
+  --nucleic-display connected-atoms \
+  --nucleic-backbone-mode phosphate-ribbon \
+  --dna-phosphate-selection '#1/D@P' \
+  --rna-phosphate-selection '#1/E@P' \
+  --rna-phosphate-selection '#1/F@P' \
+  | grep -q 'rename #20 dna_backbone'; then
+  pass "phosphate-ribbon fallback dry-run emits semantically named models"
+else
+  fail "phosphate-ribbon fallback dry-run did not emit semantically named models"
+fi
 
 for rejected_command in \
   'open https://example.org/1abc.pdb' \

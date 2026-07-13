@@ -23,6 +23,8 @@ from dnadesign.thread.adapters.proteinmpnn.manifest import FALLBACK_POLICY, POSI
 from dnadesign.thread.adapters.proteinmpnn.models import ProteinMpnnRequestIssue
 from dnadesign.thread.adapters.proteinmpnn.sidecars import resolve_manifest_sidecar_path
 
+_PROTEINMPNN_AMINO_ACIDS = frozenset("ACDEFGHIKLMNPQRSTVWYX")
+
 
 def validate_request_manifest(path: Path) -> list[ProteinMpnnRequestIssue]:
     """Validate generic ProteinMPNN request manifest and helper sidecars."""
@@ -55,11 +57,16 @@ def _validate_metadata(issues: list[ProteinMpnnRequestIssue], *, manifest: Mappi
                     path=str(path),
                 )
             )
-    if manifest.get("omit_aas") != ["C"]:
+    omit_aas = manifest.get("omit_aas")
+    if (
+        not isinstance(omit_aas, list)
+        or any(not isinstance(aa, str) or aa not in _PROTEINMPNN_AMINO_ACIDS for aa in omit_aas)
+        or len(set(omit_aas)) != len(omit_aas)
+    ):
         issues.append(
             ProteinMpnnRequestIssue(
-                check_id="thread.proteinmpnn.omit_aas_mismatch",
-                message="ProteinMPNN request must declare omit_aas: [C] for no-new-cysteine policy",
+                check_id="thread.proteinmpnn.invalid_omit_aas",
+                message="ProteinMPNN omit_aas must be a unique list of supported one-letter amino-acid codes",
                 path=str(path),
             )
         )
@@ -182,6 +189,111 @@ def _validate_sidecar_payloads(
                     path=str(path),
                 )
             )
+    omit_sidecar = sidecar_paths.get("omit_AA_jsonl")
+    if omit_sidecar:
+        omit_path = resolve_manifest_sidecar_path(path, omit_sidecar)
+        omit_payload = _jsonl_record_or_issue(
+            issues,
+            sidecar_path=omit_path,
+            sidecar_name="omit_AA_jsonl",
+            path=path,
+        )
+        if omit_payload is not None and parsed_payload is not None:
+            _validate_omit_aa_payload(
+                issues,
+                omit_payload=omit_payload,
+                parsed_payload=parsed_payload,
+                manifest=manifest,
+                target_name=target_name,
+                chain_id=chain_id,
+                path=path,
+            )
+
+
+def _validate_omit_aa_payload(
+    issues: list[ProteinMpnnRequestIssue],
+    *,
+    omit_payload: Mapping[str, Any],
+    parsed_payload: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    target_name: str,
+    chain_id: str,
+    path: Path,
+) -> None:
+    errors: list[str] = []
+    if set(omit_payload) != {target_name}:
+        errors.append(f"target keys must equal [{target_name!r}]")
+    target_payload = omit_payload.get(target_name)
+    if not isinstance(target_payload, Mapping) or set(target_payload) != {chain_id}:
+        errors.append(f"target payload must contain only chain {chain_id!r}")
+        _append_omit_aa_issue(issues, errors=errors, path=path)
+        return
+    groups = target_payload.get(chain_id)
+    if not isinstance(groups, list):
+        errors.append("chain payload must be a list of [positions, omitted_amino_acids] groups")
+        _append_omit_aa_issue(issues, errors=errors, path=path)
+        return
+    sequence = parsed_payload.get(f"seq_chain_{chain_id}")
+    if not isinstance(sequence, str) or not sequence:
+        errors.append(f"parsed_pdbs.jsonl must contain a non-empty seq_chain_{chain_id}")
+        _append_omit_aa_issue(issues, errors=errors, path=path)
+        return
+    mutable_by_chain = manifest.get("mutable_positions_by_chain")
+    mutable_values = mutable_by_chain.get(chain_id) if isinstance(mutable_by_chain, Mapping) else None
+    if not isinstance(mutable_values, list) or any(
+        not isinstance(position, int) or isinstance(position, bool) for position in mutable_values
+    ):
+        errors.append("manifest mutable_positions_by_chain must contain integer positions for the design chain")
+        _append_omit_aa_issue(issues, errors=errors, path=path)
+        return
+    expected_positions = set(mutable_values)
+    observed_positions: set[int] = set()
+    for group_index, group in enumerate(groups):
+        if not isinstance(group, list) or len(group) != 2:
+            errors.append(f"group {group_index} must contain positions and one omitted-amino-acid string")
+            continue
+        positions, omitted = group
+        if not isinstance(positions, list) or not positions:
+            errors.append(f"group {group_index} positions must be a non-empty list")
+            continue
+        if not isinstance(omitted, str) or not omitted:
+            errors.append(f"group {group_index} omitted amino acids must be a non-empty string")
+            continue
+        if len(set(omitted)) != len(omitted) or any(aa not in _PROTEINMPNN_AMINO_ACIDS for aa in omitted):
+            errors.append(f"group {group_index} contains duplicate or unsupported amino-acid codes")
+        for position in positions:
+            if not isinstance(position, int) or isinstance(position, bool):
+                errors.append(f"group {group_index} positions must be integers")
+                continue
+            if position < 1 or position > len(sequence):
+                errors.append(f"position {position} is outside the exported chain length {len(sequence)}")
+                continue
+            if position not in expected_positions:
+                errors.append(f"position {position} is not mutable in the request manifest")
+            if position in observed_positions:
+                errors.append(f"position {position} appears in more than one omit group")
+            observed_positions.add(position)
+    extra_positions = sorted(observed_positions - expected_positions)
+    if extra_positions:
+        errors.append(f"omit sidecar contains non-mutable positions {extra_positions}")
+    _append_omit_aa_issue(issues, errors=errors, path=path)
+
+
+def _append_omit_aa_issue(
+    issues: list[ProteinMpnnRequestIssue],
+    *,
+    errors: list[str],
+    path: Path,
+) -> None:
+    if not errors:
+        return
+    issues.append(
+        ProteinMpnnRequestIssue(
+            check_id="thread.proteinmpnn.invalid_omit_aa_jsonl",
+            message="Invalid ProteinMPNN omit_AA_jsonl payload: " + "; ".join(errors),
+            path=str(path),
+        )
+    )
 
 
 def _validate_request_hash(issues: list[ProteinMpnnRequestIssue], *, manifest: Mapping[str, Any], path: Path) -> None:

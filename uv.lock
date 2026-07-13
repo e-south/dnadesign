@@ -510,7 +510,7 @@ requires-dist = [
     { name = "pandas" },
     { name = "pip", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=26.1" },
     { name = "polars", specifier = ">=1.36.1" },
-    { name = "py3dmol", specifier = ">=2.5.5" },
+    { name = "py3dmol", specifier = "==2.5.5" },
     { name = "pyarrow", specifier = ">=23.0.1" },
     { name = "pydantic" },
     { name = "pygments", specifier = ">=2.20.0" },

@@ -32,7 +32,13 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructureQaV1,
 )
 
-from .errors import FoldingConfigError, FoldingError, FoldingExecutionError
+from .errors import (
+    FoldingConfigError,
+    FoldingError,
+    FoldingExecutionError,
+    FoldingLengthMismatchError,
+    FoldingMalformedOutputError,
+)
 from .rnafold import parse_rnafold_stdout
 from .viennarna_plot import enrich_prediction_pairing_qa, publish_viennarna_structure_svg
 
@@ -339,7 +345,11 @@ def run_prediction_request(
             command=command,
             error=str(exc),
         )
-        if request.policy.required and raise_on_required_failure:
+        if _parse_failure_requires_raise(
+            request,
+            exc,
+            raise_on_required_failure=raise_on_required_failure,
+        ):
             _write_prediction(output_path, prediction)
             raise
     _write_prediction(output_path, prediction)
@@ -439,7 +449,11 @@ def _run_python_api_prediction_request(
             command=command,
             error=str(exc),
         )
-        if request.policy.required and raise_on_required_failure:
+        if _parse_failure_requires_raise(
+            request,
+            exc,
+            raise_on_required_failure=raise_on_required_failure,
+        ):
             _write_prediction(output_path, prediction)
             raise
     _write_prediction(output_path, prediction)
@@ -465,6 +479,21 @@ def _run_python_api_mfe(
         raise FoldingExecutionError("ViennaRNA fold_compound.mfe() returned an unsupported result.")
     dot_bracket, mfe_kcal_mol = raw_result
     return f">{sequence_id}\n{submitted_sequence}\n{dot_bracket} ({float(mfe_kcal_mol):.2f})\n"
+
+
+def _parse_failure_requires_raise(
+    request: SecondaryStructurePredictionRequestV1,
+    error: FoldingError,
+    *,
+    raise_on_required_failure: bool,
+) -> bool:
+    if request.policy.required and raise_on_required_failure:
+        return True
+    if isinstance(error, FoldingLengthMismatchError):
+        return request.policy.fail_on_length_mismatch
+    if isinstance(error, FoldingMalformedOutputError):
+        return request.policy.fail_on_malformed_output
+    return False
 
 
 def _python_api_model_details(module: Any, *, parameters: dict[str, Any]) -> object | None:

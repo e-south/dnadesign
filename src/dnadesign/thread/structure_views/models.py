@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import shlex
+from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
 
@@ -46,7 +47,14 @@ STANDARD_AMINO_ACID_RESIDUE_NAMES = frozenset(
 ViewProjection = Literal["", "orthographic", "perspective"]
 ViewStyle = Literal["", "outline"]
 MoleculeClass = Literal["protein", "dna", "rna"]
-MoleculeRenderStyle = Literal["", "cartoon", "line", "stick", "surface"]
+MoleculeRenderStyle = Literal[
+    "",
+    "cartoon",
+    "backbone_ribbon_with_base_spokes",
+    "line",
+    "stick",
+    "surface",
+]
 
 
 @dataclass(frozen=True)
@@ -89,6 +97,105 @@ def summarize_structure_atom_content(
     if structure_format == "mmcif":
         return _summarize_mmcif_atom_content(structure_text)
     raise ValueError(f"Unsupported structure format for atom summary: {structure_format}")
+
+
+def molecule_classes_in_structure_text(
+    structure_text: str,
+    *,
+    structure_format: StructureFormat,
+) -> frozenset[MoleculeClass]:
+    """Return molecule roles present in PDB or mmCIF coordinate text."""
+
+    classes: set[MoleculeClass] = set()
+    for line in structure_text.splitlines():
+        if not line.startswith(("ATOM  ", "HETATM", "ATOM ")):
+            continue
+        if structure_format == "pdb":
+            residue_name = line[17:20].strip().upper()
+        else:
+            try:
+                parts = shlex.split(line.strip())
+            except ValueError:
+                continue
+            if len(parts) < 6:
+                continue
+            residue_name = parts[5].strip().upper()
+        if residue_name in STANDARD_AMINO_ACID_RESIDUE_NAMES:
+            classes.add("protein")
+        elif residue_name in DNA_RESIDUE_NAMES:
+            classes.add("dna")
+        elif residue_name in RNA_RESIDUE_NAMES:
+            classes.add("rna")
+    return frozenset(classes)
+
+
+def filter_structure_text_by_molecule_classes(
+    structure_text: str,
+    *,
+    structure_format: StructureFormat,
+    visible_molecule_classes: tuple[MoleculeClass, ...],
+) -> str:
+    """Return coordinate text containing only the requested molecule roles."""
+
+    visible = set(visible_molecule_classes)
+    if visible == {"protein", "dna", "rna"}:
+        return structure_text
+    if structure_format == "pdb":
+        return "\n".join(
+            line
+            for line in structure_text.splitlines()
+            if _coordinate_line_is_visible(
+                line,
+                structure_format=structure_format,
+                visible_molecule_classes=visible,
+            )
+        )
+    if structure_format == "mmcif":
+        return "\n".join(
+            line
+            for line in structure_text.splitlines()
+            if _coordinate_line_is_visible(
+                line,
+                structure_format=structure_format,
+                visible_molecule_classes=visible,
+            )
+        )
+    raise ValueError(f"Unsupported structure format for molecule filtering: {structure_format}")
+
+
+def _coordinate_line_is_visible(
+    line: str,
+    *,
+    structure_format: StructureFormat,
+    visible_molecule_classes: set[MoleculeClass],
+) -> bool:
+    if structure_format == "pdb":
+        if not line.startswith(("ATOM  ", "HETATM")):
+            return True
+        residue_name = line[17:20].strip().upper()
+    else:
+        stripped = line.strip()
+        if not stripped.startswith(("ATOM ", "HETATM ")):
+            return True
+        try:
+            parts = shlex.split(stripped)
+        except ValueError:
+            return True
+        if len(parts) < 6:
+            return True
+        residue_name = parts[5].strip().upper()
+    molecule_class = _molecule_class_for_residue_name(residue_name)
+    return molecule_class is None or molecule_class in visible_molecule_classes
+
+
+def _molecule_class_for_residue_name(residue_name: str) -> MoleculeClass | None:
+    if residue_name in STANDARD_AMINO_ACID_RESIDUE_NAMES:
+        return "protein"
+    if residue_name in DNA_RESIDUE_NAMES:
+        return "dna"
+    if residue_name in RNA_RESIDUE_NAMES:
+        return "rna"
+    return None
 
 
 def _summarize_pdb_atom_content(structure_text: str) -> StructureAtomContent:
@@ -190,7 +297,9 @@ class StructureViewMoleculeStyle:
     color: str
     opacity: float = 1.0
     style: MoleculeRenderStyle = ""
-    radius: float = 0.18
+    radius: float = 0.24
+    width: float = 1.35
+    thickness: float = 0.28
 
     def validate(self, *, model_ids: set[str]) -> None:
         if self.molecule_class not in {"protein", "dna", "rna"}:
@@ -201,10 +310,26 @@ class StructureViewMoleculeStyle:
             raise ValueError(f"StructureViewMoleculeStyle.label is required for {self.molecule_class}")
         if not (0.0 < float(self.opacity) <= 1.0):
             raise ValueError(f"StructureViewMoleculeStyle.opacity must be in (0, 1] for {self.molecule_class}")
-        if self.style not in {"", "cartoon", "line", "stick", "surface"}:
+        if self.style not in {
+            "",
+            "cartoon",
+            "backbone_ribbon_with_base_spokes",
+            "line",
+            "stick",
+            "surface",
+        }:
             raise ValueError(f"Unsupported molecule render style: {self.style}")
+        if self.style == "backbone_ribbon_with_base_spokes" and self.molecule_class == "protein":
+            raise ValueError("backbone_ribbon_with_base_spokes is only supported for DNA and RNA styles")
+        if self.molecule_class in {"dna", "rna"} and self.style in {"cartoon", "surface"}:
+            raise ValueError(
+                "DNA and RNA styles must use backbone_ribbon_with_base_spokes, stick, or line; "
+                "cartoon creates base cylinders and surface obscures nucleotide geometry"
+            )
         if float(self.radius) <= 0.0:
             raise ValueError(f"StructureViewMoleculeStyle.radius must be positive for {self.molecule_class}")
+        if float(self.width) <= 0.0 or float(self.thickness) <= 0.0:
+            raise ValueError(f"StructureViewMoleculeStyle width/thickness must be positive for {self.molecule_class}")
 
 
 @dataclass(frozen=True)
@@ -218,6 +343,7 @@ class StructureViewSelectionStyle:
     color: str = "#D55E00"
     opacity: float = 1.0
     residue_scope: MoleculeClass = "protein"
+    show_sidechains: bool = False
 
     def validate(self, *, model_ids: set[str]) -> None:
         if not self.selection_id.strip():
@@ -277,7 +403,13 @@ class StructureViewSpec:
             raise ValueError("StructureViewSpec.camera_memory_key must be non-empty when provided")
         for model in self.models:
             model.validate()
-        model_ids = {model.model_id for model in self.models}
+        ordered_model_ids = [model.model_id for model in self.models]
+        duplicate_model_ids = sorted(model_id for model_id, count in Counter(ordered_model_ids).items() if count > 1)
+        if duplicate_model_ids:
+            raise ValueError(
+                "StructureViewSpec model_id values must be unique; duplicates: " + ", ".join(duplicate_model_ids)
+            )
+        model_ids = set(ordered_model_ids)
         hidden_molecule_classes = set(self.hidden_molecule_classes)
         if hidden_molecule_classes - {"protein", "dna", "rna"}:
             raise ValueError(f"Unsupported hidden molecule class: {sorted(hidden_molecule_classes)}")

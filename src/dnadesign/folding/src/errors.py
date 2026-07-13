@@ -24,4 +24,18 @@ class FoldingExecutionError(FoldingError):
     """Raised when a backend run fails."""
 
 
-__all__ = ["FoldingConfigError", "FoldingError", "FoldingExecutionError"]
+class FoldingMalformedOutputError(FoldingExecutionError):
+    """Raised when backend output cannot be parsed as a folding result."""
+
+
+class FoldingLengthMismatchError(FoldingExecutionError):
+    """Raised when backend output does not match the declared input length."""
+
+
+__all__ = [
+    "FoldingConfigError",
+    "FoldingError",
+    "FoldingExecutionError",
+    "FoldingLengthMismatchError",
+    "FoldingMalformedOutputError",
+]

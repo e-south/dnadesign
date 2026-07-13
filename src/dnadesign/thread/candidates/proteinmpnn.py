@@ -176,7 +176,16 @@ def validate_candidate_table(
                 path=str(path),
             )
         )
-    sample_count = pq.read_table(sample_table_path).num_rows
+    if metadata.get(b"request_hash") != request_hash.encode("utf-8"):
+        issues.append(
+            ProteinMpnnRequestIssue(
+                check_id="thread.candidate_table.metadata_request_hash_mismatch",
+                message=f"Candidate table metadata must carry request hash {request_hash}",
+                path=str(path),
+            )
+        )
+    sample_rows = pq.read_table(sample_table_path).to_pylist()
+    sample_count = len(sample_rows)
     rows = table.to_pylist()
     if not rows or len(rows) > sample_count:
         issues.append(
@@ -191,6 +200,18 @@ def validate_candidate_table(
             ProteinMpnnRequestIssue(
                 check_id="thread.candidate_table.request_hash_mismatch",
                 message=f"Candidate rows must carry request hash {request_hash}",
+                path=str(path),
+            )
+        )
+    sample_ids = {str(row["sample_id"]) for row in sample_rows}
+    missing_source_sample_ids = sorted(
+        str(row["source_sample_id"]) for row in rows if str(row["source_sample_id"]) not in sample_ids
+    )
+    if missing_source_sample_ids:
+        issues.append(
+            ProteinMpnnRequestIssue(
+                check_id="thread.candidate_table.missing_source_sample",
+                message="Candidate rows must reference sample ids in the source sample table",
                 path=str(path),
             )
         )

@@ -26,7 +26,8 @@ POSE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,79}$")
 INT_RE = re.compile(r"^-?[0-9]+$")
 FLOAT_RE = re.compile(r"^-?[0-9]+(?:\.[0-9]+)?$")
 SAFE_SELECTION_CHARS_RE = re.compile(r"^[A-Za-z0-9#/:@&.,_+*?\-\s]+$")
-SAFE_COLOR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 -]{0,40}$")
+SAFE_COLOR_RE = re.compile(r"^(?:[A-Za-z][A-Za-z0-9 -]{0,40}|#[0-9A-Fa-f]{6})$")
+COLOR_TARGET_CHARS = frozenset("abcspflr")
 EXECUTABLE_OPEN_SUFFIXES = {".cxc", ".cmd", ".py", ".pyc", ".sh", ".bash", ".zsh", ".command"}
 ALLOWED_OPEN_SUFFIXES = {
     ".bild",
@@ -138,7 +139,78 @@ def _allowed_show_hide(parts: list[str]) -> bool:
         return False
     if parts[-2] == "target":
         return parts[-1] in {"a", "b", "c", "r", "s", "m", "acs", "ac", "rs"} and _safe_selection(" ".join(parts[1:-2]))
-    return parts[-1] in {"atoms", "cartoons", "surfaces", "models"} and _safe_selection(" ".join(parts[1:-1]))
+    return parts[-1] in {"atoms", "cartoons", "surfaces", "models", "pseudobonds"} and _safe_selection(
+        " ".join(parts[1:-1])
+    )
+
+
+def _allowed_nucleotides(parts: list[str]) -> bool:
+    return len(parts) >= 3 and parts[-1] in {"atoms", "ladder"} and _safe_selection(" ".join(parts[1:-1]))
+
+
+def _allowed_cartoon(parts: list[str]) -> bool:
+    if len(parts) == 2:
+        return _safe_selection(parts[1])
+    if len(parts) == 4 and parts[2] == "suppressBackboneDisplay" and parts[3] in {"true", "false"}:
+        return _safe_selection(parts[1])
+    if len(parts) == 6 and parts[:3] == ["cartoon", "style", "width"] and parts[4] == "thick":
+        return FLOAT_RE.fullmatch(parts[3]) is not None and FLOAT_RE.fullmatch(parts[5]) is not None
+    if (
+        len(parts) == 9
+        and parts[:4] == ["cartoon", "style", "nucleic", "xsect"]
+        and parts[4] in {"oval", "rectangle", "barbell"}
+        and parts[5] == "width"
+        and parts[7] == "thick"
+    ):
+        return FLOAT_RE.fullmatch(parts[6]) is not None and FLOAT_RE.fullmatch(parts[8]) is not None
+    if (
+        len(parts) == 11
+        and parts[:3] == ["cartoon", "tether", "nucleic"]
+        and parts[3:5] == ["shape", "cylinder"]
+        and parts[5] == "sides"
+        and parts[7] == "scale"
+        and parts[9] == "opacity"
+    ):
+        return (
+            INT_RE.fullmatch(parts[6]) is not None
+            and FLOAT_RE.fullmatch(parts[8]) is not None
+            and FLOAT_RE.fullmatch(parts[10]) is not None
+        )
+    return False
+
+
+def _allowed_size(parts: list[str]) -> bool:
+    return (
+        len(parts) == 4
+        and parts[2] == "stickRadius"
+        and _safe_selection(parts[1])
+        and FLOAT_RE.fullmatch(parts[3]) is not None
+    )
+
+
+def _allowed_shape_ribbon(parts: list[str]) -> bool:
+    if len(parts) != 13 or parts[:2] != ["shape", "ribbon"]:
+        return False
+    return (
+        _safe_selection(parts[2])
+        and parts[3] == "width"
+        and FLOAT_RE.fullmatch(parts[4]) is not None
+        and parts[5] == "height"
+        and FLOAT_RE.fullmatch(parts[6]) is not None
+        and parts[7:9] == ["followBonds", "false"]
+        and parts[9] == "color"
+        and SAFE_COLOR_RE.fullmatch(parts[10]) is not None
+        and parts[11] == "modelId"
+        and re.fullmatch(r"#[0-9]+", parts[12]) is not None
+    )
+
+
+def _allowed_name(parts: list[str]) -> bool:
+    return len(parts) >= 3 and POSE_ID_RE.fullmatch(parts[1]) is not None and _safe_selection(" ".join(parts[2:]))
+
+
+def _allowed_rename(parts: list[str]) -> bool:
+    return len(parts) == 3 and _safe_selection(parts[1]) and POSE_ID_RE.fullmatch(parts[2]) is not None
 
 
 def _allowed_view(parts: list[str]) -> bool:
@@ -158,7 +230,9 @@ def _allowed_color(parts: list[str]) -> bool:
     color = parts[-3]
     selection = " ".join(parts[1:-3])
     return (
-        target in {"a", "b", "c", "r", "s", "rs", "ab", "acs"}
+        bool(target)
+        and len(target) <= len(COLOR_TARGET_CHARS)
+        and set(target) <= COLOR_TARGET_CHARS
         and _safe_selection(selection)
         and bool(SAFE_COLOR_RE.fullmatch(color))
     )
@@ -221,10 +295,20 @@ def _allowed(command: str) -> bool:
         return _is_allowed_open_path(parts[1])
     if parts == ["close", "session"]:
         return True
+    if parts == ["label", "delete"]:
+        return True
     if parts[0] in {"show", "hide"}:
         return _allowed_show_hide(parts)
+    if parts[0] == "nucleotides":
+        return _allowed_nucleotides(parts)
+    if parts[0] == "name":
+        return _allowed_name(parts)
+    if parts[0] == "rename":
+        return _allowed_rename(parts)
     if parts[0] == "style" and len(parts) >= 3:
         return parts[-1] in {"stick", "ball", "sphere"} and _safe_selection(" ".join(parts[1:-1]))
+    if parts[0] == "size":
+        return _allowed_size(parts)
     if parts[0] == "surface":
         return _allowed_surface(parts)
     if parts[0] == "transparency":
@@ -232,15 +316,9 @@ def _allowed(command: str) -> bool:
     if parts[0] == "color":
         return _allowed_color(parts)
     if parts[0] == "cartoon":
-        return (
-            len(parts) == 2
-            and _safe_selection(parts[1])
-            or len(parts) == 6
-            and parts[:3] == ["cartoon", "style", "width"]
-            and parts[4] == "thick"
-            and FLOAT_RE.fullmatch(parts[3]) is not None
-            and FLOAT_RE.fullmatch(parts[5]) is not None
-        )
+        return _allowed_cartoon(parts)
+    if parts[0] == "shape":
+        return _allowed_shape_ribbon(parts)
     if parts == ["lighting", "soft"] or parts == ["lighting", "full"]:
         return True
     if parts == ["graphics", "silhouettes", "true"] or parts == ["graphics", "silhouettes", "false"]:

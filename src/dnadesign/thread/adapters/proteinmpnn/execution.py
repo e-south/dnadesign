@@ -31,6 +31,7 @@ from dnadesign.thread.adapters.proteinmpnn.execution_preflight import (
 )
 from dnadesign.thread.adapters.proteinmpnn.samples import write_backend_run_manifest
 from dnadesign.thread.adapters.proteinmpnn.sidecars import resolve_manifest_sidecar_paths
+from dnadesign.thread.adapters.proteinmpnn.validation import validate_request_manifest
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,11 @@ def run_official_proteinmpnn_request(
 ) -> dict[str, Any]:
     """Run official ProteinMPNN scripts for one validated request manifest."""
 
+    request_manifest_path = request_manifest_path.expanduser().resolve()
+    request_issues = validate_request_manifest(request_manifest_path)
+    if request_issues:
+        messages = "; ".join(f"{issue.check_id}: {issue.message}" for issue in request_issues)
+        raise ValueError(f"ProteinMPNN request manifest validation failed: {messages}")
     root = resolve_proteinmpnn_root(proteinmpnn_root)
     issues = validate_proteinmpnn_root(root)
     if issues:
@@ -125,13 +131,14 @@ def run_official_proteinmpnn_request(
             str(int(seed)),
             "--batch_size",
             str(config.batch_size),
-            "--omit_AAs",
-            "C",
             "--save_score",
             "1",
             "--suppress_print",
             "1",
         ]
+        omit_aas = [str(aa) for aa in manifest.get("omit_aas", [])]
+        if omit_aas:
+            command.extend(["--omit_AAs", "".join(omit_aas)])
         if "omit_AA_jsonl" in sidecar_paths:
             command.extend(["--omit_AA_jsonl", str(sidecar_paths["omit_AA_jsonl"])])
         started = time.perf_counter()
@@ -198,7 +205,7 @@ def _run_helper_parity_check(
             python_executable,
             str(proteinmpnn_root / "helper_scripts/parse_multiple_chains.py"),
             "--input_path",
-            str(request_dir),
+            request_dir.as_posix().rstrip("/") + "/",
             "--output_path",
             str(parsed_path),
         ],

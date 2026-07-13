@@ -20,6 +20,8 @@ from dnadesign.thread.structure_views import (
     StructureViewMoleculeStyle,
     StructureViewSelectionStyle,
     StructureViewSpec,
+    filter_structure_text_by_molecule_classes,
+    molecule_classes_in_structure_text,
     render_structure_view_html,
     structure_view_backend_available,
     summarize_pdb_atom_content,
@@ -50,11 +52,23 @@ ATOM      3  CB  ALA A   1       1.800  -1.200   0.000  1.00 80.00           C
 ATOM      4  C   ALA A   1       2.000   1.400   0.000  1.00 80.00           C
 ATOM      5  O   ALA A   1       1.300   2.300   0.000  1.00 80.00           O
 HETATM    6  P    DA B   1       4.000   0.000   0.000  1.00 80.00           P
-HETATM    7  O3'  DA B   1       4.500   0.500   0.000  1.00 80.00           O
+HETATM    7  C4'  DA B   1       4.400   0.400   0.000  1.00 80.00           C
 HETATM    8  N1   DA B   1       4.900   0.900   0.000  1.00 80.00           N
-HETATM    9  P     U C   2       5.000   0.000   0.000  1.00 80.00           P
-HETATM   10  O3'   U C   2       5.500   0.500   0.000  1.00 80.00           O
-HETATM   11  N1    U C   2       5.900   0.900   0.000  1.00 80.00           N
+HETATM    9  P    DA B   2       5.000   0.000   0.000  1.00 80.00           P
+HETATM   10  C4'  DA B   2       5.400   0.400   0.000  1.00 80.00           C
+HETATM   11  N1   DA B   2       5.900   0.900   0.000  1.00 80.00           N
+HETATM   12  P    DA B   3       6.000   0.000   0.000  1.00 80.00           P
+HETATM   13  C4'  DA B   3       6.400   0.400   0.000  1.00 80.00           C
+HETATM   14  N1   DA B   3       6.900   0.900   0.000  1.00 80.00           N
+HETATM   15  P     U C   2       5.000   0.000   1.000  1.00 80.00           P
+HETATM   16  C4'   U C   2       5.400   0.400   1.000  1.00 80.00           C
+HETATM   17  N1    U C   2       5.900   0.900   1.000  1.00 80.00           N
+HETATM   18  P     U C   3       6.000   0.000   1.000  1.00 80.00           P
+HETATM   19  C4'   U C   3       6.400   0.400   1.000  1.00 80.00           C
+HETATM   20  N1    U C   3       6.900   0.900   1.000  1.00 80.00           N
+HETATM   21  P     U C   4       7.000   0.000   1.000  1.00 80.00           P
+HETATM   22  C4'   U C   4       7.400   0.400   1.000  1.00 80.00           C
+HETATM   23  N1    U C   4       7.900   0.900   1.000  1.00 80.00           N
 END
 """
 
@@ -68,6 +82,9 @@ ATOM 5 O O . SER A 1 3 2.500 0.500 0.000 A 3 ? 1.00 80.00 1
 HETATM 6 P P . DA D 2 1 4.000 0.000 0.000 D 1 ? 1.00 80.00 1
 #
 """
+
+_DNA_RESIDUE_SELECTION = '"resn":["DA","DC","DG","DT"]'
+_RNA_RESIDUE_SELECTION = '"resn":["A","C","G","I","U"]'
 
 
 def test_py3dmol_backend_renders_interactive_html() -> None:
@@ -97,7 +114,9 @@ def test_py3dmol_backend_renders_interactive_html() -> None:
     assert "margin:0 auto" in html
     assert "text-align:center" in html
     assert "justify-content:center" in html
+    assert "setBackgroundColor(&quot;white&quot;)" in html
     assert "setProjection(&quot;orthographic&quot;)" in html
+    assert "3dmol@2.5.5/build/3Dmol-min.js" in html
     assert "setViewStyle({&quot;style&quot;: &quot;outline&quot;})" in html
     assert "<script>" not in html
     assert "&lt;script&gt;" in html
@@ -141,7 +160,7 @@ def test_py3dmol_backend_can_show_sidechains_and_persist_camera() -> None:
     unescaped_html = html_lib.unescape(html).replace(" ", "")
     assert "localStorage" in html
     assert "eco1-review:test-structure-browser" in html
-    assert "zoom(1.35)" in html
+    assert "zoom(6.0)" in html
     assert "translate(0,0)" in html
     assert "twoFingerPan" in html
     assert "event.preventDefault()" in html
@@ -152,6 +171,7 @@ def test_py3dmol_backend_can_show_sidechains_and_persist_camera() -> None:
     assert "{passive: false, capture: true}" in html
     assert "viewer.translateScene.bind(viewer)" in html
     assert "const pan = translateScene || translate" in html
+    assert "const panScale = 0.22" in html
     assert "pan(-event.deltaX * panScale, -event.deltaY * panScale)" in html
     assert '"not":{"atom":["N","C","O","OXT"]}' in unescaped_html
     expected_residue_selection = (
@@ -190,7 +210,7 @@ def test_py3dmol_backend_scopes_residue_highlights_to_protein_residues() -> None
     assert '"resi":[1],"resn":["A","C","G","I","U"]' not in unescaped_html
 
 
-def test_py3dmol_backend_keeps_nucleic_acid_cartoons_without_color_toggles() -> None:
+def test_py3dmol_backend_uses_coordinate_derived_nucleic_ribbons_and_base_spokes() -> None:
     html = render_structure_view_html(
         StructureViewSpec(
             title="Default nucleic-acid context",
@@ -199,15 +219,39 @@ def test_py3dmol_backend_keeps_nucleic_acid_cartoons_without_color_toggles() -> 
     )
 
     unescaped_html = html_lib.unescape(html).replace(" ", "")
-    assert '"resn":["DA","DC","DG","DT"]' in unescaped_html
-    assert '"resn":["A","C","G","I","U"]' in unescaped_html
-    assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_html
-    assert (
-        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#F7F3EA","colorfunc":function(atom){return"#F7F3EA";}}'
-    ) in unescaped_html
-    assert "#C58A00" not in html
-    assert "#D6604D" not in html
-    assert '"stick":{"radius":0.18}' not in unescaped_html
+    assert _DNA_RESIDUE_SELECTION in unescaped_html
+    assert _RNA_RESIDUE_SELECTION in unescaped_html
+    assert unescaped_html.count("addCustom(") == 2
+    assert "addCurve(" not in unescaped_html
+    assert unescaped_html.count("addCylinder(") == 6
+    assert '"faceArr":' in unescaped_html
+    assert '"vertexArr":' in unescaped_html
+    assert '"color":"#B97700","opacity":1.0' in unescaped_html
+    assert '"color":"#C84C5A","opacity":1.0' in unescaped_html
+    assert '"radius":0.12,"fromCap":1,"toCap":1,"color":"#B97700"' in unescaped_html
+    assert '"radius":0.12,"fromCap":1,"toCap":1,"color":"#C84C5A"' in unescaped_html
+    assert '"representation":"backbone_ribbon_with_base_spokes"' in unescaped_html
+    assert '"nucleotide_count":3' in unescaped_html
+    assert '"base_spoke_count":3' in unescaped_html
+    assert '"ribbon_mesh_count":1' in unescaped_html
+    assert '"ribbon_vertex_count":12' in unescaped_html
+    assert '"ribbon_triangle_count":20' in unescaped_html
+    assert '"ribbon_width_angstrom":1.35' in unescaped_html
+    assert '"ribbon_thickness_angstrom":0.28' in unescaped_html
+    assert '"stick":{"color":"#B97700"' not in unescaped_html
+    assert '"stick":{"color":"#C84C5A"' not in unescaped_html
+
+
+def test_py3dmol_backend_rejects_nucleotide_geometry_without_c4_prime_anchors() -> None:
+    incomplete_structure = _PROTEIN_AND_NUCLEIC_PDB.replace(" C4' ", " C5' ")
+
+    with pytest.raises(ValueError, match="lacks C4-prime backbone anchor"):
+        render_structure_view_html(
+            StructureViewSpec(
+                title="Incomplete nucleic geometry",
+                models=(StructureViewModel("reference", incomplete_structure, label="Reference"),),
+            )
+        )
 
 
 def test_py3dmol_backend_can_hide_nucleic_acid_classes() -> None:
@@ -227,18 +271,19 @@ def test_py3dmol_backend_can_hide_nucleic_acid_classes() -> None:
     unescaped_html = unescaped_payload.replace(" ", "")
     assert "HETATM    6  P    DA B   1" not in unescaped_payload
     assert "HETATM    8  N1   DA B   1" not in unescaped_payload
-    assert "HETATM    9  P     U C   2" in unescaped_payload
-    assert "HETATM   11  N1    U C   2" in unescaped_payload
+    assert "HETATM   15  P     U C   2" in unescaped_payload
+    assert "HETATM   17  N1    U C   2" in unescaped_payload
     assert '"resn":["DA","DC","DG","DT"]' not in unescaped_html
     assert '"resn":["A","C","G","I","U"]' in unescaped_html
     assert "#E69F00" not in html
     assert "DNA" not in html
     assert '"cartoon":{"color":"#E69F00"}' not in unescaped_html
     assert '"stick":{"color":"#E69F00","radius":0.18}' not in unescaped_html
-    assert (
-        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#009E73","colorfunc":function(atom){return"#009E73";}}'
-    ) in unescaped_html
-    assert '"stick":{"color":"#009E73","radius":0.18}' not in unescaped_html
+    assert unescaped_html.count("addCustom(") == 1
+    assert "addCurve(" not in unescaped_html
+    assert unescaped_html.count("addCylinder(") == 3
+    assert '"color":"#009E73","opacity":1.0' in unescaped_html
+    assert '"radius":0.12,"fromCap":1,"toCap":1,"color":"#009E73"' in unescaped_html
 
     hidden_all_html = render_structure_view_html(
         StructureViewSpec(
@@ -255,9 +300,12 @@ def test_py3dmol_backend_can_hide_nucleic_acid_classes() -> None:
     hidden_all_payload = html_lib.unescape(hidden_all_html)
     hidden_all_unescaped = hidden_all_payload.replace(" ", "")
     assert "HETATM    6  P    DA B   1" not in hidden_all_payload
-    assert "HETATM    9  P     U C   2" not in hidden_all_payload
+    assert "HETATM   15  P     U C   2" not in hidden_all_payload
     assert '"resn":["DA","DC","DG","DT"]' not in hidden_all_unescaped
     assert '"resn":["A","C","G","I","U"]' not in hidden_all_unescaped
+    assert "addCustom(" not in hidden_all_unescaped
+    assert "addCurve(" not in hidden_all_unescaped
+    assert "addCylinder(" not in hidden_all_unescaped
     assert "#E69F00" not in hidden_all_html
     assert "#009E73" not in hidden_all_html
 
@@ -283,18 +331,127 @@ def test_py3dmol_backend_can_color_molecule_classes_independently() -> None:
     assert '"resn":["A","C","G","I","U"]' in unescaped_html
     assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_html
     assert '"resn":["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","ILE",' in unescaped_html
-    assert (
-        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#E69F00","colorfunc":function(atom){return"#E69F00";}}'
-    ) in unescaped_html
-    assert '"stick":{"color":"#E69F00","radius":0.18}' not in unescaped_html
-    assert '"atom":["N1"]' not in unescaped_html
-    assert (
-        '"cartoon":{"style":"rectangle","ribbon":true,"color":"#009E73","colorfunc":function(atom){return"#009E73";}}'
-    ) in unescaped_html
-    assert '"stick":{"color":"#009E73","radius":0.18}' not in unescaped_html
+    assert unescaped_html.count("addCustom(") == 2
+    assert "addCurve(" not in unescaped_html
+    assert unescaped_html.count("addCylinder(") == 6
+    assert '"color":"#E69F00","opacity":1.0' in unescaped_html
+    assert '"color":"#009E73","opacity":1.0' in unescaped_html
 
 
-def test_py3dmol_backend_colors_nucleic_acid_selection_backbone_and_bases_together() -> None:
+def test_py3dmol_backend_honors_explicit_nucleic_acid_stick_style() -> None:
+    rendered = render_structure_view_html(
+        StructureViewSpec(
+            title="Nucleic-acid sticks",
+            models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+            molecule_styles=(
+                StructureViewMoleculeStyle(
+                    "dna",
+                    "reference",
+                    label="DNA",
+                    color="#B97700",
+                    style="stick",
+                    radius=0.24,
+                ),
+                StructureViewMoleculeStyle(
+                    "rna",
+                    "reference",
+                    label="RNA",
+                    color="#C84C5A",
+                    style="stick",
+                    radius=0.24,
+                ),
+            ),
+        )
+    )
+
+    unescaped = html_lib.unescape(rendered).replace(" ", "")
+    assert '"stick":{"color":"#B97700","radius":0.24}' in unescaped
+    assert '"stick":{"color":"#C84C5A","radius":0.24}' in unescaped
+    assert "addCustom(" not in unescaped
+    assert "addCurve(" not in unescaped
+    assert '"style":"trace"' not in unescaped
+
+
+def test_py3dmol_backend_accepts_explicit_nucleic_ribbon_with_base_spokes_style() -> None:
+    rendered = render_structure_view_html(
+        StructureViewSpec(
+            title="Nucleic-acid traces and spokes",
+            models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+            molecule_styles=(
+                StructureViewMoleculeStyle(
+                    "dna",
+                    "reference",
+                    label="DNA",
+                    color="#B97700",
+                    style="backbone_ribbon_with_base_spokes",
+                    width=1.5,
+                    thickness=0.3,
+                ),
+                StructureViewMoleculeStyle(
+                    "rna",
+                    "reference",
+                    label="RNA",
+                    color="#C84C5A",
+                    style="backbone_ribbon_with_base_spokes",
+                    width=1.5,
+                    thickness=0.3,
+                ),
+            ),
+        )
+    )
+
+    unescaped = html_lib.unescape(rendered).replace(" ", "")
+    assert unescaped.count("addCustom(") == 2
+    assert "addCurve(" not in unescaped
+    assert unescaped.count("addCylinder(") == 6
+    assert '"color":"#B97700","opacity":1.0' in unescaped
+    assert '"color":"#C84C5A","opacity":1.0' in unescaped
+    assert '"radius":0.12,"fromCap":1,"toCap":1,"color":"#B97700"' in unescaped
+    assert '"radius":0.12,"fromCap":1,"toCap":1,"color":"#C84C5A"' in unescaped
+    assert '"ribbon_width_angstrom":1.5' in unescaped
+    assert '"ribbon_thickness_angstrom":0.3' in unescaped
+
+
+def test_py3dmol_backend_rejects_removed_nucleic_ribbon_style() -> None:
+    with pytest.raises(ValueError, match="Unsupported molecule render style"):
+        render_structure_view_html(
+            StructureViewSpec(
+                title="Removed nucleic style",
+                models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+                molecule_styles=(
+                    StructureViewMoleculeStyle(
+                        "dna",
+                        "reference",
+                        label="DNA",
+                        color="#B97700",
+                        style="backbone_ribbon_with_base_sticks",  # type: ignore[arg-type]
+                    ),
+                ),
+            )
+        )
+
+
+@pytest.mark.parametrize("style", ["cartoon", "surface"])
+def test_py3dmol_backend_rejects_nucleic_styles_that_create_slabs_or_occlusion(style: str) -> None:
+    with pytest.raises(ValueError, match="DNA and RNA styles"):
+        render_structure_view_html(
+            StructureViewSpec(
+                title="Invalid nucleic style",
+                models=(StructureViewModel("reference", _PROTEIN_AND_NUCLEIC_PDB, label="Reference"),),
+                molecule_styles=(
+                    StructureViewMoleculeStyle(
+                        "dna",
+                        "reference",
+                        label="DNA",
+                        color="#B97700",
+                        style=style,
+                    ),
+                ),
+            )
+        )
+
+
+def test_py3dmol_backend_colors_selected_nucleic_acid_spokes_without_atom_sticks() -> None:
     dna_html = render_structure_view_html(
         StructureViewSpec(
             title="DNA-scoped selection",
@@ -316,9 +473,8 @@ def test_py3dmol_backend_colors_nucleic_acid_selection_backbone_and_bases_togeth
     assert "DNA residue 1" in dna_html
     assert '"resi":[1],"resn":["DA","DC","DG","DT"]' in unescaped_dna
     assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_dna
-    assert '"cartoon":{"style":"rectangle","ribbon":true,"color":"#D55E00"' in unescaped_dna
-    assert '"colorfunc":function(atom){return"#D55E00";}' in unescaped_dna
-    assert '"stick":{"color":"#D55E00","radius":0.18}' not in unescaped_dna
+    assert '"radius":0.15,"fromCap":1,"toCap":1,"color":"#D55E00"' in unescaped_dna
+    assert '"stick":{"color":"#D55E00"' not in unescaped_dna
 
     rna_html = render_structure_view_html(
         StructureViewSpec(
@@ -341,9 +497,8 @@ def test_py3dmol_backend_colors_nucleic_acid_selection_backbone_and_bases_togeth
     assert "RNA residue 2" in rna_html
     assert '"resi":[2],"resn":["A","C","G","I","U"]' in unescaped_rna
     assert '"atom":["O1P","O2P","OP1","OP2","P"]' not in unescaped_rna
-    assert '"cartoon":{"style":"rectangle","ribbon":true,"color":"#D55E00"' in unescaped_rna
-    assert '"colorfunc":function(atom){return"#D55E00";}' in unescaped_rna
-    assert '"stick":{"color":"#D55E00","radius":0.18}' not in unescaped_rna
+    assert '"radius":0.15,"fromCap":1,"toCap":1,"color":"#D55E00"' in unescaped_rna
+    assert '"stick":{"color":"#D55E00"' not in unescaped_rna
 
 
 def test_py3dmol_backend_colors_visible_protein_sidechains_with_molecule_class() -> None:
@@ -391,8 +546,10 @@ def test_py3dmol_backend_applies_selection_after_visible_sidechain_styles() -> N
                     label="Active-site residues",
                     residue_numbers=(1,),
                     color="#D55E00",
+                    show_sidechains=True,
                 ),
             ),
+            hidden_molecule_classes=("dna", "rna"),
         )
     )
 
@@ -404,7 +561,7 @@ def test_py3dmol_backend_applies_selection_after_visible_sidechain_styles() -> N
     assert unescaped_html.index(base_sticks) < unescaped_html.index(highlighted_sticks)
 
 
-def test_py3dmol_backend_shows_selected_protein_sidechains_without_global_sidechains() -> None:
+def test_py3dmol_backend_hides_selected_protein_sidechains_when_sidechains_are_disabled() -> None:
     html = render_structure_view_html(
         StructureViewSpec(
             title="Selected side-chain-only emphasis",
@@ -418,12 +575,13 @@ def test_py3dmol_backend_shows_selected_protein_sidechains_without_global_sidech
                     color="#C00000",
                 ),
             ),
+            hidden_molecule_classes=("dna", "rna"),
         )
     )
 
     unescaped_html = html_lib.unescape(html).replace(" ", "")
     assert '"stick":{"color":"#F7F3EA","radius":0.16}' not in unescaped_html
-    assert '"stick":{"color":"#C00000","radius":0.22}' in unescaped_html
+    assert '"stick":{"color":"#C00000","radius":0.22}' not in unescaped_html
 
 
 def test_py3dmol_backend_can_emit_explicit_molecule_surface_style() -> None:
@@ -449,6 +607,40 @@ def test_py3dmol_backend_can_emit_explicit_molecule_surface_style() -> None:
     assert '"resn":["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","ILE",' in unescaped_html
 
 
+def test_py3dmol_backend_keeps_surface_highlight_at_the_declared_surface_alpha() -> None:
+    html = render_structure_view_html(
+        StructureViewSpec(
+            title="Protein surface selection",
+            models=(StructureViewModel("reference", _SIDECHAIN_PDB, label="Reference"),),
+            molecule_styles=(
+                StructureViewMoleculeStyle(
+                    "protein",
+                    "reference",
+                    label="Protein surface",
+                    color="#F7F3EA",
+                    opacity=0.78,
+                    style="surface",
+                ),
+            ),
+            selection_styles=(
+                StructureViewSelectionStyle(
+                    selection_id="contact_site",
+                    model_id="reference",
+                    label="Contact site",
+                    residue_numbers=(1,),
+                    color="#C00000",
+                    show_sidechains=True,
+                ),
+            ),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(html).replace(" ", "")
+    assert 'addSurface("VDW",{"color":"#F7F3EA","opacity":0.78}' in unescaped_html
+    assert 'addSurface("VDW",{"color":"#C00000","opacity":0.78}' in unescaped_html
+    assert '"stick":{"color":"#C00000","radius":0.22}' in unescaped_html
+
+
 def test_py3dmol_backend_maps_mmcif_contract_to_3dmol_cif_loader() -> None:
     html = render_structure_view_html(
         StructureViewSpec(
@@ -463,6 +655,7 @@ def test_py3dmol_backend_maps_mmcif_contract_to_3dmol_cif_loader() -> None:
                     show_sidechains=True,
                 ),
             ),
+            hidden_molecule_classes=("dna", "rna"),
         )
     )
 
@@ -489,6 +682,29 @@ def test_structure_atom_content_summary_detects_sidechain_atoms() -> None:
     assert sidechain_content.scope_label == "sidechain_atoms_present"
 
 
+def test_structure_molecule_class_summary_detects_protein_dna_and_rna() -> None:
+    assert molecule_classes_in_structure_text(
+        _PROTEIN_AND_NUCLEIC_PDB,
+        structure_format="pdb",
+    ) == frozenset({"protein", "dna", "rna"})
+
+
+def test_structure_text_filter_keeps_only_requested_molecule_roles() -> None:
+    nucleic_text = filter_structure_text_by_molecule_classes(
+        _PROTEIN_AND_NUCLEIC_PDB,
+        structure_format="pdb",
+        visible_molecule_classes=("dna", "rna"),
+    )
+
+    assert " ALA A " not in nucleic_text
+    assert " DA B " in nucleic_text
+    assert " U C " in nucleic_text
+    assert molecule_classes_in_structure_text(
+        nucleic_text,
+        structure_format="pdb",
+    ) == frozenset({"dna", "rna"})
+
+
 def test_structure_atom_content_summary_detects_mmcif_protein_sidechains_only() -> None:
     content = summarize_structure_atom_content(_SIDECHAIN_MMCIF, structure_format="mmcif")
 
@@ -510,6 +726,17 @@ def test_structure_view_contract_rejects_unsupported_backend() -> None:
 def test_structure_view_contract_rejects_empty_structure() -> None:
     with pytest.raises(ValueError, match="structure_text is required"):
         StructureViewSpec(title="x", models=(StructureViewModel("m", ""),)).validate()
+
+
+def test_structure_view_contract_rejects_duplicate_model_ids() -> None:
+    with pytest.raises(ValueError, match="model_id values must be unique"):
+        StructureViewSpec(
+            title="Duplicate model identifiers",
+            models=(
+                StructureViewModel("shared", _MINIMAL_PDB, label="Reference"),
+                StructureViewModel("shared", _SIDECHAIN_PDB, label="Query"),
+            ),
+        ).validate()
 
 
 def test_py3dmol_backend_renders_residue_selection_styles() -> None:
