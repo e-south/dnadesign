@@ -1,7 +1,7 @@
 ## OPAL Dev Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-12
+**Last verified:** 2026-07-13
 
 
 This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
@@ -24,7 +24,6 @@ Compatibility decision:
 
 Validation:
 - Objective and configuration regression tests cover the sole-method contract, clipping, exact-setpoint cusp, and local Monte Carlo agreement.
-- The canonical SFXI reference documents the superseding uncertainty contract; the 2026-02-20 entry remains below as historical context.
 
 ### 2026-02-23 EI tie-break ordering by predicted score
 

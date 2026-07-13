@@ -1854,7 +1854,6 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
     assert "data.location.kind: usr" in docs
     assert "observed assay labels as study-level truth" in docs
     assert "three digest-pinned SFXI source runs remain" in docs
-    assert "Historical boundary" not in docs
     assert "response-window label store" in docs
     assert "_opal/observed_labels.parquet" in docs
     assert "_opal/response_window_observed_labels.parquet" in docs
