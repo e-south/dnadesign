@@ -1055,7 +1055,7 @@ def _write_relative_opal_campaign(config_path: Path, *, rounds: list[dict[str, o
 
 def _opal_state_payload(*, workdir: Path, rounds: list[dict[str, object]]) -> dict[str, object]:
     return {
-        "version": 2,
+        "version": 3,
         "campaign_slug": "demo_campaign",
         "campaign_name": "Demo campaign",
         "workdir": str(workdir),
@@ -1085,6 +1085,8 @@ def _opal_round_payload(round_payload: dict[str, object]) -> dict[str, object]:
         "number_of_candidates_scored_in_round": 0,
         "selection_top_k_requested": 0,
         "selection_top_k_effective_after_ties": 0,
+        "selection_views": {},
+        "selection_batch": {},
         "model": {},
         "metrics": {},
         "durations_sec": {},
@@ -2800,7 +2802,7 @@ def test_cli_progress_show_rejects_incompatible_opal_state_schema() -> None:
         assert payload["status_kind"] == "opal-campaign-state"
         assert payload["state"] == "attention"
         assert payload["summary"] == "OPAL state.json is not loadable"
-        assert "state.json version must be 2" in payload["evidence"]["state_load_error"]
+        assert "state.json version must be 3" in payload["evidence"]["state_load_error"]
 
 
 def test_cli_progress_show_resolves_opal_workdir_relative_to_campaign_root() -> None:
