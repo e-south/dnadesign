@@ -15,12 +15,15 @@ import argparse
 import datetime as dt
 import re
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import yaml
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
+from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
+from dnadesign.devtools.docs.metadata import LAST_VERIFIED_PATTERN, OWNER_PATTERN, SOR_MARKDOWN_FILES
 from dnadesign.ops.catalog import (
     CatalogProcedureEntry,
     load_runbook_catalog,
@@ -80,14 +83,6 @@ ROOT_MARKDOWN_FILES = (
     "PLANS.md",
     "QUALITY_SCORE.md",
 )
-SOR_MARKDOWN_FILES = (
-    "ARCHITECTURE.md",
-    "DESIGN.md",
-    "SECURITY.md",
-    "RELIABILITY.md",
-    "PLANS.md",
-    "QUALITY_SCORE.md",
-)
 INDEX_MARKDOWN_FILES = (
     "docs/README.md",
     "docs/setup/README.md",
@@ -117,8 +112,6 @@ RUNBOOK_MARKDOWN_FILES = (
     "docs/bu-scc/runbooks/batch-notify.md",
     "docs/notify/usr-events.md",
 )
-OWNER_PATTERN = re.compile(r"^\*\*Owner:\*\*\s*(.+?)\s*$", re.MULTILINE)
-LAST_VERIFIED_PATTERN = re.compile(r"^\*\*Last verified:\*\*\s*(.+?)\s*$", re.MULTILINE)
 TYPE_PATTERN = re.compile(r"^\*\*Type:\*\*\s*(.+?)\s*$", re.MULTILINE)
 PLANE_PATTERN = re.compile(r"^\*\*Plane:\*\*\s*(.+?)\s*$", re.MULTILINE)
 OWNER_BOUNDARY_PATTERN = re.compile(r"^\*\*Owner-boundary:\*\*\s*(.+?)\s*$", re.MULTILINE)
@@ -1096,8 +1089,13 @@ def _parse_iso_date(value: str, *, field_name: str, path: Path) -> dt.date:
         raise ValueError(f"{path}: {field_name} must use YYYY-MM-DD.") from exc
 
 
-def _find_sor_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_sor_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     today = dt.date.today()
+    changed_dates = changed_doc_dates or {}
     issues: list[str] = []
 
     for name in SOR_MARKDOWN_FILES:
@@ -1139,34 +1137,52 @@ def _find_sor_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str
             issues.append(f"{path}: Last verified date cannot be in the future ({last_verified.isoformat()}).")
             continue
 
-        age_days = (today - last_verified).days
-        if age_days > max_age_days:
-            issues.append(f"{path}: Last verified date is stale by {age_days} days (max allowed {max_age_days}).")
+        change_issue = verification_change_issue(
+            repo_root=repo_root,
+            path=path,
+            last_verified=last_verified,
+            changed_doc_dates=changed_dates,
+        )
+        if change_issue is not None:
+            issues.append(change_issue)
 
     return issues
 
 
-def _find_index_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_index_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     return _find_owner_last_verified_metadata_issues(
         repo_root,
         relative_paths=INDEX_MARKDOWN_FILES,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
-def _find_runbook_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_runbook_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     return _find_owner_last_verified_metadata_issues(
         repo_root,
         relative_paths=RUNBOOK_MARKDOWN_FILES,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
-def _find_tool_docs_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_tool_docs_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     tool_docs = _collect_tool_docs_markdown_files(repo_root)
     return _find_owner_last_verified_metadata_issues_for_files(
+        repo_root=repo_root,
         paths=tool_docs,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
@@ -1174,21 +1190,24 @@ def _find_owner_last_verified_metadata_issues(
     repo_root: Path,
     *,
     relative_paths: tuple[str, ...],
-    max_age_days: int,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
 ) -> list[str]:
     files = [repo_root / relative_path for relative_path in relative_paths]
     return _find_owner_last_verified_metadata_issues_for_files(
+        repo_root=repo_root,
         paths=files,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
 def _find_owner_last_verified_metadata_issues_for_files(
     *,
+    repo_root: Path,
     paths: list[Path],
-    max_age_days: int,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
 ) -> list[str]:
     today = dt.date.today()
+    changed_dates = changed_doc_dates or {}
     issues: list[str] = []
 
     for path in paths:
@@ -1226,9 +1245,14 @@ def _find_owner_last_verified_metadata_issues_for_files(
             issues.append(f"{path}: Last verified date cannot be in the future ({last_verified.isoformat()}).")
             continue
 
-        age_days = (today - last_verified).days
-        if age_days > max_age_days:
-            issues.append(f"{path}: Last verified date is stale by {age_days} days (max allowed {max_age_days}).")
+        change_issue = verification_change_issue(
+            repo_root=repo_root,
+            path=path,
+            last_verified=last_verified,
+            changed_doc_dates=changed_dates,
+        )
+        if change_issue is not None:
+            issues.append(change_issue)
 
     return issues
 
@@ -2605,10 +2629,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument(
-        "--max-sor-age-days",
-        type=int,
-        default=90,
-        help="Maximum allowed age in days for root system-of-record Last verified dates.",
+        "--changed-files-file",
+        type=Path,
+        default=None,
+        help=(
+            "Optional newline-delimited repository-relative change list. Verification dates must cover changes to "
+            "enforced docs; local dirty Markdown files are detected automatically."
+        ),
     )
     return parser
 
@@ -2619,7 +2646,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         docs_md_files, all_md_files = _collect_markdown_files(repo_root)
-    except FileNotFoundError as exc:
+        changed_doc_dates = collect_changed_doc_dates(
+            repo_root,
+            changed_files_file=args.changed_files_file,
+        )
+    except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1
 
@@ -2630,28 +2661,28 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {path}")
         return 1
 
-    sor_metadata_issues = _find_sor_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    sor_metadata_issues = _find_sor_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if sor_metadata_issues:
         print("Root system-of-record metadata check failed:")
         for issue in sor_metadata_issues:
             print(f" - {issue}")
         return 1
 
-    index_metadata_issues = _find_index_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    index_metadata_issues = _find_index_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if index_metadata_issues:
         print("Docs index metadata check failed:")
         for issue in index_metadata_issues:
             print(f" - {issue}")
         return 1
 
-    runbook_metadata_issues = _find_runbook_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    runbook_metadata_issues = _find_runbook_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if runbook_metadata_issues:
         print("Docs runbook metadata check failed:")
         for issue in runbook_metadata_issues:
             print(f" - {issue}")
         return 1
 
-    tool_docs_metadata_issues = _find_tool_docs_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    tool_docs_metadata_issues = _find_tool_docs_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if tool_docs_metadata_issues:
         print("Tool docs metadata check failed:")
         for issue in tool_docs_metadata_issues:

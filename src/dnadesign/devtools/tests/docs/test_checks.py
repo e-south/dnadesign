@@ -69,6 +69,12 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _write_changed_files(repo_root: Path, *relative_paths: str) -> Path:
+    path = repo_root / "changed-files.txt"
+    path.write_text("".join(f"{relative_path}\n" for relative_path in relative_paths), encoding="utf-8")
+    return path
+
+
 def _write_required_study_record_files(study_root: Path) -> None:
     for required_name in (
         "record/campaign.yaml",
@@ -1343,14 +1349,15 @@ def test_main_fails_when_root_sor_doc_missing_type_metadata(tmp_path: Path) -> N
     assert rc == 1
 
 
-def test_main_fails_when_root_sor_doc_last_verified_is_stale(tmp_path: Path) -> None:
+def test_main_fails_when_root_sor_verification_predates_document_change(tmp_path: Path) -> None:
     _write(tmp_path / "docs" / "index.md", "## Index\n")
     _write(
         tmp_path / "ARCHITECTURE.md",
         "# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** 2020-01-01\n",
     )
 
-    rc = main(["--repo-root", str(tmp_path), "--max-sor-age-days", "30"])
+    changed_files = _write_changed_files(tmp_path, "ARCHITECTURE.md")
+    rc = main(["--repo-root", str(tmp_path), "--changed-files-file", str(changed_files)])
     assert rc == 1
 
 
@@ -1397,7 +1404,7 @@ def test_main_fails_when_start_here_doc_is_present(tmp_path: Path) -> None:
     assert rc == 1
 
 
-def test_main_fails_when_docs_index_last_verified_is_stale(tmp_path: Path) -> None:
+def test_main_fails_when_docs_index_verification_predates_document_change(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(
         tmp_path / "docs" / "README.md",
@@ -1408,7 +1415,8 @@ def test_main_fails_when_docs_index_last_verified_is_stale(tmp_path: Path) -> No
         f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
     )
 
-    rc = main(["--repo-root", str(tmp_path), "--max-sor-age-days", "30"])
+    changed_files = _write_changed_files(tmp_path, "docs/README.md")
+    rc = main(["--repo-root", str(tmp_path), "--changed-files-file", str(changed_files)])
     assert rc == 1
 
 
@@ -1427,7 +1435,7 @@ def test_main_fails_when_selected_runbook_missing_required_metadata(tmp_path: Pa
     assert rc == 1
 
 
-def test_main_fails_when_selected_runbook_last_verified_is_stale(tmp_path: Path) -> None:
+def test_main_fails_when_selected_runbook_verification_predates_document_change(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(
         tmp_path / "docs" / "setup" / "installation.md",
@@ -1438,7 +1446,8 @@ def test_main_fails_when_selected_runbook_last_verified_is_stale(tmp_path: Path)
         f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
     )
 
-    rc = main(["--repo-root", str(tmp_path), "--max-sor-age-days", "30"])
+    changed_files = _write_changed_files(tmp_path, "docs/setup/installation.md")
+    rc = main(["--repo-root", str(tmp_path), "--changed-files-file", str(changed_files)])
     assert rc == 1
 
 
@@ -2870,7 +2879,7 @@ def test_tool_docs_metadata_check_flags_missing_owner_and_last_verified(tmp_path
     _write(tmp_path / "src" / "dnadesign" / "alpha" / "__init__.py", "")
     _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "## Alpha docs\n")
 
-    issues = _find_tool_docs_metadata_issues(tmp_path, max_age_days=90)
+    issues = _find_tool_docs_metadata_issues(tmp_path)
 
     assert any("missing '**Owner:**' metadata field." in issue for issue in issues)
     assert any("missing '**Last verified:**' metadata field." in issue for issue in issues)
@@ -2884,9 +2893,36 @@ def test_tool_docs_metadata_check_accepts_valid_owner_and_last_verified(tmp_path
         f"## Alpha docs\n\n**Owner:** maintainers\n**Last verified:** {today}\n",
     )
 
-    issues = _find_tool_docs_metadata_issues(tmp_path, max_age_days=90)
+    issues = _find_tool_docs_metadata_issues(tmp_path)
 
     assert issues == []
+
+
+def test_tool_docs_metadata_check_does_not_expire_unchanged_docs(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md",
+        "## Alpha docs\n\n**Owner:** maintainers\n**Last verified:** 2020-01-01\n",
+    )
+
+    assert _find_tool_docs_metadata_issues(tmp_path) == []
+
+
+def test_tool_docs_metadata_check_flags_verification_before_change(tmp_path: Path) -> None:
+    relative_path = "src/dnadesign/alpha/docs/README.md"
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "__init__.py", "")
+    _write(
+        tmp_path / relative_path,
+        "## Alpha docs\n\n**Owner:** maintainers\n**Last verified:** 2020-01-01\n",
+    )
+
+    issues = _find_tool_docs_metadata_issues(
+        tmp_path,
+        changed_doc_dates={relative_path: dt.date(2026, 7, 12)},
+    )
+
+    assert len(issues) == 1
+    assert "predates this document's 2026-07-12 change" in issues[0]
 
 
 def test_cross_tool_doc_metadata_check_flags_missing_semantic_fields(tmp_path: Path) -> None:
