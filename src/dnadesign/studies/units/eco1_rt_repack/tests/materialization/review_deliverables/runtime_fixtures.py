@@ -14,6 +14,49 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+STRUCTURE_DISPLAY_STATES = (
+    {
+        "show_reference_background": True,
+        "show_mutation_differences": False,
+        "show_sidechains": True,
+        "show_protein_surface": False,
+        "show_dna": True,
+        "show_rna": True,
+    },
+    {
+        "show_reference_background": False,
+        "show_mutation_differences": True,
+        "show_sidechains": False,
+        "show_protein_surface": False,
+        "show_dna": True,
+        "show_rna": True,
+    },
+    {
+        "show_reference_background": True,
+        "show_mutation_differences": False,
+        "show_sidechains": True,
+        "show_protein_surface": True,
+        "show_dna": True,
+        "show_rna": True,
+    },
+    {
+        "show_reference_background": True,
+        "show_mutation_differences": False,
+        "show_sidechains": True,
+        "show_protein_surface": False,
+        "show_dna": False,
+        "show_rna": True,
+    },
+    {
+        "show_reference_background": True,
+        "show_mutation_differences": False,
+        "show_sidechains": True,
+        "show_protein_surface": False,
+        "show_dna": True,
+        "show_rna": False,
+    },
+)
+
 
 def mask_row(
     position: int,

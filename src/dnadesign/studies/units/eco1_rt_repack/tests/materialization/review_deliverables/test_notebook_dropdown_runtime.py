@@ -25,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliver
     write_deliverable_inputs,
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.runtime_fixtures import (
+    STRUCTURE_DISPLAY_STATES,
     FakeMo,
 )
 
@@ -78,7 +79,7 @@ def test_every_notebook_dropdown_choice_renders_without_a_dead_end(tmp_path: Pat
                             show_rna=True,
                         )
                         _assert_no_render_dead_end(rendered, deliverable_id=deliverable_id)
-                    for display_state in _STRUCTURE_DISPLAY_STATES:
+                    for display_state in STRUCTURE_DISPLAY_STATES:
                         rendered = notebook_structure_browser.render_structure_browser(
                             mo=FakeMo(),
                             selected_row=selected_row,
@@ -130,50 +131,6 @@ def _assert_no_render_dead_end(rendered: object, *, deliverable_id: str) -> None
         "is missing",
     )
     assert not any(message in rendered_text for message in dead_end_messages), deliverable_id
-
-
-_STRUCTURE_DISPLAY_STATES = (
-    {
-        "show_reference_background": True,
-        "show_mutation_differences": False,
-        "show_sidechains": True,
-        "show_protein_surface": False,
-        "show_dna": True,
-        "show_rna": True,
-    },
-    {
-        "show_reference_background": False,
-        "show_mutation_differences": True,
-        "show_sidechains": False,
-        "show_protein_surface": False,
-        "show_dna": True,
-        "show_rna": True,
-    },
-    {
-        "show_reference_background": True,
-        "show_mutation_differences": False,
-        "show_sidechains": True,
-        "show_protein_surface": True,
-        "show_dna": True,
-        "show_rna": True,
-    },
-    {
-        "show_reference_background": True,
-        "show_mutation_differences": False,
-        "show_sidechains": True,
-        "show_protein_surface": False,
-        "show_dna": False,
-        "show_rna": True,
-    },
-    {
-        "show_reference_background": True,
-        "show_mutation_differences": False,
-        "show_sidechains": True,
-        "show_protein_surface": False,
-        "show_dna": True,
-        "show_rna": False,
-    },
-)
 
 
 def test_missing_file_rows_are_not_dropdown_options(tmp_path: Path) -> None:
