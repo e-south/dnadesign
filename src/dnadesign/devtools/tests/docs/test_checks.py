@@ -1047,7 +1047,10 @@ def test_tool_readme_structure_check_rejects_overlong_tool_readmes(tmp_path: Pat
     assert any("top-level tool README has" in issue for issue in issues)
 
 
-def test_tool_readme_structure_check_requires_docs_index_first_when_present(tmp_path: Path) -> None:
+def test_tool_readme_structure_check_requires_docs_index_first_when_present(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
         "\n".join(
@@ -1070,7 +1073,8 @@ def test_tool_readme_structure_check_requires_docs_index_first_when_present(tmp_
     )
     _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "## Alpha docs\n")
 
-    issues = _find_tool_readme_structure_issues(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    issues = _find_tool_readme_structure_issues(Path("."))
 
     assert any("first local markdown link must point to the tool docs index" in issue for issue in issues)
 

@@ -2233,7 +2233,7 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
 
         first_target = (readme_path.parent / first_local_markdown_link).resolve()
         if first_target != docs_index:
-            expected_rel = docs_index.relative_to(readme_path.parent).as_posix()
+            expected_rel = docs_index.relative_to(readme_path.parent.resolve()).as_posix()
             issues.append(
                 f"{readme_path}: first local markdown link must point to the tool docs index "
                 f"'{expected_rel}', not '{first_local_markdown_link}'."

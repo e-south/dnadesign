@@ -1,9 +1,20 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-07-12
 
 Use this index to find maintainer workflows, checks, and planning records.
+
+### Documentation verification
+
+`Last verified` records the most recent substantive review. It does not expire
+after a fixed number of days. The docs gate fails when required metadata is
+missing or invalid, a date is in the future, or a changed document has a
+verification date older than that change. Local dirty Markdown files are
+detected automatically; CI supplies `.ci_changed_files.txt` so committed PR
+changes use their Git change dates. Scheduled review-age findings are advisory.
+
+Do not bump verification dates without reviewing the affected content.
 
 ### Start here
 
