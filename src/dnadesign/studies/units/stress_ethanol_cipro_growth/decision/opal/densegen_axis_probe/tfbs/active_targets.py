@@ -91,7 +91,7 @@ def tfbs_learnability_active_target_spec(label_name: str) -> TfbsExpectedScalarT
                 },
             },
         ),
-        score_ref=f"vector_channel_v1/{label}",
+        score_ref=label,
         objective_mode="maximize",
         score_label=score_label,
         score_title_label=score_label,

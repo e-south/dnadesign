@@ -49,6 +49,14 @@ Keep ownership boundaries clear.
   `opal_batch0/provenance.py`, which joins DenseGen sidecars, anchor records,
   Construct views, Infer aliases, LatentDNA rows, and OPAL records by stable
   `id`.
+- SFXI metric review is study-owned under `decision/opal/response_metastudy/`.
+  OPAL owns canonical SFXI math; the metastudy owns stress setpoints, policy
+  comparisons, model validation, and generated review evidence. Do not
+  reconstruct its verdict from loose plot files.
+- The successor-metric decision record is
+  `contexts/opal/response-magnitude-feasibility.md`. OPAL owns the generic
+  objective; Reader owns event-relative assay reduction; the study owns masks,
+  calibration evidence, and activation posture.
 
 ## Study-Owned Source Routing
 

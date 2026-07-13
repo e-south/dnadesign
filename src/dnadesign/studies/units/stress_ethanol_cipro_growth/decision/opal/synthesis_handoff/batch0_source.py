@@ -23,16 +23,16 @@ from ..batch0.select import (
     validate_configured_candidate_feature_table,
     validate_selected_ids_against_candidate_feature_table,
 )
-from .campaigns import STRESS_OPAL_CAMPAIGN_ALIAS_CODES
+from .campaigns import SFXI_SOURCE_CAMPAIGN_SELECTION_VIEWS, sfxi_source_selection_view_id
 from .campaigns import batch0_synthesis_name as _campaign_batch0_synthesis_name
-from .contracts import SelectedCandidate
+from .contracts import SelectedCandidate, SelectionMembership
 
 DEFAULT_BATCH0_BATCH_ID = "stress-opal-batch0-sfxi-v1"
 DEFAULT_BATCH0_RUN_ID = "batch0_pre_assay_review"
 DEFAULT_BATCH0_SELECTION_SOURCE = "batch0_pre_assay"
 DEFAULT_BATCH0_SELECTION_CONFIG = Path(__file__).resolve().parents[1] / "batch0" / "sampling.yaml"
 
-BATCH0_CAMPAIGN_ALIAS_CODES = STRESS_OPAL_CAMPAIGN_ALIAS_CODES
+BATCH0_CAMPAIGN_SELECTION_VIEWS = SFXI_SOURCE_CAMPAIGN_SELECTION_VIEWS
 
 
 def _repo_root_from(path: Path) -> Path:
@@ -48,7 +48,7 @@ def batch0_synthesis_name(campaign_slug: str, selection_rank: int) -> str:
     try:
         return _campaign_batch0_synthesis_name(campaign_slug, selection_rank)
     except ValueError as exc:
-        if "unknown stress OPAL campaign slug" in str(exc):
+        if "unknown SFXI source campaign slug" in str(exc):
             raise ValueError(f"unknown batch-0 campaign slug for synthesis alias: {campaign_slug}") from None
         raise
 
@@ -72,9 +72,19 @@ def selected_candidates_from_batch0_review(
         campaign_slug = str(row["campaign"])
         rank = ranks_by_campaign.get(campaign_slug, 0) + 1
         ranks_by_campaign[campaign_slug] = rank
+        try:
+            selection_view_id = sfxi_source_selection_view_id(campaign_slug)
+        except ValueError as exc:
+            raise ValueError(f"unknown batch-0 campaign slug for synthesis alias: {campaign_slug}") from exc
         selected.append(
             SelectedCandidate(
                 campaign_slug=campaign_slug,
+                selection_memberships=(
+                    SelectionMembership(
+                        selection_view_id=selection_view_id,
+                        rank=rank,
+                    ),
+                ),
                 as_of_round=as_of_round,
                 run_id=run_id,
                 selection_rank=rank,

@@ -15,20 +15,21 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.opal import read_campaign_predictions
+from dnadesign.opal import read_campaign_selection_view_predictions
 
 
 def read_probe_predictions(config_path: Path, *, round_selector: str | None = "latest") -> pd.DataFrame:
-    return read_campaign_predictions(
+    return read_campaign_selection_view_predictions(
         config_path,
+        selection_view_id="primary",
         columns=[
             "run_id",
             "as_of_round",
             "id",
             "pred__y_hat_model",
-            "pred__score_selected",
-            "sel__rank_competition",
-            "sel__is_selected",
+            "view__selection_score",
+            "view__rank_competition",
+            "view__is_selected",
         ],
         round_selector=round_selector,
         require_run_id=True,

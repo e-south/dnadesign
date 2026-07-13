@@ -71,7 +71,7 @@ def test_scratch_campaign_plot_config_declares_round_dogfood_primitives(tmp_path
     assert "highlight_round" not in plots_by_name["score_selected_over_rounds"]["params"]
     assert plots_by_name["score_vs_rank_over_rounds"]["round_selector"] == "all"
     assert plots_by_name["score_vs_rank_over_rounds"]["params"]["rank_mode"] == "competition"
-    assert plots_by_name["score_threshold_over_rounds"]["params"]["metric"] == "pred__score_selected"
+    assert plots_by_name["score_threshold_over_rounds"]["params"]["metric"] == "view__selection_score"
     assert plots_by_name["score_threshold_over_rounds"]["params"]["threshold_quantile"] == 0.9
     assert plots_by_name["score_threshold_over_rounds"]["params"]["mode"] == "line"
     assert "highlight_round" not in plots_by_name["score_threshold_over_rounds"]["params"]

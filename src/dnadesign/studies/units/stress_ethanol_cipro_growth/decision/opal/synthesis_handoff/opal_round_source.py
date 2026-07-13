@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/opal_round_source.py
 
-Measured OPAL round selected-candidate source for synthesis handoff.
+Measured OPAL selection-batch source for the study synthesis handoff.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,12 +17,12 @@ from typing import Any
 
 import pandas as pd
 
-from dnadesign.opal import load_config, load_selection_set
+from dnadesign.opal import load_config, load_selection_batch, load_selection_set
 
 from .campaigns import opal_round_synthesis_name
-from .contracts import SelectedCandidate
+from .contracts import SelectedCandidate, SelectionMembership
 
-OPAL_ROUND_SELECTION_SOURCE = "opal_ledger"
+OPAL_ROUND_SELECTION_SOURCE = "opal_selection_batch"
 
 
 def _study_value_error_from_opal(exc: RuntimeError) -> ValueError:
@@ -35,21 +35,17 @@ def _study_value_error_from_opal(exc: RuntimeError) -> ValueError:
 
 def _resolve_repo_path(repo_root: Path | None, value: str | Path) -> Path:
     path = Path(value)
-    if path.is_absolute():
-        return path
-    if repo_root is None:
+    if path.is_absolute() or repo_root is None:
         return path
     return repo_root / path
 
 
 def _records_path(config_path: Path) -> Path:
     cfg = load_config(config_path)
-    loc = cfg.data.location
-    loc_path = Path(str(getattr(loc, "path")))
-    dataset = getattr(loc, "dataset", None)
-    if dataset is not None:
-        return loc_path / str(dataset) / "records.parquet"
-    return loc_path
+    location = cfg.data.location
+    path = Path(str(getattr(location, "path")))
+    dataset = getattr(location, "dataset", None)
+    return path / str(dataset) / "records.parquet" if dataset is not None else path
 
 
 def _read_parquet(path: Path, *, columns: Sequence[str] | None = None) -> pd.DataFrame:
@@ -66,130 +62,167 @@ def _records_sequence_map(config_path: Path) -> dict[str, str]:
     records = records.copy()
     records["id"] = records["id"].astype(str).str.strip()
     if records["id"].duplicated().any():
-        dupes = sorted(records.loc[records["id"].duplicated(), "id"].unique().tolist())
-        raise ValueError(f"records table contains duplicate ids: {dupes[:10]}")
+        duplicates = sorted(records.loc[records["id"].duplicated(), "id"].unique().tolist())
+        raise ValueError(f"records table contains duplicate ids: {duplicates[:10]}")
     records["sequence"] = records["sequence"].astype(str).str.strip()
     return dict(zip(records["id"], records["sequence"], strict=True))
 
 
-def _validate_selected_sequences_against_records(
-    selected: pd.DataFrame,
+def _membership_from(value: Mapping[str, Any]) -> SelectionMembership:
+    return SelectionMembership.from_mapping(value)
+
+
+def _validate_batch_memberships(
+    batch_rows: list[dict[str, Any]],
     *,
-    records_by_id: Mapping[str, str],
-    campaign_slug: str,
+    selection_sets: Mapping[str, dict[str, Any]],
 ) -> None:
-    missing_ids = [
-        candidate_id for candidate_id in selected["id"].astype(str).tolist() if candidate_id not in records_by_id
-    ]
-    if missing_ids:
-        raise ValueError(
-            f"OPAL selected ids missing from records table for campaign={campaign_slug}: {missing_ids[:10]}"
-        )
-    mismatches: list[str] = []
-    for candidate_id, sequence in selected[["id", "sequence"]].itertuples(index=False, name=None):
-        expected = str(records_by_id[str(candidate_id)])
-        observed = str(sequence)
-        if observed != expected:
-            mismatches.append(str(candidate_id))
-    if mismatches:
-        raise ValueError(
-            f"OPAL selected sequence mismatch against records table for campaign={campaign_slug}: {mismatches[:10]}"
-        )
-
-
-def _campaign_selected_candidates(
-    config_path: Path,
-    *,
-    as_of_round: int,
-    requested_run_id: str | None,
-) -> tuple[list[SelectedCandidate], dict[str, Any]]:
-    cfg = load_config(config_path)
-    try:
-        selection_set = load_selection_set(
-            config_path,
-            round_selector=str(as_of_round),
-            run_id=requested_run_id,
-            verify_artifact=False,
-        )
-    except RuntimeError as exc:
-        raise _study_value_error_from_opal(exc) from exc
-
-    selected = pd.DataFrame(selection_set["rows"])
-    _validate_selected_sequences_against_records(
-        selected,
-        records_by_id=_records_sequence_map(config_path),
-        campaign_slug=cfg.campaign.slug,
-    )
-
-    candidates: list[SelectedCandidate] = []
-    for order_index, row in enumerate(selected.itertuples(index=False), start=1):
-        candidates.append(
-            SelectedCandidate(
-                campaign_slug=cfg.campaign.slug,
-                as_of_round=int(selection_set["as_of_round"]),
-                run_id=str(selection_set["run_id"]),
-                selection_rank=order_index,
-                id=str(row.id),
-                sequence=str(row.sequence),
-                synthesis_name=opal_round_synthesis_name(cfg.campaign.slug, int(as_of_round), order_index),
-                selection_source=OPAL_ROUND_SELECTION_SOURCE,
-                selection_epoch="opal_model_round",
-                assay_batch_index=None,
-                model_as_of_round=int(selection_set["as_of_round"]),
-            )
-        )
-    report = {
-        "campaign_slug": cfg.campaign.slug,
-        "config_path": str(config_path),
-        "workdir": str(selection_set["campaign"]["workdir"]),
-        "as_of_round": int(selection_set["as_of_round"]),
-        "run_id": str(selection_set["run_id"]),
-        "selected_count": int(len(candidates)),
-        "selection_set_schema_version": str(selection_set["schema_version"]),
-        "selection_path": selection_set.get("selection_path"),
-        "selection_verification": selection_set.get("verification"),
+    selected_by_view = {
+        view_id: {str(row["id"]): row for row in payload["rows"]} for view_id, payload in selection_sets.items()
     }
-    return candidates, report
+    batch_ids_by_view: dict[str, set[str]] = {view_id: set() for view_id in selection_sets}
+    for row in batch_rows:
+        candidate_id = str(row["id"])
+        memberships = row.get("selection_memberships")
+        if not isinstance(memberships, list) or not memberships:
+            raise ValueError(f"selection batch candidate {candidate_id!r} has no selection memberships")
+        declared_view_ids = row.get("selection_view_ids")
+        if not isinstance(declared_view_ids, list):
+            raise ValueError(f"selection batch candidate {candidate_id!r} has invalid selection_view_ids")
+        membership_view_ids = [str(item.get("selection_view_id", "")) for item in memberships]
+        if declared_view_ids != membership_view_ids:
+            raise ValueError(f"selection batch candidate {candidate_id!r} view IDs do not match its membership records")
+        for membership_raw in memberships:
+            membership = _membership_from(membership_raw)
+            selected_rows = selected_by_view.get(membership.selection_view_id)
+            if selected_rows is None:
+                raise ValueError(
+                    f"selection batch candidate {candidate_id!r} references unknown view "
+                    f"{membership.selection_view_id!r}"
+                )
+            selected_row = selected_rows.get(candidate_id)
+            if selected_row is None:
+                raise ValueError(
+                    f"selection batch candidate {candidate_id!r} is absent from selection set "
+                    f"{membership.selection_view_id!r}"
+                )
+            if int(selected_row["rank_competition"]) != membership.rank:
+                raise ValueError(
+                    f"selection batch rank mismatch for candidate {candidate_id!r} in view "
+                    f"{membership.selection_view_id!r}"
+                )
+            if membership.score is None or abs(float(selected_row["score"]) - membership.score) > 1e-9:
+                raise ValueError(
+                    f"selection batch score mismatch for candidate {candidate_id!r} in view "
+                    f"{membership.selection_view_id!r}"
+                )
+            batch_ids_by_view[membership.selection_view_id].add(candidate_id)
+    for view_id, selected_rows in selected_by_view.items():
+        if batch_ids_by_view[view_id] != set(selected_rows):
+            raise ValueError(f"selection batch membership coverage mismatch for view {view_id!r}")
 
 
-def selected_candidates_from_opal_round_campaigns(
-    campaign_configs: Sequence[str | Path],
+def selected_candidates_from_opal_round(
+    campaign_config: str | Path,
     *,
     as_of_round: int,
     run_id: str | None = None,
-    run_id_by_campaign: Mapping[str, str] | None = None,
     repo_root: str | Path | None = None,
 ) -> tuple[list[SelectedCandidate], dict[str, Any]]:
-    """Build synthesis candidates from measured OPAL round ledgers."""
+    """Load one campaign run's verified logical selection batch."""
 
     if int(as_of_round) < 0:
         raise ValueError("as_of_round must be non-negative")
-    if not campaign_configs:
-        raise ValueError("at least one OPAL campaign config is required")
     root = Path(repo_root) if repo_root is not None else None
-    config_paths = [_resolve_repo_path(root, config_path) for config_path in campaign_configs]
-    if run_id is not None and len(config_paths) != 1:
-        raise ValueError("run_id without a campaign key is only supported for a single campaign config")
-
-    selected: list[SelectedCandidate] = []
-    campaign_reports: list[dict[str, Any]] = []
-    run_map = {str(key): str(value) for key, value in (run_id_by_campaign or {}).items()}
-    for config_path in config_paths:
-        cfg = load_config(config_path)
-        requested_run_id = run_map.get(cfg.campaign.slug, run_id)
-        campaign_selected, campaign_report = _campaign_selected_candidates(
+    config_path = _resolve_repo_path(root, campaign_config)
+    cfg = load_config(config_path)
+    view_ids = [view.id for view in cfg.selection_views]
+    try:
+        batch = load_selection_batch(
             config_path,
-            as_of_round=int(as_of_round),
-            requested_run_id=requested_run_id,
+            round_selector=str(as_of_round),
+            run_id=run_id,
         )
-        selected.extend(campaign_selected)
-        campaign_reports.append(campaign_report)
+        selection_sets = {
+            view_id: load_selection_set(
+                config_path,
+                selection_view_id=view_id,
+                round_selector=str(as_of_round),
+                run_id=str(batch["run_id"]),
+                verify_artifact=True,
+            )
+            for view_id in view_ids
+        }
+    except RuntimeError as exc:
+        raise _study_value_error_from_opal(exc) from exc
 
-    report = {
-        "source": OPAL_ROUND_SELECTION_SOURCE,
-        "as_of_round": int(as_of_round),
-        "row_count": int(len(selected)),
-        "campaign_counts": {row["campaign_slug"]: int(row["selected_count"]) for row in campaign_reports},
-        "campaigns": campaign_reports,
+    batch_rows = list(batch["rows"])
+    _validate_batch_memberships(batch_rows, selection_sets=selection_sets)
+    records_by_id = _records_sequence_map(config_path)
+    for view_id, payload in selection_sets.items():
+        mismatches = [
+            str(row["id"]) for row in payload["rows"] if records_by_id.get(str(row["id"])) != str(row["sequence"])
+        ]
+        if mismatches:
+            raise ValueError(
+                f"OPAL selected sequence mismatch against records table for selection_view={view_id}: {mismatches[:10]}"
+            )
+    view_order = {view_id: index for index, view_id in enumerate(view_ids)}
+
+    def order_key(row: dict[str, Any]) -> tuple[int, int, str]:
+        memberships = [_membership_from(item) for item in row["selection_memberships"]]
+        first = min(memberships, key=lambda item: (view_order[item.selection_view_id], item.rank))
+        return view_order[first.selection_view_id], first.rank, str(row["id"])
+
+    candidates: list[SelectedCandidate] = []
+    for batch_rank, row in enumerate(sorted(batch_rows, key=order_key), start=1):
+        candidate_id = str(row["id"])
+        sequence = records_by_id.get(candidate_id)
+        if sequence is None:
+            raise ValueError(f"OPAL selection batch id missing from records table: {candidate_id}")
+        memberships = tuple(_membership_from(item) for item in row["selection_memberships"])
+        primary = min(memberships, key=lambda item: (view_order[item.selection_view_id], item.rank))
+        candidates.append(
+            SelectedCandidate(
+                campaign_slug=cfg.campaign.slug,
+                selection_memberships=memberships,
+                as_of_round=int(batch["as_of_round"]),
+                run_id=str(batch["run_id"]),
+                selection_rank=batch_rank,
+                id=candidate_id,
+                sequence=sequence,
+                synthesis_name=opal_round_synthesis_name(
+                    primary.selection_view_id,
+                    int(batch["as_of_round"]),
+                    primary.rank,
+                ),
+                selection_source=OPAL_ROUND_SELECTION_SOURCE,
+                selection_epoch="opal_model_round",
+                assay_batch_index=None,
+                model_as_of_round=int(batch["as_of_round"]),
+            )
+        )
+
+    selection_view_counts = {
+        view_id: int(sum(view_id in row.selection_view_ids for row in candidates)) for view_id in view_ids
     }
-    return selected, report
+    return candidates, {
+        "source": OPAL_ROUND_SELECTION_SOURCE,
+        "campaign_slug": cfg.campaign.slug,
+        "config_path": str(config_path),
+        "workdir": str(batch["campaign"]["workdir"]),
+        "as_of_round": int(batch["as_of_round"]),
+        "run_id": str(batch["run_id"]),
+        "row_count": int(len(candidates)),
+        "selection_view_counts": selection_view_counts,
+        "selection_batch_schema_version": str(batch["schema_version"]),
+        "selection_batch_path": str(batch["selection_batch_path"]),
+        "selection_sets": {
+            view_id: {
+                "selected_count": int(payload["selected_count"]),
+                "selection_path": payload.get("selection_path"),
+                "verification": payload.get("verification"),
+            }
+            for view_id, payload in selection_sets.items()
+        },
+    }

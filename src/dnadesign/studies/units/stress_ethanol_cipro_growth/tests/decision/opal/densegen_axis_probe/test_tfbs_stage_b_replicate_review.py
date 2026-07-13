@@ -292,9 +292,9 @@ def _write_replicate_fixture(
 
 
 def _write_selection(workdir: Path, round_index: int) -> None:
-    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selection_top_k.csv"
+    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selections.parquet"
     path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"id": ["c", "d"], "pred__score_selected": [0.8, 0.7]}).to_csv(path, index=False)
+    pd.DataFrame({"id": ["c", "d"], "selection_view_id": "primary", "score": [0.8, 0.7]}).to_parquet(path, index=False)
 
 
 def _seed_context(*, label_name: str, seed: int) -> str:

@@ -11,6 +11,6 @@ checks:
   - kind: command
     check_id: opal.candidate_table.contract
     check_group: opal
-    summary: OPAL candidate feature table contract validates with the selected fixed-length X column.
+    summary: OPAL candidate feature table validates fixed-length X and complete BaseRender-compatible DenseGen TFBS metadata.
     required: true
     surface: opal_candidate_table_contract

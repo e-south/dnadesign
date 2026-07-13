@@ -25,6 +25,7 @@ from Bio import SeqIO
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff import (
     CloningStrategy,
     SelectedCandidate,
+    SelectionMembership,
     build_genbank_feature_table,
     build_synthesis_manifest,
     campaign_synthesis_output_dir,
@@ -32,7 +33,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis
     render_azenta_workbook,
     render_campaign_scoped_exports,
     selected_candidates_from_batch0_review,
-    selected_candidates_from_opal_round_campaigns,
+    selected_candidates_from_opal_round,
     validate_azenta_workbook,
     validate_genbank_record_set,
 )
@@ -47,6 +48,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.records import (
     ExpectedHandoffArtifact,
+    ExpectedSelectionView,
     SynthesisHandoffRecord,
     apply_handoff_record_lifecycle,
 )
@@ -59,6 +61,15 @@ RIGHT_FLANK = "tgagggaattcgcga"
 CORE_A = "ACGT" * 15
 CORE_B = "TGCA" * 15
 CORE_ECORI_LEFT_JUNCTION = "AATTC" + "A" * 55
+
+
+def _membership(selection_view_id: str, rank: int, *, score: float | None = None) -> SelectionMembership:
+    return SelectionMembership(
+        selection_view_id=selection_view_id,
+        rank=rank,
+        score=score,
+        score_ref=(None if score is None else f"{selection_view_id}/score"),
+    )
 
 
 def _json_cli_error(stderr: str) -> dict[str, Any]:
@@ -74,7 +85,7 @@ def _strategy() -> CloningStrategy:
     return load_cloning_strategy(
         Path(
             "src/dnadesign/studies/units/stress_ethanol_cipro_growth/"
-            "decision/opal/synthesis_handoff/configs/sfxi_promoter_insert_v1.yaml"
+            "decision/opal/synthesis_handoff/configs/stress_promoter_insert_v1.yaml"
         )
     )
 
@@ -83,6 +94,7 @@ def _selected_candidates() -> list[SelectedCandidate]:
     return [
         SelectedCandidate(
             campaign_slug="secg_ethanol_rf_sfxi_topn",
+            selection_memberships=(_membership("ethanol", 1),),
             as_of_round=0,
             run_id="run-eth-r0",
             selection_rank=1,
@@ -92,6 +104,7 @@ def _selected_candidates() -> list[SelectedCandidate]:
         ),
         SelectedCandidate(
             campaign_slug="secg_cipro_rf_sfxi_topn",
+            selection_memberships=(_membership("ciprofloxacin", 2),),
             as_of_round=0,
             run_id="run-cipro-r0",
             selection_rank=2,
@@ -114,6 +127,16 @@ def _batch0_cli_source_fixture() -> list[SelectedCandidate]:
             selected.append(
                 SelectedCandidate(
                     campaign_slug=campaign_slug,
+                    selection_memberships=(
+                        _membership(
+                            {
+                                "secg_ethanol_rf_sfxi_topn": "ethanol",
+                                "secg_cipro_rf_sfxi_topn": "ciprofloxacin",
+                                "secg_and_rf_sfxi_topn": "and",
+                            }[campaign_slug],
+                            rank,
+                        ),
+                    ),
                     as_of_round=0,
                     run_id="batch0_pre_assay_review",
                     selection_rank=rank,
@@ -190,6 +213,7 @@ def test_build_synthesis_manifest_preserves_ids_and_applies_case_aware_flanks() 
 def test_manifest_fails_fast_on_invalid_promoter_core(sequence: str, message: str) -> None:
     candidate = SelectedCandidate(
         campaign_slug="secg_ethanol_rf_sfxi_topn",
+        selection_memberships=(_membership("ethanol", 1),),
         as_of_round=0,
         run_id="run-eth-r0",
         selection_rank=1,
@@ -209,6 +233,7 @@ def test_manifest_fails_fast_on_invalid_promoter_core(sequence: str, message: st
 def test_manifest_fails_fast_on_unexpected_restriction_site_in_assembled_insert() -> None:
     candidate = SelectedCandidate(
         campaign_slug="secg_and_rf_sfxi_topn",
+        selection_memberships=(_membership("and", 1),),
         as_of_round=0,
         run_id="run-and-r0",
         selection_rank=1,
@@ -225,10 +250,10 @@ def test_manifest_fails_fast_on_unexpected_restriction_site_in_assembled_insert(
         )
 
 
-def test_strategy_yaml_declares_expected_sfxi_restriction_site_policy() -> None:
+def test_strategy_yaml_declares_expected_stress_promoter_restriction_site_policy() -> None:
     strategy = _strategy()
 
-    assert strategy.strategy_id == "sfxi_promoter_insert:v1"
+    assert strategy.strategy_id == "stress_promoter_insert:v1"
     assert [(site.enzyme, site.motif, site.allowed_regions) for site in strategy.restriction_sites] == [
         ("BamHI", "GGATCC", ("left_flank",)),
         ("EcoRI", "GAATTC", ("right_flank",)),
@@ -239,6 +264,7 @@ def test_manifest_rejects_duplicate_candidate_ids_and_duplicate_order_aliases() 
     duplicate_id = _selected_candidates()
     duplicate_id[1] = SelectedCandidate(
         campaign_slug="secg_cipro_rf_sfxi_topn",
+        selection_memberships=(_membership("ciprofloxacin", 2),),
         as_of_round=0,
         run_id="run-cipro-r0",
         selection_rank=2,
@@ -252,6 +278,7 @@ def test_manifest_rejects_duplicate_candidate_ids_and_duplicate_order_aliases() 
     duplicate_alias = _selected_candidates()
     duplicate_alias[1] = SelectedCandidate(
         campaign_slug="secg_cipro_rf_sfxi_topn",
+        selection_memberships=(_membership("ciprofloxacin", 2),),
         as_of_round=0,
         run_id="run-cipro-r0",
         selection_rank=2,
@@ -804,9 +831,9 @@ def test_campaign_synthesis_output_dir_is_campaign_local() -> None:
 def _write_opal_round_fixture(
     tmp_path: Path,
     *,
-    slug: str = "secg_ethanol_rf_sfxi_topn",
+    slug: str = "secg_rmf_greedy",
     as_of_round: int = 1,
-    run_ids: tuple[str, ...] = ("run-eth-r1",),
+    run_ids: tuple[str, ...] = ("run-rmf-r1",),
     candidate_id_prefix: str = "",
     record_sequences: dict[str, str] | None = None,
     ledger_sequences: dict[str, str] | None = None,
@@ -818,6 +845,12 @@ def _write_opal_round_fixture(
     config_path.write_text(
         textwrap.dedent(
             """
+            schema_version: opal.campaign.v3
+            ownership:
+              owner_scope: study_campaign
+              study_id: stress_ethanol_cipro_growth
+              dataset_id: test_candidates
+              portable: false
             campaign:
               name: "test campaign"
               slug: "{slug}"
@@ -844,21 +877,41 @@ def _write_opal_round_fixture(
                 n_estimators: 10
                 random_state: 7
                 n_jobs: 1
-            objectives:
-              - name: sfxi_v1
-                params:
-                  setpoint_vector: [0, 1, 0, 1]
-                  logic_exponent_beta: 1.0
-                  intensity_exponent_gamma: 1.0
-                  intensity_log2_offset_delta: 0.0
-                  scaling: {{ percentile: 95, min_n: 5, eps: 1.0e-8 }}
-            selection:
-              name: top_n
-              params:
-                top_k: 2
-                score_ref: sfxi_v1/sfxi
-                tie_handling: competition_rank
-                objective_mode: maximize
+            selection_views:
+              - id: ethanol
+                objective:
+                  name: sfxi_v1
+                  params:
+                    setpoint_vector: [0, 1, 0, 1]
+                    logic_exponent_beta: 1.0
+                    intensity_exponent_gamma: 1.0
+                    intensity_log2_offset_delta: 0.0
+                    scaling: {{ percentile: 95, min_n: 5, eps: 1.0e-8 }}
+                selection:
+                  name: top_n
+                  params:
+                    top_k: 2
+                    score_ref: sfxi
+                    tie_handling: competition_rank
+                    objective_mode: maximize
+              - id: ciprofloxacin
+                objective:
+                  name: sfxi_v1
+                  params:
+                    setpoint_vector: [0, 0, 1, 1]
+                    logic_exponent_beta: 1.0
+                    intensity_exponent_gamma: 1.0
+                    intensity_log2_offset_delta: 0.0
+                    scaling: {{ percentile: 95, min_n: 5, eps: 1.0e-8 }}
+                selection:
+                  name: top_n
+                  params:
+                    top_k: 2
+                    score_ref: sfxi
+                    tie_handling: competition_rank
+                    objective_mode: maximize
+            selection_batch:
+              deduplicate_by: id
             """
         ).format(slug=slug),
         encoding="utf-8",
@@ -879,8 +932,22 @@ def _write_opal_round_fixture(
     predictions_dir.mkdir(parents=True)
     runs_dir = ledger_root / "runs.parquet"
     runs_dir.mkdir(parents=True)
+    selection_dir = campaign_root / "outputs" / "rounds" / f"round_{as_of_round}" / "selection"
+    selection_path = selection_dir / "selections.parquet"
+    selection_batch_path = selection_dir / "selection_batch.parquet"
 
-    run_rows = [{"event": "run_meta", "run_id": run_id, "as_of_round": as_of_round} for run_id in run_ids]
+    run_rows = [
+        {
+            "event": "run_meta",
+            "run_id": run_id,
+            "as_of_round": as_of_round,
+            "artifacts": {
+                "selection/selections.parquet": ["test-selection-sha", str(selection_path)],
+                "selection/selection_batch.parquet": ["test-batch-sha", str(selection_batch_path)],
+            },
+        }
+        for run_id in run_ids
+    ]
     pd.DataFrame(run_rows).to_parquet(runs_dir / "part-runs.parquet", index=False)
 
     prediction_rows = []
@@ -893,8 +960,36 @@ def _write_opal_round_fixture(
                     "as_of_round": as_of_round,
                     "id": candidate_a,
                     "sequence": ledger_sequences[candidate_a],
-                    "sel__rank_competition": 2,
-                    "sel__is_selected": True,
+                    "pred__selection_views": [
+                        {
+                            "selection_view_id": "ethanol",
+                            "objective_name": "sfxi_v1",
+                            "selection_name": "top_n",
+                            "score_ref": "ethanol/sfxi",
+                            "score": 0.8,
+                            "selection_score": 0.8,
+                            "rank_competition": 2,
+                            "is_selected": True,
+                            "top_k": 2,
+                            "uncertainty": None,
+                            "uncertainty_ref": None,
+                            "diagnostics": None,
+                        },
+                        {
+                            "selection_view_id": "ciprofloxacin",
+                            "objective_name": "sfxi_v1",
+                            "selection_name": "top_n",
+                            "score_ref": "ciprofloxacin/sfxi",
+                            "score": 0.1,
+                            "selection_score": 0.1,
+                            "rank_competition": 3,
+                            "is_selected": False,
+                            "top_k": 2,
+                            "uncertainty": None,
+                            "uncertainty_ref": None,
+                            "diagnostics": None,
+                        },
+                    ],
                 },
                 {
                     "event": "run_pred",
@@ -902,8 +997,36 @@ def _write_opal_round_fixture(
                     "as_of_round": as_of_round,
                     "id": candidate_b,
                     "sequence": ledger_sequences[candidate_b],
-                    "sel__rank_competition": 1,
-                    "sel__is_selected": True,
+                    "pred__selection_views": [
+                        {
+                            "selection_view_id": "ethanol",
+                            "objective_name": "sfxi_v1",
+                            "selection_name": "top_n",
+                            "score_ref": "ethanol/sfxi",
+                            "score": 0.9,
+                            "selection_score": 0.9,
+                            "rank_competition": 1,
+                            "is_selected": True,
+                            "top_k": 2,
+                            "uncertainty": None,
+                            "uncertainty_ref": None,
+                            "diagnostics": None,
+                        },
+                        {
+                            "selection_view_id": "ciprofloxacin",
+                            "objective_name": "sfxi_v1",
+                            "selection_name": "top_n",
+                            "score_ref": "ciprofloxacin/sfxi",
+                            "score": 0.85,
+                            "selection_score": 0.85,
+                            "rank_competition": 2,
+                            "is_selected": True,
+                            "top_k": 2,
+                            "uncertainty": None,
+                            "uncertainty_ref": None,
+                            "diagnostics": None,
+                        },
+                    ],
                 },
                 {
                     "event": "run_pred",
@@ -911,43 +1034,155 @@ def _write_opal_round_fixture(
                     "as_of_round": as_of_round,
                     "id": candidate_c,
                     "sequence": ledger_sequences[candidate_c],
-                    "sel__rank_competition": 3,
-                    "sel__is_selected": False,
+                    "pred__selection_views": [
+                        {
+                            "selection_view_id": "ethanol",
+                            "objective_name": "sfxi_v1",
+                            "selection_name": "top_n",
+                            "score_ref": "ethanol/sfxi",
+                            "score": 0.2,
+                            "selection_score": 0.2,
+                            "rank_competition": 3,
+                            "is_selected": False,
+                            "top_k": 2,
+                            "uncertainty": None,
+                            "uncertainty_ref": None,
+                            "diagnostics": None,
+                        },
+                        {
+                            "selection_view_id": "ciprofloxacin",
+                            "objective_name": "sfxi_v1",
+                            "selection_name": "top_n",
+                            "score_ref": "ciprofloxacin/sfxi",
+                            "score": 0.95,
+                            "selection_score": 0.95,
+                            "rank_competition": 1,
+                            "is_selected": True,
+                            "top_k": 2,
+                            "uncertainty": None,
+                            "uncertainty_ref": None,
+                            "diagnostics": None,
+                        },
+                    ],
                 },
             ]
         )
     pd.DataFrame(prediction_rows).to_parquet(predictions_dir / "part-predictions.parquet", index=False)
+    selection_dir.mkdir(parents=True)
+    pd.DataFrame(
+        [
+            {"selection_view_id": "ethanol", "id": candidate_b, "score": 0.9, "selection_score": 0.9},
+            {"selection_view_id": "ethanol", "id": candidate_a, "score": 0.8, "selection_score": 0.8},
+            {
+                "selection_view_id": "ciprofloxacin",
+                "id": candidate_c,
+                "score": 0.95,
+                "selection_score": 0.95,
+            },
+            {
+                "selection_view_id": "ciprofloxacin",
+                "id": candidate_b,
+                "score": 0.85,
+                "selection_score": 0.85,
+            },
+        ]
+    ).to_parquet(selection_path, index=False)
+    pd.DataFrame(
+        [
+            {
+                "id": candidate_a,
+                "selection_batch_key": candidate_a,
+                "deduplicate_by": "id",
+                "selection_view_ids": ["ethanol"],
+                "selection_memberships": [
+                    {
+                        "selection_view_id": "ethanol",
+                        "rank": 2,
+                        "score": 0.8,
+                        "selection_score": 0.8,
+                        "score_ref": "ethanol/sfxi",
+                    }
+                ],
+            },
+            {
+                "id": candidate_b,
+                "selection_batch_key": candidate_b,
+                "deduplicate_by": "id",
+                "selection_view_ids": ["ethanol", "ciprofloxacin"],
+                "selection_memberships": [
+                    {
+                        "selection_view_id": "ethanol",
+                        "rank": 1,
+                        "score": 0.9,
+                        "selection_score": 0.9,
+                        "score_ref": "ethanol/sfxi",
+                    },
+                    {
+                        "selection_view_id": "ciprofloxacin",
+                        "rank": 2,
+                        "score": 0.85,
+                        "selection_score": 0.85,
+                        "score_ref": "ciprofloxacin/sfxi",
+                    },
+                ],
+            },
+            {
+                "id": candidate_c,
+                "selection_batch_key": candidate_c,
+                "deduplicate_by": "id",
+                "selection_view_ids": ["ciprofloxacin"],
+                "selection_memberships": [
+                    {
+                        "selection_view_id": "ciprofloxacin",
+                        "rank": 1,
+                        "score": 0.95,
+                        "selection_score": 0.95,
+                        "score_ref": "ciprofloxacin/sfxi",
+                    }
+                ],
+            },
+        ]
+    ).to_parquet(selection_batch_path, index=False)
     return config_path
 
 
-def test_opal_round_ledgers_become_campaign_scoped_selected_candidates(tmp_path: Path) -> None:
+def test_opal_round_selection_batch_becomes_one_campaign_handoff(tmp_path: Path) -> None:
     config_path = _write_opal_round_fixture(tmp_path)
 
-    selected, report = selected_candidates_from_opal_round_campaigns(
-        [config_path],
+    selected, report = selected_candidates_from_opal_round(
+        config_path,
         as_of_round=1,
     )
 
     assert [
-        (row.campaign_slug, row.as_of_round, row.run_id, row.selection_rank, row.id, row.synthesis_name)
+        (
+            row.campaign_slug,
+            row.as_of_round,
+            row.run_id,
+            row.selection_rank,
+            row.id,
+            row.synthesis_name,
+            row.selection_view_ids,
+        )
         for row in selected
     ] == [
-        ("secg_ethanol_rf_sfxi_topn", 1, "run-eth-r1", 1, "candidate-b", "SECG-R1-ETH-01"),
-        ("secg_ethanol_rf_sfxi_topn", 1, "run-eth-r1", 2, "candidate-a", "SECG-R1-ETH-02"),
+        ("secg_rmf_greedy", 1, "run-rmf-r1", 1, "candidate-b", "SECG-R1-ETH-01", ("ethanol", "ciprofloxacin")),
+        ("secg_rmf_greedy", 1, "run-rmf-r1", 2, "candidate-a", "SECG-R1-ETH-02", ("ethanol",)),
+        ("secg_rmf_greedy", 1, "run-rmf-r1", 3, "candidate-c", "SECG-R1-CIP-01", ("ciprofloxacin",)),
     ]
-    assert {row.selection_source for row in selected} == {"opal_ledger"}
+    assert {row.selection_source for row in selected} == {"opal_selection_batch"}
     assert {row.selection_epoch for row in selected} == {"opal_model_round"}
     assert {row.model_as_of_round for row in selected} == {1}
     assert {row.assay_batch_index for row in selected} == {None}
-    assert report["row_count"] == 2
-    assert report["campaigns"][0]["selected_count"] == 2
+    assert report["row_count"] == 3
+    assert report["selection_view_counts"] == {"ethanol": 2, "ciprofloxacin": 2}
 
 
 def test_opal_round_source_rejects_ambiguous_reruns_without_run_id(tmp_path: Path) -> None:
     config_path = _write_opal_round_fixture(tmp_path, run_ids=("run-a", "run-b"))
 
     with pytest.raises(ValueError, match="Multiple run_id values"):
-        selected_candidates_from_opal_round_campaigns([config_path], as_of_round=1)
+        selected_candidates_from_opal_round(config_path, as_of_round=1)
 
 
 def test_opal_round_source_rejects_sequence_mismatch_against_records(tmp_path: Path) -> None:
@@ -957,10 +1192,10 @@ def test_opal_round_source_rejects_sequence_mismatch_against_records(tmp_path: P
     )
 
     with pytest.raises(ValueError, match="sequence mismatch"):
-        selected_candidates_from_opal_round_campaigns(
-            [config_path],
+        selected_candidates_from_opal_round(
+            config_path,
             as_of_round=1,
-            run_id_by_campaign={"secg_ethanol_rf_sfxi_topn": "run-eth-r1"},
+            run_id="run-rmf-r1",
         )
 
 
@@ -989,24 +1224,16 @@ def test_cli_writes_opal_round_handoff_from_campaign_ledgers(
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "ok"
     assert payload["source"] == "opal-round"
-    assert payload["batch_id"] == "stress-opal-r1-sfxi-v1"
-    manifest_path = (
-        output_root
-        / "secg_ethanol_rf_sfxi_topn"
-        / "stress-opal-r1-sfxi-v1__secg_ethanol_rf_sfxi_topn__synthesis_manifest.csv"
-    )
+    assert payload["batch_id"] == "stress-opal-r1-rmf-v1"
+    manifest_path = output_root / "secg_rmf_greedy" / "stress-opal-r1-rmf-v1__secg_rmf_greedy__synthesis_manifest.csv"
     workbook_path = (
-        output_root
-        / "secg_ethanol_rf_sfxi_topn"
-        / "stress-opal-r1-sfxi-v1__secg_ethanol_rf_sfxi_topn__azenta_gene_synthesis.xlsx"
+        output_root / "secg_rmf_greedy" / "stress-opal-r1-rmf-v1__secg_rmf_greedy__azenta_gene_synthesis.xlsx"
     )
-    genbank_dir_path = (
-        output_root / "secg_ethanol_rf_sfxi_topn" / "stress-opal-r1-sfxi-v1__secg_ethanol_rf_sfxi_topn__genbank_inserts"
-    )
+    genbank_dir_path = output_root / "secg_rmf_greedy" / "stress-opal-r1-rmf-v1__secg_rmf_greedy__genbank_inserts"
     assert manifest_path.exists()
     assert workbook_path.exists()
     assert genbank_dir_path.is_dir()
-    assert len(sorted(genbank_dir_path.glob("*.gb"))) == 2
+    assert len(sorted(genbank_dir_path.glob("*.gb"))) == 3
     manifest = pd.read_csv(manifest_path)
     assert manifest[["id", "synthesis_name", "selection_source", "selection_epoch", "model_as_of_round"]].to_dict(
         "records"
@@ -1014,14 +1241,21 @@ def test_cli_writes_opal_round_handoff_from_campaign_ledgers(
         {
             "id": "candidate-b",
             "synthesis_name": "SECG-R1-ETH-01",
-            "selection_source": "opal_ledger",
+            "selection_source": "opal_selection_batch",
             "selection_epoch": "opal_model_round",
             "model_as_of_round": 1,
         },
         {
             "id": "candidate-a",
             "synthesis_name": "SECG-R1-ETH-02",
-            "selection_source": "opal_ledger",
+            "selection_source": "opal_selection_batch",
+            "selection_epoch": "opal_model_round",
+            "model_as_of_round": 1,
+        },
+        {
+            "id": "candidate-c",
+            "synthesis_name": "SECG-R1-CIP-01",
+            "selection_source": "opal_selection_batch",
             "selection_epoch": "opal_model_round",
             "model_as_of_round": 1,
         },
@@ -1050,7 +1284,7 @@ def test_cli_resolves_batch0_from_checked_in_handoff_record(
     assert payload["batch_id"] == "stress-opal-batch0-sfxi-v1"
     assert payload["handoff_record"]["lifecycle_status"] == "generated_pending_acceptance"
     assert payload["handoff_record"]["selection_epoch"] == "pre_assay_seed"
-    assert payload["handoff_record"]["artifact_status"]["summary"]["expected_campaign_count"] == 3
+    assert payload["handoff_record"]["artifact_status"]["summary"]["expected_artifact_count"] == 3
     expected_artifacts = {row["campaign_slug"]: row for row in payload["handoff_record"]["expected_artifacts"]}
     assert set(expected_artifacts) == {
         "secg_ethanol_rf_sfxi_topn",
@@ -1098,56 +1332,42 @@ def test_cli_handoff_record_preview_does_not_rebuild_batch0_inputs(
     assert payload["source"] == "batch0"
     assert payload["batch_id"] == "stress-opal-batch0-sfxi-v1"
     assert payload["handoff_record"]["handoff_id"] == "stress-opal-batch0-sfxi-v1"
-    assert payload["handoff_record"]["artifact_status"]["summary"]["expected_campaign_count"] == 3
+    assert payload["handoff_record"]["artifact_status"]["summary"]["expected_artifact_count"] == 3
 
 
-def test_cli_handoff_record_resolves_opal_round_per_campaign_run_ids(
+def test_cli_handoff_record_resolves_one_campaign_run_and_view_memberships(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    ethanol_config = _write_opal_round_fixture(
-        tmp_path,
-        slug="secg_ethanol_rf_sfxi_topn",
-        as_of_round=1,
-        run_ids=("eth-run-a", "eth-run-b"),
-    )
-    cipro_config = _write_opal_round_fixture(
-        tmp_path,
-        slug="secg_cipro_rf_sfxi_topn",
-        as_of_round=1,
-        run_ids=("cip-run-a", "cip-run-b"),
-        candidate_id_prefix="cip-",
-    )
+    config_path = _write_opal_round_fixture(tmp_path, as_of_round=1, run_ids=("rmf-run-a", "rmf-run-b"))
     record_path = tmp_path / "synthesis_handoffs.yaml"
     record_path.write_text(
         textwrap.dedent(
             """
-            version: 1
+            version: 2
             study_id: stress_ethanol_cipro_growth
             handoffs:
-              - handoff_id: stress-opal-r1-sfxi-v1
+              - handoff_id: stress-opal-r1-rmf-v1
                 lifecycle_status: generated_pending_acceptance
-                source_authority: opal_selection_set
+                source_authority: opal_selection_batch
                 selection_epoch: opal_model_round
                 assay_batch_index: 1
                 model_as_of_round: 1
-                run_id: null
-                strategy_id: sfxi_promoter_insert:v1
-                expected_campaigns:
-                  - campaign_slug: secg_ethanol_rf_sfxi_topn
+                campaign_slug: secg_rmf_greedy
+                run_id: rmf-run-b
+                strategy_id: stress_promoter_insert:v1
+                expected_selection_views:
+                  - selection_view_id: ethanol
                     expected_rows: 2
-                    run_id: eth-run-b
-                    manifest_path: out/ethanol/synthesis_manifest.csv
-                    vendor_workbook_path: out/ethanol/azenta_gene_synthesis.xlsx
-                    genbank_dir_path: out/ethanol/genbank_inserts
-                    genbank_feature_table_path: out/ethanol/genbank_features.csv
-                  - campaign_slug: secg_cipro_rf_sfxi_topn
+                  - selection_view_id: ciprofloxacin
                     expected_rows: 2
-                    run_id: cip-run-a
-                    manifest_path: out/cipro/synthesis_manifest.csv
-                    vendor_workbook_path: out/cipro/azenta_gene_synthesis.xlsx
-                    genbank_dir_path: out/cipro/genbank_inserts
-                    genbank_feature_table_path: out/cipro/genbank_features.csv
+                expected_artifact:
+                  campaign_slug: secg_rmf_greedy
+                  expected_rows: 3
+                  manifest_path: out/rmf/synthesis_manifest.csv
+                  vendor_workbook_path: out/rmf/azenta_gene_synthesis.xlsx
+                  genbank_dir_path: out/rmf/genbank_inserts
+                  genbank_feature_table_path: out/rmf/genbank_features.csv
             """
         ).strip()
         + "\n",
@@ -1157,13 +1377,11 @@ def test_cli_handoff_record_resolves_opal_round_per_campaign_run_ids(
     exit_code = synthesis_handoff_main(
         [
             "--handoff-id",
-            "stress-opal-r1-sfxi-v1",
+            "stress-opal-r1-rmf-v1",
             "--record-yaml",
             str(record_path),
             "--campaign-config",
-            str(ethanol_config),
-            "--campaign-config",
-            str(cipro_config),
+            str(config_path),
             "--json",
         ]
     )
@@ -1171,22 +1389,18 @@ def test_cli_handoff_record_resolves_opal_round_per_campaign_run_ids(
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["source"] == "opal-round"
-    assert payload["batch_id"] == "stress-opal-r1-sfxi-v1"
+    assert payload["batch_id"] == "stress-opal-r1-rmf-v1"
     assert payload["handoff_record"]["manifest_validation"]["status"] == "pass"
     assert payload["handoff_record"]["assay_batch_index"] == 1
-    assert {row["campaign_slug"]: row["run_id"] for row in payload["handoff_record"]["expected_artifacts"]} == {
-        "secg_ethanol_rf_sfxi_topn": "eth-run-b",
-        "secg_cipro_rf_sfxi_topn": "cip-run-a",
-    }
-    assert {row["campaign_slug"]: row["run_id"] for row in payload["source_report"]["campaigns"]} == {
-        "secg_ethanol_rf_sfxi_topn": "eth-run-b",
-        "secg_cipro_rf_sfxi_topn": "cip-run-a",
-    }
+    assert payload["handoff_record"]["run_id"] == "rmf-run-b"
+    assert payload["source_report"]["campaign_slug"] == "secg_rmf_greedy"
+    assert payload["source_report"]["selection_view_counts"] == {"ethanol": 2, "ciprofloxacin": 2}
 
 
-def test_handoff_record_lifecycle_stamps_campaign_run_ids_onto_selected_rows() -> None:
+def test_handoff_record_lifecycle_stamps_unified_run_id_onto_selected_rows() -> None:
     source_row = SelectedCandidate(
-        campaign_slug="secg_ethanol_rf_sfxi_topn",
+        campaign_slug="secg_rmf_greedy",
+        selection_memberships=(_membership("ethanol", 1),),
         as_of_round=1,
         run_id="source-run-a",
         selection_rank=1,
@@ -1195,24 +1409,23 @@ def test_handoff_record_lifecycle_stamps_campaign_run_ids_onto_selected_rows() -
         synthesis_name="ES-promoter-32",
     )
     record = SynthesisHandoffRecord(
-        handoff_id="stress-opal-r1-sfxi-v1",
+        handoff_id="stress-opal-r1-rmf-v1",
         lifecycle_status="generated_pending_acceptance",
-        source_authority="opal_selection_set",
+        source_authority="opal_selection_batch",
         selection_epoch="opal_model_round",
         assay_batch_index=1,
         model_as_of_round=1,
-        run_id=None,
-        strategy_id="sfxi_promoter_insert:v1",
-        expected_campaigns=(
-            ExpectedHandoffArtifact(
-                campaign_slug="secg_ethanol_rf_sfxi_topn",
-                expected_rows=1,
-                run_id="record-run-b",
-                manifest_path="out/ethanol/synthesis_manifest.csv",
-                vendor_workbook_path="out/ethanol/azenta_gene_synthesis.xlsx",
-                genbank_dir_path="out/ethanol/genbank_inserts",
-                genbank_feature_table_path="out/ethanol/genbank_features.csv",
-            ),
+        run_id="record-run-b",
+        strategy_id="stress_promoter_insert:v1",
+        campaign_slug="secg_rmf_greedy",
+        expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
+        expected_artifact=ExpectedHandoffArtifact(
+            campaign_slug="secg_rmf_greedy",
+            expected_rows=1,
+            manifest_path="out/rmf/synthesis_manifest.csv",
+            vendor_workbook_path="out/rmf/azenta_gene_synthesis.xlsx",
+            genbank_dir_path="out/rmf/genbank_inserts",
+            genbank_feature_table_path="out/rmf/genbank_features.csv",
         ),
     )
 
@@ -1221,7 +1434,7 @@ def test_handoff_record_lifecycle_stamps_campaign_run_ids_onto_selected_rows() -
     assert [row.run_id for row in stamped] == ["record-run-b"]
 
 
-def test_cli_opal_round_handoff_record_requires_explicit_run_ids(
+def test_cli_opal_round_handoff_record_requires_explicit_run_id(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1230,24 +1443,28 @@ def test_cli_opal_round_handoff_record_requires_explicit_run_ids(
     record_path.write_text(
         textwrap.dedent(
             """
-            version: 1
+            version: 2
             study_id: stress_ethanol_cipro_growth
             handoffs:
-              - handoff_id: stress-opal-r1-sfxi-v1
+              - handoff_id: stress-opal-r1-rmf-v1
                 lifecycle_status: generated_pending_acceptance
-                source_authority: opal_selection_set
+                source_authority: opal_selection_batch
                 selection_epoch: opal_model_round
                 assay_batch_index: 1
                 model_as_of_round: 1
+                campaign_slug: secg_rmf_greedy
                 run_id: null
-                strategy_id: sfxi_promoter_insert:v1
-                expected_campaigns:
-                  - campaign_slug: secg_ethanol_rf_sfxi_topn
+                strategy_id: stress_promoter_insert:v1
+                expected_selection_views:
+                  - selection_view_id: ethanol
                     expected_rows: 2
-                    manifest_path: out/ethanol/synthesis_manifest.csv
-                    vendor_workbook_path: out/ethanol/azenta_gene_synthesis.xlsx
-                    genbank_dir_path: out/ethanol/genbank_inserts
-                    genbank_feature_table_path: out/ethanol/genbank_features.csv
+                expected_artifact:
+                  campaign_slug: secg_rmf_greedy
+                  expected_rows: 3
+                  manifest_path: out/rmf/synthesis_manifest.csv
+                  vendor_workbook_path: out/rmf/azenta_gene_synthesis.xlsx
+                  genbank_dir_path: out/rmf/genbank_inserts
+                  genbank_feature_table_path: out/rmf/genbank_features.csv
             """
         ).strip()
         + "\n",
@@ -1258,7 +1475,7 @@ def test_cli_opal_round_handoff_record_requires_explicit_run_ids(
         synthesis_handoff_main(
             [
                 "--handoff-id",
-                "stress-opal-r1-sfxi-v1",
+                "stress-opal-r1-rmf-v1",
                 "--record-yaml",
                 str(record_path),
                 "--campaign-config",
@@ -1293,7 +1510,7 @@ def test_cli_handoff_record_rejects_campaign_count_drift(
                 assay_batch_index: 0
                 model_as_of_round: null
                 run_id: batch0_pre_assay_review
-                strategy_id: sfxi_promoter_insert:v1
+                strategy_id: stress_promoter_insert:v1
                 expected_campaigns:
                   - campaign_slug: secg_ethanol_rf_sfxi_topn
                     expected_rows: 7

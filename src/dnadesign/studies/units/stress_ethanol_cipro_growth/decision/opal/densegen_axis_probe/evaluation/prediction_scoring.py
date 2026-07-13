@@ -47,32 +47,32 @@ def validate_prediction_selection_contract(predictions: pd.DataFrame) -> None:
 
 
 def selected_bool_mask(frame: pd.DataFrame) -> pd.Series:
-    if "sel__is_selected" not in frame.columns:
-        raise RuntimeError("OPAL predictions missing required column: sel__is_selected")
-    values = frame["sel__is_selected"]
+    if "view__is_selected" not in frame.columns:
+        raise RuntimeError("OPAL predictions missing required column: view__is_selected")
+    values = frame["view__is_selected"]
     if values.isna().any():
-        raise RuntimeError("OPAL predictions contain null sel__is_selected values")
+        raise RuntimeError("OPAL predictions contain null view__is_selected values")
     if not pd.api.types.is_bool_dtype(values):
         bad = values.loc[~values.map(lambda value: isinstance(value, (bool, np.bool_)))]
         if not bad.empty:
             preview = ", ".join(repr(value) for value in bad.head(5).tolist())
-            raise RuntimeError(f"OPAL predictions sel__is_selected must be boolean; got {preview}")
+            raise RuntimeError(f"OPAL predictions view__is_selected must be boolean; got {preview}")
     return values.astype(bool)
 
 
 def rank_competition(frame: pd.DataFrame) -> pd.Series:
-    if "sel__rank_competition" not in frame.columns:
-        raise RuntimeError("OPAL predictions missing required column: sel__rank_competition")
-    ranks = pd.to_numeric(frame["sel__rank_competition"], errors="coerce")
+    if "view__rank_competition" not in frame.columns:
+        raise RuntimeError("OPAL predictions missing required column: view__rank_competition")
+    ranks = pd.to_numeric(frame["view__rank_competition"], errors="coerce")
     if ranks.isna().any() or not np.isfinite(ranks.to_numpy(dtype=float)).all():
-        raise RuntimeError("OPAL predictions contain non-finite sel__rank_competition values")
+        raise RuntimeError("OPAL predictions contain non-finite view__rank_competition values")
     if (ranks <= 0).any():
-        raise RuntimeError("OPAL predictions sel__rank_competition must be positive")
+        raise RuntimeError("OPAL predictions view__rank_competition must be positive")
     return ranks
 
 
 def top_ids_from_prediction_frame(frame: pd.DataFrame, *, k: int) -> list[str]:
-    score_col = "pred__score_selected"
+    score_col = "view__selection_score"
     if score_col not in frame.columns:
         raise RuntimeError(f"OPAL predictions missing required column: {score_col}")
     frame[score_col] = pd.to_numeric(frame[score_col], errors="coerce")
@@ -81,8 +81,8 @@ def top_ids_from_prediction_frame(frame: pd.DataFrame, *, k: int) -> list[str]:
     selected = frame.loc[selected_bool_mask(frame)].copy()
     if selected.empty:
         return []
-    selected["sel__rank_competition"] = rank_competition(selected)
-    selected = selected.sort_values(["sel__rank_competition", score_col, "id"], ascending=[True, False, True])
+    selected["view__rank_competition"] = rank_competition(selected)
+    selected = selected.sort_values(["view__rank_competition", score_col, "id"], ascending=[True, False, True])
     return selected["id"].astype(str).head(int(k)).tolist()
 
 

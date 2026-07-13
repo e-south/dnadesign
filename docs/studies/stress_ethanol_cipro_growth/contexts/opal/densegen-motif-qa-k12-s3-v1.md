@@ -1,7 +1,15 @@
+---
+id: stress-ethanol-cipro-growth-opal-densegen-motif-qa-k12-s3-v1
+title: DenseGen motif QA K12/S3 v1
+owner: dnadesign-maintainers
+status: reference
+last_verified: 2026-07-13
+---
+
 ## DenseGen Motif QA K12/S3 v1
 
-**Supersession note:** this document is historical execution precedent for the
-DenseGen OPAL probe family. The retained v1 TFBS contract is
+This page records the K12/S3 execution contract for the DenseGen OPAL probe
+family. The TFBS contract is
 [`densegen-tfbs-learnability-probe-v1.md`](densegen-tfbs-learnability-probe-v1.md);
 current realized profile boundaries live in the source package README and
 profile registry.

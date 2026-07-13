@@ -2,7 +2,7 @@
 
 This package holds study-owned implementation, durable review prose, and static
 curation records for the stress / ethanol / ciprofloxacin promoter study. Use
-the docs-side study record for current state, and use this source package only
+the docs-side study record for verified status, and use this source package
 when the task needs executable study surfaces or checked-in review artifacts.
 
 - Binding file: [contexts/latentdna/binding.yaml](../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml)
@@ -23,10 +23,13 @@ when the task needs executable study surfaces or checked-in review artifacts.
 
 ```text
 stress_ethanol_cipro_growth/
+  promoter_candidate_bindings/ # exact alias -> candidate/sequence authority
   decision/
     opal/
       batch0/               # pre-assay OPAL candidate-table handoff
       densegen_axis_probe/  # DenseGen-label OPAL probe and TFBS learnability
+      reader_promoter_evidence/ # OPAL discovery of Reader evidence bundles
+      response_metastudy/   # SFXI/RMF evidence and promotion review
   operations/
     status/                 # OPS status/preflight provider implementation
   workbench/
@@ -37,9 +40,19 @@ stress_ethanol_cipro_growth/
   tests/                    # mirrors decision/ and operations/
 ```
 
+- `promoter_candidate_bindings/`: study-wide identity-routing authority for
+  namespace-qualified promoter aliases, canonical candidate/sequence identity,
+  and BaseRender adapter projections. Reader, synthesis, OPAL adapters, and
+  other study narratives consume this artifact without redefining identity.
 - `decision/opal/batch0/`: OPAL candidate-table sampling for this study only.
 - `decision/opal/densegen_axis_probe/`: study-local OPAL probes that consume
   DenseGen construction metadata through study-owned contracts.
+- `decision/opal/reader_promoter_evidence/`: verifies objective-neutral Reader
+  evidence bundles for OPAL discovery without owning candidate identity or RMF
+  mathematics.
+- `decision/opal/response_metastudy/`: compares the declared SFXI source
+  evidence with response-window and RMF requirements without merging their
+  vector contracts.
 - `operations/status/service.py`: study status service orchestration and OPS
   contract binding.
 - `operations/status/snapshot.py`: record-backed snapshot assembly.

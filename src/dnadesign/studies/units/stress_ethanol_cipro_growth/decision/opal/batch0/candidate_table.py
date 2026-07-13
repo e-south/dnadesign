@@ -26,14 +26,16 @@ import yaml
 
 from dnadesign.opal import validate_x_parquet_column
 
+from .candidate_metadata import (
+    DENSEGEN_KEY_COLUMNS,
+    DENSEGEN_MATERIALIZATION_COLUMNS,
+    DENSEGEN_TFBS_METADATA_COLUMNS,
+    validate_candidate_densegen_metadata,
+)
+
 EXPECTED_OPAL_CANDIDATE_ROLE = "opal_candidate_feature_table"
 REQUIRED_OPAL_COLUMNS: tuple[str, ...] = ("id", "bio_type", "sequence", "alphabet")
 VIEW_PROVENANCE_COLUMNS: tuple[str, ...] = ("source_class", "design_family")
-DENSEGEN_KEY_COLUMNS: tuple[str, ...] = (
-    "densegen__plan",
-    "densegen__run_id",
-    "densegen__sampling_library_hash",
-)
 REQUIRED_CANDIDATE_PROVENANCE_COLUMNS: tuple[str, ...] = (
     "opal_candidate__role",
     "opal_candidate__x_source_view_id",
@@ -261,6 +263,7 @@ def validate_candidate_feature_table(
     required_columns = (
         *REQUIRED_OPAL_COLUMNS,
         *REQUIRED_CANDIDATE_PROVENANCE_COLUMNS,
+        *DENSEGEN_TFBS_METADATA_COLUMNS,
         *required_null_columns,
         x_column,
     )
@@ -287,6 +290,7 @@ def validate_candidate_feature_table(
         allowed_design_families=allowed_design_families,
         required_null_provenance_columns=required_null_columns,
     )
+    densegen_metadata_report = validate_candidate_densegen_metadata(parquet_path)
     ids = records["id"].astype(str)
     if ids.duplicated().any():
         sample = ids[ids.duplicated()].unique().tolist()[:5]
@@ -308,7 +312,11 @@ def validate_candidate_feature_table(
             view_row_id_column=view_row_id_column,
         )
 
-    return {"row_count": int(len(records)), "x_dim": int(x_report.x_dim)}
+    return {
+        "row_count": int(len(records)),
+        "x_dim": int(x_report.x_dim),
+        **densegen_metadata_report,
+    }
 
 
 def _configured_records_path(config: Mapping[str, Any], *, repo_root: str | Path) -> Path:
@@ -510,7 +518,7 @@ def _source_table_for_ids(source_records_path: Path, ids: Sequence[str]) -> pa.T
 
 
 def _configured_densegen_sidecar_columns(materialization: Mapping[str, Any]) -> list[str]:
-    raw_columns = materialization.get("densegen_sidecar_columns") or DENSEGEN_KEY_COLUMNS
+    raw_columns = materialization.get("densegen_sidecar_columns") or DENSEGEN_MATERIALIZATION_COLUMNS
     columns = [str(column) for column in raw_columns]
     columns = list(dict.fromkeys(columns))
     if not columns:

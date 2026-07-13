@@ -157,7 +157,7 @@ def test_materialize_probe_inputs_writes_shared_records(tmp_path: Path, monkeypa
             "source_plot_kind": "metric_over_rounds",
             "comparison_scope": "comparison_set",
             "group_key": "label_oracle_kind",
-            "metric": "pred__score_selected",
+            "metric": "view__selection_score",
             "cohort": "selected",
             "summary": "mean",
             "interval_kind": "iqr",
@@ -210,31 +210,33 @@ def test_materialize_probe_inputs_writes_shared_records(tmp_path: Path, monkeypa
 
 def test_selected_ids_from_round_rejects_duplicate_selection_ids(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
-    selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
+    selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
     selection_path.parent.mkdir(parents=True)
-    selection_path.write_text("id,score\ncandidate-1,1.0\ncandidate-1,0.9\n", encoding="utf-8")
-
+    pd.DataFrame(
+        {"id": ["candidate-1", "candidate-1"], "selection_view_id": "primary", "score": [1.0, 0.9]}
+    ).to_parquet(selection_path, index=False)
     with pytest.raises(RuntimeError, match="duplicate selected id"):
         selected_ids_from_round("cipro_positive_random_id", workdir, 0)
 
 
 def test_selected_ids_from_round_rejects_null_selection_ids(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
-    selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
+    selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
     selection_path.parent.mkdir(parents=True)
-    selection_path.write_text("id,score\n,1.0\n", encoding="utf-8")
-
+    pd.DataFrame({"id": [None], "selection_view_id": ["primary"], "score": [1.0]}).to_parquet(
+        selection_path, index=False
+    )
     with pytest.raises(RuntimeError, match="null id"):
         selected_ids_from_round("cipro_positive_random_id", workdir, 0)
 
 
 def test_selected_ids_from_round_rejects_unexpected_selection_count(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
-    selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
+    selection_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
     selection_path.parent.mkdir(parents=True)
-    rows = "\n".join(f"candidate-{idx},1.0" for idx in range(7))
-    selection_path.write_text(f"id,score\n{rows}\n", encoding="utf-8")
-
+    pd.DataFrame(
+        {"id": [f"candidate-{idx}" for idx in range(7)], "selection_view_id": "primary", "score": 1.0}
+    ).to_parquet(selection_path, index=False)
     with pytest.raises(RuntimeError, match="expected 6 selected"):
         selected_ids_from_round("cipro_positive_random_id", workdir, 0, expected_k=6)
 
@@ -305,9 +307,11 @@ def test_run_opal_rounds_reuses_existing_ingest_and_selection_outputs(
         }
     ).to_parquet(run.sidecar_path, index=False)
     for round_index, candidate_id in [(0, "selected-r0"), (1, "selected-r1")]:
-        selection_path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selection_top_k.csv"
+        selection_path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selections.parquet"
         selection_path.parent.mkdir(parents=True)
-        selection_path.write_text(f"id,score\n{candidate_id},1.0\n", encoding="utf-8")
+        pd.DataFrame({"id": [candidate_id], "selection_view_id": ["primary"], "score": [1.0]}).to_parquet(
+            selection_path, index=False
+        )
     plan = ProbePlan(
         run_root=run_root,
         initial_label_count=1,

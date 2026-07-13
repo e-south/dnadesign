@@ -13,28 +13,39 @@ from __future__ import annotations
 
 from pathlib import Path
 
-DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS: tuple[Path, ...] = (
-    Path("src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
-    Path("src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml"),
-    Path("src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml"),
-)
+DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG = Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml")
 
-STRESS_OPAL_CAMPAIGN_ALIAS_CODES: dict[str, str] = {
-    "secg_ethanol_rf_sfxi_topn": "ETH",
-    "secg_cipro_rf_sfxi_topn": "CIP",
-    "secg_and_rf_sfxi_topn": "AND",
+STRESS_SELECTION_VIEW_ALIAS_CODES: dict[str, str] = {
+    "ethanol": "ETH",
+    "ciprofloxacin": "CIP",
+    "and": "AND",
+}
+SFXI_SOURCE_CAMPAIGN_SELECTION_VIEWS: dict[str, str] = {
+    "secg_ethanol_rf_sfxi_topn": "ethanol",
+    "secg_cipro_rf_sfxi_topn": "ciprofloxacin",
+    "secg_and_rf_sfxi_topn": "and",
 }
 STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX = "SECG"
 
 
-def stress_opal_campaign_code(campaign_slug: str) -> str:
-    """Return the short synthesis alias code for a known stress OPAL campaign."""
+def stress_selection_view_code(selection_view_id: str) -> str:
+    """Return the short synthesis alias code for a stress selection view."""
+
+    view_id = str(selection_view_id).strip()
+    code = STRESS_SELECTION_VIEW_ALIAS_CODES.get(view_id)
+    if code is None:
+        raise ValueError(f"unknown stress selection view for synthesis alias: {view_id}")
+    return code
+
+
+def sfxi_source_selection_view_id(campaign_slug: str) -> str:
+    """Map a digest-pinned SFXI source campaign to its declared selection view."""
 
     slug = str(campaign_slug).strip()
-    code = STRESS_OPAL_CAMPAIGN_ALIAS_CODES.get(slug)
-    if code is None:
-        raise ValueError(f"unknown stress OPAL campaign slug for synthesis alias: {slug}")
-    return code
+    view_id = SFXI_SOURCE_CAMPAIGN_SELECTION_VIEWS.get(slug)
+    if view_id is None:
+        raise ValueError(f"unknown SFXI source campaign slug: {slug}")
+    return view_id
 
 
 def batch0_synthesis_name(campaign_slug: str, selection_rank: int) -> str:
@@ -42,13 +53,12 @@ def batch0_synthesis_name(campaign_slug: str, selection_rank: int) -> str:
 
     if int(selection_rank) <= 0:
         raise ValueError("selection_rank must be positive")
-    return (
-        f"{STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX}-B0-{stress_opal_campaign_code(campaign_slug)}-{int(selection_rank):02d}"
-    )
+    view_id = sfxi_source_selection_view_id(campaign_slug)
+    return f"{STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX}-B0-{stress_selection_view_code(view_id)}-{int(selection_rank):02d}"
 
 
-def opal_round_synthesis_name(campaign_slug: str, as_of_round: int, selection_rank: int) -> str:
-    """Return the deterministic measured-round synthesis alias for a campaign row."""
+def opal_round_synthesis_name(selection_view_id: str, as_of_round: int, selection_rank: int) -> str:
+    """Return the deterministic measured-round synthesis alias for a view member."""
 
     if int(as_of_round) < 0:
         raise ValueError("as_of_round must be non-negative")
@@ -56,5 +66,5 @@ def opal_round_synthesis_name(campaign_slug: str, as_of_round: int, selection_ra
         raise ValueError("selection_rank must be positive")
     return (
         f"{STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX}-R{int(as_of_round)}-"
-        f"{stress_opal_campaign_code(campaign_slug)}-{int(selection_rank):02d}"
+        f"{stress_selection_view_code(selection_view_id)}-{int(selection_rank):02d}"
     )

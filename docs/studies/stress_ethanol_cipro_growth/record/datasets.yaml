@@ -174,7 +174,7 @@ datasets:
       recommended pooling; native or designed exact-60 rows are not duplicated
       or relabeled as analysis_window in this merged handoff. Record data exists
       locally and on the SCC cluster root; the local sidecar migration is
-      current, but the next USR sync audit must verify remote parity before
+      complete, but the next USR sync audit must verify remote parity before
       assuming the SCC root has the same `_views` artifacts.
     sync:
       enabled: true
@@ -205,7 +205,7 @@ datasets:
       contexts here through the same Construct project after the native core60
       rows are merged into `usr_prom_eth_cip_anchor`; it should not materialize
       a separate native context dataset. Record data exists locally and on the
-      SCC cluster root; the local sidecar migration is current, but the next USR
+      SCC cluster root; the local sidecar migration is complete, but the next USR
       sync audit must verify remote parity before assuming the SCC root has the
       same `_views` artifacts.
     sync:
@@ -227,11 +227,11 @@ datasets:
     onboard_mode: create_new
     authority: shared
     notes: >-
-      Materialized shared OPAL candidate feature table for the three current
-      OPAL campaign configs. This is a USR `records.parquet` candidate universe
-      with 157185 rows: 157160 generated promoter rows from the four current
+      Materialized shared OPAL candidate feature table for the unified RMF
+      campaign. This is a USR `records.parquet` candidate universe
+      with 157185 rows: 157160 generated promoter rows from the four declared
       DenseGen plans (`background_only`, `ethanol`, `ciprofloxacin`, and
-      `ethanol_ciprofloxacin`), 23 measured pDual-10 historical SFXI rows, and
+      `ethanol_ciprofloxacin`), 23 measured pDual-10 SFXI source rows, and
       2 measured pDual-10 control rows. Native/reference audit rows remain
       LatentDNA review context unless explicitly added to this contract. The
       materializer resolves DenseGen plan/run/hash fields from
@@ -240,13 +240,14 @@ datasets:
       table carries self-auditing `opal_candidate__source_class`,
       `opal_candidate__design_family`, and `opal_candidate__sfxi_ref__collection_id`
       provenance columns plus one fixed-length vector-valued X column named
-      `latentdna__evo2_7b__context_anchor_mean_bidir_concat`, plus a shared
-      observed-label sidecar at `_opal/observed_labels.parquet` once assay
-      labels exist. Campaign-specific predictions/selections remain OPAL
-      runtime artifacts. The X value is the Fwd+RC 1 kb context-anchor Evo2 7B
+      `latentdna__evo2_7b__context_anchor_mean_bidir_concat`. SFXI source
+      labels remain at `_opal/observed_labels.parquet`; the inactive RMF route
+      requires `_opal/response_window_observed_labels.parquet`. Shared
+      predictions, view-specific selections, and the logical selection batch
+      remain OPAL runtime artifacts. The X value is the Fwd+RC 1 kb context-anchor Evo2 7B
       intermediate embedding vector; it is not UMAP, centroid distance, an
       assay label, or a phenotype claim. Do not fork this into one USR dataset
-      per campaign unless the candidate universe, X, or validation contract
+      per selection view unless the candidate universe, X, or validation contract
       diverges.
     sync:
       enabled: true

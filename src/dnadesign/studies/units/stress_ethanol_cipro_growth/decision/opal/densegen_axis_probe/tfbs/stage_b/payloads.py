@@ -92,6 +92,7 @@ def tfbs_stage_b_campaign_config_payload(
         else {}
     )
     return {
+        "schema_version": "opal.campaign.v3",
         "campaign": {
             "name": f"Dense Array TFBS metadata probe: {target_label}, {role_label}, seed {int(cfg.seed)}",
             "slug": slug,
@@ -141,7 +142,7 @@ def tfbs_stage_b_campaign_config_payload(
         },
         "plot_config": "plots.yaml",
         "ownership": {
-            "owner_scope": "study_fixture",
+            "owner_scope": "study_campaign",
             "study_id": STUDY_ID,
             "dataset_id": layout.dataset,
             "portable": False,
@@ -209,16 +210,25 @@ def tfbs_stage_b_campaign_config_payload(
                 "emit_feature_importance": True,
             },
         },
-        "objectives": [{"name": item["name"], "params": dict(item.get("params") or {})} for item in target.objectives],
-        "selection": {
-            "name": "top_n",
-            "params": {
-                "top_k": int(cfg.selection_k),
-                "score_ref": target.score_ref,
-                "objective_mode": target.objective_mode,
-                "tie_handling": cfg.selection_tie_handling,
-            },
-        },
+        "selection_views": [
+            {
+                "id": "primary",
+                "objective": {
+                    "name": target.objectives[0]["name"],
+                    "params": dict(target.objectives[0].get("params") or {}),
+                },
+                "selection": {
+                    "name": "top_n",
+                    "params": {
+                        "top_k": int(cfg.selection_k),
+                        "score_ref": target.score_ref,
+                        "objective_mode": target.objective_mode,
+                        "tie_handling": cfg.selection_tie_handling,
+                    },
+                },
+            }
+        ],
+        "selection_batch": {"deduplicate_by": "id"},
         "scoring": {"score_batch_size": int(cfg.score_batch_size)},
         "safety": {
             "fail_on_mixed_biotype_or_alphabet": True,
@@ -243,7 +253,7 @@ def write_tfbs_stage_b_plot_config(path: Path, *, label_name: str, target_displa
                 "round_selector": "all",
                 "tags": ["rounds", "tfbs_learnability", "sentinel"],
                 "params": {
-                    "metric": "pred__score_selected",
+                    "metric": "view__selection_score",
                     "cohort": "selected",
                     "summaries": ["mean", "count"],
                     "band": "iqr",

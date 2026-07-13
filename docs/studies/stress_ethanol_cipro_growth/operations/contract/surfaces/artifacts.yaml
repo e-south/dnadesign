@@ -30,8 +30,8 @@ opal_candidate_feature_table:
     generated_promoter_candidates: 157160
     measured_pdual10_sfxi_reference_rows: 23
     measured_pdual10_control_rows: 2
-  round0_observed_label_pool_state: staged_via_measured_reader_vec8
-  label_sidecar_state: absent_until_assay_labels
+  sfxi_source_label_pool_state: present_35_rows
+  response_window_label_sidecar_state: absent_until_promotion
 reference_native_dataset:
   artifact_type: dataset
   dataset_id: usr_promoter_references

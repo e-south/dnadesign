@@ -1,17 +1,27 @@
+---
+id: stress-ethanol-cipro-growth-opal-densegen-tfbs-learnability-probe-v1
+title: DenseGen TFBS learnability probe v1
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-13
+audience:
+  - maintainer
+  - agent
+---
+
 ## OPAL DenseGen TFBS Learnability Probe v1
 
-**Status:** retained v1 contract and historical implementation spec
+**Status:** study-owned v1 contract and implementation spec
 **Owner:** `stress_ethanol_cipro_growth` study package
+**Last verified:** 2026-07-13
 **Target package:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe`
 **Test owner:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe`
-**Replaces:** the production role of the prior OPAL DenseGen axis probe
-
-This document records the v1 design contract that led to the current study-owned
-implementation. It is not a result report. For current realized profile
-boundaries, use the source package README and profile registry under
+This design contract defines the study-owned implementation and is not a result
+report. Realized profile boundaries are defined by the source
+package README and profile registry under
 `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/densegen_axis_probe`.
-This document remains useful for the scientific contract, OPAL/study ownership
-boundary, staged campaign plan, and runtime-retention gates.
+Its scope is the scientific contract, OPAL/study ownership boundary,
+staged campaign plan, and runtime-retention gates.
 
 Audience and outcome: this is written for maintainers and follow-on agents
 working in `dnadesign`. Treat it as a contract and rationale record, not as the
@@ -168,7 +178,7 @@ requirements.
 | Orientation, motif score, adjacent pairs, pair spacing, full grammar | Deferred to audit/future work | These may be useful later, but they are not required for v1. |
 | Negative MSE-to-vector as active objective | Rejected for new probes | Selection should maximize predicted expected scalar label value. |
 | DenseGen-specific logic in OPAL core | Rejected | OPAL remains generic. DenseGen semantics stay in the study package. |
-| Backcompat aliases for old names | Rejected | Use strict v1 names and fail fast. |
+| Aliases for retired names | Rejected | Use strict v1 names and fail fast. |
 
 Canonical wording must use literal construction terms: `count`, `presence`,
 `count_fraction`, and `slot_family_presence`.
@@ -1522,7 +1532,7 @@ OPAL package surfaces to respect:
 Do not put DenseGen-specific parsing, TF family names, slot contracts,
 sigma-core fields, or plan-specific captions into OPAL core.
 
-Do not add backcompat shims or legacy aliases for old DenseGen target names.
+Do not add aliases for retired DenseGen target names.
 
 ### 16. Implementation Phases
 
@@ -1928,7 +1938,7 @@ artifact_retention:
 - OPAL core remains campaign-agnostic.
 - No DenseGen-specific TF family names, slot contracts, or sigma-core fields
   are added to OPAL core.
-- No backcompat shims or legacy aliases are added.
+- No aliases for retired target names are added.
 - Repo checks pass, including lint, tests, config validation, plot/report
   checks, docs checks where available, and `git diff --check`.
 

@@ -1,3 +1,11 @@
+---
+id: stress-ethanol-cipro-growth-opal-densegen-axis-probe-v0
+title: OPAL DenseGen axis probe v0
+owner: dnadesign-maintainers
+status: reference
+last_verified: 2026-07-13
+---
+
 ## OPAL DenseGen Axis Probe v0
 
 `opal_densegen_axis_probe_v0` is a minimal study-owned OPAL probe for
@@ -20,21 +28,13 @@ sources. A distribution-preserving permuted null is a paired diagnostic control.
 
 ### Boundary
 
-Allowed label inputs:
-- `densegen__used_tfbs_detail`
-- `densegen__plan` for audit and sigma35 suffix parsing
-- `densegen__required_regulators` for audit
-- `densegen__sampling_library_hash` for collapse audit
-- pad and GC metadata for future audit only
+Allowed label inputs are `densegen__used_tfbs_detail`; `densegen__plan` for
+audit and sigma35 suffix parsing; `densegen__required_regulators` for audit;
+`densegen__sampling_library_hash` for collapse audit; and pad/GC audit metadata.
 
-Forbidden label inputs:
-- `latentdna__*`
-- `infer__*`
-- OPAL predictions or selections
-- UMAP coordinates or cluster labels
-- archive SFXI labels
-- observed assay labels
-- previous synthetic labels
+Forbidden label inputs are `latentdna__*`, `infer__*`, OPAL predictions or
+selections, UMAP coordinates or cluster labels, SFXI source labels, observed
+assay labels, and previous synthetic labels.
 
 Synthetic labels are scratch-only. They must not be written to the shared
 `usr_prom_eth_cip_opal_candidates/_opal/observed_labels.parquet` sidecar.

@@ -17,8 +17,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from dnadesign.opal import read_selection_artifact
-
+from ....core.selection_artifacts import read_probe_selection
 from ..slot_diagnostics.contracts import SLOT_LABEL_SPECS
 
 
@@ -80,10 +79,7 @@ def label_table(path: Path, *, label_name: str) -> pd.DataFrame:
 def selection_table(workdir: Path, *, round_index: int) -> pd.DataFrame:
     """Read one OPAL selection artifact for a Stage B campaign round."""
 
-    path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
-    if not path.exists():
-        raise FileNotFoundError(f"Stage B selection artifact missing: {path}")
-    return read_selection_artifact(path, required_columns=("id",))
+    return read_probe_selection(workdir, round_index)
 
 
 def campaign_workdir(config_path: Path) -> Path:

@@ -140,7 +140,7 @@ def probe_campaign_collection_manifest_payload(
                 "source_plot_kind": "metric_over_rounds",
                 "comparison_scope": "comparison_set",
                 "group_key": "label_oracle_kind",
-                "metric": "pred__score_selected",
+                "metric": "view__selection_score",
                 "cohort": "selected",
                 "summary": "mean",
                 "interval_kind": "iqr",
@@ -201,13 +201,13 @@ def selected_ids_from_round(
     *,
     expected_k: int | None = None,
 ) -> list[str]:
-    from dnadesign.opal import read_selection_artifact
+    from ..core.selection_artifacts import probe_selection_path, read_probe_selection
 
-    selection_path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
+    selection_path = probe_selection_path(workdir, round_index)
     if not selection_path.exists():
         raise RuntimeError(f"selection artifact missing for {run_key} round {int(round_index)}: {selection_path}")
     try:
-        frame = read_selection_artifact(selection_path, required_columns=("id",))
+        frame = read_probe_selection(workdir, round_index)
     except Exception as exc:
         message = str(exc)
         if "duplicate IDs" in message:
@@ -260,7 +260,9 @@ def _observed_label_ids_for_round(sidecar_path: Path, round_index: int) -> set[s
 
 
 def _round_selection_exists(workdir: Path, round_index: int) -> bool:
-    return (workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv").exists()
+    from ..core.selection_artifacts import probe_selection_path
+
+    return probe_selection_path(workdir, round_index).exists()
 
 
 def _campaign_has_mutable_state(run: Any) -> bool:

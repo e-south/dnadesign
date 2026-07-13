@@ -57,17 +57,21 @@ def test_selected_campaign_rows_fail_on_missing_requested_key() -> None:
 
 
 def test_assert_selection_budget_fails_for_ordinal_tie_expansion(tmp_path: Path) -> None:
-    selection_path = tmp_path / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
+    selection_path = tmp_path / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
     selection_path.parent.mkdir(parents=True)
-    pd.DataFrame({"id": ["a", "b", "c", "d", "e", "f", "g"]}).to_csv(selection_path, index=False)
+    pd.DataFrame({"id": ["a", "b", "c", "d", "e", "f", "g"], "selection_view_id": "primary"}).to_parquet(
+        selection_path, index=False
+    )
 
     with pytest.raises(RuntimeError, match="exact-budget selection contract failed"):
         assert_selection_budget(workdir=tmp_path, round_index=0, selection_k=6, tie_handling="ordinal")
 
 
 def test_assert_selection_budget_allows_exact_ordinal_budget(tmp_path: Path) -> None:
-    selection_path = tmp_path / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
+    selection_path = tmp_path / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
     selection_path.parent.mkdir(parents=True)
-    pd.DataFrame({"id": ["a", "b", "c", "d", "e", "f"]}).to_csv(selection_path, index=False)
+    pd.DataFrame({"id": ["a", "b", "c", "d", "e", "f"], "selection_view_id": "primary"}).to_parquet(
+        selection_path, index=False
+    )
 
     assert_selection_budget(workdir=tmp_path, round_index=0, selection_k=6, tie_handling="ordinal")

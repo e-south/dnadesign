@@ -1,26 +1,30 @@
 # OPAL Batch 0 Handoff
 
-This directory owns the pre-assay seed selection for the three stress /
-ethanol / ciprofloxacin OPAL campaigns.
+**Owner:** stress_ethanol_cipro_growth study
+**Lifecycle:** active candidate-table materialization; pre-assay seed recorded
+**Last verified:** 2026-07-13
 
-Batch 0 is not OPAL model selection. It is a reviewed handoff that combines
-DenseGen design metadata, the current LatentDNA representation choice, and the
-campaign setup rules. After measured labels exist, ingest them with
-`opal ingest-y --observed-round 0`, then run OPAL with `opal run --labels-as-of
-0`.
+This directory materializes the shared OPAL candidate table and preserves the
+reviewed 18-row pre-assay seed. The seed combines DenseGen design metadata, the
+selected LatentDNA representation, and the declared synthesis rules. It is
+digest-pinned source provenance, not an executable OPAL model-selection campaign.
+
+Measured-round execution is routed through the unified `secg_rmf_greedy`
+campaign. Its canonical commands and activation gate are documented in
+`docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md`.
 
 ## Candidate Feature Table
 
 OPAL reads the USR dataset
 `src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet`.
-That dataset is one shared candidate feature table for the three current OPAL
-campaign configs, not one dataset per campaign and not just a matrix. It starts
-from the dense generated promoter subset in the current LatentDNA view: rows
+That dataset is the shared candidate feature table for the unified OPAL
+campaign, not one dataset per selection view and not only a matrix. It starts
+from the dense generated promoter subset in the selected LatentDNA view: rows
 whose `source_class` is `densegen` and whose `design_family` is one of
 `background_only`, `ethanol`, `ciprofloxacin`, or `ethanol_ciprofloxacin`. The
 materialized table also includes measured pDual-10 Reader round-0 rows that
 already have stable candidate IDs, exact sequence parity, and the selected X:
-23 historical SFXI rows plus 2 control promoter rows. Native/reference audit
+23 SFXI source rows plus 2 control promoter rows. Native/reference audit
 rows stay in LatentDNA review surfaces unless explicitly added to this OPAL
 candidate-table contract. Each candidate row must carry stable identity,
 sequence, audit/provenance metadata, and one fixed-length vector-valued X
@@ -34,21 +38,18 @@ UMAP coordinate, a centroid distance, an assay label, or a phenotype claim.
 The generated table also carries `opal_candidate__source_class`,
 `opal_candidate__design_family`, and `opal_candidate__sfxi_ref__collection_id`
 so the dense generated subset remains auditable without a LatentDNA join.
+DenseGen-backed rows also carry `densegen__used_tfbs_detail` and
+`densegen__required_regulators` from the authoritative anchor sidecar. Those
+columns are required candidate-table data: OPAL's selected-sequence surface
+passes them to BaseRender's configured `densegen_tfbs` adapter.
 
-Campaign-specific predictions, selections, and run artifacts use OPAL-owned
-campaign-local `outputs/ledger/` state. Observed SFXI labels are shared assay
-truth: every ethanol, ciprofloxacin, and AND campaign should train on the same
-latest observed-label pool while keeping its own setpoint and objective state.
-The current shared-label source is the USR sidecar
-`usr_prom_eth_cip_opal_candidates/_opal/observed_labels.parquet`.
-Legacy OPAL training labels are campaign-slug scoped; the stress campaign
-configs now use `labels.source.kind: usr_sidecar` for `ingest-y`, run/explain
-training, and candidate exclusion, plus `writeback.prediction_records:
-ledger_only` so run predictions do not mutate the shared `records.parquet`.
-Fork the USR candidate table only if a future campaign uses a different
-candidate universe or a different `X` contract.
-For this study the OPAL-writeback surface is the shared observed-label sidecar
-plus campaign-local ledgers; `records.parquet` remains the candidate/X table.
+The SFXI source runs used the `_opal/observed_labels.parquet`
+sidecar. The unified RMF campaign instead requires
+`_opal/response_window_observed_labels.parquet`, fits one shared eight-output
+model, and writes predictions, view-specific selections, and the logical
+selection batch to one campaign ledger. `records.parquet` remains the
+candidate/X table. Fork the USR candidate table only when a future campaign
+uses a different candidate universe or X contract.
 Shared sidecar appends use a local path lock during load/merge/write.
 For scratch simulations that must leave the shared USR table untouched, copy
 the candidate table and configure the campaign with `data.location.kind:
@@ -92,7 +93,8 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 ```
 
 Some DenseGen plan/run/hash fields are incomplete in row-level source records.
-The candidate-table materializer resolves those fields by `id` from
+The candidate-table materializer resolves those fields and the renderable TFBS
+metadata by `id` from
 `usr_prom_eth_cip_anchor/_derived/densegen.parquet` and fails if the sidecar is
 missing, duplicated, or null for a selected candidate. Do not infer those values
 from OPAL campaign ledgers or from a campaign-local label history column.
@@ -137,7 +139,7 @@ review rows are not scanned unless they survive the declared candidate filters.
 The live min-remaining guard is `1000` candidates; tiny unit tests must lower
 that value explicitly instead of weakening the production rule.
 
-The current batch-0 selector is a granular pre-assay seed. Ethanol and
+The batch-0 selector is a granular pre-assay seed. Ethanol and
 ciprofloxacin lean into their single-axis priors while varying placement,
 count, spacer class, and sigma strength; mixed activator-plus-LexA logic is
 reserved for the AND objective in batch zero only:

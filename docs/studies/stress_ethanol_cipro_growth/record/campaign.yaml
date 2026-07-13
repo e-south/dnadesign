@@ -2,21 +2,9 @@ version: 2
 path_base: repo
 campaign_id: stress_ethanol_cipro_growth
 steps:
-  - label: opal-candidate-feature-table-ethanol
+  - label: opal-candidate-feature-table-rmf
     registry_id: opal.downstream.usr-infer-x-active-learning
     inputs:
       usr_root: repo:src/dnadesign/usr/datasets
       dataset: usr_prom_eth_cip_opal_candidates
-      opal_config: repo:src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml
-  - label: opal-candidate-feature-table-cipro
-    registry_id: opal.downstream.usr-infer-x-active-learning
-    inputs:
-      usr_root: repo:src/dnadesign/usr/datasets
-      dataset: usr_prom_eth_cip_opal_candidates
-      opal_config: repo:src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml
-  - label: opal-candidate-feature-table-and
-    registry_id: opal.downstream.usr-infer-x-active-learning
-    inputs:
-      usr_root: repo:src/dnadesign/usr/datasets
-      dataset: usr_prom_eth_cip_opal_candidates
-      opal_config: repo:src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml
+      opal_config: repo:src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml

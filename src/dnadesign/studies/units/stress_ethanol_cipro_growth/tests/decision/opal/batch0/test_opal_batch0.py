@@ -87,6 +87,10 @@ def _candidate_provenance(
         "densegen__plan": [f"plan-{idx}" for idx in range(row_count)],
         "densegen__run_id": ["study_stress_ethanol_cipro"] * row_count,
         "densegen__sampling_library_hash": [f"hash-{idx}" for idx in range(row_count)],
+        "densegen__used_tfbs_detail": [
+            _densegen_tfbs_detail(("background", "baeR", "background")) for _ in range(row_count)
+        ],
+        "densegen__required_regulators": [["baeR"] for _ in range(row_count)],
     }
 
 
@@ -142,6 +146,7 @@ def _densegen_tfbs_detail(pattern: tuple[str, str, str]) -> list[dict[str, objec
         {
             "part_kind": "tfbs",
             "regulator": regulator,
+            "sequence": "ACGTACGTAC",
             "offset_raw": idx * 20,
             "offset": idx * 20,
             "length": 10,
@@ -1089,7 +1094,12 @@ def test_candidate_feature_table_validation_does_not_pandas_load_x(
         view_row_id_column="construct__anchor_id",
     )
 
-    assert report == {"row_count": 2, "x_dim": 2}
+    assert report == {
+        "row_count": 2,
+        "x_dim": 2,
+        "densegen_metadata_row_count": 2,
+        "densegen_metadata_exempt_row_count": 0,
+    }
     assert calls == [
         (
             "id",
@@ -1205,7 +1215,12 @@ def test_candidate_feature_table_validation_allows_ordered_latentdna_view_subset
         x_column=x_col,
         view_rows_path=view_rows,
         view_row_id_column="construct__anchor_id",
-    ) == {"row_count": 2, "x_dim": 2}
+    ) == {
+        "row_count": 2,
+        "x_dim": 2,
+        "densegen_metadata_row_count": 2,
+        "densegen_metadata_exempt_row_count": 0,
+    }
 
 
 def test_candidate_feature_table_validation_fails_fast_when_records_missing(tmp_path: Path) -> None:
@@ -1308,7 +1323,12 @@ def test_configured_candidate_feature_table_validation_resolves_repo_paths(tmp_p
         repo_root=tmp_path,
     )
 
-    assert report == {"row_count": 1, "x_dim": 2}
+    assert report == {
+        "row_count": 1,
+        "x_dim": 2,
+        "densegen_metadata_row_count": 1,
+        "densegen_metadata_exempt_row_count": 0,
+    }
 
 
 def test_batch0_preview_fails_fast_when_candidate_table_view_rows_drift(tmp_path: Path) -> None:
@@ -1384,6 +1404,11 @@ def test_candidate_table_materializer_filters_dense_plan_subset_and_writes_x(tmp
             "densegen__plan": ["ethanol", "ciprofloxacin"],
             "densegen__run_id": ["run-a", "run-b"],
             "densegen__sampling_library_hash": ["hash-a", "hash-b"],
+            "densegen__used_tfbs_detail": [
+                _densegen_tfbs_detail(("background", "baeR", "background")),
+                _densegen_tfbs_detail(("background", "lexA", "background")),
+            ],
+            "densegen__required_regulators": [["baeR"], ["lexA"]],
         }
     ).to_parquet(densegen_sidecar_path, index=False)
     config_path.write_text(
@@ -1407,6 +1432,8 @@ def test_candidate_table_materializer_filters_dense_plan_subset_and_writes_x(tmp
                             "densegen__plan",
                             "densegen__run_id",
                             "densegen__sampling_library_hash",
+                            "densegen__used_tfbs_detail",
+                            "densegen__required_regulators",
                         ],
                         "view_row_id_column": "construct__anchor_id",
                         "include_source_class": ["densegen"],
@@ -1485,6 +1512,11 @@ def test_candidate_table_materializer_manual_includes_measured_reader_rows(tmp_p
             "densegen__plan": ["ethanol", "ethanol_ciprofloxacin"],
             "densegen__run_id": ["run-a", "reader_sfxi_archive"],
             "densegen__sampling_library_hash": ["hash-a", "archive-hash"],
+            "densegen__used_tfbs_detail": [
+                _densegen_tfbs_detail(("background", "baeR", "background")),
+                _densegen_tfbs_detail(("baeR", "lexA", "background")),
+            ],
+            "densegen__required_regulators": [["baeR"], ["baeR", "lexA"]],
         }
     ).to_parquet(densegen_sidecar_path, index=False)
     config = {
@@ -1506,6 +1538,8 @@ def test_candidate_table_materializer_manual_includes_measured_reader_rows(tmp_p
                     "densegen__plan",
                     "densegen__run_id",
                     "densegen__sampling_library_hash",
+                    "densegen__used_tfbs_detail",
+                    "densegen__required_regulators",
                 ],
                 "view_row_id_column": "construct__anchor_id",
                 "include_source_class": ["densegen"],
@@ -1523,7 +1557,12 @@ def test_candidate_table_materializer_manual_includes_measured_reader_rows(tmp_p
     report = materialize_configured_candidate_feature_table(config, repo_root=tmp_path, write=True)
 
     assert report["row_count"] == 3
-    assert report["validation"] == {"row_count": 3, "x_dim": 2}
+    assert report["validation"] == {
+        "row_count": 3,
+        "x_dim": 2,
+        "densegen_metadata_row_count": 2,
+        "densegen_metadata_exempt_row_count": 1,
+    }
     records = pd.read_parquet(records_path)
     assert records["id"].tolist() == ["dense-a", "sfxi-b", "control-c"]
     assert records[x_col].map(list).tolist() == [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
@@ -1562,6 +1601,11 @@ def test_candidate_table_write_reuses_configured_validation_guards(tmp_path: Pat
             "densegen__plan": ["ethanol", "ciprofloxacin"],
             "densegen__run_id": ["run-a", "run-b"],
             "densegen__sampling_library_hash": ["hash-a", "hash-b"],
+            "densegen__used_tfbs_detail": [
+                _densegen_tfbs_detail(("background", "baeR", "background")),
+                _densegen_tfbs_detail(("background", "lexA", "background")),
+            ],
+            "densegen__required_regulators": [["baeR"], ["lexA"]],
         }
     ).to_parquet(source_path, index=False)
     densegen_sidecar_path.parent.mkdir(parents=True)
@@ -1571,6 +1615,11 @@ def test_candidate_table_write_reuses_configured_validation_guards(tmp_path: Pat
             "densegen__plan": ["ethanol", "ciprofloxacin"],
             "densegen__run_id": ["run-a", "run-b"],
             "densegen__sampling_library_hash": ["hash-a", "hash-b"],
+            "densegen__used_tfbs_detail": [
+                _densegen_tfbs_detail(("background", "baeR", "background")),
+                _densegen_tfbs_detail(("background", "lexA", "background")),
+            ],
+            "densegen__required_regulators": [["baeR"], ["lexA"]],
         }
     ).to_parquet(densegen_sidecar_path, index=False)
     config_path.write_text(
@@ -1592,6 +1641,8 @@ def test_candidate_table_write_reuses_configured_validation_guards(tmp_path: Pat
                             "densegen__plan",
                             "densegen__run_id",
                             "densegen__sampling_library_hash",
+                            "densegen__used_tfbs_detail",
+                            "densegen__required_regulators",
                         ],
                         "view_row_id_column": "construct__anchor_id",
                         "include_source_class": ["densegen"],
@@ -1741,38 +1792,39 @@ def test_selected_ids_must_exist_in_candidate_feature_table(tmp_path: Path) -> N
 
 def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
     expected = {
-        "secg_ethanol_rf_sfxi_topn": [0, 1, 0, 1],
-        "secg_cipro_rf_sfxi_topn": [0, 0, 1, 1],
-        "secg_and_rf_sfxi_topn": [0, 0, 0, 1],
+        "ethanol": [0, 1, 0, 1],
+        "ciprofloxacin": [0, 0, 1, 1],
+        "and": [0, 0, 0, 1],
     }
     x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
 
-    for slug, setpoint in expected.items():
-        cfg = load_config(CAMPAIGN_ROOT / slug / "configs/campaign.yaml")
-        assert cfg.campaign.slug == slug
-        assert cfg.data.location.kind == "usr"
-        assert cfg.data.location.dataset == "usr_prom_eth_cip_opal_candidates"
-        assert cfg.data.location.path.endswith("src/dnadesign/usr/datasets")
-        assert cfg.data.x_column_name == x_col
-        assert cfg.data.y_column_name == f"opal__{slug}__y"
-        assert cfg.data.y_expected_length == 8
-        assert cfg.labels.source.kind == "usr_sidecar"
-        assert cfg.labels.source.dataset == "usr_prom_eth_cip_opal_candidates"
-        assert cfg.labels.source.path == "_opal/observed_labels.parquet"
-        assert cfg.labels.y_space == "sfxi_vec8"
-        assert cfg.labels.round_column == "observed_round"
-        assert cfg.labels.dedup_policy == "latest_by_round"
-        assert cfg.writeback.prediction_records == "ledger_only"
-        assert cfg.ownership is not None
-        assert cfg.ownership.owner_scope == "study_fixture"
-        assert cfg.ownership.study_id == "stress_ethanol_cipro_growth"
-        assert cfg.ownership.dataset_id == "usr_prom_eth_cip_opal_candidates"
-        assert cfg.ownership.portable is False
-        assert cfg.model.name == "random_forest"
-        assert cfg.selection.selection.name == "top_n"
-        assert cfg.selection.selection.params["top_k"] == 6
-        assert cfg.selection.selection.params["score_ref"] == "sfxi_v1/sfxi"
-        assert cfg.objectives.objectives[0].params["setpoint_vector"] == setpoint
+    cfg = load_config(CAMPAIGN_ROOT / "secg_rmf_greedy" / "configs/campaign.yaml")
+    assert cfg.campaign.slug == "secg_rmf_greedy"
+    assert cfg.data.location.kind == "usr"
+    assert cfg.data.location.dataset == "usr_prom_eth_cip_opal_candidates"
+    assert cfg.data.location.path.endswith("src/dnadesign/usr/datasets")
+    assert cfg.data.x_column_name == x_col
+    assert cfg.data.y_column_name == "opal__secg_rmf_greedy__response_window_y"
+    assert cfg.data.y_expected_length == 8
+    assert cfg.labels.source.kind == "usr_sidecar"
+    assert cfg.labels.source.dataset == "usr_prom_eth_cip_opal_candidates"
+    assert cfg.labels.source.path == "_opal/response_window_observed_labels.parquet"
+    assert cfg.labels.y_space == "reader_response_window_vector_v1"
+    assert cfg.labels.round_column == "observed_round"
+    assert cfg.labels.dedup_policy == "latest_by_round"
+    assert cfg.writeback.prediction_records == "ledger_only"
+    assert cfg.ownership is not None
+    assert cfg.ownership.owner_scope == "study_campaign"
+    assert cfg.ownership.study_id == "stress_ethanol_cipro_growth"
+    assert cfg.ownership.dataset_id == "usr_prom_eth_cip_opal_candidates"
+    assert cfg.ownership.portable is False
+    assert cfg.model.name == "random_forest"
+    assert {view.id: view.objective.params["target_mask"] for view in cfg.selection_views} == expected
+    assert all(view.selection.name == "top_n" for view in cfg.selection_views)
+    assert all(view.selection.params["top_k"] == 6 for view in cfg.selection_views)
+    assert all(view.selection.params["score_ref"] == "feasibility_margin" for view in cfg.selection_views)
+    assert cfg.selection_batch.deduplicate_by == "sequence"
+    assert cfg.selection_batch.expected_unique_count == 18
 
 
 def test_study_docs_use_candidate_feature_table_name() -> None:
@@ -1796,13 +1848,16 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
     assert "opal_candidate_feature_table" in docs
     assert "one shared USR `opal_candidate_feature_table`" in docs
     assert "Do not mint one USR dataset per campaign" in docs
-    assert "OPAL-writeback surface" in docs
+    assert "one campaign fits the shared eight-output phenotype model" in docs
+    assert "named selection views" in docs
     assert "records-path lock" in docs
-    assert "data.location.kind: local" in docs
-    assert "observed SFXI labels as study-level assay truth" in docs
-    assert "Legacy OPAL training labels are campaign-slug scoped" in docs
-    assert "observed-label store" in docs
+    assert "data.location.kind: usr" in docs
+    assert "observed assay labels as study-level truth" in docs
+    assert "three digest-pinned SFXI source runs remain" in docs
+    assert "Historical boundary" not in docs
+    assert "response-window label store" in docs
     assert "_opal/observed_labels.parquet" in docs
+    assert "_opal/response_window_observed_labels.parquet" in docs
     assert "decision.opal.batch0.provenance" in docs
     assert "raw Infer vector concat" in docs
 
@@ -1827,7 +1882,8 @@ def test_opal_candidate_table_contract_tracks_round0_augmented_materialization()
         "measured_pdual10_control_rows": 2,
     }
     assert artifact["source_population"] == "dense_generated_promoters_plus_measured_reader_round0_rows"
-    assert artifact["round0_observed_label_pool_state"] == "staged_via_measured_reader_vec8"
+    assert artifact["sfxi_source_label_pool_state"] == "present_35_rows"
+    assert artifact["response_window_label_sidecar_state"] == "absent_until_promotion"
     assert "archive_sfxi_reference_control_rows" not in artifact.get("excludes", "")
     assert check["target_rows"] == artifact["row_count"]
     assert check["row_count_mode"] == "exact"
@@ -1845,12 +1901,12 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
 
     assert "routes/decision/opal/README.md" in routes
     assert "Campaign configs and commands" in opal_route
-    assert "Pre-run campaign viewer generation" in opal_commands
+    assert "Notebook review" in opal_commands
     assert "uv run opal notebook generate" in opal_commands
     assert "uv run opal notebook run" in opal_commands
-    assert "Post-run status command" in opal_commands
-    assert "campaign-specific artifact viewer" in opal_route
-    assert "Per-ID provenance trace" in opal_commands
+    assert "uv run opal status" in opal_commands
+    assert "unified notebook displays named selection views" in opal_route
+    assert "selection batch" in opal_commands
     assert "decision.opal.batch0.provenance" in opal_route
     assert "studies.stress-ethanol-cipro-growth.status" in routes
     assert opal_notebook["role"] == "campaign_specific_artifact_viewer"
@@ -1880,6 +1936,6 @@ def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() ->
     assert len(routes.splitlines()) <= 140
     assert "routes/decision/opal/README.md" in routes
     assert "routes/analysis/latentdna.md" in routes
-    assert "candidate_table_materialized_pre_assay" in opal_route
-    assert "observed-label store" in opal_context
+    assert "round0_metric_review" in opal_route
+    assert "response-window label store" in opal_context
     assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in latentdna_route

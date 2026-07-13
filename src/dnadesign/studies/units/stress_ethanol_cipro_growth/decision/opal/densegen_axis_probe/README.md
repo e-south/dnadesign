@@ -1,22 +1,25 @@
 # OPAL Dense Array Construction-Metadata Probes
 
+**Owner:** stress_ethanol_cipro_growth study
+**Lifecycle:** active TFBS probe; inactive plan-logic probe
+**Last verified:** 2026-07-13
+
 This package owns two study-local OPAL probes that use Dense Array construction
-metadata as synthetic labels. The current narrative surface is the TFBS
-synthetic-metadata probe; the older plan-logic suite remains historical
-execution precedent. The root package is only the entrypoint layer (`cli.py` and
+metadata as synthetic labels. The study decision surface is the TFBS
+synthetic-metadata probe; the plan-logic suite is inactive. The root package is
+only the entrypoint layer (`cli.py` and
 `__main__.py`). The `tfbs/` subpackage owns the strict TFBS review surface,
 where each positive campaign is paired with a matched control so enrichment can
 be evaluated from realized selected labels rather than inferred from predicted
 scores alone.
 
-The organizing rule is ownership, not historical arrival order: study-specific
-Dense Array construction semantics stay here, while OPAL core remains
-campaign-agnostic.
+The package follows ownership boundaries: study-specific Dense Array
+construction semantics stay here, while OPAL core remains campaign-agnostic.
 
 - `core/`: shared constants, run specs, artifact layouts, path policy, and
   source-column contracts.
 - `plan_logic/`: construction-metadata parsing, four-channel plan-logic labels,
-  active-target wiring, label-family registry, and legacy plan-logic nulls.
+  active-target wiring, label-family registry, and plan-logic null controls.
 - `runtime/`: run-matrix planning, scratch USR materialization, OPAL round
   execution, run-root fingerprinting, and sweep guards.
 - `evaluation/`: prediction ledger checks, prediction scoring, round dynamics,

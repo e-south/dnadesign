@@ -1,0 +1,46 @@
+schema_id: dnadesign.study.promoter_candidate_binding_sources.v1
+schema_version: "1"
+study_id: stress_ethanol_cipro_growth
+candidate_table:
+  dataset_id: usr_prom_eth_cip_opal_candidates
+  records_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet
+alias_sources:
+  - source_id: reader_promoter_source_labels
+    adapter: sequence_view_source_label.v1
+    config:
+      records_path: src/dnadesign/usr/datasets/usr_sfxi_pdual10_densegen_promoters/records.parquet
+      views_path: src/dnadesign/usr/datasets/usr_sfxi_pdual10_densegen_promoters/_views/sequence_views.parquet
+      alias_namespace: reader.design_id
+      authority_dataset_id: usr_sfxi_pdual10_densegen_promoters
+  - source_id: promoter_reference_aliases
+    adapter: reference_label_aliases.v1
+    config:
+      records_path: src/dnadesign/usr/datasets/usr_promoter_references/records.parquet
+      annotations_path: src/dnadesign/usr/datasets/usr_promoter_references/_derived/seq_annot.parquet
+      authority_dataset_id: usr_promoter_references
+      aliases:
+        - source_label: spyp
+          display_label: spyp
+          names:
+            - namespace: reader.design_id
+              alias: pDual-10-spyp
+            - namespace: source.alias
+              alias: spyp
+        - source_label: sulAp
+          display_label: sulAp
+          names:
+            - namespace: reader.design_id
+              alias: pDual-10-sulAp
+            - namespace: source.alias
+              alias: sulAp
+  - source_id: pre_assay_synthesis_aliases
+    adapter: synthesis_handoff.v1
+    config:
+      record_path: docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml
+      handoff_id: stress-opal-batch0-sfxi-v1
+      authority_dataset_id: stress-opal-batch0-sfxi-v1
+      aliases:
+        - namespace: synthesis.name
+          template: "{synthesis_name}"
+        - namespace: reader.design_id
+          template: "pDual-10-{synthesis_name}"

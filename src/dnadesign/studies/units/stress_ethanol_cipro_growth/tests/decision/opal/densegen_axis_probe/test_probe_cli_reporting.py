@@ -42,9 +42,38 @@ def test_probe_progress_summarizes_round_logs(tmp_path: Path, capsys: pytest.Cap
     log_path.write_text(
         "\n".join(
             [
-                json.dumps({"ts": "2026-05-19T18:36:23+00:00", "stage": "start"}),
-                json.dumps({"ts": "2026-05-19T18:36:30+00:00", "stage": "predict_batch", "batch": 2, "of": 5}),
-                json.dumps({"ts": "2026-05-19T18:36:35+00:00", "stage": "done"}),
+                json.dumps(
+                    {
+                        "schema_version": "opal.progress_event.v1",
+                        "event_id": "probe-progress-0",
+                        "phase": "run",
+                        "severity": "info",
+                        "ts": "2026-05-19T18:36:23+00:00",
+                        "stage": "start",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": "opal.progress_event.v1",
+                        "event_id": "probe-progress-1",
+                        "phase": "run",
+                        "severity": "info",
+                        "ts": "2026-05-19T18:36:30+00:00",
+                        "stage": "predict_batch",
+                        "batch": 2,
+                        "of": 5,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": "opal.progress_event.v1",
+                        "event_id": "probe-progress-2",
+                        "phase": "run",
+                        "severity": "info",
+                        "ts": "2026-05-19T18:36:35+00:00",
+                        "stage": "done",
+                    }
+                ),
             ]
         ),
         encoding="utf-8",
@@ -90,8 +119,26 @@ def test_probe_progress_uses_planned_round_count_for_done_status(tmp_path: Path)
     log_path.write_text(
         "\n".join(
             [
-                json.dumps({"ts": "2026-05-19T18:36:23+00:00", "stage": "start"}),
-                json.dumps({"ts": "2026-05-19T18:36:35+00:00", "stage": "done"}),
+                json.dumps(
+                    {
+                        "schema_version": "opal.progress_event.v1",
+                        "event_id": "probe-round-count-0",
+                        "phase": "run",
+                        "severity": "info",
+                        "ts": "2026-05-19T18:36:23+00:00",
+                        "stage": "start",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": "opal.progress_event.v1",
+                        "event_id": "probe-round-count-1",
+                        "phase": "run",
+                        "severity": "info",
+                        "ts": "2026-05-19T18:36:35+00:00",
+                        "stage": "done",
+                    }
+                ),
             ]
         ),
         encoding="utf-8",

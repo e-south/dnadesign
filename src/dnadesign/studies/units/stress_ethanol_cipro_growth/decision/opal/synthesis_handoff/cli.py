@@ -27,18 +27,17 @@ from .batch0_source import (
     DEFAULT_BATCH0_SELECTION_CONFIG,
     build_batch0_selected_candidates,
 )
-from .campaigns import DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS
-from .contracts import SelectedCandidate
+from .campaigns import DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG
+from .contracts import SelectedCandidate, SelectionMembership
 from .exports import campaign_synthesis_output_dir, render_campaign_scoped_exports
 from .manifest import build_synthesis_manifest
-from .opal_round_source import selected_candidates_from_opal_round_campaigns
+from .opal_round_source import selected_candidates_from_opal_round
 from .records import (
     DEFAULT_SYNTHESIS_HANDOFF_RECORD,
     SynthesisHandoffRecord,
     apply_handoff_record_lifecycle,
     get_synthesis_handoff_record,
     handoff_record_payload,
-    run_id_by_campaign_from_handoff_record,
     source_mode_from_handoff_record,
     validate_manifest_against_handoff_record,
 )
@@ -49,6 +48,7 @@ def _selected_from_csv(path: Path) -> list[SelectedCandidate]:
     rows = pd.read_csv(path, dtype=str).fillna("")
     required = [
         "campaign_slug",
+        "selection_memberships",
         "as_of_round",
         "run_id",
         "selection_rank",
@@ -61,9 +61,16 @@ def _selected_from_csv(path: Path) -> list[SelectedCandidate]:
         raise ValueError("selected-csv missing required columns: " + ", ".join(missing))
     selected: list[SelectedCandidate] = []
     for idx, row in rows.iterrows():
+        try:
+            memberships_raw = json.loads(str(row["selection_memberships"]))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"selected-csv row {idx} has invalid selection_memberships JSON") from exc
+        if not isinstance(memberships_raw, list):
+            raise ValueError(f"selected-csv row {idx} selection_memberships must be a JSON list")
         selected.append(
             SelectedCandidate(
                 campaign_slug=str(row["campaign_slug"]),
+                selection_memberships=tuple(SelectionMembership.from_mapping(item) for item in memberships_raw),
                 as_of_round=int(row["as_of_round"]),
                 run_id=str(row["run_id"]),
                 selection_rank=int(row["selection_rank"]),
@@ -96,35 +103,6 @@ def _repo_root_from(path: Path) -> Path:
     raise RuntimeError(f"could not resolve repo root from {path}")
 
 
-def _parse_run_id_args(
-    values: Sequence[str] | None, *, campaign_config_count: int
-) -> tuple[str | None, dict[str, str]]:
-    if not values:
-        return None, {}
-    single: str | None = None
-    by_campaign: dict[str, str] = {}
-    for value in values:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("--run-id values must be non-empty")
-        if "=" in text:
-            campaign_slug, run_id = text.split("=", 1)
-            campaign_slug = campaign_slug.strip()
-            run_id = run_id.strip()
-            if not campaign_slug or not run_id:
-                raise ValueError("--run-id campaign mappings must look like campaign_slug=run_id")
-            by_campaign[campaign_slug] = run_id
-            continue
-        if single is not None:
-            raise ValueError("provide at most one unqualified --run-id")
-        single = text
-    if single is not None and by_campaign:
-        raise ValueError("do not mix unqualified --run-id with campaign_slug=run_id mappings")
-    if single is not None and int(campaign_config_count) != 1:
-        raise ValueError("unqualified --run-id is only valid with one --campaign-config")
-    return single, by_campaign
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build and validate stress-study OPAL synthesis handoff artifacts.",
@@ -153,10 +131,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--campaign-config",
         type=Path,
-        action="append",
         help=(
-            "OPAL campaign config used when --source opal-round. "
-            "Repeat for multiple campaigns; defaults to the three stress SFXI campaign configs."
+            "Unified OPAL campaign config used when --source opal-round. Defaults to the inactive stress RMF campaign."
         ),
     )
     parser.add_argument(
@@ -168,23 +144,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--run-id",
-        action="append",
         help=(
-            "Optional OPAL run_id for raw --source opal-round. "
+            "Optional unified OPAL run_id for raw --source opal-round. "
             "For --handoff-id, record run IDs in the lifecycle record instead."
         ),
     )
     parser.add_argument(
         "--strategy-yaml",
         type=Path,
-        default=Path(__file__).parent / "configs" / "sfxi_promoter_insert_v1.yaml",
+        default=Path(__file__).parent / "configs" / "stress_promoter_insert_v1.yaml",
         help="YAML cloning strategy config.",
     )
     parser.add_argument("--batch-id", help="Synthesis batch identifier.")
     parser.add_argument(
         "--repo-root",
         type=Path,
-        help="Repository root for campaign-scoped outputs. Defaults from the selected source path or current repo.",
+        help=(
+            "Repository root for campaign-scoped outputs. Defaults from the selected source path or working directory."
+        ),
     )
     parser.add_argument(
         "--output-dir",
@@ -300,7 +277,7 @@ def _batch_id_from_source(
     if source == "opal-round":
         if as_of_round is None:
             raise ValueError("--round is required when --source opal-round")
-        return args_batch_id or f"stress-opal-r{int(as_of_round)}-sfxi-v1"
+        return args_batch_id or f"stress-opal-r{int(as_of_round)}-rmf-v1"
     return args_batch_id or "stress-opal-synthesis-batch"
 
 
@@ -319,20 +296,16 @@ def _validate_record_manifest(
     )
 
 
-def _run_ids_for_opal_round_source(
+def _run_id_for_opal_round_source(
     *,
-    args_run_id: Sequence[str] | None,
-    campaign_config_count: int,
+    args_run_id: str | None,
     handoff_record: SynthesisHandoffRecord | None,
-) -> tuple[str | None, dict[str, str]]:
+) -> str | None:
     if handoff_record is None:
-        return _parse_run_id_args(
-            args_run_id,
-            campaign_config_count=campaign_config_count,
-        )
+        return args_run_id
     if args_run_id:
         raise ValueError("--handoff-id records OPAL run IDs; do not also pass --run-id")
-    return None, run_id_by_campaign_from_handoff_record(handoff_record)
+    return handoff_record.run_id
 
 
 def _is_handoff_record_only_preview(
@@ -391,7 +364,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "mode": "dry_run_helpful_noop",
                 "strategy_id": strategy.strategy_id,
                 "batch0_default_batch_id": DEFAULT_BATCH0_BATCH_ID,
-                "opal_round_default_campaign_configs": [str(path) for path in DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS],
+                "opal_round_default_campaign_config": str(DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG),
                 "note": "provide --source batch0, --source opal-round, or --selected-csv to build a manifest",
             },
             as_json=bool(args.json),
@@ -441,21 +414,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             _parser_error(parser, args, str(exc))
     elif source == "opal-round":
         repo_root = args.repo_root or _repo_root_from(Path.cwd())
-        campaign_configs = args.campaign_config or [repo_root / path for path in DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIGS]
+        campaign_config = args.campaign_config or repo_root / DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG
         try:
-            run_id, run_id_by_campaign = _run_ids_for_opal_round_source(
+            run_id = _run_id_for_opal_round_source(
                 args_run_id=args.run_id,
-                campaign_config_count=len(campaign_configs),
                 handoff_record=handoff_record,
             )
         except ValueError as exc:
             _parser_error(parser, args, str(exc))
         try:
-            selected, source_report = selected_candidates_from_opal_round_campaigns(
-                campaign_configs,
+            selected, source_report = selected_candidates_from_opal_round(
+                campaign_config,
                 as_of_round=int(as_of_round),
                 run_id=run_id,
-                run_id_by_campaign=run_id_by_campaign,
                 repo_root=repo_root,
             )
         except ValueError as exc:

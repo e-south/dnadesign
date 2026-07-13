@@ -281,9 +281,9 @@ def single_nonempty(values: Sequence[Any]) -> str:
 def predicted_score_mean(selection: pd.DataFrame) -> float:
     """Return the selected prediction score mean when present."""
 
-    if "pred__score_selected" not in selection.columns:
+    if "score" not in selection.columns:
         return np.nan
-    return float(pd.to_numeric(selection["pred__score_selected"], errors="coerce").mean())
+    return float(pd.to_numeric(selection["score"], errors="coerce").mean())
 
 
 def reject_duplicate_ids(ids: Sequence[str], *, path: Path, round_index: int) -> None:

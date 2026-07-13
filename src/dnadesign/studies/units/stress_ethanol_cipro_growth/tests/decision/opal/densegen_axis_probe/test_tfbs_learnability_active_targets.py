@@ -64,7 +64,7 @@ def test_binary_presence_target_uses_expected_scalar_channel_not_plan_similarity
             "params": {"channel_index": 0, "channel_name": "lexA_present", "mode": "maximize"},
         },
     )
-    assert spec.score_ref == "vector_channel_v1/lexA_present"
+    assert spec.score_ref == "lexA_present"
     assert spec.score_label == "Predicted P(LexA present)"
     assert "vector_target_similarity_v1" not in str(spec.to_dict())
     assert "wet-lab phenotype" in spec.interpretation_boundary

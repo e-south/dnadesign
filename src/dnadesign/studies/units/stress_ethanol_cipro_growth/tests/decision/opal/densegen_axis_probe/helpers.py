@@ -155,10 +155,34 @@ def _write_probe_prediction_campaign(
         pred["run_id"] = run_rows[0][0]
     if "as_of_round" not in pred.columns:
         pred["as_of_round"] = run_rows[0][1]
-    if "sel__is_selected" not in pred.columns:
-        pred["sel__is_selected"] = True
-    if "sel__rank_competition" not in pred.columns:
-        pred["sel__rank_competition"] = range(1, len(pred) + 1)
+    if "view__is_selected" not in pred.columns:
+        pred["view__is_selected"] = True
+    if "view__rank_competition" not in pred.columns:
+        pred["view__rank_competition"] = range(1, len(pred) + 1)
+    if "view__selection_score" not in pred.columns:
+        pred["view__selection_score"] = 0.0
+    pred["pred__selection_views"] = [
+        [
+            {
+                "selection_view_id": "primary",
+                "objective_name": "test_objective",
+                "selection_name": "top_n",
+                "score": float(score),
+                "score_ref": "score",
+                "selection_score": float(score),
+                "rank_competition": int(rank),
+                "is_selected": selected,
+                "top_k": len(pred),
+                "uncertainty": None,
+                "uncertainty_ref": None,
+                "diagnostics": [],
+            }
+        ]
+        for score, rank, selected in pred[
+            ["view__selection_score", "view__rank_competition", "view__is_selected"]
+        ].itertuples(index=False, name=None)
+    ]
+    pred = pred.drop(columns=["view__selection_score", "view__rank_competition", "view__is_selected"])
     predictions_dir = ledger_dir / "predictions"
     predictions_dir.mkdir(parents=True, exist_ok=True)
     pred.to_parquet(predictions_dir / "part.parquet", index=False)
@@ -232,9 +256,9 @@ def _write_stage_b_review_fixture(tmp_path: Path, *, include_missing_selection_i
 
 
 def _write_stage_b_review_selection(workdir: Path, round_index: int, ids: list[str], scores: list[float]) -> None:
-    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selection_top_k.csv"
+    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selections.parquet"
     path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"id": ids, "pred__score_selected": scores}).to_csv(path, index=False)
+    pd.DataFrame({"id": ids, "selection_view_id": "primary", "score": scores}).to_parquet(path, index=False)
 
 
 def _dark_edge_pixel_count(image: object, *, edge_width: int = 5) -> int:

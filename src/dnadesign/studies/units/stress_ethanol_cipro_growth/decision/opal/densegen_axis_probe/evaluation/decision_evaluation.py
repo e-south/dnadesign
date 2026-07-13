@@ -257,7 +257,7 @@ def _validate_prediction_scope(*, run: RunSpec, predictions: pd.DataFrame, row: 
     if predictions.empty:
         raise RuntimeError(f"missing OPAL prediction artifacts for scored run {run.run_key}: {run.workdir}")
     missing = sorted(
-        {"id", "pred__y_hat_model", "pred__score_selected", "sel__is_selected", "sel__rank_competition"}
+        {"id", "pred__y_hat_model", "view__selection_score", "view__is_selected", "view__rank_competition"}
         - set(predictions.columns)
     )
     if missing:

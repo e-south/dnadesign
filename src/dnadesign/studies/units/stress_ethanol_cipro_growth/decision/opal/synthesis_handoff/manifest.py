@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from typing import Any
@@ -20,7 +21,7 @@ import pandas as pd
 
 from dnadesign.opal import scan_restriction_sites
 
-from .contracts import CloningStrategy, SelectedCandidate, validate_promoter_core
+from .contracts import CloningStrategy, SelectedCandidate, SelectionMembership, validate_promoter_core
 
 
 def _sha256_text(value: str) -> str:
@@ -33,6 +34,9 @@ def _candidate_from(value: SelectedCandidate | Mapping[str, Any]) -> SelectedCan
     if isinstance(value, Mapping):
         return SelectedCandidate(
             campaign_slug=str(value["campaign_slug"]),
+            selection_memberships=tuple(
+                SelectionMembership.from_mapping(row) for row in value["selection_memberships"]
+            ),
             as_of_round=int(value["as_of_round"]),
             run_id=str(value["run_id"]),
             selection_rank=int(value["selection_rank"]),
@@ -124,6 +128,12 @@ def build_synthesis_manifest(
                 "strategy_name": strategy.name,
                 "strategy_version": strategy.version,
                 "campaign_slug": candidate.campaign_slug,
+                "selection_view_ids": json.dumps(candidate.selection_view_ids, separators=(",", ":")),
+                "selection_memberships": json.dumps(
+                    [asdict(row) for row in candidate.selection_memberships],
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ),
                 "as_of_round": candidate.as_of_round,
                 "run_id": candidate.run_id,
                 "selection_source": candidate.selection_source,

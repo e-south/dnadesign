@@ -14,8 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
-from dnadesign.opal import read_selection_artifact
-
+from ....core.selection_artifacts import probe_selection_path, read_probe_selection
 from ..semantics import (
     TFBS_STAGE_B_EXACT_BUDGET_TIE_HANDLING,
     validate_stage_b_tie_handling,
@@ -29,10 +28,10 @@ def selected_ids_from_round(
     selection_k: int | None = None,
     tie_handling: str | None = None,
 ) -> tuple[str, ...]:
-    path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
+    path = probe_selection_path(workdir, round_index)
     if not path.exists():
         raise FileNotFoundError(f"Stage B selection artifact missing: {path}")
-    frame = read_selection_artifact(path, required_columns=("id",))
+    frame = read_probe_selection(workdir, round_index)
     ids = tuple(str(value).strip() for value in frame["id"].tolist())
     if not ids or any(not value for value in ids):
         raise ValueError(f"Stage B selection artifact has blank or empty ids: {path}")
@@ -49,14 +48,14 @@ def selected_ids_from_round(
 
 
 def selection_exists(*, workdir: Path, round_index: int) -> bool:
-    return (workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv").exists()
+    return probe_selection_path(workdir, round_index).exists()
 
 
 def assert_selection_budget(*, workdir: Path, round_index: int, selection_k: int, tie_handling: str) -> None:
-    path = workdir / "outputs" / "rounds" / f"round_{int(round_index)}" / "selection" / "selection_top_k.csv"
+    path = probe_selection_path(workdir, round_index)
     if not path.exists():
         raise FileNotFoundError(f"Stage B selection artifact missing: {path}")
-    frame = read_selection_artifact(path, required_columns=("id",))
+    frame = read_probe_selection(workdir, round_index)
     assert_selected_count(
         selected_count=len(frame),
         path=path,

@@ -151,16 +151,17 @@ def test_tfbs_stage_b_generates_sentinel_configs_from_stage_a_artifacts(tmp_path
         assert cfg["labels"]["y_space"] == "numeric_vector"
         assert cfg["transforms_y"]["name"] == "vector_from_table_v1"
         assert cfg["transforms_y"]["params"]["value_columns"] == [label_name]
-        assert cfg["objectives"] == [
-            {
-                "name": "vector_channel_v1",
-                "params": {"channel_index": 0, "channel_name": label_name, "mode": "maximize"},
-            }
-        ]
-        assert cfg["selection"]["params"]["score_ref"] == f"vector_channel_v1/{label_name}"
-        assert cfg["selection"]["params"]["objective_mode"] == "maximize"
-        assert cfg["selection"]["params"]["top_k"] == 6
-        assert cfg["selection"]["params"]["tie_handling"] == "ordinal"
+        assert cfg["schema_version"] == "opal.campaign.v3"
+        view = cfg["selection_views"][0]
+        assert view["id"] == "primary"
+        assert view["objective"] == {
+            "name": "vector_channel_v1",
+            "params": {"channel_index": 0, "channel_name": label_name, "mode": "maximize"},
+        }
+        assert view["selection"]["params"]["score_ref"] == label_name
+        assert view["selection"]["params"]["objective_mode"] == "maximize"
+        assert view["selection"]["params"]["top_k"] == 6
+        assert view["selection"]["params"]["tie_handling"] == "ordinal"
         assert cfg["writeback"]["prediction_records"] == "ledger_only"
         assert cfg["artifact_retention"] == {
             "mode": "production_review",

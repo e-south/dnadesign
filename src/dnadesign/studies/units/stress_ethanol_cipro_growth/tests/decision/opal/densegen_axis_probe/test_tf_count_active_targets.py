@@ -61,7 +61,7 @@ def test_make_training_input_for_tf_count_materializes_compact_objectives(tmp_pa
 
 
 def test_write_campaign_config_uses_generic_vector_contract_for_tf_count(tmp_path: Path) -> None:
-    source_config = tmp_path / "src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml"
+    source_config = tmp_path / "src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml"
     source_config.parent.mkdir(parents=True)
     source_config.write_text(yaml.safe_dump(_minimal_source_config(), sort_keys=False), encoding="utf-8")
     run_root = tmp_path / "probe"
@@ -92,9 +92,11 @@ def test_write_campaign_config_uses_generic_vector_contract_for_tf_count(tmp_pat
     assert cfg["data"]["y_expected_length"] == 3
     assert cfg["labels"]["y_space"] == "numeric_vector"
     assert cfg["transforms_y"]["name"] == "vector_from_table_v1"
-    assert cfg["objectives"][0]["name"] == "vector_channel_v1"
-    assert cfg["objectives"][0]["params"]["channel_name"] == "tf_count__lexA"
-    assert cfg["selection"]["params"]["score_ref"] == "vector_channel_v1/tf_count__lexA"
+    view = cfg["selection_views"][0]
+    assert view["id"] == "primary"
+    assert view["objective"]["name"] == "vector_channel_v1"
+    assert view["objective"]["params"]["channel_name"] == "tf_count__lexA"
+    assert view["selection"]["params"]["score_ref"] == "tf_count__lexA"
     assert "y_ops" not in cfg["training"]
     plot_names = {row["name"] for row in plots["plots"]}
     assert "selected_target_vector_summary" in plot_names
@@ -103,6 +105,7 @@ def test_write_campaign_config_uses_generic_vector_contract_for_tf_count(tmp_pat
 
 def _minimal_source_config() -> dict[str, object]:
     return {
+        "schema_version": "opal.campaign.v3",
         "campaign": {"name": "source", "slug": "source", "workdir": ".", "metadata": {}},
         "data": {"location": {"kind": "usr", "path": ".", "dataset": "src"}, "y_column_name": "y"},
         "labels": {"source": {"kind": "usr_sidecar", "dataset": "src", "path": "labels.parquet"}},
@@ -110,8 +113,14 @@ def _minimal_source_config() -> dict[str, object]:
         "transforms_x": {"name": "identity", "params": {}},
         "transforms_y": {"name": "vector_from_table_v1", "params": {}},
         "model": {"name": "random_forest", "params": {}},
-        "objectives": [{"name": "vector_channel_v1", "params": {}}],
-        "selection": {"name": "top_n", "params": {"top_k": 6, "score_ref": "vector_channel_v1/channel"}},
+        "selection_views": [
+            {
+                "id": "primary",
+                "objective": {"name": "vector_channel_v1", "params": {}},
+                "selection": {"name": "top_n", "params": {"top_k": 6, "score_ref": "channel"}},
+            }
+        ],
+        "selection_batch": {"deduplicate_by": "id"},
         "scoring": {"score_batch_size": 1000},
         "safety": {},
     }

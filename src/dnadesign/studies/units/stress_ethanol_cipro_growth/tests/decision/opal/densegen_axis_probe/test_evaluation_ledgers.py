@@ -31,7 +31,7 @@ def test_evaluate_run_rejects_partial_prediction_ledgers(tmp_path: Path) -> None
             {
                 "id": ["eval-1"],
                 "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]],
-                "pred__score_selected": [1.0],
+                "view__selection_score": [1.0],
             }
         ),
     )
@@ -73,7 +73,7 @@ def test_evaluate_run_respects_split_eval_ids(tmp_path: Path) -> None:
             {
                 "id": eval_ids,
                 "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]] * len(eval_ids),
-                "pred__score_selected": [1.0 - (idx * 0.01) for idx in range(len(eval_ids))],
+                "view__selection_score": [1.0 - (idx * 0.01) for idx in range(len(eval_ids))],
             }
         ),
     )
@@ -122,9 +122,9 @@ def test_evaluate_run_scores_tf_count_active_target_by_mean_lift(tmp_path: Path)
             {
                 "id": ["eval-high", "eval-mid", "eval-zero"],
                 "pred__y_hat_model": [[4.0, 0.0, 4.0], [2.0, 0.0, 2.0], [0.0, 0.0, 0.0]],
-                "pred__score_selected": [0.9, 0.8, 0.1],
-                "sel__is_selected": [True, True, False],
-                "sel__rank_competition": [1, 2, 3],
+                "view__selection_score": [0.9, 0.8, 0.1],
+                "view__is_selected": [True, True, False],
+                "view__rank_competition": [1, 2, 3],
             }
         ),
     )
@@ -180,9 +180,9 @@ def test_evaluate_run_rounds_tracks_retroactive_performance_by_round(tmp_path: P
                     [0.0, 0.0, 0.0, 0.0],
                     [0.0, 0.0, 0.0, 0.0],
                 ],
-                "pred__score_selected": [0.9, 0.1, 0.8],
-                "sel__is_selected": [True, False, True],
-                "sel__rank_competition": [1, 2, 1],
+                "view__selection_score": [0.9, 0.1, 0.8],
+                "view__is_selected": [True, False, True],
+                "view__rank_competition": [1, 2, 1],
             }
         ),
         runs=[("run-r0", 0), ("run-r1", 1)],
@@ -231,7 +231,7 @@ def test_evaluate_run_requires_prediction_schema(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     config_path = _write_probe_prediction_campaign(
         workdir,
-        pd.DataFrame({"id": ["eval-1"], "pred__score_selected": [1.0]}),
+        pd.DataFrame({"id": ["eval-1"], "view__selection_score": [1.0]}),
     )
     labels = pd.DataFrame(
         {
@@ -273,7 +273,7 @@ def test_evaluate_run_rejects_duplicate_prediction_ids(tmp_path: Path) -> None:
                     [0.0, 0.0, 1.0, 1.0],
                     [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
                 ],
-                "pred__score_selected": [1.0, 0.5],
+                "view__selection_score": [1.0, 0.5],
             }
         ),
     )
@@ -318,9 +318,9 @@ def test_evaluate_run_scores_actual_selected_rows_not_highest_unselected_score(t
                     [0.0, 0.0, 1.0, 1.0],
                     *([[0.0, 0.0, 1.0, 1.0]] * len(selected_ids)),
                 ],
-                "pred__score_selected": [0.99, *([0.5] * len(selected_ids))],
-                "sel__is_selected": [False, *([True] * len(selected_ids))],
-                "sel__rank_competition": [7, *range(1, 7)],
+                "view__selection_score": [0.99, *([0.5] * len(selected_ids))],
+                "view__is_selected": [False, *([True] * len(selected_ids))],
+                "view__rank_competition": [7, *range(1, 7)],
             }
         ),
     )

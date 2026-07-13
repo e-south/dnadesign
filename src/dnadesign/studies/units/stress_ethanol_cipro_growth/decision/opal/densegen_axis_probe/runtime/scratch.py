@@ -238,14 +238,28 @@ def _write_campaign_config(repo_root: Path, run: RunSpec, run_root: Path) -> Non
         "name": target.transforms_y["name"],
         "params": dict(target.transforms_y.get("params") or {}),
     }
-    cfg["objectives"] = [{"name": item["name"], "params": dict(item.get("params") or {})} for item in target.objectives]
+    if len(target.objectives) != 1:
+        raise ValueError("DenseGen probe selection view requires exactly one objective.")
     cfg.setdefault("training", {}).pop("y_ops", None)
-    selection = cfg.setdefault("selection", {})
-    selection_params = selection.setdefault("params", {})
-    selection_params["top_k"] = int(run.selection_k)
-    selection_params["score_ref"] = target.score_ref
-    selection_params["objective_mode"] = target.objective_mode
-    selection_params["tie_handling"] = "ordinal"
+    cfg["selection_views"] = [
+        {
+            "id": "primary",
+            "objective": {
+                "name": target.objectives[0]["name"],
+                "params": dict(target.objectives[0].get("params") or {}),
+            },
+            "selection": {
+                "name": "top_n",
+                "params": {
+                    "top_k": int(run.selection_k),
+                    "score_ref": target.score_ref,
+                    "objective_mode": target.objective_mode,
+                    "tie_handling": "ordinal",
+                },
+            },
+        }
+    ]
+    cfg["selection_batch"] = {"deduplicate_by": "id"}
     if run.max_x_matrix_gib is not None:
         cfg.setdefault("safety", {})["max_x_matrix_gib"] = float(run.max_x_matrix_gib)
     if run.score_batch_size is not None:
@@ -273,7 +287,7 @@ def write_campaign_plot_config(run: RunSpec) -> None:
             "round_selector": "all",
             "tags": ["rounds", "dogfood"],
             "params": {
-                "metric": "pred__score_selected",
+                "metric": "view__selection_score",
                 "cohort": "selected",
                 "summaries": ["mean", "count"],
                 "band": "iqr",
@@ -295,7 +309,7 @@ def write_campaign_plot_config(run: RunSpec) -> None:
             "round_selector": "all",
             "tags": ["rounds", "dogfood", "selection"],
             "params": {
-                "score_field": "pred__score_selected",
+                "score_field": "view__selection_score",
                 "rank_mode": "competition",
                 "alpha": 0.45,
                 "multi_round_alpha": 0.24,
@@ -312,7 +326,7 @@ def write_campaign_plot_config(run: RunSpec) -> None:
             "round_selector": "all",
             "tags": ["rounds", "dogfood", "selection", "threshold"],
             "params": {
-                "metric": "pred__score_selected",
+                "metric": "view__selection_score",
                 "threshold_quantile": 0.9,
                 "mode": "line",
                 "title": "Objective score enrichment above fixed P90",

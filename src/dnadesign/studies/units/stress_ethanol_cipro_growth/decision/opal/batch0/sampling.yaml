@@ -24,6 +24,8 @@ candidate_feature_table:
       - densegen__plan
       - densegen__run_id
       - densegen__sampling_library_hash
+      - densegen__used_tfbs_detail
+      - densegen__required_regulators
     view_row_id_column: construct__anchor_id
     include_source_class: ["densegen"]
     allowed_design_families: ["background_only", "ethanol", "ciprofloxacin", "ethanol_ciprofloxacin"]
@@ -90,7 +92,7 @@ filters:
   note: LatentDNA margins are pre-assay priors only; do not treat them as phenotype claims.
 
 synthesis_eligibility:
-  strategy_yaml: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/sfxi_promoter_insert_v1.yaml
+  strategy_yaml: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/stress_promoter_insert_v1.yaml
   sequence_column: sequence
   min_remaining_candidates: 1000
 

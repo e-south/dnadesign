@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-05-19
+  last_verified: 2026-07-11
   navigation:
     command_group_map: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md
     lane_sidecars:
@@ -121,7 +121,7 @@ study_pipeline:
         reusable_vectors: 1605080
         reusable_scalars: 963048
       latest_live_submit:
-        status: historical_pre_completion_submit
+        status: complete
         current: false
         submitted_at: 2026-04-30T15:21:07-04:00
         command: uv run ops runbook fill-infer --study-dir docs/studies/stress_ethanol_cipro_growth --repo-root . --submit --command-timeout-seconds 900
@@ -290,24 +290,25 @@ study_pipeline:
       densegen_subset_exclude_non_null_columns:
         - sfxi_ref__collection_id
       manual_include_scope: measured_pdual10_reader_round0_rows_with_existing_x
-    config: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml
-    configs:
-      ethanol_factor: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml
-      cipro_factor: src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml
-      and: src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml
-    progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
-    review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml --round latest --json
+    config: src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+    selection_views:
+      ethanol: [0, 1, 0, 1]
+      ciprofloxacin: [0, 0, 1, 1]
+      and: [0, 0, 0, 1]
+    progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --round latest --json
+    review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view <selection_view_id> --round latest --json
     densegen_axis_probe_progress_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe progress --run-root <run-root> --json
-    selection_set_show_command: uv run opal selection-set show -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --json
-    selection_set_export_command: uv run opal selection-set export -c src/dnadesign/opal/campaigns/<campaign_slug>/configs/campaign.yaml --round <as_of_round> --out <selection-set.csv> --format csv --json
+    selection_set_show_command: uv run opal selection-set show -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --json
+    selection_set_export_command: uv run opal selection-set export -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --out <selection-set.csv> --format csv --json
+    selection_batch_show_command: uv run opal selection-batch show -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --round <as_of_round> --json
     synthesis_handoff_batch0_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --write --json
     synthesis_handoff_round_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <measured_round_handoff_id> --write --json
-    synthesis_handoff_round_draft_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round <as_of_round> --write --json
+    synthesis_handoff_round_draft_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round <as_of_round> --run-id <run_id> --write --json
     notebook:
       role: campaign_specific_artifact_viewer
       pre_run_execution_safe: true
       mutates_notebook: true
-      generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml --round latest --force
-      run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml
+      generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --round latest --force
+      run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
     batch0_selector: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml
-    state: candidate_table_materialized_pre_assay
+    state: round0_metric_review

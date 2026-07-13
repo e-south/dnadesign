@@ -30,9 +30,9 @@ def test_evaluate_run_rejects_less_than_six_evaluable_selected_ids(tmp_path: Pat
             {
                 "id": ["eval-1"],
                 "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]],
-                "pred__score_selected": [1.0],
-                "sel__is_selected": [True],
-                "sel__rank_competition": [1],
+                "view__selection_score": [1.0],
+                "view__is_selected": [True],
+                "view__rank_competition": [1],
             }
         ),
     )
@@ -74,9 +74,9 @@ def test_evaluate_run_rejects_more_than_six_evaluable_selected_ids(tmp_path: Pat
             {
                 "id": eval_ids,
                 "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]] * len(eval_ids),
-                "pred__score_selected": [1.0] * len(eval_ids),
-                "sel__is_selected": [True] * len(eval_ids),
-                "sel__rank_competition": [1] * len(eval_ids),
+                "view__selection_score": [1.0] * len(eval_ids),
+                "view__is_selected": [True] * len(eval_ids),
+                "view__rank_competition": [1] * len(eval_ids),
             }
         ),
     )
@@ -117,9 +117,9 @@ def test_evaluate_run_rejects_string_selection_flags(tmp_path: Path) -> None:
             {
                 "id": ["eval-1"],
                 "pred__y_hat_model": [[0.0, 0.0, 1.0, 1.0]],
-                "pred__score_selected": [0.99],
-                "sel__is_selected": ["False"],
-                "sel__rank_competition": [1],
+                "view__selection_score": [0.99],
+                "view__is_selected": ["False"],
+                "view__rank_competition": [1],
             }
         ),
     )
@@ -142,7 +142,7 @@ def test_evaluate_run_rejects_string_selection_flags(tmp_path: Path) -> None:
         sidecar_path=workdir / "sidecar.parquet",
     )
 
-    with pytest.raises(RuntimeError, match="sel__is_selected must be boolean"):
+    with pytest.raises(RuntimeError, match="view__is_selected must be boolean"):
         _evaluate_run(
             run=run,
             positive_labels=labels,

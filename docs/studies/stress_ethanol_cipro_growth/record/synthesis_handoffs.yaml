@@ -1,8 +1,8 @@
-version: 1
+version: 2
 study_id: stress_ethanol_cipro_growth
 record_kind: synthesis_handoff_lifecycle
 owner: dnadesign-maintainers
-last_verified: 2026-06-18
+last_verified: 2026-07-12
 authority: checked_in_study_record
 generated_artifact_policy:
   outputs_are_generated: true
@@ -19,14 +19,14 @@ operator_preview_command: >-
 canonical_contract:
   selected_set_authorities:
     pre_assay_seed: study_batch0_selector
-    opal_model_round: opal_selection_set
-  required_identity_fields:
+    opal_model_round: opal_selection_batch
+  common_identity_fields:
     - handoff_id
     - campaign_slug
     - selection_epoch
     - assay_batch_index
     - model_as_of_round
-    - run_id or expected_campaigns[].run_id
+    - run_id
     - strategy_id
     - manifest_path
     - vendor_workbook_path
@@ -36,13 +36,24 @@ canonical_contract:
     - vendor_workbook_sha256
     - genbank_dir_sha256
     - genbank_feature_table_sha256
+  measured_round_identity_fields:
+    - selection_view_ids
+    - selection_memberships
+    - expected_selection_views
+    - expected_artifact
   measured_round_record_rules:
-    - source_authority must be opal_selection_set
+    - source_authority must be opal_selection_batch
     - selection_epoch must be opal_model_round
     - model_as_of_round must be the OPAL round used for selection
     - assay_batch_index must be the physical order batch index
-    - each expected campaign must have an explicit run_id unless one top-level run_id applies to all campaigns
+    - campaign_slug and run_id identify one unified OPAL learning lifecycle
+    - expected_selection_views records each target view and its logical membership count
+    - expected_artifact records the deduplicated selection-batch artifact set
     - operators should invoke measured rounds by --handoff-id after adding the record row
+  pre_assay_seed_record_rules:
+    - campaign_slug identifies the digest-pinned source directory for one SFXI selection view
+    - source_campaign_slug is the exact campaign identity embedded in the digest-pinned manifest
+    - neither source campaign slug is an executable OPAL campaign route
   lifecycle_status_values:
     - generated_pending_acceptance
     - accepted_for_order
@@ -61,6 +72,7 @@ handoffs:
     strategy_id: sfxi_promoter_insert:v1
     expected_campaigns:
       - campaign_slug: secg_ethanol_rf_sfxi_topn
+        source_campaign_slug: stress_eth_cip_ethanol_rf_sfxi_topn
         expected_rows: 6
         manifest_path: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__synthesis_manifest.csv
         vendor_workbook_path: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__azenta_gene_synthesis.xlsx
@@ -73,6 +85,7 @@ handoffs:
         workbook_readback_status: pass
         genbank_readback_status: pass
       - campaign_slug: secg_cipro_rf_sfxi_topn
+        source_campaign_slug: stress_eth_cip_cipro_rf_sfxi_topn
         expected_rows: 6
         manifest_path: src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__synthesis_manifest.csv
         vendor_workbook_path: src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__azenta_gene_synthesis.xlsx
@@ -85,6 +98,7 @@ handoffs:
         workbook_readback_status: pass
         genbank_readback_status: pass
       - campaign_slug: secg_and_rf_sfxi_topn
+        source_campaign_slug: stress_eth_cip_and_rf_sfxi_topn
         expected_rows: 6
         manifest_path: src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__synthesis_manifest.csv
         vendor_workbook_path: src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__azenta_gene_synthesis.xlsx

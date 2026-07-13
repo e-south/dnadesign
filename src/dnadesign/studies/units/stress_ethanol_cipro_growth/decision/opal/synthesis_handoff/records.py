@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,26 @@ class ExpectedHandoffArtifact:
 
 
 @dataclass(frozen=True)
+class ExpectedSelectionView:
+    """Expected logical membership count for one OPAL selection view."""
+
+    selection_view_id: str
+    expected_rows: int
+
+    def __post_init__(self) -> None:
+        if not str(self.selection_view_id).strip():
+            raise ValueError("expected selection_view_id must be non-empty")
+        if int(self.expected_rows) <= 0:
+            raise ValueError(f"expected_rows must be positive for selection_view_id={self.selection_view_id}")
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "selection_view_id": self.selection_view_id,
+            "expected_rows": int(self.expected_rows),
+        }
+
+
+@dataclass(frozen=True)
 class SynthesisHandoffRecord:
     """One lifecycle record from ``synthesis_handoffs.yaml``."""
 
@@ -88,7 +109,10 @@ class SynthesisHandoffRecord:
     model_as_of_round: int | None
     run_id: str | None
     strategy_id: str
-    expected_campaigns: tuple[ExpectedHandoffArtifact, ...]
+    expected_campaigns: tuple[ExpectedHandoffArtifact, ...] = ()
+    campaign_slug: str | None = None
+    expected_selection_views: tuple[ExpectedSelectionView, ...] = ()
+    expected_artifact: ExpectedHandoffArtifact | None = None
 
     def __post_init__(self) -> None:
         for field in (
@@ -100,20 +124,34 @@ class SynthesisHandoffRecord:
         ):
             if not str(getattr(self, field)).strip():
                 raise ValueError(f"{field} must be non-empty in synthesis handoff record")
-        if not self.expected_campaigns:
-            raise ValueError(f"handoff record {self.handoff_id} requires expected_campaigns")
-        if self.source_authority == "study_batch0_selector" and self.run_id is None:
-            raise ValueError(f"handoff record {self.handoff_id} requires explicit run_id for batch-0 source")
-        if self.source_authority == "opal_selection_set":
-            missing_run_id = [
-                row.campaign_slug for row in self.expected_campaigns if row.run_id is None and self.run_id is None
-            ]
-            if missing_run_id:
-                preview = ", ".join(missing_run_id[:5])
+        if self.source_authority == "study_batch0_selector":
+            if not self.expected_campaigns:
+                raise ValueError(f"batch-0 handoff record {self.handoff_id} requires expected_campaigns")
+            if self.run_id is None:
+                raise ValueError(f"handoff record {self.handoff_id} requires explicit run_id for batch-0 source")
+            if self.campaign_slug is not None or self.expected_selection_views or self.expected_artifact is not None:
+                raise ValueError(f"batch-0 handoff record {self.handoff_id} cannot declare measured-round fields")
+            return
+        if self.source_authority == "opal_selection_batch":
+            if self.expected_campaigns:
+                raise ValueError(f"measured-round handoff record {self.handoff_id} cannot declare expected_campaigns")
+            if self.campaign_slug is None or not str(self.campaign_slug).strip():
+                raise ValueError(f"measured-round handoff record {self.handoff_id} requires campaign_slug")
+            if self.run_id is None:
+                raise ValueError(f"measured-round handoff record {self.handoff_id} requires explicit run_id")
+            if not self.expected_selection_views:
+                raise ValueError(f"measured-round handoff record {self.handoff_id} requires expected_selection_views")
+            if self.expected_artifact is None:
+                raise ValueError(f"measured-round handoff record {self.handoff_id} requires expected_artifact")
+            if self.expected_artifact.campaign_slug != self.campaign_slug:
                 raise ValueError(
-                    f"handoff record {self.handoff_id} requires explicit run_id for every campaign "
-                    f"when source_authority=opal_selection_set: {preview}"
+                    f"measured-round handoff record {self.handoff_id} artifact campaign does not match campaign_slug"
                 )
+            view_ids = [row.selection_view_id for row in self.expected_selection_views]
+            if len(view_ids) != len(set(view_ids)):
+                raise ValueError(f"measured-round handoff record {self.handoff_id} has duplicate selection views")
+            return
+        raise ValueError(f"unsupported synthesis handoff source_authority: {self.source_authority}")
 
     @property
     def expected_campaign_counts(self) -> dict[str, int]:
@@ -127,6 +165,17 @@ class SynthesisHandoffRecord:
             if run_id is not None:
                 run_ids[row.campaign_slug] = run_id
         return run_ids
+
+    @property
+    def expected_selection_view_counts(self) -> dict[str, int]:
+        return {row.selection_view_id: int(row.expected_rows) for row in self.expected_selection_views}
+
+    @property
+    def artifacts(self) -> tuple[ExpectedHandoffArtifact, ...]:
+        if self.source_authority == "study_batch0_selector":
+            return self.expected_campaigns
+        assert self.expected_artifact is not None
+        return (self.expected_artifact,)
 
 
 def _optional_int(value: Any) -> int | None:
@@ -153,12 +202,10 @@ def _require_mapping(value: Any, *, label: str) -> dict[str, Any]:
 
 
 def _record_from_raw(raw: dict[str, Any]) -> SynthesisHandoffRecord:
-    campaigns_raw = raw.get("expected_campaigns")
-    if not isinstance(campaigns_raw, list):
-        raise ValueError(f"handoff record {raw.get('handoff_id', '<unknown>')} expected_campaigns must be a list")
-    expected_campaigns = tuple(
-        ExpectedHandoffArtifact(
-            campaign_slug=str(_require_mapping(item, label="expected campaign")["campaign_slug"]),
+    def artifact_from(value: Any, *, label: str) -> ExpectedHandoffArtifact:
+        item = _require_mapping(value, label=label)
+        return ExpectedHandoffArtifact(
+            campaign_slug=str(item["campaign_slug"]),
             expected_rows=int(item["expected_rows"]),
             manifest_path=str(item["manifest_path"]),
             vendor_workbook_path=str(item["vendor_workbook_path"]),
@@ -172,18 +219,43 @@ def _record_from_raw(raw: dict[str, Any]) -> SynthesisHandoffRecord:
             workbook_readback_status=_optional_text(item.get("workbook_readback_status")),
             genbank_readback_status=_optional_text(item.get("genbank_readback_status")),
         )
-        for item in campaigns_raw
-    )
+
+    source_authority = str(raw["source_authority"])
+    expected_campaigns: tuple[ExpectedHandoffArtifact, ...] = ()
+    expected_selection_views: tuple[ExpectedSelectionView, ...] = ()
+    expected_artifact: ExpectedHandoffArtifact | None = None
+    if source_authority == "study_batch0_selector":
+        campaigns_raw = raw.get("expected_campaigns")
+        if not isinstance(campaigns_raw, list):
+            raise ValueError(f"handoff record {raw.get('handoff_id', '<unknown>')} expected_campaigns must be a list")
+        expected_campaigns = tuple(artifact_from(item, label="expected campaign") for item in campaigns_raw)
+    elif source_authority == "opal_selection_batch":
+        views_raw = raw.get("expected_selection_views")
+        if not isinstance(views_raw, list):
+            raise ValueError(
+                f"handoff record {raw.get('handoff_id', '<unknown>')} expected_selection_views must be a list"
+            )
+        expected_selection_views = tuple(
+            ExpectedSelectionView(
+                selection_view_id=str(_require_mapping(item, label="expected selection view")["selection_view_id"]),
+                expected_rows=int(item["expected_rows"]),
+            )
+            for item in views_raw
+        )
+        expected_artifact = artifact_from(raw.get("expected_artifact"), label="expected artifact")
     return SynthesisHandoffRecord(
         handoff_id=str(raw["handoff_id"]),
         lifecycle_status=str(raw["lifecycle_status"]),
-        source_authority=str(raw["source_authority"]),
+        source_authority=source_authority,
         selection_epoch=str(raw["selection_epoch"]),
         assay_batch_index=_optional_int(raw.get("assay_batch_index")),
         model_as_of_round=_optional_int(raw.get("model_as_of_round")),
         run_id=_optional_text(raw.get("run_id")),
         strategy_id=str(raw["strategy_id"]),
         expected_campaigns=expected_campaigns,
+        campaign_slug=_optional_text(raw.get("campaign_slug")),
+        expected_selection_views=expected_selection_views,
+        expected_artifact=expected_artifact,
     )
 
 
@@ -227,7 +299,7 @@ def source_mode_from_handoff_record(record: SynthesisHandoffRecord) -> tuple[str
 
     if record.source_authority == "study_batch0_selector" and record.selection_epoch == "pre_assay_seed":
         return "batch0", None
-    if record.source_authority == "opal_selection_set" and record.selection_epoch == "opal_model_round":
+    if record.source_authority == "opal_selection_batch" and record.selection_epoch == "opal_model_round":
         if record.model_as_of_round is None:
             raise ValueError(f"handoff record {record.handoff_id} requires model_as_of_round for OPAL rounds")
         return "opal-round", int(record.model_as_of_round)
@@ -265,7 +337,7 @@ def _require_manifest_field(manifest: pd.DataFrame, column: str, expected: Any) 
         raise ValueError(f"handoff record lifecycle mismatch for {column}: expected {expected!r}, observed {observed}")
 
 
-def _require_manifest_run_ids(manifest: pd.DataFrame, record: SynthesisHandoffRecord) -> None:
+def _require_batch0_manifest_run_ids(manifest: pd.DataFrame, record: SynthesisHandoffRecord) -> None:
     if "run_id" not in manifest.columns:
         raise ValueError("synthesis manifest missing lifecycle column required by handoff record: run_id")
     if "campaign_slug" not in manifest.columns:
@@ -290,6 +362,63 @@ def _require_manifest_run_ids(manifest: pd.DataFrame, record: SynthesisHandoffRe
             )
 
 
+def _selection_view_membership_counts(manifest: pd.DataFrame) -> dict[str, int]:
+    if "selection_view_ids" not in manifest.columns:
+        raise ValueError("synthesis manifest missing selection_view_ids required by measured-round record")
+    counts: dict[str, int] = {}
+    for raw in manifest["selection_view_ids"].tolist():
+        try:
+            view_ids = json.loads(str(raw))
+        except json.JSONDecodeError as exc:
+            raise ValueError("synthesis manifest contains invalid selection_view_ids JSON") from exc
+        if not isinstance(view_ids, list) or not view_ids:
+            raise ValueError("synthesis manifest selection_view_ids must be a non-empty JSON list")
+        for view_id in view_ids:
+            key = str(view_id)
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _validate_batch0_manifest(manifest: pd.DataFrame, record: SynthesisHandoffRecord) -> dict[str, Any]:
+    observed_counts = manifest.groupby("campaign_slug", sort=True).size().astype(int).to_dict()
+    expected_counts = record.expected_campaign_counts
+    mismatches = []
+    for campaign_slug in sorted(set(expected_counts).union(observed_counts)):
+        if expected_counts.get(campaign_slug) != observed_counts.get(campaign_slug):
+            mismatches.append(
+                f"{campaign_slug} expected={expected_counts.get(campaign_slug)} "
+                f"observed={observed_counts.get(campaign_slug)}"
+            )
+    if mismatches:
+        raise ValueError("handoff record campaign row mismatch: " + "; ".join(mismatches[:5]))
+    _require_batch0_manifest_run_ids(manifest, record)
+    return {"campaign_counts": observed_counts}
+
+
+def _validate_measured_round_manifest(manifest: pd.DataFrame, record: SynthesisHandoffRecord) -> dict[str, Any]:
+    assert record.expected_artifact is not None
+    _require_manifest_field(manifest, "campaign_slug", record.campaign_slug)
+    _require_manifest_field(manifest, "run_id", record.run_id)
+    observed_rows = int(len(manifest))
+    if observed_rows != int(record.expected_artifact.expected_rows):
+        raise ValueError(
+            f"handoff record selection batch row mismatch: expected={record.expected_artifact.expected_rows} "
+            f"observed={observed_rows}"
+        )
+    observed_view_counts = _selection_view_membership_counts(manifest)
+    expected_view_counts = record.expected_selection_view_counts
+    if observed_view_counts != expected_view_counts:
+        raise ValueError(
+            "handoff record selection-view membership mismatch: "
+            f"expected={expected_view_counts} observed={observed_view_counts}"
+        )
+    return {
+        "campaign_slug": record.campaign_slug,
+        "selection_view_counts": observed_view_counts,
+        "selection_batch_count": observed_rows,
+    }
+
+
 def validate_manifest_against_handoff_record(
     manifest: pd.DataFrame,
     record: SynthesisHandoffRecord,
@@ -302,45 +431,22 @@ def validate_manifest_against_handoff_record(
         raise ValueError(f"handoff record strategy mismatch: expected {record.strategy_id}, observed {strategy_id}")
     if "campaign_slug" not in manifest.columns:
         raise ValueError("synthesis manifest missing campaign_slug required by handoff record")
-    observed_counts = manifest.groupby("campaign_slug", sort=True).size().astype(int).to_dict()
-    expected_counts = record.expected_campaign_counts
-    mismatches: list[dict[str, Any]] = []
-    for campaign_slug in sorted(set(expected_counts).union(observed_counts)):
-        expected_rows = expected_counts.get(campaign_slug)
-        observed_rows = observed_counts.get(campaign_slug)
-        if expected_rows != observed_rows:
-            mismatches.append(
-                {
-                    "campaign_slug": campaign_slug,
-                    "expected_rows": expected_rows,
-                    "observed_rows": observed_rows,
-                }
-            )
-    if mismatches:
-        preview = "; ".join(
-            f"{row['campaign_slug']} expected={row['expected_rows']} observed={row['observed_rows']}"
-            for row in mismatches[:5]
-        )
-        raise ValueError(f"handoff record campaign row mismatch: {preview}")
+    if record.source_authority == "study_batch0_selector":
+        source_validation = _validate_batch0_manifest(manifest, record)
+    elif record.source_authority == "opal_selection_batch":
+        source_validation = _validate_measured_round_manifest(manifest, record)
+    else:
+        raise ValueError(f"unsupported synthesis handoff source_authority: {record.source_authority}")
 
     _require_manifest_field(manifest, "batch_id", record.handoff_id)
     _require_manifest_field(manifest, "selection_epoch", record.selection_epoch)
-    _require_manifest_run_ids(manifest, record)
     _require_manifest_field(manifest, "assay_batch_index", record.assay_batch_index)
     _require_manifest_field(manifest, "model_as_of_round", record.model_as_of_round)
     return {
         "status": "pass",
-        "campaign_counts": observed_counts,
         "strategy_id": strategy_id,
+        **source_validation,
     }
-
-
-def run_id_by_campaign_from_handoff_record(record: SynthesisHandoffRecord) -> dict[str, str]:
-    """Return campaign-scoped OPAL run IDs from a lifecycle record."""
-
-    if record.source_authority != "opal_selection_set":
-        return {}
-    return record.expected_run_ids_by_campaign
 
 
 def apply_handoff_record_lifecycle(
@@ -353,8 +459,13 @@ def apply_handoff_record_lifecycle(
     return [
         SelectedCandidate(
             campaign_slug=row.campaign_slug,
+            selection_memberships=row.selection_memberships,
             as_of_round=row.as_of_round,
-            run_id=expected_run_ids.get(row.campaign_slug, row.run_id),
+            run_id=(
+                str(record.run_id)
+                if record.source_authority == "opal_selection_batch"
+                else expected_run_ids.get(row.campaign_slug, row.run_id)
+            ),
             selection_rank=row.selection_rank,
             id=row.id,
             sequence=row.sequence,
@@ -396,10 +507,10 @@ def artifact_status_for_handoff_record(
     """Inspect generated artifacts referenced by a lifecycle record."""
 
     rows: list[dict[str, Any]] = []
-    present_campaigns = 0
+    present_artifacts = 0
     workbook_readback_pass_count = 0
     genbank_readback_pass_count = 0
-    for expected in record.expected_campaigns:
+    for expected in record.artifacts:
         manifest_path = _resolve_repo_path(repo_root, expected.manifest_path)
         workbook_path = _resolve_repo_path(repo_root, expected.vendor_workbook_path)
         genbank_dir_path = _resolve_repo_path(repo_root, expected.genbank_dir_path)
@@ -472,7 +583,7 @@ def artifact_status_for_handoff_record(
             and row["genbank_dir_exists"]
             and row["genbank_feature_table_exists"]
         ):
-            present_campaigns += 1
+            present_artifacts += 1
         if row["workbook_readback_status"] == "pass":
             workbook_readback_pass_count += 1
         if row["genbank_readback_status"] == "pass":
@@ -481,13 +592,13 @@ def artifact_status_for_handoff_record(
 
     return {
         "summary": {
-            "expected_campaign_count": int(len(record.expected_campaigns)),
-            "present_campaign_count": int(present_campaigns),
+            "expected_artifact_count": int(len(record.artifacts)),
+            "present_artifact_count": int(present_artifacts),
             "readback_pass_count": int(workbook_readback_pass_count),
             "workbook_readback_pass_count": int(workbook_readback_pass_count),
             "genbank_readback_pass_count": int(genbank_readback_pass_count),
         },
-        "campaigns": rows,
+        "artifacts": rows,
     }
 
 
@@ -506,7 +617,9 @@ def handoff_record_payload(
         "assay_batch_index": record.assay_batch_index,
         "model_as_of_round": record.model_as_of_round,
         "run_id": record.run_id,
+        "campaign_slug": record.campaign_slug,
         "strategy_id": record.strategy_id,
-        "expected_artifacts": [row.to_json() for row in record.expected_campaigns],
+        "expected_selection_views": [row.to_json() for row in record.expected_selection_views],
+        "expected_artifacts": [row.to_json() for row in record.artifacts],
         "artifact_status": artifact_status_for_handoff_record(record, repo_root=repo_root),
     }

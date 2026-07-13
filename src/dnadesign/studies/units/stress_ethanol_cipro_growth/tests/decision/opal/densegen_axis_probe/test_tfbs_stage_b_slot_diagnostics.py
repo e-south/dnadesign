@@ -148,6 +148,6 @@ def _write_slot_fixture(tmp_path: Path, *, drop_count_column: bool = False) -> P
 
 
 def _write_selection(workdir: Path, round_index: int, ids: list[str]) -> None:
-    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selection_top_k.csv"
+    path = workdir / "outputs" / "rounds" / f"round_{round_index}" / "selection" / "selections.parquet"
     path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"id": ids, "pred__score_selected": [0.9, 0.8]}).to_csv(path, index=False)
+    pd.DataFrame({"id": ids, "selection_view_id": "primary", "score": [0.9, 0.8]}).to_parquet(path, index=False)

@@ -27,7 +27,7 @@ build_tfbs_stage_b_realized_label_review = probe_module(
 def test_stage_b_realized_review_does_not_register_failed_budget_review(tmp_path: Path) -> None:
     stage_b_root = tmp_path / "stage_b"
     manifest_path = _write_stage_b_review_fixture(stage_b_root / "manifests")
-    pd.DataFrame({"id": ["c"], "pred__score_selected": [0.8]}).to_csv(
+    pd.DataFrame({"id": ["c"], "selection_view_id": ["primary"], "score": [0.8]}).to_parquet(
         stage_b_root
         / "manifests"
         / "campaigns"
@@ -36,7 +36,7 @@ def test_stage_b_realized_review_does_not_register_failed_budget_review(tmp_path
         / "rounds"
         / "round_1"
         / "selection"
-        / "selection_top_k.csv",
+        / "selections.parquet",
         index=False,
     )
     visual_index_path = stage_b_root / "notebooks" / "collection_visuals" / "collection_visual_manifest.json"

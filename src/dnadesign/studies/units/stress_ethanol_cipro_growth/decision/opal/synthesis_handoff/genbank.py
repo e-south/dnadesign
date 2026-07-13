@@ -56,6 +56,8 @@ GENBANK_FEATURE_COLUMNS: tuple[str, ...] = (
 _REQUIRED_MANIFEST_COLUMNS: tuple[str, ...] = (
     "batch_id",
     "campaign_slug",
+    "selection_view_ids",
+    "selection_memberships",
     "id",
     "synthesis_name",
     "core_sequence",
@@ -470,10 +472,39 @@ def genbank_record_filename(manifest_row: pd.Series) -> str:
     )
 
 
+def _selection_qualifiers(manifest_row: pd.Series) -> dict[str, list[str]]:
+    try:
+        view_ids = json.loads(str(manifest_row["selection_view_ids"]))
+        memberships = json.loads(str(manifest_row["selection_memberships"]))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"manifest selection membership JSON is invalid for {manifest_row['id']}") from exc
+    if not isinstance(view_ids, list) or not isinstance(memberships, list):
+        raise ValueError(f"manifest selection membership fields must be JSON lists for {manifest_row['id']}")
+    membership_values = []
+    for row in memberships:
+        if not isinstance(row, dict):
+            raise ValueError(f"manifest selection membership rows must be mappings for {manifest_row['id']}")
+        membership_values.append(
+            "|".join(
+                (
+                    f"view={row.get('selection_view_id')}",
+                    f"rank={row.get('rank')}",
+                    f"score={row.get('score')}",
+                    f"score_ref={row.get('score_ref')}",
+                )
+            )
+        )
+    return {
+        "selection_views": [",".join(str(view_id) for view_id in view_ids)],
+        "selection_membership": membership_values,
+    }
+
+
 def _feature_qualifiers(manifest_row: pd.Series, feature_row: pd.Series) -> dict[str, list[str]]:
     qualifiers: dict[str, list[str]] = {
         "label": [str(feature_row["label"])],
         "campaign_slug": [str(manifest_row["campaign_slug"])],
+        **_selection_qualifiers(manifest_row),
         "batch_id": [str(manifest_row["batch_id"])],
         "handoff_id": [str(manifest_row["batch_id"])],
         "synthesis_name": [str(manifest_row["synthesis_name"])],

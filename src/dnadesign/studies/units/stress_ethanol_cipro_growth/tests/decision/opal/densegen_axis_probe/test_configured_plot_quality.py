@@ -41,7 +41,7 @@ def test_configured_plot_quality_respects_artifact_round_scope_and_optional_tidy
         {
             "round": [0, 1, 2],
             "cohort": ["selected", "selected", "selected"],
-            "metric": ["pred__score_selected"] * 3,
+            "metric": ["view__selection_score"] * 3,
             "summary": ["mean", "mean", "mean"],
             "value": [0.1, 0.2, 0.3],
         }
@@ -51,7 +51,7 @@ def test_configured_plot_quality_respects_artifact_round_scope_and_optional_tidy
         {
             "round": [1],
             "cohort": ["selected"],
-            "metric": ["pred__score_selected"],
+            "metric": ["view__selection_score"],
             "summary": ["mean"],
             "value": [0.2],
         }
@@ -61,7 +61,7 @@ def test_configured_plot_quality_respects_artifact_round_scope_and_optional_tidy
         {
             "round": [2],
             "cohort": ["selected"],
-            "metric": ["pred__score_selected"],
+            "metric": ["view__selection_score"],
             "summary": ["mean"],
             "value": [0.3],
         }

@@ -63,7 +63,7 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
         {
             "round": [0],
             "cohort": ["selected"],
-            "metric": ["pred__score_selected"],
+            "metric": ["view__selection_score"],
             "summary": ["mean"],
             "value": [0.5],
         }
@@ -139,9 +139,9 @@ def test_probe_report_reuses_opal_campaign_review_primitives(
     assert Path(payload["review"]).exists()
     assert Path(payload["index"]).exists()
     assert Path(payload["run_manifest"]).exists()
-    opal_review = workdir / "outputs" / "review" / "review.md"
+    opal_review = workdir / "outputs" / "review" / "selection_views" / "primary" / "review.md"
     assert opal_review.exists()
-    opal_index = workdir / "outputs" / "review" / "index.html"
+    opal_index = workdir / "outputs" / "review" / "selection_views" / "primary" / "index.html"
     assert opal_index.exists()
     review_text = Path(payload["review"]).read_text(encoding="utf-8")
     assert "OPAL campaign run review artifacts remain campaign-scoped" in review_text
