@@ -157,6 +157,4 @@ def test_cli_pressure_sfxi_multi_round(tmp_path: Path) -> None:
 
     hist_e = store._normalize_hist_cell(df.loc[df["id"] == "e", lh].iloc[0])
     pred_entries = [e for e in hist_e if e.get("kind") == "pred"]
-    assert pred_entries
-    assert any(e.get("as_of_round") == 1 for e in pred_entries)
-    assert pred_entries[0].get("metrics", {}).get("score") is not None
+    assert pred_entries == []

@@ -25,8 +25,8 @@ class _RoundLite:
     run_id: str
     number_of_training_examples_used_in_round: int
     number_of_candidates_scored_in_round: int
-    selection_top_k_requested: int
-    selection_top_k_effective_after_ties: int
+    selection_views: dict
+    selection_batch: dict
     round_dir: str
 
 
@@ -55,8 +55,8 @@ def build_status(
             run_id=str(r.run_id),
             number_of_training_examples_used_in_round=int(r.number_of_training_examples_used_in_round),
             number_of_candidates_scored_in_round=int(r.number_of_candidates_scored_in_round),
-            selection_top_k_requested=int(r.selection_top_k_requested),
-            selection_top_k_effective_after_ties=int(r.selection_top_k_effective_after_ties),
+            selection_views=dict(r.selection_views),
+            selection_batch=dict(r.selection_batch),
             round_dir=str(r.round_dir),
         )
 
@@ -87,12 +87,11 @@ def build_status(
                         "run_id",
                         "as_of_round",
                         "model__name",
-                        "objective__name",
-                        "selection__name",
+                        "objective__defs_json",
+                        "selection_views__defs_json",
                         "training__y_ops",
                         "stats__n_train",
                         "stats__n_scored",
-                        "objective__summary_stats",
                     ]
                 )
             except Exception as e:
@@ -103,16 +102,9 @@ def build_status(
             if rsel.empty:
                 return None
             row = rsel.sort_values(["run_id"]).tail(1).iloc[0]
-            return {
-                "run_id": str(row.get("run_id", "")),
-                "model": row.get("model__name"),
-                "objective": row.get("objective__name"),
-                "selection": row.get("selection__name"),
-                "y_ops": row.get("training__y_ops") or [],
-                "stats_n_train": int(row.get("stats__n_train", 0)),
-                "stats_n_scored": int(row.get("stats__n_scored", 0)),
-                "objective_summary_stats": row.get("objective__summary_stats") or {},
-            }
+            from .summary import summarize_run_meta
+
+            return summarize_run_meta(row)
 
         if latest:
             out["latest_round_ledger"] = _ledger_summary_for_round(int(latest.round_index))

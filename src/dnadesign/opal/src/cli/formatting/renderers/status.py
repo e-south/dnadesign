@@ -86,23 +86,18 @@ def render_status_text(st: Mapping[str, Any]) -> str:
                     "run_id": run_id,
                     "n_train": round_info.get("number_of_training_examples_used_in_round"),
                     "n_scored": round_info.get("number_of_candidates_scored_in_round"),
-                    "top_k requested": round_info.get("selection_top_k_requested"),
-                    "top_k effective": round_info.get("selection_top_k_effective_after_ties"),
+                    "selection views": len(round_info.get("selection_views") or {}),
+                    "selection batch": (round_info.get("selection_batch") or {}).get("unique_count"),
                     "round_dir": round_info.get("round_dir"),
                 },
             )
             if main is not None:
                 blocks.append(main)
             if ledger_info:
-                summary = ledger_info.get("objective_summary_stats") or {}
                 kv = {
                     "model": ledger_info.get("model"),
-                    "objective": ledger_info.get("objective"),
-                    "selection": ledger_info.get("selection"),
+                    "selection views": ledger_info.get("selection_view_count"),
                     "y_ops": ", ".join([p.get("name") for p in (ledger_info.get("y_ops") or [])]) or "(none)",
-                    "score_min": summary.get("score_min"),
-                    "score_median": summary.get("score_median"),
-                    "score_max": summary.get("score_max"),
                 }
                 ledger_block = kv_table(f"{label} (ledger)", kv)
                 if ledger_block is not None:
@@ -170,22 +165,17 @@ def render_status_text(st: Mapping[str, Any]) -> str:
                 "run_id": run_id,
                 "n_train": round_info.get("number_of_training_examples_used_in_round"),
                 "n_scored": round_info.get("number_of_candidates_scored_in_round"),
-                "top_k requested": round_info.get("selection_top_k_requested"),
-                "top_k effective": round_info.get("selection_top_k_effective_after_ties"),
+                "selection views": len(round_info.get("selection_views") or {}),
+                "selection batch": (round_info.get("selection_batch") or {}).get("unique_count"),
                 "round_dir": round_info.get("round_dir"),
             },
         )
         blocks = [main]
         if ledger_info:
-            summary = ledger_info.get("objective_summary_stats") or {}
             kv = {
                 "model": ledger_info.get("model"),
-                "objective": ledger_info.get("objective"),
-                "selection": ledger_info.get("selection"),
+                "selection views": ledger_info.get("selection_view_count"),
                 "y_ops": ", ".join([p.get("name") for p in (ledger_info.get("y_ops") or [])]) or "(none)",
-                "score_min": summary.get("score_min"),
-                "score_median": summary.get("score_median"),
-                "score_max": summary.get("score_max"),
             }
             blocks.append(kv_block(f"{label} (ledger)", kv))
         return blocks

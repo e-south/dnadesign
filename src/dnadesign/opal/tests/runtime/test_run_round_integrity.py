@@ -24,12 +24,13 @@ from dnadesign.opal.src.config.types import (
     DataBlock,
     IngestBlock,
     LocationLocal,
-    ObjectivesBlock,
+    OwnershipBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
     ScoringBlock,
-    SelectionBlock,
+    SelectionBatchBlock,
+    SelectionView,
     TrainingBlock,
 )
 from dnadesign.opal.src.core.objective_result import ObjectiveResultV2
@@ -258,13 +259,18 @@ def _make_config(
     score_batch_size: int = 1000,
 ) -> RootConfig:
     resolved_sel = dict(selection_params or {"top_k": 1})
-    resolved_sel.setdefault("score_ref", f"{objective_name}/scalar")
+    resolved_sel.setdefault("score_ref", "scalar")
     resolved_sel.setdefault("tie_handling", "competition_rank")
     resolved_sel.setdefault("objective_mode", "maximize")
+    for ref_key in ("score_ref", "uncertainty_ref"):
+        if ref_key in resolved_sel and "/" in str(resolved_sel[ref_key]):
+            resolved_sel[ref_key] = str(resolved_sel[ref_key]).rsplit("/", 1)[-1]
     if model_params is None:
         model_params = {"n_estimators": 5, "random_state": 0}
     return RootConfig(
+        schema_version="opal.campaign.v3",
         campaign=CampaignBlock(name="Demo", slug="demo", workdir=str(workdir)),
+        ownership=OwnershipBlock(owner_scope="opal_demo"),
         data=DataBlock(
             location=LocationLocal(kind="local", path=str(records_path)),
             x_column_name="X",
@@ -274,8 +280,14 @@ def _make_config(
             y_expected_length=y_expected_length,
         ),
         model=PluginRef(name=model_name, params=model_params),
-        selection=SelectionBlock(selection=PluginRef(name=selection_name, params=resolved_sel)),
-        objectives=ObjectivesBlock(objectives=[PluginRef(name=objective_name, params=objective_params or {})]),
+        selection_views=[
+            SelectionView(
+                id="primary",
+                objective=PluginRef(name=objective_name, params=objective_params or {}),
+                selection=PluginRef(name=selection_name, params=resolved_sel),
+            )
+        ],
+        selection_batch=SelectionBatchBlock(),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
         scoring=ScoringBlock(score_batch_size=int(score_batch_size)),
@@ -606,8 +618,8 @@ def test_run_round_allow_resume_rejects_malformed_state_round_index(tmp_path: Pa
             labels_used_rounds=[0],
             number_of_training_examples_used_in_round=1,
             number_of_candidates_scored_in_round=1,
-            selection_top_k_requested=1,
-            selection_top_k_effective_after_ties=1,
+            selection_views={},
+            selection_batch={},
             model={},
             metrics={},
             durations_sec={},
@@ -683,11 +695,9 @@ def test_run_round_preserves_null_sequence_in_selection_artifacts(tmp_path: Path
     )
     assert res.ok is True
 
-    sel_csv_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
-    sel_parquet_path = sel_csv_path.with_suffix(".parquet")
-    assert sel_csv_path.exists()
-    assert not sel_parquet_path.exists()
-    sel_df = pd.read_csv(sel_csv_path)
+    sel_parquet_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
+    assert sel_parquet_path.exists()
+    sel_df = pd.read_parquet(sel_parquet_path)
     assert pd.isna(sel_df.loc[0, "sequence"])
 
 
@@ -747,7 +757,7 @@ def test_run_round_matrix_gp_top_n_path(tmp_path: Path) -> None:
             "alpha": 1e-6,
             "kernel": {"name": "matern", "length_scale": 0.5, "nu": 1.5, "with_white_noise": True},
         },
-        selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
+        selection_params={"top_k": 1, "score_ref": "scalar"},
     )
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
@@ -786,7 +796,7 @@ def test_run_round_matrix_rf_sfxi_top_n_path(tmp_path: Path) -> None:
         records_path=records_path,
         objective_name="sfxi_v1",
         objective_params={"setpoint_vector": [0, 0, 0, 1], "scaling": {"min_n": 1}},
-        selection_params={"top_k": 1, "score_ref": "sfxi_v1/sfxi"},
+        selection_params={"top_k": 1, "score_ref": "sfxi"},
         y_expected_length=8,
     )
     _write_state(workdir, cfg, records_path)
@@ -831,8 +841,8 @@ def test_run_round_matrix_gp_ei_path(tmp_path: Path) -> None:
         selection_name="expected_improvement",
         selection_params={
             "top_k": 1,
-            "score_ref": f"{objective_name}/scalar",
-            "uncertainty_ref": f"{objective_name}/scalar_var",
+            "score_ref": "scalar",
+            "uncertainty_ref": "scalar_var",
             "objective_mode": "maximize",
             "alpha": 1.0,
             "beta": 1.0,
@@ -862,16 +872,14 @@ def test_run_round_matrix_gp_ei_path(tmp_path: Path) -> None:
         ),
     )
     assert res.ok is True
-    df_after = store.load()
-    hist = df_after.loc[df_after["id"] == "b", "opal__demo__label_hist"].iloc[0]
-    pred_entries = [e for e in hist if e.get("kind") == "pred"]
-    assert pred_entries
-    metrics = pred_entries[-1]["metrics"]
-    assert "score" in metrics
-    assert np.isfinite(float(metrics["score"]))
-    assert 0.0 <= float(metrics["score"]) <= 1.0
-    assert f"score::{objective_name}/scalar" in metrics
-    assert f"uncertainty::{objective_name}/scalar_var" in metrics
+    ledger = pd.read_parquet(workdir / "outputs" / "ledger" / "predictions")
+    view_payload = ledger.loc[ledger["id"] == "b", "pred__selection_views"].iloc[0][0]
+    assert view_payload["selection_view_id"] == "primary"
+    assert np.isfinite(float(view_payload["selection_score"]))
+    assert 0.0 <= float(view_payload["selection_score"]) <= 1.0
+    assert view_payload["score_ref"] == "primary/scalar"
+    assert np.isfinite(float(view_payload["uncertainty"]))
+    assert view_payload["uncertainty_ref"] == "primary/scalar_var"
 
 
 def test_run_round_ei_fails_on_non_positive_uncertainty_channel(tmp_path: Path) -> None:
@@ -990,7 +998,7 @@ def test_run_round_rejects_topn_when_yops_lacks_inverse_std_with_gp(tmp_path: Pa
         selection_name="top_n",
         selection_params={
             "top_k": 1,
-            "score_ref": "scalar_identity_v1/scalar",
+            "score_ref": "scalar",
             "objective_mode": "maximize",
         },
     )
@@ -1041,8 +1049,8 @@ def test_run_round_gp_ei_with_intensity_yops_emits_finite_uncertainty(tmp_path: 
         selection_name="expected_improvement",
         selection_params={
             "top_k": 1,
-            "score_ref": "sfxi_v1/sfxi",
-            "uncertainty_ref": "sfxi_v1/sfxi",
+            "score_ref": "sfxi",
+            "uncertainty_ref": "sfxi",
             "objective_mode": "maximize",
             "alpha": 1.0,
             "beta": 1.0,
@@ -1075,16 +1083,9 @@ def test_run_round_gp_ei_with_intensity_yops_emits_finite_uncertainty(tmp_path: 
     )
     assert res.ok is True
 
-    df_after = store.load()
-    emitted = []
-    for hist in df_after["opal__demo__label_hist"]:
-        for event in hist:
-            if event.get("kind") != "pred":
-                continue
-            metrics = event.get("metrics", {}) or {}
-            if "uncertainty::sfxi_v1/sfxi" in metrics:
-                emitted.append(float(metrics["uncertainty::sfxi_v1/sfxi"]))
-    assert emitted, "Expected uncertainty::sfxi_v1/sfxi to be emitted in prediction metrics."
+    ledger = pd.read_parquet(workdir / "outputs" / "ledger" / "predictions")
+    emitted = [float(payload[0]["uncertainty"]) for payload in ledger["pred__selection_views"]]
+    assert emitted, "Expected view uncertainty in the shared prediction ledger."
     assert np.all(np.isfinite(np.asarray(emitted, dtype=float)))
     assert np.all(np.asarray(emitted, dtype=float) >= 0.0)
 
@@ -1102,7 +1103,7 @@ def test_run_round_matrix_gp_topn_handles_scalar_uncertainty_multibatch(tmp_path
         model_name="gaussian_process",
         model_params={"normalize_y": False, "alpha": 1e-6},
         selection_name="top_n",
-        selection_params={"top_k": 2, "score_ref": "scalar_identity_v1/scalar", "objective_mode": "maximize"},
+        selection_params={"top_k": 2, "score_ref": "scalar", "objective_mode": "maximize"},
         score_batch_size=2,
     )
     _write_state(workdir, cfg, records_path)
@@ -1178,8 +1179,8 @@ def test_run_round_uses_selection_score_for_tie_expansion(tmp_path: Path) -> Non
     )
     assert res.ok is True
 
-    sel_csv_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
-    sel_df = pd.read_csv(sel_csv_path)
+    sel_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
+    sel_df = pd.read_parquet(sel_path)
     assert sel_df.shape[0] == 2
 
 
@@ -1193,7 +1194,7 @@ def test_run_round_rejects_invalid_score_ref(tmp_path: Path) -> None:
         workdir=workdir,
         records_path=records_path,
         objective_name="scalar_identity_v1",
-        selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/missing"},
+        selection_params={"top_k": 1, "score_ref": "missing"},
     )
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
@@ -1233,7 +1234,7 @@ def test_run_round_rejects_missing_objective_mode(tmp_path: Path) -> None:
         objective_name="scalar_identity_v1",
         selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
     )
-    cfg.selection.selection.params.pop("objective_mode", None)
+    cfg.selection_views[0].selection.params.pop("objective_mode", None)
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
 
@@ -1272,7 +1273,7 @@ def test_run_round_rejects_missing_tie_handling(tmp_path: Path) -> None:
         objective_name="scalar_identity_v1",
         selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar", "objective_mode": "maximize"},
     )
-    cfg.selection.selection.params.pop("tie_handling", None)
+    cfg.selection_views[0].selection.params.pop("tie_handling", None)
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
 
@@ -1316,7 +1317,7 @@ def test_run_round_rejects_invalid_uncertainty_ref(tmp_path: Path) -> None:
         selection_params={
             "top_k": 1,
             "score_ref": f"{objective_name}/scalar",
-            "uncertainty_ref": f"{objective_name}/does_not_exist",
+            "uncertainty_ref": "does_not_exist",
             "objective_mode": "maximize",
         },
     )

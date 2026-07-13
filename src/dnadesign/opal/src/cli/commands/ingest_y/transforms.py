@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from ....core.round_context import PluginRegistryView, RoundCtx
-from ....core.utils import now_iso
+from ....core.utils import OpalError, now_iso
 from ....registries.transforms_y import get_transform_y
 from .input_files import read_transform_params
 
@@ -36,9 +36,14 @@ def resolve_transform_settings(
     if transform_name == "sfxi_vec8_from_table_v1":
         transform_params = dict(transform_params or {})
         if "expected_log2_offset_delta" not in transform_params:
-            sfxi_obj = next((o for o in cfg.objectives.objectives if o.name == "sfxi_v1"), None)
-            obj_params = (sfxi_obj.params if sfxi_obj is not None else {}) or {}
-            transform_params["expected_log2_offset_delta"] = float(obj_params.get("intensity_log2_offset_delta", 0.0))
+            deltas = {
+                float(view.objective.params.get("intensity_log2_offset_delta", 0.0))
+                for view in cfg.selection_views
+                if view.objective.name == "sfxi_v1"
+            }
+            if len(deltas) > 1:
+                raise OpalError("SFXI selection views must share intensity_log2_offset_delta at ingest.")
+            transform_params["expected_log2_offset_delta"] = deltas.pop() if deltas else 0.0
         if "enforce_log2_offset_match" not in transform_params:
             transform_params["enforce_log2_offset_match"] = True
         if "sfxi_log_json" not in transform_params:
@@ -50,11 +55,10 @@ def resolve_transform_settings(
 
 
 def build_transform_context(cfg: Any, *, round_index: int, transform_name: str):
-    primary_objective = cfg.objectives.objectives[0].name
     registry = PluginRegistryView(
         model=cfg.model.name,
-        objective=primary_objective,
-        selection=cfg.selection.selection.name,
+        objective="selection_views",
+        selection="selection_views",
         transform_x=cfg.data.transforms_x.name,
         transform_y=transform_name,
     )

@@ -1,5 +1,11 @@
 # OPAL demo campaign configuration: GP + SFXI + top_n
 
+schema_version: opal.campaign.v3
+
+ownership:
+  owner_scope: opal_demo
+  portable: true
+
 campaign:
   name: "Demo GP + SFXI + top_n"
   slug: "demo_gp_topn"
@@ -50,22 +56,26 @@ model:
       nu: 1.5
       with_white_noise: true
 
-objectives:
-  - name: "sfxi_v1"
-    params:
-      setpoint_vector: [0, 0, 0, 1]
-      logic_exponent_beta: 1.0
-      intensity_exponent_gamma: 1.0
-      intensity_log2_offset_delta: 0.0
-      scaling: { percentile: 95, min_n: 5, eps: 1.0e-8 }
+selection_views:
+  - id: primary
+    objective:
+      name: "sfxi_v1"
+      params:
+        setpoint_vector: [0, 0, 0, 1]
+        logic_exponent_beta: 1.0
+        intensity_exponent_gamma: 1.0
+        intensity_log2_offset_delta: 0.0
+        scaling: { percentile: 95, min_n: 5, eps: 1.0e-8 }
+    selection:
+      name: "top_n"
+      params:
+        top_k: 5
+        score_ref: "sfxi"
+        tie_handling: "competition_rank"
+        objective_mode: "maximize"
 
-selection:
-  name: "top_n"
-  params:
-    top_k: 5
-    score_ref: "sfxi_v1/sfxi"
-    tie_handling: "competition_rank"
-    objective_mode: "maximize"
+selection_batch:
+  deduplicate_by: id
 
 scoring:
   score_batch_size: 1000

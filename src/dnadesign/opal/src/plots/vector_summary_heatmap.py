@@ -98,23 +98,29 @@ def render(context, params: dict) -> None:
     need = {"as_of_round", "run_id", vector_field}
     row_filters = []
     if cohort == "selected":
-        need.add("sel__is_selected")
-        row_filters.append({"column": "sel__is_selected", "op": "eq", "value": True})
+        need.add("view__is_selected")
+        row_filters.append({"column": "view__is_selected", "op": "eq", "value": True})
     elif cohort == "top_k":
-        need.add("sel__rank_competition")
-        row_filters.append({"column": "sel__rank_competition", "op": "lte", "value": top_k})
+        need.add("view__rank_competition")
+        row_filters.append({"column": "view__rank_competition", "op": "lte", "value": top_k})
     outputs_dir = resolve_outputs_dir(context)
     if include_reference and explicit_reference is None:
         df = load_events_with_setpoint(
             outputs_dir,
             need,
             round_selector=context.rounds,
+            selection_view_id=context.selection_view_id,
             run_id=context.run_id,
             row_filters=row_filters,
         )
     else:
         df = load_events(
-            outputs_dir, need, round_selector=context.rounds, run_id=context.run_id, row_filters=row_filters
+            outputs_dir,
+            need,
+            round_selector=context.rounds,
+            selection_view_id=context.selection_view_id,
+            run_id=context.run_id,
+            row_filters=row_filters,
         )
     if df.empty:
         raise ValueError("vector_summary_heatmap had zero rows after round/run filtering.")
@@ -322,13 +328,13 @@ def _cohort_frame(df, *, cohort: str, top_k: int):
     if cohort == "all_pool":
         return df.copy()
     if cohort == "selected":
-        if "sel__is_selected" not in df.columns:
-            raise ValueError("selected cohort requires sel__is_selected.")
-        return df[selected_mask(df["sel__is_selected"])].copy()
+        if "view__is_selected" not in df.columns:
+            raise ValueError("selected cohort requires view__is_selected.")
+        return df[selected_mask(df["view__is_selected"])].copy()
     if cohort == "top_k":
-        if "sel__rank_competition" not in df.columns:
-            raise ValueError("top_k cohort requires sel__rank_competition.")
-        return df[positive_ranks(df["sel__rank_competition"]) <= int(top_k)].copy()
+        if "view__rank_competition" not in df.columns:
+            raise ValueError("top_k cohort requires view__rank_competition.")
+        return df[positive_ranks(df["view__rank_competition"]) <= int(top_k)].copy()
     raise ValueError(f"Unknown cohort: {cohort}")
 
 

@@ -37,7 +37,7 @@ from ._round_overlay import resolve_highlight_round
     meta=PlotMeta(
         summary="Percent of candidates above a configured metric threshold across rounds.",
         params={
-            "metric": "Numeric ledger field to threshold (default pred__score_selected).",
+            "metric": "Numeric ledger field to threshold (default view__selection_score).",
             "threshold": "Scalar cutoff for 'high' (default 0.8).",
             "threshold_quantile": "Optional quantile-derived cutoff in [0, 1]; mutually exclusive with threshold.",
             "mode": "line|violin|both (default both).",
@@ -47,7 +47,7 @@ from ._round_overlay import resolve_highlight_round
             "show_meta": "Draw small diagnostic text inside the axes (default false).",
             "percent_ylim": "Percent axis range: auto or full (default auto).",
         },
-        requires=["as_of_round", "pred__score_selected"],
+        requires=["as_of_round", "view__selection_score"],
         notes=["Reads outputs/ledger/predictions."],
         data_shape="thresholded scalar over rounds",
         tidy_schema=["as_of_round", "total", "high", "percent_high"],
@@ -94,7 +94,7 @@ def render(context, params: dict) -> None:
     if percent_ylim not in {"auto", "full"}:
         raise ValueError("percent_ylim must be 'auto' or 'full'.")
     metric_field = normalize_metric_field(
-        get_str(params, ["metric", "score_field", "metric_field", "field"], "pred__score_selected")
+        get_str(params, ["metric", "score_field", "metric_field", "field"], "view__selection_score")
     )
     if not metric_field:
         raise ValueError("percent_high_activity_over_rounds requires a metric field.")
@@ -125,7 +125,13 @@ def render(context, params: dict) -> None:
     need = {"as_of_round", metric_field}
     if draw_swarm:
         need |= event_columns_for(hue_field, size_by)
-    df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
+    df = load_events(
+        outputs_dir,
+        need,
+        round_selector=context.rounds,
+        selection_view_id=context.selection_view_id,
+        run_id=context.run_id,
+    )
     if df.empty:
         raise ValueError("Ledger predictions contained zero rows after projection.")
     if metric_field not in df.columns:
@@ -310,6 +316,6 @@ def _auto_percent_upper(max_percent: float) -> float:
 
 
 def _threshold_quantile_label(metric_field: str, quantile_pct: float, threshold: float, *, metric_label: str) -> str:
-    if metric_field == "pred__score_selected":
+    if metric_field == "view__selection_score":
         return f"P{quantile_pct:g} of {metric_label} ({threshold:.3g})"
     return f"P{quantile_pct:g} {metric_label} cutoff ({threshold:.3g})"

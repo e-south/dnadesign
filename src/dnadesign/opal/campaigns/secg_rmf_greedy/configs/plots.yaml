@@ -1,0 +1,25 @@
+plot_defaults:
+  output:
+    format: png
+    dpi: 300
+    save_data: true
+
+plots:
+  - name: rmf_candidate_frontier
+    kind: response_magnitude_feasibility_frontier
+    round_selector: latest
+    round_variants: each
+    tags: [decision, rmf]
+    params:
+      title: "Predicted candidates occupy distinct response and fluorescence constraint regions"
+      response_label: "Target-ON minus target-OFF response, log2(YFP/CFP)"
+      magnitude_label: "Minimum target-ON fluorescence relative to pDual-10, log2(YFP/OD600)"
+      off_constraint_label: "Target-OFF fluorescence clearance, standardized margin"
+
+  - name: rmf_selected_constraints
+    kind: response_magnitude_feasibility_constraint_decomposition
+    round_selector: latest
+    round_variants: each
+    tags: [decision, rmf, selection]
+    params:
+      title: "Each selected candidate is limited by one explicit RMF requirement"

@@ -14,22 +14,26 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
 
-from ..core.utils import ensure_dir, file_sha256
+from ..core.utils import OpalError, ensure_dir, file_sha256
 from .parquet_io import write_parquet_df
 
 PROGRESS_EVENT_SCHEMA_VERSION = "opal.progress_event.v1"
+PROGRESS_EVENT_PHASES = frozenset({"command", "preflight", "run", "abort", "finalize"})
+PROGRESS_EVENT_SEVERITIES = frozenset({"info", "warning", "error"})
 
 
 @dataclass
 class ArtifactPaths:
     model: Path
     model_meta_json: Path
-    selection_csv: Path
+    selections_parquet: Path
+    selection_batch_parquet: Path
     round_log_jsonl: Path
     round_ctx_json: Path
     objective_meta_json: Path
@@ -37,9 +41,9 @@ class ArtifactPaths:
     feature_importance_csv: Path
 
 
-def write_selection_csv(path: Path, df_selected: pd.DataFrame) -> str:
+def write_selection_parquet(path: Path, frame: pd.DataFrame) -> str:
     ensure_dir(path.parent)
-    df_selected.to_csv(path, index=False)
+    write_parquet_df(path, frame, index=False)
     return file_sha256(path)
 
 
@@ -57,13 +61,43 @@ def write_feature_importance_csv(path: Path, df: pd.DataFrame) -> str:
 def append_round_log_event(path: Path, event: dict) -> None:
     ensure_dir(path.parent)
     event = dict(event)
-    stage = str(event.get("stage", "unknown"))
+    stage = str(event.get("stage", "")).strip()
     event.setdefault("schema_version", PROGRESS_EVENT_SCHEMA_VERSION)
     event.setdefault("event_id", uuid.uuid4().hex)
     event.setdefault("phase", _infer_progress_phase(stage))
     event.setdefault("severity", "info")
+    validate_progress_event(event)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(event, separators=(",", ":")) + "\n")
+
+
+def validate_progress_event(event: Any, *, position: int | None = None) -> None:
+    prefix = f"Progress event {position}" if position is not None else "Progress event"
+    if not isinstance(event, dict):
+        raise OpalError(f"{prefix} must be a JSON object.")
+    required = {"schema_version", "event_id", "phase", "severity", "stage", "ts"}
+    missing = sorted(required - set(event))
+    if missing:
+        raise OpalError(f"{prefix} missing required fields: {missing}")
+    if event["schema_version"] != PROGRESS_EVENT_SCHEMA_VERSION:
+        raise OpalError(
+            f"{prefix} schema_version must be {PROGRESS_EVENT_SCHEMA_VERSION!r}; observed {event['schema_version']!r}."
+        )
+    for field in ("event_id", "stage"):
+        if not isinstance(event[field], str) or not event[field].strip():
+            raise OpalError(f"{prefix} field {field!r} must be a non-empty string.")
+    if not isinstance(event["phase"], str) or event["phase"] not in PROGRESS_EVENT_PHASES:
+        raise OpalError(f"{prefix} phase must be one of {sorted(PROGRESS_EVENT_PHASES)}; observed {event['phase']!r}.")
+    if not isinstance(event["severity"], str) or event["severity"] not in PROGRESS_EVENT_SEVERITIES:
+        raise OpalError(
+            f"{prefix} severity must be one of {sorted(PROGRESS_EVENT_SEVERITIES)}; observed {event['severity']!r}."
+        )
+    try:
+        timestamp = datetime.fromisoformat(str(event["ts"]))
+    except ValueError as exc:
+        raise OpalError(f"{prefix} ts must be an ISO-8601 timestamp; observed {event['ts']!r}.") from exc
+    if timestamp.tzinfo is None:
+        raise OpalError(f"{prefix} ts must include a UTC offset; observed {event['ts']!r}.")
 
 
 def _infer_progress_phase(stage: str) -> str:

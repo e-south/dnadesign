@@ -177,33 +177,6 @@ class RecordsStore:
             if_exists=if_exists,
         )
 
-    def append_predictions_from_arrays(
-        self,
-        df: pd.DataFrame,
-        *,
-        ids: List[str],
-        y_hat: np.ndarray,
-        as_of_round: int,
-        run_id: str,
-        objective: Dict[str, Any],
-        metrics_by_name: Dict[str, List[float]],
-        selection_rank: np.ndarray,
-        selection_top_k: np.ndarray,
-        ts: str | None = None,
-    ) -> pd.DataFrame:
-        return self._label_hist.append_predictions_from_arrays(
-            df,
-            ids=ids,
-            y_hat=y_hat,
-            as_of_round=as_of_round,
-            run_id=run_id,
-            objective=objective,
-            metrics_by_name=metrics_by_name,
-            selection_rank=selection_rank,
-            selection_top_k=selection_top_k,
-            ts=ts,
-        )
-
     def training_labels_from_y(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
         return self._label_hist.training_labels_from_y(df, as_of_round)
 

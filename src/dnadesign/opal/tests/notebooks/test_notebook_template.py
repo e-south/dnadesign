@@ -22,6 +22,7 @@ import pytest
 
 from dnadesign.opal.src.analysis.notebook_components import (
     CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND,
+    SELECTION_BATCH_SURFACE_KIND,
     annotate_notebook_visual_choices,
     build_notebook_artifact_garden_lines,
     build_notebook_artifact_garden_rows,
@@ -54,6 +55,9 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_reader_evidence_artifact_rows,
     build_notebook_run_summary_lines,
     build_notebook_selected_baserender_record_ids,
+    build_notebook_selection_batch_choice,
+    build_notebook_selection_batch_rows,
+    build_notebook_selection_view_options,
     build_notebook_validity_lines,
     build_notebook_visual_group_options,
     build_notebook_visual_surface_model,
@@ -65,6 +69,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     render_notebook_review_control_surface,
     render_notebook_visual_panel,
     render_visual_surface_cells,
+    resolve_notebook_selection_view,
     select_notebook_baserender_default_record_id,
     select_notebook_plot_scope,
 )
@@ -97,6 +102,34 @@ def test_notebook_template_uses_medium_width() -> None:
     assert 'marimo.App(width="full")' not in text
 
 
+def test_notebook_campaign_summary_exposes_rmf_target_partition() -> None:
+    selection_view = {
+        "id": "ethanol",
+        "objective": {
+            "name": "response_magnitude_feasibility_v1",
+            "params": {
+                "state_ids": ["00", "10", "01", "11"],
+                "target_mask": [0, 1, 0, 1],
+            },
+        },
+    }
+    view_model = {
+        "campaign": {
+            "slug": "rmf_ethanol",
+            "selection_views": [selection_view],
+        },
+        "status": {},
+    }
+
+    target = "RMF mask=[0, 1, 0, 1]; ON=10, 11; OFF=00, 01"
+    rows = build_notebook_at_a_glance_rows(view_model, selection_view=selection_view)
+    assert {"field": "selection view", "value": "ethanol"} in rows
+    assert {"field": "objective target", "value": target} in rows
+    assert build_notebook_campaign_header_lines(view_model, selection_view=selection_view)[-1] == (
+        f"**Objective target:** {target}."
+    )
+
+
 def test_notebook_template_removes_extra_tables() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     assert "mo.ui.dataframe(summary_df)" not in text
@@ -113,6 +146,30 @@ def test_notebook_template_has_visual_surface() -> None:
     assert "build_campaign_set_notebook_view_model" in text
     assert "Select one operative visual surface" not in text
     assert '"Plot deliverables": plot_panel' not in text
+
+
+def test_notebook_template_initializes_mapped_view_dropdown_by_label() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+
+    assert "options=_labels" in text
+    assert "value=next(iter(_labels))" in text
+    assert 'value=str(_views[0]["id"])' not in text
+
+
+def test_notebook_selection_view_controls_resolve_exact_ids() -> None:
+    view_model = {
+        "campaign": {
+            "selection_views": [
+                {"id": "ethanol", "objective": {"name": "rmf"}},
+                {"id": "and", "objective": {"name": "rmf"}},
+            ]
+        }
+    }
+
+    assert build_notebook_selection_view_options(view_model) == {"Ethanol": "ethanol", "AND": "and"}
+    assert resolve_notebook_selection_view(view_model, "and")["id"] == "and"
+    with pytest.raises(ValueError, match="must resolve exactly once"):
+        resolve_notebook_selection_view(view_model, "missing")
 
 
 def test_notebook_template_has_opal_schema_sentinel() -> None:
@@ -248,6 +305,10 @@ def test_notebook_visual_hierarchy_groups_without_hiding_deliverables() -> None:
                 "name": "effect_scaled_vs_logic_fidelity_latest",
             },
             {"label": "Setpoint sweep", "kind": "sfxi_setpoint_sweep", "name": "sfxi_setpoint_sweep_latest"},
+            {
+                "label": "Selection batch",
+                "surface_kind": SELECTION_BATCH_SURFACE_KIND,
+            },
         ]
     )
 
@@ -265,6 +326,10 @@ def test_notebook_visual_hierarchy_groups_without_hiding_deliverables() -> None:
     assert [choice["label"] for choice in filter_notebook_visual_choices_by_group(choices, "EDA comparisons")] == [
         "Effect scaled vs logic fidelity"
     ]
+    assert [choice["label"] for choice in filter_notebook_visual_choices_by_group(choices, "Handoff")] == [
+        "Selection batch",
+        "Sequence render",
+    ]
     assert sum(
         len(filter_notebook_visual_choices_by_group(choices, group))
         for group in build_notebook_visual_group_options(choices)
@@ -273,25 +338,80 @@ def test_notebook_visual_hierarchy_groups_without_hiding_deliverables() -> None:
         filter_notebook_visual_choices_by_group(choices, "Legacy bucket")
 
 
+def test_notebook_selection_batch_choice_preserves_view_memberships() -> None:
+    payload = {
+        "schema_version": "opal.selection_batch.v1",
+        "as_of_round": 1,
+        "run_id": "run-1",
+        "unique_count": 2,
+        "rows": [
+            {
+                "id": "candidate-a",
+                "sequence": "AAAA",
+                "selection_view_ids": ["ethanol", "and"],
+                "selection_memberships": [
+                    {"selection_view_id": "ethanol", "rank": 1, "score": -0.2},
+                    {"selection_view_id": "and", "rank": 4, "score": -0.7},
+                ],
+                "selection_batch_key": "AAAA",
+                "deduplicate_by": "sequence",
+            },
+            {
+                "id": "candidate-b",
+                "sequence": "CCCC",
+                "selection_view_ids": ["ciprofloxacin"],
+                "selection_memberships": [{"selection_view_id": "ciprofloxacin", "rank": 2, "score": 1.3}],
+                "selection_batch_key": "CCCC",
+                "deduplicate_by": "sequence",
+            },
+        ],
+    }
+
+    choice = build_notebook_selection_batch_choice(payload)
+
+    assert choice["surface_kind"] == SELECTION_BATCH_SURFACE_KIND
+    assert choice["label"] == "Selection batch"
+    assert choice["review_group"] == "handoff"
+    assert build_notebook_selection_batch_rows(choice) == [
+        {
+            "candidate": "candidate-a",
+            "selection views": "Ethanol, AND",
+            "view count": 2,
+            "view ranks": "Ethanol 1; AND 4",
+        },
+        {
+            "candidate": "candidate-b",
+            "selection views": "Ciprofloxacin",
+            "view count": 1,
+            "view ranks": "Ciprofloxacin 2",
+        },
+    ]
+
+
 def test_campaign_set_selection_overlap_choice_and_renderer(tmp_path: Path) -> None:
     def _campaign(slug: str, rows: list[tuple[str, int, float]]) -> dict[str, object]:
         workdir = tmp_path / slug
         selection_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
         selection_dir.mkdir(parents=True)
-        selection_path = selection_dir / "selection_top_k.csv"
-        selection_path.write_text(
-            "id,as_of_round,run_id,sel__rank_competition,pred__score_selected,pred__score_ref,sequence\n"
-            + "\n".join(
-                f"{candidate_id},0,r0,{rank},{score},sfxi,{candidate_id}ACGT" for candidate_id, rank, score in rows
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        pl.DataFrame(
+            {
+                "selection_view_id": ["primary"] * len(rows),
+                "id": [candidate_id for candidate_id, _, _ in rows],
+                "as_of_round": [0] * len(rows),
+                "run_id": ["r0"] * len(rows),
+                "rank_competition": [rank for _, rank, _ in rows],
+                "score": [score for _, _, score in rows],
+                "selection_score": [score for _, _, score in rows],
+                "score_ref": ["primary/sfxi"] * len(rows),
+                "sequence": [f"{candidate_id}ACGT" for candidate_id, _, _ in rows],
+            }
+        ).write_parquet(selection_dir / "selections.parquet")
         return {
             "campaign": {
                 "slug": slug,
                 "name": f"SECG {slug} RF + SFXI",
                 "workdir": str(workdir),
+                "selection_views": [{"id": "primary"}],
             }
         }
 
@@ -394,6 +514,7 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_collection_set_choices" in text
     assert "build_notebook_collection_visual_choices" in text
+    assert "selected_campaign_baserender_contract, selected_campaign_model," in text
     assert "build_notebook_collection_visual_card_rows" in text
     assert "build_notebook_visual_group_options" in text
     assert "filter_notebook_visual_choices_by_group" in text
@@ -868,9 +989,13 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
             "x_column": "x_vec",
             "label_source": "usr_sidecar",
             "model": "random_forest",
-            "selection": "top_n",
-            "objectives": ["sfxi_v1"],
-            "objective_params": [{"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 1, 1]}}],
+            "selection_views": [
+                {
+                    "id": "ciprofloxacin",
+                    "objective": {"name": "sfxi_v1", "params": {"setpoint_vector": [0, 0, 1, 1]}},
+                    "selection": {"name": "top_n", "params": {"top_k": 6}},
+                }
+            ],
             "metadata": {
                 "response_axis": "ciprofloxacin",
                 "comparison_group": "Ciprofloxacin factor",
@@ -918,9 +1043,12 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
                 }
             ],
         },
-        "review_manifest": {
-            "schema_version": "opal.campaign_review.v1",
-            "selection": {"selected_count": 6},
+        "review_manifests": {
+            "primary": {
+                "schema_version": "opal.campaign_review.v1",
+                "review_scope": {"selection_view_id": "primary"},
+                "selection": {"selected_count": 6},
+            },
         },
         "plot_manifests": [
             {
@@ -973,34 +1101,44 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
         },
     }
 
-    glance_rows = build_notebook_at_a_glance_rows(view_model)
+    selection_view = view_model["campaign"]["selection_views"][0]
+    glance_rows = build_notebook_at_a_glance_rows(view_model, selection_view=selection_view)
     assert {"field": "campaign", "value": "campaign_a"} in glance_rows
     assert {
         "field": "description",
         "value": (
-            "Campaign ID `campaign_a`. Campaign A scores the configured OPAL records table with `random_forest` "
-            "and selects candidates by `top_n` against `sfxi_v1`. The active X contract is `x_vec`."
+            "Campaign ID `campaign_a`. Campaign A fits `random_forest` once and evaluates 1 selection view "
+            "from the shared predictions. The active X contract is `x_vec`."
         ),
     } in glance_rows
     assert {"field": "description source", "value": "derived"} in glance_rows
     assert {"field": "X column", "value": "x_vec"} in glance_rows
+    assert {"field": "objective target", "value": "sfxi_v1 setpoint_vector=[0, 0, 1, 1]"} in glance_rows
     assert {"field": "stale artifacts", "value": 1} in glance_rows
-    header_lines = build_notebook_campaign_header_lines(view_model)
+    header_lines = build_notebook_campaign_header_lines(view_model, selection_view=selection_view)
     assert header_lines[0] == "# Campaign A"
     assert "Campaign ID `campaign_a`." in header_lines[2]
-    assert "scores the configured OPAL records table with `random_forest`" in header_lines[2]
+    assert "fits `random_forest` once and evaluates 1 selection view" in header_lines[2]
     assert "The active X contract is `x_vec`." in header_lines[2]
-    assert build_notebook_campaign_header_lines(view_model, heading_level=2)[0] == "## Campaign A"
+    assert header_lines[-1] == "**Objective target:** sfxi_v1 setpoint_vector=[0, 0, 1, 1]."
+    assert (
+        build_notebook_campaign_header_lines(
+            view_model,
+            selection_view=selection_view,
+            heading_level=2,
+        )[0]
+        == "## Campaign A"
+    )
     named_header = build_notebook_campaign_header_lines(
         {
             "campaign": {
                 "name": "Stress ethanol/ciprofloxacin cipro factor RF + SFXI + top_n [cipro_positive_random_id]",
                 "slug": "opal_axis_probe_v0_cipro_positive_random_id",
                 "model": "random_forest",
-                "selection": "top_n",
-                "objectives": ["sfxi_v1"],
+                "selection_views": [selection_view],
             }
-        }
+        },
+        selection_view=selection_view,
     )
     assert named_header[0] == "# Stress ethanol/ciprofloxacin cipro factor RF + SFXI + top N"
     assert "Opal Axis Probe" not in named_header[2]
@@ -1137,7 +1275,7 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert evidence[0]["path"] == "campaign.yaml"
 
     validity_lines = "\n".join(build_notebook_validity_lines(view_model))
-    assert "Review manifest: `present`" in validity_lines
+    assert "Review manifests: `1`" in validity_lines
     assert "Plot manifests: `1`" in validity_lines
     assert "Missing plot outputs: `0`" in validity_lines
     assert "Artifact garden: `opal.artifact_garden.v1`" in validity_lines
@@ -1202,7 +1340,11 @@ def test_notebook_campaign_description_prefers_structured_target_metadata() -> N
         "selection_summary": {"row_count": 0},
     }
 
-    rows = build_notebook_at_a_glance_rows(view_model)
+    selection_view = {
+        "id": "primary",
+        "objective": {"name": "metadata_probe_v1", "params": {}},
+    }
+    rows = build_notebook_at_a_glance_rows(view_model, selection_view=selection_view)
     description = next(row["value"] for row in rows if row["field"] == "description")
     assert description == (
         "Pre-assay metadata probe for BaeR count fraction (count / 3) using the "
@@ -1252,6 +1394,43 @@ def test_registered_plot_kinds_have_explicit_math_disclosure() -> None:
         assert "Provenance:" in method_sections["Data contract"], kind
         assert "Counts and replicates:" in method_sections["Data contract"], kind
         assert "manifest=outputs/plots/example.manifest.json" in method_sections["Data contract"], kind
+
+
+def test_plot_method_sections_surface_manifest_decision_metadata() -> None:
+    choice = {
+        "kind": "response_magnitude_feasibility_frontier",
+        "name": "rmf_frontier",
+        "title": "Predicted RMF components locate selections relative to campaign thresholds",
+        "rounds": [0],
+        "freshness": "fresh",
+        "warning_count": 0,
+        "manifest": {
+            "metadata": {
+                "summary": "Predicted candidate constraints with observed labels identified.",
+                "premise": "Selections occupy explicit response and fluorescence constraint space.",
+                "decision_value": "Locates selected candidates relative to each configured boundary.",
+                "rationale": "Separate components expose which requirement limits selection.",
+                "non_claim_boundary": "Predictions do not establish measured response.",
+                "capability": {
+                    "objective_family": "response_magnitude_feasibility",
+                    "data_layer": "predictions_plus_labels",
+                    "round_scope": "single_round",
+                    "label_requirement": "required",
+                },
+            },
+            "params": {},
+            "rounds": [0],
+        },
+    }
+
+    sections = build_notebook_plot_method_sections(choice)
+
+    assert sections["Decision"] == (
+        "**Premise.** Selections occupy explicit response and fluorescence constraint space.\n\n"
+        "**Decision use.** Locates selected candidates relative to each configured boundary.\n\n"
+        "**Rationale.** Separate components expose which requirement limits selection.\n\n"
+        "**Claim boundary.** Predictions do not establish measured response."
+    )
 
 
 def test_registered_plot_alt_text_exposes_primary_visual_encoding() -> None:
@@ -1320,7 +1499,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "visual_group_label_memory, set_visual_group_label_memory = mo.state(None)" in text
     assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
     assert "on_change=set_visual_group_label_memory" in text
-    assert "_preferred_visual_label = visual_label_memory()" in text
+    assert "_preferred = visual_label_memory()" in text
     assert "on_change=set_visual_label_memory" in text
     assert "Plot:" not in text
     assert "Campaigns at a glance" in text
@@ -1467,10 +1646,13 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     assert "render_notebook_visual_panel(" in text
     assert render_notebook_visual_panel.__module__.endswith(".notebook_components.visual_panel")
     helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/visual_panel.py").read_text()
+    collection_helper_text = Path(
+        "src/dnadesign/opal/src/analysis/notebook_components/visual_panel_collection.py"
+    ).read_text()
     assert '"width": "100%"' in helper_text
     assert '"background-color": "#FFFFFF"' in helper_text
     assert "Selection evidence" in helper_text
-    assert "Collection plot evidence" in helper_text
+    assert "Collection plot evidence" in collection_helper_text
     assert "densegen__used_tfbs_detail" not in text
     ast.parse(text)
 
@@ -1659,7 +1841,8 @@ def test_collection_baserender_role_choices_use_generic_fallback_labels() -> Non
 
 def test_selected_baserender_record_ids_filter_and_sort_selected_rows() -> None:
     class _CampaignAnalysis:
-        def read_predictions(self, **kwargs: object) -> pl.DataFrame:
+        def read_selection_view_predictions(self, **kwargs: object) -> pl.DataFrame:
+            assert kwargs["selection_view_id"] == "ethanol"
             assert kwargs["round_selector"] == [3]
             assert kwargs["run_id"] == "run-3"
             return pl.DataFrame(
@@ -1667,13 +1850,14 @@ def test_selected_baserender_record_ids_filter_and_sort_selected_rows() -> None:
                     "id": ["second", "unselected", "first", "null-selection"],
                     "as_of_round": [3, 3, 3, 3],
                     "run_id": ["run-3", "run-3", "run-3", "run-3"],
-                    "sel__rank_competition": [2, 1, 1, 3],
-                    "sel__is_selected": [True, False, True, None],
+                    "view__rank_competition": [2, 1, 1, 3],
+                    "view__is_selected": [True, False, True, None],
                 }
             )
 
     ids, rows = build_notebook_selected_baserender_record_ids(
         _CampaignAnalysis(),
+        selection_view_id="ethanol",
         round_value=3,
         run_id="run-3",
     )
@@ -1684,9 +1868,9 @@ def test_selected_baserender_record_ids_filter_and_sort_selected_rows() -> None:
         {"field": "selection run", "value": "run-3"},
         {"field": "selected records", "value": 2},
     ]
-    assert build_notebook_selected_baserender_record_ids(_CampaignAnalysis(), round_value=3, run_id=None)[1] == [
-        {"field": "selection scope", "value": "no run available"}
-    ]
+    assert build_notebook_selected_baserender_record_ids(
+        _CampaignAnalysis(), selection_view_id="ethanol", round_value=3, run_id=None
+    )[1] == [{"field": "selection scope", "value": "no run available"}]
 
 
 def test_baserender_record_choices_compact_record_ids_without_losing_identity() -> None:

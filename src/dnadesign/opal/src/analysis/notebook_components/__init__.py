@@ -112,6 +112,12 @@ from .runs import (
     build_notebook_run_summary_lines,
     resolve_notebook_round_default,
 )
+from .selection_batch import (
+    SELECTION_BATCH_SURFACE_KIND,
+    build_notebook_selection_batch_choice,
+    build_notebook_selection_batch_rows,
+    build_notebook_selection_batch_summary_rows,
+)
 from .selection_overlap import (
     CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND,
     build_notebook_campaign_set_selection_overlap_card_rows,
@@ -119,6 +125,7 @@ from .selection_overlap import (
     build_notebook_campaign_set_selection_overlap_rows,
     render_notebook_campaign_set_selection_overlap_image,
 )
+from .selection_views import build_notebook_selection_view_options, resolve_notebook_selection_view
 from .visual_hierarchy import (
     annotate_notebook_visual_choices,
     build_notebook_visual_group_options,
@@ -130,6 +137,7 @@ from .zoomable_visual import render_notebook_zoomable_image
 
 __all__ = [
     "CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND",
+    "SELECTION_BATCH_SURFACE_KIND",
     "annotate_notebook_visual_choices",
     "build_notebook_artifact_garden_lines",
     "build_notebook_artifact_garden_rows",
@@ -143,8 +151,13 @@ __all__ = [
     "build_notebook_baserender_record_choices_with_counts",
     "build_notebook_baserender_record_options",
     "build_notebook_selected_baserender_record_ids",
+    "build_notebook_selection_batch_choice",
+    "build_notebook_selection_batch_rows",
+    "build_notebook_selection_batch_summary_rows",
+    "build_notebook_selection_view_options",
     "build_notebook_campaign_header_lines",
     "build_notebook_campaign_summary_row",
+    "resolve_notebook_selection_view",
     "build_notebook_collection_baserender_role_choices",
     "build_notebook_campaign_set_metric_comparison_rows",
     "build_notebook_campaign_set_plot_gallery_items",

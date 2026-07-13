@@ -16,6 +16,7 @@ from dnadesign.opal.src.plots._mpl_utils import (
     pretty_label,
     pretty_title,
 )
+from dnadesign.opal.src.plots.scatter_score_vs_rank import _rank_axis_label
 from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot_meta
 
 
@@ -52,7 +53,7 @@ def test_plot_meta_exposes_dropdown_capability_contract() -> None:
 
 
 def test_plot_style_helpers_prettify_labels_and_cycle_accessible_categories() -> None:
-    assert pretty_label("pred__score_selected") == "Selected objective score"
+    assert pretty_label("view__selection_score") == "Selected objective score"
     assert pretty_label("obj__logic_fidelity", raw=True) == "Logic fidelity (obj__logic_fidelity)"
     assert pretty_title("RF top-N Score = -MSE(y_hat, [0, 0, 1, 1]) over rounds") == (
         "RF top-N Score = -MSE(y_hat, [0, 0, 1, 1]) over rounds"
@@ -63,3 +64,23 @@ def test_plot_style_helpers_prettify_labels_and_cycle_accessible_categories() ->
     assert second["color"] == COLORBLIND_PALETTE[1]
     assert first["marker"] != second["marker"]
     assert "F_{\\ell}" in math_label("logic_fidelity")
+    assert pretty_title("Higher RMF scores receive better round-0 ranks") == (
+        "Higher RMF scores receive better round 0 ranks"
+    )
+
+
+def test_score_rank_plot_accepts_an_explicit_directional_rank_label() -> None:
+    assert (
+        _rank_axis_label(
+            x_field="view__rank_competition",
+            rank_mode="competition",
+            rank_label="Selection rank (lower is better)",
+        )
+        == "Selection rank (lower is better)"
+    )
+    metadata = describe_plot_kind("scatter_score_vs_rank")
+    assert metadata["premise"]
+    assert metadata["decision_value"]
+    assert metadata["rationale"]
+    assert "rank one appears at the right" in metadata["alt_text"]
+    assert metadata["non_claim_boundary"]

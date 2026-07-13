@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -39,6 +40,29 @@ def _setup_workspace(tmp_path: Path, *, include_opal_cols: bool = False) -> tupl
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
     return workdir, campaign, records
+
+
+@pytest.mark.parametrize(
+    ("args", "retired_flag"),
+    [
+        (["ingest-y", "--observed-round", "0", "--in", "labels.csv"], "--observed-round"),
+        (["run", "--labels-as-of", "0"], "--labels-as-of"),
+        (["explain", "--labels-as-of", "0"], "--labels-as-of"),
+        (["guide", "--labels-as-of", "0"], "--labels-as-of"),
+        (["guide", "next", "--observed-round", "0"], "--observed-round"),
+    ],
+)
+def test_round_commands_reject_retired_option_aliases(
+    tmp_path: Path,
+    args: list[str],
+    retired_flag: str,
+) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+
+    result = CliRunner().invoke(_build(), ["--no-color", *args, "-c", str(campaign)])
+
+    assert result.exit_code == 2
+    assert f"No such option: {retired_flag}" in result.output
 
 
 def test_init_validate_explain_cli(tmp_path: Path) -> None:
@@ -85,7 +109,7 @@ def test_validate_json_writes_machine_readable_contract(tmp_path: Path) -> None:
     assert payload["data"]["y_column"] == "Y"
     assert payload["x_contract"] == {"row_count": 2, "x_dim": 2}
     assert payload["label_source"]["kind"] == "campaign_history"
-    assert payload["label_source"]["prediction_records"] == "label_history"
+    assert payload["label_source"]["prediction_records"] == "ledger_only"
     assert "validation passed" not in res.stdout.lower()
 
 
@@ -275,7 +299,11 @@ def test_run_ledger_only_streams_candidate_x_without_full_records_load(tmp_path:
     workdir, campaign, _ = _setup_workspace(tmp_path)
     raw = yaml.safe_load(campaign.read_text())
     raw["writeback"] = {"prediction_records": "ledger_only"}
-    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    raw["selection_views"][0]["objective"]["params"]["scaling"] = {
+        "percentile": 95,
+        "min_n": 1,
+        "eps": 1.0e-8,
+    }
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     app = _build()
@@ -388,8 +416,8 @@ def test_validate_rejects_unknown_plugin_names(tmp_path: Path) -> None:
     raw["transforms_x"]["name"] = "does_not_exist_tx"
     raw["transforms_y"]["name"] = "does_not_exist_ty"
     raw["model"]["name"] = "does_not_exist_model"
-    raw["selection"]["name"] = "does_not_exist_selection"
-    raw["objectives"][0]["name"] = "does_not_exist_objective"
+    raw["selection_views"][0]["selection"]["name"] = "does_not_exist_selection"
+    raw["selection_views"][0]["objective"]["name"] = "does_not_exist_objective"
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
@@ -405,6 +433,8 @@ def test_validate_rejects_duplicate_yaml_keys_as_bad_args(tmp_path: Path) -> Non
 
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: "Demo"
   slug: "demo"
@@ -416,17 +446,22 @@ data:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: scalar_from_table_v1, params: {{}} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params:
-    top_k: 2
-    score_ref: "scalar_identity_v1/scalar"
-    objective_mode: maximize
-    tie_handling: competition_rank
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params:
+        top_k: 2
+        score_ref: scalar
+        objective_mode: maximize
+        tie_handling: competition_rank
+selection_views:
+  - id: duplicate
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 2, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip()
     )
 
@@ -460,7 +495,7 @@ def test_validate_requires_explicit_selection_contract_fields(tmp_path: Path) ->
     runner = CliRunner()
 
     raw = yaml.safe_load(campaign.read_text())
-    params = raw["selection"]["params"]
+    params = raw["selection_views"][0]["selection"]["params"]
     params.pop("top_k", None)
     params.pop("tie_handling", None)
     params.pop("objective_mode", None)
@@ -480,7 +515,7 @@ def test_validate_rejects_unknown_selection_score_channel_for_declared_objective
     runner = CliRunner()
 
     raw = yaml.safe_load(campaign.read_text())
-    raw["selection"]["params"]["score_ref"] = "sfxi_v1/missing_channel"
+    raw["selection_views"][0]["selection"]["params"]["score_ref"] = "missing_channel"
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
@@ -503,10 +538,11 @@ def test_validate_rejects_ei_channel_typo_before_runtime(tmp_path: Path) -> None
         "normalize_y": True,
         "kernel": {"name": "rbf", "length_scale": 1.0},
     }
-    raw["selection"]["name"] = "expected_improvement"
-    raw["selection"]["params"]["uncertainty_ref"] = "sfxi_v1/missing_channel"
-    raw["selection"]["params"]["alpha"] = 1.0
-    raw["selection"]["params"]["beta"] = 1.0
+    selection = raw["selection_views"][0]["selection"]
+    selection["name"] = "expected_improvement"
+    selection["params"]["uncertainty_ref"] = "missing_channel"
+    selection["params"]["alpha"] = 1.0
+    selection["params"]["beta"] = 1.0
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
@@ -523,10 +559,11 @@ def test_validate_rejects_ei_with_model_without_predictive_std(tmp_path: Path) -
     runner = CliRunner()
 
     raw = yaml.safe_load(campaign.read_text())
-    raw["selection"]["name"] = "expected_improvement"
-    raw["selection"]["params"]["uncertainty_ref"] = "sfxi_v1/sfxi"
-    raw["selection"]["params"]["alpha"] = 1.0
-    raw["selection"]["params"]["beta"] = 1.0
+    selection = raw["selection_views"][0]["selection"]
+    selection["name"] = "expected_improvement"
+    selection["params"]["uncertainty_ref"] = "sfxi"
+    selection["params"]["alpha"] = 1.0
+    selection["params"]["beta"] = 1.0
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
@@ -542,14 +579,14 @@ def test_validate_rejects_objective_mode_mismatch_for_score_ref(tmp_path: Path) 
     runner = CliRunner()
 
     raw = yaml.safe_load(campaign.read_text())
-    raw["selection"]["params"]["objective_mode"] = "minimize"
+    raw["selection_views"][0]["selection"]["params"]["objective_mode"] = "minimize"
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
     assert res.exit_code != 0
     out = res.output.lower()
     assert "objective mode mismatch" in out
-    assert "sfxi_v1/sfxi" in out
+    assert "sfxi" in out
     assert "maximize" in out
     assert "minimize" in out
 
@@ -566,10 +603,11 @@ def test_validate_rejects_ei_negative_weights(tmp_path: Path) -> None:
         "normalize_y": True,
         "kernel": {"name": "rbf", "length_scale": 1.0},
     }
-    raw["selection"]["name"] = "expected_improvement"
-    raw["selection"]["params"]["uncertainty_ref"] = "sfxi_v1/sfxi"
-    raw["selection"]["params"]["alpha"] = -0.1
-    raw["selection"]["params"]["beta"] = -0.5
+    selection = raw["selection_views"][0]["selection"]
+    selection["name"] = "expected_improvement"
+    selection["params"]["uncertainty_ref"] = "sfxi"
+    selection["params"]["alpha"] = -0.1
+    selection["params"]["beta"] = -0.5
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
@@ -599,7 +637,11 @@ def test_run_surfaces_sfxi_round_label_requirements_as_opal_error(tmp_path: Path
     runner = CliRunner()
 
     raw = yaml.safe_load(campaign.read_text())
-    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    raw["selection_views"][0]["objective"]["params"]["scaling"] = {
+        "percentile": 95,
+        "min_n": 1,
+        "eps": 1.0e-8,
+    }
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
@@ -652,7 +694,11 @@ def test_run_reports_empty_candidate_pool_as_opal_error(tmp_path: Path) -> None:
     runner = CliRunner()
 
     raw = yaml.safe_load(campaign.read_text())
-    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    raw["selection_views"][0]["objective"]["params"]["scaling"] = {
+        "percentile": 95,
+        "min_n": 1,
+        "eps": 1.0e-8,
+    }
     campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
 
     init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])

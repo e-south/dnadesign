@@ -45,7 +45,7 @@ cli_group("guide", help="Guided workflow helper commands.")(guide_app)
 def cmd_guide(
     ctx: typer.Context,
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    labels_as_of: int = typer.Option(0, "--labels-as-of", help="Labels cutoff used in generated runbook commands."),
+    round: int = typer.Option(0, "--round", "-r", help="Round used in generated runbook commands."),
     format: str = typer.Option("text", "--format", help="Runbook output format: text, markdown, or json."),
     out: Optional[Path] = typer.Option(None, "--out", help="Optional output file path."),
 ) -> None:
@@ -57,7 +57,7 @@ def cmd_guide(
             raise OpalError("--format must be one of: text, markdown, json.")
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
-        report = build_guidance_report(cfg_path, cfg, labels_as_of=int(labels_as_of))
+        report = build_guidance_report(cfg_path, cfg, labels_as_of=int(round))
         if fmt == "json":
             if out is not None:
                 out.parent.mkdir(parents=True, exist_ok=True)
@@ -80,8 +80,7 @@ def cmd_guide(
 @guide_app.command("next", help="Inspect campaign state and print the recommended next command.")
 def cmd_guide_next(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
-    observed_round: Optional[int] = typer.Option(None, "--observed-round", help="Observed round to inspect."),
-    labels_as_of: Optional[int] = typer.Option(None, "--labels-as-of", help="Labels cutoff round to inspect."),
+    round: Optional[int] = typer.Option(None, "--round", "-r", help="Round to inspect."),
     json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
     try:
@@ -93,8 +92,8 @@ def cmd_guide_next(
                 cfg_path,
                 cfg,
                 store.records_path,
-                labels_as_of=labels_as_of,
-                observed_round=observed_round,
+                labels_as_of=round,
+                observed_round=round,
             )
         else:
             from ...storage.workspace import CampaignWorkspace
@@ -106,8 +105,8 @@ def cmd_guide_next(
                 cfg,
                 store,
                 df,
-                labels_as_of=labels_as_of,
-                observed_round=observed_round,
+                labels_as_of=round,
+                observed_round=round,
             )
         if json:
             json_out(report)

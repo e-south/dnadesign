@@ -20,8 +20,10 @@ from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from ..analysis.campaign import CampaignAnalysis
+from ..analysis.ledger import read_selection_view_predictions
 from ..core.leakage import assert_no_leakage_violations, build_prediction_identity_report
 from ..core.rounds import resolve_round_index_from_runs
 from ..core.utils import ExitCodes, OpalError, read_json, write_json
@@ -35,9 +37,9 @@ _PREDICTION_REVIEW_COLUMNS = (
     "id",
     "run_id",
     "as_of_round",
-    "pred__score_selected",
-    "sel__rank_competition",
-    "sel__is_selected",
+    "view__selection_score",
+    "view__rank_competition",
+    "view__is_selected",
 )
 
 
@@ -70,11 +72,25 @@ def build_campaign_review(
     *,
     round_selector: str | None = "latest",
     run_id: str | None = None,
+    selection_view_id: str | None = None,
     out_dir: Path | None = None,
     include_plots: bool = True,
 ) -> CampaignReviewResult:
     analysis = CampaignAnalysis.from_config_path(config_path, allow_dir=True)
     cfg = analysis.config
+    configured_view_ids = [view.id for view in cfg.selection_views]
+    if selection_view_id is None:
+        if len(configured_view_ids) != 1:
+            raise OpalError(
+                f"selection_view_id is required for this multi-view campaign. Available: {configured_view_ids}",
+                ExitCodes.BAD_ARGS,
+            )
+        selection_view_id = configured_view_ids[0]
+    if selection_view_id not in configured_view_ids:
+        raise OpalError(
+            f"Unknown selection view {selection_view_id!r}. Available: {configured_view_ids}",
+            ExitCodes.BAD_ARGS,
+        )
     ws = analysis.workspace
     reader = LedgerReader(ws)
     x_contract = validate_x_parquet_column(
@@ -93,10 +109,15 @@ def build_campaign_review(
     round_log_summary["round_index"] = resolved_round
     round_log_summary["path"] = str(round_log_path)
 
-    predictions = _read_review_predictions(reader, round_index=resolved_round, run_id=resolved_run_id)
+    predictions = _read_review_predictions(
+        reader,
+        selection_view_id=selection_view_id,
+        round_index=resolved_round,
+        run_id=resolved_run_id,
+    )
     selection_summary, selection_preview = _selection_summary(predictions)
 
-    review_dir = out_dir if out_dir is not None else ws.outputs_dir / "review"
+    review_dir = out_dir if out_dir is not None else ws.outputs_dir / "review" / "selection_views" / selection_view_id
     review_dir = Path(review_dir).resolve()
     plots_dir = review_dir / "plots"
     manifest_path = review_dir / "manifest.json"
@@ -150,10 +171,17 @@ def build_campaign_review(
                 },
                 "y_column": cfg.data.y_column_name,
                 "model": cfg.model.name,
-                "selection": cfg.selection.selection.name,
-                "objectives": [objective.name for objective in cfg.objectives.objectives],
+                "selection_views": [
+                    {
+                        "id": view.id,
+                        "objective": view.objective.name,
+                        "selection": view.selection.name,
+                    }
+                    for view in cfg.selection_views
+                ],
             },
             "review_scope": {
+                "selection_view_id": selection_view_id,
                 "round_selector": round_selector,
                 "round_index": resolved_round,
                 "run_id": resolved_run_id,
@@ -506,22 +534,19 @@ def _html_document(*, title: str, body: str) -> str:
 def _read_review_predictions(
     reader: LedgerReader,
     *,
+    selection_view_id: str,
     round_index: int,
     run_id: str,
 ) -> pd.DataFrame:
-    schema_columns = set(reader.predictions_schema_columns())
-    missing = sorted(set(_PREDICTION_REVIEW_COLUMNS) - schema_columns)
-    if missing:
-        raise OpalError(
-            f"outputs/ledger/predictions missing campaign review column(s): {missing}",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    df = reader.read_predictions(
+    df = read_selection_view_predictions(
+        reader.paths.predictions_dir,
+        selection_view_id=selection_view_id,
         columns=_PREDICTION_REVIEW_COLUMNS,
         round_selector=int(round_index),
         run_id=str(run_id),
+        runs_df=pl.from_pandas(reader.read_runs()),
         require_run_id=True,
-    )
+    ).to_pandas()
     if df.empty:
         raise OpalError("No prediction rows found for campaign review scope.", ExitCodes.BAD_ARGS)
     assert_no_leakage_violations(
@@ -536,7 +561,7 @@ def _read_review_predictions(
 def _selected_mask(values: pd.Series) -> pd.Series:
     if values.isna().any():
         raise OpalError(
-            "Campaign review predictions contain null sel__is_selected values.",
+            "Campaign review predictions contain null view__is_selected values.",
             ExitCodes.CONTRACT_VIOLATION,
         )
     if not pd.api.types.is_bool_dtype(values):
@@ -544,7 +569,7 @@ def _selected_mask(values: pd.Series) -> pd.Series:
         if not bad.empty:
             preview = ", ".join(repr(value) for value in bad.head(5).tolist())
             raise OpalError(
-                f"Campaign review predictions sel__is_selected must be boolean; got {preview}",
+                f"Campaign review predictions view__is_selected must be boolean; got {preview}",
                 ExitCodes.CONTRACT_VIOLATION,
             )
     return values.astype(bool)
@@ -552,16 +577,16 @@ def _selected_mask(values: pd.Series) -> pd.Series:
 
 def _selection_summary(predictions: pd.DataFrame) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     df = predictions.copy()
-    df["pred__score_selected"] = pd.to_numeric(df["pred__score_selected"], errors="raise")
-    df["sel__rank_competition"] = pd.to_numeric(df["sel__rank_competition"], errors="raise").astype(int)
-    selected = df[_selected_mask(df["sel__is_selected"])].sort_values(["sel__rank_competition", "id"]).copy()
+    df["view__selection_score"] = pd.to_numeric(df["view__selection_score"], errors="raise")
+    df["view__rank_competition"] = pd.to_numeric(df["view__rank_competition"], errors="raise").astype(int)
+    selected = df[_selected_mask(df["view__is_selected"])].sort_values(["view__rank_competition", "id"]).copy()
     preview_rows = selected.head(25)
     preview = [
         {
-            "rank": int(row["sel__rank_competition"]),
+            "rank": int(row["view__rank_competition"]),
             "id": str(row["id"]),
-            "score": float(row["pred__score_selected"]),
-            "selected": bool(row["sel__is_selected"]),
+            "score": float(row["view__selection_score"]),
+            "selected": bool(row["view__is_selected"]),
         }
         for _, row in preview_rows.iterrows()
     ]
@@ -569,11 +594,11 @@ def _selection_summary(predictions: pd.DataFrame) -> tuple[dict[str, Any], list[
         {
             "prediction_count": int(len(df)),
             "selected_count": int(len(selected)),
-            "score_min": float(df["pred__score_selected"].min()),
-            "score_median": float(df["pred__score_selected"].median()),
-            "score_max": float(df["pred__score_selected"].max()),
-            "best_rank": int(df["sel__rank_competition"].min()),
-            "worst_rank": int(df["sel__rank_competition"].max()),
+            "score_min": float(df["view__selection_score"].min()),
+            "score_median": float(df["view__selection_score"].median()),
+            "score_max": float(df["view__selection_score"].max()),
+            "best_rank": int(df["view__rank_competition"].min()),
+            "worst_rank": int(df["view__rank_competition"].max()),
         },
         preview,
     )
@@ -585,15 +610,15 @@ def _write_score_vs_rank_plot(predictions: pd.DataFrame, path: Path, *, title: s
     import matplotlib.pyplot as plt
 
     df = predictions.copy()
-    df["pred__score_selected"] = pd.to_numeric(df["pred__score_selected"], errors="raise")
-    df["sel__rank_competition"] = pd.to_numeric(df["sel__rank_competition"], errors="raise").astype(int)
-    df = df.sort_values(["sel__rank_competition", "id"])
-    selected = _selected_mask(df["sel__is_selected"])
+    df["view__selection_score"] = pd.to_numeric(df["view__selection_score"], errors="raise")
+    df["view__rank_competition"] = pd.to_numeric(df["view__rank_competition"], errors="raise").astype(int)
+    df = df.sort_values(["view__rank_competition", "id"])
+    selected = _selected_mask(df["view__is_selected"])
     fig, ax = plt.subplots(figsize=(8.5, 5.0), constrained_layout=True)
     scatter_smart(
         ax,
-        df["sel__rank_competition"].to_numpy(),
-        df["pred__score_selected"].to_numpy(),
+        df["view__rank_competition"].to_numpy(),
+        df["view__selection_score"].to_numpy(),
         s=12,
         alpha=0.35,
         rasterize_at=20_000,
@@ -601,8 +626,8 @@ def _write_score_vs_rank_plot(predictions: pd.DataFrame, path: Path, *, title: s
     if selected.any():
         scatter_smart(
             ax,
-            df.loc[selected, "sel__rank_competition"].to_numpy(),
-            df.loc[selected, "pred__score_selected"].to_numpy(),
+            df.loc[selected, "view__rank_competition"].to_numpy(),
+            df.loc[selected, "view__selection_score"].to_numpy(),
             s=34,
             alpha=0.9,
             edgecolors="black",
@@ -611,7 +636,7 @@ def _write_score_vs_rank_plot(predictions: pd.DataFrame, path: Path, *, title: s
     ax.set_xlabel("selection rank")
     ax.set_ylabel("selected objective score")
     ax.set_title(title)
-    ax.set_xlim(left=int(df["sel__rank_competition"].max()), right=1)
+    ax.set_xlim(left=int(df["view__rank_competition"].max()), right=1)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=160)
     plt.close(fig)

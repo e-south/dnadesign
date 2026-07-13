@@ -26,6 +26,12 @@ _PLOT_META: Dict[str, "PlotMeta"] = {}
 @dataclass(frozen=True)
 class PlotMeta:
     summary: str
+    premise: str | None = None
+    decision_value: str | None = None
+    rationale: str | None = None
+    alt_text: str | None = None
+    non_claim_boundary: str | None = None
+    tier: str | None = None
     params: Dict[str, str] = field(default_factory=dict)
     requires: List[str] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
@@ -136,6 +142,12 @@ def describe_plot_kind(name: str) -> Dict[str, object]:
         return {
             "kind": name,
             "summary": None,
+            "premise": None,
+            "decision_value": None,
+            "rationale": None,
+            "alt_text": None,
+            "non_claim_boundary": None,
+            "tier": None,
             "params": {},
             "requires": [],
             "notes": [],
@@ -154,6 +166,12 @@ def describe_plot_kind(name: str) -> Dict[str, object]:
     return {
         "kind": name,
         "summary": meta.summary,
+        "premise": meta.premise,
+        "decision_value": meta.decision_value,
+        "rationale": meta.rationale,
+        "alt_text": meta.alt_text,
+        "non_claim_boundary": meta.non_claim_boundary,
+        "tier": meta.tier,
         "params": dict(meta.params),
         "requires": list(meta.requires),
         "notes": list(meta.notes),

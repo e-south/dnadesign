@@ -9,6 +9,8 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -22,12 +24,11 @@ def test_select_run_meta_latest_round():
             "run_id": ["r0-a", "r1-b"],
             "as_of_round": [0, 1],
             "model__name": ["m0", "m1"],
-            "objective__name": ["o0", "o1"],
-            "selection__name": ["s0", "s1"],
+            "objective__defs_json": [json.dumps([]), json.dumps([])],
+            "selection_views__defs_json": [json.dumps([]), json.dumps([])],
             "training__y_ops": [[], []],
             "stats__n_train": [10, 11],
             "stats__n_scored": [100, 110],
-            "objective__summary_stats": [{}, {}],
         }
     )
     row = select_run_meta(df)
@@ -42,12 +43,11 @@ def test_select_run_meta_requires_run_id_for_duplicates():
             "run_id": ["r0-a", "r0-b"],
             "as_of_round": [0, 0],
             "model__name": ["m0", "m0"],
-            "objective__name": ["o0", "o0"],
-            "selection__name": ["s0", "s0"],
+            "objective__defs_json": [json.dumps([]), json.dumps([])],
+            "selection_views__defs_json": [json.dumps([]), json.dumps([])],
             "training__y_ops": [[], []],
             "stats__n_train": [10, 10],
             "stats__n_scored": [100, 100],
-            "objective__summary_stats": [{}, {}],
         }
     )
     with pytest.raises(OpalError):

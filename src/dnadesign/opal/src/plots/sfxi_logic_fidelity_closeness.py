@@ -29,6 +29,7 @@ from ._mpl_utils import (
     save_notebook_square_figure,
     sequential_colormap,
 )
+from .sfxi_diag_data import parse_setpoint_from_runs
 
 if TYPE_CHECKING:
     import numpy as np
@@ -53,7 +54,7 @@ def _import_pyarrow():
             "on_violin_invalid": "error|line (default error).",
             "setpoint_override": "Override setpoint vector (length-4).",
         },
-        requires=["observed_round", "y_obs", "objective__params"],
+        requires=["observed_round", "y_obs", "objective__defs_json"],
         notes=["Reads outputs/ledger/labels.parquet + outputs/ledger/runs.parquet for setpoint."],
         data_shape="observed label agreement matrix",
         tidy_schema=["observed_round", "mse"],
@@ -74,6 +75,7 @@ def render(context, params: dict) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
+    import polars as pl
 
     apply_plot_style()
     arrow_pc, ds = _import_pyarrow()
@@ -158,13 +160,6 @@ def render(context, params: dict) -> None:
     if df.empty:
         raise ValueError("outputs/ledger/labels.parquet had zero rows for the requested rounds.")
 
-    # Resolve setpoint: override > specific round > latest
-    def _extract_setpoint(obj):
-        try:
-            return [float(x) for x in (obj or {}).get("setpoint_vector", [])]
-        except Exception:
-            return None
-
     # Param overrides for setpoint (optional but assertive)
     sp_override = params.get("setpoint") or params.get("setpoint_override")
     sp_round = params.get("setpoint_round")  # int (as_of_round in outputs/ledger/runs.parquet)
@@ -174,33 +169,22 @@ def render(context, params: dict) -> None:
             raise ValueError("setpoint_override must be a finite length-4 vector.")
         setpoint = sp_arr
     else:
-        druns = ds.dataset(str(runs_path))
-        nn = {f.name for f in druns.schema}
-        need_runs = {"as_of_round", "objective__params"}
-        miss = sorted(need_runs - nn)
-        if miss:
-            raise ValueError(f"outputs/ledger/runs.parquet missing columns: {miss}")
+        runs = pl.read_parquet(runs_path)
+        if context.run_id is not None:
+            runs = runs.filter(pl.col("run_id") == str(context.run_id))
         if sp_round is None:
-            # Pick the latest run that has a setpoint
-            meta = druns.to_table(columns=list(need_runs)).to_pandas()
-            meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
-            meta = meta.dropna(subset=["setpoint"])
-            if meta.empty:
-                raise ValueError("No setpoint_vector found in outputs/ledger/runs.parquet objective__params.")
-            meta = meta.sort_values(["as_of_round"]).tail(1)
-            setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
+            latest = int(runs["as_of_round"].max())
+            runs = runs.filter(pl.col("as_of_round") == latest)
         else:
             try:
                 sp_round = int(sp_round)
             except Exception as e:
                 raise ValueError("setpoint_round must be an integer.") from e
-            filt_r = arrow_pc.field("as_of_round") == sp_round
-            meta = druns.to_table(columns=list(need_runs), filter=filt_r).to_pandas()
-            meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
-            meta = meta.dropna(subset=["setpoint"])
-            if meta.empty:
-                raise ValueError(f"No setpoint_vector found in outputs/ledger/runs.parquet for as_of_round={sp_round}.")
-            setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
+            runs = runs.filter(pl.col("as_of_round") == sp_round)
+        setpoint = np.asarray(
+            parse_setpoint_from_runs(runs, selection_view_id=context.selection_view_id),
+            dtype=float,
+        ).ravel()
 
     if setpoint.size != 4 or not np.all(np.isfinite(setpoint)):
         raise ValueError("Resolved setpoint must be a finite length-4 vector.")

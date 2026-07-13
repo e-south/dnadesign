@@ -68,6 +68,7 @@ def render(context, params: dict) -> None:
     df = load_predictions_with_setpoint(
         outputs_dir,
         need,
+        selection_view_id=context.selection_view_id,
         round_selector=round_k,
         run_id=run_id,
         require_run_id=False,

@@ -38,83 +38,70 @@ from ._common import (
 )
 
 
-def _parse_channel_ref(ref: object, *, label: str) -> tuple[str, str]:
+def _parse_channel_name(ref: object, *, label: str) -> str:
     key = str(ref or "").strip()
     if not key:
-        raise OpalError(f"{label} is required and must be a non-empty channel reference.")
-    if "/" not in key:
-        raise OpalError(f"{label} must be in '<objective>/<channel>' format; got {key!r}.")
-    objective_name, channel_name = key.split("/", 1)
-    objective_name = objective_name.strip()
-    channel_name = channel_name.strip()
-    if not objective_name or not channel_name:
-        raise OpalError(f"{label} must be in '<objective>/<channel>' format; got {key!r}.")
-    return objective_name, channel_name
+        raise OpalError(f"{label} is required and must be a non-empty objective channel name.")
+    if "/" in key:
+        raise OpalError(f"{label} must be an unqualified objective channel name; got {key!r}.")
+    return key
 
 
 def _validate_selection_channel_refs(cfg) -> None:
-    sel_name = str(cfg.selection.selection.name)
-    sel_params = dict(cfg.selection.selection.params or {})
-    objective_names = {str(o.name) for o in cfg.objectives.objectives}
-
-    score_obj, score_channel = _parse_channel_ref(sel_params.get("score_ref"), label="selection.params.score_ref")
-    if score_obj not in objective_names:
-        raise OpalError(
-            "selection.params.score_ref references objective "
-            f"{score_obj!r}, which is not configured in objectives={sorted(objective_names)}."
+    for view in cfg.selection_views:
+        view_id = str(view.id)
+        objective_name = str(view.objective.name)
+        sel_name = str(view.selection.name)
+        sel_params = dict(view.selection.params or {})
+        score_channel = _parse_channel_name(
+            sel_params.get("score_ref"),
+            label=f"selection_views[{view_id}].selection.params.score_ref",
         )
-    score_declared = get_objective_declared_channels(score_obj)
-    score_decl = score_declared.get("score", ())
-    if score_decl and score_channel not in set(score_decl):
-        available = [f"{score_obj}/{ch}" for ch in score_decl]
-        raise OpalError(
-            f"score_ref channel '{score_obj}/{score_channel}' not declared by objective '{score_obj}'. "
-            f"Available: {available}"
-        )
-    selected_mode = str(sel_params.get("objective_mode", "")).strip().lower()
-    score_modes = dict(score_declared.get("score_modes", {}) or {})
-    if score_modes and score_channel in score_modes:
-        channel_mode = str(score_modes[score_channel]).strip().lower()
-        if selected_mode and channel_mode != selected_mode:
+        declared = get_objective_declared_channels(objective_name)
+        score_decl = declared.get("score", ())
+        if score_decl and score_channel not in set(score_decl):
             raise OpalError(
-                "Objective mode mismatch: selected score channel "
-                f"'{score_obj}/{score_channel}' has mode '{channel_mode}' but "
-                f"selection objective_mode is '{selected_mode}'."
+                f"score_ref channel {score_channel!r} is not declared by objective {objective_name!r} "
+                f"for selection view {view_id!r}. Available: {sorted(score_decl)}"
             )
+        selected_mode = str(sel_params.get("objective_mode", "")).strip().lower()
+        score_modes = dict(declared.get("score_modes", {}) or {})
+        if score_modes and score_channel in score_modes:
+            channel_mode = str(score_modes[score_channel]).strip().lower()
+            if selected_mode and channel_mode != selected_mode:
+                raise OpalError(
+                    f"Objective mode mismatch in selection view {view_id!r}: channel {score_channel!r} "
+                    f"has mode {channel_mode!r} but selection declares {selected_mode!r}."
+                )
 
-    uncertainty_ref_raw = sel_params.get("uncertainty_ref")
-    if uncertainty_ref_raw is not None and str(uncertainty_ref_raw).strip():
-        unc_obj, unc_channel = _parse_channel_ref(
-            uncertainty_ref_raw,
-            label="selection.params.uncertainty_ref",
-        )
-        if unc_obj not in objective_names:
-            raise OpalError(
-                "selection.params.uncertainty_ref references objective "
-                f"{unc_obj!r}, which is not configured in objectives={sorted(objective_names)}."
+        uncertainty_ref_raw = sel_params.get("uncertainty_ref")
+        if uncertainty_ref_raw is not None and str(uncertainty_ref_raw).strip():
+            unc_channel = _parse_channel_name(
+                uncertainty_ref_raw,
+                label=f"selection_views[{view_id}].selection.params.uncertainty_ref",
             )
-        unc_declared = get_objective_declared_channels(unc_obj)
-        unc_decl = unc_declared.get("uncertainty", ())
-        if unc_decl and unc_channel not in set(unc_decl):
-            available = [f"{unc_obj}/{ch}" for ch in unc_decl]
-            raise OpalError(
-                f"uncertainty_ref channel '{unc_obj}/{unc_channel}' not declared by objective '{unc_obj}'. "
-                f"Available: {available}"
-            )
+            unc_decl = declared.get("uncertainty", ())
+            if unc_decl and unc_channel not in set(unc_decl):
+                raise OpalError(
+                    f"uncertainty_ref channel {unc_channel!r} is not declared by objective {objective_name!r} "
+                    f"for selection view {view_id!r}. Available: {sorted(unc_decl)}"
+                )
 
-    if sel_name == "expected_improvement":
-        if uncertainty_ref_raw is None or not str(uncertainty_ref_raw).strip():
-            raise OpalError("selection.params.uncertainty_ref is required for expected_improvement.")
-        model = get_model(cfg.model.name, cfg.model.params)
-        contract = getattr(model, "__opal_contract__", None)
-        produces_by_stage = getattr(contract, "produces_by_stage", None) or {}
-        predict_produces = tuple(produces_by_stage.get("predict", ()) or ())
-        if "model/<self>/std_devs" not in predict_produces:
-            raise OpalError(
-                "selection='expected_improvement' requires a model plugin that emits predictive std "
-                "('model/<self>/std_devs'). "
-                f"Configured model '{cfg.model.name}' does not advertise that contract."
-            )
+        if sel_name == "expected_improvement":
+            if uncertainty_ref_raw is None or not str(uncertainty_ref_raw).strip():
+                raise OpalError(
+                    f"selection_views[{view_id}].selection.params.uncertainty_ref is required for expected_improvement."
+                )
+            model = get_model(cfg.model.name, cfg.model.params)
+            contract = getattr(model, "__opal_contract__", None)
+            produces_by_stage = getattr(contract, "produces_by_stage", None) or {}
+            predict_produces = tuple(produces_by_stage.get("predict", ()) or ())
+            if "model/<self>/std_devs" not in predict_produces:
+                raise OpalError(
+                    f"Selection view {view_id!r} uses expected_improvement, which requires a model "
+                    "plugin that emits predictive std ('model/<self>/std_devs'). "
+                    f"Configured model {cfg.model.name!r} does not advertise that contract."
+                )
 
 
 @cli_command("validate", help="End-to-end table checks (essentials present; X column finite and fixed-length).")

@@ -28,6 +28,7 @@ class PlotContext:
     workspace: CampaignWorkspace
     rounds: str | list[int]  # "unspecified" | "latest" | "all" | [ints]
     run_id: str | None  # explicit run_id (required when multiple runs per round)
+    selection_view_id: str
     data_paths: dict[str, Path]  # built-ins + YAML data entries (resolved)
     output_dir: Path
     filename: str  # final filename (with round suffix applied)

@@ -61,14 +61,14 @@ class NextGuidance:
 
 def detect_workflow_key(cfg: RootConfig) -> str:
     model_name = str(cfg.model.name)
-    selection_name = str(cfg.selection.selection.name)
-    objective_names = [str(o.name) for o in cfg.objectives.objectives]
+    selection_names = {str(view.selection.name) for view in cfg.selection_views}
+    objective_names = [str(view.objective.name) for view in cfg.selection_views]
     has_sfxi = "sfxi_v1" in objective_names
-    if model_name == "random_forest" and selection_name == "top_n" and has_sfxi:
+    if model_name == "random_forest" and selection_names == {"top_n"} and has_sfxi:
         return "rf_sfxi_topn"
-    if model_name == "gaussian_process" and selection_name == "top_n" and has_sfxi:
+    if model_name == "gaussian_process" and selection_names == {"top_n"} and has_sfxi:
         return "gp_sfxi_topn"
-    if model_name == "gaussian_process" and selection_name == "expected_improvement" and has_sfxi:
+    if model_name == "gaussian_process" and selection_names == {"expected_improvement"} and has_sfxi:
         return "gp_sfxi_ei"
     return "custom"
 
@@ -93,8 +93,8 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     ]
 
     model_name = str(cfg.model.name)
-    selection_name = str(cfg.selection.selection.name)
-    objective_names = [str(o.name) for o in cfg.objectives.objectives]
+    selection_names = {str(view.selection.name) for view in cfg.selection_views}
+    objective_names = [str(view.objective.name) for view in cfg.selection_views]
     if model_name == "gaussian_process":
         docs.append("docs/plugins/models/gaussian-process.md")
         source.append(f"{src_root}/models/gaussian_process.py")
@@ -107,7 +107,7 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     if "spop_v1" in objective_names:
         docs.append("docs/plugins/objectives/spop.md")
         source.append(f"{src_root}/objectives/spop_v1.py")
-    if selection_name == "expected_improvement":
+    if "expected_improvement" in selection_names:
         docs.append("docs/plugins/selection/expected-improvement.md")
         source.append(f"{src_root}/selection/expected_improvement.py")
     docs.append("docs/plugins/selection/README.md")
@@ -156,7 +156,7 @@ def _label_source_summary(cfg: RootConfig) -> dict[str, Any]:
 
 
 def _ingest_command(*, cfg_path: Path, cfg: RootConfig, labels_as_of: int, labels_file: str) -> str:
-    command = f"opal ingest-y -c {cfg_path.resolve()} --observed-round {labels_as_of} --in {labels_file}"
+    command = f"opal ingest-y -c {cfg_path.resolve()} --round {labels_as_of} --csv {labels_file}"
     if isinstance(cfg.labels.source, LabelSourceUSRSidecar):
         command += " --unknown-sequences error"
     return f"{command} --apply"
@@ -198,10 +198,11 @@ def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[Gui
         GuidanceStep(
             title="Run train/score/select round",
             why="Train surrogate, evaluate objectives, and produce selected candidates.",
-            command=f"opal run -c {c} --labels-as-of {labels_as_of}",
+            command=f"opal run -c {c} --round {labels_as_of}",
             reads=[records_path, "state.json"],
             writes=[
-                f"outputs/rounds/round_{labels_as_of}/selection/selection_top_k.csv",
+                f"outputs/rounds/round_{labels_as_of}/selection/selections.parquet",
+                f"outputs/rounds/round_{labels_as_of}/selection/selection_batch.parquet",
                 "outputs/ledger/runs.parquet",
                 "outputs/ledger/predictions/",
             ],
@@ -209,8 +210,8 @@ def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[Gui
         GuidanceStep(
             title="Verify selection/ledger agreement",
             why="Confirm persisted selection artifacts match ledger prediction rows.",
-            command=f"opal verify-outputs -c {c} --round latest",
-            reads=["outputs/rounds/round_*/selection/selection_top_k.csv", "outputs/ledger/predictions/"],
+            command=f"opal verify-outputs -c {c} --round latest --view <selection-view-id>",
+            reads=["outputs/rounds/round_*/selection/selections.parquet", "outputs/ledger/predictions/"],
             writes=[],
         ),
         GuidanceStep(
@@ -222,8 +223,8 @@ def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[Gui
         ),
         GuidanceStep(
             title="Dry-run next-round preflight",
-            why="Explain the next labels-as-of cut before running it.",
-            command=f"opal explain -c {c} --labels-as-of {labels_as_of + 1}",
+            why="Explain the next label cutoff before running it.",
+            command=f"opal explain -c {c} --round {labels_as_of + 1}",
             reads=[records_path, "state.json"],
             writes=[],
         ),
@@ -233,16 +234,23 @@ def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[Gui
 def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int = 0) -> GuidanceReport:
     ws = CampaignWorkspace.from_config(cfg, cfg_path)
     workflow_key = detect_workflow_key(cfg)
-    objective_rows = [{"name": str(o.name), "params": dict(o.params or {})} for o in cfg.objectives.objectives]
-    objective_names = [str(o.name) for o in cfg.objectives.objectives]
+    view_rows = [
+        {
+            "id": view.id,
+            "objective": {"name": view.objective.name, "params": dict(view.objective.params or {})},
+            "selection": {"name": view.selection.name, "params": dict(view.selection.params or {})},
+        }
+        for view in cfg.selection_views
+    ]
+    objective_names = [str(view.objective.name) for view in cfg.selection_views]
     common_errors = [
         "EI requires uncertainty_ref resolving to a finite, strictly positive standard-deviation channel.",
-        "score_ref and uncertainty_ref must be '<objective>/<channel>' and resolve against configured objectives.",
+        "Each view's score_ref and uncertainty_ref must name channels declared by that view's objective.",
     ]
     if "sfxi_v1" in objective_names:
         common_errors.insert(
             0,
-            "SFXI min_n failures occur when current-round observed labels are missing for labels-as-of round.",
+            "SFXI min_n failures occur when current-round observed labels are missing for the run cutoff.",
         )
     if "spop_v1" in objective_names:
         common_errors.insert(
@@ -262,11 +270,7 @@ def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int 
         },
         plugins={
             "model": {"name": cfg.model.name, "params": dict(cfg.model.params or {})},
-            "objectives": objective_rows,
-            "selection": {
-                "name": cfg.selection.selection.name,
-                "params": dict(cfg.selection.selection.params or {}),
-            },
+            "selection_views": view_rows,
         },
         round_semantics={
             "observed_round": "Round index stamped on ingested labels (wet-lab event time).",
@@ -296,15 +300,16 @@ def _state_round_set(state_path: Path) -> set[int]:
 
 
 def _sfxi_min_n(cfg: RootConfig) -> int | None:
-    for obj in cfg.objectives.objectives:
-        if str(obj.name) != "sfxi_v1":
+    minimums: list[int] = []
+    for view in cfg.selection_views:
+        if str(view.objective.name) != "sfxi_v1":
             continue
-        scaling = dict((obj.params or {}).get("scaling") or {})
+        scaling = dict((view.objective.params or {}).get("scaling") or {})
         try:
-            return int(scaling.get("min_n", 5))
+            minimums.append(int(scaling.get("min_n", 5)))
         except Exception:
-            return 5
-    return None
+            minimums.append(5)
+    return max(minimums) if minimums else None
 
 
 def build_next_guidance(
@@ -373,14 +378,14 @@ def build_next_guidance(
     if not run_exists:
         return NextGuidance(
             stage="run",
-            reason=f"Labels exist for observed round {target_observed}; run selection for labels-as-of {target_as_of}.",
+            reason=f"Labels exist for observed round {target_observed}; run selection through round {target_as_of}.",
             labels_as_of=target_as_of,
             observed_round=target_observed,
             labels_in_observed_round=labels_in_round,
             state_exists=True,
             run_exists_for_labels_as_of=False,
             next_commands=[
-                f"opal run -c {ws.config_path} --labels-as-of {target_as_of}",
+                f"opal run -c {ws.config_path} --round {target_as_of}",
             ],
             learn_more=["docs/reference/cli.md", "docs/concepts/architecture.md"],
         )
@@ -394,10 +399,10 @@ def build_next_guidance(
         state_exists=True,
         run_exists_for_labels_as_of=True,
         next_commands=[
-            f"opal verify-outputs -c {ws.config_path} --round latest",
+            f"opal verify-outputs -c {ws.config_path} --view <selection-view-id> --round latest",
             f"opal ctx audit -c {ws.config_path} --round latest",
             f"opal status -c {ws.config_path}",
-            f"opal explain -c {ws.config_path} --labels-as-of {target_as_of + 1}",
+            f"opal explain -c {ws.config_path} --round {target_as_of + 1}",
         ],
         learn_more=["docs/reference/cli.md", "docs/concepts/roundctx.md"],
     )

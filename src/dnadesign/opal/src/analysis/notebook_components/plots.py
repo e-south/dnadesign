@@ -34,6 +34,7 @@ from .plot_text import rounds_text
 def build_notebook_visual_surface_model(
     view_model: Mapping[str, Any],
     *,
+    selection_view_id: str | None = None,
     plot_entries: Iterable[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build manifest-authoritative visual choices for OPAL marimo templates."""
@@ -46,6 +47,14 @@ def build_notebook_visual_surface_model(
         for manifest in sequence(view_model.get("plot_manifests"))
         if isinstance(manifest, Mapping) and manifest.get("status") == "written"
     ]
+    if selection_view_id is not None:
+        missing_view_identity = [row.get("manifest_path") for row in manifest_rows if not row.get("selection_view_id")]
+        if missing_view_identity:
+            raise ValueError(
+                "Written plot manifests require selection_view_id: "
+                + ", ".join(str(path) for path in missing_view_identity)
+            )
+        manifest_rows = [row for row in manifest_rows if str(row.get("selection_view_id")) == str(selection_view_id)]
     active_by_name: dict[str, list[Mapping[str, Any]]] = {}
     for row in manifest_rows:
         active_by_name.setdefault(str(row.get("name")), []).append(row)

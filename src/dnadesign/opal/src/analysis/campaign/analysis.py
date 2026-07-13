@@ -25,6 +25,7 @@ from ..ledger import (
     read_labels,
     read_predictions,
     read_runs,
+    read_selection_view_predictions,
     scan_labels,
     scan_predictions,
     scan_runs,
@@ -105,6 +106,7 @@ class CampaignAnalysis:
         self,
         columns: Iterable[str],
         *,
+        selection_view_id: str,
         round_selector: RoundSelector | None = None,
         run_id: str | None = None,
         require_run_id: bool = True,
@@ -112,7 +114,30 @@ class CampaignAnalysis:
         return load_predictions_with_setpoint(
             self.workspace.outputs_dir,
             columns,
+            selection_view_id=selection_view_id,
             round_selector=round_selector,
             run_id=run_id,
+            require_run_id=require_run_id,
+        )
+
+    def read_selection_view_predictions(
+        self,
+        *,
+        selection_view_id: str,
+        columns: Sequence[str] | None = None,
+        round_selector: RoundSelector | None = None,
+        run_id: str | None = None,
+        runs_df: pl.DataFrame | None = None,
+        require_run_id: bool = True,
+    ) -> pl.DataFrame:
+        if runs_df is None:
+            runs_df = self.read_runs()
+        return read_selection_view_predictions(
+            self.workspace.ledger_predictions_dir,
+            selection_view_id=selection_view_id,
+            columns=columns,
+            round_selector=round_selector,
+            run_id=run_id,
+            runs_df=runs_df,
             require_run_id=require_run_id,
         )

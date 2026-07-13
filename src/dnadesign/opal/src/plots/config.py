@@ -165,13 +165,8 @@ def _resolve_plot_config_source(
     *,
     campaign_cfg: dict,
     campaign_yaml: Path,
-    campaign_dir: Path,
     plot_config_opt: Optional[Path],
 ) -> tuple[dict, Path, Path, str]:
-    inline_plots = campaign_cfg.get("plots", None)
-    inline_defaults = campaign_cfg.get("plot_defaults", None)
-    inline_presets = campaign_cfg.get("plot_presets", None)
-    inline_present = inline_plots is not None or inline_defaults is not None or inline_presets is not None
     cfg_plot_path = campaign_cfg.get("plot_config", None)
 
     opt_path: Optional[Path] = None
@@ -188,8 +183,6 @@ def _resolve_plot_config_source(
             )
 
     if opt_path is not None:
-        if inline_present:
-            raise ValueError("[plot] Remove inline plots/plot_defaults/plot_presets when using --plot-config.")
         if not opt_path.exists():
             raise ValueError(f"[plot] plot_config not found: {opt_path}")
         plot_cfg = _load_yaml(opt_path)
@@ -199,8 +192,6 @@ def _resolve_plot_config_source(
         return plot_cfg, opt_path.resolve(), opt_path.parent.resolve(), "--plot-config"
 
     if cfg_plot_path:
-        if inline_present:
-            raise ValueError("[plot] Remove inline plots/plot_defaults/plot_presets when using campaign.plot_config.")
         plot_cfg_path = resolve_path_like(campaign_yaml, cfg_plot_path)
         if not plot_cfg_path.exists():
             raise ValueError(f"[plot] plot_config not found: {plot_cfg_path}")
@@ -215,28 +206,18 @@ def _resolve_plot_config_source(
             "campaign.plot_config",
         )
 
-    if inline_plots is None:
-        raise ValueError("[plot] No plots found. Provide a plots list or set plot_config.")
-
-    plot_cfg = {
-        "plots": inline_plots,
-        "plot_defaults": inline_defaults,
-        "plot_presets": inline_presets,
-    }
-    return plot_cfg, campaign_yaml.resolve(), campaign_dir.resolve(), "campaign.yaml"
+    raise ValueError("[plot] No plots found. Set campaign.plot_config or pass --plot-config.")
 
 
 def load_plot_config(
     *,
     campaign_cfg: dict,
     campaign_yaml: Path,
-    campaign_dir: Path,
     plot_config_opt: Optional[Path],
 ) -> PlotConfig:
     plot_cfg, plot_cfg_path, plot_cfg_dir, plot_src = _resolve_plot_config_source(
         campaign_cfg=campaign_cfg,
         campaign_yaml=campaign_yaml,
-        campaign_dir=campaign_dir,
         plot_config_opt=plot_config_opt,
     )
     plots_cfg = plot_cfg.get("plots")

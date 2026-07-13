@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from typing_extensions import Literal
 
 from ..core.config_resolve import resolve_campaign_root
@@ -34,13 +34,13 @@ from .types import (
     LabelSourceUSRSidecar,
     LocationLocal,
     LocationUSR,
-    ObjectivesBlock,
     OwnershipBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
     ScoringBlock,
-    SelectionBlock,
+    SelectionBatchBlock,
+    SelectionView,
     TrainingBlock,
     WritebackBlock,
 )
@@ -98,6 +98,49 @@ class PPluginRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PSelectionView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    objective: PPluginRef
+    selection: PPluginRef
+
+    @field_validator("id")
+    @classmethod
+    def _id_ok(cls, value: str) -> str:
+        import re
+
+        out = str(value).strip()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", out):
+            raise ValueError("selection view id must match ^[a-z0-9][a-z0-9_-]*$")
+        return out
+
+
+class PSelectionBatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    deduplicate_by: Optional[str] = None
+    expected_unique_count: Optional[int] = None
+
+    @field_validator("deduplicate_by")
+    @classmethod
+    def _deduplicate_by_nonempty(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        out = str(value).strip()
+        if not out:
+            raise ValueError("selection_batch.deduplicate_by must be non-empty when provided")
+        return out
+
+    @field_validator("expected_unique_count")
+    @classmethod
+    def _expected_unique_count_positive(cls, value: Optional[int]) -> Optional[int]:
+        if value is None:
+            return None
+        out = int(value)
+        if out <= 0:
+            raise ValueError("selection_batch.expected_unique_count must be positive")
+        return out
 
 
 class PCandidateEligibility(BaseModel):
@@ -177,7 +220,7 @@ class PScoring(BaseModel):
 
 class PWriteback(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    prediction_records: Literal["label_history", "ledger_only"] = "label_history"
+    prediction_records: Literal["ledger_only"] = "ledger_only"
 
 
 class PArtifactRetention(BaseModel):
@@ -239,22 +282,45 @@ class PSafety(BaseModel):
 
 class POwnership(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    owner_scope: Literal["opal_example", "study_fixture"]
+    owner_scope: Literal["opal_demo", "study_campaign"]
     study_id: Optional[str] = None
     dataset_id: Optional[str] = None
     portable: bool = True
 
+    @model_validator(mode="after")
+    def _scope_contract(self) -> "POwnership":
+        study_id = str(self.study_id or "").strip()
+        dataset_id = str(self.dataset_id or "").strip()
+        if self.owner_scope == "opal_demo":
+            if study_id:
+                raise ValueError("opal_demo ownership must not declare study_id")
+            if dataset_id:
+                raise ValueError("opal_demo ownership must not declare dataset_id")
+            if not self.portable:
+                raise ValueError("opal_demo ownership must set portable=true")
+            return self
+        if not study_id:
+            raise ValueError("study_campaign ownership requires study_id")
+        if not dataset_id:
+            raise ValueError("study_campaign ownership requires dataset_id")
+        if self.portable:
+            raise ValueError("study_campaign ownership must set portable=false")
+        self.study_id = study_id
+        self.dataset_id = dataset_id
+        return self
+
 
 class PRoot(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    schema_version: Literal["opal.campaign.v3"]
     campaign: PCampaign
     data: PData
     candidate_eligibility: PCandidateEligibility = Field(default_factory=PCandidateEligibility)
     transforms_x: PPluginRef
     transforms_y: PPluginRef
     model: PPluginRef
-    objectives: List[PPluginRef]
-    selection: PPluginRef
+    selection_views: List[PSelectionView]
+    selection_batch: PSelectionBatch = Field(default_factory=PSelectionBatch)
     labels: PLabels = Field(default_factory=PLabels)
     writeback: Optional[PWriteback] = None
     artifact_retention: PArtifactRetention = Field(default_factory=PArtifactRetention)
@@ -263,11 +329,7 @@ class PRoot(BaseModel):
     scoring: PScoring = Field(default_factory=PScoring)
     safety: PSafety = Field(default_factory=PSafety)
     plot_config: Optional[str] = None
-    plot_defaults: Dict[str, Any] = Field(default_factory=dict)
-    plot_presets: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
-    # Non-core, optional block used by the `opal plot` CLI.
-    plots: List[Dict[str, Any]] = Field(default_factory=list)
-    ownership: Optional[POwnership] = None
+    ownership: POwnership
 
 
 def _require_registered_plugin(*, category: str, name: str, available: set[str]) -> None:
@@ -300,18 +362,18 @@ def _validate_registered_plugin_names(pyd: PRoot) -> None:
         name=str(pyd.model.name),
         available=set(list_models()),
     )
-    _require_registered_plugin(
-        category="selection",
-        name=str(pyd.selection.name),
-        available=set(list_selections()),
-    )
-
     available_objectives = set(list_objectives())
-    for obj in pyd.objectives:
+    available_selections = set(list_selections())
+    for view in pyd.selection_views:
         _require_registered_plugin(
             category="objective",
-            name=str(obj.name),
+            name=str(view.objective.name),
             available=available_objectives,
+        )
+        _require_registered_plugin(
+            category="selection",
+            name=str(view.selection.name),
+            available=available_selections,
         )
 
     available_y_ops = set(list_y_ops())
@@ -351,25 +413,51 @@ def load_config(path: Path | str) -> RootConfig:
     tx = pyd.transforms_x
     ty = pyd.transforms_y
     mdl = pyd.model
-    sel = pyd.selection
 
     try:
         tx_params = validate_params("transform_x", tx.name, tx.params)
         ty_params = validate_params("transform_y", ty.name, ty.params)
         mdl_params = validate_params("model", mdl.name, mdl.params)
-        sel_params = validate_params("selection", sel.name, sel.params)
     except Exception as e:
         raise ConfigError(f"Invalid campaign.yaml plugin params: {e}")
 
-    if not pyd.objectives:
-        raise ConfigError("Invalid campaign.yaml: objectives must contain at least one objective plugin entry.")
-    obj_names = [o.name for o in pyd.objectives]
-    if len(obj_names) != len(set(obj_names)):
-        raise ConfigError("Invalid campaign.yaml: objective names must be unique in objectives.")
+    if not pyd.selection_views:
+        raise ConfigError("Invalid campaign.yaml: selection_views must contain at least one entry.")
+    view_ids = [view.id for view in pyd.selection_views]
+    if len(view_ids) != len(set(view_ids)):
+        raise ConfigError("Invalid campaign.yaml: selection view ids must be unique.")
+    selection_views: list[SelectionView] = []
     try:
-        obj_refs = [PluginRef(o.name, validate_params("objective", o.name, o.params)) for o in pyd.objectives]
+        for view in pyd.selection_views:
+            objective = PluginRef(
+                view.objective.name,
+                validate_params("objective", view.objective.name, view.objective.params),
+            )
+            selection_params = validate_params("selection", view.selection.name, view.selection.params)
+            for ref_key in ("score_ref", "uncertainty_ref"):
+                ref = selection_params.get(ref_key)
+                if ref is not None and "/" in str(ref):
+                    raise ConfigError(
+                        f"Invalid campaign.yaml: selection_views[{view.id}].selection.params.{ref_key} "
+                        "must be an objective channel name, not a namespaced reference."
+                    )
+            selection_views.append(
+                SelectionView(
+                    id=view.id,
+                    objective=objective,
+                    selection=PluginRef(view.selection.name, selection_params),
+                )
+            )
+    except ConfigError:
+        raise
     except Exception as e:
-        raise ConfigError(f"Invalid campaign.yaml objective params: {e}")
+        raise ConfigError(f"Invalid campaign.yaml selection view params: {e}")
+    exclude_policies = {bool(view.selection.params.get("exclude_already_labeled", True)) for view in selection_views}
+    if len(exclude_policies) != 1:
+        raise ConfigError(
+            "Invalid campaign.yaml: all selection views must use the same "
+            "selection.params.exclude_already_labeled policy."
+        )
     try:
         eligibility_rules = [
             PluginRef(rule.name, validate_params("candidate_eligibility", rule.name, rule.params))
@@ -415,8 +503,7 @@ def load_config(path: Path | str) -> RootConfig:
         if pyd.writeback is None:
             raise ConfigError(
                 "Invalid campaign.yaml: labels.source.kind=usr_sidecar requires explicit "
-                "writeback.prediction_records (use ledger_only unless records label-history prediction "
-                "writeback is intentional)."
+                "writeback.prediction_records=ledger_only."
             )
         label_dataset = pyd.labels.source.dataset or pyd.data.location.dataset
         if label_dataset != pyd.data.location.dataset:
@@ -444,8 +531,6 @@ def load_config(path: Path | str) -> RootConfig:
         dedup_policy=str(pyd.labels.dedup_policy),
     )
 
-    selection_dc = SelectionBlock(selection=PluginRef(sel.name, sel_params))
-    objectives_dc = ObjectivesBlock(objectives=obj_refs)
     candidate_eligibility_dc = CandidateEligibilityBlock(rules=eligibility_rules)
     training_dc = TrainingBlock(
         policy=pyd.training.policy or {},
@@ -454,7 +539,7 @@ def load_config(path: Path | str) -> RootConfig:
     ingest_dc = IngestBlock(duplicate_policy=pyd.ingest.duplicate_policy)
     scoring_dc = ScoringBlock(score_batch_size=int(pyd.scoring.score_batch_size))
     writeback_dc = WritebackBlock(
-        prediction_records=(pyd.writeback.prediction_records if pyd.writeback else "label_history")
+        prediction_records=(pyd.writeback.prediction_records if pyd.writeback else "ledger_only")
     )
     artifact_retention_dc = ArtifactRetentionBlock(
         mode=str(pyd.artifact_retention.mode),
@@ -474,18 +559,15 @@ def load_config(path: Path | str) -> RootConfig:
         accept_x_mismatch=pyd.safety.accept_x_mismatch,
         max_x_matrix_gib=float(pyd.safety.max_x_matrix_gib),
     )
-    ownership_dc = (
-        OwnershipBlock(
-            owner_scope=pyd.ownership.owner_scope,
-            study_id=pyd.ownership.study_id,
-            dataset_id=pyd.ownership.dataset_id,
-            portable=bool(pyd.ownership.portable),
-        )
-        if pyd.ownership is not None
-        else None
+    ownership_dc = OwnershipBlock(
+        owner_scope=pyd.ownership.owner_scope,
+        study_id=pyd.ownership.study_id,
+        dataset_id=pyd.ownership.dataset_id,
+        portable=bool(pyd.ownership.portable),
     )
 
     root = RootConfig(
+        schema_version=str(pyd.schema_version),
         campaign=CampaignBlock(
             name=pyd.campaign.name,
             slug=pyd.campaign.slug,
@@ -495,8 +577,11 @@ def load_config(path: Path | str) -> RootConfig:
         ),
         data=data_dc,
         model=PluginRef(mdl.name, mdl_params),
-        selection=selection_dc,
-        objectives=objectives_dc,
+        selection_views=selection_views,
+        selection_batch=SelectionBatchBlock(
+            deduplicate_by=pyd.selection_batch.deduplicate_by,
+            expected_unique_count=pyd.selection_batch.expected_unique_count,
+        ),
         candidate_eligibility=candidate_eligibility_dc,
         training=training_dc,
         ingest=ingest_dc,

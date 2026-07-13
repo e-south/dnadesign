@@ -31,12 +31,23 @@ def campaign_contract_rows(
         rows.extend(
             [
                 {"field": "campaign", "value": info.slug},
+                {"field": "ownership", "value": info.owner_scope},
+            ]
+        )
+        if info.study_id is not None:
+            rows.append({"field": "study", "value": info.study_id})
+        rows.extend(
+            [
                 {"field": "X column", "value": info.x_column},
                 {"field": "Y column", "value": info.y_column},
                 {"field": "Y expected length", "value": info.y_expected_length},
                 {"field": "model", "value": info.model_name},
-                {"field": "objective", "value": info.objective_name},
-                {"field": "selection", "value": info.selection_name},
+                {
+                    "field": "selection views",
+                    "value": ", ".join(
+                        f"{view.id}: {view.objective_name} -> {view.selection_name}" for view in info.selection_views
+                    ),
+                },
             ]
         )
     if config_path is not None:
@@ -96,8 +107,11 @@ def cli_handoff_lines(config_path: Path | str) -> list[str]:
         "```bash",
         f"uv run opal status -c {config_text} --with-ledger",
         f"uv run opal runs list -c {config_text}",
-        f"uv run opal record-show -c {config_text} --selected-rank 1 --round latest --run-id latest",
-        f"uv run opal verify-outputs -c {config_text} --round latest",
-        f"uv run opal plot -c {config_text}",
+        (
+            f"uv run opal record-show -c {config_text} --view <selection-view-id> "
+            "--selected-rank 1 --round latest --run-id latest"
+        ),
+        f"uv run opal verify-outputs -c {config_text} --view <selection-view-id> --round latest",
+        f"uv run opal plot -c {config_text} --view <selection-view-id>",
         "```",
     ]

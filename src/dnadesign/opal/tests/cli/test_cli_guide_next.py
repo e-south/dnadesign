@@ -50,6 +50,8 @@ def _setup_usr_sidecar_workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
     campaign = workdir / "campaign.yaml"
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: Demo
   slug: demo
@@ -70,11 +72,12 @@ writeback:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: scalar_from_table_v1, params: {{ y_column: y }} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip(),
         encoding="utf-8",
     )
@@ -90,6 +93,8 @@ def _setup_missing_usr_sidecar_workspace(tmp_path: Path) -> tuple[Path, Path, Pa
     campaign = workdir / "campaign.yaml"
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: Demo
   slug: demo
@@ -110,11 +115,12 @@ writeback:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: scalar_from_table_v1, params: {{ y_column: y }} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip(),
         encoding="utf-8",
     )
@@ -237,12 +243,13 @@ def test_guide_next_recommends_ingest_when_state_exists_but_round_has_no_labels(
 
     res = runner.invoke(
         app,
-        ["--no-color", "guide", "next", "-c", str(campaign), "--labels-as-of", "0", "--json"],
+        ["--no-color", "guide", "next", "-c", str(campaign), "--round", "0", "--json"],
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
     assert out["stage"] == "ingest"
-    assert "--observed-round 0" in out["next_commands"][0]
+    assert "--round 0" in out["next_commands"][0]
+    assert "--csv <labels.xlsx>" in out["next_commands"][0]
 
 
 def test_guide_next_recommends_run_after_labels_exist(tmp_path: Path) -> None:
@@ -257,12 +264,12 @@ def test_guide_next_recommends_run_after_labels_exist(tmp_path: Path) -> None:
 
     res = runner.invoke(
         app,
-        ["--no-color", "guide", "next", "-c", str(campaign), "--labels-as-of", "0", "--json"],
+        ["--no-color", "guide", "next", "-c", str(campaign), "--round", "0", "--json"],
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
     assert out["stage"] == "run"
-    assert "--labels-as-of 0" in out["next_commands"][0]
+    assert "--round 0" in out["next_commands"][0]
 
 
 def test_guide_next_counts_shared_usr_sidecar_labels(tmp_path: Path) -> None:
@@ -285,7 +292,7 @@ def test_guide_next_counts_shared_usr_sidecar_labels(tmp_path: Path) -> None:
 
     res = runner.invoke(
         app,
-        ["--no-color", "guide", "next", "-c", str(campaign), "--labels-as-of", "0", "--json"],
+        ["--no-color", "guide", "next", "-c", str(campaign), "--round", "0", "--json"],
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
@@ -302,7 +309,7 @@ def test_guide_next_recommends_verify_after_round_exists(tmp_path: Path) -> None
 
     res = runner.invoke(
         app,
-        ["--no-color", "guide", "next", "-c", str(campaign), "--labels-as-of", "0", "--json"],
+        ["--no-color", "guide", "next", "-c", str(campaign), "--round", "0", "--json"],
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)

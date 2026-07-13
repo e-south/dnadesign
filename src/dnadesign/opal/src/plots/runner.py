@@ -49,6 +49,8 @@ class PlotRequest:
     store: RecordsStore
     rounds_sel: RoundSelector
     run_id: Optional[str]
+    selection_view_id: str
+    multi_view_campaign: bool
     round_suffix: str
     name_filter: Optional[str]
     tag_filters: List[str]
@@ -366,6 +368,8 @@ def run_plots(req: PlotRequest) -> bool:
                 plot_kind=pkind,
                 round_suffix=entry_round_suffix,
             )
+            if req.multi_view_campaign:
+                out_dir = Path(out_dir) / "selection_views" / req.selection_view_id
             fmt = (out_cfg.get("format") or "png").lower()
             dpi = int(out_cfg.get("dpi", 600))
             fname = (out_cfg.get("filename") or "{name}{round_suffix}.png").format(
@@ -383,6 +387,7 @@ def run_plots(req: PlotRequest) -> bool:
                 workspace=req.workspace,
                 rounds=entry_rounds_sel,
                 run_id=req.run_id,
+                selection_view_id=req.selection_view_id,
                 data_paths=data_paths,
                 output_dir=Path(out_dir),
                 filename=fname,

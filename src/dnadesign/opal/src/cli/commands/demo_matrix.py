@@ -21,7 +21,7 @@ from typing import Any
 import typer
 
 from ...core.utils import ExitCodes, OpalError, print_stdout
-from ...reporting.verify_outputs import compare_selection_to_ledger, read_selection_table
+from ...reporting.selection_set import load_selection_set
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
 from ..registry import cli_command
@@ -37,6 +37,7 @@ DEMO_FLOWS = (
     "demo_gp_topn",
     "demo_gp_ei",
 )
+DEMO_RECORDS_SOURCE = "demo_rf_sfxi_topn"
 
 
 def _run_cli_quiet(fn, /, **kwargs) -> dict[str, str]:
@@ -87,23 +88,23 @@ def _verify_round(cfg_path: Path, round_index: int) -> dict[str, Any]:
         raise OpalError(f"No run metadata found for round {int(round_index)}.")
     rows["run_id"] = rows["run_id"].astype(str)
     run_id = str(rows.sort_values(["run_id"]).tail(1).iloc[0]["run_id"])
-    sel_path = ws.round_selection_dir(round_index) / "selection_top_k.csv"
-    if not sel_path.exists():
-        raise OpalError(f"Selection artifact missing: {sel_path}")
-    selection_df = read_selection_table(sel_path)
-    ledger_df = reader.read_predictions(
-        columns=["id", "pred__score_selected"],
+    payload = load_selection_set(
+        cfg_path,
+        selection_view_id="primary",
         round_selector=int(round_index),
         run_id=run_id,
     )
-    summary, _ = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-6)
+    verification = payload["verification"]
+    if verification.get("status") != "pass":
+        raise OpalError(f"Demo selection verification failed: {verification}")
+    summary = verification["summary"]
     return {
         "round": int(round_index),
         "run_id": run_id,
         "rows_compared": int(summary["rows_compared"]),
         "mismatch_count": int(summary["mismatch_count"]),
         "max_abs_diff": float(summary["max_abs_diff"]),
-        "selection_path": str(sel_path),
+        "selection_path": str(payload["selection_path"]),
     }
 
 
@@ -116,7 +117,7 @@ def _run_demo_flow(*, flow_name: str, tmp_root: Path, rounds: list[int], fail_fa
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
-    base_records = campaigns_root / "demo" / "records.parquet"
+    base_records = campaigns_root / DEMO_RECORDS_SOURCE / "records.parquet"
     if not base_records.exists():
         raise OpalError(f"Base records missing: {base_records}")
     shutil.copy2(base_records, dst / "records.parquet")

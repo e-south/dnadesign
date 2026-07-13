@@ -35,9 +35,11 @@ def render_guide_text(report: GuidanceReport) -> str:
     lines.append("")
     lines.append("Plugin wiring")
     lines.append(f"- model: {report.plugins['model']['name']}")
-    objective_names = [str(row.get("name")) for row in report.plugins["objectives"]]
-    lines.append(f"- objectives: {', '.join(objective_names)}")
-    lines.append(f"- selection: {report.plugins['selection']['name']}")
+    view_rows = list(report.plugins["selection_views"])
+    lines.append(
+        "- selection views: "
+        + ", ".join(f"{row['id']} ({row['objective']['name']} -> {row['selection']['name']})" for row in view_rows)
+    )
     lines.append("")
     lines.append("Round semantics")
     lines.append(f"- observed_round: {report.round_semantics['observed_round']}")
@@ -75,14 +77,18 @@ def render_guide_markdown(report: GuidanceReport) -> str:
     lines.append("### Plugin Wiring")
     lines.append("")
     lines.append(f"- model: `{report.plugins['model']['name']}`")
-    objective_names = [str(row.get("name")) for row in report.plugins["objectives"]]
-    lines.append(f"- objectives: `{', '.join(objective_names)}`")
-    lines.append(f"- selection: `{report.plugins['selection']['name']}`")
+    view_rows = list(report.plugins["selection_views"])
+    lines.append(
+        "- selection views: "
+        + ", ".join(
+            f"`{row['id']}` (`{row['objective']['name']}` -> `{row['selection']['name']}`)" for row in view_rows
+        )
+    )
     lines.append("")
     lines.append("### Round Semantics")
     lines.append("")
-    lines.append(f"- `--observed-round`: {report.round_semantics['observed_round']}")
-    lines.append(f"- `--labels-as-of`: {report.round_semantics['labels_as_of']}")
+    lines.append(f"- `ingest-y --round`: {report.round_semantics['observed_round']}")
+    lines.append(f"- `run --round`: {report.round_semantics['labels_as_of']}")
     lines.append("")
     lines.append("### Runbook")
     lines.append("")

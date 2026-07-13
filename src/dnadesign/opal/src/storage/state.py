@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Mapping
 
 from ..core.utils import now_iso, read_json, write_json
 
-STATE_SCHEMA_VERSION = 2
+STATE_SCHEMA_VERSION = 3
 _STATE_REQUIRED_KEYS = (
     "version",
     "campaign_slug",
@@ -43,8 +43,8 @@ _ROUND_REQUIRED_KEYS = (
     "labels_used_rounds",
     "number_of_training_examples_used_in_round",
     "number_of_candidates_scored_in_round",
-    "selection_top_k_requested",
-    "selection_top_k_effective_after_ties",
+    "selection_views",
+    "selection_batch",
     "model",
     "metrics",
     "durations_sec",
@@ -73,8 +73,8 @@ class RoundEntry:
     labels_used_rounds: list[int]
     number_of_training_examples_used_in_round: int
     number_of_candidates_scored_in_round: int
-    selection_top_k_requested: int
-    selection_top_k_effective_after_ties: int
+    selection_views: dict
+    selection_batch: dict
     model: dict
     metrics: dict
     durations_sec: dict
@@ -100,7 +100,7 @@ class CampaignState:
     y_column_name: str
 
     # ------- defaults after -------
-    version: int = 2
+    version: int = 3
     created_at: str = field(default_factory=now_iso)
     updated_at: str = field(default_factory=now_iso)
     representation_vector_dimension: int = 0
@@ -163,8 +163,8 @@ class CampaignState:
                         round_payload["number_of_training_examples_used_in_round"]
                     ),
                     number_of_candidates_scored_in_round=int(round_payload["number_of_candidates_scored_in_round"]),
-                    selection_top_k_requested=int(round_payload["selection_top_k_requested"]),
-                    selection_top_k_effective_after_ties=int(round_payload["selection_top_k_effective_after_ties"]),
+                    selection_views=dict(round_payload["selection_views"]),
+                    selection_batch=dict(round_payload["selection_batch"]),
                     model=dict(round_payload["model"]),
                     metrics=dict(round_payload["metrics"]),
                     durations_sec=dict(round_payload["durations_sec"]),

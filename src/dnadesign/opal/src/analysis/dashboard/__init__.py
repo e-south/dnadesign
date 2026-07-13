@@ -25,7 +25,6 @@ from . import (
     ui,
     util,
     views,
-    y_ops,
 )
 
 __all__ = [
@@ -44,5 +43,4 @@ __all__ = [
     "ui",
     "util",
     "views",
-    "y_ops",
 ]

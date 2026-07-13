@@ -113,7 +113,7 @@ def reference_y_values(frame: pd.DataFrame, *, y_axis: str, params: Mapping[str,
     prefix = SFXI_REFERENCE_OVERLAY_PREFIX
     column_by_axis = {
         "score": f"{prefix}metric_value",
-        "pred__score_selected": f"{prefix}metric_value",
+        "view__selection_score": f"{prefix}metric_value",
         "sfxi": f"{prefix}sfxi",
         "metric_value": f"{prefix}metric_value",
         "effect_raw": f"{prefix}effect_raw",

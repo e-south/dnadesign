@@ -1,13 +1,4 @@
-"""
---------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/opal/tests/analysis/test_analysis_ledger_setpoint.py
-
-Regression tests for analysis ledger setpoint OPAL analysis.
-
-Module Author(s): Eric J. South
---------------------------------------------------------------------------------
-"""
+"""Selection-view setpoint joins from ledger v2.0 metadata."""
 
 from __future__ import annotations
 
@@ -16,50 +7,44 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dnadesign.opal.src import LEDGER_SCHEMA_VERSION
-from dnadesign.opal.src import __version__ as OPAL_VERSION
 from dnadesign.opal.src.analysis.ledger import load_predictions_with_setpoint
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.storage.ledger import LedgerWriter
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 from dnadesign.opal.src.storage.writebacks import (
-    SelectionEmit,
+    SelectionViewEmit,
     build_run_meta_event,
     build_run_pred_events,
 )
-from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
-def test_load_predictions_with_setpoint_requires_setpoint(tmp_path: Path) -> None:
+def _write_run(tmp_path: Path, *, include_setpoint: bool) -> CampaignWorkspace:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
-    records = workdir / "records.parquet"
-    write_records(records)
-    campaign = workdir / "campaign.yaml"
-    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
-
-    ws = CampaignWorkspace(config_path=campaign, workdir=workdir)
-    writer = LedgerWriter(ws)
-
-    y_hat = np.array([[0.1], [0.2]])
-    y_obj = np.array([0.1, 0.2])
-    sel_emit = SelectionEmit(
-        ranks_competition=np.array([1, 2]),
-        selected_bool=np.array([True, False]),
+    ws = CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir)
+    view = SelectionViewEmit(
+        selection_view_id="ethanol",
+        objective_name="sfxi_v1",
+        selection_name="top_n",
+        score=np.asarray([0.1, 0.2]),
+        score_ref="ethanol/sfxi",
+        selection_score=np.asarray([0.1, 0.2]),
+        ranks_competition=np.asarray([2, 1]),
+        selected_bool=np.asarray([False, True]),
+        top_k=1,
+        diagnostics={},
     )
-    run_pred_ok = build_run_pred_events(
+    predictions = build_run_pred_events(
         run_id="r0",
         as_of_round=0,
         ids=["a", "b"],
         sequences=["AAA", "BBB"],
-        y_hat_model=y_hat,
-        selected_score=y_obj,
-        selected_score_ref="sfxi_v1/sfxi",
+        y_hat_model=np.asarray([[0.1], [0.2]]),
         y_dim=1,
-        obj_diagnostics=None,
-        sel_emit=sel_emit,
+        selection_views=[view],
     )
-    run_meta_ok = build_run_meta_event(
+    params = {"setpoint_vector": [0, 1, 0, 1]} if include_setpoint else {}
+    metadata = build_run_meta_event(
         run_id="r0",
         as_of_round=0,
         model_name="random_forest",
@@ -69,85 +54,55 @@ def test_load_predictions_with_setpoint_requires_setpoint(tmp_path: Path) -> Non
         x_transform_params={},
         y_ingest_transform_name="sfxi_vec8_from_table_v1",
         y_ingest_transform_params={},
-        objective_name="sfxi_v1",
-        objective_params={"setpoint_vector": [0, 0, 0, 1]},
-        objective_defs=[{"name": "sfxi_v1", "score_channels": ["sfxi_v1/sfxi"], "uncertainty_channels": []}],
-        selection_name="top_n",
-        selection_params={"top_k": 1, "score_ref": "sfxi_v1/sfxi"},
-        selection_score_ref="sfxi_v1/sfxi",
-        selection_uncertainty_ref=None,
-        selection_objective_mode="maximize",
-        sel_tie_handling="competition_rank",
+        objective_defs=[
+            {
+                "selection_view_id": "ethanol",
+                "objective_name": "sfxi_v1",
+                "params": params,
+                "score_channels": ["ethanol/sfxi"],
+            }
+        ],
+        selection_view_defs=[
+            {
+                "selection_view_id": "ethanol",
+                "objective_name": "sfxi_v1",
+                "objective_params": params,
+                "selection_name": "top_n",
+                "score_ref": "ethanol/sfxi",
+                "top_k": 1,
+            }
+        ],
         stats_n_train=2,
         stats_n_scored=2,
-        unc_mean_sd=None,
-        pred_rows_df=run_pred_ok,
+        pred_rows_df=predictions,
         artifact_paths_and_hashes={},
-        objective_summary_stats={
-            "score_min": 0.1,
-            "score_median": 0.2,
-            "score_max": 0.3,
-        },
     )
-    run_meta_ok["schema__version"] = LEDGER_SCHEMA_VERSION
-    run_meta_ok["opal__version"] = OPAL_VERSION
+    writer = LedgerWriter(ws)
+    writer.append_run_pred(predictions)
+    writer.append_run_meta(metadata)
+    return ws
 
-    run_pred_missing = build_run_pred_events(
-        run_id="r1",
-        as_of_round=0,
-        ids=["c", "d"],
-        sequences=["CCC", "DDD"],
-        y_hat_model=y_hat,
-        selected_score=y_obj,
-        selected_score_ref="sfxi_v1/sfxi",
-        y_dim=1,
-        obj_diagnostics=None,
-        sel_emit=sel_emit,
+
+def test_load_predictions_joins_requested_selection_view_setpoint(tmp_path: Path) -> None:
+    ws = _write_run(tmp_path, include_setpoint=True)
+
+    frame = load_predictions_with_setpoint(
+        ws.outputs_dir,
+        {"as_of_round"},
+        selection_view_id="ethanol",
+        round_selector="latest",
     )
-    run_meta_missing = build_run_meta_event(
-        run_id="r1",
-        as_of_round=0,
-        model_name="random_forest",
-        model_params={},
-        y_ops=[],
-        x_transform_name="identity",
-        x_transform_params={},
-        y_ingest_transform_name="sfxi_vec8_from_table_v1",
-        y_ingest_transform_params={},
-        objective_name="sfxi_v1",
-        objective_params={},  # missing setpoint_vector should be rejected
-        objective_defs=[{"name": "sfxi_v1", "score_channels": ["sfxi_v1/sfxi"], "uncertainty_channels": []}],
-        selection_name="top_n",
-        selection_params={"top_k": 1, "score_ref": "sfxi_v1/sfxi"},
-        selection_score_ref="sfxi_v1/sfxi",
-        selection_uncertainty_ref=None,
-        selection_objective_mode="maximize",
-        sel_tie_handling="competition_rank",
-        stats_n_train=2,
-        stats_n_scored=2,
-        unc_mean_sd=None,
-        pred_rows_df=run_pred_missing,
-        artifact_paths_and_hashes={},
-        objective_summary_stats={
-            "score_min": 0.1,
-            "score_median": 0.2,
-            "score_max": 0.3,
-        },
-    )
-    run_meta_missing["schema__version"] = LEDGER_SCHEMA_VERSION
-    run_meta_missing["opal__version"] = OPAL_VERSION
 
-    writer.append_run_pred(run_pred_ok)
-    writer.append_run_pred(run_pred_missing)
-    writer.append_run_meta(run_meta_ok)
-    writer.append_run_meta(run_meta_missing)
+    assert frame["obj__diag__setpoint"].to_list() == [[0.0, 1.0, 0.0, 1.0]] * 2
 
-    with pytest.raises(OpalError) as exc:
+
+def test_load_predictions_rejects_missing_view_setpoint(tmp_path: Path) -> None:
+    ws = _write_run(tmp_path, include_setpoint=False)
+
+    with pytest.raises(OpalError, match="ethanol.*setpoint_vector"):
         load_predictions_with_setpoint(
             ws.outputs_dir,
-            {"as_of_round", "pred__score_selected"},
+            {"as_of_round"},
+            selection_view_id="ethanol",
             round_selector="latest",
-            run_id="r1",
         )
-
-    assert "setpoint_vector" in str(exc.value)

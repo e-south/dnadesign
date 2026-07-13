@@ -27,6 +27,7 @@ def run_campaign_plots(
     plot_config_path: str | Path | None = None,
     round_selector: str | None = None,
     run_id: str | None = None,
+    selection_view_id: str | None = None,
     name: str | None = None,
     tags: Sequence[str] | None = None,
     quiet: bool = False,
@@ -38,10 +39,16 @@ def run_campaign_plots(
     campaign_cfg = analysis.read_config_dict()
     store = analysis.records_store()
     workspace = analysis.workspace
+    configured_views = [view.id for view in analysis.config.selection_views]
+    if selection_view_id is None:
+        if len(configured_views) != 1:
+            raise OpalError(f"selection_view_id is required. Available: {configured_views}")
+        selection_view_id = configured_views[0]
+    elif selection_view_id not in configured_views:
+        raise OpalError(f"Unknown selection_view_id {selection_view_id!r}. Available: {configured_views}")
     plot_cfg = load_plot_config(
         campaign_cfg=campaign_cfg,
         campaign_yaml=cfg_path,
-        campaign_dir=campaign_dir,
         plot_config_opt=Path(plot_config_path) if plot_config_path is not None else None,
     )
 
@@ -79,6 +86,8 @@ def run_campaign_plots(
         store=store,
         rounds_sel=rounds_sel,
         run_id=run_id,
+        selection_view_id=selection_view_id,
+        multi_view_campaign=len(configured_views) > 1,
         round_suffix=suffix,
         name_filter=name,
         tag_filters=[str(tag) for tag in (tags or [])],
@@ -92,6 +101,13 @@ def run_campaign_plots(
         "round_selector": round_selector or "unspecified",
         "round_suffix": suffix,
         "run_id": run_id,
+        "selection_view_id": selection_view_id,
         "any_fail": bool(any_fail),
-        "plot_manifest_path": str(campaign_dir / "outputs" / "plots" / "plot_manifest.json"),
+        "plot_manifest_path": str(
+            campaign_dir
+            / "outputs"
+            / "plots"
+            / (Path("selection_views") / selection_view_id if len(configured_views) > 1 else Path())
+            / "plot_manifest.json"
+        ),
     }

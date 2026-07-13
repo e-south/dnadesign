@@ -29,6 +29,7 @@ cli_group("selection-set", help="Inspect and export selected OPAL rows.")(select
 @selection_set_app.command("show", help="Show the selected rows for one OPAL run.")
 def selection_set_show(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+    view: str = typer.Option(..., "--view", help="Selection view ID."),
     round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to show."),
     selection_path: Optional[Path] = typer.Option(
@@ -42,6 +43,7 @@ def selection_set_show(
     try:
         payload = load_selection_set(
             resolve_config_path(config),
+            selection_view_id=view,
             round_selector=round,
             run_id=run_id,
             selection_path=selection_path,
@@ -53,7 +55,7 @@ def selection_set_show(
             print_stdout("selection-set")
             print_stdout(
                 f"- campaign: {payload['campaign']['slug']}  round: {payload['as_of_round']}  "
-                f"run_id: {payload['run_id']}"
+                f"run_id: {payload['run_id']}  view: {payload['selection_view_id']}"
             )
             print_stdout(
                 f"- selected: {payload['selected_count']}  verification: {payload['verification'].get('status')}"
@@ -73,6 +75,7 @@ def selection_set_show(
 @selection_set_app.command("export", help="Export the selected rows for one OPAL run.")
 def selection_set_export(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+    view: str = typer.Option(..., "--view", help="Selection view ID."),
     round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to export."),
     out: Path = typer.Option(..., "--out", help="Output CSV or JSON path."),
@@ -91,6 +94,7 @@ def selection_set_export(
             raise OpalError("--format must be one of: csv, json")
         payload = load_selection_set(
             resolve_config_path(config),
+            selection_view_id=view,
             round_selector=round,
             run_id=run_id,
             selection_path=selection_path,
@@ -105,10 +109,11 @@ def selection_set_export(
         else:
             pd.DataFrame(payload["rows"]).to_csv(output_path, index=False)
         summary = {
-            "schema_version": "opal.selection_set_export.v1",
+            "schema_version": "opal.selection_set_export.v2",
             "campaign": payload["campaign"],
             "as_of_round": payload["as_of_round"],
             "run_id": payload["run_id"],
+            "selection_view_id": payload["selection_view_id"],
             "output_path": str(output_path),
             "format": fmt,
             "row_count": int(payload["selected_count"]),

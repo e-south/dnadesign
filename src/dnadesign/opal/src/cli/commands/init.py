@@ -71,7 +71,10 @@ def cmd_init(
                 if df[col].isna().any():
                     bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
                     raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
-        if cfg.writeback.prediction_records == "label_history" and store.label_hist_col() not in schema_columns:
+        if (
+            getattr(cfg.labels.source, "kind", "campaign_history") == "campaign_history"
+            and store.label_hist_col() not in schema_columns
+        ):
             store.append_null_column_atomic(store.label_hist_col())
         data_location = {
             "kind": store.kind,
@@ -92,7 +95,14 @@ def cmd_init(
             training_policy=cfg.training.policy,
             performance={
                 "score_batch_size": cfg.scoring.score_batch_size,
-                "objectives": [o.name for o in cfg.objectives.objectives],
+                "selection_views": [
+                    {
+                        "id": view.id,
+                        "objective": view.objective.name,
+                        "selection": view.selection.name,
+                    }
+                    for view in cfg.selection_views
+                ],
             },
             representation_vector_dimension=0,
             backlog={"number_of_selected_but_not_yet_labeled_candidates_total": 0},

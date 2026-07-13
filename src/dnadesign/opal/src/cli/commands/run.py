@@ -105,7 +105,6 @@ def cmd_run(
         ...,
         "--round",
         "-r",
-        "--labels-as-of",
         help="Labels cutoff for training (use labels with observed_round ≤ this value).",
     ),
     k: Optional[int] = typer.Option(None, "--k", "-k", help="Top-k (default from YAML)."),
@@ -321,20 +320,25 @@ def cmd_run(
                     lockfile=lock_path,
                     status="released",
                 )
-        sel_params = dict(cfg.selection.selection.params or {})
-        tie_handling, objective_mode = _resolve_summary_selection_mode(sel_params)
+        selection_views = {}
+        for view in cfg.selection_views:
+            sel_params = dict(view.selection.params or {})
+            tie_handling, objective_mode = _resolve_summary_selection_mode(sel_params)
+            selection_views[view.id] = {
+                **res.selection_views[view.id],
+                "top_k_source": "cli_override" if k is not None else "yaml_default",
+                "tie_handling": tie_handling,
+                "objective_mode": objective_mode,
+            }
         summary = {
             "ok": res.ok,
             "run_id": res.run_id,
             "as_of_round": res.as_of_round,
             "trained_on": res.trained_on,
             "scored": res.scored,
-            "top_k_requested": res.top_k_requested,
-            "top_k_effective": res.top_k_effective,
+            "selection_views": selection_views,
+            "selection_batch_count": res.selection_batch_count,
             "ledger": res.ledger_path,
-            "top_k_source": "cli_override" if k is not None else "yaml_default",
-            "tie_handling": tie_handling,
-            "objective_mode": objective_mode,
         }
         if json:
             json_out(summary)

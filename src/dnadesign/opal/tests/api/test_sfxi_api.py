@@ -20,6 +20,7 @@ from dnadesign.opal.api.sfxi import (
     SFXI_REFERENCE_OVERLAY_SCHEMA_VERSION,
     SFXIScoringConfig,
     score_vec8,
+    score_vec8_with_denom,
     to_sfxi_reference_overlay_records,
     validate_sfxi_reference_overlay_records,
 )
@@ -58,6 +59,37 @@ def test_score_vec8_public_api_uses_objective_channel_names() -> None:
     assert "f_logic" not in row
     assert "e_scaled" not in row
     assert "score" not in row
+
+
+def test_score_vec8_with_denom_reuses_persisted_run_scale() -> None:
+    vec8 = np.array(
+        [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0]],
+        dtype=float,
+    )
+
+    result = score_vec8_with_denom(
+        vec8,
+        SFXIScoringConfig(setpoint_vector=(0.0, 0.0, 0.0, 1.0)),
+        denom=8.0,
+    )
+
+    assert result.denom_used == 8.0
+    assert result.effect_raw[0] == 4.0
+    assert result.effect_scaled[0] == 0.5
+    assert result.sfxi[0] == 0.5
+
+
+def test_score_vec8_rejects_intensity_values_that_overflow_linear_recovery() -> None:
+    vec8 = np.array(
+        [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2048.0]],
+        dtype=float,
+    )
+
+    with pytest.raises(ValueError, match="exceed stable score range"):
+        score_vec8(
+            vec8,
+            SFXIScoringConfig(setpoint_vector=(0.0, 0.0, 0.0, 1.0), scaling_min_n=1),
+        )
 
 
 def test_score_vec8_is_monotone_for_setpoint_weighted_right_and_bright() -> None:

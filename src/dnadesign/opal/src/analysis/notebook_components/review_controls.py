@@ -23,6 +23,7 @@ def render_notebook_review_control_surface(
     active_view_mode: str,
     mo: Any,
     campaign_ui: Any = None,
+    selection_view_ui: Any = None,
     view_mode_ui: Any = None,
     collection_set_ui: Any = None,
     visual_group_ui: Any = None,
@@ -45,6 +46,7 @@ def render_notebook_review_control_surface(
         _primary_controls(
             active_view_mode=active_view_mode,
             campaign_ui=campaign_ui,
+            selection_view_ui=selection_view_ui,
             view_mode_ui=view_mode_ui,
             collection_set_ui=collection_set_ui,
         ),
@@ -73,11 +75,12 @@ def _primary_controls(
     *,
     active_view_mode: str,
     campaign_ui: Any,
+    selection_view_ui: Any,
     view_mode_ui: Any,
     collection_set_ui: Any,
 ) -> list[Any]:
     if active_view_mode == "Campaign":
-        return _present(campaign_ui, view_mode_ui)
+        return _present(campaign_ui, selection_view_ui, view_mode_ui)
     return _present(view_mode_ui, collection_set_ui)
 
 

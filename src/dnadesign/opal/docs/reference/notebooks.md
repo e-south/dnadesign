@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-09
+**Last verified:** 2026-07-12
 
 ## OPAL Notebooks
 
@@ -100,10 +100,11 @@ Each campaign entry is a manifest-backed `NotebookViewModel` with schema
 | field | purpose |
 | --- | --- |
 | `progress` | campaign progress JSON from `build_campaign_progress` |
-| `review_manifest` | latest or explicitly provided review manifest, when present |
-| `plot_manifest_index` | aggregate `outputs/plots/plot_manifest.json`, when present |
+| `review_manifests` | map of selection-view ID to review manifest |
+| `review_manifest_paths` | map of selection-view ID to canonical manifest path |
 | `plot_manifests` | per-plot manifests referenced by the index |
 | `artifact_garden` | local artifact-root inventory, stale sibling list, byte counts, and dry-run prune plan |
+| `selection_batch` | deduplicated logical union for the resolved run |
 | `stale_artifacts` | stale review or plot files not referenced by active manifests |
 | `warnings` | missing manifests, stale files, or other nonfatal states |
 
@@ -122,12 +123,15 @@ The generated notebook renders the view model as an app-mode review surface:
   contracts;
 - progress-derived change rows for visible rounds and run scope;
 - campaign selector, even for one-campaign notebooks;
+- selection-view selector for the selected campaign; the chosen view controls
+  objective parameters, target mask, ranks, selected rows, and plot manifests;
 - round selector for progress and manifest-backed plot scope;
 - an `OPAL Campaign Review` header that names the number of OPAL campaigns,
   the review scope, and any materialized campaign-set visual count;
 - a top-level `Review scope` control only when there is a real campaign versus
   campaign-set choice: `Campaign` for one selected campaign's plot deliverables,
-  and `Campaign set` for manifest-backed collection comparison visuals;
+  and `Campaign set` for manifest-backed comparisons between genuinely
+  independent campaigns;
 - a campaign-set selector for explicit matched sets, such as one positive/null
   control pair for a target/family/split;
 - a consolidated top control surface that groups review scope, review section,
@@ -218,6 +222,13 @@ notebook UX as small semantic modules there instead of growing a single
 component file.
 Define marimo UI controls in one cell and read their `.value` in a downstream
 cell; generated notebooks include a regression guard for this rule.
+
+For a multi-view campaign, the top hierarchy is `Campaign | Selection view |
+Review section | Deliverable`. View-specific plots live under
+`outputs/plots/selection_views/<view_id>/`; shared model diagnostics appear
+once. A selection-batch deliverable reports the deduplicated logical union and
+view memberships. Do not create a campaign-set notebook merely to compare
+setpoints that share one learning lifecycle.
 
 Campaign surfaces are intentionally overview-first: they provide campaign and
 visual controls, manifest-backed plot-scope controls, status and provenance

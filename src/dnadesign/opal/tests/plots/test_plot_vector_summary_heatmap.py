@@ -47,6 +47,7 @@ def test_vector_summary_explicit_reference_does_not_require_objective_setpoint(t
         workspace=_DummyWorkspace(tmp_path),
         rounds="all",
         run_id=None,
+        selection_view_id="primary",
         data_paths={},
         output_dir=tmp_path / "plots",
         filename="vector_summary.png",

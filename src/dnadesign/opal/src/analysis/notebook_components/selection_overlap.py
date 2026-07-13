@@ -11,10 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import csv
 import io
-from pathlib import Path
 from typing import Any, Iterable, Mapping
+
+from .selection_overlap_data import build_selection_overlap_rows
 
 CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND = "campaign_set_selection_overlap"
 
@@ -59,40 +59,7 @@ def build_notebook_campaign_set_selection_overlap_rows(
 ) -> list[dict[str, Any]]:
     """Read top-k selection CSVs and return one row per campaign-selected candidate."""
 
-    rows: list[dict[str, Any]] = []
-    for campaign in campaigns:
-        if not isinstance(campaign, Mapping):
-            continue
-        campaign_meta = campaign.get("campaign") if isinstance(campaign.get("campaign"), Mapping) else {}
-        workdir = Path(str(campaign_meta.get("workdir") or ""))
-        if not str(workdir):
-            continue
-        selection_path = _selection_csv_path(workdir, round_selector=round_selector)
-        if selection_path is None:
-            continue
-        campaign_slug = str(campaign_meta.get("slug") or selection_path.parts[-5])
-        campaign_label = _campaign_label(campaign_meta, fallback=campaign_slug)
-        with selection_path.open("r", encoding="utf-8", newline="") as handle:
-            for raw in csv.DictReader(handle):
-                candidate_id = str(raw.get("id") or "").strip()
-                if not candidate_id:
-                    continue
-                rows.append(
-                    {
-                        "campaign": campaign_slug,
-                        "campaign_label": campaign_label,
-                        "round": _int_or_none(raw.get("as_of_round")),
-                        "run_id": str(raw.get("run_id") or ""),
-                        "id": candidate_id,
-                        "short_id": _short_id(candidate_id),
-                        "rank": _int_or_none(raw.get("sel__rank_competition")),
-                        "score": _float_or_none(raw.get("pred__score_selected")),
-                        "score_ref": str(raw.get("pred__score_ref") or ""),
-                        "selection_path": str(selection_path),
-                        "sequence": str(raw.get("sequence") or ""),
-                    }
-                )
-    return rows
+    return build_selection_overlap_rows(campaigns, round_selector=round_selector)
 
 
 def render_notebook_campaign_set_selection_overlap_image(
@@ -186,30 +153,6 @@ def build_notebook_campaign_set_selection_overlap_card_rows(choice: Mapping[str,
     ]
 
 
-def _selection_csv_path(workdir: Path, *, round_selector: str | int | None) -> Path | None:
-    rounds_dir = workdir / "outputs" / "rounds"
-    if not rounds_dir.exists():
-        return None
-    round_value = str(round_selector or "latest")
-    if round_value not in {"latest", "all"}:
-        path = rounds_dir / f"round_{int(round_value)}" / "selection" / "selection_top_k.csv"
-        return path if path.exists() else None
-    candidates = []
-    for child in rounds_dir.glob("round_*"):
-        if not child.is_dir():
-            continue
-        try:
-            round_index = int(child.name.split("_", 1)[1])
-        except (IndexError, ValueError):
-            continue
-        path = child / "selection" / "selection_top_k.csv"
-        if path.exists():
-            candidates.append((round_index, path))
-    if not candidates:
-        return None
-    return sorted(candidates, key=lambda item: item[0])[-1][1]
-
-
 def _selection_overlap_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     row_list = [row for row in rows if isinstance(row, Mapping)]
     campaigns = {str(row.get("campaign") or "") for row in row_list if str(row.get("campaign") or "")}
@@ -252,14 +195,6 @@ def _ordered_candidate_ids(rows: list[Mapping[str, Any]]) -> list[str]:
     )
 
 
-def _campaign_label(campaign: Mapping[str, Any], *, fallback: str) -> str:
-    name = str(campaign.get("name") or fallback).split("|", 1)[0].strip()
-    for prefix in ("SECG ", "Stress ethanol/ciprofloxacin "):
-        if name.startswith(prefix):
-            name = name[len(prefix) :]
-    return name or fallback
-
-
 def _ordered_unique(values: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     rows: list[str] = []
@@ -274,20 +209,6 @@ def _ordered_unique(values: Iterable[str]) -> list[str]:
 def _short_id(value: str) -> str:
     text = str(value or "")
     return text[:8] if len(text) > 8 else text
-
-
-def _int_or_none(value: object) -> int | None:
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return None
-
-
-def _float_or_none(value: object) -> float | None:
-    try:
-        return float(str(value))
-    except (TypeError, ValueError):
-        return None
 
 
 __all__ = [

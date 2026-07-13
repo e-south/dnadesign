@@ -62,7 +62,7 @@ def test_state_version_1_without_run_id_is_rejected(tmp_path: Path) -> None:
     }
     state_path.write_text(json.dumps(v1_state))
 
-    with pytest.raises(ValueError, match="state.json version must be 2"):
+    with pytest.raises(ValueError, match="state.json version must be 3"):
         CampaignState.load(state_path)
 
 
@@ -93,4 +93,4 @@ def test_status_cli_reports_malformed_state_as_bad_args(tmp_path: Path) -> None:
 
     assert res.exit_code != 0
     assert "Failed to load state.json" in res.output
-    assert "version must be 2" in _plain_output(res.output)
+    assert "version must be 3" in _plain_output(res.output)

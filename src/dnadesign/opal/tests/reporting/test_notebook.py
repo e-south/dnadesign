@@ -73,6 +73,39 @@ def test_notebook_view_model_pins_requested_run_scope(tmp_path: Path) -> None:
     assert run_scope["resolved_run_id"] == "run-1"
 
 
+def test_notebook_view_model_loads_run_scoped_selection_batch(tmp_path: Path, monkeypatch) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path)
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path)
+    write_ledger(workdir, run_id="run-1", round_index=0)
+    write_round_log(workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl", run_id="run-1")
+
+    import dnadesign.opal.src.reporting.notebook as notebook_reporting
+
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_load_selection_batch(config: Path, *, round_selector: str, run_id: str | None):
+        calls.append((round_selector, run_id))
+        assert config == config_path.resolve()
+        return {
+            "schema_version": "opal.selection_batch.v1",
+            "as_of_round": 0,
+            "run_id": "run-1",
+            "unique_count": 1,
+            "rows": [{"id": "a", "selection_view_ids": ["primary"]}],
+        }
+
+    monkeypatch.setattr(notebook_reporting, "load_selection_batch", fake_load_selection_batch)
+
+    payload = build_notebook_view_model(config_path, round_selector="latest", run_id="run-1")
+
+    assert calls == [("0", "run-1")]
+    assert payload["selection_batch"]["unique_count"] == 1
+
+
 def test_notebook_view_model_includes_configured_plot_inventory(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

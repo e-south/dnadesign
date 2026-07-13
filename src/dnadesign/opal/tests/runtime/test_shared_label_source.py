@@ -23,12 +23,13 @@ from dnadesign.opal.src.config.types import (
     LabelsBlock,
     LabelSourceUSRSidecar,
     LocationUSR,
-    ObjectivesBlock,
+    OwnershipBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
     ScoringBlock,
-    SelectionBlock,
+    SelectionBatchBlock,
+    SelectionView,
     TrainingBlock,
     WritebackBlock,
 )
@@ -75,7 +76,14 @@ def _labels(usr_root: Path) -> None:
 
 def _cfg(usr_root: Path, slug: str, *, top_k: int) -> RootConfig:
     return RootConfig(
+        schema_version="opal.campaign.v3",
         campaign=CampaignBlock(name=slug, slug=slug, workdir=str(usr_root / ".." / slug)),
+        ownership=OwnershipBlock(
+            owner_scope="study_campaign",
+            study_id="test_shared_label_source",
+            dataset_id="demo_candidates",
+            portable=False,
+        ),
         data=DataBlock(
             location=LocationUSR(kind="usr", path=str(usr_root), dataset="demo_candidates"),
             x_column_name="X",
@@ -97,18 +105,22 @@ def _cfg(usr_root: Path, slug: str, *, top_k: int) -> RootConfig:
             dedup_policy="latest_by_round",
         ),
         model=PluginRef(name="random_forest", params={"n_estimators": 5, "random_state": 0}),
-        selection=SelectionBlock(
-            selection=PluginRef(
-                name="top_n",
-                params={
-                    "top_k": top_k,
-                    "score_ref": "scalar_identity_v1/scalar",
-                    "objective_mode": "maximize",
-                    "tie_handling": "competition_rank",
-                },
+        selection_views=[
+            SelectionView(
+                id="primary",
+                objective=PluginRef(name="scalar_identity_v1", params={}),
+                selection=PluginRef(
+                    name="top_n",
+                    params={
+                        "top_k": top_k,
+                        "score_ref": "scalar",
+                        "objective_mode": "maximize",
+                        "tie_handling": "competition_rank",
+                    },
+                ),
             )
-        ),
-        objectives=ObjectivesBlock(objectives=[PluginRef(name="scalar_identity_v1", params={})]),
+        ],
+        selection_batch=SelectionBatchBlock(),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
         scoring=ScoringBlock(score_batch_size=1000),
@@ -170,8 +182,8 @@ def test_plan_round_uses_shared_labels_and_selector_specific_top_k(tmp_path: Pat
 
     assert eth_plan.training_df["id"].tolist() == ["a", "b"]
     assert cipro_plan.training_df["id"].tolist() == ["a", "b"]
-    assert eth_cfg.selection.selection.params["top_k"] == 1
-    assert cipro_cfg.selection.selection.params["top_k"] == 2
+    assert eth_cfg.selection_views[0].selection.params["top_k"] == 1
+    assert cipro_cfg.selection_views[0].selection.params["top_k"] == 2
     assert eth_plan.candidate_df["id"].tolist() == ["c"]
     assert cipro_plan.candidate_df["id"].tolist() == ["c"]
 
@@ -244,8 +256,8 @@ def test_run_round_shared_labels_keep_selection_ledgers_campaign_local(tmp_path:
 
     assert eth_res.trained_on == 2
     assert cipro_res.trained_on == 2
-    assert eth_res.top_k_requested == 1
-    assert cipro_res.top_k_requested == 2
+    assert eth_res.selection_views["primary"]["top_k_requested"] == 1
+    assert cipro_res.selection_views["primary"]["top_k_requested"] == 2
     assert eth_res.ledger_path != cipro_res.ledger_path
     assert Path(eth_res.ledger_path).exists()
     assert Path(cipro_res.ledger_path).exists()

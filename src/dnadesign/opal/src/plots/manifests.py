@@ -110,6 +110,12 @@ def build_plot_manifest(
         error = error or RuntimeError(message)
     caption = _clean_text(params.get("caption")) or meta.get("summary")
     review_purpose = _clean_text(params.get("review_purpose")) or caption
+    premise = _clean_text(params.get("premise")) or meta.get("premise")
+    decision_value = _clean_text(params.get("decision_value")) or meta.get("decision_value")
+    rationale = _clean_text(params.get("rationale")) or meta.get("rationale")
+    alt_text = _clean_text(params.get("alt_text")) or meta.get("alt_text")
+    non_claim_boundary = _clean_text(params.get("non_claim_boundary")) or meta.get("non_claim_boundary")
+    tier = _clean_text(params.get("tier")) or meta.get("tier")
     return {
         "schema_version": PLOT_ARTIFACT_SCHEMA_VERSION,
         "plot_id": plot_artifact_id(Path(str(context.filename)).stem),
@@ -119,6 +125,7 @@ def build_plot_manifest(
         "started_at": started_at,
         "generated_at": generated_at or now_iso(),
         "run_id": getattr(context, "run_id", None),
+        "selection_view_id": getattr(context, "selection_view_id", None),
         "rounds": _jsonable(getattr(context, "rounds", "unspecified")),
         "params": _jsonable(dict(params)),
         "inputs": freshness["inputs"],
@@ -128,6 +135,12 @@ def build_plot_manifest(
         "metadata": meta,
         "caption": caption,
         "review_purpose": review_purpose,
+        "premise": premise,
+        "decision_value": decision_value,
+        "rationale": rationale,
+        "alt_text": alt_text,
+        "non_claim_boundary": non_claim_boundary,
+        "tier": tier,
         "quality": quality,
         "freshness": freshness,
         "warnings": warnings,

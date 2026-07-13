@@ -46,8 +46,8 @@ class RunRoundResult:
     as_of_round: int
     trained_on: int
     scored: int
-    top_k_requested: int
-    top_k_effective: int
+    selection_views: Dict[str, Dict[str, int]]
+    selection_batch_count: int
     ledger_path: str
 
 
@@ -86,33 +86,18 @@ class ScoreBundle:
     fit_metrics: Any
     fit_duration: float
     Y_hat: np.ndarray
-    y_obj_scalar: np.ndarray
-    diag: Dict[str, Any]
-    obj_summary_stats: Optional[Dict[str, Any]]
-    obj_name: str
-    obj_params: Dict[str, Any]
-    obj_mode: str
     objective_defs: List[Dict[str, Any]]
     score_channels: Dict[str, np.ndarray]
     uncertainty_channels: Dict[str, np.ndarray]
-    score_ref: str
-    uncertainty_ref: Optional[str]
-    sel_name: str
-    sel_params: Dict[str, Any]
-    tie_handling: str
-    mode: str
-    ranks_competition: np.ndarray
-    selected_bool: np.ndarray
-    selected_effective: int
-    top_k: int
-    obj_sha: str
-    scores: np.ndarray
-    uq_scalar: Optional[np.ndarray]
+    selections: Dict[str, Any]
+    selection_batch: Any
+    objective_meta_sha: str
 
 
 @dataclass(frozen=True)
 class ArtifactBundle:
     apaths: Any
     selected_df: pd.DataFrame
+    selection_batch_df: pd.DataFrame
     labels_used_df: Optional[pd.DataFrame]
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]]

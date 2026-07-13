@@ -18,13 +18,25 @@ from dnadesign.opal.src.reporting.summary import summarize_round_log
 from dnadesign.opal.src.storage.artifacts import append_round_log_event
 
 
+def _event(ts: str, stage: str, **payload: object) -> dict[str, object]:
+    return {
+        "schema_version": "opal.progress_event.v1",
+        "event_id": f"event-{ts}-{stage}",
+        "phase": "run",
+        "severity": "info",
+        "ts": ts,
+        "stage": stage,
+        **payload,
+    }
+
+
 def test_round_log_summary_counts():
     events = [
-        {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
-        {"ts": "2025-01-01T00:00:05+00:00", "stage": "fit_start"},
-        {"ts": "2025-01-01T00:00:06+00:00", "stage": "fit"},
-        {"ts": "2025-01-01T00:00:07+00:00", "stage": "predict_batch", "rows": 2},
-        {"ts": "2025-01-01T00:00:08+00:00", "stage": "done"},
+        _event("2025-01-01T00:00:00+00:00", "start"),
+        _event("2025-01-01T00:00:05+00:00", "fit_start"),
+        _event("2025-01-01T00:00:06+00:00", "fit"),
+        _event("2025-01-01T00:00:07+00:00", "predict_batch", rows=2),
+        _event("2025-01-01T00:00:08+00:00", "done"),
     ]
     summary = summarize_round_log(events)
     assert summary["events"] == 5
@@ -34,10 +46,10 @@ def test_round_log_summary_counts():
 
 def test_round_log_summary_latest_run_window():
     events = [
-        {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
-        {"ts": "2025-01-01T00:00:10+00:00", "stage": "done"},
-        {"ts": "2025-01-01T00:01:00+00:00", "stage": "start"},
-        {"ts": "2025-01-01T00:01:05+00:00", "stage": "done"},
+        _event("2025-01-01T00:00:00+00:00", "start"),
+        _event("2025-01-01T00:00:10+00:00", "done"),
+        _event("2025-01-01T00:01:00+00:00", "start"),
+        _event("2025-01-01T00:01:05+00:00", "done"),
     ]
     summary = summarize_round_log(events)
     assert summary["run_count"] == 2
@@ -48,12 +60,12 @@ def test_round_log_summary_latest_run_window():
 
 def test_round_log_summary_filters_by_run_id():
     events = [
-        {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
-        {"ts": "2025-01-01T00:00:01+00:00", "stage": "run_context", "run_id": "run-a"},
-        {"ts": "2025-01-01T00:00:02+00:00", "stage": "predict_batch", "run_id": "run-a", "rows": 2},
-        {"ts": "2025-01-01T00:00:05+00:00", "stage": "done", "run_id": "run-a"},
-        {"ts": "2025-01-01T00:01:01+00:00", "stage": "run_context", "run_id": "run-b"},
-        {"ts": "2025-01-01T00:01:03+00:00", "stage": "done", "run_id": "run-b"},
+        _event("2025-01-01T00:00:00+00:00", "start"),
+        _event("2025-01-01T00:00:01+00:00", "run_context", run_id="run-a"),
+        _event("2025-01-01T00:00:02+00:00", "predict_batch", run_id="run-a", rows=2),
+        _event("2025-01-01T00:00:05+00:00", "done", run_id="run-a"),
+        _event("2025-01-01T00:01:01+00:00", "run_context", run_id="run-b"),
+        _event("2025-01-01T00:01:03+00:00", "done", run_id="run-b"),
     ]
 
     summary = summarize_round_log(events, run_id="run-a")
@@ -66,10 +78,45 @@ def test_round_log_summary_filters_by_run_id():
 
 
 def test_round_log_summary_rejects_missing_run_id_when_logs_are_run_scoped():
-    events = [{"ts": "2025-01-01T00:00:01+00:00", "stage": "done", "run_id": "run-a"}]
+    events = [_event("2025-01-01T00:00:01+00:00", "done", run_id="run-a")]
 
     with pytest.raises(OpalError, match="no events for run_id"):
         summarize_round_log(events, run_id="run-b")
+
+
+def test_round_log_summary_rejects_pre_contract_events():
+    events = [{"ts": "2025-01-01T00:00:01+00:00", "stage": "done"}]
+
+    with pytest.raises(OpalError, match="schema_version"):
+        summarize_round_log(events)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("schema_version", "opal.progress_event.v0", "schema_version"),
+        ("phase", "legacy", "phase must be one of"),
+        ("severity", "debug", "severity must be one of"),
+        ("ts", "2025-01-01T00:00:01", "must include a UTC offset"),
+    ],
+)
+def test_round_log_summary_rejects_invalid_event_contract(field: str, value: str, message: str):
+    event = _event("2025-01-01T00:00:01+00:00", "done")
+    event[field] = value
+
+    with pytest.raises(OpalError, match=message):
+        summarize_round_log([event])
+
+
+def test_round_log_summary_rejects_duplicate_event_ids():
+    events = [
+        _event("2025-01-01T00:00:00+00:00", "start"),
+        _event("2025-01-01T00:00:01+00:00", "done"),
+    ]
+    events[1]["event_id"] = events[0]["event_id"]
+
+    with pytest.raises(OpalError, match="duplicate event_id"):
+        summarize_round_log(events)
 
 
 def test_round_log_event_contract_marks_x_validation_as_preflight(tmp_path):

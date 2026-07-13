@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 
 READER_EVIDENCE_PDF_PREVIEW_DPI = 180
+READER_EVIDENCE_PDF_PREVIEW_TIMEOUT_SECONDS = 30
 
 
 def reader_pdf_preview_path(path: str | Path) -> Path:
@@ -78,7 +79,18 @@ def _render_pdf_preview(*, source_path: Path, preview_path: Path) -> None:
 def _run_pdf_preview_command(command: list[str], *, preview_path: Path) -> str | None:
     if preview_path.exists():
         preview_path.unlink()
-    result = subprocess.run(command, check=False, capture_output=True, text=True)
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=READER_EVIDENCE_PDF_PREVIEW_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        if preview_path.exists():
+            preview_path.unlink()
+        return f"{Path(command[0]).name} timed out after {READER_EVIDENCE_PDF_PREVIEW_TIMEOUT_SECONDS} seconds"
     if result.returncode == 0 and preview_path.exists() and preview_path.stat().st_size > 0:
         return None
     message = "\n".join(part.strip() for part in (result.stderr, result.stdout) if part.strip())
@@ -87,4 +99,8 @@ def _run_pdf_preview_command(command: list[str], *, preview_path: Path) -> str |
     return f"{Path(command[0]).name} exited {result.returncode}: {message}"
 
 
-__all__ = ["READER_EVIDENCE_PDF_PREVIEW_DPI", "reader_pdf_preview_path"]
+__all__ = [
+    "READER_EVIDENCE_PDF_PREVIEW_DPI",
+    "READER_EVIDENCE_PDF_PREVIEW_TIMEOUT_SECONDS",
+    "reader_pdf_preview_path",
+]

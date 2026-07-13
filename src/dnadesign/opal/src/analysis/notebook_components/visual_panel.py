@@ -14,6 +14,9 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, Literal, Mapping
 
+from .selection_batch_panel import render_notebook_selection_batch_panel
+from .visual_panel_collection import render_collection_plot_panel, render_selection_overlap_panel
+
 
 def render_notebook_visual_panel(
     *,
@@ -31,6 +34,8 @@ def render_notebook_visual_panel(
     build_notebook_collection_visual_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None = None,
     build_notebook_campaign_set_selection_overlap_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]]
     | None = None,
+    build_notebook_selection_batch_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None = None,
+    build_notebook_selection_batch_summary_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None = None,
     collection_visual_description: Callable[[Mapping[str, Any]], str] | None = None,
     campaign_set_baserender_surface_kind: str = "campaign_set_baserender",
     baserender_campaign_model: Mapping[str, Any] | None = None,
@@ -50,6 +55,7 @@ def render_notebook_visual_panel(
     selected_campaign_baserender_contract: Mapping[str, Any] | None = None,
     selected_campaign_labels_df: Any = None,
     selection_overlap_surface_kind: str = "campaign_set_selection_overlap",
+    selection_batch_surface_kind: str = "selection_batch",
 ) -> Any:
     """Render the active OPAL visual surface under an explicit control-surface contract."""
 
@@ -91,9 +97,25 @@ def render_notebook_visual_panel(
             selected_campaign_baserender_contract=selected_campaign_baserender_contract,
             selected_campaign_labels_df=selected_campaign_labels_df,
         )
+    if selected_visual_choice.get("surface_kind") == selection_batch_surface_kind:
+        return render_notebook_selection_batch_panel(
+            build_rows=_require_callable(
+                build_notebook_selection_batch_rows,
+                "build_notebook_selection_batch_rows",
+            ),
+            build_summary_rows=_require_callable(
+                build_notebook_selection_batch_summary_rows,
+                "build_notebook_selection_batch_summary_rows",
+            ),
+            controls=controls,
+            mo=mo,
+            opal_table=opal_table,
+            pl=pl,
+            selected_visual_choice=selected_visual_choice,
+        )
     if active_view_mode == "Campaign set":
         if selected_visual_choice.get("surface_kind") == selection_overlap_surface_kind:
-            return _render_selection_overlap_panel(
+            return render_selection_overlap_panel(
                 build_notebook_campaign_set_selection_overlap_card_rows=build_notebook_campaign_set_selection_overlap_card_rows,
                 controls=controls,
                 mo=mo,
@@ -102,7 +124,7 @@ def render_notebook_visual_panel(
                 render_notebook_campaign_set_selection_overlap_image=render_notebook_campaign_set_selection_overlap_image,
                 selected_visual_choice=selected_visual_choice,
             )
-        return _render_collection_plot_panel(
+        return render_collection_plot_panel(
             build_notebook_collection_visual_card_rows=build_notebook_collection_visual_card_rows,
             collection_visual_description=collection_visual_description,
             controls=controls,
@@ -246,99 +268,6 @@ def _render_baserender_panel(
             controls,
             visual,
             mo.accordion({"Selection evidence": mo.vstack(detail_items, gap=0.35)}, multiple=True),
-        ],
-    )
-
-
-def _render_collection_plot_panel(
-    *,
-    build_notebook_collection_visual_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None,
-    collection_visual_description: Callable[[Mapping[str, Any]], str] | None,
-    controls: Any | None,
-    mo: Any,
-    opal_table: Callable[..., Any],
-    pl: Any,
-    render_notebook_plot_choice_image: Callable[..., Any],
-    selected_visual_choice: Mapping[str, Any],
-) -> Any:
-    details = mo.vstack(
-        [
-            mo.md(
-                _require_callable(
-                    collection_visual_description,
-                    "collection_visual_description",
-                )(selected_visual_choice)
-            ),
-            opal_table(
-                pl.DataFrame(
-                    _require_callable(
-                        build_notebook_collection_visual_card_rows,
-                        "build_notebook_collection_visual_card_rows",
-                    )(selected_visual_choice)
-                ),
-                page_size=12,
-            ),
-        ],
-        gap=0.35,
-    )
-    return _render_panel_stack(
-        mo=mo,
-        items=[
-            controls,
-            render_notebook_plot_choice_image(selected_visual_choice, mo=mo),
-            mo.accordion({"Collection plot evidence": details}, multiple=True),
-        ],
-    )
-
-
-def _render_selection_overlap_panel(
-    *,
-    build_notebook_campaign_set_selection_overlap_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None,
-    controls: Any | None,
-    mo: Any,
-    opal_table: Callable[..., Any],
-    pl: Any,
-    render_notebook_campaign_set_selection_overlap_image: Callable[..., Mapping[str, Any] | None] | None,
-    selected_visual_choice: Mapping[str, Any],
-) -> Any:
-    payload = _require_callable(
-        render_notebook_campaign_set_selection_overlap_image,
-        "render_notebook_campaign_set_selection_overlap_image",
-    )(selected_visual_choice)
-    if payload is None:
-        visual = mo.md("No selection overlap is available for the selected campaigns.")
-    else:
-        visual = mo.image(
-            payload["image_bytes"],
-            alt=str(payload.get("alt_text") or "Pooled selection overlap."),
-            caption=str(payload.get("caption") or "") or None,
-            rounded=True,
-            style={
-                "width": "auto",
-                "max-height": "min(62vh, 720px)",
-                "max-width": "100%",
-                "height": "auto",
-                "object-fit": "contain",
-                "margin": "0 auto",
-                "display": "block",
-                "background": "white",
-            },
-        )
-    details = opal_table(
-        pl.DataFrame(
-            _require_callable(
-                build_notebook_campaign_set_selection_overlap_card_rows,
-                "build_notebook_campaign_set_selection_overlap_card_rows",
-            )(selected_visual_choice)
-        ),
-        page_size=12,
-    )
-    return _render_panel_stack(
-        mo=mo,
-        items=[
-            controls,
-            visual,
-            mo.accordion({"Selection overlap evidence": details}, multiple=True),
         ],
     )
 

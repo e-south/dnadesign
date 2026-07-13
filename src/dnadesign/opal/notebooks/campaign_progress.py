@@ -30,6 +30,7 @@ def _():
         build_notebook_plot_card_rows,
         build_notebook_plot_method_sections,
         build_notebook_plot_scope_options,
+        build_notebook_selection_view_options,
         build_notebook_validity_rows,
         build_notebook_visual_surface_model,
         find_notebook_repo_root,
@@ -41,6 +42,7 @@ def _():
         render_notebook_reader_evidence_plot_type_control,
         render_notebook_reader_evidence_time_control,
         render_notebook_visual_panel,
+        resolve_notebook_selection_view,
         select_notebook_plot_scope,
     )
 
@@ -66,6 +68,7 @@ def _():
         build_notebook_plot_card_rows,
         build_notebook_plot_method_sections,
         build_notebook_plot_scope_options,
+        build_notebook_selection_view_options,
         build_notebook_validity_rows,
         build_notebook_visual_surface_model,
         find_notebook_repo_root,
@@ -80,6 +83,7 @@ def _():
         render_notebook_reader_evidence_plot_type_control,
         render_notebook_reader_evidence_time_control,
         render_notebook_visual_panel,
+        resolve_notebook_selection_view,
         select_notebook_plot_scope,
     )
 
@@ -156,6 +160,32 @@ def _(campaign_labels, campaign_ui, campaigns):
 
 
 @app.cell
+def _(build_notebook_selection_view_options, mo, selected_campaign_model):
+    if selected_campaign_model is None:
+        selection_view_ui = None
+    else:
+        _view_options = build_notebook_selection_view_options(selected_campaign_model)
+        selection_view_ui = mo.ui.dropdown(
+            options=_view_options,
+            value=next(iter(_view_options)),
+            label="Selection view",
+        )
+    return (selection_view_ui,)
+
+
+@app.cell
+def _(resolve_notebook_selection_view, selected_campaign_model, selection_view_ui):
+    if selected_campaign_model is None or selection_view_ui is None:
+        selected_selection_view = None
+    else:
+        selected_selection_view = resolve_notebook_selection_view(
+            selected_campaign_model,
+            str(selection_view_ui.value),
+        )
+    return (selected_selection_view,)
+
+
+@app.cell
 def _(
     build_notebook_at_a_glance_rows,
     build_notebook_campaign_header_lines,
@@ -163,16 +193,26 @@ def _(
     mo,
     pl,
     selected_campaign_model,
+    selected_selection_view,
 ):
-    if selected_campaign_model is None:
+    if selected_campaign_model is None or selected_selection_view is None:
         selected_campaign_brief_md = mo.md("")
         selected_overview_panel = mo.md("No campaign configs were found.")
         selected_validity_md = mo.md("")
     else:
-        _header_lines = build_notebook_campaign_header_lines(selected_campaign_model, heading_level=2)
+        _header_lines = build_notebook_campaign_header_lines(
+            selected_campaign_model,
+            selection_view=selected_selection_view,
+            heading_level=2,
+        )
         selected_campaign_brief_md = mo.md(_header_lines[2] if len(_header_lines) > 2 else "")
         selected_overview_panel = mo.ui.table(
-            pl.DataFrame(build_notebook_at_a_glance_rows(selected_campaign_model)),
+            pl.DataFrame(
+                build_notebook_at_a_glance_rows(
+                    selected_campaign_model,
+                    selection_view=selected_selection_view,
+                )
+            ),
             page_size=14,
             show_column_summaries=False,
         )

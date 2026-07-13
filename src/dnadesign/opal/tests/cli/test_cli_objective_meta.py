@@ -35,6 +35,8 @@ def test_objective_meta_json_contains_diagnostics(tmp_path):
             "objective-meta",
             "-c",
             str(campaign),
+            "--view",
+            "primary",
             "--round",
             "latest",
             "--no-profile",
@@ -43,7 +45,7 @@ def test_objective_meta_json_contains_diagnostics(tmp_path):
     )
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
-    assert "obj__logic_fidelity" in out["row_level_diagnostics_columns"]
+    assert "logic_fidelity" in out["diagnostic_keys"]
 
 
 def test_objective_meta_accepts_directory_config(tmp_path):
@@ -51,7 +53,8 @@ def test_objective_meta_accepts_directory_config(tmp_path):
     workdir.mkdir(parents=True, exist_ok=True)
     records = workdir / "records.parquet"
     write_records(records)
-    campaign = workdir / "campaign.yaml"
+    campaign = workdir / "configs" / "campaign.yaml"
+    campaign.parent.mkdir(parents=True)
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
     write_ledger(workdir, run_id="run-0", round_index=0)
 
@@ -64,6 +67,8 @@ def test_objective_meta_accepts_directory_config(tmp_path):
             "objective-meta",
             "-c",
             str(workdir),
+            "--view",
+            "primary",
             "--round",
             "latest",
             "--no-profile",
@@ -95,6 +100,8 @@ def test_objective_meta_requires_run_id_when_multiple_runs(tmp_path):
             "objective-meta",
             "-c",
             str(campaign),
+            "--view",
+            "primary",
             "--round",
             "latest",
             "--no-profile",

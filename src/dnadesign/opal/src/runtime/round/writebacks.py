@@ -28,14 +28,14 @@ from ...storage.artifacts import (
     write_labels_used_parquet,
     write_model_meta,
     write_round_ctx,
-    write_selection_csv,
+    write_selection_parquet,
 )
 from ...storage.data_access import RecordsStore
 from ...storage.ledger import LedgerWriter
 from ...storage.state import CampaignState, RoundEntry
 from ...storage.workspace import CampaignWorkspace
 from ...storage.writebacks import (
-    SelectionEmit,
+    SelectionViewEmit,
     build_run_meta_event,
     build_run_pred_events,
 )
@@ -79,7 +79,8 @@ def write_round_artifacts(
     apaths = ArtifactPaths(
         model=rdir / "model" / "model.joblib",
         model_meta_json=rdir / "model" / "model_meta.json",
-        selection_csv=rdir / "selection" / "selection_top_k.csv",
+        selections_parquet=rdir / "selection" / "selections.parquet",
+        selection_batch_parquet=rdir / "selection" / "selection_batch.parquet",
         round_log_jsonl=rdir / "logs" / "round.log.jsonl",
         round_ctx_json=rdir / "metadata" / "round_ctx.json",
         objective_meta_json=rdir / "metadata" / "objective_meta.json",
@@ -114,46 +115,38 @@ def write_round_artifacts(
             }
         )
 
-    selected_ids = [str(i) for i in xbundle.id_order_pool]
-    selected_df = pd.DataFrame(
-        {
-            "id": selected_ids,
-            "sequence": [seq_map.get(i) for i in selected_ids],
-            "sel__rank_competition": score.ranks_competition,
-            "pred__score_selected": score.y_obj_scalar,
-            "pred__score_ref": [score.score_ref] * len(selected_ids),
-            "sel__is_selected": score.selected_bool,
-        }
+    selected_rows: list[dict[str, object]] = []
+    pool_ids = [str(value) for value in xbundle.id_order_pool]
+    for view_id, selection in score.selections.items():
+        for idx in np.flatnonzero(selection.selected_bool):
+            candidate_id = pool_ids[int(idx)]
+            selected_rows.append(
+                {
+                    "run_id": run_id,
+                    "as_of_round": int(req.as_of_round),
+                    "campaign_slug": cfg.campaign.slug,
+                    "selection_view_id": view_id,
+                    "selection_name": selection.sel_name,
+                    "objective_name": selection.obj_name,
+                    "objective_mode": selection.mode,
+                    "tie_handling": selection.tie_handling,
+                    "id": candidate_id,
+                    "sequence": seq_map.get(candidate_id),
+                    "rank_competition": int(selection.ranks_competition[int(idx)]),
+                    "score": float(selection.y_obj_scalar[int(idx)]),
+                    "selection_score": float(selection.scores[int(idx)]),
+                    "score_ref": selection.score_ref,
+                }
+            )
+    selected_df = pd.DataFrame(selected_rows).sort_values(
+        ["selection_view_id", "rank_competition", "id"], kind="stable"
     )
-    selected_df = selected_df.loc[lambda d: d["sel__is_selected"]].sort_values("sel__rank_competition")
-    selected_df = selected_df.assign(
-        run_id=run_id,
-        as_of_round=int(req.as_of_round),
-        campaign_slug=cfg.campaign.slug,
-        selection_name=score.sel_name,
-        objective_name=score.obj_name,
-        objective_mode=score.mode,
-        tie_handling=score.tie_handling,
-    )
-    selected_df = selected_df[
-        [
-            "run_id",
-            "as_of_round",
-            "campaign_slug",
-            "selection_name",
-            "objective_name",
-            "objective_mode",
-            "tie_handling",
-            "id",
-            "sequence",
-            "sel__rank_competition",
-            "pred__score_selected",
-            "pred__score_ref",
-        ]
-    ]
-    sel_sha = write_selection_csv(apaths.selection_csv, selected_df)
-    sel_run_csv_path = apaths.selection_csv.with_name(f"selection_top_k__run_{run_id}.csv")
-    sel_run_csv_sha = write_selection_csv(sel_run_csv_path, selected_df)
+    batch_df = score.selection_batch.rows.copy()
+    batch_df.insert(0, "campaign_slug", cfg.campaign.slug)
+    batch_df.insert(0, "as_of_round", int(req.as_of_round))
+    batch_df.insert(0, "run_id", run_id)
+    selections_sha = write_selection_parquet(apaths.selections_parquet, selected_df)
+    selection_batch_sha = write_selection_parquet(apaths.selection_batch_parquet, batch_df)
 
     ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
     labels_used_sha = write_labels_used_parquet(apaths.labels_used_parquet, labels_used_df)
@@ -206,17 +199,17 @@ def write_round_artifacts(
                 file_sha256(apaths.model),
                 str(apaths.model.resolve()),
             ),
-            "selection/selection_top_k.csv": (
-                sel_sha,
-                str(apaths.selection_csv.resolve()),
+            "selection/selections.parquet": (
+                selections_sha,
+                str(apaths.selections_parquet.resolve()),
             ),
-            f"selection/selection_top_k__run_{run_id}.csv": (
-                sel_run_csv_sha,
-                str(sel_run_csv_path.resolve()),
+            "selection/selection_batch.parquet": (
+                selection_batch_sha,
+                str(apaths.selection_batch_parquet.resolve()),
             ),
             "metadata/round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
             "metadata/objective_meta.json": (
-                score.obj_sha,
+                score.objective_meta_sha,
                 str(apaths.objective_meta_json.resolve()),
             ),
             "model/model_meta.json": (
@@ -233,6 +226,7 @@ def write_round_artifacts(
     return ArtifactBundle(
         apaths=apaths,
         selected_df=selected_df,
+        selection_batch_df=batch_df,
         labels_used_df=labels_used_df,
         artifacts_paths_and_hashes=artifacts_paths_and_hashes,
     )
@@ -252,11 +246,23 @@ def build_run_events(
     seq_map = build_sequence_map(inputs.df)
     sequences_list: List[Optional[str]] = [seq_map.get(i) for i in xbundle.id_order_pool]
 
-    sel_emit = SelectionEmit(
-        ranks_competition=score.ranks_competition,
-        selected_bool=score.selected_bool,
-        diagnostics=None,
-    )
+    selection_view_emits = [
+        SelectionViewEmit(
+            selection_view_id=view_id,
+            objective_name=selection.obj_name,
+            selection_name=selection.sel_name,
+            score=selection.y_obj_scalar,
+            score_ref=selection.score_ref,
+            selection_score=selection.scores,
+            ranks_competition=selection.ranks_competition,
+            selected_bool=selection.selected_bool,
+            top_k=selection.top_k,
+            diagnostics=selection.diag,
+            uncertainty=selection.uq_scalar,
+            uncertainty_ref=selection.uncertainty_ref,
+        )
+        for view_id, selection in score.selections.items()
+    ]
 
     run_pred_events = build_run_pred_events(
         run_id=run_id,
@@ -264,17 +270,29 @@ def build_run_events(
         ids=list(map(str, xbundle.id_order_pool)),
         sequences=sequences_list,
         y_hat_model=score.Y_hat,
-        selected_score=score.y_obj_scalar,
-        selected_score_ref=score.score_ref,
         y_dim=training.y_dim,
-        obj_diagnostics=score.diag,
-        sel_emit=sel_emit,
-        selected_uncertainty=score.uq_scalar,
-        selected_uncertainty_ref=score.uncertainty_ref,
-        selection_score=score.scores,
+        selection_views=selection_view_emits,
         score_channels=score.score_channels,
         uncertainty_channels=score.uncertainty_channels,
     )
+
+    selection_view_defs = [
+        {
+            "selection_view_id": view_id,
+            "objective_name": selection.obj_name,
+            "objective_params": selection.obj_params,
+            "selection_name": selection.sel_name,
+            "selection_params": selection.sel_params,
+            "score_ref": selection.score_ref,
+            "uncertainty_ref": selection.uncertainty_ref,
+            "objective_mode": selection.mode,
+            "tie_handling": selection.tie_handling,
+            "top_k": selection.top_k,
+            "selected_effective": selection.selected_effective,
+            "objective_summary_stats": selection.obj_summary_stats,
+        }
+        for view_id, selection in score.selections.items()
+    ]
 
     run_meta_event = build_run_meta_event(
         run_id=run_id,
@@ -286,21 +304,12 @@ def build_run_events(
         x_transform_params=dict(cfg.data.transforms_x.params),
         y_ingest_transform_name=cfg.data.transforms_y.name,
         y_ingest_transform_params=dict(cfg.data.transforms_y.params),
-        objective_name=score.obj_name,
-        objective_params=score.obj_params,
         objective_defs=score.objective_defs,
-        selection_name=score.sel_name,
-        selection_params=score.sel_params,
-        selection_score_ref=score.score_ref,
-        selection_uncertainty_ref=score.uncertainty_ref,
-        selection_objective_mode=score.mode,
-        sel_tie_handling=score.tie_handling,
+        selection_view_defs=selection_view_defs,
         stats_n_train=len(xbundle.id_order_train),
         stats_n_scored=len(xbundle.id_order_pool),
-        unc_mean_sd=score.uq_scalar,
         pred_rows_df=run_pred_events,
         artifact_paths_and_hashes=artifacts.artifacts_paths_and_hashes,
-        objective_summary_stats=score.obj_summary_stats,
     )
 
     return RunEvents(run_pred_events=run_pred_events, run_meta_event=run_meta_event)
@@ -322,37 +331,6 @@ def append_ledgers(
     )
 
 
-def write_prediction_label_hist(
-    *,
-    store: RecordsStore,
-    df: pd.DataFrame,
-    ids: List[str],
-    y_hat: np.ndarray,
-    as_of_round: int,
-    run_id: str,
-    objective: Dict[str, object],
-    metrics_by_name: Dict[str, List[float]],
-    selection_rank: np.ndarray,
-    selection_top_k: np.ndarray,
-    verbose: bool,
-) -> pd.DataFrame:
-    df2 = store.append_predictions_from_arrays(
-        df,
-        ids=ids,
-        y_hat=y_hat,
-        as_of_round=as_of_round,
-        run_id=run_id,
-        objective=objective,
-        metrics_by_name=metrics_by_name,
-        selection_rank=selection_rank,
-        selection_top_k=selection_top_k,
-        ts=now_iso(),
-    )
-    store.save_atomic(df2)
-    _log(verbose, "[writeback] records label_hist updated with run-aware predictions.")
-    return df2
-
-
 def update_campaign_state(
     *,
     ws: CampaignWorkspace,
@@ -362,11 +340,10 @@ def update_campaign_state(
     train_df: pd.DataFrame,
     id_order_train: List[str],
     id_order_pool: List[str],
-    top_k: int,
-    selected_effective: int,
+    selections: dict,
+    selection_batch: object,
     apaths: ArtifactPaths,
     run_id: str,
-    obj_name: str,
     store: RecordsStore,
     total_duration: float,
     fit_duration: float,
@@ -403,7 +380,7 @@ def update_campaign_state(
     st.training_policy = dict(cfg.training.policy or {})
     st.performance = {
         "score_batch_size": getattr(req, "score_batch_size_override", None) or cfg.scoring.score_batch_size,
-        "objective": obj_name,
+        "selection_view_ids": list(selections),
     }
     labels_used_rounds = sorted(set(train_df["r"].astype(int).tolist()))
     round_dir = ws.round_dir(req.as_of_round)
@@ -416,8 +393,21 @@ def update_campaign_state(
             labels_used_rounds=labels_used_rounds,
             number_of_training_examples_used_in_round=len(id_order_train),
             number_of_candidates_scored_in_round=len(id_order_pool),
-            selection_top_k_requested=int(top_k),
-            selection_top_k_effective_after_ties=int(selected_effective),
+            selection_views={
+                view_id: {
+                    "objective_name": selection.obj_name,
+                    "selection_name": selection.sel_name,
+                    "score_ref": selection.score_ref,
+                    "top_k_requested": int(selection.top_k),
+                    "top_k_effective_after_ties": int(selection.selected_effective),
+                }
+                for view_id, selection in selections.items()
+            },
+            selection_batch={
+                "deduplicate_by": selection_batch.deduplicate_by,
+                "unique_count": int(selection_batch.unique_count),
+                "expected_unique_count": selection_batch.expected_unique_count,
+            },
             model={
                 "type": cfg.model.name,
                 "params": cfg.model.params,
@@ -431,7 +421,8 @@ def update_campaign_state(
                 "model": cfg.model.params.get("random_state"),
             },
             artifacts={
-                "selection_top_k_csv": str(apaths.selection_csv.resolve()),
+                "selections_parquet": str(apaths.selections_parquet.resolve()),
+                "selection_batch_parquet": str(apaths.selection_batch_parquet.resolve()),
                 "ledger_predictions_dir": str(ws.ledger_predictions_dir.resolve()),
                 "ledger_runs_parquet": str(ws.ledger_runs_path.resolve()),
                 "ledger_labels_parquet": str(ws.ledger_labels_path.resolve()),

@@ -42,7 +42,7 @@ from ._round_overlay import resolve_highlight_round
     meta=PlotMeta(
         summary="Generic scalar metric summaries over rounds by cohort.",
         params={
-            "metric": "Numeric ledger field to summarize (default pred__score_selected).",
+            "metric": "Numeric ledger field to summarize (default view__selection_score).",
             "cohort": "Cohort or list of cohorts: selected, top_k, all_pool (default selected).",
             "top_k": "Rank cutoff for top_k cohort (default 10).",
             "summaries": "Summary or list: mean, median, count, q10, q25, q75, q90.",
@@ -51,7 +51,7 @@ from ._round_overlay import resolve_highlight_round
             "threshold": "Optional horizontal threshold/reference line.",
             "highlight_round": "Optional point marker: latest, true, false, or an integer.",
         },
-        requires=["as_of_round", "run_id", "pred__score_selected"],
+        requires=["as_of_round", "run_id", "view__selection_score"],
         notes=["Reads outputs/ledger/predictions and writes tidy scalar summaries when save_data is enabled."],
         data_shape="scalar over rounds",
         tidy_schema=["round", "cohort", "metric", "summary", "value"],
@@ -74,7 +74,7 @@ def render(context, params: dict) -> None:
     apply_plot_style()
     from matplotlib.ticker import MaxNLocator
 
-    metric = normalize_metric_field(get_str(params, ["metric", "metric_field", "field"], "pred__score_selected"))
+    metric = normalize_metric_field(get_str(params, ["metric", "metric_field", "field"], "view__selection_score"))
     if not metric:
         raise ValueError("metric_over_rounds requires a metric field.")
     cohorts = _list_param(params.get("cohort", params.get("cohorts", "selected")))
@@ -99,17 +99,18 @@ def render(context, params: dict) -> None:
     need = {"as_of_round", "run_id", metric}
     row_filters = []
     if "selected" in cohorts:
-        need.add("sel__is_selected")
+        need.add("view__is_selected")
     if "top_k" in cohorts:
-        need.add("sel__rank_competition")
+        need.add("view__rank_competition")
     if cohorts == ["selected"]:
-        row_filters.append({"column": "sel__is_selected", "op": "eq", "value": True})
+        row_filters.append({"column": "view__is_selected", "op": "eq", "value": True})
     elif cohorts == ["top_k"]:
-        row_filters.append({"column": "sel__rank_competition", "op": "lte", "value": top_k})
+        row_filters.append({"column": "view__rank_competition", "op": "lte", "value": top_k})
     df = load_events(
         resolve_outputs_dir(context),
         need,
         round_selector=context.rounds,
+        selection_view_id=context.selection_view_id,
         run_id=context.run_id,
         row_filters=row_filters,
     )
@@ -268,13 +269,13 @@ def _cohort_frame(df, *, cohort: str, top_k: int):
     if cohort == "all_pool":
         return df.copy()
     if cohort == "selected":
-        if "sel__is_selected" not in df.columns:
-            raise ValueError("selected cohort requires sel__is_selected.")
-        return df[selected_mask(df["sel__is_selected"])].copy()
+        if "view__is_selected" not in df.columns:
+            raise ValueError("selected cohort requires view__is_selected.")
+        return df[selected_mask(df["view__is_selected"])].copy()
     if cohort == "top_k":
-        if "sel__rank_competition" not in df.columns:
-            raise ValueError("top_k cohort requires sel__rank_competition.")
-        return df[positive_ranks(df["sel__rank_competition"]) <= int(top_k)].copy()
+        if "view__rank_competition" not in df.columns:
+            raise ValueError("top_k cohort requires view__rank_competition.")
+        return df[positive_ranks(df["view__rank_competition"]) <= int(top_k)].copy()
     raise ValueError(f"Unknown cohort: {cohort}")
 
 

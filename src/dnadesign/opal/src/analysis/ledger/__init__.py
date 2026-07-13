@@ -22,7 +22,7 @@ from .io import (
     scan_predictions,
     scan_runs,
 )
-from .predictions import read_predictions
+from .predictions import read_predictions, read_selection_view_predictions
 from .rounds import RoundSelector, available_rounds, latest_round, latest_run_id, parse_round_selector, round_suffix
 from .setpoints import load_predictions_with_setpoint
 
@@ -38,6 +38,7 @@ __all__ = [
     "parse_round_selector",
     "read_labels",
     "read_predictions",
+    "read_selection_view_predictions",
     "read_runs",
     "require_columns",
     "round_suffix",

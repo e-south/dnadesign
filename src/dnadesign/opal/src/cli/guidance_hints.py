@@ -43,24 +43,24 @@ def maybe_print_hints(
     if command_name == "init":
         lines = [
             f"opal validate -c {cfg}",
-            f"opal ingest-y -c {cfg} --observed-round 0 --in <labels.xlsx> --apply",
-            f"opal guide next -c {cfg} --labels-as-of 0",
+            f"opal ingest-y -c {cfg} --round 0 --csv <labels.xlsx> --apply",
+            f"opal guide next -c {cfg} --round 0",
         ]
     elif command_name == "validate":
         lines = [
-            f"opal ingest-y -c {cfg} --observed-round 0 --in <labels.xlsx> --apply",
+            f"opal ingest-y -c {cfg} --round 0 --csv <labels.xlsx> --apply",
             f"opal guide -c {cfg} --format markdown",
         ]
     elif command_name == "ingest":
         rr = int(observed_round) if observed_round is not None else 0
         lines = [
-            f"opal run -c {cfg} --labels-as-of {rr}",
-            f"opal explain -c {cfg} --labels-as-of {rr + 1}",
+            f"opal run -c {cfg} --round {rr}",
+            f"opal explain -c {cfg} --round {rr + 1}",
         ]
     elif command_name == "run":
         rr = int(labels_as_of) if labels_as_of is not None else "latest"
         lines = [
-            f"opal verify-outputs -c {cfg} --round latest",
+            f"opal verify-outputs -c {cfg} --view <selection-view-id> --round latest",
             f"opal ctx audit -c {cfg} --round latest",
             f"opal status -c {cfg} --round {rr}",
         ]
@@ -72,8 +72,8 @@ def maybe_print_hints(
     elif command_name == "explain":
         rr = int(labels_as_of) if labels_as_of is not None else 0
         lines = [
-            f"opal ingest-y -c {cfg} --observed-round {rr} --in <labels.xlsx> --apply",
-            f"opal run -c {cfg} --labels-as-of {rr}",
+            f"opal ingest-y -c {cfg} --round {rr} --csv <labels.xlsx> --apply",
+            f"opal run -c {cfg} --round {rr}",
         ]
         if explain_info:
             preflight = dict(explain_info.get("preflight") or {})

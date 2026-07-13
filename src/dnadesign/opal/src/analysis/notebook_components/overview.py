@@ -50,7 +50,12 @@ def build_notebook_campaign_summary_row(view_model: Mapping[str, Any]) -> dict[s
     }
 
 
-def build_notebook_campaign_header_lines(view_model: Mapping[str, Any], *, heading_level: int = 1) -> list[str]:
+def build_notebook_campaign_header_lines(
+    view_model: Mapping[str, Any],
+    *,
+    selection_view: Mapping[str, Any],
+    heading_level: int = 1,
+) -> list[str]:
     """Build a compact, human-readable notebook heading."""
 
     campaign = mapping(view_model.get("campaign"))
@@ -58,7 +63,8 @@ def build_notebook_campaign_header_lines(view_model: Mapping[str, Any], *, headi
     level = max(1, min(6, int(heading_level)))
     marker = "#" * level
     description = _campaign_description(campaign)
-    return [f"{marker} {title}", "", description]
+    target = _objective_target_summary(selection_view)
+    return [f"{marker} {title}", "", description, "", f"**Objective target:** {target}."]
 
 
 def _campaign_title(campaign: Mapping[str, Any]) -> str:
@@ -85,12 +91,15 @@ def _campaign_description(campaign: Mapping[str, Any]) -> str:
 
     title = _campaign_title(campaign)
     slug = str(campaign.get("slug") or "unknown").strip()
-    objective = sequence(campaign.get("objectives"))[0] if sequence(campaign.get("objectives")) else "objective"
+    selection_views = sequence(campaign.get("selection_views"))
+    if not selection_views:
+        raise ValueError("Campaign notebook description requires at least one selection view.")
+    view_label = "selection view" if len(selection_views) == 1 else "selection views"
     x_column = str(campaign.get("x_column") or "").strip()
     x_clause = f" The active X contract is `{x_column}`." if x_column else ""
     return (
-        f"Campaign ID `{slug}`. {title} scores the configured OPAL records table with `{campaign.get('model')}` "
-        f"and selects candidates by `{campaign.get('selection')}` against `{objective}`.{x_clause}"
+        f"Campaign ID `{slug}`. {title} fits `{campaign.get('model')}` once and evaluates "
+        f"{len(selection_views)} {view_label} from the shared predictions.{x_clause}"
     )
 
 
@@ -126,7 +135,11 @@ def _metadata_role_label(metadata: Mapping[str, Any]) -> str:
     return labels.get(role, display_name(role) if role else "configured label table")
 
 
-def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
+def build_notebook_at_a_glance_rows(
+    view_model: Mapping[str, Any],
+    *,
+    selection_view: Mapping[str, Any],
+) -> list[dict[str, Any]]:
     """Build first-viewport campaign status rows from a notebook view model."""
 
     row = build_notebook_campaign_summary_row(view_model)
@@ -144,6 +157,8 @@ def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[
         {"field": "latest run", "value": row["latest_run_id"]},
         {"field": "X column", "value": row["x_column"]},
         {"field": "Y column", "value": row["y_column"]},
+        {"field": "selection view", "value": selection_view.get("id")},
+        {"field": "objective target", "value": _objective_target_summary(selection_view)},
         {"field": "label source", "value": row["label_source"]},
         {"field": "label context", "value": row["label_context"] or "not recorded"},
         {"field": "campaign metadata", "value": row["metadata_context"] or "not recorded"},
@@ -160,6 +175,34 @@ def build_notebook_at_a_glance_rows(view_model: Mapping[str, Any]) -> list[dict[
         )
     )
     return rows
+
+
+def _objective_target_summary(selection_view: Mapping[str, Any]) -> str:
+    view_id = str(selection_view.get("id") or "").strip()
+    if not view_id:
+        raise ValueError("Notebook selection view requires a non-empty id.")
+    objective = mapping(selection_view.get("objective"))
+    name = str(objective.get("name") or "").strip()
+    if not name:
+        raise ValueError(f"Notebook selection view {view_id!r} requires an objective name.")
+    params = mapping(objective.get("params"))
+    if name == "response_magnitude_feasibility_v1":
+        state_ids = [str(value) for value in sequence(params.get("state_ids"))]
+        target_mask = sequence(params.get("target_mask"))
+        if not state_ids or len(state_ids) != len(target_mask):
+            raise ValueError("RMF notebook target requires aligned state_ids and target_mask values.")
+        if any(value not in (0, 1, False, True) for value in target_mask):
+            raise ValueError("RMF notebook target_mask values must be binary.")
+        on_states = [state for state, value in zip(state_ids, target_mask, strict=True) if int(value) == 1]
+        off_states = [state for state, value in zip(state_ids, target_mask, strict=True) if int(value) == 0]
+        if not on_states or not off_states:
+            raise ValueError("RMF notebook target_mask must contain at least one ON and one OFF state.")
+        return f"RMF mask={list(map(int, target_mask))}; ON={', '.join(on_states)}; OFF={', '.join(off_states)}"
+    if "setpoint_vector" in params:
+        return f"{name} setpoint_vector={params['setpoint_vector']}"
+    if params:
+        return f"{name} params={sorted(params)}"
+    return f"{name} params=none"
 
 
 def _campaign_label_context(campaign: Mapping[str, Any]) -> str:
@@ -215,8 +258,8 @@ def build_notebook_trust_rows(view_model: Mapping[str, Any]) -> list[dict[str, A
         {"field": "rounds", "value": status.get("round_count") or 0},
         {"field": "state file", "value": "present" if state.get("exists") else "missing"},
         {
-            "field": "review manifest",
-            "value": "present" if isinstance(view_model.get("review_manifest"), Mapping) else "missing",
+            "field": "review manifests",
+            "value": len(mapping(view_model.get("review_manifests"))),
         },
         {"field": "plot media choices", "value": len(visual_surface["choices"])},
         {"field": "missing plot outputs", "value": len(visual_surface["missing_outputs"])},
@@ -259,14 +302,14 @@ def build_notebook_validity_rows(view_model: Mapping[str, Any]) -> list[dict[str
     blocking_count = sum(1 for item in warnings if item.get("severity") == "error")
     artifact_garden = mapping(view_model.get("artifact_garden"))
     prune_plan = mapping(artifact_garden.get("prune_plan"))
-    review_state = "present" if isinstance(view_model.get("review_manifest"), Mapping) else "missing"
+    review_state = len(mapping(view_model.get("review_manifests")))
     state_text = "present" if state.get("exists") else "missing"
     artifact_schema = artifact_garden.get("schema_version") or "unavailable"
     return [
         {"field": "Campaign status", "value": status.get("progress_status") or "unknown"},
         {"field": "Progress schema", "value": progress.get("schema_version") or "missing"},
         {"field": "State file", "value": state_text},
-        {"field": "Review manifest", "value": review_state},
+        {"field": "Review manifests", "value": review_state},
         {"field": "Plot manifests", "value": len(plot_manifests)},
         {"field": "Written plot media choices", "value": len(visual_surface["choices"])},
         {"field": "Missing plot outputs", "value": len(visual_surface["missing_outputs"])},
@@ -287,7 +330,7 @@ def build_notebook_distrust_lines(view_model: Mapping[str, Any]) -> list[str]:
 def build_notebook_distrust_rows(view_model: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Build compact limitation rows for generated notebooks."""
 
-    review_manifest = view_model.get("review_manifest")
+    review_manifests = mapping(view_model.get("review_manifests"))
     visual_surface = build_notebook_visual_surface_model(view_model)
     warnings = sequence(view_model.get("warnings"))
     stale = sequence(view_model.get("stale_artifacts"))
@@ -301,8 +344,8 @@ def build_notebook_distrust_rows(view_model: Mapping[str, Any]) -> list[dict[str
             "value": "representation browsers and study benchmark reports stay outside canonical OPAL notebooks",
         },
         {
-            "field": "review manifest",
-            "value": "missing" if review_manifest is None else "present",
+            "field": "review manifests",
+            "value": len(review_manifests),
         },
     ]
     if not visual_surface["choices"]:

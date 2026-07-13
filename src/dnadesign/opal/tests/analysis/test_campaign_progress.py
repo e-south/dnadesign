@@ -28,7 +28,7 @@ from dnadesign.opal.src.analysis.campaign_progress import (
     x_provenance_status_lines,
     x_provenance_status_rows,
 )
-from dnadesign.opal.src.analysis.dashboard.datasets import CampaignInfo
+from dnadesign.opal.src.analysis.dashboard.datasets import CampaignInfo, CampaignSelectionViewInfo
 
 
 def _campaign_info() -> CampaignInfo:
@@ -37,15 +37,23 @@ def _campaign_info() -> CampaignInfo:
         path=Path("campaign.yaml"),
         workdir=None,
         slug="demo",
+        owner_scope="opal_demo",
+        study_id=None,
+        portable=True,
         x_column="opal__view__x",
         y_column="opal__view__y",
         y_expected_length=8,
         model_name="random_forest",
         model_params={},
-        objective_name="sfxi_v1",
-        objective_params={},
-        selection_name="top_n",
-        selection_params={},
+        selection_views=(
+            CampaignSelectionViewInfo(
+                id="primary",
+                objective_name="sfxi_v1",
+                objective_params={},
+                selection_name="top_n",
+                selection_params={},
+            ),
+        ),
         training_policy={},
         y_ops=[],
     )
@@ -153,6 +161,9 @@ def test_campaign_contract_rows_are_table_ready() -> None:
     keyed = {row["field"]: row["value"] for row in rows}
 
     assert keyed["campaign"] == "demo"
+    assert keyed["ownership"] == "opal_demo"
+    assert "study" not in keyed
+    assert keyed["selection views"] == "primary: sfxi_v1 -> top_n"
     assert keyed["config"] == "campaign.yaml"
     assert keyed["records"] == "records.parquet"
     assert keyed["records contract"] == "ready"
@@ -187,7 +198,7 @@ def test_cli_handoff_lines_keep_notebook_generation_in_canonical_path() -> None:
     assert "uv run opal status -c campaign.yaml --with-ledger" in text
     assert "uv run opal runs list -c campaign.yaml" in text
     assert "uv run opal record-show -c campaign.yaml" in text
-    assert "uv run opal verify-outputs -c campaign.yaml --round latest" in text
-    assert "uv run opal plot -c campaign.yaml" in text
+    assert "uv run opal verify-outputs -c campaign.yaml --view <selection-view-id> --round latest" in text
+    assert "uv run opal plot -c campaign.yaml --view <selection-view-id>" in text
     assert "uv run opal notebook generate -c campaign.yaml --round latest --force" in text
     assert "uv run opal notebook run -c campaign.yaml" in text

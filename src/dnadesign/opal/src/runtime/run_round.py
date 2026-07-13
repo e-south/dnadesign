@@ -15,9 +15,7 @@ import json
 import shutil
 import time
 from pathlib import Path
-from typing import Dict, List
 
-import numpy as np
 import pandas as pd
 
 from ..core.utils import OpalError, ensure_dir, now_iso, print_stderr
@@ -33,7 +31,6 @@ from .round.writebacks import (
     append_ledgers,
     build_run_events,
     update_campaign_state,
-    write_prediction_label_hist,
     write_round_artifacts,
 )
 
@@ -116,13 +113,15 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         yops_names = []
     _log(
         req.verbose,
-        "[plugins] x=%s | y_ingest=%s | model=%s | objective=%s | selection=%s | y_ops=%s"
+        "[plugins] x=%s | y_ingest=%s | model=%s | selection_views=%s | y_ops=%s"
         % (
             cfg.data.transforms_x.name,
             cfg.data.transforms_y.name,
             cfg.model.name,
-            [o.name for o in cfg.objectives.objectives],
-            cfg.selection.selection.name,
+            [
+                {"id": view.id, "objective": view.objective.name, "selection": view.selection.name}
+                for view in cfg.selection_views
+            ],
             (yops_names or "(none)"),
         ),
     )
@@ -150,11 +149,14 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
                     "params": cfg.data.transforms_y.params,
                 },
                 "model": {"name": cfg.model.name, "params": cfg.model.params},
-                "objectives": [{"name": o.name, "params": o.params} for o in cfg.objectives.objectives],
-                "selection": {
-                    "name": cfg.selection.selection.name,
-                    "params": cfg.selection.selection.params,
-                },
+                "selection_views": [
+                    {
+                        "id": view.id,
+                        "objective": {"name": view.objective.name, "params": view.objective.params},
+                        "selection": {"name": view.selection.name, "params": view.selection.params},
+                    }
+                    for view in cfg.selection_views
+                ],
                 "y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
             },
         },
@@ -235,6 +237,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         tctx=tctx,
         id_order_train=xbundle.id_order_train,
         id_order_pool=xbundle.id_order_pool,
+        candidate_df=xbundle.cand_df,
         y_dim=training.y_dim,
     )
 
@@ -279,69 +282,8 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "ledger_append_done"},
     )
 
-    metrics_by_name: Dict[str, List[float]] = {"score": score.y_obj_scalar.astype(float).tolist()}
-    for ref, values in (score.score_channels or {}).items():
-        arr = np.asarray(values, dtype=float).ravel()
-        if arr.size == len(xbundle.id_order_pool):
-            metrics_by_name[f"score::{ref}"] = arr.tolist()
-    for ref, values in (score.uncertainty_channels or {}).items():
-        arr = np.asarray(values, dtype=float).ravel()
-        if arr.size == len(xbundle.id_order_pool):
-            metrics_by_name[f"uncertainty::{ref}"] = arr.tolist()
-    if score.uq_scalar is not None:
-        arr = np.asarray(score.uq_scalar, dtype=float).ravel()
-        if arr.size == len(xbundle.id_order_pool):
-            metrics_by_name["uncertainty_selected"] = arr.tolist()
-    for key in ("logic_fidelity", "effect_scaled", "effect_raw"):
-        if isinstance(score.diag, dict) and key in score.diag:
-            arr = np.asarray(score.diag[key], dtype=float).ravel()
-            if arr.size == len(xbundle.id_order_pool):
-                metrics_by_name[key] = arr.tolist()
-
-    objective_defs = []
-    for d in score.objective_defs:
-        row = {
-            "name": d.get("name"),
-            "score_channels": d.get("score_channels", []),
-            "uncertainty_channels": d.get("uncertainty_channels", []),
-        }
-        params = d.get("params")
-        if isinstance(params, dict) and params:
-            row["params"] = params
-        objective_defs.append(row)
-
-    objective_meta = {
-        "name": score.obj_name,
-        "mode": score.mode,
-        "score_ref": score.score_ref,
-        "uncertainty_ref": score.uncertainty_ref,
-        "objectives": objective_defs,
-    }
-    if isinstance(score.obj_params, dict) and score.obj_params:
-        objective_meta["params"] = score.obj_params
     records_label_hist_updated = False
-    if cfg.writeback.prediction_records == "label_history":
-        if store.x_col not in df.columns:
-            raise OpalError(
-                "prediction_records=label_history requires a full records frame including the X column. "
-                "Use writeback.prediction_records=ledger_only for streaming large candidate universes."
-            )
-        _ = write_prediction_label_hist(
-            store=store,
-            df=df,
-            ids=list(map(str, xbundle.id_order_pool)),
-            y_hat=score.Y_hat,
-            as_of_round=int(req.as_of_round),
-            run_id=run_id,
-            objective=objective_meta,
-            metrics_by_name=metrics_by_name,
-            selection_rank=score.ranks_competition,
-            selection_top_k=score.selected_bool,
-            verbose=req.verbose,
-        )
-        records_label_hist_updated = True
-    else:
-        _log(req.verbose, "[writeback] records label_hist skipped; prediction_records=ledger_only.")
+    _log(req.verbose, "[writeback] candidate predictions persisted to the shared round ledger.")
 
     total_duration = time.perf_counter() - t0
     append_round_log_event(
@@ -356,11 +298,10 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         train_df=training.train_df,
         id_order_train=xbundle.id_order_train,
         id_order_pool=xbundle.id_order_pool,
-        top_k=score.top_k,
-        selected_effective=score.selected_effective,
+        selections=score.selections,
+        selection_batch=score.selection_batch,
         apaths=artifacts.apaths,
         run_id=run_id,
-        obj_name=score.obj_name,
         store=store,
         total_duration=total_duration,
         fit_duration=score.fit_duration,
@@ -403,8 +344,14 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             "round": int(req.as_of_round),
             "run_id": run_id,
             "stage": "selection",
-            "top_k": int(score.top_k),
-            "effective": int(score.selected_effective),
+            "selection_views": {
+                view_id: {
+                    "top_k": int(selection.top_k),
+                    "effective": int(selection.selected_effective),
+                }
+                for view_id, selection in score.selections.items()
+            },
+            "selection_batch_count": int(score.selection_batch.unique_count),
         },
     )
     append_round_log_event(
@@ -418,7 +365,13 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         as_of_round=int(req.as_of_round),
         trained_on=len(xbundle.id_order_train),
         scored=len(xbundle.id_order_pool),
-        top_k_requested=int(score.top_k),
-        top_k_effective=int(score.selected_effective),
+        selection_views={
+            view_id: {
+                "top_k_requested": int(selection.top_k),
+                "top_k_effective": int(selection.selected_effective),
+            }
+            for view_id, selection in score.selections.items()
+        },
+        selection_batch_count=int(score.selection_batch.unique_count),
         ledger_path=str(ws.ledger_dir.resolve()),
     )

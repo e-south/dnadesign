@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import pandas as pd
 
@@ -24,7 +24,6 @@ from .labels import (
     training_labels_with_round,
 )
 from .parsing import normalize_hist_cell, parse_hist_cell_strict
-from .predictions import append_predictions_from_arrays
 
 
 @dataclass(frozen=True)
@@ -119,31 +118,3 @@ class LabelHistory:
 
     def training_labels_from_y(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
         return training_labels_from_y(self, df, as_of_round)
-
-    def append_predictions_from_arrays(
-        self,
-        df: pd.DataFrame,
-        *,
-        ids: List[str],
-        y_hat: Any,
-        as_of_round: int,
-        run_id: str,
-        objective: Dict[str, Any],
-        metrics_by_name: Dict[str, List[float]],
-        selection_rank: Any,
-        selection_top_k: Any,
-        ts: str | None = None,
-    ) -> pd.DataFrame:
-        return append_predictions_from_arrays(
-            self,
-            df,
-            ids=ids,
-            y_hat=y_hat,
-            as_of_round=as_of_round,
-            run_id=run_id,
-            objective=objective,
-            metrics_by_name=metrics_by_name,
-            selection_rank=selection_rank,
-            selection_top_k=selection_top_k,
-            ts=ts,
-        )

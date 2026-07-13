@@ -47,20 +47,22 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         round_counts = {int(k): int(v) for k, v in counts.items()}
 
     preflight: Dict[str, Any] = {
-        "observed_round_definition": "Labels stamped by ingest-y --observed-round (event time).",
-        "labels_as_of_definition": "Training cutoff used by run/explain --labels-as-of.",
+        "observed_round_definition": "Labels stamped by ingest-y --round (event time).",
+        "labels_as_of_definition": "Training cutoff used by run/explain --round.",
     }
-    sfxi_obj = next((o for o in cfg.objectives.objectives if str(o.name) == "sfxi_v1"), None)
-    if sfxi_obj is not None:
-        scaling = dict((sfxi_obj.params or {}).get("scaling") or {})
-        min_n = int(scaling.get("min_n", 5))
+    sfxi_views = [view for view in cfg.selection_views if str(view.objective.name) == "sfxi_v1"]
+    if sfxi_views:
+        minimums = {
+            view.id: int(dict((view.objective.params or {}).get("scaling") or {}).get("min_n", 5))
+            for view in sfxi_views
+        }
         current_round_labels = int(round_counts.get(int(round_k), 0))
         preflight.update(
             {
-                "sfxi_scaling_min_n": min_n,
+                "sfxi_scaling_min_n_by_view": minimums,
                 "sfxi_current_round_labels": current_round_labels,
-                "sfxi_run_will_fail": bool(current_round_labels < min_n),
-                "sfxi_fix_command": (f"opal ingest-y --observed-round {int(round_k)} --in <labels.xlsx> --apply"),
+                "sfxi_run_will_fail": bool(current_round_labels < max(minimums.values())),
+                "sfxi_fix_command": (f"opal ingest-y --round {int(round_k)} --csv <labels.xlsx> --apply"),
             }
         )
 
@@ -74,11 +76,14 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         "training_policy": cfg.training.policy,
         "training_label_dedup_policy": plan.training_dedup_policy,
         "training_y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
-        "selection": {
-            "strategy": cfg.selection.selection.name,
-            "params": cfg.selection.selection.params,
-            "objectives": [{"name": o.name, "params": o.params} for o in cfg.objectives.objectives],
-        },
+        "selection_views": [
+            {
+                "id": view.id,
+                "objective": {"name": view.objective.name, "params": view.objective.params},
+                "selection": {"name": view.selection.name, "params": view.selection.params},
+            }
+            for view in cfg.selection_views
+        ],
         "number_of_training_examples_used_in_round": int(len(plan.training_df)),
         "number_of_candidates_scored_in_round": int(len(plan.candidate_df)),
         "candidate_pool_total": int(plan.candidate_total_before_filter),

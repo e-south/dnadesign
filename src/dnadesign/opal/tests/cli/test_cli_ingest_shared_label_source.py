@@ -77,6 +77,8 @@ def test_ingest_y_writes_usr_sidecar_label_source(tmp_path: Path) -> None:
     campaign = workdir / "campaign.yaml"
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: Demo
   slug: demo
@@ -97,11 +99,12 @@ writeback:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: test_shared_scalar_labels, params: {{}} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip()
     )
     labels = workdir / "labels.parquet"
@@ -189,6 +192,8 @@ def test_ingest_y_usr_sidecar_uses_identity_frame_without_full_records_load(tmp_
     campaign = workdir / "campaign.yaml"
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: Demo
   slug: demo
@@ -209,11 +214,12 @@ writeback:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: test_shared_scalar_labels, params: {{}} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip()
     )
     labels = workdir / "labels.parquet"
@@ -293,6 +299,8 @@ def test_ingest_y_rejects_unknown_ids_for_shared_label_source(tmp_path: Path) ->
     campaign = workdir / "campaign.yaml"
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: Demo
   slug: demo
@@ -313,11 +321,12 @@ writeback:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: test_shared_scalar_labels, params: {{}} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip()
     )
     labels = workdir / "labels.parquet"
@@ -356,6 +365,8 @@ def test_ingest_y_rejects_id_sequence_mismatch_for_shared_label_source(tmp_path:
     campaign = workdir / "campaign.yaml"
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: Demo
   slug: demo
@@ -376,11 +387,12 @@ writeback:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: test_shared_scalar_labels_with_sequence, params: {{}} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip()
     )
     labels = workdir / "labels.parquet"

@@ -16,6 +16,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from ..config.types import ArtifactRetentionBlock, RootConfig
@@ -29,10 +30,10 @@ RETENTION_MANIFEST_SCHEMA_VERSION = "opal.artifact_retention_manifest.v1"
 def apply_runtime_artifact_retention(cfg: RootConfig, ws: CampaignWorkspace) -> dict[str, Any]:
     """Apply the configured artifact-retention policy and write a manifest.
 
-    `audit_full` is the compatibility mode: it records the current policy but
-    does not mutate run artifacts. Production modes fail closed on unknown
-    policy values and only delete artifacts whose ownership can be proven from
-    the campaign workspace layout.
+    `audit_full` preserves complete run artifacts and records the applied
+    policy. Production modes fail closed on unknown policy values and only
+    delete artifacts whose ownership can be proven from the campaign workspace
+    layout.
     """
 
     policy = cfg.artifact_retention
@@ -104,7 +105,7 @@ def _compact_prediction_ledger(*, policy: ArtifactRetentionBlock, ws: CampaignWo
         raise OpalError(f"cannot apply retention without run ledger: {runs_path}")
     runs = read_parquet_df(runs_path, columns=["run_id", "as_of_round"])
     predictions = read_parquet_df(predictions_dir)
-    required = {"run_id", "as_of_round", "sel__is_selected"}
+    required = {"run_id", "as_of_round", "pred__selection_views"}
     missing = sorted(required - set(predictions.columns))
     if missing:
         raise OpalError(
@@ -117,7 +118,7 @@ def _compact_prediction_ledger(*, policy: ArtifactRetentionBlock, ws: CampaignWo
     full_rounds = _retained_full_prediction_rounds(policy=policy, latest_round=latest_round, runs=runs)
     if policy.prediction_ledger == "selected_history_only":
         full_rounds = set()
-    keep_selected = predictions["sel__is_selected"].fillna(False).astype(bool)
+    keep_selected = predictions["pred__selection_views"].map(_selected_by_any_view)
     keep_full = predictions["as_of_round"].astype(int).isin(full_rounds)
     retained = predictions.loc[keep_selected | keep_full].copy()
     if retained.empty and not predictions.empty:
@@ -139,6 +140,31 @@ def _compact_prediction_ledger(*, policy: ArtifactRetentionBlock, ws: CampaignWo
         "rows_removed": rows_before - rows_after,
         "sha256": _dataset_sha256(predictions_dir),
     }
+
+
+def _selected_by_any_view(payload: object) -> bool:
+    if isinstance(payload, np.ndarray):
+        payload = payload.tolist()
+    if not isinstance(payload, (list, tuple)):
+        raise OpalError(
+            "pred__selection_views must be a sequence for artifact retention.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    selected = False
+    for item in payload:
+        if not isinstance(item, dict) or "selection_view_id" not in item or "is_selected" not in item:
+            raise OpalError(
+                "Each pred__selection_views entry requires selection_view_id and is_selected.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        value = item["is_selected"]
+        if not isinstance(value, (bool, np.bool_)):
+            raise OpalError(
+                "pred__selection_views is_selected values must be boolean.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        selected = selected or bool(value)
+    return selected
 
 
 def _retained_full_prediction_rounds(

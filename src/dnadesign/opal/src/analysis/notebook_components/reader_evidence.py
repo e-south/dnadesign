@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/opal/src/analysis/notebook_components/reader_evidence.py
 
-Builds notebook rows for Reader evidence manifests staged with observed labels.
+Builds notebook rows for round-local Reader evidence manifests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -68,29 +68,40 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                     )
                     if part
                 )
-                rows.append(
-                    {
-                        "label": artifact_label,
-                        "round": round_label,
-                        "id": str(item.get("id") or ""),
-                        "design_id": design_id,
-                        "reader_experiment_id": reader_experiment_id,
-                        "reader_config_path": str(item.get("reader_config_path") or ""),
-                        "reader_record_id": str(item.get("reader_record_id") or ""),
-                        "time_selected_h": item.get("time_selected_h"),
-                        "sequence": item.get("sequence") or "",
-                        "synthesis_name": item.get("synthesis_name") or "",
-                        "semantic_kind": semantic_kind,
-                        "plot_type_label": plot_type_label,
-                        "artifact_record_id": str(artifact_item.get("record_id") or ""),
-                        "path": str(path or ""),
-                        "path_label": compact_path(path, max_parts=5),
-                        "exists": bool(artifact_item.get("exists")),
-                        "media_type": str(artifact_item.get("media_type") or ""),
-                        "manifest_path": str(manifest_path),
-                        "manifest_path_label": compact_path(manifest_path, base=root),
-                    }
-                )
+                row = {
+                    "label": artifact_label,
+                    "round": round_label,
+                    "id": str(item.get("id") or ""),
+                    "candidate_id": str(item.get("candidate_id") or item.get("id") or ""),
+                    "design_id": design_id,
+                    "reader_experiment_id": reader_experiment_id,
+                    "reduction_id": str(item.get("reduction_id") or ""),
+                    "evidence_role": str(item.get("evidence_role") or ""),
+                    "claim_status": str(item.get("claim_status") or ""),
+                    "selected_binding": dict(mapping(item.get("selected_binding"))),
+                    "reader_config_path": str(item.get("reader_config_path") or ""),
+                    "reader_record_id": str(item.get("reader_record_id") or ""),
+                    "sequence": item.get("sequence") or "",
+                    "synthesis_name": item.get("synthesis_name") or "",
+                    "semantic_kind": semantic_kind,
+                    "plot_type_label": plot_type_label,
+                    "kind": str(artifact_item.get("kind") or ""),
+                    "artifact_record_id": str(artifact_item.get("record_id") or ""),
+                    "scope": str(artifact_item.get("scope") or ""),
+                    "path": str(path or ""),
+                    "path_label": str(artifact_item.get("path_label") or compact_path(path, max_parts=5)),
+                    "exists": bool(artifact_item.get("exists")),
+                    "media_type": str(artifact_item.get("media_type") or ""),
+                    "bytes": artifact_item.get("bytes"),
+                    "sha256": str(artifact_item.get("sha256") or ""),
+                    "source_manifest_path": str(artifact_item.get("source_manifest_path") or ""),
+                    "source_manifest_sha256": str(artifact_item.get("source_manifest_sha256") or ""),
+                    "manifest_path": str(manifest_path),
+                    "manifest_path_label": compact_path(manifest_path, base=root),
+                }
+                if "time_selected_h" in item:
+                    row["time_selected_h"] = item.get("time_selected_h")
+                rows.append(row)
     return rows
 
 
@@ -123,27 +134,38 @@ def build_notebook_reader_evidence_artifact_rows(view_model: Mapping[str, Any]) 
     rows = []
     for row in sequence(view_model.get("reader_evidence_artifacts")):
         item = mapping(row)
-        rows.append(
-            {
-                "label": item.get("label") or "",
-                "round": item.get("round") or "",
-                "id": item.get("id") or "",
-                "design_id": item.get("design_id") or "",
-                "reader_experiment_id": item.get("reader_experiment_id") or "",
-                "reader_config_path": item.get("reader_config_path") or "",
-                "reader_record_id": item.get("reader_record_id") or "",
-                "time_selected_h": _blank_if_none(item.get("time_selected_h")),
-                "sequence": item.get("sequence") or "",
-                "synthesis_name": item.get("synthesis_name") or "",
-                "semantic_kind": item.get("semantic_kind") or "",
-                "plot_type_label": item.get("plot_type_label") or semantic_kind_label(item.get("semantic_kind")),
-                "artifact_record_id": item.get("artifact_record_id") or "",
-                "exists": bool(item.get("exists")),
-                "media_type": item.get("media_type") or "",
-                "path": item.get("path") or "",
-                "path_label": item.get("path_label") or item.get("path") or "",
-            }
-        )
+        output = {
+            "label": item.get("label") or "",
+            "round": item.get("round") or "",
+            "id": item.get("id") or "",
+            "candidate_id": item.get("candidate_id") or item.get("id") or "",
+            "design_id": item.get("design_id") or "",
+            "reader_experiment_id": item.get("reader_experiment_id") or "",
+            "reduction_id": item.get("reduction_id") or "",
+            "evidence_role": item.get("evidence_role") or "",
+            "claim_status": item.get("claim_status") or "",
+            "selected_binding": dict(mapping(item.get("selected_binding"))),
+            "reader_config_path": item.get("reader_config_path") or "",
+            "reader_record_id": item.get("reader_record_id") or "",
+            "sequence": item.get("sequence") or "",
+            "synthesis_name": item.get("synthesis_name") or "",
+            "semantic_kind": item.get("semantic_kind") or "",
+            "plot_type_label": item.get("plot_type_label") or semantic_kind_label(item.get("semantic_kind")),
+            "kind": item.get("kind") or "",
+            "artifact_record_id": item.get("artifact_record_id") or "",
+            "scope": item.get("scope") or "",
+            "exists": bool(item.get("exists")),
+            "media_type": item.get("media_type") or "",
+            "bytes": item.get("bytes"),
+            "sha256": item.get("sha256") or "",
+            "source_manifest_path": item.get("source_manifest_path") or "",
+            "source_manifest_sha256": item.get("source_manifest_sha256") or "",
+            "path": item.get("path") or "",
+            "path_label": item.get("path_label") or item.get("path") or "",
+        }
+        if "time_selected_h" in item:
+            output["time_selected_h"] = _blank_if_none(item.get("time_selected_h"))
+        rows.append(output)
     return rows
 
 

@@ -36,7 +36,7 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
             "batch_size": "Batch size for distance computation (default 2048).",
             "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
-        requires=["pred__y_hat_model", "pred__score_selected"],
+        requires=["pred__y_hat_model", "view__selection_score"],
         notes=["Uses labels-as-of round for support distances."],
         data_shape="support distance scatter",
         objective_family="sfxi",
@@ -64,7 +64,7 @@ def render(context, params: dict) -> None:
     show_meta = get_bool(params, ["show_meta"], False)
     reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_support_diagnostics")
 
-    need = {"id", "pred__y_hat_model", "pred__score_selected"}
+    need = {"id", "pred__y_hat_model", "view__selection_score"}
     if y_axis:
         need.add(y_axis)
     if hue:
@@ -73,6 +73,7 @@ def render(context, params: dict) -> None:
     pred_df = load_predictions_with_setpoint(
         outputs_dir,
         need,
+        selection_view_id=context.selection_view_id,
         round_selector=round_k,
         run_id=run_id,
         require_run_id=False,

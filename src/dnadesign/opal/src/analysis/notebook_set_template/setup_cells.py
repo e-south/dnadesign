@@ -17,7 +17,7 @@ from ._support import block
 def render_setup_cells() -> str:
     """Render campaign-set imports and view-model setup cells."""
 
-    return "\n\n".join((_preamble(), _import_cell(), _view_model_cell()))
+    return "\n".join((_preamble(), _import_cell(), _view_model_cell()))
 
 
 def _preamble() -> str:
@@ -63,6 +63,9 @@ def _import_cell() -> str:
                 build_notebook_label_staging_rows, build_notebook_metric_definition_rows, build_notebook_plot_card_rows,
                 build_notebook_plot_method_sections, build_notebook_plot_scope_options,
                 build_notebook_reader_evidence_visual_choices, build_notebook_run_options,
+                build_notebook_selection_batch_choice,
+                build_notebook_selection_batch_rows, build_notebook_selection_batch_summary_rows,
+                build_notebook_selection_view_options,
                 build_notebook_selected_baserender_record_ids, build_notebook_validity_rows,
                 build_notebook_visual_group_options, build_notebook_visual_surface_model,
                 filter_notebook_visual_choices_by_group, latest_round, latest_run_id,
@@ -71,7 +74,7 @@ def _import_cell() -> str:
                 render_notebook_plot_choice_image, render_notebook_reader_evidence_artifact_control,
                 render_notebook_reader_evidence_artifact_visual, render_notebook_reader_evidence_panel,
                 render_notebook_reader_evidence_time_control, render_notebook_review_control_surface,
-                render_notebook_visual_panel, resolve_notebook_round_default,
+                render_notebook_visual_panel, resolve_notebook_round_default, resolve_notebook_selection_view,
                 select_notebook_baserender_default_record_id, select_notebook_plot_scope,
             )
             from dnadesign.opal.notebooks.api.generated import (
@@ -93,6 +96,9 @@ def _import_cell() -> str:
                 build_notebook_label_staging_rows, build_notebook_metric_definition_rows, build_notebook_plot_card_rows,
                 build_notebook_plot_method_sections, build_notebook_plot_scope_options,
                 build_notebook_reader_evidence_visual_choices, build_notebook_run_options,
+                build_notebook_selection_batch_choice,
+                build_notebook_selection_batch_rows, build_notebook_selection_batch_summary_rows,
+                build_notebook_selection_view_options,
                 build_notebook_selected_baserender_record_ids, build_notebook_validity_rows,
                 build_notebook_visual_group_options, build_notebook_visual_surface_model,
                 filter_notebook_visual_choices_by_group, generated_with, latest_round, latest_run_id,
@@ -101,6 +107,7 @@ def _import_cell() -> str:
                 render_notebook_reader_evidence_artifact_control, render_notebook_reader_evidence_artifact_visual,
                 render_notebook_reader_evidence_panel, render_notebook_reader_evidence_time_control,
                 render_notebook_review_control_surface, render_notebook_visual_panel, resolve_notebook_round_default,
+                resolve_notebook_selection_view,
                 select_notebook_baserender_default_record_id, select_notebook_plot_scope,
             )
         """

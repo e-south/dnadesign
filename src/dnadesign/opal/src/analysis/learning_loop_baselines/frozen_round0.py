@@ -32,11 +32,16 @@ from ...storage.label_sources import label_source_from_config
 from ...storage.store_factory import records_store_from_config
 
 
-def frozen_round0_scores(config_path: str | Path) -> tuple[pd.DataFrame, list[str]]:
+def frozen_round0_scores(
+    config_path: str | Path,
+    *,
+    selection_view_id: str,
+) -> tuple[pd.DataFrame, list[str]]:
     """Score a campaign candidate pool from the model trained only on round-0 labels."""
 
     cfg = load_config(Path(config_path))
-    _validate_supported_selection(cfg)
+    view = _selection_view(cfg, selection_view_id=selection_view_id)
+    _validate_supported_selection(view)
     store = records_store_from_config(cfg)
     df = store.load_runtime_frame(include_x=False)
     label_source = label_source_from_config(cfg, store)
@@ -72,6 +77,7 @@ def frozen_round0_scores(config_path: str | Path) -> tuple[pd.DataFrame, list[st
         model_ctx=mctx,
         transform_ctx=tctx,
         candidate_ids=candidate_ids,
+        selection_view_id=selection_view_id,
         batch_size=int(cfg.scoring.score_batch_size),
     )
     y_hat, _ = inverse_yops_outputs(rctx=rctx, y_ops_cfg=cfg.training.y_ops or [], y_pred=y_hat_fit, y_pred_std=None)
@@ -96,8 +102,15 @@ def frozen_round0_scores(config_path: str | Path) -> tuple[pd.DataFrame, list[st
     return scores, train_ids
 
 
-def _validate_supported_selection(cfg: Any) -> None:
-    selection = cfg.selection.selection
+def _selection_view(cfg: Any, *, selection_view_id: str) -> Any:
+    matches = [view for view in cfg.selection_views if view.id == selection_view_id]
+    if len(matches) != 1:
+        raise ValueError(f"Unknown or duplicate selection view {selection_view_id!r}")
+    return matches[0]
+
+
+def _validate_supported_selection(view: Any) -> None:
+    selection = view.selection
     if str(selection.name) != "top_n":
         raise ValueError(f"Frozen replay currently supports top_n selection only; got {selection.name!r}")
     params = dict(selection.params)
@@ -162,6 +175,7 @@ def _objective_scores(
     y_train: np.ndarray,
     r_train: np.ndarray,
     candidate_ids: list[str],
+    selection_view_id: str,
 ) -> np.ndarray:
     req = SimpleNamespace(as_of_round=0, verbose=False)
     inputs = SimpleNamespace(cfg=cfg, req=req)
@@ -174,7 +188,8 @@ def _objective_scores(
         R_train=r_train,
         id_order_pool=candidate_ids,
     )
-    score_ref = str(cfg.selection.selection.params.get("score_ref") or "")
+    view = _selection_view(cfg, selection_view_id=selection_view_id)
+    score_ref = f"{selection_view_id}/{str(view.selection.params.get('score_ref') or '')}"
     score = resolve_channel_ref(score_ref, objectives.score_channels, label="score_ref")
     if not np.all(np.isfinite(score)):
         raise ValueError("Frozen replay objective scores contain non-finite values")

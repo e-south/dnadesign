@@ -20,12 +20,13 @@ from dnadesign.opal.src.config.types import (
     IngestBlock,
     LabelsBlock,
     LocationLocal,
-    ObjectivesBlock,
+    OwnershipBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
     ScoringBlock,
-    SelectionBlock,
+    SelectionBatchBlock,
+    SelectionView,
     TrainingBlock,
 )
 from dnadesign.opal.src.eligibility.restriction_sites import restriction_site_exclusion
@@ -57,7 +58,9 @@ def _eligibility_rule(*, min_remaining: int = 1) -> PluginRef:
 
 def _cfg(tmp_path, *, min_remaining: int = 1) -> RootConfig:
     return RootConfig(
+        schema_version="opal.campaign.v3",
         campaign=CampaignBlock(name="demo", slug="demo", workdir=str(tmp_path / "campaign")),
+        ownership=OwnershipBlock(owner_scope="opal_demo"),
         data=DataBlock(
             location=LocationLocal(kind="local", path=str(tmp_path / "records.parquet")),
             x_column_name="X",
@@ -69,18 +72,22 @@ def _cfg(tmp_path, *, min_remaining: int = 1) -> RootConfig:
         candidate_eligibility=CandidateEligibilityBlock(rules=[_eligibility_rule(min_remaining=min_remaining)]),
         labels=LabelsBlock(),
         model=PluginRef(name="random_forest", params={"n_estimators": 5, "random_state": 0}),
-        selection=SelectionBlock(
-            selection=PluginRef(
-                name="top_n",
-                params={
-                    "top_k": 1,
-                    "score_ref": "scalar_identity_v1/scalar",
-                    "objective_mode": "maximize",
-                    "tie_handling": "competition_rank",
-                },
+        selection_views=[
+            SelectionView(
+                id="primary",
+                objective=PluginRef(name="scalar_identity_v1", params={}),
+                selection=PluginRef(
+                    name="top_n",
+                    params={
+                        "top_k": 1,
+                        "score_ref": "scalar",
+                        "objective_mode": "maximize",
+                        "tie_handling": "competition_rank",
+                    },
+                ),
             )
-        ),
-        objectives=ObjectivesBlock(objectives=[PluginRef(name="scalar_identity_v1", params={})]),
+        ],
+        selection_batch=SelectionBatchBlock(),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
         scoring=ScoringBlock(score_batch_size=1000),

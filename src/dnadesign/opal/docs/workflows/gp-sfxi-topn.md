@@ -1,10 +1,12 @@
 ## Score-driven OPAL rounds (GP + SFXI + Top-n)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-13
 
 
-This demo swaps the surrogate model from `random_forest` to `gaussian_process` but keeps deterministic `top_n` selection. It’s the “model changed, selection unchanged” bridge between the random-forest baseline and Expected Improvement.
+This workflow changes the surrogate model from `random_forest` to
+`gaussian_process` while retaining deterministic `top_n` selection. It
+isolates model behavior from acquisition-policy behavior.
 
 Campaign: `src/dnadesign/opal/campaigns/demo_gp_topn/`
 
@@ -16,15 +18,15 @@ Campaign: `src/dnadesign/opal/campaigns/demo_gp_topn/`
 * [Selection plugins](../plugins/selection/README.md)
 * [CLI reference](../reference/cli.md)
 
-**What this doc is meant to accomplish**
+**Outcome**
 
 * Run a full round with GP predictions.
-* See where GP uncertainty is stored even when selection ignores it.
-* Keep the same verification and audit habits as the deterministic workflow.
+* Locate GP uncertainty even when selection ignores it.
+* Apply the deterministic workflow's verification and audit contracts.
 
 ---
 
-### What changed from the RF baseline in the config
+### Configuration difference from the RF baseline
 
 The key difference is the `model` block; SFXI + `top_n` are unchanged.
 
@@ -41,16 +43,19 @@ model:                              # Surrogate model used for candidate predict
       nu: 1.5                       # Matern smoothness parameter
       with_white_noise: true        # Add WhiteKernel noise component
 
-selection:                          # Selection strategy over objective channels
-  name: top_n                       # Deterministic rank-by-score selector
-  params:                           # Selection contract fields
-    top_k: 5                        # Number of candidates to select
-    score_ref: sfxi_v1/sfxi         # Objective score channel used for ranking
-    objective_mode: maximize  # Sets `objective_mode` for this example configuration.
-    tie_handling: competition_rank  # Tie policy for ranking output
+selection_views:                       # Declare target-specific scoring and selection views
+  - id: primary                        # Give the only view a stable public identifier
+    objective: {name: sfxi_v1, params: {...}} # Emit the local SFXI score channel
+    selection:                          # Configure this view's selector
+      name: top_n                       # Use deterministic greedy ranking
+      params:                           # Bind top-N to the objective channel
+        top_k: 5                        # Request five candidates
+        score_ref: sfxi                 # Use the local SFXI score channel
+        objective_mode: maximize        # Prefer larger SFXI values
+        tie_handling: competition_rank  # Preserve score ties
 ```
 
-What to expect at runtime:
+Runtime behavior:
 
 * GP produces predictive uncertainty (`sigma`) internally.
 * `top_n` ranks only by `score_ref`, so uncertainty does not affect which candidates are selected.
@@ -63,7 +68,7 @@ What to expect at runtime:
 # Enter the GP Top-N demo campaign directory.
 cd src/dnadesign/opal/campaigns/demo_gp_topn
 # Copy the shared demo design-space records into this campaign.
-cp ../demo/records.parquet ./records.parquet
+cp ../demo_rf_sfxi_topn/records.parquet ./records.parquet
 
 # Reset generated outputs and state for a fresh demo run.
 uv run opal campaign-reset -c configs/campaign.yaml --apply --no-backup
@@ -77,8 +82,8 @@ uv run opal validate -c configs/campaign.yaml
 
 ```bash
 # Ingest measured labels and stamp them as observed in round 0.
-uv run opal ingest-y -c configs/campaign.yaml --observed-round 0 \
-  --in inputs/r0/vec8-b0.xlsx \
+uv run opal ingest-y -c configs/campaign.yaml --round 0 \
+  --csv inputs/r0/vec8-b0.xlsx \
   --unknown-sequences drop \
   --if-exists replace \
   --apply
@@ -88,14 +93,15 @@ uv run opal ingest-y -c configs/campaign.yaml --observed-round 0 \
 
 ```bash
 # Train, score, and select candidates using labels visible through round 0.
-uv run opal run -c configs/campaign.yaml --labels-as-of 0
+uv run opal run -c configs/campaign.yaml --round 0
 ```
-> * `--observed-round R`: measurement stamp for ingest.
-> * `--labels-as-of R`: training/selection visibility cutoff for `opal run`.
+> `ingest-y --round R` records the measurement round. `run --round R` uses
+> labels observed through round `R`.
 
 Checkpoint outputs:
 
-* `outputs/rounds/round_0/selection/selection_top_k.csv`
+* `outputs/rounds/round_0/selection/selections.parquet`
+* `outputs/rounds/round_0/selection/selection_batch.parquet`
 * `outputs/ledger/runs.parquet`
 * `outputs/ledger/predictions/`
 
@@ -103,7 +109,7 @@ Checkpoint outputs:
 
 ```bash
 # Check selection and ledger consistency for the latest round.
-uv run opal verify-outputs -c configs/campaign.yaml --round latest
+uv run opal verify-outputs -c configs/campaign.yaml --view primary --round latest
 # Print campaign status and latest round pointers.
 uv run opal status   -c configs/campaign.yaml
 # List recorded runs for this campaign.
@@ -120,7 +126,7 @@ Inspect a selected record and look for the selected score/uncertainty fields.
 
 ```bash
 # Show the top selected record (competition rank 1) from the latest round.
-uv run opal record-show -c configs/campaign.yaml --selected-rank 1 --round latest --run-id latest
+uv run opal record-show -c configs/campaign.yaml --view primary --selected-rank 1 --round latest --run-id latest
 ```
 
 #### 6. Optional read-only analysis and plots
@@ -129,23 +135,23 @@ uv run opal record-show -c configs/campaign.yaml --selected-rank 1 --round lates
 # Export round-level predictions for downstream analysis.
 uv run opal predict -c configs/campaign.yaml --round latest --out outputs/predict_r0.parquet
 # Render the score-vs-rank plot for the latest round.
-uv run opal plot   -c configs/campaign.yaml --name score_vs_rank_latest --round latest
+uv run opal plot   -c configs/campaign.yaml --view primary --name score_vs_rank_latest --round latest
 ```
 
 ### Continue to round 1, etc.
 
 ```bash
 # Ingest the next batch and stamp labels as observed in round 1.
-uv run opal ingest-y -c configs/campaign.yaml --observed-round 1 \
-  --in inputs/r0/vec8-b0.xlsx \
+uv run opal ingest-y -c configs/campaign.yaml --round 1 \
+  --csv inputs/r0/vec8-b0.xlsx \
   --unknown-sequences drop \
   --if-exists replace \
   --apply
 
 # Re-run training/selection with labels visible through round 1.
-uv run opal run -c configs/campaign.yaml --labels-as-of 1 --resume
+uv run opal run -c configs/campaign.yaml --round 1 --resume
 # Re-check ledger and artifact consistency after the resume run.
-uv run opal verify-outputs -c configs/campaign.yaml --round latest
+uv run opal verify-outputs -c configs/campaign.yaml --view primary --round latest
 ```
 
 ---
@@ -153,5 +159,5 @@ uv run opal verify-outputs -c configs/campaign.yaml --round latest
 ### If a step fails
 
 * sklearn GP `ConvergenceWarning`: common on small demo data; treat as informational if `validate` and `verify-outputs` pass.
-* `SFXI min_n` failure: ingest enough labels for the same observed round you run as `--labels-as-of`.
+* `SFXI min_n` failure: ingest enough labels for the round supplied to `opal run`.
 * Unknown sequences during ingest: ensure input IDs exist in `records.parquet` (or keep `--unknown-sequences drop`).

@@ -44,9 +44,19 @@ from ._param_utils import (
     "scatter_score_vs_rank",
     meta=PlotMeta(
         summary="Scatter objective score vs rank; optional hue/size by diagnostics.",
+        premise="Selection rank must preserve descending objective-score order.",
+        decision_value="Confirms the operative ranking direction and exposes score compression or ties near top-K.",
+        rationale="A direct score-rank curve verifies that the selector preserves the declared objective order.",
+        alt_text=(
+            "Scatter and line plot of selected-objective score against selection rank. The rank axis is reversed so "
+            "rank one appears at the right; selected candidates are outlined."
+        ),
+        non_claim_boundary="A correct rank transform does not validate the objective, predictor, or biology.",
+        tier="diagnostic",
         params={
-            "score_field": "Ledger field for y-axis (default pred__score_selected).",
+            "score_field": "Ledger field for y-axis (default view__selection_score).",
             "rank_mode": "sequential|competition (default sequential).",
+            "rank_label": "Optional explicit x-axis label, including favorable direction.",
             "hue_field": "Optional obj__/pred__/sel__ field for color.",
             "size_by": "Optional obj__/pred__/sel__ field for size.",
             "alpha": "Point alpha (default 0.45).",
@@ -56,13 +66,13 @@ from ._param_utils import (
         requires=[
             "as_of_round",
             "run_id",
-            "pred__score_selected",
-            "sel__rank_competition",
-            "sel__is_selected",
+            "view__selection_score",
+            "view__rank_competition",
+            "view__is_selected",
         ],
         notes=["Reads outputs/ledger/predictions."],
         data_shape="selection behavior scatter",
-        tidy_schema=["as_of_round", "id", "sel__is_selected"],
+        tidy_schema=["as_of_round", "id", "view__is_selected"],
         objective_family="generic",
         data_layer="predictions_selection",
         round_scope="single_or_round_history",
@@ -83,10 +93,11 @@ def render(context, params: dict) -> None:
 
     outputs_dir = resolve_outputs_dir(context)
 
-    score_field = get_str(params, ["score_field"], "pred__score_selected")
-    score_field = normalize_metric_field(score_field) or "pred__score_selected"
+    score_field = get_str(params, ["score_field"], "view__selection_score")
+    score_field = normalize_metric_field(score_field) or "view__selection_score"
     score_label = plot_metric_label(params, score_field)
     rank_mode = (get_str(params, ["rank_mode"], "sequential") or "sequential").lower()
+    rank_label = get_str(params, ["rank_label"], None)
     # "sequential" | "competition"
     alpha = get_float(params, ["alpha"], 0.45)
     hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
@@ -119,13 +130,19 @@ def render(context, params: dict) -> None:
         "as_of_round",
         "run_id",
         "id",
-        "sel__rank_competition",
-        "sel__is_selected",
+        "view__rank_competition",
+        "view__is_selected",
         score_field,
     }
     # Ensure optional hue/size columns are loaded if they refer to ledger columns
     need |= event_columns_for(hue_field, size_by)
-    df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
+    df = load_events(
+        outputs_dir,
+        need,
+        round_selector=context.rounds,
+        selection_view_id=context.selection_view_id,
+        run_id=context.run_id,
+    )
     if df.empty:
         raise ValueError("outputs/ledger/predictions had zero rows for requested columns.")
 
@@ -149,9 +166,9 @@ def render(context, params: dict) -> None:
         df["rank__sequential"] = df.groupby("as_of_round").cumcount() + 1
         x_field = "rank__sequential"
     else:
-        if "sel__rank_competition" not in df.columns:
-            raise ValueError("sel__rank_competition not present for competition ranking.")
-        x_field = "sel__rank_competition"
+        if "view__rank_competition" not in df.columns:
+            raise ValueError("view__rank_competition not present for competition ranking.")
+        x_field = "view__rank_competition"
 
     # Hue/size arrays
     hue_vals = None
@@ -160,9 +177,9 @@ def render(context, params: dict) -> None:
             raise ValueError(f"hue field '{hue_field}' not present in predictions.")
         hue_vals = df[hue_field].to_numpy(dtype=float)
 
-    if "sel__rank_competition" not in df.columns:
+    if "view__rank_competition" not in df.columns:
         df = df.sort_values(["as_of_round", score_field], ascending=[True, False]).assign(
-            sel__rank_competition=lambda x: x.groupby("as_of_round").cumcount() + 1
+            view__rank_competition=lambda x: x.groupby("as_of_round").cumcount() + 1
         )
 
     rounds: List[int] = sorted(df["as_of_round"].unique().tolist())
@@ -209,8 +226,8 @@ def render(context, params: dict) -> None:
             **color_kw,
             rasterize_at=rasterize_at,
         )
-        if "sel__is_selected" in sub.columns:
-            sel_mask = sub["sel__is_selected"].astype("boolean").fillna(False).to_numpy(dtype=bool)
+        if "view__is_selected" in sub.columns:
+            sel_mask = sub["view__is_selected"].astype("boolean").fillna(False).to_numpy(dtype=bool)
             if sel_mask.any():
                 scatter_smart(
                     ax,
@@ -225,7 +242,7 @@ def render(context, params: dict) -> None:
                     rasterize_at=rasterize_at,
                     label="Selected",
                 )
-        ax.set_xlabel(f"{pretty_label(x_field)} ({rank_mode})")
+        ax.set_xlabel(_rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label))
         ax.set_ylabel(score_label)
         ax.set_title(pretty_title(params.get("title", f"{score_label} vs rank, round {r}")))
         _set_rank_xlim(ax, float(sub[x_field].max()))
@@ -293,8 +310,8 @@ def render(context, params: dict) -> None:
                 rasterize_at=rasterize_at,
                 **color_kw,
             )
-            if "sel__is_selected" in sub.columns:
-                sel_mask = sub["sel__is_selected"].astype("boolean").fillna(False).to_numpy(dtype=bool)
+            if "view__is_selected" in sub.columns:
+                sel_mask = sub["view__is_selected"].astype("boolean").fillna(False).to_numpy(dtype=bool)
                 if sel_mask.any():
                     sx = sub.loc[sel_mask, x_field].to_numpy()
                     sy = sub.loc[sel_mask, score_field].to_numpy(dtype=float)
@@ -311,7 +328,7 @@ def render(context, params: dict) -> None:
                         rasterize_at=rasterize_at,
                         label="_nolegend_",
                     )
-        ax.set_xlabel(f"{pretty_label(x_field)} ({rank_mode})")
+        ax.set_xlabel(_rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label))
         ax.set_ylabel(score_label)
         ax.set_title(pretty_title(params.get("title", f"{score_label} vs rank by round")))
         _set_rank_xlim(ax, float(df[x_field].max()))
@@ -356,7 +373,7 @@ def render(context, params: dict) -> None:
             "as_of_round",
             "id",
             x_field,
-            "sel__is_selected",
+            "view__is_selected",
             score_field,
         ]
         context.save_df(df[keep])
@@ -365,3 +382,12 @@ def render(context, params: dict) -> None:
 def _set_rank_xlim(ax, max_rank: float) -> None:
     pad = max(1.0, float(max_rank) * 0.01)
     ax.set_xlim(float(max_rank) + pad, 1.0 - pad)
+
+
+def _rank_axis_label(*, x_field: str, rank_mode: str, rank_label: str | None) -> str:
+    if rank_label is not None:
+        label = str(rank_label).strip()
+        if not label:
+            raise ValueError("rank_label must be non-empty when provided.")
+        return label
+    return f"{pretty_label(x_field)} ({rank_mode})"

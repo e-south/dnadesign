@@ -38,9 +38,14 @@ _GROUPS_BY_KEY = {group.key: group for group in VISUAL_GROUPS}
 _GROUPS_BY_LABEL = {group.label: group for group in VISUAL_GROUPS}
 _BASERENDER_SURFACE_KINDS = {"baserender", "campaign_set_baserender"}
 _READER_SURFACE_KIND = "reader_evidence"
+_SELECTION_BATCH_SURFACE_KIND = "selection_batch"
 _DECISION_NAMES = {
     "selected_vec8_summary": 0,
     "score_vs_rank_over_rounds": 10,
+}
+_DECISION_KINDS = {
+    "response_magnitude_feasibility_frontier": 20,
+    "response_magnitude_feasibility_constraint_decomposition": 30,
 }
 _EDA_NAMES = {
     "effect_scaled_vs_logic_fidelity_latest": 0,
@@ -120,6 +125,8 @@ def notebook_visual_group(choice: Mapping[str, Any]) -> tuple[NotebookVisualGrou
 
     if surface_kind in _BASERENDER_SURFACE_KINDS:
         return _GROUPS_BY_KEY["handoff"], 0
+    if surface_kind == _SELECTION_BATCH_SURFACE_KIND:
+        return _GROUPS_BY_KEY["handoff"], -10
     if surface_kind == _READER_SURFACE_KIND:
         return _GROUPS_BY_KEY["assay"], _reader_rank(choice)
     if surface_kind == CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND:
@@ -128,6 +135,8 @@ def notebook_visual_group(choice: Mapping[str, Any]) -> tuple[NotebookVisualGrou
         return _GROUPS_BY_KEY["eda"], 10
     if name in _DECISION_NAMES:
         return _GROUPS_BY_KEY["decision"], _DECISION_NAMES[name]
+    if kind in _DECISION_KINDS:
+        return _GROUPS_BY_KEY["decision"], _DECISION_KINDS[kind]
     if name in _EDA_NAMES:
         return _GROUPS_BY_KEY["eda"], _EDA_NAMES[name]
     if kind in _MODEL_KINDS:

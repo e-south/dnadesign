@@ -61,7 +61,7 @@ from .sfxi_reference_overlay import (
             "as_of_round",
             "run_id",
             "pred__y_hat_model",
-            "pred__score_selected",
+            "view__selection_score",
             "obj__diag__setpoint",
         ],
         notes=["Reads outputs/ledger/predictions + outputs/ledger/runs.parquet (setpoint join)."],
@@ -162,15 +162,21 @@ def render(context, params: dict) -> None:
         "run_id",
         "id",
         "pred__y_hat_model",
-        "sel__is_selected",
-        "pred__score_selected",
+        "view__is_selected",
+        "view__selection_score",
     }
     # If hue/size ask for objective/pred/sel columns, load them from predictions
     need |= event_columns_for(hue_field, size_by)
     # If hue/size/y ask for objective/pred/sel columns, load them from predictions
     # (fold_change is derived locally and won't be added here)
     need |= event_columns_for(hue_field, size_by, y_axis_field)
-    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
+    df = load_events_with_setpoint(
+        outputs_dir,
+        need,
+        round_selector=context.rounds,
+        selection_view_id=context.selection_view_id,
+        run_id=context.run_id,
+    )
 
     # Round selection: single round (default latest)
     rsel = context.rounds
@@ -289,11 +295,11 @@ def render(context, params: dict) -> None:
         y_field_label = math_label("effect_scaled")
         y_title_short = "Effect (scaled)"
         tidy_col = "obj__effect_scaled"
-    elif _ya in ("score", "pred__score_selected"):
-        y_plot = df["pred__score_selected"].astype(float).to_numpy()
+    elif _ya in ("score", "view__selection_score"):
+        y_plot = df["view__selection_score"].astype(float).to_numpy()
         y_field_label = math_label("objective_score")
         y_title_short = "Score"
-        tidy_col = "pred__score_selected"
+        tidy_col = "view__selection_score"
     else:
         raise ValueError(f"Unknown y_axis: {y_axis!r}")
 
@@ -337,8 +343,8 @@ def render(context, params: dict) -> None:
 
     # Selection mask (if present)
     sel_mask = (
-        selected_mask(df["sel__is_selected"], allow_null_false=True).to_numpy()
-        if "sel__is_selected" in df.columns
+        selected_mask(df["view__is_selected"], allow_null_false=True).to_numpy()
+        if "view__is_selected" in df.columns
         else np.zeros(lf.shape[0], dtype=bool)
     )
     not_sel = ~sel_mask

@@ -56,9 +56,10 @@ def build_notebook_plot_method_rows(choice: Mapping[str, Any]) -> list[dict[str,
 
     manifest = mapping(choice.get("manifest"))
     metadata = mapping(manifest.get("metadata"))
+    decision = _plot_decision_metadata(manifest, metadata=metadata)
     capability = mapping(metadata.get("capability")) or mapping(choice.get("capability"))
     kind = str(choice.get("kind") or manifest.get("kind") or "unknown")
-    return [
+    rows = [
         {
             "section": "reading",
             "detail": str(choice.get("caption") or metadata.get("summary") or "No plot description recorded."),
@@ -70,6 +71,14 @@ def build_notebook_plot_method_rows(choice: Mapping[str, Any]) -> list[dict[str,
         {"section": "tidy schema", "detail": join_list(metadata.get("tidy_schema"), sep=", ")},
         {"section": "failure modes", "detail": join_list(metadata.get("failure_modes"), sep="; ")},
     ]
+    if decision is not None:
+        rows[1:1] = [
+            {"section": "premise", "detail": decision["premise"]},
+            {"section": "decision value", "detail": decision["decision_value"]},
+            {"section": "rationale", "detail": decision["rationale"]},
+            {"section": "claim boundary", "detail": decision["non_claim_boundary"]},
+        ]
+    return rows
 
 
 def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, str]:
@@ -84,7 +93,7 @@ def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, 
     rounds = rounds_text(choice.get("rounds"))
     freshness = str(choice.get("freshness") or "unknown")
     warnings = int(choice.get("warning_count") or 0)
-    return {
+    sections = {
         "Read": (f"{title} shows a {kind} view for {rounds}. {rows.get('reading', 'No plot description recorded.')}"),
         "Math": rows.get("math", "No math description recorded."),
         "Data contract": (
@@ -101,6 +110,34 @@ def build_notebook_plot_method_sections(choice: Mapping[str, Any]) -> dict[str, 
             f"Freshness: `{freshness}`. Warnings: `{warnings}`."
         ),
     }
+    if "premise" in rows:
+        sections = {
+            "Read": sections["Read"],
+            "Decision": (
+                f"**Premise.** {rows['premise']}\n\n"
+                f"**Decision use.** {rows['decision value']}\n\n"
+                f"**Rationale.** {rows['rationale']}\n\n"
+                f"**Claim boundary.** {rows['claim boundary']}"
+            ),
+            "Math": sections["Math"],
+            "Data contract": sections["Data contract"],
+        }
+    return sections
+
+
+def _plot_decision_metadata(
+    manifest: Mapping[str, Any],
+    *,
+    metadata: Mapping[str, Any],
+) -> dict[str, str] | None:
+    fields = ("premise", "decision_value", "rationale", "non_claim_boundary")
+    values = {field: str(manifest.get(field) or metadata.get(field) or "").strip() for field in fields}
+    missing = [field for field, value in values.items() if not value]
+    if len(missing) == len(fields) and str(manifest.get("tier") or metadata.get("tier") or "").strip() != "decision":
+        return None
+    if missing:
+        raise ValueError(f"Plot manifest decision metadata is missing required fields: {missing}")
+    return values
 
 
 def _plot_provenance_text(manifest: Mapping[str, Any], *, base: Any | None = None) -> str:

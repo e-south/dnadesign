@@ -1,7 +1,7 @@
 ## OPAL Plots
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-26
+**Last verified:** 2026-07-13
 
 
 Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
@@ -13,6 +13,7 @@ Plot plugins own their rendering, but their public contract is shape-first metad
 
 ```bash
 uv run opal plot --config /path/to/campaign.yaml \
+  [--view selection-view-id] \
   [--plot-config /path/to/plots.yaml] \
   [--round latest|all|3|1,3,7|2-5] \
   [--name my_plot] \
@@ -65,7 +66,7 @@ plots:
 
     # Opaque, plugin-specific params (required for plot knobs)
     params:
-      score_field: "pred__score_selected"  # default selected score field from run_pred
+      score_field: "view__selection_score" # selected view projected from run_pred
       surface_label: "Selected objective score: Score = -MSE(y_hat, target)"
       metric_label: "Score = -MSE(y_hat, target)"  # optional objective-scale axis/notebook label
       legend_metric_label: "negative MSE score"    # optional compact legend label
@@ -88,7 +89,7 @@ plots:
   - name: fold_change_numeric
     preset: fold_change_base
     params:
-      hue: pred__score_selected
+      hue: view__selection_score
       cbar: true
 ```
 
@@ -102,13 +103,16 @@ plots:
   `configured` and `each`; `each` expands from `outputs/ledger/runs.parquet`
   and fails visibly when no run ledger exists. Do not combine `round_variants`
   with `--run-id`.
-- `scatter_score_vs_rank` should use `pred__score_selected` unless you intentionally target another ledger metric.
+- Plot runs project one named selection view from `pred__selection_views`.
+  Multi-view campaigns require `--view`; projected fields use the `view__`
+  prefix, including `view__selection_score`, `view__rank_competition`, and
+  `view__is_selected`.
 - Vector heatmaps are generic vector plots: campaigns should pass display-ready
   `channel_labels`, `value_label`, `reference_mse_metric_label`, and
   `reference_mse_expression` rather than relying on raw channel slugs.
 - Use `enabled: false` to keep a plot entry without running it.
 - Presets merge into each plot entry; entry values override preset values.
-- Inline `plots:` in campaign.yaml is still supported, but `plot_config` keeps runtime config lean.
+- `campaign.yaml` references one `plot_config`; plot definitions do not live inline with runtime configuration.
 - `data:` paths are resolved relative to the plots YAML that declares them.
 - `sfxi_logic_fidelity_closeness` is strict by default (`on_violin_invalid: error`); set
   `params.on_violin_invalid: line` or `params.violin: false` explicitly for small sample sizes.
@@ -141,7 +145,7 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | --- | --- |
 | `name`, `kind` | configured plot instance and registered plot primitive |
 | `status` | `written` or `failed` for current plot attempts; future schemas may add explicit `skipped` or `stale` states |
-| `run_id`, `rounds` | explicit run/round scope used for input resolution |
+| `selection_view_id`, `run_id`, `rounds` | explicit view/run/round scope used for input resolution |
 | `params` | merged plot parameters after defaults and presets |
 | `inputs` | resolved built-in and custom data paths with file size and mtime |
 | `outputs.media` | rendered image/SVG/PDF files |
@@ -150,6 +154,8 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | `quality` | tidy CSV schema validation status when a plot declares `metadata.tidy_schema` |
 | `freshness` | mtime-based freshness summary for resolved inputs and outputs |
 | `caption`, `review_purpose` | manifest-backed human purpose text; plot params can override generic metadata text |
+| `premise`, `decision_value`, `rationale` | the single claim tested, why the view changes a decision, and why this encoding is used |
+| `alt_text`, `non_claim_boundary`, `tier` | accessible visual description, explicit claim limit, and review hierarchy |
 | `warnings`, `error` | structured nonfatal and fatal plot outcomes |
 
 Review and generated notebook surfaces should read manifests first. Extra files
@@ -162,10 +168,42 @@ same `name` and different `rounds` / filename suffixes. Notebook visual
 surfaces group those rows under one plot-level dropdown and expose a second
 manifest-backed plot-scope dropdown only when multiple scopes exist.
 
+Multi-view plot indexes are written under
+`outputs/plots/selection_views/<view>/`. A plot manifest without
+`selection_view_id` is invalid for a multi-view review surface.
+
 Plot capability metadata is the dropdown contract. It records objective family,
 data layer, round behavior, label requirement, model-artifact requirement, and
 tidy-data availability so notebooks can distinguish configured-but-missing,
 generated-current, generated-stale, and stale-unmanifested surfaces.
+
+---
+
+### Response-Magnitude Feasibility decision plots
+
+These plots are operative QA surfaces for campaigns using
+`response_magnitude_feasibility_v1`. They read one unambiguous prediction-ledger
+run and recompute the persisted feasibility score with the canonical public
+math API. A mismatch fails plot generation. They do not read Reader trajectories
+or redefine assay semantics.
+
+- **`response_magnitude_feasibility_frontier`**: plots raw response separation against
+  minimum target-ON reference-relative magnitude. Color is the signed
+  target-OFF constraint `z_off = (tau_off - b_off) / s_off`, dashed lines are the configured response and ON
+  boundaries, and outlined diamonds are selected candidates. This is the
+  primary candidate-universe view.
+- **`response_magnitude_feasibility_constraint_decomposition`**: shows selected
+  candidates by `z_response`, `z_on`, `z_off`, and `min(z)`. Zero is the pass
+  boundary for each requirement, and the feasibility column must equal the
+  row-wise minimum of the first three columns. This is the primary
+  handoff-review view.
+
+Both plots require the active selection view's `selection.params.score_ref` to
+be `feasibility_margin`. Their default labels remain
+assay-neutral; study plot configs should provide exact response and
+reference-relative fluorescence labels when the Reader handoff declares those
+quantities. Predicted feasibility is decision support, not measured promoter
+behavior.
 
 ---
 
@@ -205,7 +243,7 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
     objective scale. For example, negative MSE scores can fix zero as the best
     possible score while still making small null spikes visible in their full
     objective-scale context.
-  - `pred__score_selected` is the selected score from the configured objective.
+  - `view__selection_score` is the selected score from the projected selection view.
     Its units are objective-specific; compare it within compatible campaigns,
     not as a shared effect-size scale across unrelated label families.
   - `band: iqr` is a within-campaign cohort distribution band, not a
@@ -356,16 +394,16 @@ from ..registries.plots import PlotMeta, register_plot
 )
 def render(context, params):
     # context: campaign_dir, workspace, rounds, data_paths, output_dir, filename, dpi, format, logger, save_data
-    # - Read from context.data_paths (e.g., "records", your custom sources)
+    # - Read from context.data_paths (e.g., "records" or declared custom sources)
     # - Ledger sinks live under context.workspace.outputs_dir
     # - Build tidy DataFrame(s)
-    # - Plot with matplotlib/seaborn (your call)
+    # - Plot with matplotlib/seaborn
     # - Save to context.output_dir / context.filename
     # - Optionally write tidy CSV via context.save_df(df) if context.save_data
     ...
 ```
 
-2. In your campaign YAML, add:
+2. Add the plot instance to the campaign YAML:
 
 ```yaml
 plots:

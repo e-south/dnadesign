@@ -116,8 +116,7 @@ def test_progress_json_summary(tmp_path):
     assert out["round_count"] == 1
     assert out["locks"]["campaign"]["scope"] == "local_host"
     assert "warnings" in out
-    assert out["event_contract"]["legacy_events"] == 5
-    assert out["event_contract"]["run_events"] == 0
+    assert out["event_contract"]["run_events"] == 5
     assert out["event_contract"]["aborted_rounds"] == []
     assert "run_scope" in out["rounds"][0]["summary"]
     assert out["rounds"][0]["predict"]["rows"] == 2

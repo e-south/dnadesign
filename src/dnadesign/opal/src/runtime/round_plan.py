@@ -69,8 +69,12 @@ def plan_round(
     eligibility_filtered_out = total_before_eligibility - int(len(cand_df))
     total_before = int(len(cand_df))
 
-    sel_params = dict(cfg.selection.selection.params)
-    exclude_already_labeled = bool(sel_params.get("exclude_already_labeled", True))
+    exclusion_policies = {
+        bool(view.selection.params.get("exclude_already_labeled", True)) for view in cfg.selection_views
+    }
+    if len(exclusion_policies) != 1:
+        raise ValueError("all selection views must share exclude_already_labeled")
+    exclude_already_labeled = exclusion_policies.pop()
     if exclude_already_labeled:
         labeled_ids = (
             source.labeled_id_set_leq_round(df, int(as_of_round))

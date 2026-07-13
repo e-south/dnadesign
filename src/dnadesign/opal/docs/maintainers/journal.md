@@ -1,10 +1,30 @@
 ## OPAL Dev Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-12
 
 
 This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
+
+### 2026-07-10 SFXI uncertainty clipping correction
+
+What changed:
+- Removed the analytical uncertainty approximation from the accepted SFXI configuration and runtime contract.
+- Made `delta` the sole method and the default when model standard deviations are available.
+- Applied the chain rule through the actual score clips: logic derivatives are zero outside `(0, 1)`, and effect derivatives are zero outside `(0, denominator)`.
+- Added deterministic clipping tests and a seeded local Monte Carlo comparison.
+
+Why:
+- The analytical approximation recorded below did not implement every nonlinear branch of the score and could report nonzero uncertainty where clipping made SFXI locally constant.
+- Expected-improvement selection requires uncertainty for the score that is actually ranked. SFXI now emits zero where the clipped score is locally constant, and EI rejects that zero rather than accepting a numerically positive but mismatched estimate.
+
+Compatibility decision:
+- There is no compatibility alias. Configurations that explicitly request `analytical` fail validation and must use `delta`.
+- Runs without model standard deviations are unchanged; current stress campaigns use `top_n`, so their persisted rankings are unchanged.
+
+Validation:
+- Objective and configuration regression tests cover the sole-method contract, clipping, exact-setpoint cusp, and local Monte Carlo agreement.
+- The canonical SFXI reference documents the superseding uncertainty contract; the 2026-02-20 entry remains below as historical context.
 
 ### 2026-02-23 EI tie-break ordering by predicted score
 

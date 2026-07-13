@@ -1,372 +1,204 @@
-## OPAL Configuration (v2)
+## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+**Last verified:** 2026-07-13
 
+`campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
+keys. There is no compatibility parser.
 
-This page documents the `campaign.yaml` configuration contract used by OPAL runtime and CLI commands.
-Use it as the source of truth for required keys, defaults, and model/objective/selection wiring.
+The central invariant is:
 
-### Key blocks
+> A campaign owns learning; a selection view owns a target; a selection batch owns the logical union.
 
-`configs/campaign.yaml` is organized into these top-level blocks:
+### Ontology
 
-- `campaign`: `name`, `slug`, `workdir`, optional `description`, optional `metadata`
-- `ownership`: optional owner metadata for non-portable study fixtures
-- `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`,
-  optional `candidate_scope`
-- `candidate_eligibility`: optional pre-selection rule block for generic
-  candidate-level exclusion contracts
-- `labels`: optional training-label source contract; defaults to
-  campaign-scoped label history
-- `transforms_x`: `{ name, params }` (raw X -> model-ready X)
-- `transforms_y`: `{ name, params }` (table -> model-ready Y; CSV/Parquet/XLSX)
-- `model`: `{ name, params }`
-- `objectives`: list of `{ name, params }` (one or more objective plugins)
-- `selection`: `{ name, params }`
-- `training`: `policy`
-- `training.y_ops`: list of `{ name, params }`
-- `ingest`: duplicate handling for label CSVs
-- `scoring`: batch sizing
-- `writeback`: prediction writeback policy
-- `safety`: preflight/data guards
-- `plot_config`: optional path to a separate plots YAML
-- `plot_defaults`, `plot_presets`, `plots`: optional plot-only keys when using inline plot config
+- **Campaign:** candidate universe, X, Y, labels, transforms, model, and round
+  history shared by one learning loop.
+- **Selection view:** one objective instance, objective parameters, selector,
+  and top-k policy evaluated from the campaign's shared predictions.
+- **Round:** one immutable label snapshot, one model fit, one prediction pass,
+  and all declared selection views.
+- **Selection set:** rows selected by one view.
+- **Selection batch:** deterministic union of all selection sets, deduplicated
+  by the configured candidate field.
 
-`plot_config` configures review and inspection artifacts. Runtime round
-execution does not depend on plot rendering; failed plots should fail the plot
-command and surface in manifests, not silently change model training,
-prediction, objective scoring, or selection.
+Use separate campaigns only when X, Y, labels, transforms, model, candidate
+universe, or round lifecycle differ. Different target masks or setpoints over
+the same predicted phenotype belong in selection views of one campaign.
 
-### Required v2 selection params
+### Required blocks
 
-`selection.params` is explicit and channel-driven.
+- `schema_version: opal.campaign.v3`
+- `ownership`: `opal_demo` or `study_campaign` with its required identifiers
+- `campaign`: `name`, `slug`, `workdir`
+- `data`: candidate location and X/Y columns
+- `transforms_x`, `transforms_y`, `model`
+- `selection_views`: non-empty list of named objective/selection pairs
 
-- `top_k`: positive integer
-- `score_ref`: `<objective_name>/<score_channel_name>`
-- `objective_mode`: `maximize|minimize`
-- `tie_handling`: `competition_rank|dense_rank|ordinal`
-- `uncertainty_ref`: required when `selection.name: expected_improvement`; must reference a standard-deviation channel
-
-Built-in schemas currently provide defaults for `top_k`, `objective_mode`, and `tie_handling`. For deterministic behavior and clearer reviews, declare all four keys explicitly in YAML.
-
-### Defaults
-
-If an optional block is omitted, OPAL supplies conservative defaults:
-
-- `labels.source.kind`: `campaign_history`
-- `labels.id_column`: `id`; `labels.round_column`: `observed_round`;
-  `labels.batch_column`: `batch_id`; `labels.dedup_policy`: `latest_by_round`
-- `ingest.duplicate_policy`: `error`
-- `scoring.score_batch_size`: `10000`
-- `writeback.prediction_records`: `label_history` for `campaign_history`
-  campaigns; shared `usr_sidecar` campaigns must declare this explicitly
-- `training.policy`: `{}` and `training.y_ops`: `[]`
-- `safety`: fail_on_mixed_biotype_or_alphabet=true, require_biotype_and_alphabet_on_init=true,
-  conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true,
-  accept_x_mismatch=false, max_x_matrix_gib=8.0
-
-`campaign.metadata` is metadata only; it does not change runtime behavior.
-Generated campaign-set notebooks use scalar metadata values as comparison
-facets, so prefer explicit campaign-agnostic keys such as `comparison_group`,
-`response_axis`, or `scenario_kind` over study-private scratch labels.
-
-`ownership` is metadata only; it does not change runtime behavior. Use it to
-make non-portable checked-in configs explicit, for example:
+Study-owned execution uses:
 
 ```yaml
 ownership:
-  owner_scope: study_fixture
+  owner_scope: study_campaign
   study_id: stress_ethanol_cipro_growth
   dataset_id: usr_prom_eth_cip_opal_candidates
   portable: false
 ```
 
-`data.candidate_scope` is an optional scoring-scope contract. Use it when a
-campaign should score a declared ID subset while still reading X from the
-configured candidate `records.parquet`. The scope file must be a `.parquet`,
-`.pq`, or `.csv` table with unique, non-null IDs that all exist in
-`records.parquet`.
+Portable tool examples use `owner_scope: opal_demo`, omit study and dataset
+IDs, and set `portable: true`. Runtime state does not belong in `ownership`;
+read `state.json` and the run ledger instead.
+
+`selection_batch` is optional. If omitted, OPAL deduplicates by `id` and does
+not enforce a cardinality. Declare `expected_unique_count` only when exact
+logical-batch cardinality is part of the method; mismatch is fatal and OPAL
+never fills or discards rows implicitly.
+
+### Selection-view contract
+
+Every view requires a unique slug-like `id` and:
 
 ```yaml
-data:
-  location: { kind: usr, path: src/dnadesign/usr/datasets, dataset: my_dataset }
-  x_column_name: "my_x_column"
-  y_column_name: "my_y_column"
-  candidate_scope:
-    kind: id_list
-    path: scopes/heldout_sigma35_ids.parquet
-    id_column: id
-```
-
-Candidate scopes filter the candidate pool before OPAL excludes already labeled
-IDs. They do not change label-source validation, training labels, or X
-transforms. This is the preferred way to run split-specific campaigns over a
-large shared candidate table without physically copying that table for each
-split.
-
-### Candidate eligibility
-
-`candidate_eligibility` is an optional pre-selection contract. OPAL applies
-these rules after `candidate_scope` and before excluding already-labeled IDs,
-scoring, objective ranking, or selection. Use it for generic, auditable
-candidate exclusion rules that should affect every future round. OPAL records
-input rows, output rows, filtered counts, rule ids, and parameter hashes in
-validation and runtime context reports. A rule that leaves too few candidates
-must fail fast rather than silently changing selection behavior.
-
-The first built-in rule is `restriction_site_exclusion`. It scans the assembled
-insert defined by a study- or campaign-owned strategy and excludes candidates
-with unexpected restriction enzyme motifs. OPAL owns the generic scan/report
-contract; the study owns the concrete cloning strategy, flank sequences, and
-allowed motif regions.
-
-```yaml
-candidate_eligibility:
-  rules:
-    - name: restriction_site_exclusion
+selection_views:
+  - id: ethanol
+    objective:
+      name: response_magnitude_feasibility_v1
+      params: {...}
+    selection:
+      name: top_n
       params:
-        sequence_column: sequence
-        scan_space: final_assembled_insert
-        assembly_strategy_ref: sfxi_promoter_insert:v1
-        left_flank: accgggatcctgcag
-        right_flank: tgagggaattcgcga
-        expected_core_length: 60
-        min_remaining_candidates: 1000
-        forbidden_sites:
-          - enzyme: BamHI
-            motif: GGATCC
-            allowed_regions: [left_flank]
-          - enzyme: EcoRI
-            motif: GAATTC
-            allowed_regions: [right_flank]
+        top_k: 6
+        score_ref: feasibility_margin
+        objective_mode: maximize
+        tie_handling: competition_rank
 ```
 
-For this rule, `sequence_column` must contain the candidate core sequence, not
-a context window or final insert. Flanks must be lowercase `acgt`; motifs are
-uppercase `ACGT`; `scan_space` currently supports only
-`final_assembled_insert`; `on_violation` currently supports only `exclude`.
-Allowed regions are exact flank/core regions. A motif spanning a flank/core
-junction is not allowed unless a future rule explicitly models that region.
+Channel references inside a view are unqualified plugin channel names. OPAL
+namespaces persisted channels as `<selection_view_id>/<channel>`. This permits
+multiple instances of one objective plugin without collisions.
 
-`safety.max_x_matrix_gib` is a fail-fast memory budget for model-ready X batches
-during `opal run`. For `writeback.prediction_records: ledger_only`, OPAL loads
-record metadata without the configured X column, streams candidate X from
-Parquet in `scoring.score_batch_size` batches, and aborts if a single train plus
-score batch would exceed this budget. For
-`writeback.prediction_records: label_history`, OPAL still needs a full records
-frame to rewrite prediction history into `records.parquet`; large candidate
-universes should use `ledger_only` unless record-level prediction writeback is
-explicitly required.
+`expected_improvement` also requires `uncertainty_ref`. The referenced model
+and objective path must emit predictive standard deviation; missing or invalid
+uncertainty is fatal.
 
-Plugin `params` default to `{}`, but plugin names are required.
-Unknown plugin names fail at `opal validate` (registry resolution is strict).
-Duplicate YAML keys fail fast during config parsing (for example, two `objectives:` blocks).
-Analytical `sfxi_v1` uncertainty requires `logic_exponent_beta=1` and `intensity_exponent_gamma=1`; invalid combinations are rejected at config load.
-
-### Semantic wiring (model → objective → selection)
-
-1. The configured label source supplies training `Y` through the requested
-   `--labels-as-of` round.
-2. `model` predicts `y_hat` (and, for GP, predictive standard deviation).
-3. Each objective emits named score channels (and optional uncertainty channels).
-4. `selection.params.score_ref` chooses the score channel used for ranking.
-5. `selection.params.uncertainty_ref` (EI only) chooses the uncertainty standard deviation channel.
-6. `selection.params.objective_mode` must match the selected score channel mode.
-
-### Shared label source example
-
-Use this when multiple campaigns share candidate identity, `X`, and observed
-assay labels, but differ in objective/setpoint/selection settings.
+### Multi-view example
 
 ```yaml
+schema_version: opal.campaign.v3
+
+ownership:
+  owner_scope: study_campaign
+  study_id: example_two_factor_study
+  dataset_id: candidates
+  portable: false
+
+campaign:
+  name: "Two-factor response campaign"
+  slug: two_factor_response
+  workdir: "."
+
+data:
+  location: {kind: usr, path: src/dnadesign/usr/datasets, dataset: candidates}
+  x_column_name: sequence_features
+  y_column_name: response_window_y
+  y_expected_length: 8
+
 labels:
   source:
     kind: usr_sidecar
-    dataset: my_dataset
-    path: _opal/observed_labels.parquet
-  y_space: sfxi_vec8
+    dataset: candidates
+    path: _opal/response_window_observed_labels.parquet
+  y_space: reader_response_window_vector_v1
   id_column: id
   round_column: observed_round
   batch_column: batch_id
   dedup_policy: latest_by_round
+
 writeback:
   prediction_records: ledger_only
-```
 
-`usr_sidecar` label sources must point at the same dataset as
-`data.location.dataset` and must explicitly declare
-`writeback.prediction_records`. Use `ledger_only` when the shared
-`records.parquet` should remain a candidate/X table and prediction outputs
-should live in campaign ledgers. OPAL fails fast rather than falling back to
-campaign-local label history when a configured shared sidecar is missing or
-malformed during `run`/`explain`; `opal validate` reports missing pre-ingest
-sidecars and validates schema when the file exists.
-
-Shared sidecar campaigns also fail closed on generic contamination. Non-empty
-values in the configured current-Y column, campaign-local observed-label entries
-in `opal__<slug>__label_hist`, or any campaign-local label-history entries while
-`writeback.prediction_records: ledger_only` are treated as leakage contract
-errors. `opal status --json` exposes this as `label_source.leakage` without
-loading the configured X column.
-
-### Minimal baseline example (RF + top_n)
-
-Use this example when your objective is already scalar and selection is deterministic.
-
-```yaml
-campaign:
-  name: "My Campaign"
-  slug: "my_campaign"
-  workdir: "src/dnadesign/opal/campaigns/my_campaign_dir"
-
-data:
-  location: { kind: usr, path: src/dnadesign/usr/datasets, dataset: my_dataset }
-  x_column_name: "my_x_column"
-  y_column_name: "my_y_column"
-  y_expected_length: 1
-
-transforms_x: { name: identity, params: {} }
-transforms_y: { name: scalar_from_table_v1, params: {} }
-
-model:
-  name: random_forest
-  params: { n_estimators: 100, random_state: 7 }
-
-objectives:
-  - name: scalar_identity_v1
-    params: {}
-
-selection:
-  name: top_n
-  params:
-    top_k: 12
-    score_ref: "scalar_identity_v1/scalar"
-    objective_mode: maximize
-    tie_handling: competition_rank
-
-training:
-  policy:
-    cumulative_training: true
-    label_cross_round_deduplication_policy: latest_only
-    allow_resuggesting_candidates_until_labeled: true
-```
-
-### Vector target example (RF + one selected channel)
-
-Use this pattern when a study-owned oracle emits a finite numeric target vector,
-such as binary TF-family presence, TF-family counts, or one-vs-rest class
-columns. OPAL treats the columns as generic numeric target channels; biological
-meaning stays in the campaign metadata and source oracle.
-
-```yaml
-data:
-  y_expected_length: 3
-
+transforms_x: {name: identity, params: {}}
 transforms_y:
   name: vector_from_table_v1
   params:
-    value_columns: [tf_lexA_presence, tf_cpxR_presence, tf_baeR_presence]
+    id_column: id
+    value_columns: [r00, r10, r01, r11, b00, b10, b01, b11]
 
 model:
   name: random_forest
-  params: { n_estimators: 100, random_state: 7 }
+  params: {n_estimators: 100, random_state: 7, n_jobs: -1}
 
-objectives:
-  - name: vector_channel_v1
-    params:
-      channel_index: 0
-      channel_name: tf_lexA_presence
-      mode: maximize
+selection_views:
+  - id: factor_a
+    objective:
+      name: response_magnitude_feasibility_v1
+      params:
+        state_ids: ["00", "10", "01", "11"]
+        target_mask: [0, 1, 0, 1]
+        calibration: &calibration
+          response_separation_min: 0.0
+          on_magnitude_min: 0.0
+          off_magnitude_max: 0.0
+          response_separation_scale: 1.0
+          on_magnitude_scale: 1.0
+          off_magnitude_scale: 1.0
+    selection:
+      name: top_n
+      params: {top_k: 6, score_ref: feasibility_margin, objective_mode: maximize, tie_handling: competition_rank}
 
-selection:
-  name: top_n
-  params:
-    top_k: 12
-    score_ref: "vector_channel_v1/tf_lexA_presence"
-    objective_mode: maximize
-    tie_handling: competition_rank
+  - id: factor_b
+    objective:
+      name: response_magnitude_feasibility_v1
+      params:
+        state_ids: ["00", "10", "01", "11"]
+        target_mask: [0, 0, 1, 1]
+        calibration: *calibration
+    selection:
+      name: top_n
+      params: {top_k: 6, score_ref: feasibility_margin, objective_mode: maximize, tie_handling: competition_rank}
+
+selection_batch:
+  deduplicate_by: sequence
+  expected_unique_count: 12
 ```
 
-### Vector target example (RF + target-vector similarity)
+### Shared execution
 
-Use this pattern when the objective is closeness to a declared numeric vector
-rather than one channel. OPAL still treats the labels as a generic finite
-numeric vector; study-specific semantics stay in metadata and docs.
+For each round OPAL:
 
-```yaml
-data:
-  y_expected_length: 4
+1. resolves one label snapshot;
+2. prepares X and Y once;
+3. fits one multi-output model once;
+4. predicts the candidate universe once;
+5. evaluates every selection view from those shared predictions;
+6. writes one selection set per view and one deduplicated selection batch.
 
-transforms_y:
-  name: vector_from_table_v1
-  params:
-    value_columns: [v00, v10, v01, v11]
+Validation rejects duplicate view IDs, qualified or unresolved channel refs,
+plugin-output collisions, unsupported selectors, and view-specific drift in
+already-labeled exclusion policy.
 
-model:
-  name: random_forest
-  params: { n_estimators: 100, random_state: 7 }
+### Candidate and label contracts
 
-objectives:
-  - name: vector_target_similarity_v1
-    params:
-      target_vector: [0, 0, 1, 1]
+`data.candidate_scope` optionally restricts scoring to an ID table without
+copying the candidate table. `candidate_eligibility` applies generic,
+manifested exclusion rules before scoring. Neither surface changes labels or
+rewrites source candidates.
 
-selection:
-  name: top_n
-  params:
-    top_k: 12
-    score_ref: "vector_target_similarity_v1/negative_mse"
-    objective_mode: maximize
-    tie_handling: competition_rank
-```
+`labels.source.kind` is `campaign_history` or `usr_sidecar`. A configured USR
+sidecar must match the candidate dataset and must exist for execution. OPAL does
+not fall back to campaign history. v3 predictions are always ledger-only;
+`writeback.prediction_records` accepts only `ledger_only`.
 
-### UQ example (GP + expected_improvement)
+### Defaults and fail-fast behavior
 
-Use this example when selection must consume both score and uncertainty channels.
+- `ingest.duplicate_policy`: `error`
+- `scoring.score_batch_size`: `10000`
+- `selection_batch.deduplicate_by`: `id`
+- `training.y_ops`: empty
+- safety guards: mixed type/alphabet rejection, duplicate-ID rejection,
+  canonical X validation, and an 8 GiB X-matrix budget
 
-```yaml
-model:
-  name: gaussian_process
-  params:
-    alpha: 1.0e-6
-    normalize_y: true
-    n_restarts_optimizer: 2
-    kernel:
-      name: matern
-      length_scale: 0.5
-      nu: 1.5
-      with_white_noise: true
-
-objectives:
-  - name: sfxi_v1
-    params:
-      setpoint_vector: [0, 0, 0, 1]
-      scaling: { min_n: 1 }
-
-selection:
-  name: expected_improvement
-  params:
-    top_k: 12
-    score_ref: "sfxi_v1/sfxi"
-    uncertainty_ref: "sfxi_v1/sfxi"
-    objective_mode: maximize
-    tie_handling: competition_rank
-    alpha: 1.0
-    beta: 1.0
-```
-
-### Precedence and wiring
-
-Resolution and override rules:
-
-- `campaign.workdir` and `data.location.path` resolve relative to the campaign root (parent of `configs/`), unless absolute.
-- CLI flags override YAML for that invocation:
-  `run --k` overrides `selection.params.top_k`, `run --score-batch-size` overrides `scoring.score_batch_size`,
-  and `ingest-y --transform/--params` overrides `transforms_y`.
-- `--round` is a shared alias across commands; prefer explicit flags in scripts:
-  `ingest-y --observed-round` for label stamping and `run/explain --labels-as-of` for training cutoff.
-- `transforms_y` is ingest-only; training/prediction uses `transforms_x` plus optional `training.y_ops`.
-- `state.json` records resolved config per round; ledger sinks are long-term audit.
-- `plot_config` paths resolve relative to the `configs/campaign.yaml` that declares them.
-- `plot_defaults` / `plot_presets` / `plots` are consumed by `opal plot`; runtime round execution does not read them.
+Unknown plugins, duplicate YAML keys, malformed vectors, missing sidecars,
+non-finite model/objective output, batch underfill, and ledger schema drift are
+errors. Plot rendering is separate from round execution and cannot alter model
+or selection state.

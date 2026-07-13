@@ -24,7 +24,7 @@ OPAL_NOTEBOOK_TEMPLATE_SCHEMA_VERSION = "opal.generated_campaign_review_notebook
 def render_campaign_set_template() -> str:
     """Render the full campaign-set marimo notebook source."""
 
-    return "\n\n".join(
+    return "\n".join(
         (
             render_setup_cells(),
             render_campaign_cells(),

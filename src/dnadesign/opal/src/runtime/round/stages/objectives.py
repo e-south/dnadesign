@@ -72,11 +72,13 @@ def evaluate_objectives(
     diagnostics_by_objective: Dict[str, Dict[str, Any]] = {}
     objective_defs: List[Dict[str, Any]] = []
 
-    for obj_ref in cfg.objectives.objectives:
+    for view in cfg.selection_views:
+        view_id = view.id
+        obj_ref = view.objective
         obj_name_i = obj_ref.name
         obj_params_i = dict(obj_ref.params)
         obj_fn = get_objective(obj_name_i)
-        octx = rctx.for_plugin(category="objective", name=obj_name_i, plugin=obj_fn)
+        octx = rctx.for_plugin(category="objective", name=view_id, plugin=obj_fn)
         try:
             raw_obj = obj_fn(
                 y_pred=Y_hat,
@@ -94,11 +96,11 @@ def evaluate_objectives(
             objective_name=obj_name_i,
             n_rows=len(id_order_pool),
         )
-        diagnostics_by_objective[obj_name_i] = dict(obj_res.diagnostics or {})
+        diagnostics_by_objective[view_id] = dict(obj_res.diagnostics or {})
 
         score_refs_for_obj: List[str] = []
         for channel_name, arr in obj_res.scores_by_name.items():
-            ref = f"{obj_name_i}/{channel_name}"
+            ref = f"{view_id}/{channel_name}"
             if ref in score_channels:
                 raise OpalError(f"Duplicate score channel reference generated: {ref}")
             score_channels[ref] = arr
@@ -107,7 +109,7 @@ def evaluate_objectives(
 
         uncertainty_refs_for_obj: List[str] = []
         for channel_name, arr in obj_res.uncertainty_by_name.items():
-            ref = f"{obj_name_i}/{channel_name}"
+            ref = f"{view_id}/{channel_name}"
             if ref in uncertainty_channels:
                 raise OpalError(f"Duplicate uncertainty channel reference generated: {ref}")
             uncertainty_channels[ref] = arr
@@ -115,7 +117,8 @@ def evaluate_objectives(
 
         objective_defs.append(
             {
-                "name": obj_name_i,
+                "selection_view_id": view_id,
+                "objective_name": obj_name_i,
                 "params": obj_params_i,
                 "score_channels": score_refs_for_obj,
                 "uncertainty_channels": uncertainty_refs_for_obj,
@@ -126,7 +129,7 @@ def evaluate_objectives(
         summary_stats = (obj_res.diagnostics or {}).get("summary_stats", {})
         if isinstance(summary_stats, dict) and summary_stats:
             kvs = format_summary_stats_for_log(summary_stats)
-            log(req.verbose, f"[objective:{obj_name_i}] " + " | ".join(kvs))
+            log(req.verbose, f"[objective:{view_id}:{obj_name_i}] " + " | ".join(kvs))
 
     return ObjectiveEvaluation(
         score_channels=score_channels,

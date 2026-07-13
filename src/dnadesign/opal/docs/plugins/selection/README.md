@@ -1,10 +1,11 @@
 ## OPAL Selection Strategies
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-13
 
 
-This page documents selection plugin contracts, required config fields, and runtime output expectations.
+Selection plugins consume named objective channels and emit ranked candidate
+sets under the contracts below.
 
 ### Built-in strategies
 
@@ -46,9 +47,9 @@ Required outputs:
 OPAL validates selection output types/shapes/finiteness before writeback.
 Tie expansion (`top_k` with `competition_rank` or `dense_rank`) is computed from the plugin-returned `score` vector.
 
-### Config contract (v2)
+### Config contract (v3)
 
-Every selection config must include:
+Every `selection_views[].selection` config must include:
 
 - `top_k`
 - `score_ref`
@@ -82,28 +83,34 @@ Uncertainty-aware acquisition ranking.
 Top-N:
 
 ```yaml
-selection:
-  name: top_n
-  params:
-    top_k: 12
-    score_ref: "scalar_identity_v1/scalar"
-    objective_mode: maximize
-    tie_handling: competition_rank
+selection_views:
+  - id: primary
+    objective: {name: scalar_identity_v1, params: {}}
+    selection:
+      name: top_n
+      params:
+        top_k: 12
+        score_ref: scalar
+        objective_mode: maximize
+        tie_handling: competition_rank
 ```
 
 Expected improvement:
 
 ```yaml
-selection:
-  name: expected_improvement
-  params:
-    top_k: 12
-    score_ref: "sfxi_v1/sfxi"
-    uncertainty_ref: "sfxi_v1/sfxi"
-    objective_mode: maximize
-    tie_handling: competition_rank
-    alpha: 1.0
-    beta: 1.0
+selection_views:
+  - id: primary
+    objective: {name: sfxi_v1, params: {...}}
+    selection:
+      name: expected_improvement
+      params:
+        top_k: 12
+        score_ref: sfxi
+        uncertainty_ref: sfxi
+        objective_mode: maximize
+        tie_handling: competition_rank
+        alpha: 1.0
+        beta: 1.0
 ```
 
 ### See also

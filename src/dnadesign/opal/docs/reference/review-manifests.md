@@ -1,11 +1,11 @@
 ## OPAL Review Manifests
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-20
+**Last verified:** 2026-07-12
 
 
-`opal review` writes a campaign-scoped review bundle under
-`outputs/review/` by default:
+`opal review --view <selection_view_id>` writes one view-scoped review bundle
+under `outputs/review/selection_views/<selection_view_id>/`:
 
 - `manifest.json`
 - `review.md`
@@ -24,7 +24,7 @@ Current review manifests use schema `opal.campaign_review.v1`.
 | --- | --- |
 | `generated_at` | UTC generation timestamp |
 | `campaign` | campaign name, slug, workdir, config path, X column, X contract, and label source |
-| `review_scope` | requested round selector and explicit `run_id` when provided |
+| `review_scope` | selection-view ID, requested round selector, and explicit `run_id` when provided |
 | `run` | resolved round/run metadata from ledgers |
 | `progress` | round-log summary for the selected scope |
 | `selection_preview` | compact selected-candidate preview |
@@ -35,9 +35,9 @@ Current review manifests use schema `opal.campaign_review.v1`.
 
 ### Stale Artifacts
 
-Stale artifacts are files present in the review output directory that are not
+Stale artifacts are files present in a view's review directory that are not
 referenced by the active manifest. This commonly happens after a review is
-rerun with `--no-plots` while old PNGs remain under `outputs/review/plots/`.
+rerun with `--no-plots` while old PNGs remain under that view's `plots/`.
 
 OPAL reports these as warnings instead of deleting them automatically. Deletion
 should be an explicit operator action because review directories may contain
@@ -55,5 +55,6 @@ Missing X columns, noncanonical vector schema, null values, nonfinite values, or
 ragged vectors fail the review. Review should not certify a campaign whose
 candidate/X contract is invalid.
 
-If a round has multiple run IDs, pass `--run-id`. Review and downstream
-notebook surfaces should preserve run scope rather than silently mixing reruns.
+If a campaign has multiple selection views, `--view` is required. If a round
+has multiple run IDs, pass `--run-id`. Review and notebook surfaces preserve
+both scopes rather than silently choosing one.

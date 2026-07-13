@@ -63,7 +63,7 @@ def _setup_artifact_campaign(tmp_path: Path) -> tuple[Path, Path, dict[str, Path
         },
     )
 
-    review_plots_dir = workdir / "outputs" / "review" / "plots"
+    review_plots_dir = workdir / "outputs" / "review" / "selection_views" / "primary" / "plots"
     review_plots_dir.mkdir(parents=True, exist_ok=True)
     stale_review_plot = review_plots_dir / "old_review.png"
     stale_review_plot.write_bytes(b"stale-review-plot")

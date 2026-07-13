@@ -14,8 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
+import polars as pl
 import typer
 
+from ...analysis.ledger import read_selection_view_predictions
 from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.summary import select_run_meta
@@ -44,12 +46,13 @@ from ._common import (
 )
 def verify_outputs(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+    view: str = typer.Option(..., "--view", help="Selection view ID to verify."),
     round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: int or 'latest'."),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to compare."),
     selection_path: Optional[Path] = typer.Option(
         None,
         "--selection-path",
-        help="Optional selection_top_k.csv path (defaults to run artifacts).",
+        help="Explicit selections.parquet audit override (default: run-ledger artifact reference).",
     ),
     eps: float = typer.Option(1e-6, "--eps", help="Mismatch tolerance for numeric comparisons."),
     no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
@@ -71,24 +74,31 @@ def verify_outputs(
         artifacts = run_row.get("artifacts")
         sel_path = selection_path or resolve_selection_path_from_artifacts(artifacts, run_id=run_id)
         if sel_path is None:
-            round_dir = ws.round_dir(as_of_round)
-            candidate = round_dir / "selection" / "selection_top_k.csv"
-            if candidate.exists():
-                sel_path = candidate
-        if sel_path is None:
-            raise OpalError("Could not resolve selection output path; provide --selection-path explicitly.")
+            raise OpalError(
+                "Run ledger is missing the selection/selections.parquet artifact reference. "
+                "Use --selection-path only for an explicit audit override."
+            )
 
         selection_df = read_selection_table(Path(sel_path))
-        ledger_df = reader.read_predictions(
-            columns=["id", "pred__score_selected"],
+        if "selection_view_id" not in selection_df.columns:
+            raise OpalError("Selection data missing selection_view_id.")
+        selection_df = selection_df.loc[selection_df["selection_view_id"].astype(str) == str(view)].copy()
+        if selection_df.empty:
+            raise OpalError(f"Selection artifact contains no rows for selection view {view!r}.")
+        ledger_df = read_selection_view_predictions(
+            ws.ledger_predictions_dir,
+            selection_view_id=view,
+            columns=["id"],
             round_selector=as_of_round,
             run_id=run_id,
-        )
+            runs_df=pl.from_pandas(runs_df),
+        ).to_pandas()
         summary, mismatches = compare_selection_to_ledger(selection_df, ledger_df, eps=eps)
         summary.update(
             {
                 "run_id": run_id,
                 "as_of_round": as_of_round,
+                "selection_view_id": view,
                 "selection_path": str(sel_path),
                 "ledger_rows": int(ledger_df.shape[0]),
             }
@@ -106,6 +116,7 @@ def verify_outputs(
             print_stdout("verify-outputs")
             print_stdout(
                 f"- run_id: {summary['run_id']}  round: {summary['as_of_round']}  "
+                f"view: {summary['selection_view_id']}  "
                 f"selection: {summary['selection_path']}"
             )
             print_stdout(

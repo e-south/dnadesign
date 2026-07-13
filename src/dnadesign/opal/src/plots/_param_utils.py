@@ -78,12 +78,12 @@ def normalize_metric_field(field: Optional[str]) -> Optional[str]:
     s = s.replace(".", "__")  # allow "obj.effect_scaled" style too
     alias = {
         # objective scalar / score
-        "score": "pred__score_selected",
-        "scalar": "pred__score_selected",
-        "objective_scalar": "pred__score_selected",
+        "score": "view__selection_score",
+        "scalar": "view__selection_score",
+        "objective_scalar": "view__selection_score",
         # rank
-        "rank": "sel__rank_competition",
-        "rank_competition": "sel__rank_competition",
+        "rank": "view__rank_competition",
+        "rank_competition": "view__rank_competition",
         # per-row objective diagnostics
         "logic_fidelity": "obj__logic_fidelity",
         "effect_raw": "obj__effect_raw",

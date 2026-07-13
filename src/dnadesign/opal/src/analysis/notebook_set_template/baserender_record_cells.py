@@ -33,11 +33,13 @@ def _selected_record_ids_cell() -> str:
             build_notebook_selected_baserender_record_ids,
             selected_baserender_round,
             selected_campaign_analysis,
+            selected_selection_view_id,
         ):
             _run_id = str(baserender_run_ui.value) if baserender_run_ui is not None else None
             selected_baserender_ids, selected_baserender_status_rows = (
                 build_notebook_selected_baserender_record_ids(
                     selected_campaign_analysis,
+                    selection_view_id=selected_selection_view_id,
                     round_value=selected_baserender_round,
                     run_id=_run_id,
                 )

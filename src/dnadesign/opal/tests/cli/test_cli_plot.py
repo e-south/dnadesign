@@ -292,7 +292,7 @@ def test_metric_over_rounds_highlight_does_not_draw_vertical_round_marker(tmp_pa
                 "name": "metric",
                 "kind": "metric_over_rounds",
                 "params": {
-                    "metric": "pred__score_selected",
+                    "metric": "view__selection_score",
                     "cohort": "selected",
                     "summaries": ["median"],
                     "highlight_round": "latest",
@@ -336,7 +336,7 @@ def test_metric_over_rounds_defaults_to_mean_only_and_preserves_metric_expressio
                 "name": "metric",
                 "kind": "metric_over_rounds",
                 "params": {
-                    "metric": "pred__score_selected",
+                    "metric": "view__selection_score",
                     "cohort": "selected",
                     "metric_label": "Score = -MSE(y_hat, [0, 0, 1, 1])",
                     "legend_metric_label": "negative MSE score",
@@ -514,62 +514,26 @@ def test_plot_cli_list_configured_json_error_when_config_missing():
     assert "Traceback" not in res.stderr
 
 
-def test_stress_sfxi_campaigns_declare_shared_plot_policy() -> None:
-    config_paths = [
-        Path("src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml"),
-        Path("src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/configs/campaign.yaml"),
-        Path("src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/configs/campaign.yaml"),
-    ]
+def test_stress_rmf_campaign_declares_concise_plot_policy() -> None:
+    config_path = Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml")
     expected = {
-        "score_selected_over_rounds": "metric_over_rounds",
-        "score_vs_rank_over_rounds": "scatter_score_vs_rank",
-        "score_threshold_over_rounds": "percent_high_activity_over_rounds",
-        "feature_importance_heatmap": "feature_importance_heatmap",
-        "feature_importance_bars": "feature_importance_bars",
-        "selected_vec8_summary": "vector_summary_heatmap",
-        "fold_change_vs_logic_fidelity_latest": "fold_change_vs_logic_fidelity",
-        "sfxi_observed_logic_closeness_over_rounds": "sfxi_logic_fidelity_closeness",
-        "sfxi_factorial_effects_latest": "sfxi_factorial_effects",
-        "sfxi_setpoint_sweep_latest": "sfxi_setpoint_sweep",
-        "sfxi_support_diagnostics_latest": "sfxi_support_diagnostics",
-        "sfxi_uncertainty_latest": "sfxi_uncertainty",
-        "sfxi_intensity_scaling_latest": "sfxi_intensity_scaling",
+        "rmf_candidate_frontier": "response_magnitude_feasibility_frontier",
+        "rmf_selected_constraints": "response_magnitude_feasibility_constraint_decomposition",
     }
 
-    for path in config_paths:
-        campaign_cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
-        plot_cfg = load_plot_config(
-            campaign_cfg=campaign_cfg,
-            campaign_yaml=path,
-            campaign_dir=path.parent.parent,
-            plot_config_opt=None,
-        )
-        specs = list_configured_plot_specs(
-            plots_cfg=plot_cfg.plots,
-            plot_presets=plot_cfg.plot_presets,
-        )
-        assert {spec["name"]: spec["kind"] for spec in specs} == expected
-        for spec in specs:
-            if spec["name"].endswith("_latest"):
-                assert spec["round_selector"] == "latest"
-                assert spec["round_variants"] == "each"
-                assert "single-round" in spec["tags"]
-            else:
-                assert spec["round_selector"] == "all"
-                assert "round_variants" not in spec
-        entries = {entry["name"]: entry for entry in plot_cfg.plots}
-        score_params = entries["score_selected_over_rounds"]["params"]
-        assert score_params["cohort"] == "selected"
-        assert score_params["summaries"] == ["median", "q25", "q75", "count"]
-        assert score_params["band"] == "iqr"
-        heatmap_params = entries["feature_importance_heatmap"]["params"]
-        assert heatmap_params["order_policy"] == "sort_index"
-        assert heatmap_params["rasterized"] is True
-        assert "top_n" not in heatmap_params
-        assert "sort" not in heatmap_params
-        joined = path.read_text(encoding="utf-8") + "\n" + plot_cfg.source_path.read_text(encoding="utf-8")
-        assert "UMAP" not in joined
-        assert "cluster__ldn_v1__umap" not in joined
+    campaign_cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    plot_cfg = load_plot_config(
+        campaign_cfg=campaign_cfg,
+        campaign_yaml=config_path,
+        plot_config_opt=None,
+    )
+    specs = list_configured_plot_specs(
+        plots_cfg=plot_cfg.plots,
+        plot_presets=plot_cfg.plot_presets,
+    )
+    assert {spec["name"]: spec["kind"] for spec in specs} == expected
+    assert all(spec["round_selector"] == "latest" for spec in specs)
+    assert all(spec["round_variants"] == "each" for spec in specs)
 
 
 def test_plot_cli_accepts_directory(tmp_path):
@@ -577,7 +541,8 @@ def test_plot_cli_accepts_directory(tmp_path):
     workdir.mkdir(parents=True, exist_ok=True)
     records = workdir / "records.parquet"
     write_records(records)
-    campaign = workdir / "campaign.yaml"
+    campaign = workdir / "configs" / "campaign.yaml"
+    campaign.parent.mkdir(parents=True)
     write_campaign_yaml(
         campaign,
         workdir=workdir,
@@ -739,7 +704,7 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
                 "name": "metric",
                 "kind": "metric_over_rounds",
                 "params": {
-                    "metric": "pred__score_selected",
+                    "metric": "view__selection_score",
                     "cohort": "selected",
                     "summaries": ["median", "q25", "q75"],
                     "band": "iqr",

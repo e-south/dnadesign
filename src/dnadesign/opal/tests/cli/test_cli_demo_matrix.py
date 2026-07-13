@@ -62,7 +62,7 @@ def test_run_cli_quiet_treats_zero_typer_exit_as_success() -> None:
 
 
 def test_demo_matrix_base_records_x_contract_is_canonical() -> None:
-    records_path = demo_matrix_cmd._campaigns_root() / "demo" / "records.parquet"
+    records_path = demo_matrix_cmd._campaigns_root() / demo_matrix_cmd.DEMO_RECORDS_SOURCE / "records.parquet"
     report = validate_x_parquet_column(records_path, x_column=DEMO_X_COLUMN)
     x_type = pq.ParquetFile(records_path).schema_arrow.field(DEMO_X_COLUMN).type
 

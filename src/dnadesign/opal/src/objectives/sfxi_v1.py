@@ -101,17 +101,18 @@ def _parse_scaling_cfg(raw: Any) -> Tuple[int, int, float]:
     return p, min_n, eps
 
 
-def _resolve_uncertainty_method(raw: Any, *, beta: float, gamma: float) -> str:
+def _resolve_uncertainty_method(raw: Any) -> str:
     method = None if raw is None else str(raw).strip().lower()
     if method is None:
-        method = "analytical" if (beta == 1.0 and gamma == 1.0) else "delta"
-    if method not in {"delta", "analytical"}:
-        raise ValueError("sfxi_v1: uncertainty_method must be 'delta' or 'analytical'.")
-    if method == "analytical" and not (beta == 1.0 and gamma == 1.0):
+        return "delta"
+    if method == "analytical":
         raise ValueError(
-            "sfxi_v1: analytical uncertainty requires logic_exponent_beta == 1 and intensity_exponent_gamma == 1."
+            "sfxi_v1: analytical uncertainty is not supported because it does not "
+            "match the clipped nonlinear SFXI score; use 'delta'."
         )
-    return method
+    if method != "delta":
+        raise ValueError("sfxi_v1: uncertainty_method must be 'delta'.")
+    return "delta"
 
 
 def _sample_index_pairs(mask: np.ndarray, *, max_items: int = 5) -> list[tuple[int, int]]:
@@ -148,18 +149,18 @@ def _validate_required_y_pred_std_strictly_positive(
     )
 
 
-def _validate_scalar_uncertainty_strictly_positive(*, scalar_uncertainty: np.ndarray, context: str) -> None:
+def _validate_scalar_uncertainty_nonnegative(*, scalar_uncertainty: np.ndarray, context: str) -> None:
     vals = np.asarray(scalar_uncertainty, dtype=float).reshape(-1)
     if not np.all(np.isfinite(vals)):
         raise ValueError(f"sfxi_v1: {context} scalar uncertainty contains non-finite values.")
-    bad = vals <= 0.0
+    bad = vals < 0.0
     if not np.any(bad):
         return
     count = int(np.sum(bad))
     sample_rows = [int(i) for i in np.where(bad)[0][:5].tolist()]
     min_value = float(np.min(vals[bad]))
     raise ValueError(
-        f"sfxi_v1: {context} scalar uncertainty must be > 0 for all candidates; "
+        f"sfxi_v1: {context} scalar uncertainty must be >= 0 for all candidates; "
         f"found {count} violations; sample_rows={sample_rows}; min_value={min_value:.6g}."
     )
 
@@ -214,6 +215,8 @@ def _scalar_uncertainty_delta(
     if np.isfinite(D) and D > 0.0:
         active_logic = dist > 1e-12
         dF_dv[active_logic, :] = -(v_hat[active_logic, :] - setpoint[None, :]) / (D * dist_safe[active_logic, None])
+    logic_clip_active = (y_pred[:, 0:4] > 0.0) & (y_pred[:, 0:4] < 1.0)
+    dF_dv *= logic_clip_active
 
     logic_prefactor = _power_derivative_prefactor(
         base=F_logic,
@@ -230,7 +233,9 @@ def _scalar_uncertainty_delta(
         y_lin = np.power(2.0, y_star) - delta
         positive_intensity = y_lin > 0.0
         dEraw_dy = np.log(2.0) * np.power(2.0, y_star) * positive_intensity * w[None, :]
-        dEscaled_dy = dEraw_dy / float(denom)
+        E_raw_local = np.sum(np.maximum(y_lin, 0.0) * w[None, :], axis=1)
+        effect_clip_active = (E_raw_local > 0.0) & (E_raw_local < float(denom))
+        dEscaled_dy = (dEraw_dy / float(denom)) * effect_clip_active[:, None]
         intensity_prefactor = _power_derivative_prefactor(
             base=E_scaled,
             exponent=gamma,
@@ -255,72 +260,9 @@ def _scalar_uncertainty_delta(
             )
     with np.errstate(invalid="ignore"):
         scalar_uncertainty = np.sqrt(scalar_uncertainty_var)
-    _validate_scalar_uncertainty_strictly_positive(
+    _validate_scalar_uncertainty_nonnegative(
         scalar_uncertainty=scalar_uncertainty,
         context="delta",
-    )
-    return scalar_uncertainty
-
-
-def _scalar_uncertainty_analytical(
-    *,
-    y_pred: np.ndarray,
-    y_pred_var: np.ndarray,
-    v_hat: np.ndarray,
-    w: np.ndarray,
-    denom: float,
-    setpoint: np.ndarray,
-    delta: float,
-    intensity_disabled: bool,
-) -> np.ndarray:
-    # Analytical uncertainty formula updated to reflect lognormal distribution usage
-    logic_mean = np.asarray(v_hat, dtype=float)
-    logic_var = np.asarray(y_pred_var[:, 0:4], dtype=float)
-    if intensity_disabled:
-        effect_var = np.zeros(y_pred.shape[0], dtype=float)
-        effect_exp = np.ones(y_pred.shape[0], dtype=float)
-    else:
-        ln2 = np.log(2.0)
-        var_ln = (ln2**2) * y_pred_var[:, 4:8]
-        mean_ln = ln2 * y_pred[:, 4:8]
-
-        effect_var_unwt = (np.exp(var_ln) - 1.0) * np.exp(2.0 * mean_ln + var_ln)
-        effect_var_unsc = np.sum(np.multiply(effect_var_unwt, w**2), axis=1)
-        effect_var = effect_var_unsc / (denom**2)
-        effect_exp = (
-            np.sum(
-                np.multiply(
-                    np.exp(mean_ln + (var_ln / 2.0)),
-                    w,
-                ),
-                axis=1,
-            )
-            / denom
-        )
-
-    D = float(worst_corner_distance(setpoint))
-    if not np.isfinite(D) or D <= 0.0:
-        raise ValueError("sfxi_v1: invalid setpoint distance for analytical uncertainty.")
-    c = 1.0 / (D**2)
-    lf_var_unsc = (
-        4.0 * (logic_mean**2) * logic_var
-        + 4.0 * (setpoint[None, :] ** 2) * logic_var
-        + 2.0 * (logic_var**2)
-        - 8.0 * logic_mean * setpoint[None, :] * logic_var
-    )
-    lf_var = c * np.sum(lf_var_unsc, axis=1)
-    lf_exp = c * np.sum(
-        logic_mean**2 + logic_var - (2.0 * logic_mean * setpoint[None, :]) + setpoint[None, :] ** 2,
-        axis=1,
-    )
-    scalar_uncertainty_var = effect_var * lf_var + effect_var * (lf_exp**2) + lf_var * (effect_exp**2)
-    if not np.all(np.isfinite(scalar_uncertainty_var)):
-        raise ValueError("sfxi_v1: computed scalar uncertainty variance contains non-finite values.")
-    with np.errstate(invalid="ignore"):
-        scalar_uncertainty = np.sqrt(scalar_uncertainty_var)
-    _validate_scalar_uncertainty_strictly_positive(
-        scalar_uncertainty=scalar_uncertainty,
-        context="analytical",
     )
     return scalar_uncertainty
 
@@ -343,9 +285,8 @@ def sfxi_v1(
     train_view=None,
     y_pred_std=None,
 ) -> ObjectiveResultV2:
-    # assert y_pred dims
-    if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8):
-        raise ValueError(f"sfxi_v1: expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
+    if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] == 8):
+        raise ValueError(f"sfxi_v1: expected exactly 8 y_pred columns; got {getattr(y_pred, 'shape', None)}.")
     if not np.all(np.isfinite(y_pred)):
         raise ValueError("sfxi_v1: y_pred must be finite.")
     y_pred_std = np.asarray(y_pred_std, dtype=float) if y_pred_std is not None else None
@@ -446,37 +387,28 @@ def sfxi_v1(
     }
 
     uncertainty_method: Optional[str] = None
+    requested_uncertainty_method = params.get("uncertainty_method", None)
+    if requested_uncertainty_method is not None:
+        _resolve_uncertainty_method(requested_uncertainty_method)
 
     # ---- scalar uncertainty (selected method over implemented score function) ----
     if y_pred_var is not None:
-        uncertainty_method = _resolve_uncertainty_method(params.get("uncertainty_method", None), beta=beta, gamma=gamma)
-        if uncertainty_method == "delta":
-            scalar_uncertainty = _scalar_uncertainty_delta(
-                y_pred=y_pred,
-                y_pred_var=y_pred_var,
-                v_hat=v_hat,
-                y_star=y_star,
-                setpoint=setpoint,
-                w=w,
-                beta=beta,
-                gamma=gamma,
-                delta=delta,
-                denom=float(denom),
-                F_logic=F_logic,
-                E_scaled=E_scaled,
-                intensity_disabled=bool(intensity_disabled),
-            )
-        else:
-            scalar_uncertainty = _scalar_uncertainty_analytical(
-                y_pred=y_pred,
-                y_pred_var=y_pred_var,
-                v_hat=v_hat,
-                w=w,
-                denom=denom,
-                setpoint=setpoint,
-                delta=delta,
-                intensity_disabled=bool(intensity_disabled),
-            )
+        uncertainty_method = _resolve_uncertainty_method(requested_uncertainty_method)
+        scalar_uncertainty = _scalar_uncertainty_delta(
+            y_pred=y_pred,
+            y_pred_var=y_pred_var,
+            v_hat=v_hat,
+            y_star=y_star,
+            setpoint=setpoint,
+            w=w,
+            beta=beta,
+            gamma=gamma,
+            delta=delta,
+            denom=float(denom),
+            F_logic=F_logic,
+            E_scaled=E_scaled,
+            intensity_disabled=bool(intensity_disabled),
+        )
     else:
         scalar_uncertainty = None
     ctx.set(

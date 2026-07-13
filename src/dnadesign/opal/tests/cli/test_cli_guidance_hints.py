@@ -63,7 +63,7 @@ def test_explain_surfaces_sfxi_round_label_preflight_warning(tmp_path: Path) -> 
     init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
     assert init_res.exit_code == 0, init_res.stdout
 
-    explain_res = runner.invoke(app, ["--no-color", "explain", "-c", str(campaign), "--labels-as-of", "0"])
+    explain_res = runner.invoke(app, ["--no-color", "explain", "-c", str(campaign), "--round", "0"])
     assert explain_res.exit_code == 0, explain_res.stdout
     assert "Run preflight" in explain_res.stdout
     assert "current-round labels" in explain_res.stdout

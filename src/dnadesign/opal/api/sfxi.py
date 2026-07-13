@@ -58,6 +58,7 @@ SFXI_REFERENCE_OVERLAY_FIELDS = (
     "intensity_disabled",
     "flat_logic",
 )
+_MAX_LOG2_FOR_SCORE = float(np.log2(np.finfo(float).max)) - 1.0
 
 
 @dataclass(frozen=True)
@@ -156,22 +157,12 @@ def score_vec8(
     scaling_pool = candidates if scaling_vec8 is None else _coerce_vec8(scaling_vec8, name="scaling_vec8")
     setpoint, percentile, min_n, eps, beta, gamma, delta = _parse_config(config)
 
-    v_hat = np.clip(candidates[:, 0:4].astype(float), 0.0, 1.0)
-    y_star = candidates[:, 4:8].astype(float)
     pool_y_star = scaling_pool[:, 4:8].astype(float)
-
-    logic_fidelity = sfxi_math.logic_fidelity(v_hat, setpoint)
-    effect_raw, weights = sfxi_math.effect_raw_from_y_star(
-        y_star,
-        setpoint,
-        delta=delta,
-        eps=eps,
-        state_order=SFXI_STATE_ORDER,
-    )
+    _validate_intensity_log2_range(pool_y_star, context="scaling_vec8")
+    weights = sfxi_math.weights_from_setpoint(setpoint, eps=eps)
     intensity_disabled = bool(not np.any(weights))
     if intensity_disabled:
         denom = 1.0
-        effect_scaled = np.ones(candidates.shape[0], dtype=float)
     else:
         denom = sfxi_math.denom_from_labels(
             pool_y_star,
@@ -182,8 +173,73 @@ def score_vec8(
             eps=eps,
             state_order=SFXI_STATE_ORDER,
         )
-        effect_scaled = sfxi_math.effect_scaled(effect_raw, denom)
+    return _score_vec8_with_resolved_denom(
+        candidates,
+        setpoint=setpoint,
+        percentile=percentile,
+        eps=eps,
+        beta=beta,
+        gamma=gamma,
+        delta=delta,
+        denom=denom,
+    )
 
+
+def score_vec8_with_denom(
+    vec8: np.ndarray | Sequence[Sequence[float]],
+    config: SFXIScoringConfig,
+    *,
+    denom: float,
+) -> SFXIScoringResult:
+    """Score vec8 rows against an explicitly persisted SFXI denominator.
+
+    Use this for ledger audits and deterministic reranks where the objective
+    denominator is already part of the run context. New OPAL rounds should use
+    :func:`score_vec8` so the denominator is derived from observed labels.
+    """
+
+    candidates = _coerce_vec8(vec8, name="vec8")
+    setpoint, percentile, _min_n, eps, beta, gamma, delta = _parse_config(config)
+    if not np.isfinite(denom) or float(denom) <= 0.0:
+        raise ValueError(f"sfxi_v1: denom must be positive and finite; got {denom}.")
+    return _score_vec8_with_resolved_denom(
+        candidates,
+        setpoint=setpoint,
+        percentile=percentile,
+        eps=eps,
+        beta=beta,
+        gamma=gamma,
+        delta=delta,
+        denom=float(denom),
+    )
+
+
+def _score_vec8_with_resolved_denom(
+    candidates: np.ndarray,
+    *,
+    setpoint: np.ndarray,
+    percentile: int,
+    eps: float,
+    beta: float,
+    gamma: float,
+    delta: float,
+    denom: float,
+) -> SFXIScoringResult:
+    v_hat = np.clip(candidates[:, 0:4].astype(float), 0.0, 1.0)
+    y_star = candidates[:, 4:8].astype(float)
+    _validate_intensity_log2_range(y_star, context="vec8")
+    logic_fidelity = sfxi_math.logic_fidelity(v_hat, setpoint)
+    effect_raw, weights = sfxi_math.effect_raw_from_y_star(
+        y_star,
+        setpoint,
+        delta=delta,
+        eps=eps,
+        state_order=SFXI_STATE_ORDER,
+    )
+    intensity_disabled = bool(not np.any(weights))
+    effect_scaled = (
+        np.ones(candidates.shape[0], dtype=float) if intensity_disabled else sfxi_math.effect_scaled(effect_raw, denom)
+    )
     sfxi = np.power(logic_fidelity, beta) * np.power(effect_scaled, gamma)
     return SFXIScoringResult(
         logic_fidelity=np.asarray(logic_fidelity, dtype=float).ravel(),
@@ -197,6 +253,15 @@ def score_vec8(
         clip_hi_mask=np.asarray(effect_scaled >= 1.0 - 1.0e-12, dtype=bool).ravel(),
         intensity_disabled=intensity_disabled,
     )
+
+
+def _validate_intensity_log2_range(values: np.ndarray, *, context: str) -> None:
+    if np.any(np.asarray(values, dtype=float) > _MAX_LOG2_FOR_SCORE):
+        observed = float(np.max(values))
+        raise ValueError(
+            "sfxi_v1: intensity log2 values exceed stable score range "
+            f"in {context} (max allowed {_MAX_LOG2_FOR_SCORE:.1f}, observed {observed:.1f})."
+        )
 
 
 def to_sfxi_reference_overlay_records(
@@ -441,6 +506,7 @@ __all__ = [
     "SFXIScoringConfig",
     "SFXIScoringResult",
     "score_vec8",
+    "score_vec8_with_denom",
     "to_sfxi_reference_overlay_records",
     "validate_sfxi_reference_overlay_records",
 ]

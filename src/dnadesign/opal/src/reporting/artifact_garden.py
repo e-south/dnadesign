@@ -34,14 +34,15 @@ def build_artifact_garden_audit(config_path: str | Path | None) -> dict[str, Any
     active_manifests: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
 
-    review_manifest_path = ws.outputs_dir / "review" / "manifest.json"
-    if review_manifest_path.exists():
-        _collect_review_manifest(
-            review_manifest_path,
-            referenced_paths=referenced_paths,
-            active_manifests=active_manifests,
-            warnings=warnings,
-        )
+    for view in cfg.selection_views:
+        review_manifest_path = ws.outputs_dir / "review" / "selection_views" / view.id / "manifest.json"
+        if review_manifest_path.exists():
+            _collect_review_manifest(
+                review_manifest_path,
+                referenced_paths=referenced_paths,
+                active_manifests=active_manifests,
+                warnings=warnings,
+            )
 
     plot_manifest_path = ws.outputs_dir / "plots" / "plot_manifest.json"
     if plot_manifest_path.exists():
@@ -51,10 +52,19 @@ def build_artifact_garden_audit(config_path: str | Path | None) -> dict[str, Any
             active_manifests=active_manifests,
             warnings=warnings,
         )
+    for view in cfg.selection_views:
+        view_plot_manifest_path = ws.outputs_dir / "plots" / "selection_views" / view.id / "plot_manifest.json"
+        if view_plot_manifest_path.exists():
+            _collect_plot_manifest_index(
+                view_plot_manifest_path,
+                referenced_paths=referenced_paths,
+                active_manifests=active_manifests,
+                warnings=warnings,
+            )
 
     stale_artifacts: list[dict[str, Any]] = []
     scan_roots = [
-        ("review_plots", ws.outputs_dir / "review" / "plots"),
+        ("review_plots", ws.outputs_dir / "review" / "selection_views"),
         ("configured_plots", ws.outputs_dir / "plots"),
     ]
     for scope, root in scan_roots:
@@ -132,7 +142,7 @@ def prune_stale_artifacts(
 
     workdir = Path(str(audit["root"])).resolve()
     allowed_roots = [
-        workdir / "outputs" / "review" / "plots",
+        workdir / "outputs" / "review" / "selection_views",
         workdir / "outputs" / "plots",
     ]
     deleted_paths: list[str] = []

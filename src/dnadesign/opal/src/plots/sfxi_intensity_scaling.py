@@ -84,14 +84,16 @@ def render(context, params: dict) -> None:
     if labels_vec is None:
         raise OpalError("Invalid label vectors (expected length-8 values).", ExitCodes.CONTRACT_VIOLATION)
 
-    setpoint = parse_setpoint_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
-    beta, gamma = parse_exponents_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
+    run_rows = runs_df.filter(pl.col("as_of_round") == int(round_k))
+    setpoint = parse_setpoint_from_runs(run_rows, selection_view_id=context.selection_view_id)
+    beta, gamma = parse_exponents_from_runs(run_rows, selection_view_id=context.selection_view_id)
 
     pool_vec = None
     if include_pool:
         pred_df = load_predictions_with_setpoint(
             outputs_dir,
             {"pred__y_hat_model"},
+            selection_view_id=context.selection_view_id,
             round_selector=round_k,
             run_id=run_id,
             require_run_id=False,

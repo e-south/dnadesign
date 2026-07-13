@@ -49,7 +49,7 @@ def render_record_report_text(report: Mapping[str, Any]) -> str:
             f"r={r.get('as_of_round')}",
             f"run_id={_truncate(r.get('run_id', ''), 18)}",
         ]
-        for k in ("sel__is_selected", "sel__rank_competition", "pred__score_selected"):
+        for k in ("view__is_selected", "view__rank_competition", "view__selection_score"):
             if k in r:
                 parts.append(f"{k.split('__', 1)[-1]}={r[k]}")
         lines.append(", ".join(parts))

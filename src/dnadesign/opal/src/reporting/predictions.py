@@ -43,3 +43,33 @@ def read_campaign_predictions(
             ExitCodes.BAD_ARGS,
         )
     return frame.to_pandas()
+
+
+def read_campaign_selection_view_predictions(
+    config_path: Path | None,
+    *,
+    selection_view_id: str,
+    columns: Sequence[str] | None = None,
+    round_selector: str | None = "latest",
+    run_id: str | None = None,
+    require_run_id: bool = True,
+) -> pd.DataFrame:
+    """Read one named selection view through OPAL's run-aware ledger contract."""
+
+    analysis = CampaignAnalysis.from_config_path(config_path, allow_dir=True)
+    frame = analysis.read_selection_view_predictions(
+        selection_view_id=selection_view_id,
+        columns=columns,
+        round_selector=round_selector,
+        run_id=run_id,
+        require_run_id=require_run_id,
+    )
+    if frame.is_empty():
+        raise OpalError(
+            f"outputs/ledger/predictions had zero rows for selection view {selection_view_id!r}.",
+            ExitCodes.BAD_ARGS,
+        )
+    return frame.to_pandas()
+
+
+__all__ = ["read_campaign_predictions", "read_campaign_selection_view_predictions"]

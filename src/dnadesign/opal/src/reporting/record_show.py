@@ -15,7 +15,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import pandas as pd
+import polars as pl
 
+from ..analysis.ledger import read_selection_view_predictions
 from ..storage.data_access import RecordsStore
 from ..storage.ledger import LedgerReader
 
@@ -37,6 +39,7 @@ def build_record_report(
     ledger_reader: Optional[LedgerReader] = None,
     records_path: Optional[Path] = None,
     run_id: Optional[str] = None,
+    selection_view_id: str,
 ) -> Dict[str, Any]:
     if id_ is None and sequence is None:
         raise ValueError("Provide id or sequence.")
@@ -87,7 +90,7 @@ def build_record_report(
     avg_rank_comp: Optional[float] = None
 
     if ledger_reader is None:
-        raise ValueError("Ledger reader is required for record_show (legacy sinks are no longer supported).")
+        raise ValueError("record_show requires a ledger reader.")
     needed_cols = [
         "event",
         "as_of_round",
@@ -95,16 +98,20 @@ def build_record_report(
         "id",
         "sequence",
         "pred__y_dim",
-        "pred__score_selected",
-        "sel__rank_competition",
-        "sel__is_selected",
+        "view__selection_score",
+        "view__rank_competition",
+        "view__is_selected",
     ]
-    out = ledger_reader.read_predictions(
+    runs = ledger_reader.read_runs()
+    out = read_selection_view_predictions(
+        ledger_reader.paths.predictions_dir,
+        selection_view_id=selection_view_id,
         columns=needed_cols,
-        id_value=rid,
         run_id=run_id,
         round_selector="all",
-    )
+        runs_df=pl.from_pandas(runs),
+        row_filters=[{"column": "id", "op": "eq", "value": rid}],
+    ).to_pandas()
     out = out[out.get("event") == "run_pred"] if not out.empty else out
 
     report["runs"] = out.to_dict(orient="records")
@@ -119,17 +126,17 @@ def build_record_report(
             pass
 
     # Rank summaries (competition rank). Robust to missing col.
-    if "sel__rank_competition" in out.columns and not out.empty:
+    if "view__rank_competition" in out.columns and not out.empty:
         try:
             lr = int(out["as_of_round"].max())
             latest = out[out["as_of_round"] == lr]
             latest = latest.sort_values(["run_id"]).tail(1)
-            v = latest["sel__rank_competition"].iloc[0]
+            v = latest["view__rank_competition"].iloc[0]
             latest_rank_comp = int(v) if pd.notna(v) else None
         except Exception:
             latest_rank_comp = None
         try:
-            avg_rank_comp = float(pd.to_numeric(out["sel__rank_competition"], errors="coerce").dropna().mean())
+            avg_rank_comp = float(pd.to_numeric(out["view__rank_competition"], errors="coerce").dropna().mean())
         except Exception:
             avg_rank_comp = None
 

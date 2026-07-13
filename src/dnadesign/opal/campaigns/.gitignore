@@ -5,6 +5,7 @@
 
 # Local campaign-scoped data copies used for demo runs
 **/records.parquet
+!demo_rf_sfxi_topn/records.parquet
 
 # macOS metadata
 .DS_Store

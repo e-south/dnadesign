@@ -1,7 +1,7 @@
 ## SPOP Scalar Objective `spop_v1`
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-26
+**Last verified:** 2026-07-12
 
 `spop_v1` ranks candidates by a predicted SPOP endpoint scalar.
 
@@ -52,17 +52,16 @@ transforms_y:
   name: scalar_from_table_v1
   params: {}
 
-objectives:
-  - name: spop_v1
-    params: {}
-
-selection:
-  name: top_n
-  params:
-    top_k: 12
-    score_ref: spop_v1/spop
-    objective_mode: maximize
-    tie_handling: competition_rank
+selection_views:
+  - id: primary
+    objective: {name: spop_v1, params: {}}
+    selection:
+      name: top_n
+      params:
+        top_k: 12
+        score_ref: spop
+        objective_mode: maximize
+        tie_handling: competition_rank
 ```
 
 ## Record Flow
@@ -70,7 +69,7 @@ selection:
 Reader computes the SPOP scalar and support vectors. A bridge materializes that
 assay result onto study, Construct, USR, or label-source records with Reader
 artifact provenance. OPAL reads the configured scalar `Y` surface and ranks
-predictions through `spop_v1/spop`.
+predictions through the view-local `spop` channel.
 
 Keep the provenance with the records that carry the scalar:
 

@@ -117,9 +117,9 @@ def render(context, params: dict) -> None:
         raise OpalError("No run metadata found for requested round/run.", ExitCodes.BAD_ARGS)
 
     run_row = run_sel.head(1)
-    setpoint = parse_setpoint_from_runs(run_sel)
-    beta, gamma = parse_exponents_from_runs(run_sel)
-    delta = parse_delta_from_runs(run_sel)
+    setpoint = parse_setpoint_from_runs(run_sel, selection_view_id=context.selection_view_id)
+    beta, gamma = parse_exponents_from_runs(run_sel, selection_view_id=context.selection_view_id)
+    delta = parse_delta_from_runs(run_sel, selection_view_id=context.selection_view_id)
     denom = run_row["objective__denom_value"][0] if "objective__denom_value" in run_row.columns else None
     y_ops_raw = run_row["training__y_ops"][0] if "training__y_ops" in run_row.columns else []
     y_ops = _coerce_y_ops(y_ops_raw)
@@ -152,7 +152,7 @@ def render(context, params: dict) -> None:
     if records_path is None:
         raise OpalError("records path not available in PlotContext.", ExitCodes.BAD_ARGS)
 
-    need = {"id", "pred__score_selected", "obj__logic_fidelity"}
+    need = {"id", "view__selection_score", "obj__logic_fidelity"}
     if y_axis:
         need.add(y_axis)
     if hue:
@@ -160,6 +160,7 @@ def render(context, params: dict) -> None:
     pred_df = load_predictions_with_setpoint(
         outputs_dir,
         need,
+        selection_view_id=context.selection_view_id,
         round_selector=round_k,
         run_id=run_id,
         require_run_id=False,

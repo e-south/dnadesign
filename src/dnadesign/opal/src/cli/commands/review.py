@@ -32,6 +32,7 @@ def cmd_review(
     ),
     round: Optional[str] = typer.Option("latest", "--round", "-r", help="Round selector: int or latest."),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to review."),
+    view: Optional[str] = typer.Option(None, "--view", help="Selection view ID; required for multi-view campaigns."),
     out_dir: Optional[Path] = typer.Option(None, "--out-dir", help="Review output directory."),
     plots: bool = typer.Option(True, "--plots/--no-plots", help="Write portable review plots."),
     json: bool = typer.Option(False, "--json/--text", help="Output format."),
@@ -43,6 +44,7 @@ def cmd_review(
             config,
             round_selector=round,
             run_id=run_id,
+            selection_view_id=view,
             out_dir=out_dir,
             include_plots=plots,
         )

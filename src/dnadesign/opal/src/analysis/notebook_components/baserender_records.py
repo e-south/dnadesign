@@ -194,6 +194,7 @@ def select_notebook_baserender_default_record_id(
 def build_notebook_selected_baserender_record_ids(
     campaign_analysis: Any,
     *,
+    selection_view_id: str,
     round_value: Any | None,
     run_id: Any | None,
 ) -> tuple[list[str], list[dict[str, Any]]]:
@@ -211,20 +212,22 @@ def build_notebook_selected_baserender_record_ids(
         import polars as pl
 
         round_int = int(round_value)
-        pred_df = campaign_analysis.read_predictions(
+        pred_df = campaign_analysis.read_selection_view_predictions(
+            selection_view_id=selection_view_id,
             columns=[
                 "id",
                 "as_of_round",
                 "run_id",
-                "sel__rank_competition",
-                "sel__is_selected",
+                "view__rank_competition",
+                "view__is_selected",
             ],
             round_selector=[round_int],
             run_id=run_text,
-            allow_missing=True,
         )
-        selected_df = pred_df.filter(pl.col("sel__is_selected").fill_null(False)) if not pred_df.is_empty() else pred_df
-        sort_columns = [column for column in ("sel__rank_competition", "id") if column in selected_df.columns]
+        selected_df = (
+            pred_df.filter(pl.col("view__is_selected").fill_null(False)) if not pred_df.is_empty() else pred_df
+        )
+        sort_columns = [column for column in ("view__rank_competition", "id") if column in selected_df.columns]
         if sort_columns:
             selected_df = selected_df.sort(sort_columns)
         if "id" in selected_df.columns:

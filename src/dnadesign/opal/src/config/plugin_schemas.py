@@ -306,7 +306,7 @@ class _SFXIParams(BaseModel):
     logic_exponent_beta: float = 1.0
     intensity_exponent_gamma: float = 1.0
     intensity_log2_offset_delta: float = 0.0
-    uncertainty_method: Optional[Literal["delta", "analytical"]] = None
+    uncertainty_method: Optional[Literal["delta"]] = None
     scaling: _SFXIScaling = Field(default_factory=_SFXIScaling)
 
     @field_validator("setpoint_vector")
@@ -318,16 +318,58 @@ class _SFXIParams(BaseModel):
             raise ValueError("objective.params.setpoint_vector entries must be in [0, 1]")
         return v
 
+
+class _ResponseMagnitudeFeasibilityCalibration(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    response_separation_min: float
+    on_magnitude_min: float
+    off_magnitude_max: float
+    response_separation_scale: float
+    on_magnitude_scale: float
+    off_magnitude_scale: float
+
+    @field_validator(
+        "response_separation_min",
+        "on_magnitude_min",
+        "off_magnitude_max",
+        "response_separation_scale",
+        "on_magnitude_scale",
+        "off_magnitude_scale",
+    )
+    @classmethod
+    def _finite(cls, v: float) -> float:
+        value = float(v)
+        if not np.isfinite(value):
+            raise ValueError("RMF calibration values must be finite")
+        return value
+
+    @field_validator("response_separation_scale", "on_magnitude_scale", "off_magnitude_scale")
+    @classmethod
+    def _positive_scale(cls, v: float) -> float:
+        value = float(v)
+        if value <= 0.0:
+            raise ValueError("RMF calibration scales must be > 0")
+        return value
+
+
+@register_param_schema("objective", "response_magnitude_feasibility_v1")
+class _ResponseMagnitudeFeasibilityParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    state_ids: List[str]
+    target_mask: List[Literal[0, 1]]
+    calibration: _ResponseMagnitudeFeasibilityCalibration
+
     @model_validator(mode="after")
-    def _analytical_requires_unit_exponents(self):
-        method = self.uncertainty_method
-        if method == "analytical" and not (
-            float(self.logic_exponent_beta) == 1.0 and float(self.intensity_exponent_gamma) == 1.0
-        ):
-            raise ValueError(
-                "objective.params.uncertainty_method=analytical requires "
-                "logic_exponent_beta=1 and intensity_exponent_gamma=1"
-            )
+    def _state_contract_is_aligned(self):
+        normalized = [str(value).strip() for value in self.state_ids]
+        if len(normalized) < 2 or any(not value for value in normalized) or len(set(normalized)) != len(normalized):
+            raise ValueError("objective.params.state_ids must contain at least two unique, non-empty values")
+        if len(self.target_mask) != len(normalized):
+            raise ValueError("objective.params.target_mask must align one-to-one with state_ids")
+        on_count = int(sum(self.target_mask))
+        if on_count <= 0 or on_count >= len(self.target_mask):
+            raise ValueError("objective.params.target_mask must contain at least one ON and one OFF state")
+        self.state_ids = normalized
         return self
 
 

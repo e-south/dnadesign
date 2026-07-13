@@ -79,8 +79,9 @@ def render(context, params: dict) -> None:
     if labels_vec is None:
         raise OpalError("Invalid label vectors (expected length-8 values).", ExitCodes.CONTRACT_VIOLATION)
 
-    setpoint = parse_setpoint_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
-    beta, gamma = parse_exponents_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
+    run_rows = runs_df.filter(pl.col("as_of_round") == int(round_k))
+    setpoint = parse_setpoint_from_runs(run_rows, selection_view_id=context.selection_view_id)
+    beta, gamma = parse_exponents_from_runs(run_rows, selection_view_id=context.selection_view_id)
 
     sweep_df = sweep_setpoints(
         labels_vec8=labels_vec,

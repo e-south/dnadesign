@@ -34,9 +34,12 @@ def plot_alt_text(
     scope = rounds_text(rounds)
     run_text = "all runs" if run_id in (None, "") else f"run {run_id}"
     field_text = plot_field_text(kind=str(kind or ""), params=mapping(params), metadata=mapping(metadata))
+    declared_alt_text = str(mapping(metadata).get("alt_text") or "").strip()
     quality = f"freshness {freshness or 'unknown'}"
     if int(warning_count) > 0:
         quality += f", {int(warning_count)} warnings"
+    if declared_alt_text:
+        return f"{declared_alt_text} {field_text} Scope: {scope}, {run_text}; {quality}."
     if summary_text:
         return f"{title}. {summary_text} {field_text} Scope: {scope}, {run_text}; {quality}."
     return f"{title}. OPAL {kind_text} visual. {field_text} Scope: {scope}, {run_text}; {quality}."
@@ -78,9 +81,9 @@ def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) ->
         ),
         "scatter_score_vs_rank": (
             "OPAL plots prediction rows by rank and the configured score field. sequential rank is recomputed within "
-            "each round after sorting score descending; competition rank uses the persisted sel__rank_competition "
+            "each round after sorting score descending; competition rank uses the persisted view__rank_competition "
             "field so selected-order ties remain visible. Selected count is represented by rows with "
-            "sel__is_selected=true under the chosen round/run scope."
+            "view__is_selected=true under the chosen round/run scope."
         ),
         "percent_high_activity_over_rounds": (
             "OPAL first chooses one fixed cutoff for the plotted metric. With threshold_quantile=0.9, P90 means "
@@ -128,6 +131,19 @@ def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) ->
             "uses a configured percentile denominator, then clips effect_scaled = effect_raw / denom to [0, 1]. "
             "The denominator is label-derived for the current round and requires the configured min_n labels."
         ),
+        "response_magnitude_feasibility_frontier": (
+            "OPAL reads the response separation, minimum target-ON magnitude, and maximum target-OFF magnitude from "
+            "the prediction ledger. It standardizes the three requirements using the run's explicit thresholds "
+            "and positive scales. The selected score is their minimum, so one strong component cannot compensate "
+            "for a failed requirement."
+        ),
+        "response_magnitude_feasibility_constraint_decomposition": (
+            "For each selected candidate, OPAL shows the three signed standardized requirements: "
+            "(response_separation - response_min) / response_scale, "
+            "(on_magnitude - on_min) / on_scale, and "
+            "(off_max - off_magnitude) / off_scale. Feasibility is their row-wise minimum; "
+            "zero is the configured boundary."
+        ),
     }
     description = descriptions.get(
         kind,
@@ -171,7 +187,7 @@ def plot_field_text(*, kind: str, params: Mapping[str, Any], metadata: Mapping[s
         params.get(key) not in (None, "") for key in ("metric_label", "score_label", "y_label", "axis_label")
     )
     if label_field not in (None, "") or has_explicit_label:
-        metric_label = plot_metric_label(params, label_field or "pred__score_selected")
+        metric_label = plot_metric_label(params, label_field or "view__selection_score")
         if metric_label:
             fields.append(f"metric_label={metric_label}")
     metric_expression = plot_metric_expression(params)
@@ -206,7 +222,7 @@ def plot_field_text(*, kind: str, params: Mapping[str, Any], metadata: Mapping[s
 def plot_encoding_text(*, kind: str, params: Mapping[str, Any]) -> str:
     """Describe the primary visual channels for notebook alt text."""
 
-    metric = str(params.get("metric") or params.get("score_field") or "pred__score_selected")
+    metric = str(params.get("metric") or params.get("score_field") or "view__selection_score")
     y_axis = str(params.get("y_axis") or params.get("y") or "score")
     hue = str(params.get("hue") or params.get("hue_field") or "none")
     size_by = str(params.get("size_by") or "none")
@@ -220,7 +236,7 @@ def plot_encoding_text(*, kind: str, params: Mapping[str, Any]) -> str:
         )
     if kind == "scatter_score_vs_rank":
         rank_mode = str(params.get("rank_mode") or "sequential")
-        score_field = str(params.get("score_field") or "pred__score_selected")
+        score_field = str(params.get("score_field") or "view__selection_score")
         return f"x={rank_mode} rank; y={plot_metric_label(params, score_field)}; selected rows outlined when present"
     if kind == "percent_high_activity_over_rounds":
         threshold = params.get("threshold", None)
@@ -263,6 +279,13 @@ def plot_encoding_text(*, kind: str, params: Mapping[str, Any]) -> str:
         return f"x=ensemble score uncertainty; y={_pretty_with_raw(y_axis)}; hue={_pretty_with_raw(hue)}{sample_clause}"
     if kind == "sfxi_intensity_scaling":
         return "panels=denominator by setpoint, clipping fraction by setpoint, and E_raw distribution"
+    if kind == "response_magnitude_feasibility_frontier":
+        return (
+            "x=response separation; y=minimum target-ON reference-relative magnitude; "
+            "color=signed target-OFF constraint; selected candidates=outlined diamonds"
+        )
+    if kind == "response_magnitude_feasibility_constraint_decomposition":
+        return "x=standardized requirement; y=selected candidate; color=signed margin with zero as the pass boundary"
     return ""
 
 

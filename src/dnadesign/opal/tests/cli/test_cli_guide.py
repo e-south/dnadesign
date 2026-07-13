@@ -50,6 +50,8 @@ def _setup_usr_sidecar_workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
     campaign = workdir / "campaign.yaml"
     campaign.write_text(
         f"""
+schema_version: opal.campaign.v3
+ownership: {{owner_scope: opal_demo, portable: true}}
 campaign:
   name: Demo
   slug: demo
@@ -70,11 +72,12 @@ writeback:
 transforms_x: {{ name: identity, params: {{}} }}
 transforms_y: {{ name: scalar_from_table_v1, params: {{ y_column: y }} }}
 model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
-objectives:
-  - {{ name: scalar_identity_v1, params: {{}} }}
-selection:
-  name: top_n
-  params: {{ top_k: 1, score_ref: scalar_identity_v1/scalar, objective_mode: maximize, tie_handling: competition_rank }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
 """.strip(),
         encoding="utf-8",
     )
@@ -92,7 +95,7 @@ def test_guide_json_includes_campaign_plugins_steps_and_doc_pointers(tmp_path: P
 
     assert out["campaign"]["slug"] == "demo"
     assert out["plugins"]["model"]["name"] == "random_forest"
-    assert out["plugins"]["selection"]["name"] == "top_n"
+    assert out["plugins"]["selection_views"][0]["selection"]["name"] == "top_n"
     assert out["workflow_key"] == "rf_sfxi_topn"
     assert any("opal run -c" in str(step["command"]) for step in out["steps"])
     assert out["steps"][0]["title"] == "Validate schema and plugin wiring"
@@ -162,7 +165,7 @@ def test_guide_markdown_contains_round_semantics_and_commands(tmp_path: Path) ->
     text = res.stdout
 
     assert "## Guided Workflow" in text
-    assert "--observed-round" in text
-    assert "--labels-as-of" in text
+    assert "ingest-y --round" in text
+    assert "run --round" in text
     assert "opal init -c" in text
     assert "opal run -c" in text

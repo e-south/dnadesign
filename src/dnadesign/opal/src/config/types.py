@@ -79,14 +79,17 @@ class DataBlock:
     candidate_scope: Optional[CandidateScope] = None
 
 
-@dataclass
-class SelectionBlock:
-    selection: PluginRef  # params must contain top_k + score_ref; objective/tie controls are explicit
+@dataclass(frozen=True)
+class SelectionView:
+    id: str
+    objective: PluginRef
+    selection: PluginRef
 
 
-@dataclass
-class ObjectivesBlock:
-    objectives: List[PluginRef]
+@dataclass(frozen=True)
+class SelectionBatchBlock:
+    deduplicate_by: Optional[str] = None
+    expected_unique_count: Optional[int] = None
 
 
 @dataclass
@@ -118,8 +121,7 @@ class ScoringBlock:
 
 @dataclass
 class WritebackBlock:
-    # label_history | ledger_only
-    prediction_records: str = "label_history"
+    prediction_records: str = "ledger_only"
 
 
 @dataclass
@@ -168,18 +170,19 @@ class CampaignBlock:
 
 @dataclass
 class RootConfig:
+    schema_version: str
     campaign: CampaignBlock
     data: DataBlock
     model: PluginRef
-    selection: SelectionBlock
-    objectives: ObjectivesBlock
+    selection_views: List[SelectionView]
+    selection_batch: SelectionBatchBlock
     training: TrainingBlock
     ingest: IngestBlock
     scoring: ScoringBlock
     safety: SafetyBlock
+    ownership: OwnershipBlock
     candidate_eligibility: CandidateEligibilityBlock = field(default_factory=CandidateEligibilityBlock)
     labels: LabelsBlock = field(default_factory=LabelsBlock)
     writeback: WritebackBlock = field(default_factory=WritebackBlock)
     artifact_retention: ArtifactRetentionBlock = field(default_factory=ArtifactRetentionBlock)
     plot_config: Optional[str] = None
-    ownership: Optional[OwnershipBlock] = None

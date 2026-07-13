@@ -26,7 +26,6 @@ def build_notebook_evidence_rows(view_model: Mapping[str, Any]) -> list[dict[str
         ("config", campaign.get("config_path")),
         ("workdir", workdir),
         ("records", campaign.get("records_path")),
-        ("review_manifest", view_model.get("review_manifest_path")),
     ):
         if path:
             rows.append(
@@ -38,6 +37,16 @@ def build_notebook_evidence_rows(view_model: Mapping[str, Any]) -> list[dict[str
                     "path": compact_path(path, base=workdir),
                 }
             )
+    for view_id, path in mapping(view_model.get("review_manifest_paths")).items():
+        rows.append(
+            {
+                "source": "path",
+                "category": f"review_manifest:{view_id}",
+                "severity": None,
+                "message": compact_path(path, base=workdir),
+                "path": compact_path(path, base=workdir),
+            }
+        )
     for warning in sequence(view_model.get("warnings")):
         if isinstance(warning, Mapping):
             rows.append(

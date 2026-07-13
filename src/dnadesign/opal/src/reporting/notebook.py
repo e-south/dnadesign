@@ -35,6 +35,7 @@ from ..plots.manifests import (
 from .artifact_garden import build_artifact_garden_audit
 from .progress import build_campaign_progress
 from .review import load_review_manifest
+from .selection_set import load_selection_batch
 
 NOTEBOOK_VIEW_MODEL_SCHEMA_VERSION = "opal.notebook_view_model.v1"
 
@@ -72,23 +73,30 @@ def build_notebook_view_model(
         }
         warnings.append(_warning("ProgressContractError", str(exc), severity="error"))
 
-    review_manifest = None
-    review_path = (
-        Path(review_manifest_path) if review_manifest_path is not None else ws.outputs_dir / "review" / "manifest.json"
-    )
-    if review_path.exists():
-        try:
-            review_manifest = load_review_manifest(review_path)
-        except Exception as exc:
-            warnings.append(_warning("ReviewManifestError", str(exc), path=review_path, severity="error"))
+    if review_manifest_path is not None:
+        review_paths = [Path(review_manifest_path)]
     else:
-        warnings.append(
-            _warning(
-                "ReviewManifestWarning",
-                f"Review manifest not found: {review_path}",
-                path=review_path,
+        review_paths = [
+            ws.outputs_dir / "review" / "selection_views" / view.id / "manifest.json" for view in cfg.selection_views
+        ]
+    review_manifests: dict[str, dict[str, Any]] = {}
+    review_manifest_paths: dict[str, str] = {}
+    for review_path in review_paths:
+        view_id = review_path.parent.name
+        review_manifest_paths[view_id] = str(review_path)
+        if review_path.exists():
+            try:
+                review_manifests[view_id] = load_review_manifest(review_path)
+            except Exception as exc:
+                warnings.append(_warning("ReviewManifestError", str(exc), path=review_path, severity="error"))
+        else:
+            warnings.append(
+                _warning(
+                    "ReviewManifestWarning",
+                    f"Review manifest not found for selection view {view_id!r}: {review_path}",
+                    path=review_path,
+                )
             )
-        )
 
     plot_manifests = _load_plot_manifests(
         ws.outputs_dir / "plots",
@@ -102,9 +110,20 @@ def build_notebook_view_model(
         warnings=warnings,
     )
     stale_artifacts = []
-    if review_manifest is not None:
+    for review_manifest in review_manifests.values():
         stale_artifacts.extend(review_manifest.get("stale_artifacts") or [])
     stale_artifacts.extend(_detect_unmanifested_plot_outputs(ws.outputs_dir / "plots", plot_manifests))
+
+    selection_batch = None
+    if resolved_run_id is not None:
+        try:
+            selection_batch = load_selection_batch(
+                analysis.config_path,
+                round_selector=resolved_round_selector,
+                run_id=resolved_run_id,
+            )
+        except OpalError as exc:
+            warnings.append(_warning("SelectionBatchWarning", str(exc)))
 
     artifact_garden = None
     try:
@@ -128,11 +147,13 @@ def build_notebook_view_model(
             "y_column": cfg.data.y_column_name,
             "label_source": getattr(cfg.labels.source, "kind", "campaign_history"),
             "model": cfg.model.name,
-            "selection": cfg.selection.selection.name,
-            "objectives": [objective.name for objective in cfg.objectives.objectives],
-            "objective_params": [
-                {"name": objective.name, "params": dict(objective.params or {})}
-                for objective in cfg.objectives.objectives
+            "selection_views": [
+                {
+                    "id": view.id,
+                    "objective": {"name": view.objective.name, "params": dict(view.objective.params or {})},
+                    "selection": {"name": view.selection.name, "params": dict(view.selection.params or {})},
+                }
+                for view in cfg.selection_views
             ],
         },
         "status": {
@@ -143,13 +164,14 @@ def build_notebook_view_model(
             "latest_run_id": _latest_run_id(progress),
         },
         "progress": progress,
-        "review_manifest_path": str(review_path),
-        "review_manifest": review_manifest,
+        "review_manifest_paths": review_manifest_paths,
+        "review_manifests": review_manifests,
         "configured_plots": configured_plots,
         "label_staging": discover_label_staging_inputs(ws.workdir),
         "reader_evidence": discover_reader_evidence_manifests(ws.workdir),
         "reader_evidence_artifacts": discover_reader_evidence_artifacts(ws.workdir),
         "plot_manifests": plot_manifests,
+        "selection_batch": selection_batch,
         "artifact_garden": artifact_garden,
         "stale_artifacts": stale_artifacts,
         "warnings": warnings,
@@ -192,9 +214,14 @@ def _load_plot_manifests(
     plot_manifest_path: str | Path | None,
     warnings: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    index_path = Path(plot_manifest_path) if plot_manifest_path is not None else plots_dir / "plot_manifest.json"
+    if plot_manifest_path is not None:
+        index_paths = [Path(plot_manifest_path)]
+    else:
+        root_index = plots_dir / "plot_manifest.json"
+        view_indexes = sorted((plots_dir / "selection_views").glob("*/plot_manifest.json"))
+        index_paths = ([root_index] if root_index.exists() else []) + view_indexes
     manifests: list[dict[str, Any]] = []
-    if index_path.exists():
+    for index_path in index_paths:
         try:
             index = load_plot_manifest_index(index_path)
             if index.get("schema_version") != PLOT_MANIFEST_INDEX_SCHEMA_VERSION:
@@ -215,12 +242,13 @@ def _load_plot_manifests(
                     )
         except Exception as exc:
             warnings.append(_warning("PlotManifestError", str(exc), path=index_path, severity="error"))
-    elif plots_dir.exists():
+    if not index_paths and plots_dir.exists():
+        missing_index = plots_dir / "plot_manifest.json"
         warnings.append(
             _warning(
                 "StaleArtifactWarning",
-                f"Plot manifest index not found: {index_path}",
-                path=index_path,
+                f"Plot manifest index not found: {missing_index}",
+                path=missing_index,
             )
         )
     return manifests
@@ -237,7 +265,6 @@ def _load_configured_plot_specs(
         plot_cfg = load_plot_config(
             campaign_cfg=campaign_cfg,
             campaign_yaml=config_path,
-            campaign_dir=campaign_dir,
             plot_config_opt=None,
         )
         return [
@@ -265,7 +292,7 @@ def _detect_unmanifested_plot_outputs(plots_dir: Path, manifests: list[dict[str,
     if not plots_dir.exists():
         return []
     stale = []
-    for path in sorted(plots_dir.iterdir()):
+    for path in sorted(plots_dir.rglob("*")):
         if not path.is_file() or path.name == "plot_manifest.json" or path.name.endswith(".manifest.json"):
             continue
         if path.suffix.lower() not in {".png", ".svg", ".pdf", ".csv"}:

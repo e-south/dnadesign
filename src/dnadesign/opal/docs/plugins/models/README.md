@@ -1,10 +1,11 @@
 ## OPAL Models — Registry
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-13
 
 
-This page documents model plugin contracts, config surface, and runtime wiring. For equations and detailed behavior, use the model-specific pages.
+Model plugins fit one campaign phenotype surface and predict the configured Y
+representation. Model-specific pages define detailed behavior and equations.
 
 ### Inventory
 

@@ -18,7 +18,7 @@ from dnadesign.opal.src.plots._cohort_utils import positive_ranks, selected_mask
 
 
 def test_selected_mask_rejects_string_booleans() -> None:
-    with pytest.raises(ValueError, match="sel__is_selected must be boolean"):
+    with pytest.raises(ValueError, match="view__is_selected must be boolean"):
         selected_mask(pd.Series(["False", "True"]))
 
 

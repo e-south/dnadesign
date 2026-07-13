@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -19,6 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional
 import pandas as pd
 
 from ..core.utils import OpalError
+from ..storage.artifacts import validate_progress_event
 from ..storage.ledger import LedgerReader
 
 
@@ -28,12 +30,11 @@ def list_runs(reader: LedgerReader, *, round_selector: Optional[int] = None) -> 
             "run_id",
             "as_of_round",
             "model__name",
-            "objective__name",
-            "selection__name",
+            "objective__defs_json",
+            "selection_views__defs_json",
             "training__y_ops",
             "stats__n_train",
             "stats__n_scored",
-            "objective__summary_stats",
         ]
     )
     if round_selector is not None:
@@ -73,17 +74,38 @@ def select_run_meta(
 
 
 def summarize_run_meta(row: pd.Series) -> Dict[str, Any]:
+    selection_views = _json_list(row.get("selection_views__defs_json"))
+    objectives = _json_list(row.get("objective__defs_json"))
     return {
         "run_id": str(row.get("run_id", "")),
         "as_of_round": int(row.get("as_of_round", -1)),
         "model": row.get("model__name"),
-        "objective": row.get("objective__name"),
-        "selection": row.get("selection__name"),
+        "selection_views": selection_views,
+        "objectives": objectives,
+        "selection_view_count": len(selection_views),
         "y_ops": row.get("training__y_ops") or [],
         "stats_n_train": int(row.get("stats__n_train", 0)),
         "stats_n_scored": int(row.get("stats__n_scored", 0)),
-        "objective_summary_stats": row.get("objective__summary_stats") or {},
+        "objective_summary_stats_by_view": {
+            str(view.get("selection_view_id")): view.get("objective_summary_stats") or {}
+            for view in selection_views
+            if isinstance(view, dict)
+        },
     }
+
+
+def _json_list(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [dict(item) for item in value if isinstance(item, dict)]
+    if not value:
+        return []
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise OpalError(f"Run metadata contains invalid JSON: {exc}") from exc
+    if not isinstance(parsed, list) or not all(isinstance(item, dict) for item in parsed):
+        raise OpalError("Run metadata JSON must contain a list of objects.")
+    return [dict(item) for item in parsed]
 
 
 def _parse_ts(val: Any) -> Optional[datetime]:
@@ -114,6 +136,12 @@ def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[st
     events = list(events)
     if not events:
         return {"events": 0, "events_total": 0, "run_count": 0, "run_id": run_id}
+    for position, event in enumerate(events):
+        validate_progress_event(event, position=position)
+    event_ids = [str(event["event_id"]) for event in events]
+    duplicate_event_ids = sorted(event_id for event_id, count in Counter(event_ids).items() if count > 1)
+    if duplicate_event_ids:
+        raise OpalError(f"round.log.jsonl contains duplicate event_id values: {duplicate_event_ids}")
 
     run_count = sum(1 for e in events if e.get("stage") == "start")
     events_total = len(events)
@@ -140,7 +168,7 @@ def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[st
     for e in events:
         stage = str(e.get("stage", "unknown"))
         stages[stage] = stages.get(stage, 0) + 1
-        phase = str(e.get("phase", "legacy_event_contract"))
+        phase = str(e["phase"])
         phases[phase] = phases.get(phase, 0) + 1
         ts = _parse_ts(e.get("ts"))
         if ts is not None:
@@ -165,7 +193,6 @@ def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[st
 
     predict_batches = sum(1 for e in events if e.get("stage") == "predict_batch")
     predict_rows = int(sum(int(e.get("rows", 0)) for e in events if e.get("stage") == "predict_batch"))
-    legacy_events = sum(1 for e in events if not e.get("schema_version") or not e.get("phase"))
     command_events = sum(1 for e in events if e.get("phase") == "command")
     preflight_events = sum(1 for e in events if e.get("phase") == "preflight")
     run_events = sum(1 for e in events if e.get("phase") == "run")
@@ -193,7 +220,6 @@ def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[st
         },
         "stage_counts": stages,
         "phase_counts": phases,
-        "legacy_events": legacy_events,
         "command_events": command_events,
         "preflight_events": preflight_events,
         "run_events": run_events,

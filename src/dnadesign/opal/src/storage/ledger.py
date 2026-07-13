@@ -33,7 +33,7 @@ from .parquet_io import (
 )
 from .workspace import CampaignWorkspace
 
-# ---- schema allow-lists (Ledger v1.1) ----
+# ---- schema allow-lists (Ledger v2.0) ----
 ALLOW: dict[str, set[str]] = {
     "run_pred": {
         "event",
@@ -43,21 +43,9 @@ ALLOW: dict[str, set[str]] = {
         "sequence",
         "pred__y_dim",
         "pred__y_hat_model",
-        "pred__score_selected",
-        "pred__score_ref",
-        "pred__selection_score",
-        "sel__rank_competition",
-        "sel__is_selected",
-        "pred__uncertainty_selected",
-        "pred__uncertainty_ref",
         "pred__score_channels",
         "pred__uncertainty_channels",
-        # row-level objective diagnostics only
-        "obj__logic_fidelity",
-        "obj__effect_raw",
-        "obj__effect_scaled",
-        "obj__clip_lo_mask",
-        "obj__clip_hi_mask",
+        "pred__selection_views",
     },
     "run_meta": {
         "event",
@@ -70,21 +58,10 @@ ALLOW: dict[str, set[str]] = {
         "x_transform__params",
         "y_ingest__name",
         "y_ingest__params",
-        "objective__name",
-        "objective__params",
         "objective__defs_json",
-        "objective__summary_stats",
-        "objective__denom_value",
-        "objective__denom_percentile",
-        "selection__name",
-        "selection__params",
-        "selection__score_ref",
-        "selection__uncertainty_ref",
-        "selection__objective",
-        "selection__tie_handling",
+        "selection_views__defs_json",
         "stats__n_train",
         "stats__n_scored",
-        "stats__unc_mean_sd_targets",
         "artifacts",
         "pred__preview",
         "schema__version",
@@ -109,9 +86,7 @@ REQUIRED: dict[str, set[str]] = {
         "id",
         "pred__y_dim",
         "pred__y_hat_model",
-        "pred__score_selected",
-        "sel__rank_competition",
-        "sel__is_selected",
+        "pred__selection_views",
     },
     "run_meta": {
         "event",
@@ -119,9 +94,8 @@ REQUIRED: dict[str, set[str]] = {
         "as_of_round",
         "model__name",
         "model__params",
-        "objective__name",
-        "selection__name",
-        "selection__params",
+        "objective__defs_json",
+        "selection_views__defs_json",
         "schema__version",
         "opal__version",
     },

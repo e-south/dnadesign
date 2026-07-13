@@ -1,28 +1,44 @@
+---
+id: opal-campaign-demo-rf-sfxi-topn
+title: Demo campaign RF SFXI top N
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-13
+surface: opal_campaign
+campaign_slug: demo_rf_sfxi_topn
+campaign_kind: demo
+runtime_status: runnable
+---
+
 ## Demo Campaign: RF + SFXI + top_n
 
-### What this demo covers
+**Owner:** OPAL
+**Lifecycle:** portable demo
+**Last verified:** 2026-07-13
+
+### Purpose
 
 Deterministic baseline flow with `random_forest` model, `sfxi_v1` objective, and `top_n` selection.
 
 ### Run from this directory
 
 ```bash
-# Copy baseline artifacts into the workspace-local location.
-cp ../demo/records.parquet ./records.parquet
-# Reset campaign state to a clean baseline before rerunning.
+# Confirm that the canonical demo records are present.
+test -f records.parquet
+# Remove generated state from an earlier local run.
 uv run opal campaign-reset -c configs/campaign.yaml --apply --no-backup
-# Initialize campaign state for this OPAL demo workflow.
+# Initialize the campaign workspace.
 uv run opal init -c configs/campaign.yaml
-# Validate campaign config and plugin contracts.
+# Validate config, records, and plugin contracts.
 uv run opal validate -c configs/campaign.yaml
-# Ingest observed labels for the selected campaign round.
+# Ingest the round-0 demo labels.
 uv run opal ingest-y -c configs/campaign.yaml --round 0 --csv inputs/r0/vec8-b0.xlsx --unknown-sequences drop --if-exists replace --apply
-# Execute OPAL training, scoring, and selection for the next round.
+# Fit, score, and select round 0.
 uv run opal run -c configs/campaign.yaml --round 0
-# Verify selection outputs and ledger consistency for the chosen round.
-uv run opal verify-outputs -c configs/campaign.yaml --round latest
+# Verify the primary selection view against its ledgers.
+uv run opal verify-outputs -c configs/campaign.yaml --view primary --round latest
 ```
 
 ### Full guide
 
-- `src/dnadesign/opal/docs/workflows/rf-sfxi-topn.md`
+- [RF, SFXI, and top-N workflow](../../docs/workflows/rf-sfxi-topn.md)

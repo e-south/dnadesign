@@ -56,7 +56,7 @@ def test_build_campaign_review_writes_portable_artifacts(tmp_path: Path) -> None
 
     result = build_campaign_review(campaign, run_id=run_id)
 
-    assert result.manifest_path == workdir / "outputs" / "review" / "manifest.json"
+    assert result.manifest_path == workdir / "outputs" / "review" / "selection_views" / "primary" / "manifest.json"
     assert result.review_path.exists()
     assert result.index_path.exists()
     assert result.manifest["schema_version"] == "opal.campaign_review.v1"
@@ -127,7 +127,7 @@ def test_build_campaign_review_requires_run_scoped_round_log(tmp_path: Path) -> 
 
 def test_build_campaign_review_reports_stale_plot_files_when_plots_disabled(tmp_path: Path) -> None:
     workdir, campaign, run_id = _setup_review_campaign(tmp_path)
-    stale_dir = workdir / "outputs" / "review" / "plots"
+    stale_dir = workdir / "outputs" / "review" / "selection_views" / "primary" / "plots"
     stale_dir.mkdir(parents=True, exist_ok=True)
     stale_file = stale_dir / "old_score.png"
     stale_file.write_bytes(b"old")

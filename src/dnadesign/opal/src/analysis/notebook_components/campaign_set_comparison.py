@@ -276,7 +276,7 @@ def _target_label(value: str) -> str:
 def _metric_title_phrase(*, metric: str, fallback: str) -> str:
     if metric == "reference_mse":
         return "target-vector MSE positive/null trajectory"
-    if metric == "pred__score_selected":
+    if metric == "view__selection_score":
         return "objective score positive/null trajectory"
     return str(fallback or "campaign-set comparison")
 
@@ -306,7 +306,7 @@ def _campaign_set_count_text(counts_by_group_round: Mapping[tuple[str, int], lis
 
 
 def _metric_axis_label(*, metric: str, summary: str) -> str:
-    if metric == "pred__score_selected":
+    if metric == "view__selection_score":
         return f"{pretty_label(summary)} objective score (campaign scale)"
     if metric == "reference_mse":
         return "MSE of selected mean vector to reference"
@@ -314,7 +314,7 @@ def _metric_axis_label(*, metric: str, summary: str) -> str:
 
 
 def _metric_interpretation_sentence(metric: str) -> str:
-    if metric == "pred__score_selected":
+    if metric == "view__selection_score":
         return (
             " Selected score is on each campaign's configured objective scale; compare it within a compatible "
             "campaign set, not as a cross-family effect size."

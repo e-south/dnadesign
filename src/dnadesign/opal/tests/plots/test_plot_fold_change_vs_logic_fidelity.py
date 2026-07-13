@@ -30,7 +30,9 @@ class _DummyWorkspace:
 
 
 def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch):
-    def _stub_load_events_with_setpoint(outputs_dir, base_columns, round_selector=None, run_id=None):
+    def _stub_load_events_with_setpoint(
+        outputs_dir, base_columns, round_selector=None, selection_view_id=None, run_id=None
+    ):
         assert "obj__diag__setpoint" not in base_columns
         return pd.DataFrame(
             {
@@ -38,8 +40,8 @@ def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch
                 "run_id": ["r0"],
                 "id": ["a"],
                 "pred__y_hat_model": [list(np.linspace(0.0, 1.0, 8))],
-                "sel__is_selected": [True],
-                "pred__score_selected": [0.5],
+                "view__is_selected": [True],
+                "view__selection_score": [0.5],
                 "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
             }
         )
@@ -51,6 +53,7 @@ def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch
         workspace=_DummyWorkspace(tmp_path),
         rounds="unspecified",
         run_id=None,
+        selection_view_id="primary",
         data_paths={},
         output_dir=tmp_path / "plots",
         filename="fold_change.png",
@@ -68,7 +71,9 @@ def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch
 
 
 def test_fold_change_plot_saves_namespaced_columns(tmp_path, monkeypatch):
-    def _stub_load_events_with_setpoint(outputs_dir, base_columns, round_selector=None, run_id=None):
+    def _stub_load_events_with_setpoint(
+        outputs_dir, base_columns, round_selector=None, selection_view_id=None, run_id=None
+    ):
         assert "obj__effect_scaled" in base_columns
         return pd.DataFrame(
             {
@@ -76,8 +81,8 @@ def test_fold_change_plot_saves_namespaced_columns(tmp_path, monkeypatch):
                 "run_id": ["r0"],
                 "id": ["a"],
                 "pred__y_hat_model": [list(np.linspace(0.0, 1.0, 8))],
-                "sel__is_selected": [True],
-                "pred__score_selected": [0.5],
+                "view__is_selected": [True],
+                "view__selection_score": [0.5],
                 "obj__effect_scaled": [0.9],
                 "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
             }
@@ -90,6 +95,7 @@ def test_fold_change_plot_saves_namespaced_columns(tmp_path, monkeypatch):
         workspace=_DummyWorkspace(tmp_path),
         rounds="unspecified",
         run_id=None,
+        selection_view_id="primary",
         data_paths={},
         output_dir=tmp_path / "plots",
         filename="fold_change.png",
@@ -109,7 +115,9 @@ def test_fold_change_plot_saves_namespaced_columns(tmp_path, monkeypatch):
 
 
 def test_fold_change_plot_can_overlay_validated_sfxi_reference_points(tmp_path, monkeypatch):
-    def _stub_load_events_with_setpoint(outputs_dir, base_columns, round_selector=None, run_id=None):
+    def _stub_load_events_with_setpoint(
+        outputs_dir, base_columns, round_selector=None, selection_view_id=None, run_id=None
+    ):
         assert "obj__effect_scaled" in base_columns
         return pd.DataFrame(
             {
@@ -117,8 +125,8 @@ def test_fold_change_plot_can_overlay_validated_sfxi_reference_points(tmp_path, 
                 "run_id": ["r0"],
                 "id": ["a"],
                 "pred__y_hat_model": [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]],
-                "sel__is_selected": [False],
-                "pred__score_selected": [0.5],
+                "view__is_selected": [False],
+                "view__selection_score": [0.5],
                 "obj__effect_scaled": [0.8],
                 "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
             }
@@ -149,6 +157,7 @@ def test_fold_change_plot_can_overlay_validated_sfxi_reference_points(tmp_path, 
         workspace=_DummyWorkspace(tmp_path),
         rounds="unspecified",
         run_id=None,
+        selection_view_id="primary",
         data_paths={"records": records_path},
         output_dir=tmp_path / "plots",
         filename="fold_change.png",

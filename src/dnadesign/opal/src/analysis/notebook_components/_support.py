@@ -73,17 +73,9 @@ def compact_notebook_path(value: Any, *, base: Any | None = None, max_parts: int
 
 
 def selection_count(view_model: Mapping[str, Any]) -> int | None:
-    review_manifest = mapping(view_model.get("review_manifest"))
-    selection = mapping(review_manifest.get("selection"))
-    for key in ("selected_count", "selection_count", "count"):
-        value = selection.get(key)
-        if isinstance(value, int):
-            return value
-    for key in ("selected_records", "preview", "rows"):
-        value = selection.get(key)
-        if isinstance(value, list):
-            return len(value)
-    return None
+    selection_batch = mapping(view_model.get("selection_batch"))
+    value = selection_batch.get("unique_count")
+    return value if isinstance(value, int) else None
 
 
 def resolved_run_id(run_scope: Mapping[str, Any]) -> str | None:

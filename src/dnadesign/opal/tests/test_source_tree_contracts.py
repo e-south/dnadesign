@@ -15,8 +15,75 @@ import importlib
 import tomllib
 from pathlib import Path
 
+import yaml
+
+from dnadesign.opal.src.config.loader import load_config
+
 OPAL_ROOT = Path("src/dnadesign/opal")
 OPAL_SOURCE_ROOT = OPAL_ROOT / "src"
+
+
+def _read_frontmatter(path: Path) -> dict[str, object]:
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("---\n"), f"missing YAML frontmatter: {path}"
+    payload = yaml.safe_load(text.split("---", 2)[1])
+    assert isinstance(payload, dict), f"frontmatter must be a mapping: {path}"
+    return payload
+
+
+def test_checked_in_campaigns_are_explicit_modern_surfaces() -> None:
+    campaign_configs = sorted((OPAL_ROOT / "campaigns").glob("*/configs/campaign.yaml"))
+    expected = {
+        "demo_gp_ei": ("opal_demo", "demo", "runnable"),
+        "demo_gp_topn": ("opal_demo", "demo", "runnable"),
+        "demo_rf_sfxi_topn": ("opal_demo", "demo", "runnable"),
+        "secg_rmf_greedy": ("study_campaign", "study", "blocked_on_label_promotion"),
+    }
+
+    actual: dict[str, tuple[str, str, str]] = {}
+    for path in campaign_configs:
+        cfg = load_config(path)
+        assert path.parents[1].name == cfg.campaign.slug
+        readme = path.parents[1] / "README.md"
+        frontmatter = _read_frontmatter(readme)
+        assert frontmatter["surface"] == "opal_campaign"
+        assert frontmatter["campaign_slug"] == cfg.campaign.slug
+        assert sorted(candidate.name for candidate in path.parent.iterdir()) == ["campaign.yaml", "plots.yaml"]
+        actual[cfg.campaign.slug] = (
+            cfg.ownership.owner_scope,
+            str(frontmatter["campaign_kind"]),
+            str(frontmatter["runtime_status"]),
+        )
+
+    assert actual == expected
+
+
+def test_campaign_index_declares_routing_frontmatter() -> None:
+    frontmatter = _read_frontmatter(OPAL_ROOT / "campaigns" / "README.md")
+
+    assert frontmatter["surface"] == "opal_campaign_index"
+    assert frontmatter["status"] == "active"
+
+
+def test_current_stress_campaign_config_has_no_sfxi_metric_or_brightness_aliases() -> None:
+    config_path = OPAL_ROOT / "campaigns" / "secg_rmf_greedy" / "configs" / "campaign.yaml"
+    text = config_path.read_text(encoding="utf-8").lower()
+
+    assert "sfxi" not in text
+    assert "vec8" not in text
+    assert "brightness" not in text
+    assert "stress_promoter_insert:v1" in text
+
+
+def test_checked_in_campaigns_use_only_canonical_config_filenames() -> None:
+    alternate_names = {"campaign.yml", "opal.yaml", "opal.yml"}
+    alternates = [
+        path.as_posix()
+        for path in (OPAL_ROOT / "campaigns").rglob("*")
+        if path.is_file() and path.name in alternate_names
+    ]
+
+    assert alternates == []
 
 
 def _line_count(path: Path) -> int:

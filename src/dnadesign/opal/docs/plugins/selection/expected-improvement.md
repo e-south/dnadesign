@@ -1,10 +1,12 @@
 ## Expected Improvement Plugin (`expected_improvement`)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-13
 
 
-This page documents `expected_improvement` acquisition behavior, equations, and failure conditions. For registry-level selection contracts and required fields, see [Selection](README.md).
+`expected_improvement` follows the equations and failure conditions below.
+Registry-level contracts and required fields are listed under
+[Selection](README.md).
 
 ### Purpose
 
@@ -15,10 +17,10 @@ This page documents `expected_improvement` acquisition behavior, equations, and 
 
 ### Inputs and channel refs
 
-Configured in `selection.params`:
+Configured in `selection_views[].selection.params`:
 
-- `score_ref`: `<objective>/<score_channel>`
-- `uncertainty_ref`: `<objective>/<uncertainty_channel>` (required for EI)
+- `score_ref`: objective-local score channel
+- `uncertainty_ref`: objective-local uncertainty channel (required for EI)
 - `objective_mode`: `maximize|minimize`
 - `top_k`, `tie_handling`, optional `alpha`, `beta`
 
@@ -26,25 +28,31 @@ Configured in `selection.params`:
 
 ### Wiring patterns (important)
 
-The `<objective>/<channel>` ref identifies a **channel key** within that objective. Score and uncertainty are separate surfaces:
+Refs identify channel keys emitted by the objective in the same named view.
+Persisted refs are namespaced by view ID. Score and uncertainty are separate
+surfaces:
 
 * `score_ref` pulls the **score values** for that channel key.
 * `uncertainty_ref` pulls the **standard deviation values** for that channel key.
 
 Some objectives publish uncertainty under the **same channel key** as the score (SFXI does this for `sfxi`). In that case it is valid for `score_ref` and `uncertainty_ref` to be identical.
 
-Minimal example (SFXI + EI):
+Minimal v3 example (SFXI + EI):
 
 ```yaml
-selection:
-  name: expected_improvement
-  params:
-    top_k: 5
-    score_ref: sfxi_v1/sfxi
-    uncertainty_ref: sfxi_v1/sfxi
-    objective_mode: maximize
-    alpha: 1.0
-    beta: 1.0
+selection_views:
+  - id: primary
+    objective: {name: sfxi_v1, params: {...}}
+    selection:
+      name: expected_improvement
+      params:
+        top_k: 5
+        score_ref: sfxi
+        uncertainty_ref: sfxi
+        objective_mode: maximize
+        tie_handling: competition_rank
+        alpha: 1.0
+        beta: 1.0
 ```
 
 Common pitfall: setting `uncertainty_ref` to a channel key that **does not** publish uncertainty (or running EI with a model/objective path that produces no uncertainty). OPAL fails fast and does not fall back to `top_n`.

@@ -18,6 +18,7 @@ from ._support import mapping, sequence
 
 _SEMANTIC_KIND_LABELS = {
     "intensity_overview": "Time series + snapshot",
+    "promoter_response_evidence": "Promoter response evidence",
     "raw_kinetics": "Plate-reader time series",
     "sfxi_vec8_heatmap": "SFXI vec8 heatmap",
     "vec8_heatmap": "SFXI vec8 heatmap",

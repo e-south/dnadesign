@@ -17,6 +17,11 @@ from typing import Any, Mapping
 from .reader_evidence_media import select_reader_media_artifact
 from .reader_evidence_preview import reader_pdf_preview_path
 from .reader_evidence_triptych import is_reader_sfxi_triptych_artifact, render_reader_sfxi_triptych_visual
+from .reader_promoter_evidence import (
+    ReaderPromoterEvidenceIntegrityError,
+    is_reader_promoter_evidence_artifact,
+    verify_reader_promoter_evidence_artifact,
+)
 from .zoomable_visual import render_notebook_zoomable_image
 
 
@@ -49,6 +54,11 @@ def render_notebook_reader_evidence_artifact_visual(
 def _render_static_reader_artifact(selected: Mapping[str, Any], *, mo: Any) -> Any:
     path = Path(str(selected.get("path") or ""))
     media_type = str(selected.get("media_type") or "")
+    if is_reader_promoter_evidence_artifact(selected):
+        try:
+            path = verify_reader_promoter_evidence_artifact(selected)
+        except ReaderPromoterEvidenceIntegrityError as exc:
+            return mo.md(f"Promoter-response evidence verification failed: `{exc}`")
     if not path.exists():
         return mo.md(f"Plot artifact missing: `{path}`")
     if media_type == "application/pdf" or path.suffix.lower() == ".pdf":

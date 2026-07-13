@@ -240,7 +240,6 @@ def _event_contract_summary(rounds: list[dict[str, Any]]) -> dict[str, Any]:
     )
     return {
         "schema_version": "opal.progress_event_rollup.v1",
-        "legacy_events": int(sum(int(summary.get("legacy_events") or 0) for summary in summaries)),
         "command_events": int(sum(int(summary.get("command_events") or 0) for summary in summaries)),
         "preflight_events": int(sum(int(summary.get("preflight_events") or 0) for summary in summaries)),
         "run_events": int(sum(int(summary.get("run_events") or 0) for summary in summaries)),
@@ -284,16 +283,6 @@ def _event_contract_warnings(rounds: list[dict[str, Any]]) -> list[dict[str, Any
                     "message": f"Round {round_index} has multiple run_id values; pass --run-id on run-scoped surfaces.",
                     "round_index": round_index,
                     "run_ids": run_scope.get("run_ids") or [],
-                }
-            )
-        if int(summary.get("legacy_events") or 0):
-            warnings.append(
-                {
-                    "category": "ProgressContractError",
-                    "severity": "warning",
-                    "message": f"Round {round_index} contains legacy progress events without schema_version or phase.",
-                    "round_index": round_index,
-                    "legacy_events": int(summary.get("legacy_events") or 0),
                 }
             )
     return warnings

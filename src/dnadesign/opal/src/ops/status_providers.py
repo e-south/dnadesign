@@ -145,8 +145,8 @@ def _round_status_evidence(round_entry: RoundEntry | None) -> dict[str, object] 
         "round_index": round_entry.round_index,
         "run_id": round_entry.run_id,
         "round_dir": round_entry.round_dir,
-        "selection_top_k_requested": round_entry.selection_top_k_requested,
-        "selection_top_k_effective_after_ties": round_entry.selection_top_k_effective_after_ties,
+        "selection_views": round_entry.selection_views,
+        "selection_batch": round_entry.selection_batch,
     }
 
 

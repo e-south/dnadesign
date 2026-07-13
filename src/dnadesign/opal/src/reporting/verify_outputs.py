@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from ..core.leakage import (
@@ -59,13 +60,13 @@ def read_selection_artifact(path: Path, *, required_columns: tuple[str, ...] = (
 
 
 def resolve_selection_score_column(df: pd.DataFrame) -> str:
-    if "pred__score_selected" in df.columns:
-        return "pred__score_selected"
-    raise OpalError("Selection data missing pred__score_selected.")
+    if "selection_score" in df.columns:
+        return "selection_score"
+    raise OpalError("Selection data missing selection_score.")
 
 
 def _extract_artifact_path(val: Any) -> Path | None:
-    if isinstance(val, (list, tuple)) and len(val) >= 2:
+    if isinstance(val, (list, tuple, np.ndarray)) and len(val) >= 2:
         return Path(val[1])
     if isinstance(val, str):
         return Path(val)
@@ -79,14 +80,7 @@ def resolve_selection_path_from_artifacts(
 ) -> Path | None:
     if not isinstance(artifacts, dict):
         return None
-    preferred_keys = []
-    if run_id:
-        preferred_keys.extend(
-            [
-                f"selection/selection_top_k__run_{run_id}.csv",
-            ]
-        )
-    preferred_keys.extend(["selection/selection_top_k.csv"])
+    preferred_keys = ["selection/selections.parquet"]
     for key in preferred_keys:
         if key not in artifacts:
             continue
@@ -102,7 +96,7 @@ def compare_selection_to_ledger(
     *,
     eps: float = 1e-6,
     id_col: str = "id",
-    ledger_score_col: str = "pred__score_selected",
+    ledger_score_col: str = "view__selection_score",
 ) -> tuple[dict, pd.DataFrame]:
     if id_col not in selection_df.columns:
         raise OpalError(f"Selection data missing '{id_col}' column.")

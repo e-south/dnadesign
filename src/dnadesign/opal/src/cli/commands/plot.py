@@ -27,7 +27,7 @@ from ..registry import cli_command
 from ._common import json_error, json_out, opal_error, print_config_context
 
 
-@cli_command("plot", help="Generate plots from plot_config (preferred) or inline 'plots:'.")
+@cli_command("plot", help="Generate plots from the campaign plot_config or an explicit plot-config path.")
 def cmd_plot(
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to campaign.yaml or campaign directory."),
     plot_config: Optional[Path] = typer.Option(
@@ -61,6 +61,11 @@ def cmd_plot(
         "--run-id",
         help="Explicit run_id to disambiguate ledger predictions (required if multiple runs per round).",
     ),
+    view: Optional[str] = typer.Option(
+        None,
+        "--view",
+        help="Selection view ID; required for multi-view campaigns.",
+    ),
     name: Optional[str] = typer.Option(None, "--name", "-n", help="Run a single plot by its 'name' in the YAML."),
     tag: Optional[List[str]] = typer.Option(
         None,
@@ -85,6 +90,7 @@ def cmd_plot(
             describe=describe,
             round=round,
             run_id=run_id,
+            view=view,
             name=name,
             tag=tag,
             json_output=json_output,
@@ -107,6 +113,7 @@ def _run_plot_command(
     describe: Optional[str],
     round: Optional[str],
     run_id: Optional[str],
+    view: Optional[str],
     name: Optional[str],
     tag: Optional[List[str]],
     json_output: bool,
@@ -179,13 +186,12 @@ def _run_plot_command(
         plot_cfg = load_plot_config(
             campaign_cfg=campaign_cfg,
             campaign_yaml=campaign_yaml,
-            campaign_dir=campaign_dir,
             plot_config_opt=plot_config,
         )
     except ValueError as e:
         msg = str(e)
         if "No plots found" in msg:
-            err = OpalError("[plot] No plots found. Add plots.yaml or define plots in campaign.yaml.")
+            err = OpalError("[plot] No plots found. Set campaign.plot_config or pass --plot-config.")
             if json_output:
                 json_error("plot list-config" if list_config else "plot", err)
                 raise typer.Exit(code=err.exit_code) from e
@@ -234,6 +240,13 @@ def _run_plot_command(
         return
 
     tag_filters = [str(t) for t in (tag or [])]
+    configured_views = [selection_view.id for selection_view in cfg.selection_views]
+    if view is None:
+        if len(configured_views) != 1:
+            raise OpalError(f"[plot] --view is required. Available: {configured_views}", ExitCodes.BAD_ARGS)
+        view = configured_views[0]
+    elif view not in configured_views:
+        raise OpalError(f"[plot] Unknown --view {view!r}. Available: {configured_views}", ExitCodes.BAD_ARGS)
 
     try:
         rounds_sel = parse_round_selector(round)
@@ -280,6 +293,8 @@ def _run_plot_command(
         store=store,
         rounds_sel=rounds_sel,
         run_id=run_id,
+        selection_view_id=view,
+        multi_view_campaign=len(configured_views) > 1,
         round_suffix=suffix,
         name_filter=name,
         tag_filters=tag_filters,

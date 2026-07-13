@@ -1,10 +1,11 @@
 ## OPAL X Transforms
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-13
 
 
-This page documents X-transform plugin contracts and runtime expectations. Use it when configuring `transforms_x` in `campaign.yaml` or implementing a new X transform plugin.
+X-transform plugins produce the feature matrix consumed by the model. The
+contracts below apply to `transforms_x` configuration and implementations.
 
 **Contract**
 
