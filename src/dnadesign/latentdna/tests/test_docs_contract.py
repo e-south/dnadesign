@@ -189,9 +189,9 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "Declared phase: `opal_candidate_table_pre_assay`" in study_status
     normalized_study_status = " ".join(study_status.split())
     assert "RegulonDB/native appendix visualization does not gate OPAL readiness" in normalized_study_status
-    assert "Current LatentDNA decision surfaces:" in study_status
+    assert "LatentDNA decision surfaces:" in study_status
     assert "LatentDNA X-selection: `complete`" in study_status
-    assert "Current working pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_status
+    assert "Selected pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`" in study_status
     assert "Preferred infer family: `evo2_7b`" in study_status
     assert "Supported infer families: `evo2_7b`, `evo2_20b`" in study_status
     assert "LatentDNA browser default family: `evo2_7b`" in study_status
