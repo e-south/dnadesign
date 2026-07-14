@@ -21,6 +21,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     SFXI_SOURCE_PROVENANCE,
     MetastudyPaths,
     SfxiSourceProvenance,
+    StressCampaignContract,
     StressTargetView,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime.loading import (
@@ -137,8 +138,67 @@ def test_label_source_frame_rejects_identity_drift(tmp_path) -> None:
         load_label_source_frame(paths, source, labels=labels)
 
 
+def test_stress_campaign_contract_rejects_missing_candidate_records(tmp_path) -> None:
+    repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file())
+    source_config = repo_root / "src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml"
+    campaign_root = tmp_path / "src/dnadesign/opal/campaigns"
+    target_config = campaign_root / "secg_rmf_greedy/configs/campaign.yaml"
+    target_config.parent.mkdir(parents=True)
+    target_config.write_text(source_config.read_text(encoding="utf-8"), encoding="utf-8")
+    paths = MetastudyPaths(
+        repo_root=tmp_path,
+        reader_bundle_root=tmp_path / "reader-bundle",
+        out_dir=tmp_path / "out",
+        campaign_root=campaign_root,
+    )
+
+    with pytest.raises(FileNotFoundError, match="Stress campaign candidate records are missing"):
+        load_stress_campaign_contract(paths)
+
+
+def test_sfxi_evidence_frame_rejects_missing_persisted_ledgers(tmp_path) -> None:
+    source = _sfxi_source()
+    target_view = _target_view()
+    paths = MetastudyPaths(
+        repo_root=tmp_path,
+        reader_bundle_root=tmp_path / "reader-bundle",
+        out_dir=tmp_path / "out",
+        campaign_root=tmp_path / "campaigns",
+    )
+    stress_campaign = StressCampaignContract(
+        slug="secg_rmf_greedy",
+        config_path=tmp_path / "campaign.yaml",
+        target_views=(target_view,),
+        candidate_records_path=tmp_path / "records.parquet",
+        x_column_name="x",
+    )
+
+    with pytest.raises(FileNotFoundError, match="Required SFXI source artifact is missing"):
+        load_sfxi_evidence_frame(
+            paths,
+            source,
+            target_view=target_view,
+            stress_campaign=stress_campaign,
+        )
+
+
+def test_repository_sfxi_artifact_gate_skips_unmaterialized_inputs(tmp_path) -> None:
+    with pytest.raises(pytest.skip.Exception, match="requires local stress-study SFXI provenance artifacts"):
+        _require_repository_sfxi_artifacts(tmp_path)
+
+
+def test_repository_sfxi_artifact_gate_rejects_partial_materialization(tmp_path) -> None:
+    candidate_records = tmp_path / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet"
+    candidate_records.parent.mkdir(parents=True)
+    candidate_records.touch()
+
+    with pytest.raises(AssertionError, match="partially materialized"):
+        _require_repository_sfxi_artifacts(tmp_path)
+
+
 def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) -> None:
     repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file())
+    _require_repository_sfxi_artifacts(repo_root)
     paths = MetastudyPaths(
         repo_root=repo_root,
         reader_bundle_root=tmp_path / "reader-bundle",
@@ -165,6 +225,34 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
         (0.0, 0.0, 1.0, 1.0),
         (0.0, 0.0, 0.0, 1.0),
     )
+
+
+def _require_repository_sfxi_artifacts(repo_root: Path) -> None:
+    missing = _missing_repository_sfxi_artifacts(repo_root)
+    if not missing:
+        return
+    required_artifact_count = 1 + (2 * len(SFXI_SOURCE_PROVENANCE))
+    if len(missing) == required_artifact_count:
+        pytest.skip(
+            f"requires local stress-study SFXI provenance artifacts; missing {missing[0].relative_to(repo_root)}"
+        )
+    missing_paths = [str(path.relative_to(repo_root)) for path in missing]
+    raise AssertionError(f"stress-study SFXI provenance artifacts are partially materialized; missing={missing_paths}")
+
+
+def _missing_repository_sfxi_artifacts(repo_root: Path) -> tuple[Path, ...]:
+    campaign_root = repo_root / "src/dnadesign/opal/campaigns"
+    candidate_records = repo_root / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet"
+    missing = [candidate_records] if not candidate_records.is_file() else []
+    for source in SFXI_SOURCE_PROVENANCE:
+        campaign_dir = campaign_root / source.source_campaign_slug
+        for path in (
+            campaign_dir / "outputs/ledger/predictions",
+            campaign_dir / "outputs/ledger/runs.parquet",
+        ):
+            if not path.exists():
+                missing.append(path)
+    return tuple(missing)
 
 
 def _sfxi_source() -> SfxiSourceProvenance:
