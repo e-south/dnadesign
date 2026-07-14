@@ -484,16 +484,12 @@ def _selection_qualifiers(manifest_row: pd.Series) -> dict[str, list[str]]:
     for row in memberships:
         if not isinstance(row, dict):
             raise ValueError(f"manifest selection membership rows must be mappings for {manifest_row['id']}")
-        membership_values.append(
-            "|".join(
-                (
-                    f"view={row.get('selection_view_id')}",
-                    f"rank={row.get('rank')}",
-                    f"score={row.get('score')}",
-                    f"score_ref={row.get('score_ref')}",
-                )
-            )
-        )
+        parts = [f"view={row.get('selection_view_id')}", f"rank={row.get('rank')}"]
+        if row.get("score") is not None:
+            parts.append(f"score={row['score']}")
+        if row.get("score_ref") is not None:
+            parts.append(f"score_ref={row['score_ref']}")
+        membership_values.append("|".join(parts))
     return {
         "selection_views": [",".join(str(view_id) for view_id in view_ids)],
         "selection_membership": membership_values,
@@ -650,6 +646,15 @@ def _validate_record_against_manifest_row(record: SeqRecord, expected: pd.Series
             "GenBank record source feature synthesis_name mismatch: "
             f"expected {expected['synthesis_name']!r}, observed {aliases!r}"
         )
+    for qualifier, expected_values in _selection_qualifiers(expected).items():
+        observed_values = source.qualifiers.get(qualifier) or []
+        normalized_observed = ["".join(value.split()) for value in observed_values]
+        normalized_expected = ["".join(value.split()) for value in expected_values]
+        if normalized_observed != normalized_expected:
+            raise ValueError(
+                f"GenBank record source feature {qualifier} mismatch for {expected['synthesis_name']}: "
+                f"expected {expected_values!r}, observed {observed_values!r}"
+            )
     if str(record.seq).upper() != str(expected["final_sequence"]).upper():
         raise ValueError(f"GenBank sequence mismatch for {expected['synthesis_name']}")
     labels = {str(value) for feature in record.features for value in feature.qualifiers.get("label", [])}

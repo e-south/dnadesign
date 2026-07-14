@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-candidate-table
 title: OPAL candidate table
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 audience:
   - operator
   - agent
@@ -69,16 +69,17 @@ panel = render_sequence_panel_image(candidate_row, config=config)
 - Keep X, Y, labels, model fitting, predictions, and round history in one OPAL
   campaign. Keep target masks and selectors in named selection views.
 - Treat observed assay labels as study-level truth, not selection-view truth.
-  The SFXI source runs used one shared pool; the RMF campaign will
-  ingest one typed response-window sidecar after promotion.
-- OPAL run/explain and `ingest-y` read the unified RMF labels through
+  The SFXI source runs used one shared pool. The study publisher will publish
+  one typed response-window sidecar and promotion manifest for the RMF
+  campaign; that publisher is not yet implemented.
+- OPAL run and explain read the unified response-window observed labels through
   `labels.source.kind: usr_sidecar` at
   `_opal/response_window_observed_labels.parquet`.
+- Generic `opal ingest-y` cannot modify the manifest-pinned response-window
+  label source.
 - The stress config sets `writeback.prediction_records: ledger_only`, so runs keep
   predictions, scores, selections, and batch ledgers campaign-local instead of
   writing prediction history into the shared `records.parquet`.
-- Shared `ingest-y` rejects unknown IDs unless explicitly dropped; it does not
-  create candidate rows.
 - Measured controls are valid observed-label rows but are excluded from
   synthesis-candidate eligibility by exact ID before restriction-site scanning.
 - Selected DenseGen sequences render directly from candidate-table
@@ -93,9 +94,11 @@ panel = render_sequence_panel_image(candidate_row, config=config)
 
 ### Target Label Contract
 
-- Source of truth: one append-only response-window label store keyed by stable
-  candidate `id`, observed round or batch, Reader artifact identity, reduction
-  contract, and eight-component Y schema. The promoted path is
+- Source of truth: one response-window label snapshot keyed by stable candidate
+  `id`, observed round or batch, and the eight-component Y schema. Its
+  digest-pinned study-provenance manifest records the Reader artifact,
+  candidate-binding artifact, reduction, and repeat-aggregation contracts. The
+  planned published path is
   `usr_prom_eth_cip_opal_candidates/_opal/response_window_observed_labels.parquet`.
 - Consumer contract: one campaign fits the shared eight-output phenotype model.
   Ethanol, ciprofloxacin, and AND masks are named selection views over the same

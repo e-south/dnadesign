@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-sfxi-round0-source-evidence
 title: SFXI round-0 source evidence
 owner: dnadesign-maintainers
 status: source_evidence
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 audience:
   - operator
   - agent
@@ -29,6 +29,10 @@ candidate/X-valid labels.
 
 ### Source Contract
 
+- Source-run directories are stored under
+  `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/`.
+  Their slugs and run IDs are immutable provenance; they are not executable
+  OPAL campaigns.
 - Response values use each Reader experiment's nearest snapshot to 12 hours.
 - Logic channels use `YFP/CFP`; fluorescence channels use corner-specific
   reference-normalized `YFP/OD600` under the SFXI vec8 contract.

@@ -29,7 +29,11 @@ from .batch0_source import (
 )
 from .campaigns import DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG
 from .contracts import SelectedCandidate, SelectionMembership
-from .exports import campaign_synthesis_output_dir, render_campaign_scoped_exports
+from .exports import (
+    campaign_synthesis_output_dir,
+    render_campaign_scoped_exports,
+    source_evidence_synthesis_output_dir,
+)
 from .manifest import build_synthesis_manifest
 from .opal_round_source import selected_candidates_from_opal_round
 from .records import (
@@ -467,9 +471,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.write:
         if source in {"batch0", "opal-round"}:
+            output_owner = "source_evidence" if source == "batch0" else "campaign"
             campaign_exports = render_campaign_scoped_exports(
                 manifest,
                 batch_id=batch_id,
+                output_owner=output_owner,
                 repo_root=repo_root,
                 output_root=args.output_dir,
                 candidate_records_path=candidate_records_path,
@@ -490,8 +496,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload["azenta_validation"] = validate_azenta_workbook(manifest, workbook_path)
     elif source in {"batch0", "opal-round"}:
         root = repo_root or args.repo_root or _repo_root_from(Path.cwd())
+        output_dir_for = source_evidence_synthesis_output_dir if source == "batch0" else campaign_synthesis_output_dir
         payload["default_campaign_output_dirs"] = {
-            campaign: str(campaign_synthesis_output_dir(root, campaign_slug=campaign, batch_id=batch_id))
+            campaign: str(output_dir_for(root, campaign_slug=campaign, batch_id=batch_id))
             for campaign in campaign_counts
         }
     if handoff_record is not None:

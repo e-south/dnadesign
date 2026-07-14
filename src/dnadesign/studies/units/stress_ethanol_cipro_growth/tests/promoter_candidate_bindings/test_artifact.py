@@ -24,6 +24,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
     BindingSourceArtifact,
     PromoterCandidateBindingsError,
     bundle_io,
+    load_promoter_candidate_bindings,
     materialize_promoter_candidate_bindings,
     preview_promoter_candidate_bindings,
     verify_promoter_candidate_bindings,
@@ -65,6 +66,23 @@ def test_materialize_and_verify_round_trip(tmp_path: Path) -> None:
     assert manifest["record"]["record_id"] == BINDINGS_RECORD_ID
     assert manifest["record"]["path"] == "bindings.parquet"
     assert "x_projection" not in manifest
+
+
+def test_public_loader_returns_only_rows_from_a_verified_bundle(tmp_path: Path) -> None:
+    allowed_root = tmp_path / "allowed"
+    bundle = allowed_root / "bundle"
+    materialize_promoter_candidate_bindings(
+        preview(),
+        out_dir=bundle,
+        allowed_output_root=allowed_root,
+    )
+
+    rows = load_promoter_candidate_bindings(bundle, allowed_root=allowed_root)
+
+    assert rows[["alias_namespace", "alias", "candidate_id"]].to_records(index=False).tolist() == [
+        ("reader.design_id", "pDual-10-A", "candidate-1"),
+        ("synthesis.name", "A", "candidate-1"),
+    ]
 
 
 def test_overwrite_restores_prior_bundle_when_publication_fails(

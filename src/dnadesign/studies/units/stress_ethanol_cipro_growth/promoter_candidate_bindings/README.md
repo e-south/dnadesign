@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-promoter-candidate-bindings
 title: Promoter candidate bindings
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 ---
 
 # Promoter Candidate Bindings
@@ -33,6 +33,10 @@ Reader selects `reader.design_id` aliases when it needs sequence context for an
 assay deliverable. Synthesis and source records use their own namespaces. The
 same binding artifact can therefore route study evidence that does not involve
 Reader or OPAL.
+
+Python consumers use the public `load_promoter_candidate_bindings` function.
+It verifies the complete bundle before returning rows; consumers do not read
+the Parquet record through package-private helpers.
 
 The synthesis adapter reads digest-pinned manifests from either a multi-artifact
 pre-assay record or one deduplicated selection-batch record. It does not branch

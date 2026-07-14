@@ -195,6 +195,10 @@ src/dnadesign/opal/campaigns/**/records.parquet
 !src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/records.parquet
 src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
+# Stress-study OPAL source evidence: preserve local immutable run artifacts
+# outside the executable campaign registry.
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/**
+
 # OPAL per-run products anywhere
 **/outputs/
 # Cruncher demo fixtures: keep packaged YIU demo bundle outputs, not full run trees.
@@ -309,7 +313,7 @@ src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/*
 src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/*
 !src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
 
-# Legacy DenseGen runs (ignored to avoid local artifact noise)
+# DenseGen run outputs retained outside active package surfaces
 src/dnadesign/densegen/runs/**
 !src/dnadesign/densegen/runs/demo/inputs/*.jaspar
 !src/dnadesign/densegen/runs/demo_meme_two_tf/

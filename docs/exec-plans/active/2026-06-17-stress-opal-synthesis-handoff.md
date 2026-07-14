@@ -61,7 +61,7 @@ cloning flanks, uppercase promoter cores, and readback validation.
 - Evidence: Candidate-table validation reported 157,160 rows, unique IDs, 60 nt
   uppercase DNA sequences, and `x_dim=8192`.
 
-- Observation: Historical sibling cloning workbooks use human-friendly order
+- Observation: Sibling cloning workbooks use human-friendly order
   aliases and lowercase flanks around uppercase promoter cores.
 - Evidence: `../cloning/genewiz_orders/opal-sfxi-stress-campaigns/*.xlsx`
   examples use `Sequence Name` and `Sequence` columns, with names like
@@ -145,7 +145,7 @@ cloning flanks, uppercase promoter cores, and readback validation.
 - Decision: Refine the existing pending batch-0 handoff instead of creating a
   second batch-zero variant or compatibility path.
 - Rationale: The first batch-zero handoff was still
-  `generated_pending_acceptance`; carrying old and new batch-zero sources would
+  `generated_pending_acceptance`; carrying multiple batch-zero sources would
   create avoidable operator drift before any order was accepted.
 - Date/Author: 2026-06-17 / Codex
 
@@ -179,7 +179,7 @@ Relevant existing surfaces:
   `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/`
 - OPAL campaign configs:
   `src/dnadesign/opal/campaigns/stress_eth_cip_*_rf_sfxi_topn/configs/campaign.yaml`
-- Sibling historical order examples:
+- Sibling order examples:
   `../cloning/genewiz_orders/opal-sfxi-stress-campaigns/`
 
 Boundaries:
@@ -294,8 +294,10 @@ Recent targeted validation:
 - `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source batch0 --json`
   passed, reporting 18 rows, 6 per campaign, and the three default
   campaign-local output directories.
-- `uv run opal selection-set show -c src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/configs/campaign.yaml --round 0 --json`
-  exits 2 with a structured `opal.cli_error.v1` missing-ledger payload, which
+- The three SFXI source runs have no campaign config and are stored under the
+  stress study's `workbench/source_evidence/opal_sfxi_round0/` root. Attempting
+  to use one as an executable OPAL campaign exits with a structured
+  `opal.cli_error.v1` missing-ledger payload, which
   is expected in the current pre-assay state.
 - `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round 0 --json`
   exits 2 with a concise missing

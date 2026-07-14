@@ -1809,6 +1809,7 @@ def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
     assert cfg.labels.source.kind == "usr_sidecar"
     assert cfg.labels.source.dataset == "usr_prom_eth_cip_opal_candidates"
     assert cfg.labels.source.path == "_opal/response_window_observed_labels.parquet"
+    assert cfg.labels.source.manifest_path == "_opal/response_window_observed_labels.manifest.json"
     assert cfg.labels.y_space == "reader_response_window_vector_v1"
     assert cfg.labels.round_column == "observed_round"
     assert cfg.labels.dedup_policy == "latest_by_round"
@@ -1822,6 +1823,7 @@ def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
     assert {view.id: view.objective.params["target_mask"] for view in cfg.selection_views} == expected
     assert all(view.selection.name == "top_n" for view in cfg.selection_views)
     assert all(view.selection.params["top_k"] == 6 for view in cfg.selection_views)
+    assert all(view.selection.params["require_exact_top_k"] is True for view in cfg.selection_views)
     assert all(view.selection.params["score_ref"] == "feasibility_margin" for view in cfg.selection_views)
     assert cfg.selection_batch.deduplicate_by == "sequence"
     assert cfg.selection_batch.expected_unique_count == 18
@@ -1854,7 +1856,8 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
     assert "data.location.kind: usr" in docs
     assert "observed assay labels as study-level truth" in docs
     assert "three digest-pinned SFXI source runs remain" in docs
-    assert "response-window label store" in docs
+    assert "response-window label snapshot" in docs
+    assert "digest-pinned study-provenance manifest" in docs
     assert "_opal/observed_labels.parquet" in docs
     assert "_opal/response_window_observed_labels.parquet" in docs
     assert "decision.opal.batch0.provenance" in docs
@@ -1936,5 +1939,5 @@ def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() ->
     assert "routes/decision/opal/README.md" in routes
     assert "routes/analysis/latentdna.md" in routes
     assert "round0_metric_review" in opal_route
-    assert "response-window label store" in opal_context
+    assert "response-window label snapshot" in opal_context
     assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in latentdna_route

@@ -15,6 +15,7 @@ import hashlib
 import json
 import shutil
 import textwrap
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -32,8 +33,10 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis
     read_azenta_workbook,
     render_azenta_workbook,
     render_campaign_scoped_exports,
+    render_genbank_record_set,
     selected_candidates_from_batch0_review,
     selected_candidates_from_opal_round,
+    source_evidence_synthesis_output_dir,
     validate_azenta_workbook,
     validate_genbank_record_set,
 )
@@ -334,6 +337,24 @@ def test_azenta_workbook_round_trip_matches_manifest(tmp_path: Path) -> None:
     }
 
 
+def test_azenta_workbook_render_is_byte_reproducible(tmp_path: Path) -> None:
+    manifest = build_synthesis_manifest(
+        selected=_selected_candidates(),
+        strategy=_strategy(),
+        batch_id="stress-opal-r0-20260617",
+    )
+    first_path = tmp_path / "first.xlsx"
+    second_path = tmp_path / "second.xlsx"
+
+    render_azenta_workbook(manifest, first_path)
+    render_azenta_workbook(manifest, second_path)
+
+    assert hashlib.sha256(first_path.read_bytes()).hexdigest() == hashlib.sha256(second_path.read_bytes()).hexdigest()
+    with zipfile.ZipFile(first_path) as workbook:
+        core_properties = workbook.read("docProps/core.xml")
+    assert core_properties.count(b"2000-01-01T00:00:00Z") == 2
+
+
 def test_azenta_workbook_readback_fails_on_sequence_mismatch(tmp_path: Path) -> None:
     manifest = build_synthesis_manifest(
         selected=_selected_candidates(),
@@ -459,6 +480,7 @@ def test_campaign_scoped_exports_write_manifest_and_gene_synthesis_workbook(tmp_
     exports = render_campaign_scoped_exports(
         manifest,
         batch_id="stress-opal-batch0-sfxi-v1",
+        output_owner="source_evidence",
         output_root=tmp_path,
     )
 
@@ -553,6 +575,7 @@ def test_campaign_scoped_exports_write_per_sequence_genbank_files_and_feature_ta
     exports = render_campaign_scoped_exports(
         manifest,
         batch_id="stress-opal-batch0-sfxi-v1",
+        output_owner="source_evidence",
         output_root=tmp_path,
         candidate_records_path=candidate_records_path,
     )
@@ -588,6 +611,8 @@ def test_campaign_scoped_exports_write_per_sequence_genbank_files_and_feature_ta
     assert source_qualifiers["campaign_slug"] == ["secg_ethanol_rf_sfxi_topn"]
     assert source_qualifiers["batch_id"] == ["stress-opal-batch0-sfxi-v1"]
     assert source_qualifiers["synthesis_name"] == ["SECG-B0-ETH-01"]
+    assert source_qualifiers["selection_views"] == ["ethanol"]
+    assert source_qualifiers["selection_membership"] == ["view=ethanol|rank=1"]
 
     feature_rows = pd.read_csv(feature_table_path)
     assert set(feature_rows["label"]) >= {
@@ -601,6 +626,56 @@ def test_campaign_scoped_exports_write_per_sequence_genbank_files_and_feature_ta
     assert set(feature_rows.loc[feature_rows["label"] == "BaeR TFBS", "densegen_coordinate_key"]) == {"offset"}
     fixed_mask = feature_rows["label"].astype(str).str.startswith(("-35", "-10"))
     assert set(feature_rows.loc[fixed_mask, "densegen_coordinate_key"]) == {"offset_raw"}
+
+
+def test_genbank_validation_requires_membership_aware_manifest(tmp_path: Path) -> None:
+    selected = selected_candidates_from_batch0_review(
+        pd.DataFrame(
+            [
+                {
+                    "campaign": "secg_ethanol_rf_sfxi_topn",
+                    "id": "eth-a",
+                    "sequence": CORE_A,
+                }
+            ]
+        )
+    )
+    manifest = build_synthesis_manifest(selected=selected, strategy=_strategy(), batch_id="stress-opal-batch0-sfxi-v1")
+    feature_table = build_genbank_feature_table(manifest)
+    genbank_dir = tmp_path / "genbank"
+    render_genbank_record_set(manifest, feature_table, genbank_dir)
+    old_schema_manifest = manifest.drop(columns=["selection_view_ids", "selection_memberships"])
+
+    with pytest.raises(
+        ValueError,
+        match="missing required GenBank columns: selection_view_ids, selection_memberships",
+    ):
+        validate_genbank_record_set(old_schema_manifest, genbank_dir)
+
+
+def test_genbank_validation_rejects_membership_qualifier_drift(tmp_path: Path) -> None:
+    selected = selected_candidates_from_batch0_review(
+        pd.DataFrame(
+            [
+                {
+                    "campaign": "secg_ethanol_rf_sfxi_topn",
+                    "id": "eth-a",
+                    "sequence": CORE_A,
+                }
+            ]
+        )
+    )
+    manifest = build_synthesis_manifest(selected=selected, strategy=_strategy(), batch_id="stress-opal-batch0-sfxi-v1")
+    feature_table = build_genbank_feature_table(manifest)
+    genbank_dir = tmp_path / "genbank"
+    rendered = render_genbank_record_set(manifest, feature_table, genbank_dir)
+    record_path = Path(rendered.iloc[0]["genbank_file_path"])
+    record = SeqIO.read(record_path, "genbank")
+    record.features[0].qualifiers["selection_views"] = ["and"]
+    SeqIO.write(record, record_path, "genbank")
+
+    with pytest.raises(ValueError, match="selection_views mismatch"):
+        validate_genbank_record_set(manifest, genbank_dir)
 
 
 def test_genbank_feature_projection_fails_fast_on_densegen_coordinate_mismatch(tmp_path: Path) -> None:
@@ -816,15 +891,28 @@ def test_genbank_feature_projection_accepts_reverse_orientation_motif_sequences(
     assert tfbs["genbank_location"] == f"complement({len(LEFT_FLANK) + 14 + 1}..{len(LEFT_FLANK) + 30})"
 
 
-def test_campaign_synthesis_output_dir_is_campaign_local() -> None:
-    path = campaign_synthesis_output_dir(
+def test_batch0_synthesis_output_dir_is_study_source_evidence_local() -> None:
+    path = source_evidence_synthesis_output_dir(
         Path("/repo"),
         campaign_slug="secg_and_rf_sfxi_topn",
         batch_id="stress-opal-batch0-sfxi-v1",
     )
 
     assert path == Path(
-        "/repo/src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1"
+        "/repo/src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/"
+        "opal_sfxi_round0/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1"
+    )
+
+
+def test_measured_round_synthesis_output_dir_is_campaign_local() -> None:
+    path = campaign_synthesis_output_dir(
+        Path("/repo"),
+        campaign_slug="secg_rmf_greedy",
+        batch_id="stress-opal-r1-rmf-v1",
+    )
+
+    assert path == Path(
+        "/repo/src/dnadesign/opal/campaigns/secg_rmf_greedy/outputs/synthesis_handoff/stress-opal-r1-rmf-v1"
     )
 
 
@@ -1292,20 +1380,53 @@ def test_cli_resolves_batch0_from_checked_in_handoff_record(
         "secg_and_rf_sfxi_topn",
     }
     assert expected_artifacts["secg_ethanol_rf_sfxi_topn"]["manifest_path"].endswith(
-        "src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/"
+        "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/"
+        "opal_sfxi_round0/secg_ethanol_rf_sfxi_topn/outputs/"
         "synthesis_handoff/stress-opal-batch0-sfxi-v1/"
         "stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__synthesis_manifest.csv"
     )
     assert expected_artifacts["secg_ethanol_rf_sfxi_topn"]["vendor_workbook_path"].endswith(
-        "src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/"
+        "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/"
+        "opal_sfxi_round0/secg_ethanol_rf_sfxi_topn/outputs/"
         "synthesis_handoff/stress-opal-batch0-sfxi-v1/"
         "stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__azenta_gene_synthesis.xlsx"
     )
     assert expected_artifacts["secg_ethanol_rf_sfxi_topn"]["genbank_dir_path"].endswith(
-        "src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/"
+        "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/"
+        "opal_sfxi_round0/secg_ethanol_rf_sfxi_topn/outputs/"
         "synthesis_handoff/stress-opal-batch0-sfxi-v1/"
         "stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__genbank_inserts"
     )
+
+
+def test_checked_in_batch0_record_accepts_current_strategy_and_manifest(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_batch0_cli_source(monkeypatch)
+
+    exit_code = synthesis_handoff_main(
+        [
+            "--handoff-id",
+            "stress-opal-batch0-sfxi-v1",
+            "--source",
+            "batch0",
+            "--json",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["strategy_id"] == "stress_promoter_insert:v1"
+    assert payload["handoff_record"]["manifest_validation"] == {
+        "campaign_counts": {
+            "secg_and_rf_sfxi_topn": 6,
+            "secg_cipro_rf_sfxi_topn": 6,
+            "secg_ethanol_rf_sfxi_topn": 6,
+        },
+        "status": "pass",
+        "strategy_id": "stress_promoter_insert:v1",
+    }
 
 
 def test_cli_handoff_record_preview_does_not_rebuild_batch0_inputs(

@@ -12,10 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 
+from ..source_evidence import sfxi_round0_source_evidence_dir
 from .azenta import render_azenta_workbook, validate_azenta_workbook
 from .genbank import build_genbank_feature_table, render_genbank_record_set, validate_genbank_record_set
 
@@ -37,6 +38,16 @@ def campaign_synthesis_output_dir(repo_root: str | Path, *, campaign_slug: str, 
     if not batch:
         raise ValueError("batch_id must be non-empty")
     return Path(repo_root) / CAMPAIGN_ROOT / slug / "outputs" / "synthesis_handoff" / batch
+
+
+def source_evidence_synthesis_output_dir(repo_root: str | Path, *, campaign_slug: str, batch_id: str) -> Path:
+    """Return the synthesis handoff directory owned by one SFXI source artifact."""
+
+    batch = str(batch_id).strip()
+    if not batch:
+        raise ValueError("batch_id must be non-empty")
+    source_dir = sfxi_round0_source_evidence_dir(repo_root, source_slug=campaign_slug)
+    return source_dir / "outputs" / "synthesis_handoff" / batch
 
 
 def campaign_synthesis_artifact_paths(
@@ -78,18 +89,32 @@ def _export_dir_for(
     output_root: str | Path | None,
     campaign_slug: str,
     batch_id: str,
+    output_owner: Literal["campaign", "source_evidence"],
 ) -> Path:
     if output_root is not None:
         return Path(output_root) / campaign_slug
     if repo_root is None:
         raise ValueError("repo_root is required when output_root is not provided")
-    return campaign_synthesis_output_dir(repo_root, campaign_slug=campaign_slug, batch_id=batch_id)
+    if output_owner == "source_evidence":
+        return source_evidence_synthesis_output_dir(
+            repo_root,
+            campaign_slug=campaign_slug,
+            batch_id=batch_id,
+        )
+    if output_owner == "campaign":
+        return campaign_synthesis_output_dir(
+            repo_root,
+            campaign_slug=campaign_slug,
+            batch_id=batch_id,
+        )
+    raise ValueError(f"unknown synthesis output owner: {output_owner!r}")
 
 
 def render_campaign_scoped_exports(
     manifest: pd.DataFrame,
     *,
     batch_id: str,
+    output_owner: Literal["campaign", "source_evidence"],
     repo_root: str | Path | None = None,
     output_root: str | Path | None = None,
     candidate_records_path: str | Path | None = None,
@@ -106,6 +131,7 @@ def render_campaign_scoped_exports(
             output_root=output_root,
             campaign_slug=campaign,
             batch_id=batch_id,
+            output_owner=output_owner,
         )
         export_dir.mkdir(parents=True, exist_ok=True)
         for stale_name in _STALE_GENERIC_ARTIFACT_NAMES:

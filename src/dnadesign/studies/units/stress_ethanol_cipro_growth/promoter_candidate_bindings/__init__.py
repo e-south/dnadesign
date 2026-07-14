@@ -30,6 +30,7 @@ from .contracts import (
     PromoterCandidateBindingsVerification,
     PromoterCandidateBindingsWriteResult,
 )
+from .loading import load_promoter_candidate_bindings
 from .resolution import resolve_exact_promoter_candidate_identity, resolve_promoter_candidate_bindings
 from .row_contract import BINDING_COLUMNS
 from .sources import preview_promoter_candidate_bindings_from_repo
@@ -51,6 +52,7 @@ __all__ = [
     "PromoterCandidateBindingsVerification",
     "PromoterCandidateBindingsWriteResult",
     "materialize_promoter_candidate_bindings",
+    "load_promoter_candidate_bindings",
     "preview_promoter_candidate_bindings",
     "preview_promoter_candidate_bindings_from_repo",
     "resolve_exact_promoter_candidate_identity",

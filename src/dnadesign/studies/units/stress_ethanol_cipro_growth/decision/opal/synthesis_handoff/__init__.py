@@ -39,6 +39,7 @@ _PUBLIC_EXPORTS = {
     "render_genbank_record_set": ".genbank",
     "selected_candidates_from_batch0_review": ".batch0_source",
     "selected_candidates_from_opal_round": ".opal_round_source",
+    "source_evidence_synthesis_output_dir": ".exports",
     "source_mode_from_handoff_record": ".records",
     "validate_azenta_workbook": ".azenta",
     "validate_genbank_record_set": ".genbank",

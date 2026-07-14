@@ -2,7 +2,7 @@ version: 2
 study_id: stress_ethanol_cipro_growth
 record_kind: synthesis_handoff_lifecycle
 owner: dnadesign-maintainers
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 authority: checked_in_study_record
 generated_artifact_policy:
   outputs_are_generated: true
@@ -69,45 +69,45 @@ handoffs:
     assay_batch_index: 0
     model_as_of_round: null
     run_id: batch0_pre_assay_review
-    strategy_id: sfxi_promoter_insert:v1
+    strategy_id: stress_promoter_insert:v1
     expected_campaigns:
       - campaign_slug: secg_ethanol_rf_sfxi_topn
-        source_campaign_slug: stress_eth_cip_ethanol_rf_sfxi_topn
+        source_campaign_slug: secg_ethanol_rf_sfxi_topn
         expected_rows: 6
-        manifest_path: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__synthesis_manifest.csv
-        vendor_workbook_path: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__azenta_gene_synthesis.xlsx
-        genbank_dir_path: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__genbank_inserts
-        genbank_feature_table_path: src/dnadesign/opal/campaigns/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__genbank_features.csv
-        manifest_sha256: 96b256af4d66169dac73fe5feb9a8be442c4975bc9b580caf1fb3168b58c2981  # pragma: allowlist secret
-        vendor_workbook_sha256: 8a912e7c971774f7d3938008c330c6061f3b078b27ebdfa11b7b8b2c678d42f3  # pragma: allowlist secret
-        genbank_dir_sha256: e7a344251240396ff8f4c064f4aa5084b9af22fab78a1d7caab2e36bfd99cb48  # pragma: allowlist secret
-        genbank_feature_table_sha256: 4dc2471dea39a8630d3deabad563100f13bfbab05d6670f3b1f4b636461b4c00  # pragma: allowlist secret
+        manifest_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__synthesis_manifest.csv
+        vendor_workbook_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__azenta_gene_synthesis.xlsx
+        genbank_dir_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__genbank_inserts
+        genbank_feature_table_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_ethanol_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_ethanol_rf_sfxi_topn__genbank_features.csv
+        manifest_sha256: 0e7ba06e22df41a84e41b966f589248d7f6c8953127bcbd4615f623defbaa6d8  # pragma: allowlist secret
+        vendor_workbook_sha256: 1220be78e62c7712f2e823a85a9399f9ba2893a1336fb197de3e4c98077786f6  # pragma: allowlist secret
+        genbank_dir_sha256: edee82064f4d5f7637cb3504fafcde339f0228130c6084c3e9d7e28b2b789aa2  # pragma: allowlist secret
+        genbank_feature_table_sha256: b4d66d0e3c187e98b18ec32f283b1cfc84d06058880c7f8069ffd69c876a2954  # pragma: allowlist secret
         workbook_readback_status: pass
         genbank_readback_status: pass
       - campaign_slug: secg_cipro_rf_sfxi_topn
-        source_campaign_slug: stress_eth_cip_cipro_rf_sfxi_topn
+        source_campaign_slug: secg_cipro_rf_sfxi_topn
         expected_rows: 6
-        manifest_path: src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__synthesis_manifest.csv
-        vendor_workbook_path: src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__azenta_gene_synthesis.xlsx
-        genbank_dir_path: src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__genbank_inserts
-        genbank_feature_table_path: src/dnadesign/opal/campaigns/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__genbank_features.csv
-        manifest_sha256: 280b5e33e8ff3a999f35de3e8c93fd44efebcf2dab56c215f59c66f2266913bd  # pragma: allowlist secret
-        vendor_workbook_sha256: 1f998852175dfb976821a9144e87b6377c5bbc966c09e19da354c6cc337e9c41  # pragma: allowlist secret
-        genbank_dir_sha256: defb70c0376a287d8264dabf306c47ab90a34681968b6b39f73c00124c48e6ee  # pragma: allowlist secret
-        genbank_feature_table_sha256: 34821e79fc3ed2bb1476d7bae63df74c360d45d3d206b6a0e5b198d3ff9ae1d0  # pragma: allowlist secret
+        manifest_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__synthesis_manifest.csv
+        vendor_workbook_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__azenta_gene_synthesis.xlsx
+        genbank_dir_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__genbank_inserts
+        genbank_feature_table_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_cipro_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_cipro_rf_sfxi_topn__genbank_features.csv
+        manifest_sha256: ceafa45623d73c5cb6e13e3f8d3b6f78d00660b6e4418375dc6bcbfa892fd863  # pragma: allowlist secret
+        vendor_workbook_sha256: 5209f8e2e8054355090b81b3bf1ee472567f2fea4e42bd3798838d69d28c6be2  # pragma: allowlist secret
+        genbank_dir_sha256: 4b420959eb2f1924f0a46c045eb6d90718ca8c704693dde933d9ddeaa71df4e7  # pragma: allowlist secret
+        genbank_feature_table_sha256: 99dfbfd939e28d4a0cf13e2d894decf0bbe072a307c546ed2d08a819ff68906a  # pragma: allowlist secret
         workbook_readback_status: pass
         genbank_readback_status: pass
       - campaign_slug: secg_and_rf_sfxi_topn
-        source_campaign_slug: stress_eth_cip_and_rf_sfxi_topn
+        source_campaign_slug: secg_and_rf_sfxi_topn
         expected_rows: 6
-        manifest_path: src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__synthesis_manifest.csv
-        vendor_workbook_path: src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__azenta_gene_synthesis.xlsx
-        genbank_dir_path: src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__genbank_inserts
-        genbank_feature_table_path: src/dnadesign/opal/campaigns/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__genbank_features.csv
-        manifest_sha256: 6550ed54fa1b4aaf7c9957cb31f889108661f7f3c1fa7dd297ac31a780c20814  # pragma: allowlist secret
-        vendor_workbook_sha256: 38a160c7254e1f36f877db5af94384642282bf136ae350c5e261a1c431ecb9c6  # pragma: allowlist secret
-        genbank_dir_sha256: f2a3d990ac7515cd93561f7f799b04cf43eb66dce705a832aa1b1948abcfc017  # pragma: allowlist secret
-        genbank_feature_table_sha256: da2507e54af23dd6aa8e9eba60fa1488cabe1397c78e51c48f4e466001112cd9  # pragma: allowlist secret
+        manifest_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__synthesis_manifest.csv
+        vendor_workbook_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__azenta_gene_synthesis.xlsx
+        genbank_dir_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__genbank_inserts
+        genbank_feature_table_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/secg_and_rf_sfxi_topn/outputs/synthesis_handoff/stress-opal-batch0-sfxi-v1/stress-opal-batch0-sfxi-v1__secg_and_rf_sfxi_topn__genbank_features.csv
+        manifest_sha256: 150fd1909c16b435f9f8fef4479363daf3ff7374854c4c0425002f4483e197b4  # pragma: allowlist secret
+        vendor_workbook_sha256: 258767760154674f38a38e947ebcf7d99208d412be00135f4e68ba2aee7fdf25  # pragma: allowlist secret
+        genbank_dir_sha256: ede459177b8079797ac052960de4fc790498200bf1db174bca51c5a5ecbee8b5  # pragma: allowlist secret
+        genbank_feature_table_sha256: 95be65785e1e51b2831f1c4fe90d0ff02c0b29f73423069dd925c25272bd31b2  # pragma: allowlist secret
         workbook_readback_status: pass
         genbank_readback_status: pass
-    note: Refined in place as the granular single-axis/AND pre-assay seed order before acceptance; generated local artifacts must be hashed and readback-validated before changing lifecycle_status to accepted_for_order.
+    note: Batch zero contains six pre-assay candidates for each declared selection view. Acceptance requires recorded hashes plus current-contract workbook and GenBank readback.

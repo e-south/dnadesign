@@ -2,7 +2,7 @@
 
 **Owner:** stress_ethanol_cipro_growth study
 **Lifecycle:** pre-assay batch zero recorded; measured-round contract inactive
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Study-owned conversion from an OPAL logical selection batch to physical
 synthesis artifacts.
@@ -23,13 +23,15 @@ from campaign names.
 ### Pre-assay batch zero
 
 `study_batch0_selector` preserves the digest-pinned pre-assay 18-row seed. Its
-SFXI source campaign slugs map explicitly to declared selection-view IDs:
+SFXI source-run slugs map explicitly to declared selection-view IDs:
 
 - `secg_ethanol_rf_sfxi_topn` -> `ethanol`
 - `secg_cipro_rf_sfxi_topn` -> `ciprofloxacin`
 - `secg_and_rf_sfxi_topn` -> `and`
 
 Those slugs are source-provenance labels, not executable OPAL configurations.
+Their artifacts and batch-zero exports are stored under the study-owned
+`workbench/source_evidence/opal_sfxi_round0/` root.
 
 ### Measured OPAL rounds
 

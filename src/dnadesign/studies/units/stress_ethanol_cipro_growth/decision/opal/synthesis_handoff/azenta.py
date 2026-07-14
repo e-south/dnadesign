@@ -11,6 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
+import re
+import tempfile
+import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +29,9 @@ AZENTA_COLUMNS: tuple[str, ...] = (
     "5' Phosphorylation",
 )
 _MANIFEST_COLUMNS = ("synthesis_name", "final_sequence")
+_WORKBOOK_TIMESTAMP = datetime(2000, 1, 1)
+_ZIP_TIMESTAMP = (2000, 1, 1, 0, 0, 0)
+_CORE_MODIFIED_PATTERN = re.compile(rb"(<dcterms:modified[^>]*>)[^<]*(</dcterms:modified>)")
 
 
 def _require_manifest_columns(manifest: pd.DataFrame) -> None:
@@ -54,8 +62,41 @@ def render_azenta_workbook(manifest: pd.DataFrame, path: str | Path) -> Path:
     workbook_path.parent.mkdir(parents=True, exist_ok=True)
     rows = azenta_rows_from_manifest(manifest)
     with pd.ExcelWriter(workbook_path, engine="openpyxl") as writer:
+        writer.book.properties.created = _WORKBOOK_TIMESTAMP
+        writer.book.properties.modified = _WORKBOOK_TIMESTAMP
         rows.to_excel(writer, sheet_name=AZENTA_SHEET_NAME, index=False)
+    _normalize_xlsx_archive(workbook_path)
     return workbook_path
+
+
+def _normalize_xlsx_archive(path: Path) -> None:
+    """Rewrite XLSX member metadata so identical rows have identical bytes."""
+
+    with zipfile.ZipFile(path, "r") as source:
+        members = [(info, source.read(info.filename)) for info in source.infolist()]
+
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(fd)
+    temp_path = Path(temp_name)
+    try:
+        with zipfile.ZipFile(temp_path, "w") as target:
+            for source_info, content in members:
+                if source_info.filename == "docProps/core.xml":
+                    content = _CORE_MODIFIED_PATTERN.sub(
+                        rb"\g<1>2000-01-01T00:00:00Z\g<2>",
+                        content,
+                    )
+                info = zipfile.ZipInfo(filename=source_info.filename, date_time=_ZIP_TIMESTAMP)
+                info.compress_type = source_info.compress_type
+                info.comment = source_info.comment
+                info.extra = source_info.extra
+                info.internal_attr = source_info.internal_attr
+                info.external_attr = source_info.external_attr
+                info.create_system = source_info.create_system
+                target.writestr(info, content)
+        temp_path.replace(path)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def read_azenta_workbook(path: str | Path) -> pd.DataFrame:
