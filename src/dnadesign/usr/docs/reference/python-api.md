@@ -1,7 +1,7 @@
 # USR Python API quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-23
+**Last verified:** 2026-07-14
 
 Public import surface: `dnadesign.usr`
 

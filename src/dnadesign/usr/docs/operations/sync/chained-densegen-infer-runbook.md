@@ -11,7 +11,7 @@
 **Status-kind:** usr-sync-audit
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-14
 
 
 Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with USR sync as the transfer contract.

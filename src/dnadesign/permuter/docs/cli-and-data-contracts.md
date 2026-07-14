@@ -1,7 +1,7 @@
 # Permuter CLI And Data Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-24
+**Last verified:** 2026-07-14
 
 Permuter mutates biological sequences, scores variants with pluggable
 evaluators, and writes one scoped dataset per workspace run.
@@ -31,8 +31,8 @@ Each scope is a directory with a single `config.yaml`. The directory name must
 match `scope.name`, `input.refs` must resolve to a readable CSV with the
 declared name and sequence columns, and `output.dir` must resolve inside the
 workspace `outputs/` tree.
-Supported output layouts are `flat` and `nested`; retired layout names are
-contract errors rather than compatibility aliases.
+Supported output layouts are `flat` and `nested`; every other layout value is a
+contract error.
 
 ```yaml
 scope:
@@ -73,7 +73,7 @@ Permuter workspaces. `--out` is an explicit output override. If
 `PERMUTER_OUTPUT_ROOT` is set, it behaves as a federated output root and writes
 to `$PERMUTER_OUTPUT_ROOT/<scope>`; `--out` still wins.
 `evaluate` and `plot` resolve exactly the configured workspace/ref dataset path
-instead of probing alternate legacy layouts.
+instead of probing undeclared layouts.
 For `evaluate`, explicit `--with` or `--metric` entries replace workspace
 `evaluate.metrics`; workspace metrics are used only when no explicit metric is
 provided.

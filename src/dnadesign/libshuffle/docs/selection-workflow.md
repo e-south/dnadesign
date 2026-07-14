@@ -1,7 +1,7 @@
 # LibShuffle Selection Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
+**Last verified:** 2026-07-14
 
 LibShuffle identifies representative subsets of dense-array DNA libraries by
 combining embedding-space diversity with literal sequence-diversity checks from
@@ -42,7 +42,10 @@ Given a large pool of sequences, **libshuffle** repeatedly draws fixed‑size su
 
 <img src="../images/flag_composition.png" alt="Literal Flag Composition" width="300"/>
 
-> **Note:** We also use a **Leiden flag**, clustering Evo 2 embeddings with the Leiden algorithm (see [**cluster**](../../cluster/README.md)). Any subsample that contains more than one sequence from the same cluster is flagged, ensuring we sample across distinct semantic “islands.”
+> **Note:** The current selector does not enforce a Leiden-cluster uniqueness
+> gate. Use [**cluster**](../../cluster/README.md) as a separate review surface
+> when cluster coverage matters; do not describe a LibShuffle winner as
+> cluster-balanced unless an explicit downstream check establishes that fact.
 
 ### Outlier Ranking: Minimum‑Gap Selection
 
@@ -64,17 +67,21 @@ We generate many 16‑sequence subsets and first filter for those with high aver
 
 ### Installation & Usage
 
-1. **Configure** `configs/example.yaml` under `libshuffle` to point at your `.pt` directory, set subsample size, plot settings, etc.
-4. **Run** the pipeline:
+1. **Configure** `src/dnadesign/libshuffle/config.yaml` to point at a directory
+   containing exactly one `.pt` file. `input_pt_path` is resolved relative to
+   `src/dnadesign/`, with `src/dnadesign/sequences/` checked as an explicit
+   second location.
+2. **Run** the package module from the repository root:
    ```bash
-   python libshuffle/main.py
+   uv run python -m dnadesign.libshuffle.main
    ```
-5. **Inspect** output under `libshuffle/batch_results/<prefix>_YYYYMMDD/`.
+3. **Inspect** output under
+   `src/dnadesign/libshuffle/batch_results/<prefix>_YYYYMMDD/`.
 
 
 ### Configuration
 
-Key settings in `configs/example.yaml`:
+Key settings in `src/dnadesign/libshuffle/config.yaml`:
 
 ```yaml
 libshuffle:
@@ -102,9 +109,9 @@ libshuffle:
 dnadesign/
 └── src/
     └── dnadesign/
-        ├── configs/             # YAML inputs
-        ├── sequences/           # source .pt files
+        ├── sequences/           # optional source .pt location
         └── libshuffle/
+            ├── config.yaml      # package-local run configuration
             ├── main.py          # CLI driver
             ├── config.py        # config loader
             ├── subsampler.py    # draw & cache
@@ -122,3 +129,4 @@ dnadesign/
 - **flag_composition.png** – QC breakdown bar chart
 - **hitzone_summary.png** – final outlier ranking
 - **selected/** – the final `.pt` of the chosen subsample (if enabled)
+- **saved_subs/** – explicitly requested additional subsamples (if enabled)

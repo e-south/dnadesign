@@ -7,7 +7,7 @@
 **Exit artifact:** the next concrete runbook for source assembly, contextualization, Evo2 feature extraction, notification, or downstream analysis
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-14
 
 Use this page when you need the full promoter-study Evo2 path in one place before choosing a concrete runbook.
 If you are checking the live study record, start with [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md).
@@ -56,8 +56,8 @@ The study record is the right place for current phase, dataset posture, and down
 ### Related docs
 
 - Docs index: [../../../../../../docs/README.md](../../../../../../docs/README.md)
-- USR docs index: [../README.md](../README.md)
-- USR operations index: [README.md](../README.md)
+- USR docs index: [../../README.md](../../README.md)
+- USR operations index: [../README.md](../README.md)
 - DenseGen docs: [../../../../densegen/docs/README.md](../../../../densegen/docs/README.md)
 - Construct docs: [../../../../construct/docs/README.md](../../../../construct/docs/README.md)
 - Infer docs: [../../../../infer/docs/README.md](../../../../infer/docs/README.md)

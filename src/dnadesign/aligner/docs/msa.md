@@ -1,7 +1,7 @@
 # Multiple Sequence Alignment
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-13
 
 Use `dnadesign.aligner.msa` when a workflow needs a generic aligned FASTA
 bundle. This package owns FASTA validation, declared MSA backend

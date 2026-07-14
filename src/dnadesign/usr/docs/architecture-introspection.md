@@ -1,7 +1,7 @@
 # USR Architecture Introspection
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-23
+**Last verified:** 2026-07-14
 
 
 ## Decision summary
@@ -36,7 +36,9 @@
   - Overlay parts are append-only; read/materialize semantics are deterministic last-writer-wins.
 - Sync contract:
   - Dataset sync defaults to primary hash verification plus strict sidecar parity.
-  - High-assurance mode (`--verify-derived-hashes`) verifies `_derived` and `_auxiliary` file-content hashes.
+  - `_derived` and `_auxiliary` file-content hashes are verified by default;
+    `--verify-derived-hashes` states that default explicitly, while
+    `--no-verify-derived-hashes` is the deliberate opt-out.
 - Failure behavior:
   - Hard errors on invalid schema, missing required files, unsupported paths, and verification mismatches.
   - Pull promotes staged payload only after verification; partial transfer does not mutate canonical local primary.
@@ -57,7 +59,7 @@
 Edge cases handled:
 - Interrupted pull/push retries.
 - Sidecar inventory mismatch (`_derived`, `_snapshots`, `_auxiliary`).
-- Hash mismatch in high-assurance sync.
+- Hash mismatch in default derived and auxiliary content verification.
 - Archived storage is kept out of default live dataset-id discovery while explicit archived paths remain readable.
 - Legacy promoter-focused PyTorch archives live under `datasets/archived/promoter_misc_pytorch/` and stay outside the `records.parquet` dataset API.
 - Strict bootstrap dataset-id enforcement.
@@ -97,7 +99,7 @@ Runtime interaction scenario:
 | `--root` | CLI root callback | Selects dataset root boundary and path resolution context. |
 | `--verify` (`hash|auto|size|parquet`) | Sync CLI + diff resolver | Chooses primary verification method for diff/pull/push. |
 | `--verify-sidecars` / `--no-verify-sidecars` | Sync policy | Enables/disables strict sidecar parity checks for dataset mode. |
-| `--verify-derived-hashes` | Sync policy + sidecar verifier | Enables high-assurance content-hash verification for `_derived` and `_auxiliary`. |
+| `--verify-derived-hashes` / `--no-verify-derived-hashes` | Sync policy + sidecar verifier | Explicitly retains or opts out of the default content-hash verification for `_derived` and `_auxiliary`. |
 | `USR_SYNC_STRICT_BOOTSTRAP_ID=1` | Sync CLI policy | Requires an explicit canonical dataset id on bootstrap pulls and disables local name guessing. |
 | `USR_SHOW_DEV_COMMANDS=1` | CLI app registration | Enables hidden dev subcommands in CLI surface. |
 | `USR_REMOTES_PATH` | Remote config loading | Selects remotes registry path for SSH sync profiles. |
@@ -124,7 +126,7 @@ Precedence notes:
   - `id = sha1("bio_type|sequence_norm")` (stable identity over normalized sequence and bio_type).
 - Diff/verification complexity:
   - Primary hash verification is `O(file_size)`.
-  - High-assurance sidecar hashes scale with number and size of `_derived` and auxiliary files.
+  - Default sidecar content hashes scale with number and size of `_derived` and auxiliary files.
 - Overlay resolution:
   - Last-writer-wins by overlay part ordering (`created_at`, filename tiebreak).
 
@@ -253,5 +255,5 @@ Precedence notes:
 - The layout contract now depends on helper families remaining under sanctioned subpackages; adding new top-level `usr/src/*.py` helpers should be treated as an architecture regression unless they are true coordinators.
 - Closed helper clusters should keep nesting under their owning family instead of adding new sibling flat modules; `contracts/*`, `events/*`, `overlays/*`, `registry/*`, `cli/commands/datasets/*`, `cli/commands/lifecycle/*`, `cli/commands/maintenance/*`, `cli/commands/namespace/*`, `cli/commands/query/*`, `cli/commands/read_views/*`, `cli/commands/remotes/*`, `cli/commands/sync/*`, `cli/commands/tooling/*`, `datasets/core/*`, `datasets/demo/*`, `datasets/lifecycle/*`, `datasets/maintenance/*`, `datasets/merge/*`, `datasets/overlay/*`, `datasets/query/*`, `datasets/state/*`, `datasets/validate/*`, `datasets/views/*`, and `runtime/*` are the current precedent.
 - `repair_densegen_used_tfbs()` still combines multiple optional mutation/drop paths; next extraction slice should isolate single-TF and id/sequence-only drop policy handling.
-- High-assurance hash mode can add runtime cost on very large overlay trees; operators should choose cadence based on transfer window constraints.
+- Default derived and auxiliary content hashing can add runtime cost on very large overlay trees; any opt-out should be an explicit operator decision tied to transfer-window constraints.
 - Sync audit output is strong for decision support; adding machine-readable audit snapshots may further improve automated orchestration loops.

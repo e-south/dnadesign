@@ -1,7 +1,7 @@
 ## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 `campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
 keys. There is no compatibility parser.
@@ -183,6 +183,12 @@ already-labeled exclusion policy.
 copying the candidate table. `candidate_eligibility` applies generic,
 manifested exclusion rules before scoring. Neither surface changes labels or
 rewrites source candidates.
+
+The streaming runtime loads only core candidate fields plus columns declared by
+the configured eligibility plugins and `selection_batch.deduplicate_by`.
+Eligibility plugins own that required-column declaration. A configured column
+missing from `records.parquet` is an execution error; OPAL does not silently
+load the full candidate table or skip the rule.
 
 `labels.source.kind` is `campaign_history` or `usr_sidecar`. A configured USR
 sidecar must match the candidate dataset and must exist for execution. OPAL does

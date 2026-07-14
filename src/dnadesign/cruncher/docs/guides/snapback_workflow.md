@@ -3,9 +3,9 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** guide
 **Audience:** snapback workflow users and maintainers
-**Last updated by:** cruncher-maintainers on 2026-05-14
+**Last updated by:** cruncher-maintainers on 2026-07-13
 **Applies to:** `uv run cruncher snapback init-workspace|validate|design|solve|target-search|show`
-**Last verified:** 2026-04-21
+**Last verified:** 2026-07-13
 **Primary artifacts:** `analysis/reports/report.json`, `analysis/reports/solve_report.json`, `analysis/views/views_manifest.v1.json`, `analysis/materialized_hits/hit_<rank>/`
 
 ### Contents

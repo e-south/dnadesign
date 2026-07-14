@@ -1,7 +1,7 @@
 # USR sync setup
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-14
 
 
 Use this page for one-time setup and periodic key hygiene.

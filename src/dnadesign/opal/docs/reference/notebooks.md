@@ -3,7 +3,7 @@ id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-09
+last_verified: 2026-07-14
 audience:
   - operator
   - maintainer
@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-12
+**Last verified:** 2026-07-14
 
 ## OPAL Notebooks
 
@@ -240,9 +240,12 @@ separate progress-only UI.
 
 ### Boundaries
 
-Canonical OPAL notebooks show OPAL campaign evidence only: records contract,
-configured X column provenance, ledgers, progress, review manifests, selection
-behavior, labels, predictions, plot artifacts, and limitations.
+Canonical OPAL notebooks assemble OPAL campaign evidence and explicitly staged
+external evidence manifests: records contracts, configured X provenance,
+ledgers, progress, review manifests, selection behavior, labels, predictions,
+plot artifacts, Reader evidence artifacts, and limitations. Reader artifacts
+remain Reader-authored; OPAL displays their manifest-backed outputs and does not
+rebuild assay reductions or composite figures.
 
 They must not render LatentDNA geometry, UMAP atlases, or representation-browser
 content. They may expose a BaseRender record view only when the records schema

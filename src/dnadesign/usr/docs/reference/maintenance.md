@@ -1,7 +1,7 @@
 # USR maintenance patterns
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-29
+**Last verified:** 2026-07-14
 
 
 This page captures common maintenance commands that mutate or package dataset state.

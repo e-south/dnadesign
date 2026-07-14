@@ -1,7 +1,7 @@
 ## SPOP Scalar Objective `spop_v1`
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-12
+**Last verified:** 2026-07-14
 
 `spop_v1` ranks candidates by a predicted SPOP endpoint scalar.
 
@@ -13,8 +13,10 @@ reader_spop_endpoint_dose_mean_v1
 ```
 
 OPAL does not parse Reader plate artifacts, choose endpoints, aggregate wells,
-or recompute SPOP. Reader and the study bridge own those steps. OPAL receives a
-scalar label or prediction and exposes a typed objective channel for selection.
+or recompute SPOP. Reader owns the assay reduction; the study owns exact
+candidate identity, provenance projection, and label staging. OPAL receives a
+typed scalar label or prediction and exposes the objective channel for
+selection.
 
 ## Input
 
@@ -66,10 +68,11 @@ selection_views:
 
 ## Record Flow
 
-Reader computes the SPOP scalar and support vectors. A bridge materializes that
-assay result onto study, Construct, USR, or label-source records with Reader
-artifact provenance. OPAL reads the configured scalar `Y` surface and ranks
-predictions through the view-local `spop` channel.
+Reader computes the SPOP scalar and support vectors. The study resolves Reader
+assay identity through its explicit Reader-to-Construct identity contract and
+stages the scalar on the selected label-source records with Reader artifact
+provenance. OPAL reads that configured scalar `Y` surface and ranks predictions
+through the view-local `spop` channel.
 
 Keep the provenance with the records that carry the scalar:
 

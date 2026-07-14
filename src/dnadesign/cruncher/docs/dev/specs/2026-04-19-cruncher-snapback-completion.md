@@ -1,10 +1,10 @@
 ## Cruncher Snapback Completion Dev Spec
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-19
+**Last verified:** 2026-07-13
 
-> **Last updated by:** cruncher-maintainers on 2026-04-19
-> **Historical note:** this developer spec captures the 2026-04-19 design cut. The shipped solve lane was later promoted to co-design-first `single_nick_snapback_solve_v3`. Use [`../guides/snapback_workflow.md`](../../guides/snapback_workflow.md), [`../reference/snapback_artifacts.md`](../../reference/snapback_artifacts.md), and [`../reference/architecture.md`](../../reference/architecture.md) for the active workflow, ranking, and artifact layout.
+> **Last updated by:** cruncher-maintainers on 2026-07-13
+> **Supersession note:** this developer spec records the 2026-04-19 design cut. The maintained solve lane is co-design-first `single_nick_snapback_solve_v3`. Use [`../guides/snapback_workflow.md`](../../guides/snapback_workflow.md), [`../reference/snapback_artifacts.md`](../../reference/snapback_artifacts.md), and [`../reference/architecture.md`](../../reference/architecture.md) for the active workflow, ranking, and artifact layout.
 
 ### Contents
 - [Purpose](#purpose)
@@ -18,7 +18,7 @@
 - [Required Domain Semantics](#required-domain-semantics)
 - [Public Workflow Contract](#public-workflow-contract)
 - [Explicit V2 Spec Contract](#explicit-v2-spec-contract)
-- [Historical Solve V2 Spec Contract](#historical-solve-v2-spec-contract)
+- [Superseded Solve V2 Spec Contract](#superseded-solve-v2-spec-contract)
 - [Geometry And Pairing Rules](#geometry-and-pairing-rules)
 - [Ranking Policy](#ranking-policy)
 - [Artifact Contract](#artifact-contract)
@@ -64,7 +64,7 @@ Implementation alignment rule:
 
 - replace the tracer-bullet `v1` contract with a clean `v2` cut
 - do not keep dual-contract runtime support inside `snapback`
-- keep the old `v1` spec only as historical documentation
+- retain the dated `v1` design record only as a superseded specification
 
 ## Skill Composition Decision
 
@@ -142,7 +142,7 @@ The command family remains:
 Implementation stance:
 
 - replace `single_nick_snapback_v1` with `single_nick_snapback_v2`
-- add the historical `single_nick_snapback_solve_v2` design cut later superseded by `single_nick_snapback_solve_v3`
+- record the superseded `single_nick_snapback_solve_v2` design cut while keeping `single_nick_snapback_solve_v3` as the maintained solve contract
 - `show` must distinguish explicit versus solve bundles from bundle metadata
 - `init-workspace` should scaffold only `v2` examples
 
@@ -345,7 +345,7 @@ uv run cruncher snapback show --run <run_dir>
 ### Version behavior
 
 - `validate|design` accept only `single_nick_snapback_v2`
-- historical design cut: `solve` emitted only `single_nick_snapback_solve_v2` reports and `single_nick_snapback_v2` hit bundles
+- superseded solve contract: `solve` emitted only `single_nick_snapback_solve_v2` reports and `single_nick_snapback_v2` hit bundles
 - `show` distinguishes explicit versus solve bundles from bundle metadata without guessing
 
 ## Explicit V2 Spec Contract
@@ -431,7 +431,7 @@ The report must publish:
 - `added_nt`
 - `extra_nick_event_count`
 
-## Historical Solve V2 Spec Contract
+## Superseded Solve V2 Spec Contract
 
 File suffix:
 

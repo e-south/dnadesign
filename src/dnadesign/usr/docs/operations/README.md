@@ -7,7 +7,7 @@
 **Exit artifact:** USR runbook or downstream handoff route
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-24
+**Last verified:** 2026-07-14
 
 Use this index to pick the next dataset, sync, or handoff step.
 
@@ -82,4 +82,4 @@ Use this index to pick the next dataset, sync, or handoff step.
 - Default dataset sync contract is `--verify hash` with strict sidecar and `_derived`/`_auxiliary` content-hash checks enabled.
 - Use `--no-verify-sidecars` only when an operator explicitly accepts reduced fidelity checks.
 - Use `--no-verify-derived-hashes` only when an operator explicitly accepts reduced content-hash fidelity.
-- Use sync audit output (`Primary`, `.events.log`, `_snapshots`, `_derived`) to decide pull/push actions.
+- Use sync audit output (`Primary`, `.events.log`, `_snapshots`, `_derived`, `_auxiliary`) to decide pull/push actions.

@@ -1,7 +1,7 @@
 # USR dataset layout and code map
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-24
+**Last verified:** 2026-07-14
 
 
 ## Dataset layout

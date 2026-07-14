@@ -1,7 +1,7 @@
 # Workspace Snapshot Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-15
+**Last verified:** 2026-07-14
 
 `latentdna workspace snapshot --workspace <id|path> --json` publishes the
 sanctioned study-facing status surface and writes

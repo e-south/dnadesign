@@ -1,7 +1,7 @@
 # LibShuffle Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
+**Last verified:** 2026-07-14
 
 Use LibShuffle when a large generated library needs a smaller, diverse subset
 for synthesis, inspection, or downstream modeling.

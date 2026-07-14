@@ -1,7 +1,7 @@
 # Contract Exports
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
+**Last verified:** 2026-07-13
 
 `contracts` publishes shared cross-tool artifact schemas for `dnadesign`.
 
@@ -24,8 +24,11 @@ Visual contracts:
 - `SequenceEvidenceMapV1`: shared nucleotide-evidence contract for YIU and sibling renderers
 - `ViennaRNAStructureSvgV1`: manifest for ViennaRNA-native structure SVG artifacts and dnadesign annotation metadata
 - `CompositionReviewSvgV1`: manifest for two-row composition review SVGs plus high-resolution PNG siblings that combine structure and component-span QA views
+- `ScarNickVisualV1`: scar-nick construct, nick-event, motif, and fragment-state rendering contract
+- `SnapbackVisualV1`: snapback geometry and sequence rendering contract
 - `YiuLinearStateV1`: shared linear/state contract for YIU visual publication
 - `YiuHairpinTopologyV1`: shared hairpin topology contract for YIU ligation states
+- `YiuPayloadVisualV1`: YIU payload sequence and state rendering contract
 - `YiuTopologyCartoonV1`: shared topology/cartoon contract for YIU circular or branched states
 
 Domain-qualified handoff contracts:

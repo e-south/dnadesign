@@ -1,7 +1,7 @@
 ## OPAL Review Manifests
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-12
+**Last verified:** 2026-07-14
 
 
 `opal review --view <selection_view_id>` writes one view-scoped review bundle

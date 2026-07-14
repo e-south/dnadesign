@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 audience:
   - operator
   - maintainer
@@ -13,7 +13,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 ## OPAL Command Line Interface
 
@@ -193,7 +193,9 @@ opal run --config <yaml> --round <r> \
 
 * Pulls effective labels per `training.policy` (cumulative vs current round, dedup policy).
 * Validates the Parquet X contract in bounded batches before round execution.
-* Loads record metadata without X and streams model-ready candidate X in bounded score batches.
+* Loads record metadata without X, including the columns declared by candidate
+  eligibility plugins and `selection_batch.deduplicate_by`, then streams
+  model-ready candidate X in bounded score batches.
 * Aborts if the train plus score batch X footprint exceeds `safety.max_x_matrix_gib`.
 * Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
   The batch stream may follow Parquet storage order; OPAL realigns predictions

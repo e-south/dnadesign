@@ -7,7 +7,7 @@
 **Exit artifact:** chosen runbook link plus summary command chain
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-14
 
 
 Use this page to pick a command chain quickly, then open the linked runbook for full detail. The command blocks below are short summaries, not full procedures.
@@ -216,8 +216,8 @@ USR_HARNESS_SYNC_AUDIT_REPORT_PATH="$ARTIFACT_ROOT/usr-sync-audit-drill-report.j
 
 # Re-run targeted adversarial suites directly when iterating quickly.
 uv run pytest -q \
-  src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py \
-  src/dnadesign/usr/tests/test_sync_schema_adversarial.py \
+  src/dnadesign/usr/tests/sync/test_sync_iterative_batch_flow.py \
+  src/dnadesign/usr/tests/sync/test_sync_schema_adversarial.py \
   src/dnadesign/usr/tests/test_usr_sync_audit_drill_script.py
 ```
 

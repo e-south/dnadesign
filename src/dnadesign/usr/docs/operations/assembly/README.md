@@ -1,7 +1,7 @@
 ## USR Assembly Runbooks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-07-14
 
 Use this folder when multiple source datasets or Construct handoffs need one
 durable USR dataset boundary before Infer, Notify, Cluster, or OPAL continues.

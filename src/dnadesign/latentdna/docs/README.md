@@ -1,7 +1,7 @@
 # LatentDNA Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-17
+**Last verified:** 2026-07-14
 
 LatentDNA docs are organized by task. Start with a workflow when you are
 running or reviewing a comparison, use reference docs when editing contracts,

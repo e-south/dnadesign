@@ -1,7 +1,7 @@
 ## Construct docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-13
 
 Construct places anchor sequences or other focal DNA parts into explicit larger
 sequence contexts, then hands those realized sequences to downstream tools

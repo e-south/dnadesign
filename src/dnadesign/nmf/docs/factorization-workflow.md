@@ -1,29 +1,23 @@
 # NMF Factorization Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
+**Last verified:** 2026-07-14
 
 NMF applies non-negative matrix factorization to dense-array DNA sequences to
 summarize motif co-occurrence programs across a designed library.
 
 ```bash
-dnadesign/
-├── billboard/
-├── libshuffle/
-├── nmf/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── parser.py
-│   ├── encoder.py
-│   ├── nmf_train.py
-│   ├── diagnostics.py
-│   ├── persistence.py
-│   ├── utils.py
-│   └── main.py                 # Main CLI entry point
-├── configs/
-│   └── example.yaml
-└── sequences/
-    └── densebatch_example.pt   # Example .pt file
+src/dnadesign/nmf/
+├── __init__.py
+├── config.yaml                 # package-local example configuration
+├── config.py
+├── parser.py
+├── encoder.py
+├── nmf_train.py
+├── diagnostics.py
+├── persistence.py
+├── utils.py
+└── main.py                     # internal orchestration module
 ```
 
 ### Background
@@ -51,7 +45,7 @@ The pipeline takes as input:
   - A YAML config specifying NMF hyperparameters, rank range, and visualization flags.
 
     ```yaml
-    # configs/example.yaml
+    # Configuration schema example
     nmf:
       batch_name: "densebatch_test"
       k_range: [8, 21]
@@ -72,10 +66,15 @@ The pipeline takes as input:
         similarity_threshold: 0.6
     ```
 
-#### Program Execution
-  ```python
-  python nmf/main.py
-  ```
+#### Runtime Status
+
+The repository has no `nmf` project script. The current `main.py` also resolves
+`src/dnadesign/configs/example.yaml` and
+`src/dnadesign/sequences/<batch_name>/`, neither of which is a checked-in NMF
+input surface. Therefore this page documents the factorization and artifact
+contracts but does not advertise `main.py` as a runnable operator command.
+Make configuration and input paths explicit in code before promoting an
+end-to-end CLI.
 
 #### Motif-Centric Encoding
   - The pipeline constructs a feature matrix `X` where rows represent sequences in the library and columns represent individual TF motifs found in the sequence.
@@ -99,7 +98,8 @@ Because our input sequences are densely encoded with many transcription factor m
 
   <img src="../images/reconstruction_loss.png" alt="Reconstruction Loss" width="500"/>
 
-Alternatively, we introduced a **Composite Diversity Score (CDS)** to select `k`. This metric balances two competing goals:
+The implementation can also plot a **Composite Diversity Score (CDS)** as a
+diagnostic across `k`. This metric balances two competing goals:
 - Dominance — how clearly each sequence favors a single program (i.e., low entropy).
 - Program Diversity — how broadly the subsample of sequences spans different programs.
 
@@ -112,15 +112,20 @@ where:
 - k is the number of latent programs (NMF rank).
 - α ∈ [0,1] (default: 0.5) balances per-sequence clarity vs. global program coverage.
 
-We compute CDS across a range of k values and select the one that maximizes it—representing the best tradeoff between interpretability and diversity.
+The current training code does not select `k` by maximizing CDS. When
+`nmf.best_k` is configured, orchestration uses that rank. Otherwise,
+`train_nmf(...)` selects the rank with the lowest mean reconstruction loss.
+CDS remains a review plot and must not be reported as the selection rule.
 
   <img src="../images/composite_diversity_curve.png" alt="Composite Diversity Curve" width="500"/>
 
-In the above example, k = 12 achieved the highest CDS. We then reused the corresponding NMF decomposition (W, H) for all downstream analyses and subset evaluations.
+In the checked-in package configuration, `best_k: 12` pins the downstream
+decomposition. The CDS plot can help review that choice, but it does not make
+the choice.
 
 
 ### Outputs
-- A results directory `nmf/batch_results/<batch_name>` containing:
+- A results directory `src/dnadesign/nmf/batch_results/<batch_name>` containing:
   - W.csv and H.csv for each k, plus a metrics.yaml detailing reconstruction error, replicate losses, etc.
   - Diagnostic plots (e.g. W_heatmap.png, H_heatmap.png, top_motifs_grid.png, signature_stability_riverplot.png).
 - Each sequence dictionary in the original .pt file gets an annotated meta_nmf key:
@@ -133,7 +138,11 @@ In the above example, k = 12 achieved the highest CDS. We then reused the corres
   }
   ```
 
-Check `nmf/batch_results/<batch_name>` for CSVs, metrics, and plots. Sequences in your .pt file now have a `meta_nmf` object capturing the final factorization details.
+When the orchestration module is supplied valid explicit inputs, check
+`src/dnadesign/nmf/batch_results/<batch_name>` for CSVs, metrics, and plots.
+The current persistence path mutates the input `.pt` file by adding a
+`meta_nmf` object; callers should treat that write as intentional, not as a
+read-only analysis step.
 
 #### Example Visualizations
 

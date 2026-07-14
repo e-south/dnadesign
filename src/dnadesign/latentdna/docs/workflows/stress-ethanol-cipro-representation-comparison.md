@@ -5,7 +5,7 @@
 **Surface role:** downstream-analysis
 **Owner-boundary:** latentdna
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-08
+**Last verified:** 2026-07-14
 **Registry-id:** latentdna.stress-ethanol-cipro-growth.representation-comparison
 **Entry artifact:** usr_prom_eth_cip_anchor, construct_prom_eth_cip_context, usr_promoter_references, construct_prom_eth_cip_reference_core60, and construct_prom_eth_cip_reference_contexts
 **Exit artifact:** published LatentDNA workspace snapshot plus sanctioned comparison deliverables and the `latent_geometry_browser` notebook

@@ -1,7 +1,7 @@
 # Permuter Architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-24
+**Last verified:** 2026-07-14
 
 Permuter is the variant-intent surface for dnadesign. It generates explicit
 sequence variants, records what changed, and materializes USR-shaped candidate
@@ -64,9 +64,10 @@ execution. In particular, Permuter must not write or mutate:
 - `_derived/infer/feature_scalars.parquet`
 - Infer completion ledgers, runtime fingerprints, or stale/reusable inventory
 
-The modern path is a non-executing handoff to Infer's public feature-bundle
-surface. The older ad hoc Evo2 evaluator path is a Permuter scoring convenience,
-not proof that a dataset has modern Infer sidecar coverage.
+`InferFeatureRequest` is a non-executing handoff to Infer's public
+feature-bundle surface. Permuter's Evo2 evaluators call the public Infer facade
+for candidate scoring, but those values are not proof that a dataset has Infer
+feature aliases or vector/scalar sidecar coverage.
 
 ## Study Boundary
 
@@ -84,6 +85,6 @@ for generic variant generation.
 - Reject conflicting `metadata.permuter.var_id` if present.
 - Reject `metadata.permuter.variant_id`; it would materialize the forbidden
   duplicate `permuter__variant_id` spelling.
-- Reject legacy `permuter__metric__*` columns in strict validation.
+- Reject unsupported `permuter__metric__*` columns in strict validation.
 - Treat missing Construct sequence views as upstream Construct/USR completion,
   not a Permuter fallback.

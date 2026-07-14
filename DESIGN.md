@@ -2,14 +2,14 @@
 doc_id: design
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-04-24
+last_verified: 2026-07-13
 ---
 
 # DESIGN
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-24
+**Last verified:** 2026-07-13
 
 ## At a glance
 This document defines repo-wide engineering principles, invariants, and boundary rules.
@@ -65,7 +65,7 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 - Tool-local behavior belongs under `src/dnadesign/<tool>/`.
 - Shared top-level `src/dnadesign/utils` is disallowed; reusable helpers must either live inside a tool boundary or move into an explicitly versioned shared package.
 - Shared cross-tool artifact schemas may live under `src/dnadesign/contracts/` when they are neutral, versioned, and used through public imports instead of sibling `src.*` internals.
-- Shared test fixtures may live under `src/dnadesign/devtools/testsupport/`, but production code must not import them.
+- Shared test fixtures may live under `src/dnadesign/devtools/tests/support/`, but production code must not import them.
 - Shared logic belongs in shared modules (`src/dnadesign/devtools/` or dedicated shared packages), not by copying scripts across tools.
 - Cross-tool coupling should happen via documented artifacts/contracts (files, events, CLI contracts) or explicit public package APIs.
 - Internal `dnadesign.<tool>.src.*` imports across tool boundaries are non-contractual and disallowed.

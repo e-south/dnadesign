@@ -1,7 +1,7 @@
 # 2026-04-19 retron P4 hairpin and YIU executive summary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-19
+**Last verified:** 2026-07-13
 
 ## Scope
 
@@ -99,7 +99,7 @@ Current YIU docs, schema models, and tests are explicit:
 - the junction is always an internal `4 nt` window
 - `candidate_positions` must be a subset of `0..3`
 - `candidate_positions=[1,2]` is a middle-only mismatch pool
-- legacy `bulge_mask`, `split`, and related topology keys are rejected
+- unsupported `bulge_mask`, `split`, and related topology keys are rejected
 
 So YIU can represent:
 

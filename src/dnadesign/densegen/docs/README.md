@@ -1,7 +1,7 @@
 ## DenseGen documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-13
 
 ### Documentation by workflow
 

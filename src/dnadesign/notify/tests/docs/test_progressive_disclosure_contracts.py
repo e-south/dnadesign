@@ -175,7 +175,7 @@ def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:
     )
     assert "Workspace shorthand is repo-rooted for all resolver-mode tools." in text
     assert "ingest.root" in text
-    assert "one legacy USR write-back destination or exactly one sequence-view" in text
+    assert "one USR write-back destination or exactly one sequence-view" in text
     assert "Multi-destination infer configs must use explicit `--events <path>`" in text
 
 

@@ -1,7 +1,7 @@
 ## Infer Pressure Test: Agnostic Model Namespaces + USR Write-Back
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-13
 
 This guide pressure-tests infer as a model-agnostic extraction engine with explicit namespace contracts and USR write-back.
 

@@ -1,7 +1,7 @@
 # Aligner Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
+**Last verified:** 2026-07-13
 
 Use Aligner when a workflow needs public alignment primitives:
 pairwise nucleotide scoring or generic protein MSA bundles.

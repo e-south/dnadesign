@@ -1,7 +1,7 @@
 # Contracts Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
+**Last verified:** 2026-07-13
 
 Use Contracts when a producer and consumer need a stable schema owned outside
 either tool's private implementation.

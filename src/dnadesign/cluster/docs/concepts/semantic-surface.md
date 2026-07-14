@@ -1,7 +1,7 @@
 ## Cluster semantic surface
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-13
 
 Use this page when you need the package nouns and boundaries before changing code or contracts.
 

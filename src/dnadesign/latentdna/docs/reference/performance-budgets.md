@@ -1,7 +1,7 @@
 # Performance Budgets
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-02
+**Last verified:** 2026-07-14
 
 The package currently treats promoter-study scale as a normal operating target, but checked-in verification remains contract-first and fixture-scale.
 

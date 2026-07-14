@@ -1,427 +1,184 @@
-# Permuter Modernization Plan
+# Permuter Contract Modernization
 
-**Type:** living dev spec
+**Type:** implementation status and remaining-work contract
 **Owner:** dnadesign-maintainers
 **Owner-boundary:** `src/dnadesign/permuter`
-**Status:** active
-**Last verified:** 2026-05-24
+**Status:** core contract slices implemented
+**Last verified:** 2026-07-14
 
-## Plan Intent Summary
+## Outcome
 
-Modernize Permuter from a CLI/scope-first mini-project into a contract-backed tool
-with a stable public API, workspace-scoped execution, and schema-aware dataset
-handling. The target outcome is a maintainable path from input biological
-sequence to explicit variant records, model scores, plots, and downstream
-selection artifacts without hidden coupling to package-local generated results.
+Permuter is the public variant-generation and in silico DMS surface for DNA,
+protein, and coding-DNA-backed requests. It has a stable public API,
+workspace-scoped CLI execution, explicit dataset identity, namespaced metric
+columns, and a non-executing Infer feature-request handoff.
 
-This plan follows top-level `dnadesign` principles:
+The package owns variant intent and materialization mechanics. It does not own
+USR synchronization, Construct placement, study interpretation, Infer feature
+sidecars, or Ops run-state semantics.
 
-- parse inputs at boundaries, then operate on trusted internal structures
-- fail fast on missing or invalid prerequisites
-- keep tool boundaries explicit and avoid cross-tool internal imports
-- accumulate repeated-run state under workspace roots, not ad hoc repository
-  paths
-- keep documentation layered, owner-local, and backed by executable checks
-- use evidence-backed quality gates instead of convention-only contracts
-
-## Worth-Doing Preflight
-
-Best case: Permuter becomes the public variant-generation and in silico DMS
-surface for DNA, codon, protein, and multi-site workflows, including future
-reverse transcriptase scans from a provided protein or coding sequence.
-
-Why it matters: the current package works, but its contracts have drifted across
-older metric-column drift, newer observed/expected columns, RT-specific selection
-logic, and package-local generated outputs. Hardening those seams now reduces
-future maintenance cost and makes Permuter safe to call from studies, notebooks,
-cluster runs, and other `dnadesign` tools.
-
-## Current Audit Baseline
-
-Verified on 2026-05-24:
-
-- `uv run permuter --help` passed.
-- `uv run pytest -q src/dnadesign/permuter/tests` passed after the public
-  API/JSON/plot-manifest/SCC wrapper slice and the non-executing Infer handoff
-  request slice.
-- All 9 checked-in workspace scope configs validated with `ScopeConfig`.
-- Scratch dogfood `run -> evaluate -> validate -> plot` passed and rendered
-  PNG/PDF plot artifacts.
-
-Primary findings:
-
-- High: Permuter no longer reaches into stale Infer internals and now has a
-  non-executing public Infer feature-request manifest. Its Evo2 evaluators still
-  use the ad hoc evaluator path and do not yet opt into Infer's current
-  feature-bundle, sequence-view alias, scalar/vector sidecar, `_derived/infer`,
-  or USR overlay contracts.
-- Medium: generated datasets remain workspace-Parquet-native. They are
-  USR-shaped rows, but not overlay-native sidecars with `.events.log`,
-  sync/diff semantics, or Infer sidecar reuse.
-- Medium: public generation is clean, but scoring, materialization, and
-  validation needed stable library APIs so sibling tools do not shell out or
-  import `dnadesign.permuter.src.*`.
-- Medium: `run`, `evaluate`, `plot`, and `validate` needed one-object JSON
-  output so naive agents and SCC wrappers can coordinate without scraping rich
-  console text.
-- Low/medium: plot IDs drifted. `window_score_mass` appeared in help/config
-  sizing surfaces even though CLI dispatch rejected it. Plot artifacts also
-  lacked a freshness manifest.
-- Low: BU SCC had Infer/Evo2 templates but no Permuter wrapper for
-  closed-loop evaluate jobs.
-
-## Explicit Scope
-
-In scope:
-
-- dataset column contract modernization
-- scope config parsing and schema validation hardening
-- workspace model introduction
-- public API facade for generation and evaluation planning
-- protein-native or codon-policy-backed DMS request design
-- docs and tests that make the contracts executable
-- migration of former runnable configs into workspace scopes
-
-Out of scope for the first modernization pass:
-
-- replacing Evo2 evaluator internals
-- changing USR core semantics
-- moving cross-tool schemas into shared contracts before a real cross-tool
-  consumer needs them
-- rewriting all protocols at once
-- preserving deprecated identifiers as silent aliases
-- committing generated workspace `outputs/` artifacts
-
-## Target Architecture
-
-### Boundary Model
-
-Permuter should have four explicit layers:
-
-1. `api`
-   Public, typed library entrypoints. No console output, no implicit filesystem
-   writes unless the caller passes a workspace or output policy.
-
-2. `contracts`
-   Pydantic/dataclass request and result objects, dataset schema helpers,
-   and metric-column selectors.
-
-3. `runtime`
-   Execution orchestration for generation, evaluation, plotting, validation,
-   journaling, and workspace materialization.
-
-4. `cli`
-   Typer command bindings that parse user input and delegate to `api` or
-   `runtime` services.
-
-Existing protocol/evaluator implementations can remain under `src/` during the
-transition, but new cross-module calls should target public contracts and
-services rather than CLI functions.
-
-### Workspace Model
-
-Add a tool-local workspace convention:
+## Current Architecture
 
 ```text
-src/dnadesign/permuter/workspaces/<workspace_id>/
-  config.yaml
-  outputs/
-    records.parquet
-    plots/
+src/dnadesign/permuter/
+  __init__.py                    public facade and CLI entrypoint
+  src/
+    api/                         typed generation, evaluation, materialization,
+                                 validation, and Infer request contracts
+    contracts/                   metric-column contracts
+    cli/                         Typer parsing and output adapters
+    evaluators/                  pluggable scoring implementations
+    plots/                       registered plot implementations
+    protocols/                   mutation protocols
+    workspaces/                  workspace loading and validation
+    resources/                   packaged codon tables
+  workspaces/
+    _shared/inputs/              shared checked-in inputs
+    <scope>/config.yaml          one runnable scope
+    <scope>/outputs/             generated artifacts
 ```
 
-Workspace principles:
+Cross-tool callers import `dnadesign.permuter`. They do not import
+`dnadesign.permuter.src.*` or CLI handlers.
 
-- `config.yaml` is the entry artifact for workspace-backed execution.
-- `outputs/` is generated and ignored unless explicitly promoted.
-- Downstream dependencies between DMS, combine, and selection runs are explicit
-  workspace-relative paths, not hard-coded paths into package-root `results/`.
-- The CLI uses `--workspace`; package-root `jobs/`, `inputs/`, `results/`, and
-  `notebooks/` are not part of the architecture.
+## Implemented Contracts
 
-### Dataset Column Contract
+### Public generation and materialization
 
-Canonical columns:
+The public facade exports:
 
-- USR core: `id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`,
-  `created_at`
-- variant identity: `permuter__var_id`
-- generation metadata: `permuter__scope`, `permuter__ref`,
-  `permuter__protocol`, `permuter__round`, `permuter__modifications`
-- observed metrics: `permuter__observed__<metric_id>`
-- expected metrics: `permuter__expected__<metric_id>`
-- interaction metrics: `permuter__interaction__epistasis__<metric_id>`
-- vector outputs: `permuter__observed__<metric_id>` may be Arrow list columns
-  when the evaluator declares a vector shape
-
-Compatibility rule:
-
-- Do not accept legacy `permuter__metric__<metric_id>` as runtime input.
-- Re-materialize old datasets through `permuter evaluate` instead of carrying a
-  read shim.
-- Plot and protocol code must use the metric contract helpers rather than
-  hand-building column names.
-
-### Public API Direction
-
-Initial public API objects:
-
+- `NucleotideDmsRequest`
 - `ProteinDmsRequest`
 - `CodingDnaDmsRequest`
-- `NucleotideDmsRequest`
 - `EvaluatorPlan`
 - `MetricSpec`
-- `DatasetRef`
 - `VariantRecord`
 - `PermuterResult`
+- `DatasetRef`
 - `ValidationReport`
+- `generate_variants(...)`
+- `evaluate_variants(...)`
+- `materialize_result(...)`
+- `validate_dataset(...)`
 
-Initial API functions:
+Pure generation returns typed in-memory records. Filesystem materialization is
+an explicit second operation. Coding-DNA requests require an explicit codon
+table and may set `max_variants` to reject oversized scans before rows are
+materialized.
 
-- `generate_variants(request) -> PermuterResult`
-- `evaluate_variants(result, plan) -> PermuterResult`
-- `materialize_result(result, output_dir) -> DatasetRef`
-- `validate_dataset(dataset, strict=False) -> ValidationReport`
+Materialized identity is deliberately split:
 
-Protein DMS policy:
+- `id` is the canonical USR sequence identity derived from `bio_type` and
+  `sequence`.
+- `permuter__var_id` is the Permuter request/variant identity preserved from
+  `VariantRecord.id`.
 
-- Protein-native enumeration should emit protein variant records without
-  pretending a nucleotide sequence exists.
-- If DNA or Evo2-DNA scoring is requested from a protein request, the caller must
-  provide a coding DNA reference or an explicit codon design policy.
-- Back-translation must be explicit and recorded in provenance.
+`metadata.permuter.variant_id` and a parallel `permuter__variant_id` column are
+rejected. A new identity spelling requires a versioned materialization
+contract, not a second column.
 
-Current implementation note:
+### Metric columns
 
-- `generate_variants(...)` is implemented for `NucleotideDmsRequest`,
-  `ProteinDmsRequest`, and `CodingDnaDmsRequest`.
-- `CodingDnaDmsRequest` is the construct-ready DMS surface: it accepts a coding
-  DNA reference plus an explicit codon table and returns DNA variant records
-  with codon-policy provenance in metadata.
-- `evaluate_variants(...)`, `materialize_result(...)`, and
-  `validate_dataset(...)` are public surfaces. Sibling tools should call the
-  facade at `dnadesign.permuter` and should not import CLI functions or
-  `dnadesign.permuter.src.*` modules as stand-ins.
-- The public scoring path shares evaluator output normalization with the CLI:
-  scalar, dict, and fixed-vector evaluator outputs become canonical
-  `permuter__observed__*` columns when materialized.
-- Public API materialization now keeps USR sequence identity and Permuter
-  variant identity separate: materialized `id` is the canonical USR sequence id,
-  while `VariantRecord.id` is preserved as `permuter__var_id`.
-- This API is still not a substitute for the future Infer feature-bundle/USR
-  sidecar bridge. Evo2 feature bundles should use Infer directly until Permuter
-  has an explicit sidecar-native evaluator mode.
-- `InferFeatureRequest` is the public non-executing handoff manifest for
-  requesting Infer feature work. It requires explicit `view_name` or `alias`
-  selectors and keeps `execution_owner` / `writeback_owner` pinned to Infer.
+Canonical metric columns are:
 
-### Machine and Batch Surface
+- observed: `permuter__observed__<metric_id>`
+- expected: `permuter__expected__<metric_id>`
+- interaction: `permuter__interaction__<interaction_id>__<metric_id>`
 
-- `permuter run --json`, `permuter evaluate --json`,
-  `permuter validate --json`, and `permuter plot --json` emit a single JSON
-  object on stdout.
-- Plot runs write `plots/manifest.json` with source parquet path, source size,
-  source mtime, metric id, render parameters, and emitted artifacts.
-- Supported plot IDs are centralized in `plots.registry`. Internal helpers such
-  as `window_score_mass` are not advertised unless they have a complete CLI
-  renderer contract.
-- BU SCC has a `docs/bu-scc/jobs/permuter-evaluate.qsub` wrapper that validates
-  a workspace, optionally runs generation, evaluates with JSON output, and
-  writes a workspace-scoped runtime trace.
+Fixed-vector evaluator values may use Arrow list columns or declared observed
+subcolumns. `permuter__metric__*` is unsupported and rejected by strict
+validation; the runtime does not carry a read alias.
 
-### Next Architecture Gap
+### Workspace execution
 
-Permuter's next high-value slice is an explicit Infer bridge:
+Each scope has exactly one `config.yaml`. Scope name, input reference columns,
+protocol, and output layout are validated before execution. Output layouts are
+`flat` or `nested`; every other value fails validation.
 
-- Add a non-executing handoff manifest that references an Infer workspace or
-  feature-bundle plan instead of an ad hoc Evo2 output spec.
-- Preserve Infer-owned sidecar contracts rather than copying private
-  implementation details into Permuter.
-- Decide whether Permuter writes a USR overlay namespace directly or returns a
-  handoff object that an owning study/workspace syncs into USR.
-- Keep the fast ad hoc Evo2 evaluator path explicit, named, and documented so it
-  is not mistaken for full Infer sidecar semantics.
+The resolver accepts a workspace directory, a `config.yaml` path, or a scope
+ID. It supports `${WORKSPACE_DIR}`, `${WORKSPACES_DIR}`,
+`${PERMUTER_RESOURCE_DIR}`, environment variables, and `~`. `${JOB_DIR}` is
+unsupported. `--out` is the explicit output override; otherwise
+`PERMUTER_OUTPUT_ROOT` may provide a federated writable root. The runtime does
+not probe undeclared output layouts.
 
-## Ordered Modernization Checklist
+The checked-in workspace configurations and shared input CSVs are included as
+`dnadesign.permuter` package data.
 
-### Slice 0: Lock Contracts Before Refactors
+### CLI and read-only behavior
 
-- Add a short contract glossary to the Permuter docs for observed, expected,
-  interaction, metric selector, workspace, run, dataset, and artifact.
-- Add tests that reproduce the current drift:
-  - fresh `run -> evaluate -> combine_aa` should use the canonical metric
-    selector
-  - ordinary DMS plots should not require expected/epistasis columns
-  - strict validation should accept the intended multi-site contract
-- Decide and document the rejection rule for legacy `permuter__metric__*`.
+The CLI provides:
 
-Done when:
+- `permuter run`
+- `permuter evaluate`
+- `permuter plot`
+- `permuter export`
+- `permuter validate`
+- `permuter inspect`
+- `permuter workspace list|validate|inspect`
 
-- the failing contract tests are written first
-- each failing test names the expected replacement behavior
-- no runtime refactor has started before the contract is explicit
+`run`, `evaluate`, `plot`, and `validate` expose one-object JSON output for
+automation. `validate` and `inspect` do not append to `RECORD.md` unless the
+caller passes `--record`.
 
-### Slice 1: Metric and Dataset Schema Hardening
+Plot runs write `plots/manifest.json` with schema
+`permuter.plot_manifest.v1`, source provenance, metric and render parameters,
+and emitted artifacts. Only plot IDs in the registry are advertised by the
+CLI.
 
-- Implement one metric selector module that resolves:
-  - observed scalar metrics
-  - observed vector metrics
-  - expected metrics
-  - interaction metrics
-- Update `combine_aa`, plot modules, inspect, and validate to use the selector.
-- Split dataset validation by dataset kind:
-  - `dms_single`
-  - `hairpin_scan`
-  - `combine_aa`
-  - `multisite_select`
-  - `generic_permuter`
-- Reject legacy metric columns with actionable errors.
-- Update docs to remove stale `RECORDS.md` and `permuter__metric__*` claims.
+### Infer boundary
 
-Done when:
+Permuter exposes two distinct Infer-facing surfaces:
 
-- package tests pass
-- a temp-output `run -> evaluate -> validate -> plot` smoke test passes
-- RT DMS result can feed `combine_aa` without depending on stale metric columns
+1. Evo2 evaluators call the public `dnadesign.infer.run_extract` facade to
+   compute candidate-level scores.
+2. `InferFeatureRequest` records a non-executing feature-bundle request with an
+   explicit source dataset, feature-bundle reference, sequence-view selectors,
+   and requested outputs.
 
-### Slice 2: Read-Only Command Semantics
+Neither surface makes Permuter the owner of Infer feature aliases,
+vector/scalar sidecars, completion ledgers, resume planning, stale detection,
+or `_derived/infer` writes. Candidate scores must not be presented as evidence
+that those Infer artifacts exist.
 
-- Add pure validation/inspection paths that do not mutate `RECORD.md`.
-- Keep CLI journaling opt-in or explicit for commands that are conceptually
-  read-only.
-- Make command help state whether a command mutates the dataset journal.
+## Remaining Explicit Gap
 
-Done when:
+There is no Permuter executor for `InferFeatureRequest`. Add one only when a
+real consumer requires a Permuter-initiated, sidecar-native feature run. That
+slice must:
 
-- `validate` and `inspect` can run without changing file mtimes in pure mode
-- tests assert pure mode does not append `RECORD.md`
+- call public Infer APIs only;
+- preserve Infer feature-bundle and sequence-view contracts;
+- keep execution and writeback ownership with Infer;
+- prove feature alias and scalar/vector sidecar behavior with a smoke workspace;
+- keep study overlay policy outside Permuter;
+- avoid generated workspace artifacts in tests.
 
-### Slice 3: Workspace Shell
+Until then, use the request manifest as a handoff and run the owning Infer
+workflow directly.
 
-- Add workspace config models, loader, resolver, and validator.
-- Add CLI commands:
-  - `permuter workspace list`
-  - `permuter workspace validate`
-  - `permuter workspace inspect`
-- Add one migrated RT workspace that models:
-  - single-codon DMS
-  - combine from DMS
-  - multi-site selection
-  - explicit dataset edges
-- Treat each former runnable config as its own workspace scope with `config.yaml`.
-- Implement `PERMUTER_OUTPUT_ROOT` or remove it from docs and help. Hidden
-  fallback behavior is not allowed.
-- Remove retired dataset-layout probes. `evaluate` and `plot` must resolve the
-  configured workspace/ref path and fail if that path is missing.
-- Make invalid `output.layout` values fail fast instead of falling through to
-  nested layout.
+## Maintainer Decisions
 
-Done when:
+- Interaction metrics use the namespaced interaction form; unprefixed
+  exceptions are not part of the contract.
+- Protein-native and coding-DNA-backed DMS are separate explicit request types.
+- Checked-in runnable examples remain workspace scopes under
+  `src/dnadesign/permuter/workspaces/`.
+- Generated datasets remain workspace-Parquet artifacts. USR event logs,
+  overlay synchronization, and Infer sidecar reuse belong to their owning
+  tools.
+- Unsupported protocol, metric, identity, and layout names fail; do not add
+  silent aliases or fallback probes.
 
-- workspace validation fails fast on missing inputs, scope/config name mismatch,
-  and invalid layouts
-- workspace output paths stay under the workspace `outputs/` tree unless an
-  explicit external root is configured with `--out` or `PERMUTER_OUTPUT_ROOT`
-- workspace CLI resolves scope ids, workspace directories, and `config.yaml`
-  paths
-
-### Slice 4: Public API Facade
-
-- Add `dnadesign.permuter` public package facade with typed request/result objects.
-- Refactor CLI commands to call API/runtime services rather than owning behavior.
-- Keep filesystem materialization separate from pure variant generation.
-- Add protein-native DMS enumeration.
-- Add coding-DNA-backed protein DMS with explicit codon policy requirements.
-
-Done when:
-
-- a user can call `generate_variants(ProteinDmsRequest(...))` without touching
-  the filesystem
-- a user can materialize the same result into a workspace
-- CLI and API share validation contracts
-
-### Slice 5: Operability and Quality Integration
-
-- Add status or inventory metadata only if Permuter gains repeated operational
-  use that needs observation-plane discovery.
-- Add docs-check coverage for the modernization spec links.
-- Add package-data entries for workspace templates only after they become
-  packaged defaults.
-- Add coverage baseline updates after the new contract tests land.
-
-Done when:
-
-- quality evidence links point to real tests or docs checks
-- workspace examples are packaged or clearly marked as source-only
-- no generated result artifacts are required for tests
-
-## Provisional Sprint Contract
-
-Recommended next execution slice: **Infer execution bridge and USR-sidecar
-handoff**.
-
-Goal:
-
-- Let Permuter evaluate generated variants through Infer's current public
-  feature-bundle/sidecar semantics without internal Infer inreach.
-
-In-scope work:
-
-- a public `InferScoringPlan` or equivalent execution plan that consumes the
-  existing non-executing `InferFeatureRequest` manifest
-- an implementation path that calls Infer public APIs only
-- feature alias and sequence-view contract tests against an Infer smoke
-  workspace
-- scalar/vector sidecar preservation tests
-- explicit documentation that distinguishes ad hoc Evo2 scoring from
-  sidecar-native Infer scoring
-
-Out-of-scope work:
-
-- copying Infer private config/runtime internals into Permuter
-- adding compatibility shims for old Infer workspaces
-- making Permuter own study-specific USR overlay policy
-- committing generated workspace artifacts
-
-Done criteria:
-
-- Permuter tests pass
-- Infer feature-bundle smoke validation and dry-run pass
-- architecture boundary checks pass
-- a temp-output Permuter dogfood path can choose either ad hoc scoring or
-  sidecar-native Infer scoring by explicit plan
-- docs checks pass
-
-Verification:
+## Verification
 
 ```bash
 uv run pytest -q src/dnadesign/permuter/tests
 uv run permuter --help
+uv run permuter workspace list --root src/dnadesign/permuter/workspaces
 uv run python -m dnadesign.devtools.docs.checks --repo-root .
 uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .
 uv run ruff check src/dnadesign/permuter
 uv run ruff format --check src/dnadesign/permuter
 git diff --check
 ```
-
-## Risk Handling
-
-- Avoid broad rewrites. Use adapter seams first, then migrate callers.
-- Do not let legacy columns remain the write contract.
-- Do not add cross-tool shared schemas until another tool consumes the contract.
-- Do not make workspace support depend on generated package-root `results/`.
-- Fail fast on invalid layouts, missing dependencies, duplicate run ids, and
-  ambiguous metric ids.
-- Keep read-only commands read-only by default once pure mode exists.
-
-## Open Questions
-
-1. Should new interaction metrics use only the namespaced form
-   `permuter__interaction__epistasis__<metric_id>`, or should `epistasis`
-   remain an accepted canonical unprefixed exception?
-2. For future protein DMS, should the first public API be protein-native only,
-   or should the first version require coding DNA so Evo2-DNA scoring is
-   immediately supported?
-3. Should checked-in workspace examples live under
-   `src/dnadesign/permuter/workspaces/`, or should Permuter begin with
-   template workspaces only and keep live study workspaces in study-owned docs?

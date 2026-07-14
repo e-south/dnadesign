@@ -1,7 +1,7 @@
 # Billboard Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
+**Last verified:** 2026-07-13
 
 Billboard quantifies regulatory diversity in dense-array DNA libraries by
 extracting TFBS content and computing scalar diversity metrics plus diagnostic
@@ -15,17 +15,17 @@ plots.
 Assuming you have a **densegen**-derived `.pt` file under `sequences/` containing a Python list of sequence dicts:
 
 ```bash
-python billboard/main.py
+uv run python -m dnadesign.billboard.main
 ```
 
 By default, outputs will be written to
 ```
-batch_results/<output_dir_prefix>_YYYYMMDD/
+src/dnadesign/billboard/batch_results/<output_dir_prefix>_YYYYMMDD/
 ```
 
 ### Pipeline Overview
 
-1. **Load configuration** (`configs/example.yaml`).
+1. **Load configuration** (`src/dnadesign/billboard/config.yaml`).
 2. **Load sequences** from one or more `.pt` files.
 3. **Parse TFBS annotations** (`meta_tfbs_parts` / `meta_tfbs_parts_in_array`).
 4. **Build motif strings** (ordered comma‑delimited TF+strand lists).
@@ -42,7 +42,7 @@ batch_results/<output_dir_prefix>_YYYYMMDD/
 ### Configuration
 
 ```yaml
-# example.yaml
+# src/dnadesign/billboard/config.yaml
 billboard:
   # Prefix for your output folder in billboard's batch_results
   output_dir_prefix: example_library
@@ -183,7 +183,8 @@ Evaluates global sequence‐level diversity via optimal alignment.
 
 ### Output Structure
 
-After running, you’ll find under `batch_results/<prefix>_YYYYMMDD/`:
+After running, you’ll find under
+`src/dnadesign/billboard/batch_results/<prefix>_YYYYMMDD/`:
 
 ```
 csvs/
@@ -193,11 +194,12 @@ csvs/
 
 plots/  (if save_plots: true)
   ├ tf_frequency.png
-  ├ occupancy.png
-  ├ motif_length.png
-  ├ tf_entropy_hist.png
+  ├ occupancy.pdf
+  ├ motif_length.pdf
+  ├ tf_entropy_kde.pdf
   ├ gini_lorenz.png
-  └ jaccard_hist.png
+  ├ jaccard_hist.png
+  └ cluster_char.png          # only when cluster metadata is present
 ```
 
 ### Module Overview
@@ -228,4 +230,4 @@ plots/  (if save_plots: true)
   - Jaccard dissimilarity histogram
 
 - **`by_cluster.py`**
-  Computes metrics per Leiden cluster of sequences, producing a characterization scatter plot. This modules expects an input `.pt` file which has already been passed through the **clustering** pipeline, where each entry receives a cluster ID.
+  Computes metrics per Leiden cluster of sequences, producing a characterization scatter plot. This module expects an input `.pt` file which has already been passed through the **clustering** pipeline, where each entry receives a cluster ID.

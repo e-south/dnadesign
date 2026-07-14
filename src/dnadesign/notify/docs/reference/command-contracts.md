@@ -1,7 +1,7 @@
 ## Notify command contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-14
 
 This page is the tool-local source for Notify command invocation contracts and fail-fast behavior.
 
@@ -28,8 +28,8 @@ This page is the tool-local source for Notify command invocation contracts and f
   - `infer` -> `infer`
   - `construct` -> `construct`
 - Workspace shorthand is repo-rooted for all resolver-mode tools. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
-- `infer` resolver accepts exactly one legacy USR write-back destination or exactly one sequence-view
-  input dataset. Legacy write-back jobs still require explicit `ingest.root` for every
+- `infer` resolver accepts exactly one USR write-back destination or exactly one sequence-view
+  input dataset. Write-back jobs require explicit `ingest.root` for every
   `ingest.source='usr'` + `io.write_back=true` job.
 - Multi-destination infer configs must use explicit `--events <path>` or be split into
   single-dataset runbooks instead of resolver mode.

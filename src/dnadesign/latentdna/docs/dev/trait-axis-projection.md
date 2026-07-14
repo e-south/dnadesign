@@ -1,9 +1,9 @@
 # Trait Axis Projection Dev Spec
 
 **Owner:** dnadesign-maintainers
-**Status:** proposed development specification
-**Last verified:** 2026-05-26
-**Last edited:** 2026-05-27
+**Status:** implemented generic runtime contract
+**Last verified:** 2026-07-14
+**Last edited:** 2026-07-14
 **First dogfood workspace:** `rt_lnrna_sponging_construct_triage`
 
 This note defines a generic LatentDNA fitted-geometry primitive,
@@ -12,10 +12,9 @@ geometry, but the primitive is not RT-specific.
 
 ## Source Basis and Document Role
 
-This dev spec is the durable LatentDNA maintainer handoff for implementing the
-primitive. It incorporates the later corrected design from the RT-lnRNA design
-discussion: LatentDNA owns fitted-geometry mechanics and compact provenance
-only when LatentDNA fits geometry; the RT-lnRNA study owns biological meaning,
+This dev spec is the durable LatentDNA maintainer contract for the implemented
+primitive. LatentDNA owns fitted-geometry mechanics and compact provenance only
+when LatentDNA fits geometry; the RT-lnRNA study owns biological meaning,
 source labels, abundance overlays, GenBank/compiler/DMS categories, and future
 SPOP interpretation.
 
@@ -53,10 +52,11 @@ Success criteria for this document:
 - failure modes are explicit enough to prevent an attractive but unsupported
   biological claim.
 
-This document is a specification and handoff, not implementation evidence. An
-implementer should update it when code choices diverge from the plan, but should
-not use this file to imply that any scalar, plot, notebook, or artifact already
-exists.
+This document defines the runtime contract; it is not evidence that a generated
+workspace artifact is current. The scalar builders, RT workspace configuration,
+plot semantics, and tests exist in the checked-in source tree. Use manifests,
+deliverable status, and workspace validation to establish whether a particular
+generated scalar, plot, or notebook is present and fresh.
 
 ## Executive Summary
 
@@ -154,13 +154,13 @@ Use the following tags when implementing, reviewing, or updating the spec:
   stable upstream field or existing LatentDNA utility makes it cheap and
   generic.
 
-Prefer explicit contract errors over compatibility padding. Do not add alias
-paths, silent fallbacks, broad source selectors, or hidden row collapsing to
-make the first RT dogfood pass look cleaner.
+Prefer explicit contract errors. Do not add alias paths, silent fallbacks,
+broad source selectors, or hidden row collapsing to make the first RT dogfood
+pass look cleaner.
 
 ## Goals
 
-The first implementation must support:
+The implemented first pass supports:
 
 - a generic `trait_axis_projection` primitive for fitted high/low endpoint
   geometry;
@@ -332,23 +332,13 @@ Current preassay scalar builders are registered through
 declare fitted-geometry provenance and, if axis concordance is supported, a
 compact fitted-axis sidecar.
 
-Implementation must choose one of these integration patterns deliberately:
-
-1. keep the preassay tuple path and extend the preassay wrapper so selected
-   builders can return extra declared outputs; or
-2. register this primitive through the broader scalar `build.py` path so it can
-   return a full `BuiltScalarArtifact` with sidecar outputs.
-
-Do not write undeclared files under `outputs/scalars/<scalar_id>/`. Every
-Parquet, JSON, or NPZ sidecar must appear in the scalar manifest outputs so
-freshness, deliverables, and downstream summary builders can reason about it.
-
-Implementation choice as of 2026-05-27: `trait_axis_projection_rows` and
-`trait_axis_projection_summary` use the broader scalar `build.py` dispatch path
-and return full `BuiltScalarArtifact` objects. This keeps `provenance.json`,
-`fitted_axes.parquet`, and `axis_concordance.parquet` declared in scalar
-manifests instead of extending the preassay tuple wrapper for one fitted
-geometry primitive.
+`trait_axis_projection_rows` and `trait_axis_projection_summary` use the broad
+scalar `build.py` dispatch path and return full `BuiltScalarArtifact` objects.
+This keeps `provenance.json`, `fitted_axes.parquet`, and
+`axis_concordance.parquet` declared in scalar manifests. Do not write
+undeclared files under `outputs/scalars/<scalar_id>/`; every Parquet, JSON, or
+NPZ sidecar must appear in the manifest so freshness, deliverables, and
+downstream summary builders can reason about it.
 
 The implementation should reuse existing utilities where they match the
 contract:
@@ -1537,8 +1527,8 @@ to regenerated artifacts.
 
 ### Reader and Skeptic Checks
 
-Before marking the dev spec implemented, answer these review questions from the
-artifact itself:
+When reviewing the implementation, answer these questions from the artifact
+itself:
 
 - Can a maintainer identify which rows fit each axis and which rows were only
   scored?
@@ -1696,70 +1686,22 @@ metrics must be sufficient to support them.
 - Does the source sample size require fit rows to double as fit-eval summaries?
   If yes, provenance must say so.
 
-## Implementation Handoff
+## Implementation Surfaces
 
-Break implementation into reviewable commits. Keep generic primitive work
-separate from RT dogfood config and generated artifacts.
+- Generic builders:
+  `src/dnadesign/latentdna/src/scalars/builders/trait_axis_projection.py`
+- Scalar dispatch:
+  `src/dnadesign/latentdna/src/scalars/build.py`
+- Generic contract tests:
+  `src/dnadesign/latentdna/tests/test_trait_axis_projection.py`
+- RT configuration and plot semantics:
+  `src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/`
+- RT study interpretation:
+  `docs/studies/rt_lnrna_sponging_construct_triage/contexts/latentdna/trait-axis-projection.md`
 
-### Commit 1: Generic Contract and Tests
-
-- Add typed config/data structures if current scalar patterns support typed
-  params.
-- Add synthetic tests for endpoint selection, failure modes, centroid math, row
-  scoring, endpoint sensitivity, provenance, and parent-relative deltas.
-- Add any new test fixtures under LatentDNA test paths, not RT study paths,
-  unless the fixture is explicitly RT integration coverage.
-- Keep RT workspace changes out of this commit unless required for schema
-  validation.
-
-### Commit 2: Scalar Implementation and Registry
-
-- Implement `src/dnadesign/latentdna/src/scalars/preassay_trait_axis.py`.
-- Add the thinnest possible registry or dispatch hook.
-- Implement row-level builder output.
-- Implement summary builder output.
-- Write Parquet sidecars and scalar manifests consistent with existing scalar
-  artifacts.
-- Emit compact fit/scored provenance.
-- Use chunked scoring for large views.
-
-### Commit 3: RT Workspace Configuration and Plot Semantics
-
-- Configure Crawford and Khan axes separately.
-- Configure Crawford, Khan, GenBank, compiler MSD, and RT-CDS DMS score
-  populations with generic roles.
-- Add plot specs using existing plot kinds first.
-- Add plot-semantics sidecars that describe the decision gate, biological
-  limits, and failure modes.
-- Ensure DMS is excluded from fit by default.
-- Ensure Crawford and Khan are not numerically pooled.
-
-### Commit 4: Notebook and Plot UX
-
-- Adjust notebook ordering to follow the decision funnel.
-- Keep UMAP appendix-level.
-- Fix visible label semantics: `RT`, `CDS`, `DMS`, `lnRNA`, `Eco1`, and public
-  "span" terminology.
-- Add generic layout config where needed for long labels, legends, tick labels,
-  and crowded scorecards.
-- Inspect rendered surfaces if plot or browser behavior changes.
-
-### Commit 5: Docs and Status
-
-- Keep this LatentDNA maintainer spec current if implementation decisions drift.
-- Add the RT study-facing companion doc under
-  `docs/studies/rt_lnrna_sponging_construct_triage/contexts/latentdna/`.
-- Update RT status or review docs only where needed.
-- Distinguish current implementation from future SPOP, null-control,
-  composition-baseline, and DMS enrichment extensions.
-
-### Commit 6: Regenerated Artifacts
-
-- Regenerate scalar, plot, notebook, and deliverable artifacts only through repo
-  recipes or official CLIs.
-- Do not hand-edit generated outputs.
-- Include validation evidence in the commit message, PR body, or implementation
-  notes.
+Keep runtime, study configuration, and generated artifacts reviewable as
+separate changes. Regenerate scalar, plot, notebook, and deliverable artifacts
+only through workspace recipes or official CLIs; do not hand-edit outputs.
 
 Preserve the division:
 

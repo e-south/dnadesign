@@ -1,7 +1,7 @@
 ## OPAL Architecture and Data Flow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 OPAL executes each round through the stages below.
 
@@ -10,7 +10,8 @@ OPAL executes each round through the stages below.
 1. Load `configs/campaign.yaml` and validate schema + plugin names.
 2. Resolve one label snapshot from the configured `labels` source.
 3. Apply candidate-scope and candidate-eligibility rules before scoring. These
-   rules filter rows but do not mutate `records.parquet`.
+   rules declare their required candidate columns, filter rows, and do not
+   mutate `records.parquet`.
 4. Build feature matrices with `transforms_x`.
 5. Fit `model` and predict `y_pred` (and optional predictive std-dev).
 6. Apply `training.y_ops` inversion to both mean and std-dev when configured.

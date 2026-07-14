@@ -1,7 +1,7 @@
 # USR sync quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-14
+**Last verified:** 2026-07-14
 
 
 Use this page for the minimum reliable loop: preflight diff, transfer, verify.

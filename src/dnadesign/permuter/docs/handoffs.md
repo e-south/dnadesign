@@ -1,7 +1,7 @@
 # Permuter Handoffs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-24
+**Last verified:** 2026-07-14
 
 Permuter handoffs are boundary artifacts. They name generated variants and the
 next requested action, but they do not make Permuter the owner of USR, Infer,
@@ -48,7 +48,7 @@ variant identity in `permuter__var_id`.
 
 ## Permuter To Infer
 
-Permuter does not execute modern Infer feature bundles. A Permuter-to-Infer
+Permuter does not execute Infer feature bundles. A Permuter-to-Infer
 handoff is a non-executing request that names the already materialized dataset
 and the Infer-owned feature-bundle config. The public `InferFeatureRequest`
 contract can write and read this manifest without importing Infer internals.
@@ -138,4 +138,4 @@ not a replacement for the canonical USR `id` column.
 - USR `id` values copied from study candidate ids.
 - Duplicate variant id columns such as both `permuter__var_id` and
   `permuter__variant_id`.
-- Compatibility aliases for retired protocol or metric ids.
+- Aliases for unsupported protocol or metric ids.

@@ -1,7 +1,7 @@
 # USR Sync Fidelity Drills (Adversarial)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-14
 
 
 Use this runbook to pressure test strict sync fidelity for iterative batch workflows (`densegen`, `infer`, and sibling tools) across local and HPC clones.

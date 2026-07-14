@@ -1,7 +1,7 @@
 # Development
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-07-14
 
 The development journal tracks the active tracer-bullet scope, shipped slices, and remaining next steps.
 
