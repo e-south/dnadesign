@@ -20,9 +20,10 @@ audience:
 
 ### Premise
 
-The study should promote a response label and selector only when the assay
-summary is reproducible, changing the stress target view changes ranking as
-intended, and X preserves useful ordering in held-out Reader experiments.
+The study should promote response-window observed Y and activate an
+objective-selector pairing only when the assay summary is reproducible,
+changing the stress target view changes ranking as intended, and X preserves
+useful ordering in held-out Reader experiments.
 
 ### Scope
 
@@ -63,19 +64,22 @@ round-0 ledgers and measured Reader source rows directly; it does not load the
 SFXI source campaign configs or expose them as executable routes.
 Output tables identify the configured masks with `selection_view_id`.
 
-Reader-window joins accept an explicit `candidate_identity_bindings` table.
-For this provenance review, that seam receives only the exact candidate,
-Reader design, and Reader experiment identities recorded with the SFXI source
-labels. It is not candidate authority for RMF promotion. The promotion path
-must instead consume the study-issued artifact with schema ID
+Reader-window joins require the study-issued artifact with schema ID
 `dnadesign.study.promoter_candidate_bindings.v1`, schema version `1`, study ID
 `stress_ethanol_cipro_growth`, and record
 `promoter_candidate_bindings/bindings`. Its typed alias key is
-`(alias_namespace, alias)`; Reader joins only `reader.design_id`. The metastudy
-does not import the binding builder or resolve aliases itself.
+`(alias_namespace, alias)`. The response-owned
+`response_model_screen_selection.yaml` declares exact Reader experiment/design
+pairs without candidate IDs. The metastudy resolves each candidate only through
+the `reader.design_id` binding, rejects missing or duplicate resolution, and
+does not import the binding builder.
+
+The selection is limited to retrospective model screening. It makes the source
+choice for repeated designs explicit, does not read an SFXI source CSV, and does
+not define the repeat aggregation required for observed-label promotion.
 
 The response-metastudy publication schema is
-`stress_ethanol_cipro_growth.response_metastudy.v7`.
+`stress_ethanol_cipro_growth.response_metastudy.v9`.
 
 ### Evidence Flow
 
@@ -84,10 +88,13 @@ The response-metastudy publication schema is
 2. Recompute persisted SFXI scores through the public OPAL API.
 3. Audit SFXI exponent, gate, lexicographic, and OFF-state-logic variants without
    changing `secg_rmf_greedy` campaign state.
-4. Verify `reader.response_window.bundle.v3`, all record contracts, source
+4. Verify `reader.response_window.bundle.v4`, all record contracts, source
    provenance, artifact digests, and row counts.
-5. Join the 35 labels by exact Reader experiment and design identity.
-6. Compare the snapshot with five Reader-owned event-relative reductions.
+5. Verify the response-owned 35-row screen selection against the Reader bundle,
+   resolve each design alias through the study binding artifact, and join by
+   exact Reader experiment and design identity.
+6. Evaluate response and fluorescence requirement stability across five
+   Reader-owned event-relative reductions.
 7. Apply ethanol, ciprofloxacin, AND, and OR pressure-test masks to raw Reader
    state summaries and joint bootstrap draws.
 8. Compare fixed mean, robust RF, fold-fitted PCA-ridge, and PLS challengers with
@@ -119,7 +126,7 @@ Response-Magnitude Feasibility (RMF) mathematics:
 Reader response-window contract:
 
 - `reader/docs/lib/plate_reader/response_window.md`
-- Reader bundle schema `reader.response_window.bundle.v3`
+- Reader bundle schema `reader.response_window.bundle.v4`
 
 ### Package Layout
 
@@ -143,7 +150,8 @@ Reader's response-window handoff is
 `log2(YFP/OD600)` fluorescence. These values are not the SFXI vec8 fields and
 must not use `sfxi_vec8` names. The primary reduction is the 6-12-hour
 post-event geometric log mean. Reader owns that reduction and its uncertainty;
-OPAL owns RMF requirements, calibration, labels, and campaign scoring.
+the study owns repeat aggregation and promotion of response-window observed Y;
+OPAL applies RMF and owns campaign scoring.
 
 ### Evidence Findings
 
@@ -187,18 +195,16 @@ Four ordered primary plots carry the decision narrative:
 
 Metric diagnostics explain behavior without deciding promotion:
 
-- the SFXI and response-constraint comparison on the same observations;
 - canonical SFXI component dominance, target residuals, Pareto views, score
   correlations, and candidate support;
-- Reader event intervals, uncertainty sources, and snapshot-versus-window
+- Reader event intervals, uncertainty sources, and response-reduction
   sensitivity;
 - SFXI vec8 model validation, observed constraint coverage, repeated-design
   variation, and retrospective enrichment.
 
 Screen appendices retain the policy guardrail matrix and complete policy,
 selected-profile, and overlap sweeps.
-Nothing is deleted; lower-value figures no longer compete with the primary
-argument. Every plot declares one premise, a concise title without terminal
+Every plot declares one premise, a concise title without terminal
 punctuation, decision value, rationale, alt text, non-claim boundary, tier, and
 source table. Plot files use a white canvas independent of notebook theme.
 
@@ -219,6 +225,7 @@ From `dnadesign/`:
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
   --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --overwrite \
   --json
 ```

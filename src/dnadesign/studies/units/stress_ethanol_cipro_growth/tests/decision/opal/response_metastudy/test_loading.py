@@ -27,10 +27,14 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime.loading import (
     assert_sfxi_run_contract,
     assert_shared_observed_labels,
+    load_candidate_matrix,
     load_label_source_frame,
     load_sfxi_evidence_frame,
     load_stress_campaign_contract,
     load_training_matrix,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.source_evidence import (
+    sfxi_round0_source_evidence_dir,
 )
 
 
@@ -55,6 +59,20 @@ def test_training_matrix_is_aligned_to_label_order(tmp_path) -> None:
     assert y[:, 0].tolist() == [0.0, 10.0]
 
 
+def test_candidate_matrix_is_aligned_without_an_sfxi_label_frame(tmp_path: Path) -> None:
+    records_path = tmp_path / "records.parquet"
+    pd.DataFrame(
+        {
+            "id": ["b", "a"],
+            "x": [[3.0, 4.0], [1.0, 2.0]],
+        }
+    ).to_parquet(records_path, index=False)
+
+    matrix = load_candidate_matrix(records_path, x_column="x", candidate_ids=["a", "b"])
+
+    assert matrix.tolist() == [[1.0, 2.0], [3.0, 4.0]]
+
+
 def test_shared_label_contract_rejects_source_drift() -> None:
     first = pd.DataFrame({"id": ["a"], "sequence": ["AAAA"], "y_obs": [np.arange(8, dtype=float)]})
     drifted = first.copy()
@@ -74,8 +92,8 @@ def test_sfxi_run_contract_rejects_target_mask_drift() -> None:
 
 def test_label_source_frame_aligns_reader_experiments_to_ledger_order(tmp_path) -> None:
     source = _sfxi_source()
-    campaign_dir = tmp_path / "campaigns" / source.source_campaign_slug
-    input_dir = campaign_dir / "inputs" / "r0"
+    source_dir = sfxi_round0_source_evidence_dir(tmp_path, source_slug=source.source_campaign_slug)
+    input_dir = source_dir / "inputs" / "r0"
     input_dir.mkdir(parents=True)
     pd.DataFrame(
         {
@@ -114,7 +132,8 @@ def test_label_source_frame_aligns_reader_experiments_to_ledger_order(tmp_path) 
 
 def test_label_source_frame_rejects_identity_drift(tmp_path) -> None:
     source = _sfxi_source()
-    input_dir = tmp_path / "campaigns" / source.source_campaign_slug / "inputs" / "r0"
+    source_dir = sfxi_round0_source_evidence_dir(tmp_path, source_slug=source.source_campaign_slug)
+    input_dir = source_dir / "inputs" / "r0"
     input_dir.mkdir(parents=True)
     pd.DataFrame(
         {
@@ -219,6 +238,7 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
     )
 
     assert tuple(target_views) == ("ethanol", "ciprofloxacin", "and")
+    assert stress_campaign.model_params["random_state"] == 7
     assert tuple(run.source.lifecycle for run in sfxi_evidence) == ("provenance_only",) * 3
     assert tuple(run.target_view.target_mask for run in sfxi_evidence) == (
         (0.0, 1.0, 0.0, 1.0),
@@ -241,14 +261,13 @@ def _require_repository_sfxi_artifacts(repo_root: Path) -> None:
 
 
 def _missing_repository_sfxi_artifacts(repo_root: Path) -> tuple[Path, ...]:
-    campaign_root = repo_root / "src/dnadesign/opal/campaigns"
     candidate_records = repo_root / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet"
     missing = [candidate_records] if not candidate_records.is_file() else []
     for source in SFXI_SOURCE_PROVENANCE:
-        campaign_dir = campaign_root / source.source_campaign_slug
+        source_dir = sfxi_round0_source_evidence_dir(repo_root, source_slug=source.source_campaign_slug)
         for path in (
-            campaign_dir / "outputs/ledger/predictions",
-            campaign_dir / "outputs/ledger/runs.parquet",
+            source_dir / "outputs/ledger/predictions",
+            source_dir / "outputs/ledger/runs.parquet",
         ):
             if not path.exists():
                 missing.append(path)

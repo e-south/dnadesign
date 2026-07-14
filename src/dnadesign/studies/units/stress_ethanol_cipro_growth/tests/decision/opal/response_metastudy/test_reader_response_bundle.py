@@ -26,7 +26,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 def test_reader_bundle_loads_only_after_contract_and_digest_verification(tmp_path: Path) -> None:
     root = _bundle_fixture(tmp_path)
     request_path = tmp_path / "request.yaml"
-    request_path.write_text("schema_version: reader.response_window.request.v2\n", encoding="utf-8")
+    request_path.write_text("schema_version: reader.response_window.request.v3\n", encoding="utf-8")
     _attach_request_digest(root, request_path)
 
     bundle = reader_response_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
@@ -40,7 +40,7 @@ def test_reader_bundle_loads_only_after_contract_and_digest_verification(tmp_pat
 def test_reader_bundle_rejects_record_digest_drift(tmp_path: Path) -> None:
     root = _bundle_fixture(tmp_path)
     request_path = tmp_path / "request.yaml"
-    request_path.write_text("schema_version: reader.response_window.request.v2\n", encoding="utf-8")
+    request_path.write_text("schema_version: reader.response_window.request.v3\n", encoding="utf-8")
     _attach_request_digest(root, request_path)
     pd.DataFrame({"changed": [1]}).to_parquet(root / "tables" / "designs.parquet", index=False)
 
@@ -51,9 +51,9 @@ def test_reader_bundle_rejects_record_digest_drift(tmp_path: Path) -> None:
 def test_reader_bundle_rejects_study_request_drift(tmp_path: Path) -> None:
     root = _bundle_fixture(tmp_path)
     request_path = tmp_path / "request.yaml"
-    request_path.write_text("schema_version: reader.response_window.request.v2\n", encoding="utf-8")
-    _attach_request_digest(root, request_path)
     request_path.write_text("schema_version: reader.response_window.request.v3\n", encoding="utf-8")
+    _attach_request_digest(root, request_path)
+    request_path.write_text("schema_version: reader.response_window.request.v3\nstudy_id: changed\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="request digest disagrees"):
         reader_response_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
@@ -62,7 +62,7 @@ def test_reader_bundle_rejects_study_request_drift(tmp_path: Path) -> None:
 def test_reader_bundle_rejects_incomplete_display_ontology(tmp_path: Path) -> None:
     root = _bundle_fixture(tmp_path)
     request_path = tmp_path / "request.yaml"
-    request_path.write_text("schema_version: reader.response_window.request.v2\n", encoding="utf-8")
+    request_path.write_text("schema_version: reader.response_window.request.v3\n", encoding="utf-8")
     _attach_request_digest(root, request_path)
     manifest_path = root / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -168,6 +168,7 @@ def _bundle_fixture(tmp_path: Path) -> Path:
         artifacts[relative] = {"path": relative, "sha256": _sha256(path), "bytes": path.stat().st_size}
     manifest = {
         "schema_version": reader_response_bundle.READER_BUNDLE_SCHEMA,
+        "study_id": "stress_ethanol_cipro_growth",
         "request_id": "test",
         "request": {"artifact_id": "request.yaml", "sha256": "pending"},
         "state_order": ["00", "10", "01", "11"],

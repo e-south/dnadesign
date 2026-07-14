@@ -36,6 +36,33 @@ def test_evaluation_and_reporting_do_not_import_runtime() -> None:
     assert offenders == []
 
 
+def test_sfxi_and_response_label_contracts_stay_disjoint() -> None:
+    prohibited = {
+        "response_labels_as_sfxi_comparator",
+        "sfxi_comparison_vec8",
+        "build_sfxi_comparison_rows",
+        "snapshot_y",
+        "snapshot_vec8",
+    }
+    offenders: dict[str, list[str]] = {}
+    for path in sorted(PACKAGE.rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        matches = sorted(token for token in prohibited if token in text)
+        if matches:
+            offenders[str(path.relative_to(PACKAGE))] = matches
+    assert offenders == {}
+
+
+def test_response_candidate_identity_does_not_consume_sfxi_label_sources() -> None:
+    source = (PACKAGE / "runtime/candidate_identity.py").read_text(encoding="utf-8").lower()
+    assert "label_source" not in source
+    assert "sfxi" not in source
+    audit_source = (PACKAGE / "runtime/audit.py").read_text(encoding="utf-8")
+    assert "measurement_selection=measurement_selection.rows" in audit_source
+    assert "label_sources=label_sources" not in audit_source
+    assert "label_ids=response_ids" in audit_source
+
+
 def test_response_model_modules_stay_semantically_bounded() -> None:
     limits = {
         "evaluation/model_screen.py": 360,

@@ -15,11 +15,15 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-
 from dnadesign.opal import RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION
+from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings import (
+    BINDINGS_RECORD_ID,
+    READER_ALIAS_NAMESPACE,
+    SCHEMA_ID,
+    SCHEMA_VERSION,
+)
 
+from ...source_evidence import sfxi_round0_source_evidence_dir
 from ..core.contracts import (
     SFXI_SOURCE_PROVENANCE,
     STRESS_STATE_IDS,
@@ -28,7 +32,17 @@ from ..core.contracts import (
     SfxiEvidenceFrame,
     StressCampaignContract,
 )
-from .publication import source_inventory
+from .candidate_identity import ResponseCandidateIdentityBindings
+from .measurement_selection import (
+    SCHEMA_ID as RESPONSE_SELECTION_SCHEMA_ID,
+)
+from .measurement_selection import (
+    SCHEMA_VERSION as RESPONSE_SELECTION_SCHEMA_VERSION,
+)
+from .measurement_selection import (
+    ResponseMeasurementSelection,
+)
+from .publication import METASTUDY_SCHEMA_VERSION, source_inventory
 from .reader_response_bundle import ReaderResponseBundle
 
 
@@ -38,20 +52,22 @@ def write_metastudy_manifest(
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...],
     stress_campaign: StressCampaignContract,
     reader_bundle: ReaderResponseBundle,
+    measurement_selection: ResponseMeasurementSelection,
+    candidate_identity_bindings: ResponseCandidateIdentityBindings,
     policy_specs: Sequence[PolicySpec],
     top_k: int,
-    training_matrix_sha256: str,
+    sfxi_training_matrix_sha256: str,
+    response_x_matrix_sha256: str,
     recommendation: dict[str, object],
     canonical_sfxi_validation: dict[str, object],
     artifact_records: dict[str, object],
     predictor_parity: dict[str, object],
     grouped_model_validation_summary: dict[str, object],
     shuffled_model_validation_summary: dict[str, object],
-    sfxi_comparison: pd.DataFrame,
     response_metric_screen: dict[str, object],
 ) -> dict[str, object]:
     manifest = {
-        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v7",
+        "schema_version": METASTUDY_SCHEMA_VERSION,
         "canonical_sfxi_sources": {
             "documentation": "src/dnadesign/opal/docs/plugins/objectives/sfxi.md",
             "math_helpers": "src/dnadesign/opal/src/objectives/sfxi_math.py",
@@ -94,16 +110,32 @@ def write_metastudy_manifest(
                 for target_view in stress_campaign.target_views
             ],
             "candidate_identity_binding": {
-                "runtime_posture": "sfxi_source_provenance_only",
-                "promotion_schema_id": "dnadesign.study.promoter_candidate_bindings.v1",
-                "promotion_schema_version": "1",
+                "role": "candidate_identity_authority",
+                "schema_id": SCHEMA_ID,
+                "schema_version": SCHEMA_VERSION,
                 "study_id": "stress_ethanol_cipro_growth",
-                "record_id": "promoter_candidate_bindings/bindings",
-                "reader_alias_namespace": "reader.design_id",
-                "consumed_for_promotion": False,
+                "record_id": BINDINGS_RECORD_ID,
+                "reader_alias_namespace": READER_ALIAS_NAMESPACE,
+                "binding_count": candidate_identity_bindings.binding_count,
+                "candidate_count": candidate_identity_bindings.candidate_count,
+                "resolved_response_label_count": len(candidate_identity_bindings.rows),
+                "files": source_inventory(
+                    candidate_identity_bindings.bundle_root,
+                    [candidate_identity_bindings.manifest_path, candidate_identity_bindings.records_path],
+                ),
+            },
+            "response_measurement_selection": {
+                "schema_id": RESPONSE_SELECTION_SCHEMA_ID,
+                "schema_version": RESPONSE_SELECTION_SCHEMA_VERSION,
+                "selection_id": measurement_selection.selection_id,
+                "scope": measurement_selection.scope,
+                "promotion_aggregation": measurement_selection.promotion_aggregation,
+                "row_count": len(measurement_selection.rows),
+                "config": source_inventory(paths.repo_root, [measurement_selection.config_path])[0],
             },
             "state_order": list(STRESS_STATE_IDS),
-            "training_matrix_sha256": training_matrix_sha256,
+            "sfxi_training_matrix_sha256": sfxi_training_matrix_sha256,
+            "response_x_matrix_sha256": response_x_matrix_sha256,
             "files": source_inventory(paths.repo_root, _provenance_files(paths, stress_campaign=stress_campaign)),
             "reader_bundle": _reader_bundle_inventory(reader_bundle),
         },
@@ -119,7 +151,6 @@ def write_metastudy_manifest(
             "promotion_gate": grouped_model_validation_summary,
             "descriptive_shuffled": shuffled_model_validation_summary,
         },
-        "sfxi_comparison": _sfxi_comparison_manifest(sfxi_comparison),
         "response_metric_screen": response_metric_screen,
     }
     manifest_path = paths.out_dir / "manifest.json"
@@ -154,9 +185,12 @@ def _provenance_files(
     files.extend(package_root.rglob("*.py"))
     files.append(stress_campaign.config_path)
     for source in SFXI_SOURCE_PROVENANCE:
-        campaign_dir = paths.campaign_root / source.source_campaign_slug
-        ledger_dir = campaign_dir / "outputs/ledger"
-        files.append(campaign_dir / "inputs/r0/reader_vec8_batch0.csv")
+        source_dir = sfxi_round0_source_evidence_dir(
+            paths.repo_root,
+            source_slug=source.source_campaign_slug,
+        )
+        ledger_dir = source_dir / "outputs/ledger"
+        files.append(source_dir / "inputs/r0/reader_vec8_batch0.csv")
         for dataset_name in ("runs.parquet", "labels.parquet", "predictions"):
             files.extend((ledger_dir / dataset_name).rglob("*.parquet"))
     return tuple(files)
@@ -173,39 +207,4 @@ def _reader_bundle_inventory(bundle: ReaderResponseBundle) -> dict[str, object]:
         "contracts": bundle.manifest["contracts"],
         "counts": bundle.manifest["counts"],
         "source_records": bundle.manifest["source_records"],
-    }
-
-
-def _sfxi_comparison_manifest(comparison: pd.DataFrame) -> dict[str, object]:
-    alternatives = comparison.loc[~comparison["assay_summary_id"].eq("snapshot_12h")]
-    finite_score = alternatives.loc[
-        np.isfinite(alternatives["score_spearman_to_snapshot"]),
-        "score_spearman_to_snapshot",
-    ]
-    support_ranges = {
-        str(selection_view_id): {
-            "min": int(frame["logic_support_count"].min()),
-            "max": int(frame["logic_support_count"].max()),
-        }
-        for selection_view_id, frame in comparison.groupby("selection_view_id", sort=True)
-    }
-    return {
-        "baseline": "snapshot_12h",
-        "time_basis": "reader_declared_event_relative_h",
-        "alternative_summary_count": int(alternatives["assay_summary_id"].nunique()),
-        "window_specs": sorted(alternatives["assay_summary_id"].astype(str).unique().tolist()),
-        "minimum_finite_score_spearman_to_snapshot": (float(finite_score.min()) if not finite_score.empty else None),
-        "logic_support_range_by_selection_view": support_ranges,
-        "recommended_secondary_summary_id": None,
-        "next_candidate_time_basis": None,
-        "next_candidate_summary": None,
-        "interpretation": (
-            "Reader event-relative reductions are compared with the immutable snapshot only as canonical "
-            "SFXI reporting overlays; the response metric consumes the unscaled state summaries."
-        ),
-        "verdict": "screen_only_no_label_promotion",
-        "guardrail": (
-            "Reader event-relative summaries are verified assay records, but they are not OPAL labels or a new "
-            "SFXI objective until the study explicitly promotes one candidate-level label contract."
-        ),
     }

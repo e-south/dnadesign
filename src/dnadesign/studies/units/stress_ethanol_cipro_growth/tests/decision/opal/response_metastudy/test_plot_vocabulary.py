@@ -29,7 +29,6 @@ def test_plot_vocabulary_names_every_visible_domain_value() -> None:
     assert plot_vocabulary.model_metric_label("v01") == "Logic\nCiprofloxacin (v01)"
     assert plot_vocabulary.model_metric_label("y11_star") == "Fluorescence\nBoth stresses (y*11)"
     assert plot_vocabulary.representation_label("event_logmean_6_12h_post") == "6-12 h\nlog mean"
-    assert plot_vocabulary.representation_role("snapshot_vec8") == "Sensitivity"
     assert plot_vocabulary.reader_experiment_label("20260706_sfxi_sensor-panel-m9-glu-secg") == (
         "2026-07-06 | SECG sensor panel"
     )

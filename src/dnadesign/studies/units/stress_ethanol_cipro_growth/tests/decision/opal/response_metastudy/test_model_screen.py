@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy import evaluation
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
@@ -53,7 +54,6 @@ def test_only_declared_reduction_and_its_contrast_are_promotion_eligible() -> No
 
     representations = evaluation.build_label_representations(
         ids=ids,
-        snapshot_y=response_magnitude,
         response_summaries=pd.concat((primary, sensitivity), ignore_index=True),
         primary_reduction_id="primary",
         promotion_reduction_ids=frozenset({"primary"}),
@@ -61,7 +61,6 @@ def test_only_declared_reduction_and_its_contrast_are_promotion_eligible() -> No
 
     eligibility = {value.id: value.promotion_eligible for value in representations}
     assert eligibility == {
-        "snapshot_vec8": False,
         "primary": True,
         "primary__factorial_contrast7": True,
         "sensitivity": False,
@@ -80,7 +79,6 @@ def test_grouped_model_screen_returns_margin_and_enrichment_evidence() -> None:
     summaries.insert(0, "id", ids)
     representations = evaluation.build_label_representations(
         ids=ids,
-        snapshot_y=response_magnitude,
         response_summaries=summaries,
         primary_reduction_id="event_logmean_6_12h_post",
         promotion_reduction_ids=frozenset({"event_logmean_6_12h_post"}),
@@ -102,7 +100,6 @@ def test_grouped_model_screen_returns_margin_and_enrichment_evidence() -> None:
     )
 
     assert set(summary["representation_id"]) == {
-        "snapshot_vec8",
         "event_logmean_6_12h_post",
         "event_logmean_6_12h_post__factorial_contrast7",
     }
@@ -130,7 +127,6 @@ def test_retrospective_enrichment_rejects_tied_mean_predictions() -> None:
     summaries.insert(0, "id", ids)
     representations = evaluation.build_label_representations(
         ids=ids,
-        snapshot_y=response_magnitude,
         response_summaries=summaries,
         primary_reduction_id="event_logmean_6_12h_post",
         promotion_reduction_ids=frozenset({"event_logmean_6_12h_post"}),
@@ -142,7 +138,7 @@ def test_retrospective_enrichment_rejects_tied_mean_predictions() -> None:
         x,
         groups=groups,
         candidate_ids=ids,
-        representations=(representations[1],),
+        representations=(representations[0],),
         target_views=(ethanol,),
         uncertainty_rows=_uncertainty_rows(ids, groups, selection_view_id="ethanol"),
         scale_quantile=0.9,
@@ -153,6 +149,31 @@ def test_retrospective_enrichment_rejects_tied_mean_predictions() -> None:
 
     assert not enrichment["selection_defined"].any()
     assert enrichment["selected_true_percentile"].isna().all()
+
+
+def test_sfxi_vec8_cannot_enter_response_label_representations() -> None:
+    sfxi = pd.DataFrame(
+        {
+            "id": ["candidate"],
+            "reduction_id": ["snapshot"],
+            "v00": [0.0],
+            "v10": [1.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.0],
+            "y10_star": [1.0],
+            "y01_star": [0.0],
+            "y11_star": [1.0],
+        }
+    )
+
+    with pytest.raises(ValueError, match="response summary missing columns"):
+        evaluation.build_label_representations(
+            ids=["candidate"],
+            response_summaries=sfxi,
+            primary_reduction_id="snapshot",
+            promotion_reduction_ids=frozenset({"snapshot"}),
+        )
 
 
 def _uncertainty_rows(ids: list[str], groups: np.ndarray, *, selection_view_id: str) -> pd.DataFrame:

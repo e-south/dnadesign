@@ -58,17 +58,8 @@ REPRESENTATION_ORDER = (
     "event_logmean_8_12h_post",
     "event_linear_auc_6_12h_post",
     "event_logmean_6_12h_delta_pre1h",
-    "snapshot_vec8",
 )
 REDUCTION_ORDER = (
-    "event_logmean_6_12h_post",
-    "event_logmean_4_8h_post",
-    "event_logmean_8_12h_post",
-    "event_linear_auc_6_12h_post",
-    "event_logmean_6_12h_delta_pre1h",
-)
-SFXI_COMPARISON_ORDER = (
-    "snapshot_12h",
     "event_logmean_6_12h_post",
     "event_logmean_4_8h_post",
     "event_logmean_8_12h_post",
@@ -82,8 +73,6 @@ REPRESENTATION_LABELS = {
     "event_logmean_8_12h_post": "8-12 h\nlog mean",
     "event_linear_auc_6_12h_post": "6-12 h\nlinear AUC",
     "event_logmean_6_12h_delta_pre1h": "6-12 h\nlog mean -\npre-stress",
-    "snapshot_vec8": "12 h\nSFXI\nsnapshot",
-    "snapshot_12h": "12 h\nSFXI snapshot",
 }
 REPRESENTATION_ROLES = {
     "event_logmean_6_12h_post": "Candidate",
@@ -92,8 +81,6 @@ REPRESENTATION_ROLES = {
     "event_logmean_8_12h_post": "Sensitivity",
     "event_linear_auc_6_12h_post": "Sensitivity",
     "event_logmean_6_12h_delta_pre1h": "Sensitivity",
-    "snapshot_vec8": "Sensitivity",
-    "snapshot_12h": "Canonical baseline",
 }
 PREDICTION_COMPONENT_LABELS = {
     "median_logic_fidelity": "Median logic fidelity",
@@ -174,7 +161,6 @@ __all__ = [
     "TARGET_VIEW_ORDER",
     "REDUCTION_ORDER",
     "REPRESENTATION_ORDER",
-    "SFXI_COMPARISON_ORDER",
     "STATE_TICK_LABELS",
     "compact_policy_label",
     "model_metric_label",

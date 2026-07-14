@@ -1,11 +1,21 @@
+---
+id: stress-ethanol-cipro-growth-opal-decision
+title: OPAL decision surfaces
+owner: stress_ethanol_cipro_growth
+status: active
+last_verified: 2026-07-14
+---
+
 ## OPAL Decision Surfaces
 
-**Owner:** stress_ethanol_cipro_growth study
-**Last verified:** 2026-07-13
+Study-owned OPAL surfaces keep candidate universes, DenseGen-label probes, and
+biological guardrails outside generic OPAL core.
 
-This directory contains study-owned OPAL surfaces. OPAL core remains generic;
-study-specific candidate universes, DenseGen-label probes, and biological
-guardrails live here.
+OPAL registers SFXI and RMF as independent objective plugins. `top_n` and
+`expected_improvement` are selectors, not metric identities. The current stress
+campaign is configured to model the response-window eight-component Y and
+apply RMF inside its selection views. Observed-label promotion has not occurred,
+so the campaign remains inactive.
 
 - `batch0/`: pre-assay candidate-table materialization and provenance review.
 - `densegen_axis_probe/`: DenseGen construction-label OPAL probes, including

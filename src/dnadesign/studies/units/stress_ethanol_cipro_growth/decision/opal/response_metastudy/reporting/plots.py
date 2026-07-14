@@ -35,7 +35,6 @@ from .metric_behavior_plots import (
     write_sfxi_score_contours,
     write_target_view_pareto_fronts,
 )
-from .metric_comparison_plots import write_measured_response_examples, write_metric_compensation_comparison
 from .model_validation_plot import write_model_validation
 from .plot_catalog import PLOT_TIER_DIRS, build_plot_manifest, specs_by_id
 from .primary_plots import (
@@ -50,6 +49,7 @@ from .response_assay_plots import (
     write_response_separation_stability,
     write_response_uncertainty_sources,
 )
+from .response_example_plots import write_measured_response_examples
 from .response_model_plots import (
     write_greedy_support_evidence,
     write_label_model_screen,
@@ -62,7 +62,6 @@ from .screen_plots import (
     write_policy_overlap_summary,
     write_topk_overlap_curve,
 )
-from .sfxi_comparison_plots import write_sfxi_comparison_stability, write_sfxi_comparison_target_coverage
 from .support_plot import write_candidate_logic_support
 
 
@@ -77,9 +76,8 @@ def write_visuals(
     comparison_panel: pd.DataFrame,
     model_validation: pd.DataFrame,
     setpoint_support: pd.DataFrame,
-    sfxi_comparison: pd.DataFrame,
     response_screen: ResponseMetricScreen,
-    metric_comparison: pd.DataFrame,
+    response_examples: pd.DataFrame,
     rmf_cardinality_pressure: pd.DataFrame,
     scored: dict[str, dict[str, pd.DataFrame]],
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...],
@@ -93,8 +91,7 @@ def write_visuals(
     for path in paths.values():
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    write_metric_compensation_comparison(metric_comparison, paths["metric_compensation_comparison"])
-    write_measured_response_examples(metric_comparison, paths["measured_response_examples"])
+    write_measured_response_examples(response_examples, paths["measured_response_examples"])
     write_rmf_cardinality_pressure(
         rmf_cardinality_pressure,
         paths["rmf_cardinality_pressure"],
@@ -168,12 +165,6 @@ def write_visuals(
         setpoint_support,
         paths["candidate_logic_support"],
         thresholds=thresholds,
-    )
-    write_sfxi_comparison_stability(sfxi_comparison, paths["sfxi_comparison_stability"])
-    write_sfxi_comparison_target_coverage(
-        sfxi_comparison,
-        paths["sfxi_comparison_target_coverage"],
-        logic_threshold=thresholds.min_target_view_median_logic,
     )
     write_reader_event_intervals(
         response_screen.event_intervals,

@@ -19,6 +19,7 @@ from pathlib import Path
 from uuid import uuid4
 
 _MARIMO_RUNTIME_DIR = "__marimo__"
+METASTUDY_SCHEMA_VERSION = "stress_ethanol_cipro_growth.response_metastudy.v9"
 
 
 def create_staging_dir(final_dir: Path, *, overwrite: bool) -> Path:
@@ -90,9 +91,7 @@ def verify_bundle_artifacts(root: Path) -> dict[str, object]:
     if not manifest_path.is_file():
         raise FileNotFoundError(f"Metastudy manifest is missing: {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != (
-        "stress_ethanol_cipro_growth.response_metastudy.v7"
-    ):
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != METASTUDY_SCHEMA_VERSION:
         raise ValueError("Metastudy bundle schema is missing or unsupported.")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict) or not artifacts:

@@ -31,7 +31,13 @@ def main(argv: list[str] | None = None) -> int:
         "--reader-bundle",
         type=Path,
         required=True,
-        help="Reader response-window bundle using reader.response_window.bundle.v3.",
+        help="Reader response-window bundle using reader.response_window.bundle.v4.",
+    )
+    parser.add_argument(
+        "--candidate-bindings",
+        type=Path,
+        required=True,
+        help="Verified stress-study promoter candidate-binding bundle.",
     )
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--top-k", type=int, default=6)
@@ -48,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     manifest = run_metastudy(
         repo_root=repo_root,
         reader_bundle_root=args.reader_bundle.resolve(),
+        candidate_binding_bundle_root=args.candidate_bindings.resolve(),
         out_dir=out_dir,
         overwrite=bool(args.overwrite),
         top_k=int(args.top_k),

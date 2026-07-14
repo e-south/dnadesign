@@ -18,6 +18,7 @@ import pytest
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import audit
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime.publication import (
+    METASTUDY_SCHEMA_VERSION,
     artifact_inventory,
     create_staging_dir,
     publish_staging_dir,
@@ -51,7 +52,7 @@ def test_review_bundle_verifier_rejects_post_publication_drift(tmp_path: Path) -
     artifact = tmp_path / "report.md"
     artifact.write_text("artifact", encoding="utf-8")
     manifest = {
-        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v7",
+        "schema_version": METASTUDY_SCHEMA_VERSION,
         "artifacts": artifact_inventory(tmp_path, {"report": artifact}),
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -67,7 +68,7 @@ def test_review_bundle_verifier_ignores_only_marimo_runtime_state(tmp_path: Path
     artifact = tmp_path / "report.md"
     artifact.write_text("artifact", encoding="utf-8")
     manifest = {
-        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v7",
+        "schema_version": METASTUDY_SCHEMA_VERSION,
         "artifacts": artifact_inventory(tmp_path, {"report": artifact}),
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -95,6 +96,7 @@ def test_metastudy_run_removes_staging_directory_on_interrupt(
         audit.run_metastudy(
             repo_root=tmp_path,
             reader_bundle_root=tmp_path,
+            candidate_binding_bundle_root=tmp_path,
             out_dir=tmp_path / "latest",
             overwrite=True,
         )

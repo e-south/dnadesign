@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from ...source_evidence import sfxi_round0_source_evidence_dir
 from ..core.contracts import (
     EXPECTED_STRESS_TARGET_VIEW_IDS,
     STRESS_RMF_GREEDY_CAMPAIGN_SLUG,
@@ -87,12 +88,16 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
     records_path = (campaign_dir / relative_path / dataset / "records.parquet").resolve()
     if not records_path.is_file():
         raise FileNotFoundError(f"Stress campaign candidate records are missing: {records_path}")
+    model = payload.get("model")
+    if not isinstance(model, dict) or model.get("name") != "random_forest" or not isinstance(model.get("params"), dict):
+        raise ValueError("Stress campaign must declare random_forest model parameters.")
     return StressCampaignContract(
         slug=STRESS_RMF_GREEDY_CAMPAIGN_SLUG,
         config_path=config_path.resolve(),
         target_views=target_views,
         candidate_records_path=records_path,
         x_column_name=x_column_name,
+        model_params=dict(model["params"]),
     )
 
 
@@ -129,7 +134,10 @@ def load_sfxi_evidence_frame(
         raise ValueError(
             f"SFXI source provenance {source.source_id!r} targets {source.target_view_id!r}, not {target_view.id!r}."
         )
-    campaign_dir = paths.campaign_root / source.source_campaign_slug
+    campaign_dir = sfxi_round0_source_evidence_dir(
+        paths.repo_root,
+        source_slug=source.source_campaign_slug,
+    )
     predictions_path = campaign_dir / "outputs/ledger/predictions"
     runs_path = campaign_dir / "outputs/ledger/runs.parquet"
     for path in (predictions_path, runs_path):
@@ -184,7 +192,11 @@ def load_observed_label_ids(paths: MetastudyPaths, source: SfxiSourceProvenance)
 
 
 def load_observed_label_frame(paths: MetastudyPaths, source: SfxiSourceProvenance) -> pd.DataFrame:
-    labels_path = paths.campaign_root / source.source_campaign_slug / "outputs/ledger/labels.parquet"
+    source_dir = sfxi_round0_source_evidence_dir(
+        paths.repo_root,
+        source_slug=source.source_campaign_slug,
+    )
+    labels_path = source_dir / "outputs/ledger/labels.parquet"
     if not labels_path.exists():
         raise FileNotFoundError(f"Required OPAL label ledger is missing: {labels_path}")
     labels = pd.read_parquet(labels_path)
@@ -203,7 +215,11 @@ def load_label_source_frame(
     """Load the exact Reader source rows that produced the canonical label ledger."""
 
     source_id = source.source_id
-    source_path = paths.campaign_root / source.source_campaign_slug / "inputs/r0/reader_vec8_batch0.csv"
+    source_dir = sfxi_round0_source_evidence_dir(
+        paths.repo_root,
+        source_slug=source.source_campaign_slug,
+    )
+    source_path = source_dir / "inputs/r0/reader_vec8_batch0.csv"
     if not source_path.exists():
         raise FileNotFoundError(f"Required measured Reader label source is missing: {source_path}")
     source_rows = pd.read_csv(source_path)
@@ -317,21 +333,35 @@ def load_training_matrix(
     if labels["id"].astype(str).duplicated().any():
         raise ValueError("observed labels contain duplicate ids.")
     label_ids = labels["id"].astype(str).tolist()
+    x = load_candidate_matrix(records_path, x_column=x_column, candidate_ids=label_ids)
+    y = _stack_vectors(labels["y_obs"], expected_length=8, field="y_obs")
+    return x, y
+
+
+def load_candidate_matrix(
+    records_path: Path,
+    *,
+    x_column: str,
+    candidate_ids: list[str],
+) -> np.ndarray:
+    """Load one candidate X row per exact ID in the requested order."""
+
+    ids = [str(value) for value in candidate_ids]
+    if not ids or len(ids) != len(set(ids)) or any(not value for value in ids):
+        raise ValueError("candidate matrix ids must be non-empty and unique.")
     records = pd.read_parquet(
         records_path,
         columns=["id", x_column],
-        filters=[("id", "in", label_ids)],
+        filters=[("id", "in", ids)],
     )
     records["id"] = records["id"].astype(str)
     if records["id"].duplicated().any():
-        raise ValueError("candidate records contain duplicate label ids.")
-    missing = sorted(set(label_ids) - set(records["id"]))
+        raise ValueError("candidate records contain duplicate requested ids.")
+    missing = sorted(set(ids) - set(records["id"]))
     if missing:
-        raise ValueError(f"candidate records are missing observed-label ids: {missing[:5]}")
-    aligned = records.set_index("id").loc[label_ids]
-    x = _stack_vectors(aligned[x_column], expected_length=None, field=x_column)
-    y = _stack_vectors(labels["y_obs"], expected_length=8, field="y_obs")
-    return x, y
+        raise ValueError(f"candidate records are missing requested ids: {missing[:5]}")
+    aligned = records.set_index("id").loc[ids]
+    return _stack_vectors(aligned[x_column], expected_length=None, field=x_column)
 
 
 def _stack_y_hat(values: pd.Series, *, slug: str) -> np.ndarray:

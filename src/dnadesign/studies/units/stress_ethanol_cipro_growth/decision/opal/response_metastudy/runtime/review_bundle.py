@@ -38,11 +38,8 @@ class ReviewBundleEvidence:
     pressure_tests: pd.DataFrame
     model_validation: pd.DataFrame
     setpoint_support: pd.DataFrame
-    sfxi_comparison_vec8: pd.DataFrame
-    sfxi_comparison_rows: pd.DataFrame
-    sfxi_comparison: pd.DataFrame
     response_screen: ResponseMetricScreen
-    metric_comparison: pd.DataFrame
+    response_examples: pd.DataFrame
     rmf_cardinality_pressure: pd.DataFrame
     scored: dict[str, dict[str, pd.DataFrame]]
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...]
@@ -73,9 +70,8 @@ def materialize_review_bundle(
         comparison_panel=evidence.comparison_panel,
         model_validation=evidence.model_validation,
         setpoint_support=evidence.setpoint_support,
-        sfxi_comparison=evidence.sfxi_comparison,
         response_screen=evidence.response_screen,
-        metric_comparison=evidence.metric_comparison,
+        response_examples=evidence.response_examples,
         rmf_cardinality_pressure=evidence.rmf_cardinality_pressure,
         scored=evidence.scored,
         sfxi_evidence=evidence.sfxi_evidence,
@@ -96,7 +92,6 @@ def materialize_review_bundle(
         comparison_panel=evidence.comparison_panel,
         model_validation=evidence.model_validation,
         setpoint_support=evidence.setpoint_support,
-        sfxi_comparison=evidence.sfxi_comparison,
         response_screen=evidence.response_screen,
         pressure_tests=evidence.pressure_tests,
         plot_manifest=plot_manifest,
@@ -127,10 +122,7 @@ def _write_core_tables(tables_dir: Path, evidence: ReviewBundleEvidence) -> dict
         "pressure_tests": evidence.pressure_tests,
         "model_validation": evidence.model_validation,
         "setpoint_support": evidence.setpoint_support,
-        "sfxi_comparison_vec8": evidence.sfxi_comparison_vec8,
-        "sfxi_comparison_rows": evidence.sfxi_comparison_rows,
-        "sfxi_comparison_stability": evidence.sfxi_comparison,
-        "metric_comparison": evidence.metric_comparison,
+        "measured_response_examples": evidence.response_examples,
         "rmf_cardinality_pressure": evidence.rmf_cardinality_pressure,
     }
     paths: dict[str, Path] = {}

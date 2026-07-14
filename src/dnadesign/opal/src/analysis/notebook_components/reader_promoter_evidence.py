@@ -14,11 +14,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 PROMOTER_RESPONSE_EVIDENCE_SEMANTIC_KIND = "promoter_response_evidence"
-PROMOTER_EVIDENCE_BUNDLE_RECORD_ID = "reader.response_window.promoter_evidence_bundle.v1"
+PROMOTER_EVIDENCE_BUNDLE_RECORD_ID = "reader.response_window.promoter_evidence_bundle.v2"
+READER_PROMOTER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
 READER_PROMOTER_EVIDENCE_MAX_BYTES = 32 * 1024 * 1024
 
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
@@ -53,12 +54,11 @@ def verify_reader_promoter_evidence_artifact(row: Mapping[str, Any]) -> Path:
     claim_status = str(row.get("claim_status") or "")
     if evidence_role != "display_only" or claim_status not in {"objective_neutral", "screen_only"}:
         raise ReaderPromoterEvidenceIntegrityError("Promoter evidence must remain display-only with a supported claim.")
-    artifact_path = _exact_absolute_path(row.get("path"), label="artifact path")
-    source_manifest = _exact_absolute_path(row.get("source_manifest_path"), label="source manifest path")
-    if source_manifest.name != "manifest.json" or artifact_path.parent != source_manifest.parent:
-        raise ReaderPromoterEvidenceIntegrityError(
-            "Promoter artifact and source manifest must share one exact bundle root."
-        )
+    artifact_path, manifest_path = _staged_artifact_path(
+        row.get("path"),
+        manifest_path=row.get("manifest_path"),
+        source_manifest_sha256=row.get("source_manifest_sha256"),
+    )
     expected_media_type = _MEDIA_TYPES.get(artifact_path.name)
     if expected_media_type is None or row.get("media_type") != expected_media_type:
         raise ReaderPromoterEvidenceIntegrityError("Promoter artifact filename or media type is invalid.")
@@ -72,10 +72,8 @@ def verify_reader_promoter_evidence_artifact(row: Mapping[str, Any]) -> Path:
     if not artifact_path.is_file() or artifact_path.stat().st_size != expected_size:
         raise ReaderPromoterEvidenceIntegrityError("Promoter artifact size no longer matches its display manifest.")
     _verify_digest(artifact_path, expected=row.get("sha256"), label="artifact")
-    if not source_manifest.is_file():
-        raise ReaderPromoterEvidenceIntegrityError("Promoter source manifest is missing.")
-    _verify_digest(source_manifest, expected=row.get("source_manifest_sha256"), label="source manifest")
-    _verify_source_manifest_binding(row, source_manifest=source_manifest, artifact_path=artifact_path)
+    _verify_display_identity(row)
+    _verify_publication_manifest_binding(row, manifest_path=manifest_path)
     with artifact_path.open("rb") as stream:
         signature = stream.read(8)
     if artifact_path.suffix == ".png" and signature != b"\x89PNG\r\n\x1a\n":
@@ -85,71 +83,113 @@ def verify_reader_promoter_evidence_artifact(row: Mapping[str, Any]) -> Path:
     return artifact_path
 
 
-def _exact_absolute_path(value: object, *, label: str) -> Path:
-    raw = str(value or "")
-    path = Path(raw).expanduser()
-    if not raw or raw != str(path) or not path.is_absolute() or path.resolve() != path:
-        raise ReaderPromoterEvidenceIntegrityError(f"Promoter {label} must be an exact absolute path.")
-    return path
-
-
-def _verify_source_manifest_binding(
-    row: Mapping[str, Any],
+def _staged_artifact_path(
+    value: object,
     *,
-    source_manifest: Path,
-    artifact_path: Path,
-) -> None:
-    try:
-        payload = json.loads(source_manifest.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise ReaderPromoterEvidenceIntegrityError(f"Promoter source manifest is not valid JSON: {exc}") from exc
-    if not isinstance(payload, dict) or payload.get("schema_version") != PROMOTER_EVIDENCE_BUNDLE_RECORD_ID:
-        raise ReaderPromoterEvidenceIntegrityError("Promoter source manifest schema is invalid.")
-    selection = payload.get("selection")
-    selected_binding = payload.get("selected_binding")
-    source_artifacts = payload.get("artifacts")
-    if not isinstance(selection, dict) or set(selection) != {
-        "candidate_id",
-        "design_id",
-        "experiment_id",
-        "reduction_id",
-    }:
-        raise ReaderPromoterEvidenceIntegrityError("Promoter source selection is malformed.")
-    expected_selection = (
-        selection["candidate_id"],
-        selection["design_id"],
-        selection["experiment_id"],
-        selection["reduction_id"],
-    )
-    actual_selection = (
-        row.get("candidate_id"),
-        row.get("design_id"),
-        row.get("reader_experiment_id"),
-        row.get("reduction_id"),
-    )
+    manifest_path: object,
+    source_manifest_sha256: object,
+) -> tuple[Path, Path]:
+    manifest_raw = str(manifest_path or "")
+    manifest = Path(manifest_raw).expanduser()
     if (
-        actual_selection != expected_selection
-        or row.get("id") != selection["candidate_id"]
-        or row.get("claim_status") != payload.get("claim_status")
-        or not isinstance(selected_binding, dict)
-        or row.get("selected_binding") != selected_binding
+        not manifest_raw
+        or manifest_raw != str(manifest)
+        or not manifest.is_absolute()
+        or manifest.resolve() != manifest
+    ):
+        raise ReaderPromoterEvidenceIntegrityError("Promoter display manifest path must be exact and absolute.")
+    source_digest = str(source_manifest_sha256 or "")
+    if _SHA256.fullmatch(source_digest) is None:
+        raise ReaderPromoterEvidenceIntegrityError("Promoter Reader source-manifest SHA-256 is invalid.")
+    raw = str(value or "")
+    relative = PurePosixPath(raw)
+    artifact_id = relative.name
+    expected_parts = ("reader_evidence_media", source_digest.removeprefix("sha256:"), artifact_id)
+    if not raw or "\\" in raw or relative.is_absolute() or ".." in relative.parts or relative.parts != expected_parts:
+        raise ReaderPromoterEvidenceIntegrityError(
+            "Promoter artifact path must be a confined content-addressed relative path."
+        )
+    artifact = (manifest.parent / Path(*relative.parts)).resolve()
+    try:
+        artifact.relative_to(manifest.parent)
+    except ValueError as exc:
+        raise ReaderPromoterEvidenceIntegrityError("Promoter artifact path escapes its evidence bundle.") from exc
+    return artifact, manifest
+
+
+def _verify_display_identity(row: Mapping[str, Any]) -> None:
+    identity_fields = ("candidate_id", "design_id", "reader_experiment_id", "reduction_id")
+    if any(not isinstance(row.get(field), str) or not str(row.get(field)).strip() for field in identity_fields):
+        raise ReaderPromoterEvidenceIntegrityError("Promoter display selection identity is incomplete.")
+    selected_binding = row.get("selected_binding")
+    if (
+        row.get("id") != row.get("candidate_id")
+        or not isinstance(selected_binding, Mapping)
+        or selected_binding.get("reader_design_id") != row.get("design_id")
+        or selected_binding.get("candidate_id") != row.get("candidate_id")
         or selected_binding.get("binding_status") != "resolved"
         or selected_binding.get("binding_method") != "exact_alias"
     ):
+        raise ReaderPromoterEvidenceIntegrityError("Promoter display identity or selected binding is invalid.")
+
+
+def _verify_publication_manifest_binding(row: Mapping[str, Any], *, manifest_path: Path) -> None:
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ReaderPromoterEvidenceIntegrityError(f"Promoter display manifest is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != READER_PROMOTER_EVIDENCE_SCHEMA_VERSION:
+        raise ReaderPromoterEvidenceIntegrityError("Promoter display manifest schema is invalid.")
+    publication_rows = payload.get("rows")
+    if not isinstance(publication_rows, list):
+        raise ReaderPromoterEvidenceIntegrityError("Promoter display manifest rows are malformed.")
+    matches: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
+    for publication_row in publication_rows:
+        if not isinstance(publication_row, Mapping):
+            continue
+        artifacts = publication_row.get("artifacts")
+        if not isinstance(artifacts, list):
+            continue
+        for artifact in artifacts:
+            if isinstance(artifact, Mapping) and artifact.get("path") == row.get("path"):
+                matches.append((publication_row, artifact))
+    if len(matches) != 1:
         raise ReaderPromoterEvidenceIntegrityError(
-            "Promoter display identity, claim, or selected binding disagrees with its source selection."
+            "Promoter display artifact must resolve exactly once in its publication manifest."
         )
-    if not isinstance(source_artifacts, dict):
-        raise ReaderPromoterEvidenceIntegrityError("Promoter source artifact records are malformed.")
-    source_record = source_artifacts.get(artifact_path.name)
-    if not isinstance(source_record, dict) or set(source_record) != {"path", "bytes", "sha256"}:
-        raise ReaderPromoterEvidenceIntegrityError("Promoter source artifact record is malformed.")
-    if (
-        source_record["path"] != artifact_path.name
-        or source_record["bytes"] != row.get("bytes")
-        or source_record["sha256"] != row.get("sha256")
-    ):
-        raise ReaderPromoterEvidenceIntegrityError("Promoter display artifact disagrees with its source manifest.")
+    publication_row, publication_artifact = matches[0]
+    row_fields = {
+        "id": row.get("id"),
+        "candidate_id": row.get("candidate_id"),
+        "design_id": row.get("design_id"),
+        "reader_experiment_id": row.get("reader_experiment_id"),
+        "reduction_id": row.get("reduction_id"),
+        "evidence_role": row.get("evidence_role"),
+        "claim_status": row.get("claim_status"),
+        "selected_binding": row.get("selected_binding"),
+        "binding_source": row.get("binding_source"),
+    }
+    if any(publication_row.get(field) != value for field, value in row_fields.items()):
+        raise ReaderPromoterEvidenceIntegrityError(
+            "Promoter display identity or binding disagrees with its publication manifest."
+        )
+    artifact_fields = {
+        "semantic_kind": row.get("semantic_kind"),
+        "kind": row.get("kind"),
+        "record_id": row.get("artifact_record_id"),
+        "scope": row.get("scope"),
+        "path": row.get("path"),
+        "path_label": row.get("path_label"),
+        "exists": row.get("exists"),
+        "media_type": row.get("media_type"),
+        "bytes": row.get("bytes"),
+        "sha256": row.get("sha256"),
+        "source_manifest_sha256": row.get("source_manifest_sha256"),
+    }
+    if any(publication_artifact.get(field) != value for field, value in artifact_fields.items()):
+        raise ReaderPromoterEvidenceIntegrityError(
+            "Promoter display artifact metadata disagrees with its publication manifest."
+        )
 
 
 def _verify_digest(path: Path, *, expected: object, label: str) -> None:
@@ -166,6 +206,7 @@ def _verify_digest(path: Path, *, expected: object, label: str) -> None:
 
 __all__ = [
     "PROMOTER_RESPONSE_EVIDENCE_SEMANTIC_KIND",
+    "READER_PROMOTER_EVIDENCE_SCHEMA_VERSION",
     "READER_PROMOTER_EVIDENCE_MAX_BYTES",
     "ReaderPromoterEvidenceIntegrityError",
     "is_reader_promoter_evidence_artifact",

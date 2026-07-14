@@ -13,24 +13,6 @@ from .plot_contracts import PlotSpec
 
 PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
-        plot_id="metric_compensation_comparison",
-        filename="metric_compensation_comparison.png",
-        tier="metric_diagnostic",
-        visual_type="paired component scatter",
-        premise="SFXI can reward effect when target separation is weak; RMF keeps each requirement visible.",
-        decision_value=(
-            "Shows why the canonical product score can hide a weak component and how RMF exposes monotonic "
-            "response, target-ON fluorescence, and target-OFF control margins."
-        ),
-        alt_text=(
-            "Six square scatter panels compare ethanol, ciprofloxacin, and AND observations. The top row plots "
-            "SFXI logic fidelity against scaled effect and colors points by the product score. The bottom row plots "
-            "RMF response margin against target-ON fluorescence margin, colors points by the target-OFF control "
-            "margin, and outlines observations that pass all provisional zero boundaries. Every RMF axis improves "
-            "upward. SpyP and sulAp are labeled."
-        ),
-    ),
-    PlotSpec(
         plot_id="measured_response_examples",
         filename="measured_response_examples.png",
         tier="primary_decision",
@@ -243,37 +225,6 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ),
     ),
     PlotSpec(
-        plot_id="sfxi_comparison_stability",
-        filename="sfxi_comparison_stability.png",
-        tier="metric_diagnostic",
-        visual_type="summary-method agreement heatmap",
-        premise="SFXI evidence should not depend on one arbitrary assay snapshot.",
-        decision_value=(
-            "Compares observed selection-view score ordering from the canonical 12-hour snapshot with assay-elapsed "
-            "duration-normalized trajectory summaries."
-        ),
-        alt_text=(
-            "Heatmap of Spearman agreement between canonical 12-hour observed SFXI scores and assay-elapsed "
-            "window summary scores for ethanol, ciprofloxacin, and AND; columns identify window and integration "
-            "method."
-        ),
-    ),
-    PlotSpec(
-        plot_id="sfxi_comparison_target_coverage",
-        filename="sfxi_comparison_target_coverage.png",
-        tier="metric_diagnostic",
-        visual_type="observed target-support dot plot",
-        premise="Observed target-shape support should persist across reasonable assay summaries.",
-        decision_value=(
-            "Shows whether apparent ethanol, ciprofloxacin, or AND support is stable across the snapshot and "
-            "assay-elapsed window summaries."
-        ),
-        alt_text=(
-            "Dot plot of observed designs at or above the provisional logic-fidelity review threshold for each "
-            "target view and assay summary, including the canonical 12-hour snapshot."
-        ),
-    ),
-    PlotSpec(
         plot_id="logic_effect_tradeoff_overlap",
         filename="logic_effect_tradeoff_overlap.png",
         tier="screen_appendix",
@@ -386,7 +337,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         alt_text=(
             "Heatmap of the weakest median within-experiment Spearman correlation across response separation, "
             "feasibility, ethanol, ciprofloxacin, and AND for each label representation and fixed model challenger; "
-            "snapshot, AUC, and pre-window-delta columns are marked as sensitivity analyses. PLS with four components "
+            "adjacent-window, AUC, and pre-window-delta columns are marked as sensitivity analyses. PLS with four "
+            "components "
             "is the strongest fixed challenger for the primary summary, but its weakest required ordering is 0.15, so "
             "no model is promoted."
         ),

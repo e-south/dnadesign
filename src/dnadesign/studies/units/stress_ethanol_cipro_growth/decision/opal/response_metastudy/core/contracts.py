@@ -61,6 +61,7 @@ class StressCampaignContract:
     target_views: tuple[StressTargetView, ...]
     candidate_records_path: Path
     x_column_name: str
+    model_params: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

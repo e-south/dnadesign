@@ -27,6 +27,11 @@ from .reader_evidence_media import (
 from .reader_evidence_visual import render_notebook_reader_evidence_artifact_visual
 
 READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_evidence.v1"
+READER_PROMOTER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
+_READER_EVIDENCE_SCHEMA_VERSIONS = {
+    READER_EVIDENCE_SCHEMA_VERSION,
+    READER_PROMOTER_EVIDENCE_SCHEMA_VERSION,
+}
 
 
 def discover_reader_evidence_manifests(workdir: str | Path) -> list[dict[str, Any]]:
@@ -46,7 +51,7 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
     rows: list[dict[str, Any]] = []
     for manifest_path in sorted(root.glob("inputs/r*/reader_evidence*.json")):
         payload = _read_payload(manifest_path)
-        if payload is None or payload.get("schema_version") != READER_EVIDENCE_SCHEMA_VERSION:
+        if payload is None or payload.get("schema_version") not in _READER_EVIDENCE_SCHEMA_VERSIONS:
             continue
         for evidence_row in sequence(payload.get("rows")):
             item = mapping(evidence_row)
@@ -79,6 +84,7 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                     "evidence_role": str(item.get("evidence_role") or ""),
                     "claim_status": str(item.get("claim_status") or ""),
                     "selected_binding": dict(mapping(item.get("selected_binding"))),
+                    "binding_source": dict(mapping(item.get("binding_source"))),
                     "reader_config_path": str(item.get("reader_config_path") or ""),
                     "reader_record_id": str(item.get("reader_record_id") or ""),
                     "sequence": item.get("sequence") or "",
@@ -94,13 +100,14 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                     "media_type": str(artifact_item.get("media_type") or ""),
                     "bytes": artifact_item.get("bytes"),
                     "sha256": str(artifact_item.get("sha256") or ""),
-                    "source_manifest_path": str(artifact_item.get("source_manifest_path") or ""),
                     "source_manifest_sha256": str(artifact_item.get("source_manifest_sha256") or ""),
-                    "manifest_path": str(manifest_path),
+                    "manifest_path": str(manifest_path.resolve()),
                     "manifest_path_label": compact_path(manifest_path, base=root),
                 }
                 if "time_selected_h" in item:
                     row["time_selected_h"] = item.get("time_selected_h")
+                if "source_manifest_path" in artifact_item:
+                    row["source_manifest_path"] = str(artifact_item.get("source_manifest_path") or "")
                 rows.append(row)
     return rows
 
@@ -145,6 +152,7 @@ def build_notebook_reader_evidence_artifact_rows(view_model: Mapping[str, Any]) 
             "evidence_role": item.get("evidence_role") or "",
             "claim_status": item.get("claim_status") or "",
             "selected_binding": dict(mapping(item.get("selected_binding"))),
+            "binding_source": dict(mapping(item.get("binding_source"))),
             "reader_config_path": item.get("reader_config_path") or "",
             "reader_record_id": item.get("reader_record_id") or "",
             "sequence": item.get("sequence") or "",
@@ -158,13 +166,15 @@ def build_notebook_reader_evidence_artifact_rows(view_model: Mapping[str, Any]) 
             "media_type": item.get("media_type") or "",
             "bytes": item.get("bytes"),
             "sha256": item.get("sha256") or "",
-            "source_manifest_path": item.get("source_manifest_path") or "",
             "source_manifest_sha256": item.get("source_manifest_sha256") or "",
+            "manifest_path": item.get("manifest_path") or "",
             "path": item.get("path") or "",
             "path_label": item.get("path_label") or item.get("path") or "",
         }
         if "time_selected_h" in item:
             output["time_selected_h"] = _blank_if_none(item.get("time_selected_h"))
+        if "source_manifest_path" in item:
+            output["source_manifest_path"] = item.get("source_manifest_path") or ""
         rows.append(output)
     return rows
 
@@ -287,7 +297,7 @@ def _reader_evidence_manifest_row(path: Path, *, workdir: Path) -> dict[str, Any
     payload = _read_payload(path)
     if payload is None:
         return {**row, "status": "read_error"}
-    if payload.get("schema_version") != READER_EVIDENCE_SCHEMA_VERSION:
+    if payload.get("schema_version") not in _READER_EVIDENCE_SCHEMA_VERSIONS:
         return {**row, "status": "schema_attention"}
     summary = mapping(payload.get("summary"))
     row.update(
@@ -319,6 +329,7 @@ def _round_label(path: Path) -> str:
 
 __all__ = [
     "READER_EVIDENCE_SCHEMA_VERSION",
+    "READER_PROMOTER_EVIDENCE_SCHEMA_VERSION",
     "build_notebook_reader_evidence_artifact_rows",
     "build_notebook_reader_evidence_artifact_options",
     "build_notebook_reader_evidence_plot_type_options",

@@ -26,16 +26,18 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
         spec.tier for spec in plot_catalog.PLOT_SPECS
     }
     assert {
-        "metric_compensation_comparison",
         "measured_response_examples",
         "sfxi_score_contours",
         "target_view_pareto_fronts",
         "denominator_sensitivity",
         "policy_comparison_panel_roles",
         "model_validation",
+    } <= set(plot_ids)
+    assert {
+        "metric_compensation_comparison",
         "sfxi_comparison_stability",
         "sfxi_comparison_target_coverage",
-    } <= set(plot_ids)
+    }.isdisjoint(plot_ids)
     tiers = {spec.plot_id: spec.tier for spec in plot_catalog.PLOT_SPECS}
     assert tiers["selected_setpoint_residuals"] == "screen_appendix"
     assert tiers["policy_comparison_panel_roles"] == "screen_appendix"

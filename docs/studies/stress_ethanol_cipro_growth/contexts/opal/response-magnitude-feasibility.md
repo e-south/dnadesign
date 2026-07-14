@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-magnitude-feasibility
 title: Response-Magnitude Feasibility study decision
 owner: dnadesign-maintainers
 status: implemented_inactive_pending_label_promotion
-last_verified: 2026-07-12
+last_verified: 2026-07-14
 audience: [scientist, operator, agent]
 ---
 
@@ -58,7 +58,7 @@ r_i = repeated-experiment aggregate of log2(6-12 h post-event geometric time mea
 b_i = the corresponding log2 geometric time mean of YFP/OD600 minus same-state pDual-10
 ```
 
-The ordered label is:
+The ordered response-window Y is:
 
 ```text
 [r00, r10, r01, r11, b00, b10, b01, b11]
@@ -131,7 +131,7 @@ Before the unified campaign runs, freeze and record:
 
 1. Reader reduction `event_logmean_6_12h_post`.
 2. One repeated-experiment aggregation rule.
-3. The typed eight-column label schema and Reader bundle digest.
+3. The typed eight-column response-window Y schema and Reader bundle digest.
 4. RMF thresholds, positive scales, state order, and three masks.
 5. The candidate table, eligibility rules, X column, RF parameters, and seed.
 6. Greedy `top_k: 6`, sequence deduplication, and exact expected batch size 18.
@@ -150,7 +150,8 @@ constructs update every view. Report:
 - response separation, ON fluorescence floor, OFF fluorescence ceiling, and
   the limiting requirement for each construct;
 - whether each view's six outperform the other twelve under that view's mask;
-- rank changes and model performance after the prospective labels are ingested.
+- rank changes and model performance after the prospective response-window Y
+  is ingested.
 
 TFBS composition is a provenance and diagnostic surface, not a campaign-specific
 eligibility constraint. Predicted RMF alone is not evidence of a responsive

@@ -16,12 +16,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from .reader_display_contract import READER_DISPLAY_SCHEMA, response_example_labels, validate_reader_display
 
-READER_BUNDLE_SCHEMA = "reader.response_window.bundle.v3"
+READER_BUNDLE_SCHEMA = "reader.response_window.bundle.v4"
 EXPECTED_CONTRACTS = {
     "wells": "plate_reader.response_window.wells.v2",
     "designs": "plate_reader.response_window.designs.v2",
@@ -52,10 +51,6 @@ class ReaderResponseBundle:
         return value
 
     @property
-    def display(self) -> dict[str, object]:
-        return validate_reader_display(self.manifest.get("display"))
-
-    @property
     def response_examples(self) -> dict[str, str]:
         return response_example_labels(self.manifest.get("display"))
 
@@ -68,6 +63,8 @@ def load_reader_response_bundle(path: Path, *, expected_request_path: Path) -> R
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or payload.get("schema_version") != READER_BUNDLE_SCHEMA:
         raise ValueError(f"Reader response-window bundle must use {READER_BUNDLE_SCHEMA!r}.")
+    if payload.get("study_id") != "stress_ethanol_cipro_growth":
+        raise ValueError("Reader response-window bundle study identity disagrees with this study.")
     contracts = payload.get("contracts")
     if contracts != EXPECTED_CONTRACTS:
         raise ValueError(f"Reader response-window contracts disagree: {contracts!r}.")
@@ -202,53 +199,6 @@ def build_all_primary_measurements(bundle: ReaderResponseBundle) -> pd.DataFrame
     return result
 
 
-def response_labels_as_sfxi_comparator(labels: pd.DataFrame) -> pd.DataFrame:
-    """Map measured response states to canonical vec8 only for baseline comparison."""
-
-    required = {"id", "design_id", "reader_experiment_id", "reduction_id", "reduction_method", *VALUE_COLUMNS}
-    missing = sorted(required - set(labels.columns))
-    if missing:
-        raise ValueError(f"Reader response labels lack comparator fields: {missing}")
-    rows = labels.copy()
-    response = rows.loc[:, [f"r{state}" for state in STATE_ORDER]].to_numpy(dtype=float)
-    minima = response.min(axis=1, keepdims=True)
-    spans = response.max(axis=1, keepdims=True) - minima
-    normalized = np.divide(
-        response - minima,
-        spans,
-        out=np.full_like(response, 0.25),
-        where=spans > 1.0e-12,
-    )
-    for index, state in enumerate(STATE_ORDER):
-        rows[f"v{state}"] = normalized[:, index]
-        rows[f"y{state}_star"] = rows[f"b{state}"].to_numpy(dtype=float)
-    rows["assay_summary_id"] = rows["reduction_id"].astype(str)
-    rows["assay_summary_method"] = rows["reduction_method"].astype(str)
-    return rows
-
-
-def build_snapshot_comparator(label_sources: pd.DataFrame) -> pd.DataFrame:
-    """Represent immutable round-0 vec8 labels beside Reader response-window records."""
-
-    vec8_columns = ("v00", "v10", "v01", "v11", "y00_star", "y10_star", "y01_star", "y11_star")
-    required = {"id", "design_id", "reader_experiment_id", *vec8_columns}
-    missing = sorted(required - set(label_sources.columns))
-    if missing:
-        raise ValueError(f"snapshot label source lacks fields: {missing}")
-    snapshot = label_sources.copy()
-    snapshot["assay_summary_id"] = "snapshot_12h"
-    snapshot["assay_summary_method"] = "nearest_time_snapshot"
-    if "time_selected_h" not in snapshot.columns:
-        raise ValueError("snapshot label source lacks required time_selected_h provenance.")
-    selected_time = pd.to_numeric(snapshot["time_selected_h"], errors="coerce")
-    if not np.isfinite(selected_time.to_numpy(dtype=float)).all():
-        raise ValueError("snapshot label source contains invalid time_selected_h provenance.")
-    snapshot["window_start_h"] = selected_time
-    snapshot["window_end_h"] = selected_time
-    snapshot["window_duration_h"] = 0.0
-    return snapshot
-
-
 def _validate_bundle_frames(
     *,
     designs: pd.DataFrame,
@@ -323,7 +273,5 @@ __all__ = [
     "build_all_primary_measurements",
     "build_selected_bootstrap_draws",
     "build_selected_response_labels",
-    "build_snapshot_comparator",
     "load_reader_response_bundle",
-    "response_labels_as_sfxi_comparator",
 ]

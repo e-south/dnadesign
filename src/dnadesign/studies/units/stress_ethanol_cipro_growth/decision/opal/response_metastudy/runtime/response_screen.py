@@ -42,7 +42,6 @@ def build_response_metric_screen(
     *,
     primary_reduction_id: str,
     label_ids: list[str],
-    snapshot_y: np.ndarray,
     x_train: np.ndarray,
     groups: np.ndarray,
     random_forest_params: Mapping[str, object],
@@ -85,7 +84,6 @@ def build_response_metric_screen(
     )
     representations = build_label_representations(
         ids=label_ids,
-        snapshot_y=snapshot_y,
         response_summaries=labels.loc[labels["reduction_id"].isin(reduction_ids)],
         primary_reduction_id=primary_reduction_id,
         promotion_reduction_ids=promotion_ids,
@@ -245,7 +243,7 @@ def response_screen_manifest(screen: ResponseMetricScreen, *, primary_reduction_
             and int(best["minimum_defined_group_count"]) >= RESPONSE_REVIEW_SPEC.model_min_defined_group_count
         ),
         "repeated_design_count": int(len(screen.repeated_agreement)),
-        "maximum_selected_to_cross_experiment_median_abs_difference": float(
+        "maximum_screen_source_to_cross_experiment_median_abs_difference": float(
             screen.repeated_agreement["maximum_selected_to_median_abs_difference"].max()
         ),
         "ratio_domain_policy": "error_at_or_below_declared_positive_floor",

@@ -1,5 +1,6 @@
-schema_version: reader.response_window.request.v2
-request_id: stress_ethanol_cipro_growth.response_window.v2
+schema_version: reader.response_window.request.v3
+study_id: stress_ethanol_cipro_growth
+request_id: stress_ethanol_cipro_growth.response_window.v3
 
 experiment_ids:
   - 20260117_sfxi_ref-pDual10
@@ -35,9 +36,7 @@ display:
 source:
   response_record_id: ratio_yfp_cfp/df
   magnitude_record_id: ratio_yfp_od600/df
-  trajectory_record_id: promote_to_tidy_plus_map/df
-  reference_authority_record_id: sfxi_vec8/vec8
-  reference_authority_contract_id: sfxi.vec8.v3
+  trajectory_record_id: ratio_yfp_od600/df
   response_channel: YFP/CFP
   magnitude_channel: YFP/OD600
   growth_channel: OD600

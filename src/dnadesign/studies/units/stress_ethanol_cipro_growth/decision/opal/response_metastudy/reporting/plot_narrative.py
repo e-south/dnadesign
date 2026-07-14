@@ -10,10 +10,6 @@ Module Author(s): Eric J. South
 """
 
 PLOT_RATIONALES: dict[str, str] = {
-    "metric_compensation_comparison": (
-        "The same observed rows should reveal whether a scalar product hides a failed response "
-        "or fluorescence requirement."
-    ),
     "measured_response_examples": (
         "One measured assay summary should remain fixed while the declared target determines its ON and OFF partition."
     ),
@@ -41,12 +37,6 @@ PLOT_RATIONALES: dict[str, str] = {
     "policy_comparison_panel_roles": "The exported diagnostic panel must expose why each row was included.",
     "model_validation": "Selection is not actionable when the predictor cannot order held-out observations.",
     "candidate_logic_support": "No downstream selector can recover response shapes absent from model predictions.",
-    "sfxi_comparison_stability": (
-        "Canonical SFXI agreement tests whether its snapshot ranking is stable across prespecified reductions."
-    ),
-    "sfxi_comparison_target_coverage": (
-        "Canonical SFXI target support should be robust to nearby, prespecified assay reductions."
-    ),
     "logic_effect_tradeoff_overlap": (
         "Overlap is useful as a sensitivity diagnostic after objective support is established."
     ),
@@ -77,9 +67,6 @@ PLOT_RATIONALES: dict[str, str] = {
 }
 
 PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
-    "metric_compensation_comparison": (
-        "The component view diagnoses objective behavior and does not establish prospective active-learning gain."
-    ),
     "measured_response_examples": (
         "SpyP and sulAp are measured interpretation examples, not complete or optimal biological archetypes."
     ),
@@ -101,12 +88,6 @@ PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
     "policy_comparison_panel_roles": "Panel membership is for calibration review, not synthesis authorization.",
     "model_validation": "Held-out association measures ranking support and does not prove causal biology.",
     "candidate_logic_support": "Support is computed from model predictions, not measured candidate responses.",
-    "sfxi_comparison_stability": (
-        "Agreement between reductions does not prove that canonical SFXI is the appropriate selection objective."
-    ),
-    "sfxi_comparison_target_coverage": (
-        "Observed SFXI coverage is descriptive and the review threshold remains provisional."
-    ),
     "logic_effect_tradeoff_overlap": "Reduced overlap is not itself a selection-quality criterion.",
     "logic_effect_tradeoff_fidelity": "Improved predicted fidelity does not replace prospective assay validation.",
     "policy_overlap_summary": "Candidate uniqueness is not evidence of objective correctness.",
@@ -130,8 +111,7 @@ PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
 }
 
 PLOT_DATA_TABLES: dict[str, str] = {
-    "metric_compensation_comparison": "tables/metric_comparison.csv",
-    "measured_response_examples": "tables/metric_comparison.csv",
+    "measured_response_examples": "tables/measured_response_examples.csv",
     "rmf_cardinality_pressure": "tables/rmf_cardinality_pressure.csv",
     "policy_guardrail_matrix": "tables/policy_summary.csv",
     "policy_decision_frontier": "tables/policy_summary.csv",
@@ -147,8 +127,6 @@ PLOT_DATA_TABLES: dict[str, str] = {
     "policy_comparison_panel_roles": "tables/policy_comparison_panel.csv",
     "model_validation": "tables/model_validation.csv",
     "candidate_logic_support": "tables/setpoint_support.csv",
-    "sfxi_comparison_stability": "tables/sfxi_comparison_stability.csv",
-    "sfxi_comparison_target_coverage": "tables/sfxi_comparison_stability.csv",
     "logic_effect_tradeoff_overlap": "tables/policy_summary.csv",
     "logic_effect_tradeoff_fidelity": "tables/policy_summary.csv",
     "policy_overlap_summary": "tables/policy_summary.csv",

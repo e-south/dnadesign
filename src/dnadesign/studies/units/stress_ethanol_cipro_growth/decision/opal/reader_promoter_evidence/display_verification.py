@@ -18,15 +18,12 @@ from typing import Any
 
 from .contracts import (
     PROMOTER_EVIDENCE_ARTIFACT_IDS,
-    PROMOTER_RESPONSE_SEMANTIC_KIND,
-    READER_BUNDLE_SCHEMA_VERSION,
     READER_EVIDENCE_SCHEMA_VERSION,
     TARGET_CAMPAIGN_SLUG,
     ReaderPromoterEvidenceError,
     ReaderPromoterEvidenceVerification,
-    VerifiedReaderPromoterEvidenceBundle,
 )
-from .verification import verify_reader_promoter_evidence_bundle
+from .display_artifact_verification import is_sha256, verify_display_artifact
 
 _DISPLAY_MANIFEST_FIELDS = {"schema_version", "created_at", "campaign_slug", "round", "summary", "rows"}
 _DISPLAY_SUMMARY_FIELDS = {"rows", "distinct_ids", "reader_experiments", "artifact_count", "missing_artifact_rows"}
@@ -39,21 +36,32 @@ _DISPLAY_ROW_FIELDS = {
     "evidence_role",
     "claim_status",
     "selected_binding",
+    "binding_source",
     "artifacts",
 }
-_DISPLAY_ARTIFACT_FIELDS = {
-    "semantic_kind",
-    "kind",
-    "record_id",
-    "scope",
-    "path",
-    "path_label",
-    "exists",
-    "media_type",
-    "bytes",
-    "sha256",
-    "source_manifest_path",
-    "source_manifest_sha256",
+_BINDING_SOURCE_FIELDS = {
+    "schema_id",
+    "schema_version",
+    "study_id",
+    "manifest_sha256",
+    "records_sha256",
+    "candidate_table_id",
+    "candidate_selection_sha256",
+}
+_SELECTED_BINDING_FIELDS = {
+    "reader_design_id",
+    "candidate_id",
+    "sequence_sha256",
+    "sequence_authority_dataset_id",
+    "sequence_authority_id",
+    "sequence_authority_sha256",
+    "source_class",
+    "design_family",
+    "binding_status",
+    "binding_method",
+    "densegen_plan",
+    "densegen_run_id",
+    "densegen_sampling_library_hash",
 }
 
 
@@ -82,7 +90,7 @@ def verify_reader_promoter_evidence_manifest(path: Path) -> ReaderPromoterEviden
     rows = payload["rows"]
     if not isinstance(rows, list) or not rows:
         raise ReaderPromoterEvidenceError("Reader display manifest rows must be a non-empty list.")
-    verified_rows = [_verify_display_row(row) for row in rows]
+    verified_rows = [_verify_display_row(row, manifest_root=manifest_path.parent) for row in rows]
     identities = [row["identity"] for row in verified_rows]
     if len(identities) != len(set(identities)):
         raise ReaderPromoterEvidenceError("Reader display manifest contains duplicate selection identities.")
@@ -109,7 +117,7 @@ def verify_reader_promoter_evidence_manifest(path: Path) -> ReaderPromoterEviden
     )
 
 
-def _verify_display_row(value: object) -> dict[str, Any]:
+def _verify_display_row(value: object, *, manifest_root: Path) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != _DISPLAY_ROW_FIELDS:
         raise ReaderPromoterEvidenceError(f"Reader display row fields must be exactly {sorted(_DISPLAY_ROW_FIELDS)}.")
     text_fields = ("id", "candidate_id", "design_id", "reader_experiment_id", "reduction_id")
@@ -121,37 +129,33 @@ def _verify_display_row(value: object) -> dict[str, Any]:
         raise ReaderPromoterEvidenceError("Reader promoter evidence must remain display_only.")
     if value["claim_status"] not in {"objective_neutral", "screen_only"}:
         raise ReaderPromoterEvidenceError("Reader display claim_status is unsupported.")
+    _verify_binding_source(value["binding_source"])
+    _verify_selected_binding(
+        value["selected_binding"],
+        reader_design_id=str(value["design_id"]),
+        candidate_id=str(value["candidate_id"]),
+    )
     artifacts = value["artifacts"]
     if not isinstance(artifacts, list) or len(artifacts) != len(PROMOTER_EVIDENCE_ARTIFACT_IDS):
         raise ReaderPromoterEvidenceError("Reader display row must contain exactly its PNG and PDF artifacts.")
-    source_paths = {artifact.get("source_manifest_path") for artifact in artifacts if isinstance(artifact, dict)}
-    if len(source_paths) != 1:
-        raise ReaderPromoterEvidenceError("Reader display artifacts must share one source manifest path.")
-    source_manifest_path = Path(str(next(iter(source_paths)))).expanduser().resolve()
-    bundle = verify_reader_promoter_evidence_bundle(source_manifest_path.parent)
-    if source_manifest_path != bundle.manifest_path:
-        raise ReaderPromoterEvidenceError("Reader display source manifest path is not exact.")
-    selection = bundle.manifest["selection"]
-    expected_identity = (
-        str(selection["candidate_id"]),
-        str(selection["design_id"]),
-        str(selection["experiment_id"]),
-        str(selection["reduction_id"]),
-    )
     actual_identity = (
         str(value["candidate_id"]),
         str(value["design_id"]),
         str(value["reader_experiment_id"]),
         str(value["reduction_id"]),
     )
-    if (
-        actual_identity != expected_identity
-        or value["claim_status"] != bundle.manifest["claim_status"]
-        or value["selected_binding"] != bundle.manifest["selected_binding"]
-    ):
-        raise ReaderPromoterEvidenceError("Reader display row disagrees with its verified source selection.")
+    source_digests = {artifact.get("source_manifest_sha256") for artifact in artifacts if isinstance(artifact, dict)}
+    if len(source_digests) != 1 or not is_sha256(next(iter(source_digests))):
+        raise ReaderPromoterEvidenceError("Reader display artifacts must share one Reader source-manifest digest.")
+    source_manifest_sha256 = str(next(iter(source_digests)))
     artifact_ids = [
-        _verify_display_artifact(artifact, bundle=bundle, identity=actual_identity) for artifact in artifacts
+        verify_display_artifact(
+            artifact,
+            manifest_root=manifest_root,
+            identity=actual_identity,
+            source_manifest_sha256=source_manifest_sha256,
+        )
+        for artifact in artifacts
     ]
     if set(artifact_ids) != set(PROMOTER_EVIDENCE_ARTIFACT_IDS):
         raise ReaderPromoterEvidenceError("Reader display row does not bind the exact PNG and PDF artifacts.")
@@ -163,44 +167,49 @@ def _verify_display_row(value: object) -> dict[str, Any]:
     }
 
 
-def _verify_display_artifact(
+def _verify_binding_source(value: object) -> None:
+    if not isinstance(value, dict) or set(value) != _BINDING_SOURCE_FIELDS:
+        raise ReaderPromoterEvidenceError("Reader display binding source is malformed.")
+    if (
+        value["schema_id"] != "dnadesign.study.promoter_candidate_bindings.v1"
+        or str(value["schema_version"]) != "1"
+        or value["study_id"] != "stress_ethanol_cipro_growth"
+        or not _nonempty(value["candidate_table_id"])
+        or any(not is_sha256(value[field]) for field in value if field.endswith("sha256"))
+    ):
+        raise ReaderPromoterEvidenceError("Reader display binding source is invalid.")
+
+
+def _verify_selected_binding(
     value: object,
     *,
-    bundle: VerifiedReaderPromoterEvidenceBundle,
-    identity: tuple[str, str, str, str],
-) -> str:
-    if not isinstance(value, dict) or set(value) != _DISPLAY_ARTIFACT_FIELDS:
-        raise ReaderPromoterEvidenceError(
-            f"Reader display artifact fields must be exactly {sorted(_DISPLAY_ARTIFACT_FIELDS)}."
-        )
+    reader_design_id: str,
+    candidate_id: str,
+) -> None:
+    if not isinstance(value, dict) or set(value) != _SELECTED_BINDING_FIELDS:
+        raise ReaderPromoterEvidenceError("Reader display selected binding is malformed.")
+    densegen_fields = ("densegen_plan", "densegen_run_id", "densegen_sampling_library_hash")
+    text_fields = (
+        _SELECTED_BINDING_FIELDS
+        - set(densegen_fields)
+        - {
+            "sequence_sha256",
+            "sequence_authority_sha256",
+        }
+    )
     if (
-        value["semantic_kind"] != PROMOTER_RESPONSE_SEMANTIC_KIND
-        or value["kind"] != "reader_publication"
-        or value["record_id"] != READER_BUNDLE_SCHEMA_VERSION
-        or value["scope"] != "design_reduction"
-        or value["exists"] is not True
-        or value["source_manifest_path"] != str(bundle.manifest_path)
-        or value["source_manifest_sha256"] != bundle.manifest_sha256
+        not is_sha256(value["sequence_sha256"])
+        or not is_sha256(value["sequence_authority_sha256"])
+        or any(not _nonempty(value[field]) for field in text_fields)
+        or value["binding_status"] != "resolved"
+        or value["binding_method"] != "exact_alias"
     ):
-        raise ReaderPromoterEvidenceError("Reader display artifact identity or source binding is invalid.")
-    artifact_path = Path(str(value["path"])).expanduser().resolve()
-    try:
-        artifact_id = artifact_path.relative_to(bundle.root).as_posix()
-    except ValueError as exc:
-        raise ReaderPromoterEvidenceError("Reader display artifact path escapes its source bundle.") from exc
-    if artifact_id not in PROMOTER_EVIDENCE_ARTIFACT_IDS or artifact_path != bundle.root / artifact_id:
-        raise ReaderPromoterEvidenceError("Reader display artifact path is not an exact bundle artifact path.")
-    source_record = bundle.manifest["artifacts"][artifact_id]
-    expected_media_type = "image/png" if artifact_id.endswith(".png") else "application/pdf"
-    expected_label = f"{identity[2]}/{identity[1]}/{identity[3]}/{artifact_id}"
-    if (
-        value["path_label"] != expected_label
-        or value["media_type"] != expected_media_type
-        or value["bytes"] != source_record["bytes"]
-        or value["sha256"] != source_record["sha256"]
-    ):
-        raise ReaderPromoterEvidenceError("Reader display artifact metadata disagrees with its verified source.")
-    return artifact_id
+        raise ReaderPromoterEvidenceError("Reader display selected binding is invalid.")
+    if value["reader_design_id"] != reader_design_id or value["candidate_id"] != candidate_id:
+        raise ReaderPromoterEvidenceError("Reader display selected binding identity disagrees with its row.")
+    densegen_values = [value[field] for field in densegen_fields]
+    if not (all(item is None for item in densegen_values) or all(_nonempty(item) for item in densegen_values)):
+        raise ReaderPromoterEvidenceError("Reader display DenseGen binding provenance must be complete or null.")
 
 
 def _display_created_at(value: object) -> None:

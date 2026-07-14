@@ -37,7 +37,6 @@ class LabelRepresentation:
 def build_label_representations(
     *,
     ids: Sequence[str],
-    snapshot_y: np.ndarray,
     response_summaries: pd.DataFrame,
     primary_reduction_id: str,
     promotion_reduction_ids: frozenset[str],
@@ -47,16 +46,7 @@ def build_label_representations(
     candidate_ids = [str(value) for value in ids]
     if len(candidate_ids) != len(set(candidate_ids)):
         raise ValueError("label representation ids must be unique.")
-    snapshot = _validated_response_magnitude(snapshot_y, expected_rows=len(candidate_ids), context="snapshot_y")
-    representations = [
-        LabelRepresentation(
-            id="snapshot_vec8",
-            target=snapshot,
-            response_magnitude_truth=snapshot,
-            decoder="identity_response_magnitude",
-            promotion_eligible=False,
-        )
-    ]
+    representations: list[LabelRepresentation] = []
     for reduction_id, frame in response_summaries.groupby("reduction_id", sort=True):
         ordered = aligned_response_magnitude(frame, ids=candidate_ids, reduction_id=str(reduction_id))
         representations.append(

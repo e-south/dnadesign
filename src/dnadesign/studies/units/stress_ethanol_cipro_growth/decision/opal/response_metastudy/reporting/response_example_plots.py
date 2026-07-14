@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/reporting/metric_comparison_plots.py
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/reporting/response_example_plots.py
 
-Didactic comparison plots for SFXI and RMF components.
+Measured response-window examples under declared stress target masks.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,8 +16,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.colors import Normalize, TwoSlopeNorm
-from matplotlib.lines import Line2D
 
 from .plot_style import save_metastudy_figure
 
@@ -37,110 +35,13 @@ _STATE_LABELS = ("No stress", "Ethanol", "Ciprofloxacin", "Both stresses")
 _STATE_IDS = ("00", "10", "01", "11")
 
 
-def write_metric_compensation_comparison(frame: pd.DataFrame, path: Path) -> None:
-    _require(frame)
-    figure, axes = plt.subplots(
-        2,
-        3,
-        figsize=(12.8, 8.6),
-        sharex="row",
-        sharey="row",
-        constrained_layout=True,
-    )
-    sfxi_min = float(frame["sfxi"].min())
-    sfxi_max = float(frame["sfxi"].max())
-    if np.isclose(sfxi_min, sfxi_max):
-        sfxi_max = sfxi_min + 1.0e-9
-    sfxi_norm = Normalize(vmin=sfxi_min, vmax=sfxi_max)
-    off_extent = max(float(frame["off_suppression"].abs().max()), 1.0e-9)
-    off_norm = TwoSlopeNorm(vmin=-off_extent, vcenter=0.0, vmax=off_extent)
-    sfxi_scatter = None
-    response_scatter = None
-    for column, selection_view_id in enumerate(_TARGET_VIEW_IDS):
-        rows = frame.loc[frame["selection_view_id"].astype(str).eq(selection_view_id)].copy()
-        if rows.empty:
-            raise ValueError(f"metric comparison lacks target view {selection_view_id!r}.")
-        top = axes[0, column]
-        sfxi_scatter = top.scatter(
-            rows["logic_fidelity"],
-            rows["effect_scaled"],
-            c=rows["sfxi"],
-            cmap="viridis",
-            norm=sfxi_norm,
-            edgecolors="#ffffff",
-            linewidths=0.5,
-            alpha=0.65,
-            s=34,
-            zorder=3,
-        )
-        top.set_title(_TARGET_VIEW_LABELS[selection_view_id])
-        top.set_xlabel("SFXI logic fidelity\nHigher is better" if column == 1 else "")
-        top.set_ylabel("SFXI scaled effect\nHigher is better" if column == 0 else "")
-        top.set_box_aspect(1)
-
-        bottom = axes[1, column]
-        response_scatter = bottom.scatter(
-            rows["response_separation"],
-            rows["on_magnitude_floor"],
-            c=rows["off_suppression"],
-            cmap="RdBu",
-            norm=off_norm,
-            edgecolors=np.where(rows["passes_all_zero_constraints"].astype(bool), "#111827", "#ffffff"),
-            linewidths=np.where(rows["passes_all_zero_constraints"].astype(bool), 1.8, 0.5),
-            alpha=0.65,
-            s=34,
-            zorder=3,
-        )
-        bottom.axvline(0.0, color="#6b7280", linestyle="--", linewidth=0.9)
-        bottom.axhline(0.0, color="#6b7280", linestyle="--", linewidth=0.9)
-        bottom.set_xlabel(
-            "RMF response margin\nweakest ON - strongest OFF log2(YFP / CFP)\nHigher is better" if column == 1 else ""
-        )
-        bottom.set_ylabel(
-            "RMF ON-fluorescence margin\nweakest ON relative to pDual-10\nHigher is better" if column == 0 else ""
-        )
-        bottom.set_box_aspect(1)
-        _annotate_examples(top, rows, x="logic_fidelity", y="effect_scaled")
-        _annotate_examples(bottom, rows, x="response_separation", y="on_magnitude_floor")
-    if sfxi_scatter is None or response_scatter is None:
-        raise RuntimeError("metric comparison did not render any target views.")
-    figure.colorbar(
-        sfxi_scatter,
-        ax=axes[0, :],
-        shrink=0.78,
-        label="Canonical SFXI score\nHigher is better",
-    )
-    figure.colorbar(
-        response_scatter,
-        ax=axes[1, :],
-        shrink=0.78,
-        label="RMF OFF-control margin\nnegative of strongest OFF fluorescence vs pDual-10\nHigher is better",
-    )
-    figure.legend(
-        handles=[
-            Line2D(
-                [],
-                [],
-                marker="o",
-                linestyle="",
-                markerfacecolor="none",
-                markeredgecolor="#111827",
-                markeredgewidth=1.8,
-                label="Passes all provisional zero boundaries",
-            )
-        ],
-        loc="outside lower center",
-        frameon=False,
-    )
-    save_metastudy_figure(figure, path)
-
-
 def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
+    """Plot fixed Reader response values and their target-mask components."""
+
     _require(frame)
-    examples = frame.loc[frame["is_response_example"].astype(bool)].copy()
-    if examples.empty:
+    labels = list(dict.fromkeys(frame["example_label"].astype(str)))
+    if not labels:
         raise ValueError("measured response plot has no configured examples.")
-    labels = list(dict.fromkeys(examples["example_label"].astype(str)))
     figure = plt.figure(figsize=(12.6, 9.0), constrained_layout=True)
     grid = figure.add_gridspec(2, 3, height_ratios=(1.08, 1.0))
     raw_axes: list[plt.Axes] = []
@@ -148,11 +49,11 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
     width = 0.24
     colors = ("#2563eb", "#0f766e", "#be123c")
     raw_columns = [f"{prefix}{state}" for prefix in ("r", "b") for state in _STATE_IDS]
-    raw_limit = max(float(np.quantile(np.abs(examples.loc[:, raw_columns].to_numpy(dtype=float)), 0.98)), 1.0)
+    raw_limit = max(float(np.quantile(np.abs(frame.loc[:, raw_columns].to_numpy(dtype=float)), 0.98)), 1.0)
     raw_image = None
     for column_index, selection_view_id in enumerate(_TARGET_VIEW_IDS):
         rows = (
-            examples.loc[examples["selection_view_id"].astype(str).eq(selection_view_id)]
+            frame.loc[frame["selection_view_id"].astype(str).eq(selection_view_id)]
             .set_index("example_label")
             .reindex(labels)
         )
@@ -229,7 +130,7 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
         axis.set_axisbelow(True)
         axis.grid(axis="y", color="#e5e7eb", linewidth=0.7, zorder=0)
     if raw_image is None:
-        raise RuntimeError("measured response plot did not render any target view.")
+        raise RuntimeError("measured response plot did not render any target views.")
     component_axes[0].set_ylabel(
         "Unscaled RMF requirement (log2 units)\nHigher is better; 0 is the provisional boundary"
     )
@@ -252,17 +153,6 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
     save_metastudy_figure(figure, path)
 
 
-def _annotate_examples(axis: plt.Axes, rows: pd.DataFrame, *, x: str, y: str) -> None:
-    for row in rows.loc[rows["is_response_example"].astype(bool)].itertuples(index=False):
-        axis.annotate(
-            _short_example(row.example_label),
-            (float(getattr(row, x)), float(getattr(row, y))),
-            xytext=(4, 4),
-            textcoords="offset points",
-            fontsize=7,
-        )
-
-
 def _short_example(value: object) -> str:
     return str(value).split()[0]
 
@@ -270,21 +160,17 @@ def _short_example(value: object) -> str:
 def _require(frame: pd.DataFrame) -> None:
     required = {
         "selection_view_id",
-        "logic_fidelity",
-        "effect_scaled",
-        "sfxi",
         "response_separation",
         "on_magnitude_floor",
         "off_magnitude_ceiling",
         "off_suppression",
         "passes_all_zero_constraints",
         "example_label",
-        "is_response_example",
         *(f"{prefix}{state}" for prefix in ("r", "b") for state in _STATE_IDS),
     }
     missing = sorted(required - set(frame.columns))
     if missing:
-        raise ValueError(f"metric comparison plot missing columns: {missing}")
+        raise ValueError(f"measured response plot missing columns: {missing}")
 
 
-__all__ = ["write_measured_response_examples", "write_metric_compensation_comparison"]
+__all__ = ["write_measured_response_examples"]

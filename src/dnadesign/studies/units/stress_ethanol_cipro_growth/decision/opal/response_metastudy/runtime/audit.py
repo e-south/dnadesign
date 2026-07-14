@@ -26,7 +26,6 @@ from ..evaluation.candidates import build_top_candidate_table
 from ..evaluation.comparison_panel import build_policy_comparison_panel
 from ..evaluation.correlations import build_pairwise_correlations
 from ..evaluation.metric_behavior import build_denominator_sensitivity
-from ..evaluation.metric_comparison import build_metric_comparison_rows
 from ..evaluation.metric_contract import build_metric_contract_tests, build_rmf_cardinality_pressure
 from ..evaluation.model_validation import (
     cross_validate_random_forest,
@@ -37,13 +36,15 @@ from ..evaluation.overlap import build_overlap_by_k
 from ..evaluation.pressure_tests import build_pressure_tests
 from ..evaluation.recommendation import choose_recommendation
 from ..evaluation.recompute import assert_canonical_sfxi_recompute, validate_canonical_sfxi_recompute
+from ..evaluation.response_examples import build_response_example_rows
 from ..evaluation.scoring import score_sfxi_evidence
-from ..evaluation.sfxi_comparison import build_sfxi_comparison_rows, summarize_sfxi_comparison
 from ..evaluation.summaries import summarize_policies
 from ..evaluation.support import build_setpoint_support
+from .candidate_identity import load_response_candidate_identity_bindings
 from .loading import (
     assert_candidate_alignment,
     assert_shared_observed_labels,
+    load_candidate_matrix,
     load_label_source_frame,
     load_observed_label_frame,
     load_sfxi_evidence_frame,
@@ -51,14 +52,13 @@ from .loading import (
     load_training_matrix,
 )
 from .manifest import write_metastudy_manifest
+from .measurement_selection import load_response_measurement_selection
 from .publication import create_staging_dir, publish_staging_dir, remove_staging_dir, sha256_arrays
 from .reader_response_bundle import (
     build_all_primary_measurements,
     build_selected_bootstrap_draws,
     build_selected_response_labels,
-    build_snapshot_comparator,
     load_reader_response_bundle,
-    response_labels_as_sfxi_comparator,
 )
 from .response_screen import (
     build_response_metric_screen,
@@ -72,6 +72,7 @@ def run_metastudy(
     *,
     repo_root: Path,
     reader_bundle_root: Path,
+    candidate_binding_bundle_root: Path,
     out_dir: Path,
     overwrite: bool,
     top_k: int = 6,
@@ -82,6 +83,7 @@ def run_metastudy(
         manifest = _materialize_metastudy(
             repo_root=repo_root,
             reader_bundle_root=reader_bundle_root,
+            candidate_binding_bundle_root=candidate_binding_bundle_root,
             out_dir=stage,
             top_k=top_k,
         )
@@ -97,6 +99,7 @@ def _materialize_metastudy(
     *,
     repo_root: Path,
     reader_bundle_root: Path,
+    candidate_binding_bundle_root: Path,
     out_dir: Path,
     top_k: int,
 ) -> dict[str, object]:
@@ -139,31 +142,24 @@ def _materialize_metastudy(
         paths.reader_bundle_root,
         expected_request_path=reader_request_path,
     )
-    candidate_identity_bindings = label_sources.loc[:, ["id", "design_id", "reader_experiment_id"]].copy()
+    measurement_selection = load_response_measurement_selection(
+        Path(__file__).resolve().parents[1] / "config/response_model_screen_selection.yaml",
+        reader_designs=reader_bundle.designs,
+        primary_reduction_id=reader_bundle.primary_reduction_id,
+    )
+    candidate_identity_bindings = load_response_candidate_identity_bindings(
+        measurement_selection=measurement_selection.rows,
+        bundle_root=candidate_binding_bundle_root,
+    )
     response_labels = build_selected_response_labels(
         reader_bundle,
-        candidate_identity_bindings=candidate_identity_bindings,
+        candidate_identity_bindings=candidate_identity_bindings.rows,
     )
     response_draws = build_selected_bootstrap_draws(
         reader_bundle,
-        candidate_identity_bindings=candidate_identity_bindings,
+        candidate_identity_bindings=candidate_identity_bindings.rows,
     )
     all_primary_measurements = build_all_primary_measurements(reader_bundle)
-    window_sfxi_comparators = response_labels_as_sfxi_comparator(response_labels)
-    sfxi_comparison_vec8 = pd.concat(
-        [build_snapshot_comparator(label_sources), window_sfxi_comparators],
-        ignore_index=True,
-        sort=False,
-    )
-    sfxi_comparison_rows = build_sfxi_comparison_rows(
-        sfxi_comparison_vec8,
-        target_views=target_views,
-        logic_threshold=DEFAULT_RECOMMENDATION_THRESHOLDS.min_target_view_median_logic,
-    )
-    sfxi_comparison = summarize_sfxi_comparison(
-        sfxi_comparison_rows,
-        baseline_summary_id="snapshot_12h",
-    )
     for evidence in sfxi_evidence:
         if evidence.stats_n_train != len(observed_labels):
             raise ValueError(
@@ -178,10 +174,16 @@ def _materialize_metastudy(
     reference_evidence = sfxi_evidence[0]
     if reference_evidence.records_path is None:
         raise RuntimeError("response metric metastudy did not resolve candidate records for model validation.")
-    x_train, y_train = load_training_matrix(
+    sfxi_x_train, sfxi_y_train = load_training_matrix(
         reference_evidence.records_path,
         x_column=reference_evidence.x_column_name,
         labels=observed_labels,
+    )
+    response_ids = candidate_identity_bindings.rows["id"].astype(str).tolist()
+    response_x_train = load_candidate_matrix(
+        stress_campaign.candidate_records_path,
+        x_column=stress_campaign.x_column_name,
+        candidate_ids=response_ids,
     )
     response_screen = build_response_metric_screen(
         response_labels,
@@ -189,22 +191,20 @@ def _materialize_metastudy(
         all_primary_measurements,
         reader_bundle.events,
         primary_reduction_id=reader_bundle.primary_reduction_id,
-        label_ids=observed_labels["id"].astype(str).tolist(),
-        snapshot_y=y_train,
-        x_train=x_train,
-        groups=label_sources["reader_experiment_id"].astype(str).to_numpy(),
-        random_forest_params=reference_evidence.model_params,
+        label_ids=response_ids,
+        x_train=response_x_train,
+        groups=candidate_identity_bindings.rows["reader_experiment_id"].astype(str).to_numpy(),
+        random_forest_params=stress_campaign.model_params,
         target_views=target_views,
     )
-    metric_comparison = build_metric_comparison_rows(
-        sfxi_comparison_rows,
+    response_examples = build_response_example_rows(
         response_screen.uncertainty,
-        primary_reduction_id=reader_bundle.primary_reduction_id,
         examples=reader_bundle.response_examples,
+        selection_view_ids=tuple(target_view.id for target_view in target_views),
     )
     shuffled_validation = cross_validate_random_forest(
-        x_train,
-        y_train,
+        sfxi_x_train,
+        sfxi_y_train,
         target_views=target_views,
         target_view_denoms={evidence.target_view.id: evidence.denom for evidence in sfxi_evidence},
         model_params=reference_evidence.model_params,
@@ -217,8 +217,8 @@ def _materialize_metastudy(
         intensity_log2_offset_delta=reference_evidence.intensity_log2_offset_delta,
     )
     grouped_validation = cross_validate_random_forest_by_group(
-        x_train,
-        y_train,
+        sfxi_x_train,
+        sfxi_y_train,
         groups=label_sources["reader_experiment_id"].astype(str).to_numpy(),
         target_views=target_views,
         target_view_denoms={evidence.target_view.id: evidence.denom for evidence in sfxi_evidence},
@@ -239,10 +239,11 @@ def _materialize_metastudy(
         model_validation,
         split_strategy="shuffled_kfold",
     )
-    training_matrix_sha256 = sha256_arrays(
-        np.ascontiguousarray(x_train),
-        np.ascontiguousarray(y_train),
+    sfxi_training_matrix_sha256 = sha256_arrays(
+        np.ascontiguousarray(sfxi_x_train),
+        np.ascontiguousarray(sfxi_y_train),
     )
+    response_x_matrix_sha256 = sha256_arrays(np.ascontiguousarray(response_x_train))
 
     policy_specs = audit_policy_specs()
     scored = {
@@ -319,11 +320,8 @@ def _materialize_metastudy(
             pressure_tests=pressure_tests,
             model_validation=model_validation,
             setpoint_support=setpoint_support,
-            sfxi_comparison_vec8=sfxi_comparison_vec8,
-            sfxi_comparison_rows=sfxi_comparison_rows,
-            sfxi_comparison=sfxi_comparison,
             response_screen=response_screen,
-            metric_comparison=metric_comparison,
+            response_examples=response_examples,
             rmf_cardinality_pressure=rmf_cardinality_pressure,
             scored=scored,
             sfxi_evidence=sfxi_evidence,
@@ -338,16 +336,18 @@ def _materialize_metastudy(
         sfxi_evidence=sfxi_evidence,
         stress_campaign=stress_campaign,
         reader_bundle=reader_bundle,
+        measurement_selection=measurement_selection,
+        candidate_identity_bindings=candidate_identity_bindings,
         policy_specs=policy_specs,
         top_k=top_k,
-        training_matrix_sha256=training_matrix_sha256,
+        sfxi_training_matrix_sha256=sfxi_training_matrix_sha256,
+        response_x_matrix_sha256=response_x_matrix_sha256,
         recommendation=recommendation,
         canonical_sfxi_validation=canonical_sfxi_validation,
         artifact_records=artifact_records,
         predictor_parity=predictor_parity_record,
         grouped_model_validation_summary=grouped_model_validation_summary,
         shuffled_model_validation_summary=shuffled_model_validation_summary,
-        sfxi_comparison=sfxi_comparison,
         response_metric_screen=response_screen_manifest(
             response_screen,
             primary_reduction_id=reader_bundle.primary_reduction_id,

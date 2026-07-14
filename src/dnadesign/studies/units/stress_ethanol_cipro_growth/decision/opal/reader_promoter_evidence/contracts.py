@@ -15,9 +15,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v1"
-READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_evidence.v1"
+READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v2"
+READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
 READER_PROMOTER_EVIDENCE_FILENAME = "reader_evidence_promoter_response.json"
+READER_PROMOTER_EVIDENCE_MEDIA_DIR = "reader_evidence_media"
 TARGET_CAMPAIGN_SLUG = "secg_rmf_greedy"
 PROMOTER_RESPONSE_SEMANTIC_KIND = "promoter_response_evidence"
 PROMOTER_EVIDENCE_ARTIFACT_IDS = ("promoter_evidence.png", "promoter_evidence.pdf")
@@ -67,6 +68,7 @@ __all__ = [
     "READER_BUNDLE_SCHEMA_VERSION",
     "READER_EVIDENCE_SCHEMA_VERSION",
     "READER_PROMOTER_EVIDENCE_FILENAME",
+    "READER_PROMOTER_EVIDENCE_MEDIA_DIR",
     "ReaderPromoterEvidenceError",
     "ReaderPromoterEvidenceVerification",
     "ReaderPromoterEvidenceWriteResult",

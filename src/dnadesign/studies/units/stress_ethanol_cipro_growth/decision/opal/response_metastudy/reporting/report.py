@@ -33,7 +33,6 @@ def write_report(
     comparison_panel: pd.DataFrame,
     model_validation: pd.DataFrame,
     setpoint_support: pd.DataFrame,
-    sfxi_comparison: pd.DataFrame,
     response_screen: ResponseMetricScreen,
     pressure_tests: pd.DataFrame,
     plot_manifest: pd.DataFrame,
@@ -74,12 +73,6 @@ def write_report(
     support_at_guardrail = setpoint_support[
         (setpoint_support["logic_threshold"] - thresholds.min_target_view_median_logic).abs() < 1.0e-12
     ]
-    sfxi_alternatives = sfxi_comparison.loc[~sfxi_comparison["assay_summary_id"].eq("snapshot_12h")]
-    minimum_sfxi_score_correlation = float(sfxi_alternatives["score_spearman_to_snapshot"].min())
-    assay_support_ranges = {
-        str(selection_view_id): (int(frame["logic_support_count"].min()), int(frame["logic_support_count"].max()))
-        for selection_view_id, frame in sfxi_comparison.groupby("selection_view_id", sort=True)
-    }
     text = [
         "# Response Metric Metastudy",
         "",
@@ -154,40 +147,20 @@ def write_report(
         "",
         "## Assay Time-Course Robustness",
         "",
-        "The canonical round-0 labels remain the nearest 12-hour Reader snapshot. Reader now also publishes five "
-        "event-relative reductions: a primary 6-12 hour post-event log mean, adjacent-window checks, a "
+        "Reader publishes five event-relative reductions: a primary 6-12 hour post-event log mean, adjacent-window "
+        "checks, a "
         "duration-normalized linear AUC, and a pre-window-delta check. Response uses log2 YFP/CFP. The magnitude "
         "channel is same-state pDual-10-relative log2 YFP/OD600 fluorescence.",
         "",
         "Reader owns event resolution, trajectory reduction, replicate aggregation, and joint bootstrap records. "
         "The study consumes those records and applies target-view masks; it does not reopen PlateReader trajectories.",
         "",
-        f"- Minimum alternative score-rank Spearman correlation to the snapshot: {minimum_sfxi_score_correlation:.3f}.",
-        "- Observed logic-support ranges across summaries: "
-        + ", ".join(
-            f"{selection_view_id} {minimum}-{maximum}"
-            for selection_view_id, (minimum, maximum) in assay_support_ranges.items()
-        )
-        + ".",
-        "- Interpretation: snapshot and event-relative rankings are similar, but agreement does not repair weak "
-        "ethanol/AND support or establish prospective model value.",
         f"- Reader primary reduction: `{primary_reduction_id}`. It is the only promotion candidate; the adjacent "
         "windows and AUC remain sensitivity analyses.",
-        "",
-        _markdown_table(
-            sfxi_comparison[
-                [
-                    "assay_summary_id",
-                    "selection_view_id",
-                    "score_spearman_to_snapshot",
-                    "logic_spearman_to_snapshot",
-                    "effect_spearman_to_snapshot",
-                    "logic_support_count",
-                    "median_logic_fidelity",
-                    "median_effect_scaled",
-                ]
-            ]
-        ),
+        "- Response reductions are evaluated only through response and fluorescence requirements. They are not "
+        "translated into SFXI logic or intensity fields.",
+        "- The SFXI source records remain independent evidence and are evaluated only under their declared vec8 "
+        "contract.",
         "",
         *response_metric_report_lines(response_screen, primary_reduction_id=primary_reduction_id),
         "## Activation Boundary",

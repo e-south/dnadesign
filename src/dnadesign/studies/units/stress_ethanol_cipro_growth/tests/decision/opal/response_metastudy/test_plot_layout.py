@@ -18,9 +18,9 @@ import pandas as pd
 import pytest
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.reporting import (
-    metric_comparison_plots,
     plot_vocabulary,
     response_assay_plots,
+    response_example_plots,
     response_model_plots,
 )
 
@@ -36,7 +36,7 @@ def test_matrix_plot_vocabulary_covers_every_fixed_model_and_representation() ->
 @pytest.fixture
 def captured_figures(monkeypatch: pytest.MonkeyPatch) -> list[plt.Figure]:
     figures: list[plt.Figure] = []
-    for module in (metric_comparison_plots, response_assay_plots, response_model_plots):
+    for module in (response_example_plots, response_assay_plots, response_model_plots):
         monkeypatch.setattr(
             module,
             "save_metastudy_figure",
@@ -45,32 +45,29 @@ def captured_figures(monkeypatch: pytest.MonkeyPatch) -> list[plt.Figure]:
     return figures
 
 
-def test_metric_comparison_uses_one_axis_label_per_row_and_monotonic_rmf_directions(
+def test_measured_response_examples_use_only_reader_values_and_rmf_components(
     captured_figures: list[plt.Figure],
     tmp_path: Path,
 ) -> None:
-    metric_comparison_plots.write_metric_compensation_comparison(
-        _metric_comparison_rows(),
-        tmp_path / "metric_compensation_comparison.png",
+    response_example_plots.write_measured_response_examples(
+        _response_example_rows(),
+        tmp_path / "measured_response_examples.png",
     )
 
     figure = captured_figures[0]
     try:
         axes = [axis for axis in figure.axes if axis.get_label() != "<colorbar>"]
         assert len(axes) == 6
-        top = axes[:3]
-        bottom = axes[3:]
-        assert [axis.get_xlabel() for axis in top] == ["", "SFXI logic fidelity\nHigher is better", ""]
-        assert [axis.get_xlabel() for axis in bottom] == [
-            "",
-            "RMF response margin\nweakest ON - strongest OFF log2(YFP / CFP)\nHigher is better",
-            "",
-        ]
-        assert top[0].get_ylabel().endswith("Higher is better")
-        assert bottom[0].get_ylabel().endswith("Higher is better")
-        assert all(axis.get_box_aspect() == 1.0 for axis in axes)
-        colorbar_labels = [axis.get_ylabel() for axis in figure.axes if axis.get_label() == "<colorbar>"]
-        assert all(label.endswith("Higher is better") for label in colorbar_labels)
+        visible_text = " ".join(
+            [axis.get_xlabel() for axis in axes]
+            + [axis.get_ylabel() for axis in axes]
+            + [text.get_text() for axis in axes for text in axis.texts]
+        )
+        assert "SFXI" not in visible_text
+        assert any(axis.get_ylabel().startswith("Unscaled RMF requirement") for axis in axes)
+        component_axes = [axis for axis in axes if not axis.images]
+        assert len(component_axes) == 3
+        assert all(axis.get_box_aspect() == 1.0 for axis in component_axes)
     finally:
         plt.close(figure)
 
@@ -200,23 +197,19 @@ def _repeat_rows() -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
-def _metric_comparison_rows() -> pd.DataFrame:
+def _response_example_rows() -> pd.DataFrame:
     records = []
     for target_view_index, selection_view_id in enumerate(("ethanol", "ciprofloxacin", "and")):
         for example_index, label in enumerate(("SpyP control", "sulAp control")):
             value = 0.1 + target_view_index * 0.1 + example_index * 0.05
             record = {
                 "selection_view_id": selection_view_id,
-                "logic_fidelity": 0.3 + value,
-                "effect_scaled": 0.7 - value,
-                "sfxi": 0.2 + value,
                 "response_separation": value - 0.2,
                 "on_magnitude_floor": value - 0.1,
                 "off_magnitude_ceiling": 0.2 - value,
                 "off_suppression": value - 0.2,
                 "passes_all_zero_constraints": bool(value >= 0.2),
                 "example_label": label,
-                "is_response_example": True,
             }
             for prefix in ("r", "b"):
                 for state_index, state in enumerate(("00", "10", "01", "11")):

@@ -83,12 +83,13 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "### Repeated-Design Evidence",
         "",
         f"- Repeatedly measured designs: {len(screen.repeated_agreement)}.",
-        f"- Largest selected-source difference from the cross-experiment median: "
+        f"- Largest chosen screen-source difference from the cross-experiment median: "
         f"{screen.repeated_agreement['maximum_selected_to_median_abs_difference'].max():.3f} log2 units.",
         "- Ratio-domain policy: values at or below the declared positive floor abort materialization.",
         "",
-        "Repeated experiments are evidence about source transfer, not independent labels. A promoted label "
-        "materialization must declare one aggregation rule and retain every contributing Reader record.",
+        "The response-owned screen selection makes this retrospective source choice explicit. Repeated "
+        "experiments are not independent labels; promotion must declare one aggregation rule and retain every "
+        "contributing Reader record.",
         "",
         "### Grouped Model Screen",
         "",

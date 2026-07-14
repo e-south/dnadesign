@@ -58,11 +58,11 @@ def test_plot_writer_preserves_panel_titles_below_one_figure_premise(tmp_path: P
     axes[1].set_title("Ciprofloxacin")
     figure.suptitle("Writer-level duplicate")
 
-    plot_style.save_metastudy_figure(figure, tmp_path / "metric_compensation_comparison.png")
+    plot_style.save_metastudy_figure(figure, tmp_path / "measured_response_examples.png")
 
     assert figure._suptitle is not None
     assert figure._suptitle.get_text().replace("\n", " ") == (
-        "SFXI can reward effect when target separation is weak; RMF keeps each requirement visible"
+        "The target mask changes which fixed Reader states define each RMF requirement"
     )
     assert figure._suptitle.get_ha() == "center"
     assert figure._suptitle.get_position()[0] == 0.5
@@ -81,4 +81,4 @@ def test_plot_writer_rejects_multiple_panel_titles(tmp_path: Path) -> None:
     axes[0].set_title("Right title", loc="right")
 
     with pytest.raises(ValueError, match="multiple titles"):
-        plot_style.save_metastudy_figure(figure, tmp_path / "metric_compensation_comparison.png")
+        plot_style.save_metastudy_figure(figure, tmp_path / "measured_response_examples.png")

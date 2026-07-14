@@ -47,11 +47,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "preview":
         payload = preview_reader_promoter_evidence_manifest(
             args.bundle_dirs,
+            bindings_bundle=args.bindings_bundle,
             round_label=args.round_label,
         )
     elif args.command == "materialize":
         result = materialize_reader_promoter_evidence_manifest(
             args.bundle_dirs,
+            bindings_bundle=args.bindings_bundle,
             out_dir=args.out_dir,
             round_label=args.round_label,
             filename=args.filename,
@@ -77,6 +79,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _add_bundle_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--round", dest="round_label", default="r0")
+    parser.add_argument(
+        "--bindings-bundle",
+        type=Path,
+        required=True,
+        help="Verified study-owned promoter-candidate binding bundle.",
+    )
     parser.add_argument("bundle_dirs", type=Path, nargs="+")
 
 
