@@ -2,7 +2,7 @@
 
 **Owner:** stress_ethanol_cipro_growth study
 **Lifecycle:** active read-only review
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Study-owned, read-only evaluation of stress-response labels, objectives, models,
 and next-build policy.
@@ -77,9 +77,7 @@ manifest all succeed.
   `1`, record `promoter_candidate_bindings/bindings`) and join only the typed
   `reader.design_id` alias. This package does not import the binding builder or
   resolve aliases.
-- Publication uses only
-  `stress_ethanol_cipro_growth.response_metastudy.v7`; there is no prior-schema
-  reader or dual-write shim.
+- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v7`.
 
 Reader emits `[r00, r10, r01, r11, b00, b10, b01, b11]`. The `r` values are
 reduced `log2(YFP/CFP)` response, while the `b` values are same-state

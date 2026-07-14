@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/promoter_candidate_bindings/source_io.py
 
-Repository I/O and digest helpers for Reader binding sources.
+Repository I/O and digest helpers for promoter candidate-binding sources.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

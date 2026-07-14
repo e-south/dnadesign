@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-route-compute-infer
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-05-18
+last_verified: 2026-07-14
 parent_route: ../README.md
 type: route
 plane: control-plane
@@ -17,7 +17,7 @@ exit_artifact: dataset_local_infer_sidecars
 ## Infer Lanes Route Detail
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-07-14
 
 Parent router: [README.md](../README.md).
 
@@ -37,7 +37,6 @@ Parent router: [README.md](../README.md).
 - First command: `uv run ops runbook fill-infer --study-dir docs/studies/stress_ethanol_cipro_growth --no-submit`
 - Route note: Infer lanes are execution configs layered on top of the current
   study phase; they do not replace the study lifecycle record. The supported
-  Evo2 7B lanes now plan no runnable GPU work. Notify runbooks remain the
-  historical execution surfaces for one USR event stream per lane, including
-  the split reference core60, reference-context-forward, and
-  reference-context-reverse lanes.
+  Evo2 7B lanes now plan no runnable GPU work. Notify runbooks provide one USR
+  event stream per lane, including the split reference core60,
+  reference-context-forward, and reference-context-reverse lanes.

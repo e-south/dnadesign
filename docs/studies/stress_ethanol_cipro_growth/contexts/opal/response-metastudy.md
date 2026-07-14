@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-response-metastudy
 title: Response metric metastudy
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 audience:
   - scientist
   - maintainer
@@ -14,7 +14,7 @@ audience:
 
 **Status:** round-0 metric, label, and predictor review
 **Owner:** `stress_ethanol_cipro_growth` study
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 **Implementation:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy`
 **Generated evidence:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_metastudy/latest`
 
@@ -59,8 +59,8 @@ missing, reordered, or malformed views.
 The three persisted SFXI runs are not executable campaign definitions. They
 enter as `SfxiSourceProvenance` values containing a source ID, the recorded
 source campaign slug, exact run ID, and target-view ID. The runtime reads their
-round-0 ledgers and measured Reader source rows directly; it does not load or
-load the SFXI source campaign configs or expose them as executable routes.
+round-0 ledgers and measured Reader source rows directly; it does not load the
+SFXI source campaign configs or expose them as executable routes.
 Output tables identify the configured masks with `selection_view_id`.
 
 Reader-window joins accept an explicit `candidate_identity_bindings` table.
@@ -75,8 +75,7 @@ must instead consume the study-issued artifact with schema ID
 does not import the binding builder or resolve aliases itself.
 
 The response-metastudy publication schema is
-`stress_ethanol_cipro_growth.response_metastudy.v7`. There is no v6 reader,
-field alias, or dual-write path.
+`stress_ethanol_cipro_growth.response_metastudy.v7`.
 
 ### Evidence Flow
 

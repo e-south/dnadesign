@@ -195,8 +195,8 @@ def write_report(
         "`response_magnitude_feasibility_v1` is implemented but inactive. The Reader response-window bundle now "
         "provides raw four-state response, reference-relative magnitude, event bounds, and joint bootstrap draws. "
         "Activation still requires one candidate-level repeat aggregation rule and an explicit OPAL label/promotion "
-        "contract. SFXI vec8 labels are not fallback inputs. OR remains a pressure-test mask, not a configured "
-        "campaign or synthesis allocation.",
+        "contract. SFXI vec8 labels use a distinct metric contract and are not accepted for RMF activation. OR "
+        "remains a pressure-test mask, not a configured campaign or synthesis allocation.",
         "",
         "## Predicted Setpoint Support",
         "",

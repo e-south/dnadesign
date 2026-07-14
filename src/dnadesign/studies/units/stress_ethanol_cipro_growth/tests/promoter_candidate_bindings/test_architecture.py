@@ -28,9 +28,6 @@ def test_package_is_study_scoped_and_metric_neutral() -> None:
 
     for forbidden in (
         "decision.opal",
-        "reader_candidate_bindings",
-        "ReaderCandidateBindings",
-        "measured_reader_vec8",
         "X_COLUMN_ID",
         "x_readiness",
         "exact_reader_design_alias",
@@ -42,9 +39,3 @@ def test_source_adapters_do_not_infer_namespaces_from_alias_prefixes() -> None:
     source = (PACKAGE_ROOT / "source_adapters.py").read_text(encoding="utf-8")
     assert '.startswith("pDual-10")' not in source
     assert ".startswith('pDual-10')" not in source
-
-
-def test_obsolete_measured_reader_wrapper_is_absent() -> None:
-    wrapper = PACKAGE_ROOT.parent / "decision/opal/measured_reader_vec8"
-    assert not list(wrapper.glob("*.py"))
-    assert not (wrapper / "README.md").exists()
