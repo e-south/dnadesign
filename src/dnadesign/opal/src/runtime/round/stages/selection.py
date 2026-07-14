@@ -20,8 +20,10 @@ import pandas as pd
 from ....core.round_context import RoundCtx
 from ....core.selection_contracts import (
     extract_selection_plugin_params,
+    require_exact_selection_count,
     resolve_selection_objective_mode,
     resolve_selection_tie_handling,
+    resolve_selection_top_k,
 )
 from ....core.utils import OpalError, now_iso
 from ....registries.selection import get_selection, normalize_selection_result, validate_selection_result
@@ -60,14 +62,7 @@ def select_candidates(
         view_id = view.id
         sel_name = view.selection.name
         sel_params = dict(view.selection.params)
-        if req.k_override is not None:
-            top_k = int(req.k_override)
-        else:
-            if "top_k" not in sel_params:
-                raise OpalError(f"selection_views[{view_id}].selection.params.top_k is required.")
-            top_k = int(sel_params["top_k"])
-        if top_k <= 0:
-            raise OpalError(f"selection_views[{view_id}].selection.params.top_k must be > 0.")
+        top_k = resolve_selection_top_k(sel_params, view_id=view_id, override=req.k_override, error_cls=OpalError)
         tie_handling = resolve_selection_tie_handling(sel_params, error_cls=OpalError)
         sel_params["tie_handling"] = tie_handling
         mode = resolve_selection_objective_mode(sel_params, error_cls=OpalError)
@@ -128,8 +123,15 @@ def select_candidates(
         n = len(id_order_pool)
         if ranks_competition.shape[0] != n or selected_bool.shape[0] != n:
             raise OpalError(f"Selection view {view_id!r} returned arrays that do not match {n} candidates.")
-
         selected_effective = int(selected_bool.sum())
+        require_exact_selection_count(
+            sel_params,
+            view_id=view_id,
+            top_k=top_k,
+            selected_count=selected_effective,
+            tie_handling=tie_handling,
+            error_cls=OpalError,
+        )
         selected_diag = objectives.diagnostics_by_objective.get(view_id, {})
         obj_summary_stats = selected_diag.get("summary_stats") if isinstance(selected_diag, dict) else None
         result = SelectionEvaluation(

@@ -28,7 +28,7 @@ def _write_labels(path: Path) -> None:
             "id": ["a", "b", "a", "c"],
             "observed_round": [0, 0, 1, 2],
             "batch_id": ["batch0", "batch0", "batch1", "batch2"],
-            "y_space": ["sfxi_vec8", "sfxi_vec8", "sfxi_vec8", "other"],
+            "y_space": ["sfxi_vec8", "sfxi_vec8", "sfxi_vec8", "sfxi_vec8"],
             "y_obs": [[0.0], [1.0], [0.5], [9.0]],
             "src": ["assay", "assay", "assay", "assay"],
             "ts": [

@@ -430,6 +430,7 @@ class _TopNParams(BaseModel):
     tie_handling: Literal["competition_rank", "dense_rank", "ordinal"]
     objective_mode: Literal["maximize", "minimize"]
     exclude_already_labeled: bool = True
+    require_exact_top_k: bool = False
 
     @field_validator("top_k")
     @classmethod
@@ -456,6 +457,7 @@ class _ExpectedImprovementParams(BaseModel):
     tie_handling: Literal["competition_rank", "dense_rank", "ordinal"]
     objective_mode: Literal["maximize", "minimize"]
     exclude_already_labeled: bool = True
+    require_exact_top_k: bool = False
     alpha: float = 1.0
     beta: float = 1.0
 

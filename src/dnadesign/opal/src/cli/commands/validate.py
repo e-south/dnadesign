@@ -194,7 +194,7 @@ def _build_validate_report(config: Path | None) -> dict[str, object]:
         raise OpalError(f"label_hist validation failed: {e}")
 
     labels_status = label_source_status(cfg, store, df, strict=False)
-    if labels_status.get("exists") and labels_status.get("valid") is False:
+    if labels_status.get("valid") is False:
         raise OpalError(f"label source validation failed: {labels_status.get('error')}")
 
     _validate_selection_channel_refs(cfg)

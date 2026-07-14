@@ -1,10 +1,20 @@
+---
+id: opal-objective-sfxi-v1
+title: SFXI objective
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-14
+---
+
 ## setpoint_fidelity_x_intensity `sfxi`
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 `sfxi_v1` converts vec8 model outputs into score and uncertainty channels using
-the equations below.
+the equations below. It is an objective plugin, not a selector. A selection
+view may pair its channels with `top_n` or, when the uncertainty contract is
+satisfied, `expected_improvement`.
 
 ### At a glance (plugin contract)
 
@@ -123,6 +133,12 @@ Raw AUC values from different durations are not commensurate. The reference
 anchor must use the same window and state as the sample. Snapshot and window
 summaries remain distinct provenance-bearing label artifacts until a
 prospective assay comparison promotes one contract.
+
+The Reader response-window handoff
+`[r00, r10, r01, r11, b00, b10, b01, b11]` is not that SFXI window label.
+Its `r` values are reduced log2 response values rather than declared `v`
+values, and its `b` values belong to the response-metric fluorescence contract.
+Do not normalize or rename that handoff into an SFXI vec8.
 
 ### 1.2 Modeling note (median–IQR robust scaling):
 

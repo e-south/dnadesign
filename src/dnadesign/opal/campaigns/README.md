@@ -3,14 +3,14 @@ id: opal-campaign-routes
 title: OPAL campaign routes
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 surface: opal_campaign_index
 ---
 
 ## OPAL Campaign Routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 An executable campaign has one `configs/campaign.yaml` using
 `opal.campaign.v3` and an explicit `ownership` block. Repository discovery
@@ -30,19 +30,13 @@ the runtime sources of truth. The stress-study status and readiness routes are
 documented under
 [`docs/studies/stress_ethanol_cipro_growth/`](../../../../docs/studies/stress_ethanol_cipro_growth/).
 
-### Digest-Pinned SFXI Source Runs
+### Study Source Evidence
 
-These directories retain ignored run state and outputs for audit. They have no
-executable config and are not discovered as campaign routes.
-
-| Source directory | Round-0 run ID | Labels | Scored | Selected |
-| --- | --- | ---: | ---: | ---: |
-| `secg_ethanol_rf_sfxi_topn` | `r0-2026-07-09T18:37:10+00:00` | 35 | 154785 | 6 |
-| `secg_cipro_rf_sfxi_topn` | `r0-2026-07-09T18:37:49+00:00` | 35 | 154785 | 6 |
-| `secg_and_rf_sfxi_topn` | `r0-2026-07-09T18:38:31+00:00` | 35 | 154785 | 6 |
-
-Run IDs and artifact digests are preserved in the stress-study record. No
-executable configs belong in these source directories.
+The campaign registry contains executable campaigns only. The stress study
+owns its immutable SFXI round-0 run artifacts under
+`workbench/source_evidence/opal_sfxi_round0/`; that evidence is not an OPAL
+campaign route. Run IDs, artifact digests, and interpretation are recorded in
+the study's [SFXI source-evidence record](../../../../docs/studies/stress_ethanol_cipro_growth/contexts/opal/sfxi-round0-source-evidence.md).
 
 ### Placement Rules
 

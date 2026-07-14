@@ -27,6 +27,11 @@ from ..core.leakage import (
 from ..core.utils import OpalError
 from .data_access import RecordsStore
 from .locks import PathLock
+from .observed_label_promotion import (
+    ObservedLabelPromotionBinding,
+    VerifiedObservedLabelPromotion,
+    verify_observed_label_promotion,
+)
 
 
 def _coerce_float_list(value: Any) -> list[float]:
@@ -76,12 +81,29 @@ class ObservedLabelStore:
     round_column: str = "observed_round"
     batch_column: str = "batch_id"
     dedup_policy: str = "latest_by_round"
+    promotion: ObservedLabelPromotionBinding | None = None
 
     @property
     def kind(self) -> str:
         return "usr_sidecar"
 
+    @property
+    def manifest_pinned(self) -> bool:
+        return self.promotion is not None
+
+    def verified_promotion(self) -> VerifiedObservedLabelPromotion | None:
+        if self.promotion is None:
+            return None
+        verified = verify_observed_label_promotion(self.promotion)
+        if self.path.resolve() != verified.label_path:
+            raise OpalError(
+                "Manifest-pinned observed-label store path does not match the verified label artifact: "
+                f"store={self.path.resolve()}, manifest={verified.label_path}."
+            )
+        return verified
+
     def load(self) -> pd.DataFrame:
+        _ = self.verified_promotion()
         if not self.path.exists():
             raise OpalError(f"Observed label source not found: {self.path}")
         try:
@@ -114,6 +136,11 @@ class ObservedLabelStore:
         if_exists: str,
         known_ids: Iterable[str] | None = None,
     ) -> pd.DataFrame:
+        if self.manifest_pinned:
+            raise OpalError(
+                "Observed label source is manifest-pinned and immutable; generic ingest-y cannot modify it. "
+                "Publish the Parquet artifact and promotion manifest through the owning study workflow."
+            )
         if "id" not in labels.columns or "y" not in labels.columns:
             raise OpalError("Observed label append requires labels with columns ['id', 'y'].")
         if not str(self.y_space).strip():
@@ -187,7 +214,13 @@ class ObservedLabelStore:
         out = df.copy()
         out[self.id_column] = out[self.id_column].astype(str)
         out["y_space"] = out["y_space"].astype(str)
-        out = out.loc[out["y_space"] == str(self.y_space)].copy()
+        expected_y_space = str(self.y_space)
+        observed_y_spaces = sorted(out["y_space"].unique().tolist())
+        if observed_y_spaces != [expected_y_space]:
+            raise OpalError(
+                "Observed label source must contain one Y space matching the configured campaign; "
+                f"expected={expected_y_space!r}, observed={observed_y_spaces!r}."
+            )
 
         known = _known_id_set(known_ids)
         if known is not None:
@@ -195,10 +228,21 @@ class ObservedLabelStore:
             if unknown:
                 raise OpalError(f"Observed label source contains unknown ids (sample={unknown[:10]}).")
 
-        try:
-            out[self.round_column] = out[self.round_column].astype(int)
-        except Exception as exc:
-            raise OpalError(f"Observed label source round column '{self.round_column}' must be integer-like.") from exc
+        raw_rounds = out[self.round_column]
+        numeric_rounds = pd.to_numeric(raw_rounds, errors="coerce")
+        round_values = numeric_rounds.to_numpy(dtype=float)
+        has_boolean = bool(raw_rounds.map(lambda value: isinstance(value, (bool, np.bool_))).any())
+        invalid_round = (
+            has_boolean
+            or not np.all(np.isfinite(round_values))
+            or bool(np.any(round_values < 0))
+            or bool(np.any(round_values != np.floor(round_values)))
+        )
+        if invalid_round:
+            raise OpalError(
+                f"Observed label source round column '{self.round_column}' must contain nonnegative integers."
+            )
+        out[self.round_column] = numeric_rounds.astype(int)
 
         out["y"] = out["y_obs"].map(_coerce_float_list)
         out["_row_order"] = np.arange(len(out), dtype=int)
@@ -362,7 +406,21 @@ def label_source_from_config(cfg: RootConfig, store: RecordsStore) -> TrainingLa
             raise OpalError("labels.source.kind=usr_sidecar requires data.location.kind=usr.")
         if source_cfg.dataset != loc.dataset:
             raise OpalError("labels.source.dataset must match data.location.dataset for usr_sidecar labels.")
-        sidecar_path = Path(loc.path) / source_cfg.dataset / source_cfg.path
+        dataset_root = Path(loc.path) / source_cfg.dataset
+        sidecar_path = dataset_root / source_cfg.path
+        promotion = None
+        if source_cfg.manifest_path is not None:
+            study_id = str(cfg.ownership.study_id or "").strip()
+            if not study_id:
+                raise OpalError("Manifest-pinned observed labels require non-empty ownership.study_id.")
+            promotion = ObservedLabelPromotionBinding(
+                dataset_root=dataset_root,
+                manifest_path=source_cfg.manifest_path,
+                label_path=source_cfg.path,
+                campaign_slug=cfg.campaign.slug,
+                study_id=study_id,
+                y_space=str(cfg.labels.y_space or ""),
+            )
         return SharedObservedLabelSource(
             store=ObservedLabelStore(
                 path=sidecar_path,
@@ -371,6 +429,7 @@ def label_source_from_config(cfg: RootConfig, store: RecordsStore) -> TrainingLa
                 round_column=cfg.labels.round_column,
                 batch_column=cfg.labels.batch_column,
                 dedup_policy=cfg.labels.dedup_policy,
+                promotion=promotion,
             )
         )
     raise OpalError(f"Unsupported label source kind: {getattr(source_cfg, 'kind', None)!r}")
@@ -470,10 +529,30 @@ def label_source_status(
             "available_rounds": [],
             "counts_by_round": {},
             "leakage": leakage_report.to_dict(),
+            "manifest_pinned": obs.manifest_pinned,
+            "mutable": not obs.manifest_pinned,
         }
+        if obs.promotion is not None:
+            manifest_path = Path(obs.promotion.dataset_root) / obs.promotion.manifest_path
+            out.update(
+                {
+                    "manifest_path": str(manifest_path),
+                    "manifest_exists": manifest_path.exists(),
+                    "artifact_exists": obs.path.exists(),
+                }
+            )
         if leakage_report.violations:
             try:
                 assert_no_leakage_violations(leakage_report)
+            except OpalError as exc:
+                if strict:
+                    raise
+                out.update({"valid": False, "error": str(exc)})
+                return out
+        verified: VerifiedObservedLabelPromotion | None = None
+        if obs.manifest_pinned:
+            try:
+                verified = obs.verified_promotion()
             except OpalError as exc:
                 if strict:
                     raise
@@ -493,6 +572,7 @@ def label_source_status(
             return out
 
         counts = _counts_by_round(frame, obs.round_column)
+        verified = verified or obs.verified_promotion()
         out.update(
             {
                 "valid": True,
@@ -501,6 +581,17 @@ def label_source_status(
                 "counts_by_round": counts,
             }
         )
+        if verified is not None:
+            out.update(
+                {
+                    "manifest_sha256": verified.manifest_sha256,
+                    "label_sha256": verified.label_sha256,
+                    "promoted_row_count": verified.row_count,
+                    "study_provenance_schema_id": verified.study_provenance_schema_id,
+                    "study_provenance_path": str(verified.study_provenance_path),
+                    "study_provenance_sha256": verified.study_provenance_sha256,
+                }
+            )
         return out
 
     raise OpalError(f"Unsupported label source kind: {getattr(source, 'kind', None)!r}")

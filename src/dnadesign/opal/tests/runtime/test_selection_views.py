@@ -39,7 +39,7 @@ def _round_ctx() -> RoundCtx:
     )
 
 
-def _view(view_id: str) -> SelectionView:
+def _view(view_id: str, *, require_exact_top_k: bool = False) -> SelectionView:
     return SelectionView(
         id=view_id,
         objective=PluginRef("scalar_identity_v1", {}),
@@ -50,9 +50,39 @@ def _view(view_id: str) -> SelectionView:
                 "score_ref": "scalar",
                 "objective_mode": "maximize",
                 "tie_handling": "competition_rank",
+                "require_exact_top_k": require_exact_top_k,
             },
         ),
     )
+
+
+def test_selection_view_can_require_exact_cardinality_at_tied_boundary(tmp_path) -> None:
+    cfg = SimpleNamespace(selection_views=[_view("target_a", require_exact_top_k=True)])
+    inputs = SimpleNamespace(
+        cfg=cfg,
+        req=SimpleNamespace(as_of_round=0, verbose=False, k_override=None),
+        rdir=tmp_path,
+    )
+    objectives = evaluate_objectives(
+        inputs=inputs,
+        rctx=_round_ctx(),
+        Y_hat=np.asarray([[0.2], [0.2], [0.1]], dtype=float),
+        y_pred_std=None,
+        Y_train=np.asarray([[0.0]], dtype=float),
+        R_train=np.asarray([0], dtype=int),
+        id_order_pool=["a", "b", "c"],
+    )
+
+    with pytest.raises(
+        OpalError,
+        match="requires exactly 1 selected candidate, but competition_rank selected 2",
+    ):
+        select_candidates(
+            inputs=inputs,
+            rctx=_round_ctx(),
+            id_order_pool=["a", "b", "c"],
+            objectives=objectives,
+        )
 
 
 def test_objective_channels_are_namespaced_by_selection_view(tmp_path) -> None:

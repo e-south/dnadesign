@@ -1,11 +1,24 @@
+---
+id: opal-objective-plugins
+title: OPAL objective plugins
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-14
+---
+
 ## OPAL Objective Plugins
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
-
+**Last verified:** 2026-07-14
 
 Objective plugins convert shared model predictions into named score and
 uncertainty channels. Objective-specific pages define the equations.
+
+`sfxi_v1` and `response_magnitude_feasibility_v1` are independent objective
+plugins with different Y contracts. `top_n` and `expected_improvement` are
+selection plugins. A selection view binds one objective to one selector; an
+objective does not choose candidates, and a selector does not infer objective
+identity from Y.
 
 Source modules:
 

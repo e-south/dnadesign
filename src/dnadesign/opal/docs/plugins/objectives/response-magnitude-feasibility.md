@@ -1,10 +1,21 @@
+---
+id: opal-objective-response-magnitude-feasibility-v1
+title: Response-Magnitude Feasibility objective
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-14
+---
+
 ## Response-Magnitude Feasibility `response_magnitude_feasibility_v1`
 
 **Short name:** RMF
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
-**Status:** built-in objective for pressure testing; inactive for production
-campaigns until the study promotes a label and calibration contract
+**Last verified:** 2026-07-14
+
+`response_magnitude_feasibility_v1` is a built-in objective plugin, not a
+selector or label contract. The plugin is available. The stress-study campaign
+remains inactive because the study has not promoted repeat-aggregated
+response-window observed Y through its typed label manifest.
 
 These equations are the source of truth for the objective mathematics. Reader or
 another assay service owns the measurements that enter the objective. A study
@@ -48,6 +59,15 @@ m_i = window-reduced log2(YFP / OD600) for the design
 
 Thus the generic word `magnitude` means pDual-10-relative fluorescence in that
 assay. It does not mean luminance or fluorophore molecular brightness.
+
+The stress-study eight-component response-window vector is OPAL Y in
+`reader_response_window_vector_v1`. It is not an RMF vec8. RMF is the objective
+applied to that Y under a selection view's target mask; `top_n` is the current
+selector. The campaign config records the prespecified zero boundaries and
+positive review scales derived from measured assay variation. They become
+executable only with the typed, manifest-pinned observed-label sidecar. Their
+presence is not evidence that the model or selection policy has succeeded
+prospectively.
 
 ### Raw components
 
@@ -229,10 +249,13 @@ selection_views:
         score_ref: feasibility_margin
         objective_mode: maximize
         tie_handling: competition_rank
+        require_exact_top_k: true
 ```
 
 The placeholders are intentional. Missing calibration or state identity is a
-configuration error.
+configuration error. The exact-cardinality guard is part of the stress-study
+batch contract: a score tie at the sixth-candidate boundary stops selection
+instead of silently changing the requested batch size.
 
 ### Uncertainty and fail-fast behavior
 

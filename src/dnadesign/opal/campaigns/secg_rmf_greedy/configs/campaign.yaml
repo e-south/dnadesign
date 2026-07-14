@@ -55,6 +55,7 @@ labels:
     kind: usr_sidecar
     dataset: usr_prom_eth_cip_opal_candidates
     path: "_opal/response_window_observed_labels.parquet"
+    manifest_path: "_opal/response_window_observed_labels.manifest.json"
   y_space: reader_response_window_vector_v1
   id_column: id
   round_column: observed_round
@@ -112,6 +113,7 @@ selection_views:
         score_ref: feasibility_margin
         tie_handling: competition_rank
         objective_mode: maximize
+        require_exact_top_k: true
 
   - id: ciprofloxacin
     objective:
@@ -133,6 +135,7 @@ selection_views:
         score_ref: feasibility_margin
         tie_handling: competition_rank
         objective_mode: maximize
+        require_exact_top_k: true
 
   - id: and
     objective:
@@ -154,6 +157,7 @@ selection_views:
         score_ref: feasibility_margin
         tie_handling: competition_rank
         objective_mode: maximize
+        require_exact_top_k: true
 
 selection_batch:
   deduplicate_by: sequence

@@ -16,6 +16,7 @@ import pytest
 from dnadesign.opal.src.core.selection_contracts import (
     RESERVED_SELECTION_PARAM_KEYS,
     extract_selection_plugin_params,
+    require_exact_selection_count,
     resolve_selection_objective_mode,
     resolve_selection_tie_handling,
 )
@@ -42,6 +43,18 @@ def test_selection_contract_parser_supports_opal_error_type() -> None:
         resolve_selection_objective_mode({"objective_mode": "sideways"}, error_cls=OpalError)
 
 
+def test_exact_selection_count_is_optional_and_fail_fast_when_required() -> None:
+    require_exact_selection_count({}, view_id="ethanol", top_k=1, selected_count=2, tie_handling="competition_rank")
+    with pytest.raises(ValueError, match="requires exactly 1 selected candidate"):
+        require_exact_selection_count(
+            {"require_exact_top_k": True},
+            view_id="ethanol",
+            top_k=1,
+            selected_count=2,
+            tie_handling="competition_rank",
+        )
+
+
 def test_extract_selection_plugin_params_excludes_reserved_keys() -> None:
     params = {
         "top_k": 10,
@@ -50,6 +63,7 @@ def test_extract_selection_plugin_params_excludes_reserved_keys() -> None:
         "score_ref": "sfxi_v1/sfxi",
         "uncertainty_ref": "sfxi_v1/sfxi",
         "exclude_already_labeled": True,
+        "require_exact_top_k": True,
         "alpha": 0.5,
         "beta": 1.0,
     }
@@ -64,3 +78,4 @@ def test_reserved_selection_param_keys_are_complete_for_runtime_keys() -> None:
     assert "score_ref" in RESERVED_SELECTION_PARAM_KEYS
     assert "uncertainty_ref" in RESERVED_SELECTION_PARAM_KEYS
     assert "exclude_already_labeled" in RESERVED_SELECTION_PARAM_KEYS
+    assert "require_exact_top_k" in RESERVED_SELECTION_PARAM_KEYS

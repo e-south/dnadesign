@@ -25,7 +25,8 @@ OPAL executes each round through the stages below.
 
 - Source records: `records.parquet`
 - Label source: `labels.source.kind`, either `campaign_history` or
-  `usr_sidecar`
+  `usr_sidecar`; a USR sidecar may be mutable or pinned to a study-issued
+  `opal.observed_label_promotion.v1` manifest
 - Round artifacts: `outputs/rounds/round_<k>/...`
 - Ledger sinks:
   - `outputs/ledger/labels.parquet`
@@ -76,3 +77,6 @@ OPAL is fail-fast by design:
 - a configured shared label sidecar fails rather than falling back to
   campaign-local label history when it is missing, malformed, or points at
   unknown candidate IDs
+- a manifest-pinned sidecar fails when campaign, study, Y space, path, digest,
+  or row count differs from its promotion manifest; generic ingest cannot
+  mutate that source

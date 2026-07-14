@@ -20,6 +20,7 @@ import pyarrow.parquet as pq
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
+from dnadesign.opal.src.core.utils import file_sha256
 from dnadesign.opal.src.registries.transforms_y import register_transform_y
 
 
@@ -178,6 +179,146 @@ selection_views:
     assert status_json["label_source"]["label_count"] == 2
     assert status_json["label_source"]["available_rounds"] == [0]
     assert status_json["writeback"]["prediction_records"] == "ledger_only"
+
+
+def test_ingest_y_rejects_manifest_pinned_label_source_without_mutation(tmp_path: Path) -> None:
+    usr_root = tmp_path / "usr" / "datasets"
+    dataset_root = usr_root / "demo_candidates"
+    dataset_root.mkdir(parents=True)
+    records = dataset_root / "records.parquet"
+    _write_records(records, ids=["a", "b"], sequences=["AAA", "BBB"], x_values=[[0.1], [0.2]])
+
+    sidecar = dataset_root / "_opal" / "observed_labels.parquet"
+    sidecar.parent.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "id": ["a"],
+            "observed_round": [0],
+            "batch_id": ["batch_0"],
+            "y_space": ["scalar_test"],
+            "y_obs": [[0.1]],
+            "src": ["study_promotion"],
+            "ts": ["2026-07-14T00:00:00Z"],
+        }
+    ).to_parquet(sidecar, index=False)
+    provenance = dataset_root / "_opal" / "study_label_provenance.json"
+    provenance.write_text('{"schema_version":"stress-study.labels.v1"}\n', encoding="utf-8")
+    manifest = dataset_root / "_opal" / "observed_labels.manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "opal.observed_label_promotion.v1",
+                "campaign_slug": "demo",
+                "study_id": "stress_promoter",
+                "y_space": "scalar_test",
+                "study_provenance": {
+                    "schema_id": "stress-study.labels.v1",
+                    "path": "_opal/study_label_provenance.json",
+                    "sha256": file_sha256(provenance),
+                },
+                "label_artifact": {
+                    "path": "_opal/observed_labels.parquet",
+                    "sha256": file_sha256(sidecar),
+                    "row_count": 1,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    sidecar_sha256 = file_sha256(sidecar)
+
+    workdir = tmp_path / "campaign"
+    workdir.mkdir()
+    campaign = workdir / "campaign.yaml"
+    campaign.write_text(
+        f"""
+schema_version: opal.campaign.v3
+ownership:
+  owner_scope: study_campaign
+  study_id: stress_promoter
+  dataset_id: demo_candidates
+  portable: false
+campaign:
+  name: Demo
+  slug: demo
+  workdir: "{workdir}"
+data:
+  location: {{ kind: usr, path: "{usr_root}", dataset: demo_candidates }}
+  x_column_name: X
+  y_column_name: opal__demo__y
+  y_expected_length: 1
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: demo_candidates
+    path: _opal/observed_labels.parquet
+    manifest_path: _opal/observed_labels.manifest.json
+  y_space: scalar_test
+writeback:
+  prediction_records: ledger_only
+transforms_x: {{ name: identity, params: {{}} }}
+transforms_y: {{ name: test_shared_scalar_labels, params: {{}} }}
+model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
+selection_views:
+  - id: primary
+    objective: {{ name: scalar_identity_v1, params: {{}} }}
+    selection:
+      name: top_n
+      params: {{ top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank }}
+""".strip(),
+        encoding="utf-8",
+    )
+    labels = workdir / "labels.parquet"
+    pd.DataFrame({"id": ["b"], "y_val": [0.2]}).to_parquet(labels, index=False)
+
+    runner = CliRunner()
+    app = _build()
+    validation = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert validation.exit_code == 0, validation.output
+    status = runner.invoke(app, ["--no-color", "status", "-c", str(campaign), "--json"])
+    assert status.exit_code == 0, status.output
+    status_payload = json.loads(status.output)
+    assert status_payload["label_source"]["manifest_pinned"] is True
+    assert status_payload["label_source"]["mutable"] is False
+    assert status_payload["label_source"]["label_sha256"] == sidecar_sha256
+    assert status_payload["label_source"]["promoted_row_count"] == 1
+    assert status_payload["label_source"]["study_provenance_schema_id"] == "stress-study.labels.v1"
+    assert status_payload["label_source"]["study_provenance_sha256"] == file_sha256(provenance)
+
+    result = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "1",
+            "--csv",
+            str(labels),
+            "--unknown-sequences",
+            "error",
+            "--apply",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "manifest-pinned and immutable" in result.output
+    assert file_sha256(sidecar) == sidecar_sha256
+    assert not (workdir / "outputs" / "ledger" / "labels.parquet").exists()
+
+    manifest_payload = json.loads(manifest.read_text(encoding="utf-8"))
+    manifest_payload["label_artifact"]["sha256"] = "0" * 64
+    manifest.write_text(json.dumps(manifest_payload), encoding="utf-8")
+    invalid = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert invalid.exit_code != 0
+    assert "SHA-256 mismatch" in invalid.output
+
+    sidecar.unlink()
+    manifest.unlink()
+    missing = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert missing.exit_code != 0
+    assert "promotion manifest not found" in missing.output
 
 
 def test_ingest_y_usr_sidecar_uses_identity_frame_without_full_records_load(tmp_path: Path, monkeypatch) -> None:

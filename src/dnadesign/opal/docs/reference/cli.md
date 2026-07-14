@@ -150,11 +150,15 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
   (CSV will coerce lists to strings).
 * For `labels.source.kind: campaign_history`, appends to
   `opal__<slug>__label_hist` and writes the current Y column.
-* For `labels.source.kind: usr_sidecar`, appends observed labels to the shared
-  sidecar such as `_opal/observed_labels.parquet`; it does not duplicate assay
-  truth into campaign label-history columns. Fixed-universe sidecar ingest loads
-  only the records identity frame (`id`, `sequence`) and does not materialize
-  the configured X column.
+* For `labels.source.kind: usr_sidecar` without `manifest_path`, appends
+  observed labels to the shared sidecar such as
+  `_opal/observed_labels.parquet`; it does not duplicate assay truth into
+  campaign label-history columns. Fixed-universe sidecar ingest loads only the
+  records identity frame (`id`, `sequence`) and does not materialize the
+  configured X column.
+* For a USR sidecar with `manifest_path`, `ingest-y --apply` fails before any
+  label or ledger write. The source is a study-published immutable snapshot;
+  its owning workflow publishes a new Parquet artifact and promotion manifest.
 * The text preview includes a `[Runtime] ingest-y` block. JSON output includes
   `ingest_runtime.schema_version: opal.ingest_runtime.v1`, `mode`, loaded
   columns, candidate index rows, estimated frame memory, unknown-sequence policy,
@@ -520,6 +524,8 @@ For shared `usr_sidecar` campaigns, JSON output includes
 `label_source.leakage` with schema `opal.leakage_guard.v1`. Status reads only
 narrow label-status columns (`id`, configured Y when present, and
 `opal__<slug>__label_hist` when present), never the configured X column.
+Manifest-pinned sources also report `manifest_pinned`, `mutable`, manifest and
+label digests, and the verified promoted row count.
 
 **Usage**
 

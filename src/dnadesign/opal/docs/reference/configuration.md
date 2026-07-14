@@ -71,11 +71,17 @@ selection_views:
         score_ref: feasibility_margin
         objective_mode: maximize
         tie_handling: competition_rank
+        require_exact_top_k: true
 ```
 
 Channel references inside a view are unqualified plugin channel names. OPAL
 namespaces persisted channels as `<selection_view_id>/<channel>`. This permits
 multiple instances of one objective plugin without collisions.
+
+`require_exact_top_k` is optional and defaults to `false`. When true, OPAL
+requires the normalized selection to contain exactly `top_k` rows. Boundary
+ties therefore fail before ledger or batch publication; OPAL does not truncate
+or fill the result.
 
 `expected_improvement` also requires `uncertainty_ref`. The referenced model
 and objective path must emit predictive standard deviation; missing or invalid
@@ -108,6 +114,7 @@ labels:
     kind: usr_sidecar
     dataset: candidates
     path: _opal/response_window_observed_labels.parquet
+    manifest_path: _opal/response_window_observed_labels.manifest.json
   y_space: reader_response_window_vector_v1
   id_column: id
   round_column: observed_round
@@ -195,6 +202,42 @@ serve as candidate metadata; X stays in the bounded score-batch stream.
 sidecar must match the candidate dataset and must exist for execution. OPAL does
 not fall back to campaign history. v3 predictions are always ledger-only;
 `writeback.prediction_records` accepts only `ledger_only`.
+
+`labels.source.manifest_path` is optional for a USR sidecar and is relative to
+the same dataset root as `labels.source.path`. When present, it pins the label
+source to a study-published snapshot and requires `study_campaign` ownership.
+OPAL verifies the manifest each time it reads the sidecar and rejects generic
+`ingest-y` writes. When absent, the sidecar remains an OPAL-managed mutable
+label source.
+
+The pinned manifest uses this metric-neutral contract:
+
+```json
+{
+  "schema_version": "opal.observed_label_promotion.v1",
+  "campaign_slug": "two_factor_response",
+  "study_id": "example_two_factor_study",
+  "y_space": "reader_response_window_vector_v1",
+  "study_provenance": {
+    "schema_id": "example_two_factor_study.observed_labels.v1",
+    "path": "_opal/response_window_observed_labels.provenance.json",
+    "sha256": "<lowercase 64-character SHA-256>"
+  },
+  "label_artifact": {
+    "path": "_opal/response_window_observed_labels.parquet",
+    "sha256": "<lowercase 64-character SHA-256>",
+    "row_count": 24
+  }
+}
+```
+
+The campaign slug, study ID, Y-space ID, study-provenance artifact, label path,
+digests, and Parquet row count must match exactly. Paths cannot escape the
+dataset root. The study-owned provenance artifact records the assay bundle,
+identity binding, reduction, and aggregation contracts needed to interpret Y;
+OPAL verifies its digest without interpreting study fields. The study publisher
+stages all three artifacts as one promotion. OPAL reads and verifies that
+promotion but does not publish or revise it.
 
 ### Defaults and fail-fast behavior
 

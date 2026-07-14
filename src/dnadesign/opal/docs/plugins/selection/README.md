@@ -1,7 +1,15 @@
+---
+id: opal-selection-plugins
+title: OPAL selection plugins
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-14
+---
+
 ## OPAL Selection Strategies
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 
 Selection plugins consume named objective channels and emit ranked candidate
@@ -56,6 +64,12 @@ Every `selection_views[].selection` config must include:
 - `objective_mode`
 - `tie_handling`
 
+Set `require_exact_top_k: true` when the study requires exactly `top_k`
+candidates. A boundary tie under `competition_rank` or `dense_rank` then stops
+the round with an explicit cardinality error. OPAL does not silently truncate a
+tie or fill a short selection. The default is `false` because some campaigns
+intentionally preserve all tied candidates.
+
 `expected_improvement` additionally requires:
 
 - `uncertainty_ref`
@@ -93,6 +107,7 @@ selection_views:
         score_ref: scalar
         objective_mode: maximize
         tie_handling: competition_rank
+        require_exact_top_k: true
 ```
 
 Expected improvement:

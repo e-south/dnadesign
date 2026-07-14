@@ -1,7 +1,7 @@
 ## OPAL Data and Artifact Contracts v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 ### Candidate records
 
@@ -21,6 +21,17 @@ sidecar. For `usr_sidecar`, required columns are:
 
 OPAL rejects unknown IDs, mixed Y spaces, malformed lengths, and a missing
 configured sidecar. It does not infer or fall back to another label source.
+
+A USR sidecar may declare `labels.source.manifest_path`. That manifest must use
+`opal.observed_label_promotion.v1` and bind the artifact to the configured
+campaign slug, study ID, Y-space ID, a digest-pinned study-provenance manifest,
+the relative sidecar path, SHA-256 digest, and Parquet row count. OPAL verifies
+all three files before every read. The study-provenance manifest owns assay,
+identity, reduction, and aggregation semantics; OPAL records its schema and
+digest without importing study logic. A
+manifest-pinned sidecar is immutable through generic OPAL ingest; its owning
+study publishes the label table, provenance manifest, and promotion manifest
+together.
 
 ### Shared prediction ledger
 

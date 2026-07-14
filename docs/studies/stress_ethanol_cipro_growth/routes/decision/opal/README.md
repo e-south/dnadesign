@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-route-decision-opal
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 parent_route: ../../README.md
 type: route
 plane: control-plane
@@ -49,20 +49,20 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   appendix visualizations do not gate OPAL campaign readiness.
 - SFXI source labels: `_opal/observed_labels.parquet` under the candidate
   table dataset.
-- Prospective RMF labels: `_opal/response_window_observed_labels.parquet` after
-  study promotion; the sidecar is not yet materialized.
+- Prospective response-window observed labels:
+  `_opal/response_window_observed_labels.parquet` after study promotion; the
+  sidecar is not yet materialized.
 - SFXI round-0 label input: the three source runs used one deduplicated 35-row
-  Reader vec8 pool. No campaign-local staging command exists. The pool is not
-  constrained to the 18-row physical
-  batch-0 synthesis seed.
+  Reader vec8 pool, independent of the 18-row physical batch-0 synthesis seed.
 - SFXI source-run state: each RF/SFXI/top-N run used 35 labels, scored 154785
   candidates, and selected 6 rows. The runs remain metric-review evidence and
   have no executable campaign config.
 - RMF runtime: `secg_rmf_greedy` owns one shared eight-output RF and
   three selection views: ethanol, ciprofloxacin, and AND. Each view uses greedy
   `top_k: 6`; the logical batch requires 18 unique sequences.
-- The unified config is implemented but inactive until the typed Reader/RMF
-  label sidecar and frozen promotion contract exist. No synthesis is authorized.
+- The unified config is implemented but inactive until the typed
+  response-window observed-label sidecar and frozen promotion contract exist.
+  No synthesis is authorized.
 - Candidate eligibility: stress configs apply OPAL's generic
   `restriction_site_exclusion`; the study SFXI strategy allows BamHI only in the
   5 prime flank and EcoRI only in the 3 prime flank of the final insert.

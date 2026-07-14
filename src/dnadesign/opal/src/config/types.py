@@ -50,6 +50,7 @@ class LabelSourceUSRSidecar:
     kind: str
     dataset: str
     path: str
+    manifest_path: Optional[str] = None
 
 
 LabelSource = Union[LabelSourceCampaignHistory, LabelSourceUSRSidecar]

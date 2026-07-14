@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-opal-campaign-commands
 surface: study-runbook
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 parent_route: README.md
 type: runbook
 plane: control-plane
@@ -25,20 +25,23 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 uv run opal validate -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --json
 ```
 
-Validation must report the eligibility rule and all three views; it does not
-establish that the typed RMF label sidecar exists.
+The campaign remains inactive; `opal validate` must fail until the study
+publishes the typed response-window labels and promotion manifest. A passing
+validation must verify their digests, eligibility, and all three views.
 
 ### Promotion and execution
 
-Use these only after the study freezes the Reader reduction, repeat aggregation,
-typed sidecar, RMF calibration, model, and greedy policy.
+The study-owned repeat-aggregation and `opal.observed_label_promotion.v1`
+publisher is not implemented. Generic `opal ingest-y` cannot modify this
+manifest-pinned source. Execute only after the study atomically publishes its
+label Parquet, provenance, and manifest under the frozen analysis policy.
+
+After that publisher exists and the three artifacts verify, use:
 
 ```bash
 CONFIG=src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+uv run opal validate -c "$CONFIG" --json
 uv run opal init -c "$CONFIG" --json
-uv run opal ingest-y -c "$CONFIG" --round 0 \
-  --csv <typed-rmf-labels.parquet-or-csv> \
-  --unknown-sequences error --if-exists fail --apply --json
 uv run opal run -c "$CONFIG" --round 0 --json
 ```
 
@@ -66,13 +69,10 @@ batch, one model artifact, one prediction ledger, and zero mismatches; under-cap
 ```bash
 uv run opal notebook generate -c "$CONFIG" --round latest --force --json
 uv run opal notebook run -c "$CONFIG"
+uv run opal review -c "$CONFIG" --view ethanol --round latest --json
 ```
 
 The notebook exposes named selection views, shared model diagnostics, and one selection batch handoff.
-
-```bash
-uv run opal review -c "$CONFIG" --view ethanol --round latest --json
-```
 
 ### Synthesis boundary
 

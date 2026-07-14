@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-07-13
+- Last verified: 2026-07-14
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
@@ -113,10 +113,10 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
 - Response metric metastudy: `verified`. Canonical beta=1 gamma=1 SFXI recomputes
   exactly, but 18 top-six slots collapse to 11 sequences, 2 candidates occur in
   all three campaigns, and scoring is effect dominated. Reader now publishes a
-  verified `reader.response_window.bundle.v3` for 8 experiments, 5 reductions,
+  verified `reader.response_window.bundle.v4` for 8 experiments, 5 reductions,
   295 design/reduction rows, 147500 joint bootstrap rows, and 12 repeated design
   IDs. The primary reduction is the 6-12 hour post-event log mean; adjacent
-  windows, normalized linear AUC, delta, and the snapshot remain sensitivity
+  windows, normalized linear AUC, and delta remain response sensitivity
   analyses. The leading eligible challenger is PLS4 over the primary eight-component
   summary, with weakest selection-view response-separation Spearman 0.15 and
   feasibility Spearman 0.45. Retrospective grouped enrichment is strongest for
@@ -124,17 +124,18 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   0.5 and do not establish calibrated success probabilities. Under the
   study's time and assay-capacity constraints, the prospective policy is
   prespecified greedy top-six per selection view. Promotion still requires one
-  repeated-experiment aggregation rule, a provenance-preserving typed OPAL
-  label contract, dry ingest, and an explicit study run decision. This is not
-  a synthesis handoff.
+  repeated-experiment aggregation rule, implementation of the study-owned
+  publisher for the typed OPAL label artifact and promotion manifest, and an
+  explicit study run decision. Generic `opal ingest-y` cannot publish this
+  source. This is not a synthesis handoff.
 - Synthesis handoff: `generated_pending_acceptance` scaffold exists in
   `synthesis_handoffs.yaml`; batch zero is the granular single-axis/AND
   pre-assay seed order with actual parsed TFBS regulator and slot-pattern
   checks. Preview it with
   `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --json`.
-  Batch-0 generated files are campaign-scoped `outputs/**` artifacts and need
-  manifest/workbook hashes plus workbook readback status recorded before
-  ordering.
+  Batch-0 generated files are study-owned source-evidence artifacts. The
+  lifecycle record pins manifest, workbook, GenBank-directory, and feature-table
+  hashes; workbook and GenBank readback must pass before ordering.
 
 LatentDNA decision surfaces: see
 `../contexts/latentdna/review-surfaces.md` for the review-surface inventory,
@@ -148,15 +149,17 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
   157160 generated promoter rows from `background_only`, `ethanol`,
   `ciprofloxacin`, and `ethanol_ciprofloxacin` plus 25 measured pDual-10 Reader
   rows, with `latentdna__evo2_7b__context_anchor_mean_bidir_concat` as its
-  fixed-length X. The SFXI labels and ledgers exist; the typed
-  RMF labels and run do not. Do not synthesize RMF labels from an SFXI score.
-- Freeze the Reader reduction, repeated-experiment aggregation, typed RMF
-  label schema, RMF calibration, model seed, eligibility rules, and greedy
-  top-six policy before executing `secg_rmf_greedy`. Then ingest once, fit
-  once, verify all three selection views, and inspect the 18-row logical batch.
+  fixed-length X. The SFXI labels and ledgers exist; the typed response-window
+  observed labels and RMF campaign run do not. Do not synthesize response-window
+  Y from an SFXI score.
+- Freeze the Reader reduction, repeated-experiment aggregation, typed
+  response-window Y schema, RMF calibration, model seed, eligibility rules,
+  and greedy top-six policy before executing `secg_rmf_greedy`. Then implement
+  and run the study publisher once, verify its pinned artifacts, fit once,
+  verify all three selection views, and inspect the 18-row logical batch.
 - Use the response metric metastudy `report.md`, generated `review.py`,
   `tables/pressure_tests.csv`, `tables/setpoint_support.csv`,
-  `tables/sfxi_comparison_stability.csv`, `tables/reader_event_intervals.csv`,
+  `tables/reader_event_intervals.csv`,
   `tables/response_separation_stability.csv`,
   `tables/response_separation_review_scales.csv`,
   `tables/label_model_screen.csv`,

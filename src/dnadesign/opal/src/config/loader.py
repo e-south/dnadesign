@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Dict, List, Optional, Union
 
 import yaml
@@ -174,6 +174,7 @@ class PLabelSourceUSRSidecar(BaseModel):
     kind: Literal["usr_sidecar"]
     dataset: Optional[str] = None
     path: str = "_opal/observed_labels.parquet"
+    manifest_path: Optional[str] = None
 
 
 PLabelSource = Union[PLabelSourceCampaignHistory, PLabelSourceUSRSidecar]
@@ -337,6 +338,15 @@ def _require_registered_plugin(*, category: str, name: str, available: set[str])
         return
     avail = ", ".join(sorted(available))
     raise ConfigError(f"Unknown {category} plugin '{name}'. Available plugins: {avail}")
+
+
+def _dataset_relative_path(value: str, *, field: str) -> str:
+    raw = str(value).strip()
+    posix_path = PurePosixPath(raw)
+    windows_path = PureWindowsPath(raw)
+    if not raw or "\\" in raw or posix_path.is_absolute() or windows_path.is_absolute() or ".." in posix_path.parts:
+        raise ConfigError(f"Invalid campaign.yaml: labels.source.{field} must be relative to the USR dataset root.")
+    return posix_path.as_posix()
 
 
 def _validate_registered_plugin_names(pyd: PRoot) -> None:
@@ -512,12 +522,19 @@ def load_config(path: Path | str) -> RootConfig:
             )
         if not pyd.labels.y_space or not str(pyd.labels.y_space).strip():
             raise ConfigError("Invalid campaign.yaml: labels.y_space is required for labels.source.kind=usr_sidecar.")
-        if Path(str(pyd.labels.source.path)).is_absolute():
-            raise ConfigError("Invalid campaign.yaml: labels.source.path must be relative to the USR dataset root.")
+        label_path = _dataset_relative_path(str(pyd.labels.source.path), field="path")
+        manifest_path = (
+            _dataset_relative_path(str(pyd.labels.source.manifest_path), field="manifest_path")
+            if pyd.labels.source.manifest_path is not None
+            else None
+        )
+        if manifest_path is not None and pyd.ownership.owner_scope != "study_campaign":
+            raise ConfigError("Invalid campaign.yaml: labels.source.manifest_path requires study_campaign ownership.")
         label_source = LabelSourceUSRSidecar(
             kind="usr_sidecar",
             dataset=label_dataset,
-            path=str(pyd.labels.source.path),
+            path=label_path,
+            manifest_path=manifest_path,
         )
     else:
         label_source = LabelSourceCampaignHistory()
