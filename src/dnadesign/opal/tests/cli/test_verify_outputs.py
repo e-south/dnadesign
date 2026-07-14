@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.analysis.ledger import read_selection_view_predictions
@@ -132,4 +133,4 @@ def test_verify_outputs_requires_selection_view_argument() -> None:
     result = CliRunner().invoke(_build(), ["verify-outputs", "-c", "campaign.yaml"])
 
     assert result.exit_code == 2
-    assert "--view" in result.output
+    assert "--view" in unstyle(result.output)

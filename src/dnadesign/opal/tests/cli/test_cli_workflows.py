@@ -19,6 +19,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 import yaml
+from click import unstyle
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -31,7 +32,7 @@ from dnadesign.opal.tests._cli_helpers import (
 
 
 def _plain_output(text: str) -> str:
-    return " ".join(str(text).split())
+    return " ".join(unstyle(str(text)).split())
 
 
 def _setup_workspace(tmp_path: Path, *, include_opal_cols: bool = False) -> tuple[Path, Path, Path]:
@@ -93,7 +94,7 @@ def test_round_commands_reject_retired_option_aliases(
     result = CliRunner().invoke(_build(), ["--no-color", *args, "-c", str(campaign)])
 
     assert result.exit_code == 2
-    assert f"No such option: {retired_flag}" in result.output
+    assert f"No such option: {retired_flag}" in _plain_output(result.output)
 
 
 def test_init_validate_explain_cli(tmp_path: Path) -> None:
