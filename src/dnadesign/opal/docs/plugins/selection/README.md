@@ -19,8 +19,8 @@ sets under the contracts below.
 
 | Strategy | Inputs | Behavior | Typical pairing |
 | --- | --- | --- | --- |
-| `top_n` | `score_ref` | Deterministic rank-by-score | RF + SFXI, GP + SFXI |
-| `expected_improvement` | `score_ref` + `uncertainty_ref` | Acquisition ranking (exploration/exploitation) | GP + SFXI |
+| `top_n` | `score_ref` | Deterministic rank-by-score | Any model and scalar objective channel |
+| `expected_improvement` | `score_ref` + `uncertainty_ref` | Acquisition ranking (exploration/exploitation) | A model/objective pair that emits scalar uncertainty |
 
 Source modules:
 
@@ -54,6 +54,8 @@ Required outputs:
 
 OPAL validates selection output types/shapes/finiteness before writeback.
 Tie expansion (`top_k` with `competition_rank` or `dense_rank`) is computed from the plugin-returned `score` vector.
+Selection plugins do not inspect assay vectors or objective parameters; they
+consume only the configured score and uncertainty channels.
 
 ### Config contract (v3)
 
