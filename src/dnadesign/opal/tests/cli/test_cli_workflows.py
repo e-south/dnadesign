@@ -15,6 +15,8 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 import yaml
 from typer.testing import CliRunner
@@ -40,6 +42,35 @@ def _setup_workspace(tmp_path: Path, *, include_opal_cols: bool = False) -> tupl
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
     return workdir, campaign, records
+
+
+def _configure_metadata_backed_restriction_site_exclusion(campaign: Path, *, column: str) -> None:
+    raw = yaml.safe_load(campaign.read_text(encoding="utf-8"))
+    raw["candidate_eligibility"] = {
+        "rules": [
+            {
+                "name": "restriction_site_exclusion",
+                "params": {
+                    "sequence_column": "sequence",
+                    "scan_space": "final_assembled_insert",
+                    "assembly_strategy_ref": "test_insert:v1",
+                    "left_flank": "a",
+                    "right_flank": "a",
+                    "expected_core_length": 3,
+                    "min_remaining_candidates": 1,
+                    "forbidden_sites": [
+                        {
+                            "enzyme": "EcoRI",
+                            "motif": "GAATTC",
+                            "allowed_regions": ["right_flank"],
+                        }
+                    ],
+                    "exclude_rows_where": [{"column": column, "equals": "control"}],
+                },
+            }
+        ]
+    }
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
 
 
 @pytest.mark.parametrize(
@@ -130,6 +161,36 @@ def test_validate_json_error_is_machine_readable(tmp_path: Path) -> None:
     assert payload["error"]["context"] == "validate"
     assert "Missing X column" in payload["error"]["message"]
     assert "Missing X column" not in res.stderr
+
+
+def test_validate_projects_metadata_required_by_candidate_eligibility(tmp_path: Path) -> None:
+    _, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
+    table = pq.read_table(records).append_column(
+        "design_family",
+        pa.array(["candidate", "control"], type=pa.string()),
+    )
+    pq.write_table(table, records)
+    _configure_metadata_backed_restriction_site_exclusion(campaign, column="design_family")
+
+    result = CliRunner().invoke(_build(), ["--no-color", "validate", "-c", str(campaign), "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["candidate_eligibility"]["input_rows"] == 2
+    assert payload["candidate_eligibility"]["output_rows"] == 1
+    assert payload["candidate_eligibility"]["rules"][0]["pre_excluded_rows"] == 1
+
+
+def test_validate_rejects_missing_metadata_required_by_candidate_eligibility(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    _configure_metadata_backed_restriction_site_exclusion(campaign, column="design_family")
+
+    result = CliRunner().invoke(_build(), ["--no-color", "validate", "-c", str(campaign), "--json"])
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["error"]["context"] == "validate"
+    assert payload["error"]["message"] == ("records.parquet missing configured candidate column(s): ['design_family'].")
 
 
 def test_notebook_generate_json_writes_machine_readable_summary(tmp_path: Path) -> None:
@@ -296,9 +357,15 @@ def test_run_rejects_x_matrix_memory_budget_before_records_load(tmp_path: Path, 
 
 
 def test_run_ledger_only_streams_candidate_x_without_full_records_load(tmp_path: Path, monkeypatch) -> None:
-    workdir, campaign, _ = _setup_workspace(tmp_path)
+    workdir, campaign, records = _setup_workspace(tmp_path)
+    records_table = pq.read_table(records).append_column(
+        "candidate_key",
+        pa.array(["candidate-a", "candidate-b"], type=pa.string()),
+    )
+    pq.write_table(records_table, records)
     raw = yaml.safe_load(campaign.read_text())
     raw["writeback"] = {"prediction_records": "ledger_only"}
+    raw["selection_batch"] = {"deduplicate_by": "candidate_key"}
     raw["selection_views"][0]["objective"]["params"]["scaling"] = {
         "percentile": 95,
         "min_n": 1,
@@ -363,7 +430,7 @@ def test_run_ledger_only_streams_candidate_x_without_full_records_load(tmp_path:
             "--json",
         ],
     )
-    assert run_res.exit_code == 0, run_res.stdout
+    assert run_res.exit_code == 0, run_res.output
     out = json.loads(run_res.stdout)
     assert out["scored"] == 1
     assert (workdir / "outputs" / "ledger" / "predictions").exists()

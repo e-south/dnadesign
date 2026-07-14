@@ -58,11 +58,26 @@ class RecordsStore:
     def load_columns(self, columns: Iterable[str]) -> pd.DataFrame:
         return self._io.load_columns(list(columns))
 
-    def load_runtime_frame(self, *, include_x: bool) -> pd.DataFrame:
-        columns = [*ESSENTIAL_COLS, self.y_col, self.label_hist_col()]
+    def load_runtime_frame(
+        self,
+        *,
+        include_x: bool,
+        required_columns: Iterable[str] = (),
+    ) -> pd.DataFrame:
+        required = tuple(dict.fromkeys(str(column) for column in required_columns))
+        if not include_x and self.x_col in required:
+            raise OpalError(
+                f"Configured candidate metadata cannot use feature column {self.x_col!r}; "
+                "streamed X remains outside the runtime metadata frame."
+            )
+        columns = [*ESSENTIAL_COLS, self.y_col, self.label_hist_col(), *required]
         if include_x:
             columns.append(self.x_col)
-        return self.load_columns(columns)
+        frame = self.load_columns(columns)
+        missing = sorted(set(required).difference(frame.columns))
+        if missing:
+            raise OpalError(f"records.parquet missing configured candidate column(s): {missing}.")
+        return frame
 
     def load_ingest_identity_frame(self) -> pd.DataFrame:
         frame = self.load_columns(["id", "sequence"])
@@ -196,7 +211,13 @@ class RecordsStore:
         )
 
     # --------------- candidate universe & transforms ---------------
-    def candidate_universe(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
+    def candidate_universe(
+        self,
+        df: pd.DataFrame,
+        as_of_round: int,
+        *,
+        required_columns: Iterable[str] = (),
+    ) -> pd.DataFrame:
         """
         Return a DataFrame with at least 'id' and 'sequence' for all rows with X present.
         We do not exclude labeled rows from scoring; selection policy can decide.
@@ -205,8 +226,11 @@ class RecordsStore:
             keep = df[self.x_col].notna()
         else:
             keep = self._x_presence_mask_for_runtime_frame(df)
-        cols = ["id", "sequence", self.x_col]
-        cols = [c for c in cols if c in df.columns]
+        required = tuple(dict.fromkeys(str(column) for column in required_columns))
+        missing = sorted(set(required).difference(df.columns))
+        if missing:
+            raise OpalError(f"Candidate universe is missing configured candidate column(s): {missing}.")
+        cols = [column for column in dict.fromkeys(["id", "sequence", *required, self.x_col]) if column in df.columns]
         return df.loc[keep, cols].copy()
 
     def _x_presence_mask_for_runtime_frame(self, df: pd.DataFrame, *, batch_size: int = 2048) -> pd.Series:

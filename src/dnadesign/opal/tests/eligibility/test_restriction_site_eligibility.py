@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from dnadesign.opal import CandidateEligibilityBlock
 from dnadesign.opal.src.config.types import (
@@ -29,8 +30,9 @@ from dnadesign.opal.src.config.types import (
     SelectionView,
     TrainingBlock,
 )
+from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.eligibility.restriction_sites import restriction_site_exclusion
-from dnadesign.opal.src.runtime.round_plan import plan_round
+from dnadesign.opal.src.runtime.round_plan import plan_round, required_candidate_columns
 from dnadesign.opal.src.storage.data_access import RecordsStore
 
 LEFT_FLANK = "accgggatcctgcag"
@@ -123,11 +125,13 @@ def test_round_plan_filters_unexpected_restriction_sites_before_selection(tmp_pa
             ],
             "bio_type": ["dna", "dna", "dna"],
             "alphabet": ["dna_4", "dna_4", "dna_4"],
+            "design_family": ["candidate", "control", "candidate"],
             "X": [[0.1], [0.2], [0.3]],
         }
     )
     df.to_parquet(records_path, index=False)
     cfg = _cfg(tmp_path)
+    cfg.candidate_eligibility.rules[0].params["exclude_rows_where"] = [{"column": "design_family", "equals": "control"}]
     store = RecordsStore(
         kind="local",
         records_path=records_path,
@@ -145,6 +149,7 @@ def test_round_plan_filters_unexpected_restriction_sites_before_selection(tmp_pa
     assert plan.candidate_eligibility_filtered_out == 2
     assert plan.candidate_total_before_filter == 1
     assert plan.candidate_eligibility_reports[0]["rule"] == "restriction_site_exclusion"
+    assert plan.candidate_eligibility_reports[0]["pre_excluded_rows"] == 1
     assert plan.candidate_eligibility_reports[0]["excluded_rows"] == 2
 
 
@@ -167,6 +172,79 @@ def test_restriction_site_exclusion_can_pre_exclude_non_synthesis_controls() -> 
     assert result.report["pre_excluded_rows"] == 1
     assert result.report["scanned_rows"] == 1
     assert result.report["restriction_site_excluded_rows"] == 0
+
+
+def test_candidate_column_contract_combines_eligibility_and_selection_batch_requirements(tmp_path) -> None:
+    cfg = _cfg(tmp_path)
+    cfg.candidate_eligibility.rules[0].params["exclude_rows_where"] = [{"column": "design_family", "equals": "control"}]
+    cfg.selection_batch = SelectionBatchBlock(deduplicate_by="candidate_key")
+
+    assert required_candidate_columns(cfg) == (
+        "candidate_key",
+        "design_family",
+        "id",
+        "sequence",
+    )
+
+
+def test_runtime_frame_rejects_missing_configured_candidate_column(tmp_path) -> None:
+    records_path = tmp_path / "records.parquet"
+    pd.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "sequence": ["A" * 60],
+            "bio_type": ["dna"],
+            "alphabet": ["dna_4"],
+            "X": [[0.1]],
+        }
+    ).to_parquet(records_path, index=False)
+    cfg = _cfg(tmp_path)
+    cfg.selection_batch = SelectionBatchBlock(deduplicate_by="candidate_key")
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug="demo",
+        x_col="X",
+        y_col="Y",
+        x_transform_name="identity",
+        x_transform_params={},
+    )
+
+    with pytest.raises(OpalError, match="missing configured candidate column.*candidate_key"):
+        store.load_runtime_frame(
+            include_x=False,
+            required_columns=required_candidate_columns(cfg),
+        )
+
+
+def test_runtime_frame_rejects_x_as_configured_candidate_metadata(tmp_path) -> None:
+    records_path = tmp_path / "records.parquet"
+    pd.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "sequence": ["A" * 60],
+            "bio_type": ["dna"],
+            "alphabet": ["dna_4"],
+            "X": [[0.1]],
+        }
+    ).to_parquet(records_path, index=False)
+    cfg = _cfg(tmp_path)
+    cfg.selection_batch = SelectionBatchBlock(deduplicate_by="X")
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug="demo",
+        x_col="X",
+        y_col="Y",
+        x_transform_name="identity",
+        x_transform_params={},
+    )
+
+    with pytest.raises(OpalError, match="candidate metadata cannot use feature column 'X'"):
+        store.load_runtime_frame(
+            include_x=False,
+            required_columns=required_candidate_columns(cfg),
+        )
 
 
 def test_round_plan_fails_fast_when_eligibility_leaves_too_few_candidates(tmp_path) -> None:

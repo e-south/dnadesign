@@ -144,7 +144,23 @@ def _exclude_rows_where_mask(frame: pd.DataFrame, params: Mapping[str, Any]) -> 
     return mask
 
 
-@register_candidate_eligibility("restriction_site_exclusion")
+def _required_candidate_columns(params: Mapping[str, Any]) -> tuple[str, ...]:
+    columns = {"id", str(params.get("sequence_column", "sequence")).strip()}
+    specs = params.get("exclude_rows_where") or ()
+    if not isinstance(specs, Sequence) or isinstance(specs, str | bytes):
+        raise OpalError("restriction_site_exclusion.params.exclude_rows_where must be a list")
+    for spec in specs:
+        if not isinstance(spec, Mapping):
+            raise OpalError("restriction_site_exclusion.params.exclude_rows_where entries must be mappings")
+        column = str(spec.get("column", "")).strip()
+        if not column:
+            raise OpalError("restriction_site_exclusion.params.exclude_rows_where.column must be non-empty")
+        columns.add(column)
+    columns.discard("")
+    return tuple(sorted(columns))
+
+
+@register_candidate_eligibility("restriction_site_exclusion", required_columns=_required_candidate_columns)
 def restriction_site_exclusion(*, frame: pd.DataFrame, params: Mapping[str, Any]) -> CandidateEligibilityRuleResult:
     """Exclude rows whose assembled insert contains non-designated restriction sites."""
 

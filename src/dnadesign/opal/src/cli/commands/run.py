@@ -24,6 +24,7 @@ from ...core.selection_contracts import (
 )
 from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...runtime.memory_guard import enforce_x_matrix_memory_budget
+from ...runtime.round_plan import required_candidate_columns
 from ...runtime.run_round import RunRoundRequest, run_round
 from ...storage.artifacts import append_round_log_event
 from ...storage.candidate_scope import load_candidate_scope_ids
@@ -171,31 +172,18 @@ def cmd_run(
         sbatch = int(score_batch_size or cfg.scoring.score_batch_size)
         if sbatch <= 0:
             raise OpalError("score_batch_size must be a positive integer.", ExitCodes.BAD_ARGS)
-        materializes_prediction_records = str(cfg.writeback.prediction_records) == "label_history"
         scoped_candidate_rows = (
             len(load_candidate_scope_ids(cfg.data.candidate_scope))
             if cfg.data.candidate_scope is not None
             else int(x_contract.row_count)
         )
-        memory_guard_rows = (
-            int(scoped_candidate_rows)
-            if materializes_prediction_records
-            else min(
-                int(scoped_candidate_rows),
-                int(sbatch),
-            )
-        )
-        memory_guard_context = (
-            "OPAL run full X matrix for label_history prediction writeback"
-            if materializes_prediction_records
-            else "OPAL run streaming score batch X matrix"
-        )
+        memory_guard_rows = min(int(scoped_candidate_rows), int(sbatch))
         memory_estimate = enforce_x_matrix_memory_budget(
             row_count=int(memory_guard_rows),
             x_dim=int(x_contract.x_dim),
             item_size_bytes=max(8, int(x_contract.item_size_bytes)),
             max_gib=max_x_matrix_gib if max_x_matrix_gib is not None else cfg.safety.max_x_matrix_gib,
-            context=memory_guard_context,
+            context="OPAL run streaming score batch X matrix",
         )
         _append_cli_round_event(
             cfg,
@@ -204,7 +192,7 @@ def cmd_run(
             "x_memory_guard_done",
             attempt_id=attempt_id,
             status="ok",
-            scope="full_records" if materializes_prediction_records else "streaming_score_batch",
+            scope="streaming_score_batch",
             candidate_rows=int(scoped_candidate_rows),
             score_batch_size=int(sbatch),
             rows=int(memory_estimate.row_count),
@@ -221,7 +209,10 @@ def cmd_run(
             attempt_id=attempt_id,
             status="started",
         )
-        df = store.load() if materializes_prediction_records else store.load_runtime_frame(include_x=False)
+        df = store.load_runtime_frame(
+            include_x=False,
+            required_columns=required_candidate_columns(cfg),
+        )
         _append_cli_round_event(
             cfg,
             cfg_path,

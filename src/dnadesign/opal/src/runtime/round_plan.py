@@ -16,8 +16,10 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from ..config.types import RootConfig
 from ..core.leakage import assert_no_leakage_violations, build_train_eval_leakage_report
 from ..eligibility.runtime import apply_candidate_eligibility
+from ..registries.eligibility import get_candidate_eligibility_required_columns
 from ..storage.candidate_scope import apply_candidate_scope
 from ..storage.data_access import RecordsStore
 from ..storage.label_sources import CampaignHistoryLabelSource, TrainingLabelSource
@@ -40,10 +42,27 @@ class RoundPlan:
     warnings: List[str]
 
 
+def required_candidate_columns(cfg: RootConfig) -> tuple[str, ...]:
+    """Resolve candidate columns required by configured planning plugins."""
+
+    columns = {"id", "sequence"}
+    deduplicate_by = str(cfg.selection_batch.deduplicate_by or "id").strip()
+    if deduplicate_by:
+        columns.add(deduplicate_by)
+    for rule_ref in cfg.candidate_eligibility.rules:
+        columns.update(
+            get_candidate_eligibility_required_columns(
+                str(rule_ref.name).strip(),
+                dict(rule_ref.params or {}),
+            )
+        )
+    return tuple(sorted(columns))
+
+
 def plan_round(
     store: RecordsStore,
     df: pd.DataFrame,
-    cfg,
+    cfg: RootConfig,
     as_of_round: int,
     *,
     warnings: Optional[List[str]] = None,
@@ -62,7 +81,14 @@ def plan_round(
         dedup_policy=dedup_policy,
     )
 
-    scoped_df = apply_candidate_scope(store.candidate_universe(df, int(as_of_round)), cfg.data.candidate_scope)
+    scoped_df = apply_candidate_scope(
+        store.candidate_universe(
+            df,
+            int(as_of_round),
+            required_columns=required_candidate_columns(cfg),
+        ),
+        cfg.data.candidate_scope,
+    )
     eligibility_result = apply_candidate_eligibility(scoped_df, getattr(cfg, "candidate_eligibility", None))
     cand_df = eligibility_result.frame
     total_before_eligibility = int(len(scoped_df))

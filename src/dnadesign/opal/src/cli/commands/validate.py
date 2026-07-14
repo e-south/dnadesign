@@ -21,6 +21,7 @@ from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...eligibility.runtime import apply_candidate_eligibility
 from ...registries.models import get_model
 from ...registries.objectives import get_objective_declared_channels
+from ...runtime.round_plan import required_candidate_columns
 from ...storage.data_access import ESSENTIAL_COLS
 from ...storage.label_sources import label_source_status
 from ...storage.x_contracts import validate_x_parquet_column
@@ -152,13 +153,11 @@ def _build_validate_report(config: Path | None) -> dict[str, object]:
     if missing:
         raise OpalError(f"Missing essential columns: {missing}")
 
-    label_hist_col = store.label_hist_col()
-    scalar_columns = [*ESSENTIAL_COLS]
-    if cfg.data.y_column_name in schema_columns:
-        scalar_columns.append(cfg.data.y_column_name)
-    if label_hist_col in schema_columns:
-        scalar_columns.append(label_hist_col)
-    df = store.load_columns(scalar_columns)
+    candidate_columns = required_candidate_columns(cfg)
+    df = store.load_runtime_frame(
+        include_x=False,
+        required_columns=candidate_columns,
+    )
 
     ids = df["id"].astype(str)
     if ids.duplicated().any():
@@ -199,7 +198,12 @@ def _build_validate_report(config: Path | None) -> dict[str, object]:
         raise OpalError(f"label source validation failed: {labels_status.get('error')}")
 
     _validate_selection_channel_refs(cfg)
-    candidate_eligibility = _validate_candidate_eligibility(cfg=cfg, store=store, df=df)
+    candidate_eligibility = _validate_candidate_eligibility(
+        cfg=cfg,
+        store=store,
+        df=df,
+        required_columns=candidate_columns,
+    )
 
     cwd = str(Path.cwd().resolve())
     cwd_outside_workdir = False
@@ -238,8 +242,12 @@ def _build_validate_report(config: Path | None) -> dict[str, object]:
     }
 
 
-def _validate_candidate_eligibility(*, cfg, store, df) -> dict[str, object]:
-    candidate_frame = store.candidate_universe(df, 0)
+def _validate_candidate_eligibility(*, cfg, store, df, required_columns: tuple[str, ...]) -> dict[str, object]:
+    candidate_frame = store.candidate_universe(
+        df,
+        0,
+        required_columns=required_columns,
+    )
     result = apply_candidate_eligibility(candidate_frame, getattr(cfg, "candidate_eligibility", None))
     return {
         "input_rows": int(len(candidate_frame)),

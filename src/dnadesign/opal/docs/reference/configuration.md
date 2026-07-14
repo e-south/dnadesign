@@ -188,7 +188,8 @@ The streaming runtime loads only core candidate fields plus columns declared by
 the configured eligibility plugins and `selection_batch.deduplicate_by`.
 Eligibility plugins own that required-column declaration. A configured column
 missing from `records.parquet` is an execution error; OPAL does not silently
-load the full candidate table or skip the rule.
+load the full candidate table or skip the rule. The configured X column cannot
+serve as candidate metadata; X stays in the bounded score-batch stream.
 
 `labels.source.kind` is `campaign_history` or `usr_sidecar`. A configured USR
 sidecar must match the candidate dataset and must exist for execution. OPAL does

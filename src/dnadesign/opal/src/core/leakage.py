@@ -94,7 +94,6 @@ def build_shared_label_source_contamination_report(
 ) -> LeakageGuardReport:
     checks = (
         "usr_sidecar_no_current_y_column_values",
-        "usr_sidecar_no_campaign_label_entries",
         "ledger_only_no_campaign_label_history_entries",
     )
     if not isinstance(cfg.labels.source, LabelSourceUSRSidecar):
@@ -125,7 +124,6 @@ def build_shared_label_source_contamination_report(
     hist_col = store.label_hist_col()
     if hist_col in df.columns:
         entry_ids: set[str] = set()
-        label_entry_ids: set[str] = set()
         malformed_ids: set[str] = set()
         for row_id, cell in df[["id", hist_col]].itertuples(index=False, name=None):
             rid = str(row_id)
@@ -136,8 +134,6 @@ def build_shared_label_source_contamination_report(
                 continue
             if entries:
                 entry_ids.add(rid)
-            if any(str(entry.get("kind", "")).strip() == "label" for entry in entries):
-                label_entry_ids.add(rid)
 
         if malformed_ids:
             violations.append(
@@ -152,20 +148,7 @@ def build_shared_label_source_contamination_report(
                     sample_ids=_sample(malformed_ids),
                 )
             )
-        if label_entry_ids and str(cfg.writeback.prediction_records) != "ledger_only":
-            violations.append(
-                LeakageViolation(
-                    code="records_label_history_label_contamination",
-                    scope="label_source",
-                    message=(
-                        f"Shared usr_sidecar campaign {cfg.campaign.slug!r} found campaign-local observed labels "
-                        f"in {hist_col!r}; observed labels must come from the configured sidecar."
-                    ),
-                    count=len(label_entry_ids),
-                    sample_ids=_sample(label_entry_ids),
-                )
-            )
-        if str(cfg.writeback.prediction_records) == "ledger_only" and entry_ids:
+        if entry_ids:
             violations.append(
                 LeakageViolation(
                     code="records_label_history_contamination",
