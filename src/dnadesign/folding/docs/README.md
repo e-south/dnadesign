@@ -1,7 +1,7 @@
 ## Folding Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Folding is the stateless secondary-structure service for dnadesign. Use it when
 a sequence producer has already emitted a folding request or bundle and you

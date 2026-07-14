@@ -1,7 +1,7 @@
 ## Cruncher intent and lifecycle
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13

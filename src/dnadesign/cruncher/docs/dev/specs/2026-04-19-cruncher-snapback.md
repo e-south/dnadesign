@@ -1,7 +1,7 @@
 ## Cruncher Snapback Dev Spec
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 > **Last updated by:** cruncher-maintainers on 2026-07-13
 > **Supersession note:** this dated document records the initial `v1` design cut. Current explicit and solve contracts use `single_nick_snapback_v2` and `single_nick_snapback_solve_v3`. Use the [active workflow](../../guides/snapback_workflow.md), [artifact](../../reference/snapback_artifacts.md), and [architecture](../../reference/architecture.md) docs for the maintained surface.

@@ -5,7 +5,7 @@
 **Audience:** snapback workflow users and maintainers
 **Last updated by:** cruncher-maintainers on 2026-07-13
 **Applies to:** `uv run cruncher snapback init-workspace|validate|design|solve|target-search|show`
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 **Primary artifacts:** `analysis/reports/report.json`, `analysis/reports/solve_report.json`, `analysis/views/views_manifest.v1.json`, `analysis/materialized_hits/hit_<rank>/`
 
 ### Contents

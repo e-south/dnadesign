@@ -1,7 +1,7 @@
 ## DenseGen dense array showcase tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Use this tutorial to run the local dense-array showcase. The workspace uses toy `binding_sites` input, CBC, parquet-only output, and fixed-length 100 bp sequences.
 

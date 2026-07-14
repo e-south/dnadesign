@@ -1,7 +1,7 @@
 # Contract Exports
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 `contracts` publishes shared cross-tool artifact schemas for `dnadesign`.
 

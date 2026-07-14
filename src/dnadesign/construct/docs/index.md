@@ -1,7 +1,7 @@
 ## Construct docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 This concise route page points to the unified [Construct docs](README.md) index, which combines task routes and document-type links in one place.
 

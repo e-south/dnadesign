@@ -1,7 +1,7 @@
 ## Notify Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 `notify` sends webhook notifications from Universal Sequence Record (USR) `.events.log` streams.
 Start here for setup, watching, and recovery. Use [Notify USR events operator manual](usr-events.md) when you want the full ordered procedure.

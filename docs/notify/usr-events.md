@@ -1,7 +1,7 @@
 ## Notify: consuming Universal Sequence Record events
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Use this runbook to set up, run, and recover `notify` watcher loops.
 Notify consumes USR `.events.log` only. It does not consume DenseGen telemetry (`outputs/meta/events.jsonl`).

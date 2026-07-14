@@ -1,7 +1,7 @@
 ## Cruncher Snapback Completion Dev Spec
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 > **Last updated by:** cruncher-maintainers on 2026-07-13
 > **Supersession note:** this developer spec records the 2026-04-19 design cut. The maintained solve lane is co-design-first `single_nick_snapback_solve_v3`. Use [`../guides/snapback_workflow.md`](../../guides/snapback_workflow.md), [`../reference/snapback_artifacts.md`](../../reference/snapback_artifacts.md), and [`../reference/architecture.md`](../../reference/architecture.md) for the active workflow, ranking, and artifact layout.

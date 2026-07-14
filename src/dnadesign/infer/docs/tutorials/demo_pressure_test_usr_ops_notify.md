@@ -1,7 +1,7 @@
 ## infer end-to-end pressure-test demo (usr + ops + notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 This demo executes infer in an end-to-end pressure-test loop that can run standalone or via ops orchestration.
 

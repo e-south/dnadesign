@@ -1,7 +1,7 @@
 ## Construct getting started
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 This page gets you from zero to a validated Construct run with the fewest moving parts.
 

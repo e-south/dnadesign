@@ -1,7 +1,7 @@
 # Billboard Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Billboard quantifies regulatory diversity in dense-array DNA libraries by
 extracting TFBS content and computing scalar diversity metrics plus diagnostic

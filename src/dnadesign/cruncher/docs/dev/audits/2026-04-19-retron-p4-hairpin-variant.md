@@ -1,7 +1,7 @@
 # 2026-04-19 retron P4 hairpin and YIU executive summary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 ## Scope
 

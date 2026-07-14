@@ -1,7 +1,7 @@
 ## infer docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a compact by-type index.
 

@@ -1,7 +1,7 @@
 # Billboard Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-14
 
 Use Billboard when a generated library needs regulator-binding-site diversity
 metrics before downstream selection or review.
