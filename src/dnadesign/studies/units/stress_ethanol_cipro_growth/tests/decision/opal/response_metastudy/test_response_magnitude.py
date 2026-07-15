@@ -31,6 +31,7 @@ def test_response_separation_keeps_components_separate() -> None:
     assert row["response_separation"] == 1.0
     assert row["on_magnitude_floor"] == 2.0
     assert row["off_magnitude_ceiling"] == 3.0
+    assert row["response_semantics"] == "global_target_state_separation"
     assert not row["passes_all_zero_constraints"]
 
 

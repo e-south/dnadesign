@@ -29,6 +29,7 @@ class StressTargetView:
     id: str
     label: str
     target_mask: tuple[float, float, float, float]
+    response_semantics: Literal["global_target_state_separation"] = "global_target_state_separation"
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -39,6 +40,8 @@ class StressTargetView:
             )
         if not any(self.target_mask) or all(self.target_mask):
             raise ValueError(f"stress target view {self.id!r} must contain at least one ON and one OFF state.")
+        if self.response_semantics != "global_target_state_separation":
+            raise ValueError("stress target views use global target-state separation semantics.")
 
 
 @dataclass(frozen=True)

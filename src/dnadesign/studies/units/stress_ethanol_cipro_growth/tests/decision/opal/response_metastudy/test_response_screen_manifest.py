@@ -15,7 +15,9 @@ import pandas as pd
 import pytest
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core import response_contracts
-from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import response_screen
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
+    response_screen_publication,
+)
 
 _PRIMARY_REDUCTION = "event_logmean_6_12h_post"
 
@@ -54,7 +56,7 @@ def test_manifest_gates_on_exact_campaign_model_not_best_challenger() -> None:
         ]
     )
 
-    manifest = response_screen.response_screen_manifest(
+    manifest = response_screen_publication.response_screen_manifest(
         screen,
         primary_reduction_id=_PRIMARY_REDUCTION,
         campaign_calibration_parity={"status": "aligned"},
@@ -92,6 +94,13 @@ def test_manifest_gates_on_exact_campaign_model_not_best_challenger() -> None:
     assert manifest["model_support_ready"] is False
     assert manifest["model_support_basis"] == "configured_campaign_model"
     assert manifest["evidence_timing"] == "retrospective"
+    assert manifest["response_semantics"] == "global_target_state_separation"
+    assert manifest["window_comparison"] == {
+        "reduction_count": 1,
+        "window_selection_basis": "assay_evidence_not_model_performance",
+        "model_evidence_use": "diagnostic_only",
+        "trajectory_role": "diagnostic_only_not_label_reduction",
+    }
 
 
 def test_manifest_rejects_missing_exact_campaign_representation() -> None:
@@ -122,7 +131,7 @@ def test_manifest_rejects_missing_exact_campaign_representation() -> None:
     )
 
     with pytest.raises(ValueError, match="exactly one configured campaign-model row"):
-        response_screen.response_screen_manifest(
+        response_screen_publication.response_screen_manifest(
             screen,
             primary_reduction_id=_PRIMARY_REDUCTION,
             campaign_calibration_parity={"status": "aligned"},
@@ -159,7 +168,7 @@ def test_manifest_records_undefined_campaign_ordering_as_no_model_support() -> N
     campaign_mask = screen.model_screen["model_role"].eq("campaign_model")
     screen.model_screen.loc[campaign_mask, "all_target_view_metrics_finite"] = False
 
-    manifest = response_screen.response_screen_manifest(
+    manifest = response_screen_publication.response_screen_manifest(
         screen,
         primary_reduction_id=_PRIMARY_REDUCTION,
         campaign_calibration_parity={"status": "aligned"},
@@ -246,4 +255,13 @@ def _screen(model_rows: list[dict[str, object]]) -> response_contracts.ResponseM
         best_fixed_challenger_greedy_support=pd.DataFrame(),
         repeated_measurements=pd.DataFrame(),
         repeated_agreement=pd.DataFrame({"maximum_selected_to_median_abs_difference": [0.0]}),
+        window_evidence=pd.DataFrame(
+            {
+                "reduction_id": [_PRIMARY_REDUCTION],
+                "response_semantics": ["global_target_state_separation"],
+                "window_selection_basis": ["assay_evidence_not_model_performance"],
+                "model_evidence_use": ["diagnostic_only"],
+                "trajectory_role": ["diagnostic_only_not_label_reduction"],
+            }
+        ),
     )

@@ -33,7 +33,7 @@ def test_repository_policy_is_explicitly_blocked_pending_repeat_review() -> None
     assert result.approved_by is None
     assert result.approved_at is None
     expected_reader_sha256 = (
-        "f49ef80d12b76d4e92cb73feaf5423187d898de8c1ee7df0099c9fe0c3fc497d"  # pragma: allowlist secret
+        "f97831a065a9ed26aceee19f8fe7b2413ed4bf68da1122e8e49ecfce6355bf64"  # pragma: allowlist secret
     )
     expected_bindings_sha256 = (
         "273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8"  # pragma: allowlist secret

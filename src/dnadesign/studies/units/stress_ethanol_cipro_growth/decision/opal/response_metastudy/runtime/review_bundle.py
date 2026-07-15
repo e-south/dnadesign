@@ -22,7 +22,7 @@ from ..reporting.notebook import write_review_notebook
 from ..reporting.plots import write_visuals
 from ..reporting.report import write_report
 from .publication import artifact_inventory
-from .response_screen import write_response_screen_tables
+from .response_screen_publication import write_response_screen_tables
 
 
 @dataclass(frozen=True)

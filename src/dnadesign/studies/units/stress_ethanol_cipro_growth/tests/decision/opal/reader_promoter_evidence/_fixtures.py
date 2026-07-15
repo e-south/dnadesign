@@ -83,7 +83,7 @@ def write_reader_bundle(
         },
         "sources": {
             "response_window": {
-                "schema_version": "reader.response_window.bundle.v4",
+                "schema_version": "reader.response_window.bundle.v5",
                 "study_id": "stress_ethanol_cipro_growth",
                 "request_id": "stress_ethanol_cipro_growth.response_window.v3",
                 "experiment_id": experiment_id,

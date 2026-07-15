@@ -21,10 +21,15 @@ next-build policy.
 - OPAL owns objective primitives, campaign training, candidate scoring,
   selection, and ledgers after observed-Y promotion.
 
-The runtime consumes a verified `reader.response_window.bundle.v4` produced
+The runtime consumes a verified `reader.response_window.bundle.v5` produced
 from `reader.response_window.request.v3`. Both carry the stress `study_id`. The
 runtime does not import Reader, inspect raw PlateReader workbooks, or duplicate
 Reader reduction math.
+
+The window comparison may read Reader-published well and trajectory records for
+pDual-10 replicate spread, growth/OD context, and measurement observability.
+Those records are diagnostic only: the study never recomputes or substitutes
+Reader-owned response-window Y.
 
 ## Layout
 
@@ -102,7 +107,7 @@ drift from the Reader-derived review calibration beyond six-decimal rounding.
 - The response model screen does not read SFXI source CSVs. Its explicit source
   choice for repeated designs is screen-only and is not a repeat-aggregation
   rule for observed-label promotion.
-- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v10`.
+- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v11`.
 
 Reader emits `[r00, r10, r01, r11, b00, b10, b01, b11]`. The `r` values are
 reduced `log2(YFP/CFP)` response, while the `b` values are same-state
@@ -111,6 +116,11 @@ eight-component vector is response-window Y, not an RMF vec8. The primary
 reduction is the 6-12-hour post-event geometric log mean. Reader owns the
 reduction; OPAL applies the RMF objective. Promotion of response-window
 observed labels remains inactive.
+
+Every active view uses global target-state separation: the least responsive ON
+state is compared with the most responsive OFF state under the declared mask.
+Conditional induction and factorial interaction remain separately named
+diagnostics and are not alternate names for RMF.
 
 ## Outputs
 

@@ -54,31 +54,39 @@ MODEL_METRIC_LABELS = {
 REPRESENTATION_ORDER = (
     "event_logmean_6_12h_post",
     "event_logmean_6_12h_post__factorial_contrast7",
+    "event_logmean_0_6h_post",
     "event_logmean_4_8h_post",
     "event_logmean_8_12h_post",
+    "event_logmean_0_12h_post",
     "event_linear_auc_6_12h_post",
     "event_logmean_6_12h_delta_pre1h",
 )
 REDUCTION_ORDER = (
     "event_logmean_6_12h_post",
+    "event_logmean_0_6h_post",
     "event_logmean_4_8h_post",
     "event_logmean_8_12h_post",
+    "event_logmean_0_12h_post",
     "event_linear_auc_6_12h_post",
     "event_logmean_6_12h_delta_pre1h",
 )
 REPRESENTATION_LABELS = {
     "event_logmean_6_12h_post": "6-12 h\nlog mean",
     "event_logmean_6_12h_post__factorial_contrast7": "6-12 h\nfactorial\ncontrasts",
+    "event_logmean_0_6h_post": "0-6 h\nlog mean",
     "event_logmean_4_8h_post": "4-8 h\nlog mean",
     "event_logmean_8_12h_post": "8-12 h\nlog mean",
+    "event_logmean_0_12h_post": "0-12 h\nlog mean",
     "event_linear_auc_6_12h_post": "6-12 h\nlinear AUC",
     "event_logmean_6_12h_delta_pre1h": "6-12 h\nlog mean -\npre-stress",
 }
 REPRESENTATION_ROLES = {
     "event_logmean_6_12h_post": "Candidate",
     "event_logmean_6_12h_post__factorial_contrast7": "Candidate",
+    "event_logmean_0_6h_post": "Sensitivity",
     "event_logmean_4_8h_post": "Sensitivity",
     "event_logmean_8_12h_post": "Sensitivity",
+    "event_logmean_0_12h_post": "Sensitivity",
     "event_linear_auc_6_12h_post": "Sensitivity",
     "event_logmean_6_12h_delta_pre1h": "Sensitivity",
 }

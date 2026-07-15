@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/response_screen.py
 
-Orchestrate the induction-aligned response-metric screen.
+Orchestrate the target-state-aligned response-metric screen.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Mapping
 
 import numpy as np
@@ -20,6 +19,7 @@ import pandas as pd
 from ..core.contracts import StressTargetView
 from ..core.response_contracts import (
     OR_PRESSURE_TEST_VIEW,
+    RESPONSE_CONTROL_DESIGNS,
     RESPONSE_REVIEW_SPEC,
     ResponseMetricScreen,
 )
@@ -32,7 +32,7 @@ from ..evaluation.response_magnitude import (
     summarize_response_separation_stability,
 )
 from ..evaluation.response_uncertainty import estimate_response_calibration_from_reader_draws
-from .model_evidence_manifest import build_model_evidence_manifest
+from ..evaluation.window_evidence import build_response_window_evidence
 
 
 def build_response_metric_screen(
@@ -41,6 +41,10 @@ def build_response_metric_screen(
     all_measurements: pd.DataFrame,
     event_intervals: pd.DataFrame,
     *,
+    reader_designs: pd.DataFrame,
+    reader_wells: pd.DataFrame,
+    reader_traces: pd.DataFrame,
+    reference_design_id: str,
     primary_reduction_id: str,
     label_ids: list[str],
     x_train: np.ndarray,
@@ -101,6 +105,16 @@ def build_response_metric_screen(
         random_forest_params=random_forest_params,
     )
     enrichment_summary = summarize_retrospective_enrichment(enrichment)
+    window_evidence = build_response_window_evidence(
+        labels=labels,
+        margin_rows=margins,
+        reader_designs=reader_designs,
+        reader_wells=reader_wells,
+        reader_traces=reader_traces,
+        model_screen=model_screen,
+        reference_design_id=reference_design_id,
+        response_controls=RESPONSE_CONTROL_DESIGNS,
+    )
     campaign_greedy_support = build_greedy_support_evidence(
         model_screen,
         enrichment,
@@ -128,6 +142,7 @@ def build_response_metric_screen(
         best_fixed_challenger_greedy_support=challenger_greedy_support,
         repeated_measurements=repeated_measurements,
         repeated_agreement=repeated_agreement,
+        window_evidence=window_evidence,
     )
 
 
@@ -162,120 +177,3 @@ def summarize_retrospective_enrichment(enrichment: pd.DataFrame) -> pd.DataFrame
         )
         .reset_index(drop=True)
     )
-
-
-def response_screen_manifest(
-    screen: ResponseMetricScreen,
-    *,
-    primary_reduction_id: str,
-    campaign_calibration_parity: Mapping[str, object],
-    campaign_model_params: Mapping[str, object],
-) -> dict[str, object]:
-    """Return the compact promotion posture recorded in the bundle manifest."""
-
-    model_evidence = build_model_evidence_manifest(
-        screen.model_screen,
-        primary_reduction_id=primary_reduction_id,
-        campaign_model_params=campaign_model_params,
-    )
-    event_gap = (
-        screen.event_intervals["event_interval_end_assay_h"] - screen.event_intervals["event_interval_start_assay_h"]
-    )
-    primary = screen.stability.loc[screen.stability["reduction_id"].eq(primary_reduction_id)]
-    reduction_columns = [
-        "reduction_id",
-        "screen_role",
-        "response_basis",
-        "reduction_method",
-        "window_start_event_h",
-        "window_end_event_h",
-    ]
-    reduction_rows = (
-        screen.labels.loc[:, reduction_columns]
-        .drop_duplicates()
-        .sort_values(["screen_role", "reduction_id"], kind="mergesort")
-    )
-    if "bootstrap_samples" not in screen.calibration.columns:
-        raise ValueError("response calibration lacks Reader bootstrap provenance.")
-    bootstrap_samples = int(screen.calibration["bootstrap_samples"].iloc[0])
-    return {
-        "status": "screen_complete_not_promoted",
-        "evidence_timing": "retrospective",
-        "primary_reduction_candidate": primary_reduction_id,
-        "reader_event_experiment_count": int(len(screen.event_intervals)),
-        "reader_event_gap_h": {"min": float(event_gap.min()), "max": float(event_gap.max())},
-        "model_screen_candidate_count": int(screen.labels["id"].nunique()),
-        "reduction_count": int(screen.labels["reduction_id"].nunique()),
-        "review_calibration_by_selection_view": {
-            str(selection_view_id): {
-                str(row.component): {"threshold": float(row.threshold), "scale": float(row.scale)}
-                for row in rows.itertuples(index=False)
-            }
-            for selection_view_id, rows in screen.calibration.groupby("selection_view_id", sort=True)
-        },
-        "campaign_calibration_parity": dict(campaign_calibration_parity),
-        "response_screen_protocol": {
-            "bootstrap_samples": bootstrap_samples,
-            "scale_quantile": RESPONSE_REVIEW_SPEC.scale_quantile,
-            "model_min_within_group_spearman": RESPONSE_REVIEW_SPEC.model_min_within_group_spearman,
-            "model_min_defined_group_count": RESPONSE_REVIEW_SPEC.model_min_defined_group_count,
-            "model_reduction_ids": sorted(screen.labels["reduction_id"].astype(str).unique()),
-            "reductions": [
-                {
-                    "id": str(row.reduction_id),
-                    "screen_role": str(row.screen_role),
-                    "response_basis": str(row.response_basis),
-                    "method": str(row.reduction_method),
-                    "window_start_event_h": float(row.window_start_event_h),
-                    "window_end_event_h": float(row.window_end_event_h),
-                }
-                for row in reduction_rows.itertuples(index=False)
-            ],
-        },
-        "zero_constraint_feasible_count_by_selection_view": {
-            str(row.selection_view_id): int(row.zero_constraint_feasible_count)
-            for row in primary.itertuples(index=False)
-        },
-        **model_evidence,
-        "repeated_design_count": int(len(screen.repeated_agreement)),
-        "maximum_screen_source_to_cross_experiment_median_abs_difference": float(
-            screen.repeated_agreement["maximum_selected_to_median_abs_difference"].max()
-        ),
-        "ratio_domain_policy": "error_at_or_below_declared_positive_floor",
-        "prospective_hill_climb_demonstrated": False,
-        "campaign_greedy_support": screen.campaign_greedy_support.to_dict(orient="records"),
-        "best_fixed_challenger_greedy_support": screen.best_fixed_challenger_greedy_support.to_dict(orient="records"),
-        "interpretation": (
-            "Signed margins define relative improvement without positive exemplars. Available evidence is "
-            "retrospective and does not yet establish whether greedy or mixed next-round selection is superior. "
-            "Campaign-model support and challenger comparisons are reported separately."
-        ),
-    }
-
-
-def write_response_screen_tables(screen: ResponseMetricScreen, tables_dir: Path) -> dict[str, Path]:
-    """Write the response-screen tables and return their artifact registrations."""
-
-    tables_dir.mkdir(parents=True, exist_ok=True)
-    table_frames = {
-        "reader_event_intervals": screen.event_intervals,
-        "reader_response_summaries": screen.labels,
-        "response_separation_components": screen.margins,
-        "response_separation_stability": screen.stability,
-        "response_separation_uncertainty": screen.uncertainty,
-        "response_separation_review_scales": screen.calibration,
-        "label_model_screen": screen.model_screen,
-        "label_model_group_metrics": screen.model_group_metrics,
-        "retrospective_enrichment": screen.retrospective_enrichment,
-        "retrospective_enrichment_summary": screen.enrichment_summary,
-        "campaign_greedy_support": screen.campaign_greedy_support,
-        "best_fixed_challenger_greedy_support": screen.best_fixed_challenger_greedy_support,
-        "repeated_design_measurements": screen.repeated_measurements,
-        "repeated_design_agreement": screen.repeated_agreement,
-    }
-    paths: dict[str, Path] = {}
-    for table_id, frame in table_frames.items():
-        path = tables_dir / f"{table_id}.csv"
-        frame.to_csv(path, index=False)
-        paths[f"table__{table_id}"] = path
-    return paths

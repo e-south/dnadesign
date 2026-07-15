@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+from . import window_evidence
 from .grouped_models import CAMPAIGN_MODEL_SCREEN_ID, DEFAULT_MODEL_SCREEN_SPECS, ModelScreenSpec
 from .model_representations import (
     build_label_representations,
@@ -25,4 +26,5 @@ __all__ = [
     "decode_to_response_magnitude",
     "response_magnitude_to_factorial_contrast7",
     "screen_label_models",
+    "window_evidence",
 ]

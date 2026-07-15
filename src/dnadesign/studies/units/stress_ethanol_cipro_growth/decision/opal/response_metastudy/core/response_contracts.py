@@ -37,6 +37,7 @@ class ResponseMetricScreen:
     best_fixed_challenger_greedy_support: pd.DataFrame
     repeated_measurements: pd.DataFrame
     repeated_agreement: pd.DataFrame
+    window_evidence: pd.DataFrame
 
 
 @dataclass(frozen=True)
@@ -71,10 +72,16 @@ OR_PRESSURE_TEST_VIEW = StressTargetView(
     target_mask=(0.0, 1.0, 1.0, 1.0),
 )
 
+RESPONSE_CONTROL_DESIGNS = {
+    "ethanol": "pDual-10-spyp",
+    "ciprofloxacin": "pDual-10-sulAp",
+}
+
 
 __all__ = [
     "OR_PRESSURE_TEST_VIEW",
     "RESPONSE_REVIEW_SPEC",
+    "RESPONSE_CONTROL_DESIGNS",
     "ResponseMetricScreen",
     "ResponseReviewSpec",
     "STRESS_STATE_IDS",

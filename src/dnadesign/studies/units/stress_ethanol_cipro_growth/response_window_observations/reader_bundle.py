@@ -19,13 +19,14 @@ import pandas as pd
 
 from .artifact_io import read_json_object
 from .display_contract import READER_DISPLAY_SCHEMA, response_example_labels, validate_reader_display
+from .reader_bundle_validation import validate_reader_bundle_frames
 
-READER_BUNDLE_SCHEMA = "reader.response_window.bundle.v4"
+READER_BUNDLE_SCHEMA = "reader.response_window.bundle.v5"
 EXPECTED_CONTRACTS = {
-    "wells": "plate_reader.response_window.wells.v2",
-    "designs": "plate_reader.response_window.designs.v2",
+    "wells": "plate_reader.response_window.wells.v3",
+    "designs": "plate_reader.response_window.designs.v3",
     "bootstrap_draws": "plate_reader.response_window.bootstrap_draws.v2",
-    "traces": "plate_reader.response_window.traces.v2",
+    "traces": "plate_reader.response_window.traces.v3",
     "events": "plate_reader.response_window.events.v2",
 }
 EXPECTED_RECORD_ARTIFACTS = {record_id: f"tables/{record_id}.parquet" for record_id in EXPECTED_CONTRACTS}
@@ -40,6 +41,8 @@ class ReaderResponseBundle:
     manifest: dict[str, object]
     designs: pd.DataFrame
     bootstrap_draws: pd.DataFrame
+    wells: pd.DataFrame
+    traces: pd.DataFrame
     events: pd.DataFrame
 
     @property
@@ -52,6 +55,15 @@ class ReaderResponseBundle:
     @property
     def response_examples(self) -> dict[str, str]:
         return response_example_labels(self.manifest.get("display"))
+
+    @property
+    def reference_design_id(self) -> str:
+        display = self.manifest.get("display")
+        channels = display.get("channels") if isinstance(display, dict) else None
+        value = channels.get("reference_design_id") if isinstance(channels, dict) else None
+        if not isinstance(value, str) or not value:
+            raise ValueError("Reader bundle display contract lacks reference_design_id.")
+        return value
 
 
 def load_reader_response_bundle(path: Path, *, expected_request_path: Path) -> ReaderResponseBundle:
@@ -116,14 +128,20 @@ def load_reader_response_bundle(path: Path, *, expected_request_path: Path) -> R
         raise ValueError(f"Reader response-window bundle lacks record artifacts: {missing_record_artifacts}.")
     designs = pd.read_parquet(_record_path(artifact_paths, records, record_id="designs"))
     draws = pd.read_parquet(_record_path(artifact_paths, records, record_id="bootstrap_draws"))
+    wells = pd.read_parquet(_record_path(artifact_paths, records, record_id="wells"))
+    traces = pd.read_parquet(_record_path(artifact_paths, records, record_id="traces"))
     events = pd.read_parquet(_record_path(artifact_paths, records, record_id="events"))
-    _validate_bundle_frames(designs=designs, draws=draws, events=events, payload=payload)
+    validate_reader_bundle_frames(
+        designs=designs, draws=draws, wells=wells, traces=traces, events=events, payload=payload
+    )
     return ReaderResponseBundle(
         root=root,
         manifest_path=manifest_path,
         manifest=payload,
         designs=designs,
         bootstrap_draws=draws,
+        wells=wells,
+        traces=traces,
         events=events,
     )
 
@@ -136,49 +154,6 @@ def build_all_primary_measurements(bundle: ReaderResponseBundle) -> pd.DataFrame
     result = result.rename(columns={"experiment_id": "reader_experiment_id"})
     result["id"] = result["reader_experiment_id"].astype(str) + "::" + result["design_id"].astype(str)
     return result
-
-
-def _validate_bundle_frames(
-    *,
-    designs: pd.DataFrame,
-    draws: pd.DataFrame,
-    events: pd.DataFrame,
-    payload: dict[str, object],
-) -> None:
-    design_required = {"experiment_id", "design_id", "reduction_id", "reduction_role", "is_reference", *VALUE_COLUMNS}
-    draw_required = {"experiment_id", "design_id", "reduction_id", "draw_index", "is_reference", *VALUE_COLUMNS}
-    event_required = {
-        "experiment_id",
-        "event_id",
-        "event_interval_start_assay_h",
-        "event_interval_end_assay_h",
-        "event_time_estimate_assay_h",
-    }
-    for label, frame, required in (
-        ("designs", designs, design_required),
-        ("bootstrap_draws", draws, draw_required),
-        ("events", events, event_required),
-    ):
-        missing = sorted(required - set(frame.columns))
-        if missing:
-            raise ValueError(f"Reader {label} record lacks columns: {missing}")
-    if designs.duplicated(subset=["experiment_id", "design_id", "reduction_id"]).any():
-        raise ValueError("Reader design identities are not unique.")
-    if draws.duplicated(subset=["experiment_id", "design_id", "reduction_id", "draw_index"]).any():
-        raise ValueError("Reader bootstrap-draw identities are not unique.")
-    if events["experiment_id"].duplicated().any():
-        raise ValueError("Reader event identities are not unique.")
-    counts = payload.get("counts")
-    if not isinstance(counts, dict):
-        raise ValueError("Reader bundle lacks row counts.")
-    expected_counts = {
-        "design_rows": len(designs),
-        "bootstrap_draw_rows": len(draws),
-        "experiments": len(events),
-    }
-    for key, observed in expected_counts.items():
-        if int(counts.get(key, -1)) != observed:
-            raise ValueError(f"Reader bundle count mismatch for {key}: {counts.get(key)!r} != {observed}.")
 
 
 def _sha256(path: Path) -> str:

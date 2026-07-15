@@ -147,16 +147,16 @@ def write_report(
         "",
         "## Assay Time-Course Robustness",
         "",
-        "Reader publishes five event-relative reductions: a primary 6-12 hour post-event log mean, adjacent-window "
-        "checks, a "
+        "Reader publishes seven event-relative reductions: a primary 6-12 hour post-event log mean, four declared "
+        "window checks, a "
         "duration-normalized linear AUC, and a pre-window-delta check. Response uses log2 YFP/CFP. The magnitude "
         "channel is same-state pDual-10-relative log2 YFP/OD600 fluorescence.",
         "",
         "Reader owns event resolution, trajectory reduction, replicate aggregation, and joint bootstrap records. "
         "The study consumes those records and applies target-view masks; it does not reopen PlateReader trajectories.",
         "",
-        f"- Reader primary reduction: `{primary_reduction_id}`. It is the only promotion candidate; the adjacent "
-        "windows and AUC remain sensitivity analyses.",
+        f"- Reader primary reduction: `{primary_reduction_id}`. It is the only promotion candidate; the other "
+        "windows, AUC, and pre-window delta remain equal-footing sensitivity analyses.",
         "- Response reductions are evaluated only through response and fluorescence requirements. They are not "
         "translated into SFXI logic or intensity fields.",
         "- The SFXI source records remain independent evidence and are evaluated only under their declared vec8 "

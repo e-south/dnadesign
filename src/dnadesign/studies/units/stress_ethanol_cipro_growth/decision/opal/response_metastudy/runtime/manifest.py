@@ -126,6 +126,7 @@ def write_metastudy_manifest(
                     "selection_view_id": target_view.id,
                     "label": target_view.label,
                     "target_mask": list(target_view.target_mask),
+                    "response_semantics": target_view.response_semantics,
                 }
                 for target_view in stress_campaign.target_views
             ],

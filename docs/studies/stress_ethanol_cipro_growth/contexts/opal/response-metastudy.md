@@ -82,7 +82,7 @@ no label-truth role. Cross-experiment evidence and approval live in the
 study-level `response_window_observations/` package.
 
 The response-metastudy publication schema is
-`stress_ethanol_cipro_growth.response_metastudy.v10`.
+`stress_ethanol_cipro_growth.response_metastudy.v11`.
 
 ### Evidence Flow
 
@@ -91,13 +91,17 @@ The response-metastudy publication schema is
 2. Recompute persisted SFXI scores through the public OPAL API.
 3. Audit SFXI exponent, gate, lexicographic, and OFF-state-logic variants without
    changing `secg_rmf_greedy` campaign state.
-4. Verify `reader.response_window.bundle.v4`, all record contracts, source
+4. Verify `reader.response_window.bundle.v5`, all record contracts, source
    provenance, artifact digests, and row counts.
 5. Verify the response-owned 35-row screen selection against the Reader bundle,
    resolve each design alias through the study binding artifact, and join by
    exact Reader experiment and design identity.
-6. Evaluate response and fluorescence requirement stability across five
-   Reader-owned event-relative reductions.
+6. Evaluate response and fluorescence requirement stability across seven
+   Reader-owned event-relative reductions. Compare pDual-10 replicate spread,
+   cross-experiment anchor drift, SpyP and sulAp response separation, OD context,
+   event sensitivity, repeat agreement, censoring support, and the same fixed
+   model screen for every reduction. Model performance is diagnostic and does
+   not choose the response window.
 7. Apply ethanol, ciprofloxacin, AND, and OR pressure-test masks to raw Reader
    state summaries and joint bootstrap draws.
 8. Compare the exact configured campaign RF separately from the fixed mean,
@@ -130,7 +134,7 @@ Response-Magnitude Feasibility (RMF) mathematics:
 Reader response-window contract:
 
 - `reader/docs/lib/plate_reader/response_window.md`
-- Reader bundle schema `reader.response_window.bundle.v4`
+- Reader bundle schema `reader.response_window.bundle.v5`
 
 ### Package Layout
 

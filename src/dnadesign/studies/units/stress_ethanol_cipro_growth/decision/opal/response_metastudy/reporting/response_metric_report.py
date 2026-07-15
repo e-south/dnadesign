@@ -37,6 +37,25 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         on=["representation_id", "model_id"],
         how="inner",
     )
+    window_assay_columns = [
+        "reduction_id",
+        "pdual_response_within_experiment_median_range",
+        "pdual_magnitude_within_experiment_median_range",
+        "pdual_magnitude_cross_experiment_max_state_range",
+        "spyp_ethanol_response_separation_median",
+        "sulap_ciprofloxacin_response_separation_median",
+        "growth_endpoint_od600_q90",
+        "event_sensitivity_max_half_range",
+        "event_sensitivity_censored_design_state_component_count",
+        "repeat_maximum_channel_range",
+        "censoring_observability",
+    ]
+    window_model_columns = [
+        "reduction_id",
+        "campaign_random_forest_weakest_ordering_spearman",
+        "pls4_weakest_ordering_spearman",
+        "pls6_weakest_ordering_spearman",
+    ]
     return [
         "## Response-Window Label And RMF Screen",
         "",
@@ -50,7 +69,24 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         f"{screen.labels['id'].nunique()} labels.",
         f"- Primary Reader reduction: `{primary_reduction_id}`.",
         "- Event-bound sensitivity is propagated separately from replicate resampling.",
+        "- Active views use global target-state separation: every target-ON state is compared with every "
+        "target-OFF state. Conditional induction and interaction are separate diagnostics, not aliases for RMF.",
         "- No Reader record, OPAL label, campaign config, or synthesis handoff is changed by this screen.",
+        "",
+        "### Equal-Footing Window Evidence",
+        "",
+        "Every declared reduction uses the same Reader experiments, candidate identities, response controls, "
+        "anchor summaries, repeat comparison, and fixed model screen. Reader-published trajectories are consumed "
+        "only for OD and measurement observability; they never replace Reader-owned reduced Y. Model results are "
+        "diagnostic and are not a window-selection rule.",
+        "",
+        _markdown_table(screen.window_evidence.loc[:, window_assay_columns]),
+        "",
+        "The pDual-10 columns report within-experiment replicate ranges and the largest state-specific "
+        "cross-experiment range of experiment medians. SpyP and sulAp summarize every Reader occurrence, not the "
+        "single source chosen for the retrospective label-model screen.",
+        "",
+        _markdown_table(screen.window_evidence.loc[:, window_model_columns]),
         "",
         "### Provisional Reference Boundaries And Review Scales",
         "",

@@ -358,7 +358,7 @@ def _manifest(*, model_gate: float) -> dict[str, object]:
     challenger = _model_record("pls4", "fixed_challenger", views, ordering=0.15)
     baseline = _model_record("mean_baseline", "baseline", views, ordering=0.0)
     return {
-        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v10",
+        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v11",
         "source": {
             "reader_bundle": {
                 "manifest": {"path": "manifest.json", "sha256": "1" * 64, "bytes": 100},

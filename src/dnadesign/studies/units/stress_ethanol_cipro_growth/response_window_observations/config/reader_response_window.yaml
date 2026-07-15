@@ -53,6 +53,12 @@ event:
   declaration: The named experiments added ethanol and/or ciprofloxacin between acquisition segments 0 and 1.
 
 reductions:
+  - id: event_logmean_0_6h_post
+    window_start_event_h: 0.0
+    window_end_event_h: 6.0
+    method: geometric_time_mean
+    response_basis: post_window
+    role: sensitivity
   - id: event_logmean_6_12h_post
     window_start_event_h: 6.0
     window_end_event_h: 12.0
@@ -67,6 +73,12 @@ reductions:
     role: sensitivity
   - id: event_logmean_8_12h_post
     window_start_event_h: 8.0
+    window_end_event_h: 12.0
+    method: geometric_time_mean
+    response_basis: post_window
+    role: sensitivity
+  - id: event_logmean_0_12h_post
+    window_start_event_h: 0.0
     window_end_event_h: 12.0
     method: geometric_time_mean
     response_basis: post_window

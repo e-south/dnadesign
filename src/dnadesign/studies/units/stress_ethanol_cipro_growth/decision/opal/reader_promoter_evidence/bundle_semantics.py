@@ -59,7 +59,7 @@ def _verify_sources(value: object, *, selection: dict[str, str]) -> None:
     if not isinstance(response, dict) or set(response) != response_fields:
         raise ReaderPromoterEvidenceError("Reader response-window source metadata is malformed.")
     if (
-        response["schema_version"] != "reader.response_window.bundle.v4"
+        response["schema_version"] != "reader.response_window.bundle.v5"
         or response["study_id"] != "stress_ethanol_cipro_growth"
         or any(not _nonempty(response[field]) for field in ("request_id", "experiment_id", "reduction_id"))
         or not _is_sha256(response["manifest_sha256"])

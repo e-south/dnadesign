@@ -22,6 +22,7 @@ from dnadesign.opal import response_magnitude_feasibility_components
 from ..core.contracts import STRESS_STATE_IDS, StressTargetView
 
 _RAW_COLUMNS = tuple(f"r{state}" for state in STRESS_STATE_IDS) + tuple(f"b{state}" for state in STRESS_STATE_IDS)
+RESPONSE_SEMANTICS = "global_target_state_separation"
 
 
 def build_response_separation_rows(
@@ -51,6 +52,7 @@ def build_response_separation_rows(
                         "reader_experiment_id": str(source["reader_experiment_id"]),
                         "reduction_id": str(reduction_id),
                         "selection_view_id": target_view.id,
+                        "response_semantics": RESPONSE_SEMANTICS,
                         **{column: float(source[column]) for column in _RAW_COLUMNS},
                         "response_separation": float(components.response_separation[index]),
                         "on_magnitude_floor": float(components.on_magnitude_floor[index]),
@@ -118,6 +120,7 @@ def _rank_correlation(left: pd.Series, right: pd.Series) -> float:
 
 
 __all__ = [
+    "RESPONSE_SEMANTICS",
     "build_response_separation_rows",
     "summarize_response_separation_stability",
 ]

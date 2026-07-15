@@ -37,6 +37,8 @@ def test_reader_bundle_loads_only_after_contract_and_digest_verification(tmp_pat
     assert bundle.primary_reduction_id == "primary"
     assert len(bundle.designs) == 2
     assert len(bundle.bootstrap_draws) == 2
+    assert len(bundle.wells) == 2
+    assert len(bundle.traces) == 2
     assert bundle.response_examples == {"d": "Response example"}
 
 
@@ -141,6 +143,8 @@ def test_selected_bootstrap_draws_reject_missing_candidate(tmp_path: Path) -> No
                 }
             ]
         ),
+        wells=pd.DataFrame(),
+        traces=pd.DataFrame(),
         events=pd.DataFrame(),
     )
     candidate_identity_bindings = pd.DataFrame(
@@ -161,6 +165,18 @@ def _bundle_fixture(tmp_path: Path) -> Path:
     tables = root / "tables"
     tables.mkdir(parents=True)
     values = {"r00": 0.0, "r10": 1.0, "r01": 0.5, "r11": 1.5, "b00": 0.0, "b10": 0.2, "b01": 0.1, "b11": 0.3}
+    provenance = {
+        f"{prefix}{state}_{suffix}": False if suffix.startswith("has_") else "exact"
+        for prefix in ("r", "b")
+        for state in ("00", "10", "01", "11")
+        for suffix in ("has_policy_clipping", "has_instrument_overflow", "bound_kind")
+    }
+    event_provenance = {
+        f"{prefix}{state}_event_sensitivity_has_{cause}": False
+        for prefix in ("r", "b")
+        for state in ("00", "10", "01", "11")
+        for cause in ("policy_clipping", "instrument_overflow")
+    }
     designs = pd.DataFrame(
         [
             {
@@ -170,6 +186,8 @@ def _bundle_fixture(tmp_path: Path) -> Path:
                 "reduction_role": "primary",
                 "is_reference": False,
                 **values,
+                **provenance,
+                **event_provenance,
             },
             {
                 "experiment_id": "exp",
@@ -178,6 +196,8 @@ def _bundle_fixture(tmp_path: Path) -> Path:
                 "reduction_role": "primary",
                 "is_reference": True,
                 **values,
+                **provenance,
+                **event_provenance,
             },
         ]
     )
@@ -197,8 +217,39 @@ def _bundle_fixture(tmp_path: Path) -> Path:
         "designs": designs,
         "bootstrap_draws": draws,
         "events": events,
-        "wells": pd.DataFrame({"placeholder": [1]}),
-        "traces": pd.DataFrame({"placeholder": [1]}),
+        "wells": pd.DataFrame(
+            {
+                "experiment_id": ["exp", "exp"],
+                "design_id": ["d", "ref"],
+                "reduction_id": ["primary", "primary"],
+                "state": ["00", "00"],
+                "position": ["A1", "A2"],
+                "response_well": [0.0, 0.0],
+                "magnitude_well": [0.0, 0.0],
+                "response_policy_clipped_point_count": [0, 0],
+                "response_instrument_overflow_point_count": [0, 0],
+                "response_bound_kind": ["exact", "exact"],
+                "magnitude_policy_clipped_point_count": [0, 0],
+                "magnitude_instrument_overflow_point_count": [0, 0],
+                "magnitude_bound_kind": ["exact", "exact"],
+                "is_reference": [False, True],
+            }
+        ),
+        "traces": pd.DataFrame(
+            {
+                "experiment_id": ["exp", "exp"],
+                "design_id": ["d", "ref"],
+                "position": ["A1", "A2"],
+                "state": ["00", "00"],
+                "time_from_event_h": [1.0, 1.0],
+                "value": [0.2, 0.3],
+                "value_policy_clipped": [False, False],
+                "value_instrument_overflow": [False, False],
+                "value_bound_kind": ["exact", "exact"],
+                "signal_kind": ["growth", "growth"],
+                "is_reference": [False, True],
+            }
+        ),
     }
     for record_id, frame in frames.items():
         frame.to_parquet(tables / f"{record_id}.parquet", index=False)
@@ -242,7 +293,13 @@ def _bundle_fixture(tmp_path: Path) -> Path:
             }
             for record_id, artifact_id in reader_bundle.EXPECTED_RECORD_ARTIFACTS.items()
         },
-        "counts": {"design_rows": 2, "bootstrap_draw_rows": 2, "experiments": 1},
+        "counts": {
+            "design_rows": 2,
+            "bootstrap_draw_rows": 2,
+            "well_rows": 2,
+            "trace_rows": 2,
+            "experiments": 1,
+        },
         "artifacts": artifacts,
     }
     (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")

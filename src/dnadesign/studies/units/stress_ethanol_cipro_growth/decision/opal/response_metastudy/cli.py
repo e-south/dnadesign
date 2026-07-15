@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
         "--reader-bundle",
         type=Path,
         required=True,
-        help="Reader response-window bundle using reader.response_window.bundle.v4.",
+        help="Reader response-window bundle using reader.response_window.bundle.v5.",
     )
     parser.add_argument(
         "--candidate-bindings",

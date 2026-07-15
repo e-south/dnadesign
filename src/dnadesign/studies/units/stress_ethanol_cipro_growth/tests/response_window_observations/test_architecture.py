@@ -35,6 +35,7 @@ MODULE_BODY_LIMITS = {
     "display_contract.py": 80,
     "policy.py": 400,
     "reader_bundle.py": 230,
+    "reader_bundle_validation.py": 130,
     "repeat_adjudication.py": 100,
     "repeat_diagnostics.py": 80,
     "sensitivity.py": 100,

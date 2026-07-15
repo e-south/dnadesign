@@ -62,8 +62,8 @@ from .measurement_selection import load_response_measurement_selection
 from .publication import create_staging_dir, publish_staging_dir, remove_staging_dir, sha256_arrays
 from .response_screen import (
     build_response_metric_screen,
-    response_screen_manifest,
 )
+from .response_screen_publication import response_screen_manifest
 from .review_bundle import ReviewBundleEvidence, materialize_review_bundle
 from .run_contracts import assert_shared_label_sources, predictor_parity
 from .selected_reader_rows import build_selected_bootstrap_draws, build_selected_response_labels
@@ -192,6 +192,10 @@ def _materialize_metastudy(
         response_draws,
         all_primary_measurements,
         reader_bundle.events,
+        reader_designs=reader_bundle.designs,
+        reader_wells=reader_bundle.wells,
+        reader_traces=reader_bundle.traces,
+        reference_design_id=reader_bundle.reference_design_id,
         primary_reduction_id=reader_bundle.primary_reduction_id,
         label_ids=response_ids,
         x_train=response_x_train,

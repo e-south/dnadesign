@@ -137,6 +137,8 @@ def _bundle() -> ReaderResponseBundle:
         manifest={"primary_reduction_id": "primary"},
         designs=pd.DataFrame.from_records(design_rows),
         bootstrap_draws=pd.DataFrame.from_records(draw_rows),
+        wells=pd.DataFrame(),
+        traces=pd.DataFrame(),
         events=pd.DataFrame(),
     )
 
