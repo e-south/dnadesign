@@ -23,7 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.re
     save_accessible_svg,
 )
 
-from .plot_support import matrix_text_color, ordered_panel_rows, plot_row, policy_label, short_candidate
+from .plot_support import matrix_text_color, ordered_panel_rows, plot_row, policy_label, short_selected_variant
 from .region_msa_support import REGION_MSA_SUPPORT_REGION_IDS
 from .visual_inventory import SELECTION_PLOT_PLAIN_TITLES
 
@@ -54,7 +54,7 @@ def build_selected_region_msa_support_matrix(
     unobserved_matrix: list[list[int]] = []
     for panel_row in ordered_panel_rows(panel_rows):
         candidate_id = str(panel_row["candidate_id"])
-        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_selected_variant(panel_row)}")
         fractions: list[float | None] = []
         unobserved: list[int] = []
         for region_id in REGION_MSA_SUPPORT_REGION_IDS:

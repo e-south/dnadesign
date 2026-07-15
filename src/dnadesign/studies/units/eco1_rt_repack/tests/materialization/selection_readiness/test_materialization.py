@@ -119,27 +119,29 @@ def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Pat
 def test_quantitative_flow_conserves_every_transition() -> None:
     trace = [
         {"stage_id": "candidate_pool", "input_count": 1007, "removed_count": 0, "remaining_count": 1007},
-        {"stage_id": "local_geometry_screen", "input_count": 1007, "removed_count": 269, "remaining_count": 738},
-        {"stage_id": "design_groups", "input_count": 738, "removed_count": 0, "remaining_count": 738},
+        {"stage_id": "strong_fold_screen", "input_count": 1007, "removed_count": 29, "remaining_count": 978},
+        {"stage_id": "local_geometry_screen", "input_count": 978, "removed_count": 246, "remaining_count": 732},
+        {"stage_id": "design_groups", "input_count": 732, "removed_count": 0, "remaining_count": 732},
         {
             "stage_id": "selected_panel",
-            "input_count": 738,
-            "removed_count": 730,
+            "input_count": 732,
+            "removed_count": 724,
             "remaining_count": 8,
         },
     ]
 
     stages, transitions = quantitative_flow(trace)
 
-    assert [stage.count for stage in stages] == [1007, 738, 738, 8]
-    assert [transition.removed_count for transition in transitions] == [269, 0, 730]
+    assert [stage.count for stage in stages] == [1007, 978, 732, 732, 8]
+    assert [transition.removed_count for transition in transitions] == [29, 246, 0, 724]
     assert all(item.source_count == item.retained_count + item.removed_count for item in transitions)
 
 
 def test_quantitative_flow_rejects_discontinuous_trace() -> None:
     trace = [
         {"stage_id": "candidate_pool", "input_count": 10, "removed_count": 0, "remaining_count": 10},
-        {"stage_id": "local_geometry_screen", "input_count": 9, "removed_count": 2, "remaining_count": 7},
+        {"stage_id": "strong_fold_screen", "input_count": 10, "removed_count": 1, "remaining_count": 9},
+        {"stage_id": "local_geometry_screen", "input_count": 8, "removed_count": 1, "remaining_count": 7},
         {"stage_id": "design_groups", "input_count": 7, "removed_count": 0, "remaining_count": 7},
         {
             "stage_id": "selected_panel",

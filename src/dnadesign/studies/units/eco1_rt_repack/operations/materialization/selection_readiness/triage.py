@@ -14,6 +14,9 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.constants import (
+    STRONG_FOLD_REVIEW_CLASS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
     SAE_WINDOW_SELECTION_THRESHOLD,
     WANG_ALPHA1_CONTEXT_POSITIONS,
@@ -168,6 +171,8 @@ def _hard_gate_status(
         reasons.append("missing_fold_review_row")
     elif str(fold.get("foldcheck_status")) != "accepted":
         reasons.append("foldcheck_status_not_accepted")
+    elif str(fold.get("review_class") or "") != STRONG_FOLD_REVIEW_CLASS:
+        reasons.append("fold_review_class_not_strong")
     if local_structure_review is None:
         reasons.append("missing_local_structure_review")
     else:

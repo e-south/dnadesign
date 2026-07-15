@@ -21,6 +21,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.constants import (
+    STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM,
+    STRONG_FOLD_MIN_MEAN_PLDDT,
+    STRONG_FOLD_REVIEW_CLASS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
 )
@@ -79,7 +84,10 @@ def write_structural_screen(
         float(np.min(x_values)) - x_padding,
         max(float(np.max(x_values)) + x_padding, _LOCAL_GEOMETRY_CUTOFF_ANGSTROM + 0.12),
     )
-    y_limits = (float(np.min(y_values)) - y_padding, float(np.max(y_values)) + y_padding)
+    y_limits = (
+        min(float(np.min(y_values)) - y_padding, STRONG_FOLD_MIN_MEAN_PLDDT - 0.12),
+        max(float(np.max(y_values)) + y_padding, STRONG_FOLD_MIN_MEAN_PLDDT + 0.12),
+    )
 
     fig = plt.figure(figsize=(9.6, 9.6))
     grid = fig.add_gridspec(
@@ -150,22 +158,18 @@ def write_structural_screen(
     ax.set_xlim(x_limits)
     ax.set_ylim(y_limits)
     ax.axvspan(_LOCAL_GEOMETRY_CUTOFF_ANGSTROM, x_limits[1], color="#6E7781", alpha=0.08)
+    ax.axhspan(y_limits[0], STRONG_FOLD_MIN_MEAN_PLDDT, color="#6E7781", alpha=0.05)
     ax.axvline(
         _LOCAL_GEOMETRY_CUTOFF_ANGSTROM,
         color="#57606A",
         linestyle="--",
         linewidth=1.25,
     )
-    ax.text(
-        _LOCAL_GEOMETRY_CUTOFF_ANGSTROM + 0.015,
-        0.975,
-        f"Declared 2.5 {_ANGSTROM} review cutoff",
-        transform=ax.get_xaxis_transform(),
-        ha="left",
-        va="top",
-        fontsize=LEGEND_SIZE + 1.2,
+    ax.axhline(
+        STRONG_FOLD_MIN_MEAN_PLDDT,
         color="#57606A",
-        bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.82, "pad": 1.5},
+        linestyle="--",
+        linewidth=1.25,
     )
     ax.set_xlabel(f"Maximum local {_C_ALPHA} RMSD ({_ANGSTROM})", fontsize=LABEL_SIZE + 2.0)
     ax.set_ylabel("Mean ColabFold pLDDT", fontsize=LABEL_SIZE + 1.7)
@@ -209,7 +213,20 @@ def write_structural_screen(
             label="Selected panel",
         )
     )
-    fig.suptitle("Predicted confidence and local geometry across complete designs", fontsize=19, y=0.98)
+    fig.suptitle("Predicted confidence and local geometry define the structural screen", fontsize=19, y=0.985)
+    fig.text(
+        0.51,
+        0.944,
+        (
+            f"Active gates: mean pLDDT ≥ {STRONG_FOLD_MIN_MEAN_PLDDT:.1f}; "
+            f"WT-runtime {_C_ALPHA} RMSD ≤ {STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM:.2f} {_ANGSTROM}; "
+            f"maximum local {_C_ALPHA} RMSD ≤ {_LOCAL_GEOMETRY_CUTOFF_ANGSTROM:.1f} {_ANGSTROM}"
+        ),
+        ha="center",
+        va="center",
+        fontsize=LEGEND_SIZE + 0.6,
+        color="#3F464D",
+    )
     legend_ax.legend(
         handles=handles,
         frameon=False,
@@ -221,25 +238,35 @@ def write_structural_screen(
         bbox_to_anchor=(0.02, 0.48),
         handletextpad=0.45,
     )
-    fig.subplots_adjust(left=0.12, right=0.95, bottom=0.10, top=0.92)
+    fig.subplots_adjust(left=0.12, right=0.95, bottom=0.10, top=0.90)
     _assert_marginal_axes_aligned(main_ax=ax, top_ax=top_ax, right_ax=right_ax)
 
-    passed_count = sum(
+    local_pass_count = sum(
         1
         for row in plotted_rows
         if float(row["local_structure_max_gated_ca_rmsd_angstrom"]) <= _LOCAL_GEOMETRY_CUTOFF_ANGSTROM
     )
+    strong_count = sum(1 for row in plotted_rows if str(row.get("fold_review_class") or "") == STRONG_FOLD_REVIEW_CLASS)
+    joint_pass_count = sum(
+        1
+        for row in plotted_rows
+        if str(row.get("fold_review_class") or "") == STRONG_FOLD_REVIEW_CLASS
+        and float(row["local_structure_max_gated_ca_rmsd_angstrom"]) <= _LOCAL_GEOMETRY_CUTOFF_ANGSTROM
+    )
     alt_text = (
         f"Landscape scatter plot of {len(plotted_rows)} complete ProteinMPNN sequences. The x-axis is maximum "
         "local C-alpha RMSD across protected review regions and the y-axis is mean ColabFold pLDDT. Marginal "
-        "histograms show each distribution by generation policy. "
-        f"Of these, {passed_count} lie at or below the declared 2.5 A cutoff, and selected panel rows have black "
-        "outlines."
+        "histograms show each distribution by generation policy. Dashed lines mark the active mean-pLDDT threshold "
+        f"of {STRONG_FOLD_MIN_MEAN_PLDDT:.1f} and maximum-local-RMSD threshold of "
+        f"{_LOCAL_GEOMETRY_CUTOFF_ANGSTROM:.1f} A. The strong fold class also requires WT-runtime C-alpha RMSD at "
+        f"or below {STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM:.2f} A. {strong_count} sequences meet the strong "
+        f"fold definition, {local_pass_count} meet the local-geometry threshold, and {joint_pass_count} meet both. "
+        "Selected panel rows have black outlines."
     )
     save_accessible_svg(
         fig,
         path,
-        title="Predicted confidence and local geometry across complete designs",
+        title="Predicted confidence and local geometry define the structural screen",
         description=alt_text,
     )
     return make_deliverable_row(
@@ -257,8 +284,9 @@ def write_structural_screen(
         ),
         alt_text=alt_text,
         description=(
-            "Uses the local RMSD quantity that controls the structural screen and shows pLDDT as model-confidence "
-            "context. Marginal histograms expose the policy-specific distributions without covering the scatter."
+            "Shows the active mean-pLDDT and local-RMSD thresholds. The strong fold class also requires WT-runtime "
+            "C-alpha RMSD at or below 1.25 A, which is recorded but not plotted on the local-RMSD x-axis. Marginal "
+            "histograms expose policy-specific distributions without covering the scatter."
         ),
         interpretation_limit=(
             "pLDDT and local RMSD assess predicted structural plausibility. They do not measure RT activity, "
@@ -268,12 +296,15 @@ def write_structural_screen(
         role=COMMUNICATION_ROLE,
         render_mode="standard_visual",
         method_summary=(
-            "Each ColabFold model is aligned once to the mapped reference. The x-axis is the maximum residual local "
-            "C-alpha RMSD across non-distal review regions; the dashed line is the declared 2.5 A review cutoff."
+            "Each ColabFold model is aligned once to the mapped reference. Eligibility requires the strong fold "
+            "class (mean pLDDT at least 91.5 and WT-runtime C-alpha RMSD at most 1.25 A) and maximum residual local "
+            "C-alpha RMSD at most 2.5 A across non-distal review regions."
         ),
         evidence_summary={
             "candidate_count": len(plotted_rows),
-            "at_or_below_cutoff": passed_count,
+            "strong_fold_count": strong_count,
+            "local_geometry_pass_count": local_pass_count,
+            "joint_structural_pass_count": joint_pass_count,
             "selected_panel_count": len(selected_plotted),
         },
     )

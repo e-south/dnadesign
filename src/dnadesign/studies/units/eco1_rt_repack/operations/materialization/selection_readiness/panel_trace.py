@@ -14,6 +14,9 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.constants import (
+    STRONG_FOLD_REVIEW_CLASS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
     COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
     DISTAL_SCAFFOLD_POLICY_ID,
@@ -32,6 +35,7 @@ def build_selected_panel_trace_rows(
     """Return the row-reducing screen, design groups, and final selection."""
 
     all_rows = list(triage_rows)
+    strong_fold_rows = [row for row in all_rows if str(row.get("fold_review_class") or "") == STRONG_FOLD_REVIEW_CLASS]
     geometry_rows = [row for row in all_rows if str(row.get("hard_gate_status") or "") == "eligible"]
     contract_rows = [row for row in all_rows if bool(row.get("selection_contract_pass"))]
     if {str(row["candidate_id"]) for row in geometry_rows} != {str(row["candidate_id"]) for row in contract_rows}:
@@ -39,6 +43,10 @@ def build_selected_panel_trace_rows(
             "The visible Eco1 selection flow assumes generation chemistry and support are invariants among "
             "local-geometry-pass rows."
         )
+    if not {str(row["candidate_id"]) for row in geometry_rows}.issubset(
+        {str(row["candidate_id"]) for row in strong_fold_rows}
+    ):
+        raise ValueError("The local-geometry-pass pool contains rows outside the declared strong-fold class.")
     policy_counts = Counter(str(row.get("policy_id") or "") for row in contract_rows)
     selected_policy_counts = Counter(str(row.get("policy_id") or "") for row in panel_rows)
     count_fields = {
@@ -64,6 +72,20 @@ def build_selected_panel_trace_rows(
         ),
         _trace_row(
             stage_order=2,
+            stage_id="strong_fold_screen",
+            stage_label="Strong ColabFold models",
+            selector_role="fold_confidence_screen",
+            method=(
+                "Keep sequences classified as strong folds: mean pLDDT at least 91.5 and WT-runtime C-alpha RMSD "
+                "at most 1.25 A."
+            ),
+            input_count=len(all_rows),
+            remaining_count=len(strong_fold_rows),
+            is_hard_gate=True,
+            **count_fields,
+        ),
+        _trace_row(
+            stage_order=3,
             stage_id="local_geometry_screen",
             stage_label="Local geometry retained",
             selector_role="structural_screen",
@@ -71,13 +93,13 @@ def build_selected_panel_trace_rows(
                 "Keep sequences that retain fixed-position and generation-chemistry constraints and remain at or "
                 "below the declared 2.5 A local C-alpha RMSD review cutoff in every non-distal region."
             ),
-            input_count=len(all_rows),
+            input_count=len(strong_fold_rows),
             remaining_count=len(contract_rows),
             is_hard_gate=True,
             **count_fields,
         ),
         _trace_row(
-            stage_order=3,
+            stage_order=4,
             stage_id="design_groups",
             stage_label="Distal, peripheral, and combined groups",
             selector_role="experimental_design",
@@ -91,7 +113,7 @@ def build_selected_panel_trace_rows(
             **count_fields,
         ),
         _trace_row(
-            stage_order=4,
+            stage_order=5,
             stage_id="selected_panel",
             stage_label="Eight selected sequences",
             selector_role="within_group_mutation_set_selection",

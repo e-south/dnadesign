@@ -69,7 +69,7 @@ def validate_panel_shape(rows: list[dict[str, Any]]) -> None:
     policy_counts = Counter(str(row.get("policy_id")) for row in rows)
     if dict(policy_counts) != EXPECTED_SELECTED_POLICY_COUNTS:
         raise ValueError(f"candidate selection panel has invalid policy counts: {dict(policy_counts)}")
-    for field in ("candidate_id", "selection_slot", "sequence_hash"):
+    for field in ("variant_id", "candidate_id", "selection_slot", "sequence_hash"):
         values = [str(row.get(field)) for row in rows]
         if len(set(values)) != SELECTED_PANEL_SIZE or "None" in values:
             raise ValueError(f"candidate selection panel requires {SELECTED_PANEL_SIZE} unique {field} values")

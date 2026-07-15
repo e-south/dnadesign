@@ -91,7 +91,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         write_svg(plot_root / f"{plot_id}.svg", plot_id=plot_id, title=title)
     payload = {
         "schema_id": "eco1_rt.selection_readiness_manifest",
-        "schema_version": 3,
+        "schema_version": 4,
         "status": "materialized",
         "selection_policy_id": SELECTION_POLICY_ID,
         "governing_rule": (
@@ -117,6 +117,7 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
         },
         "selection_funnel_stages": SELECTION_FUNNEL_STAGES,
         "selected_candidate_ids": ["thread_candidate_alpha", "thread_candidate_beta"],
+        "selected_variant_ids": [str(row["variant_id"]) for row in panel_rows],
         "panel_coverage": {"selected_panel_size": 2},
         "panel_tie_break_order": PANEL_TIE_BREAK_ORDER,
         "handoff_readiness": {

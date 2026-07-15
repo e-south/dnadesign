@@ -798,6 +798,7 @@ datasets:
     description: >-
       Materialized v3 table joining generation-policy provenance, mutation geography,
       charge events, regional MSA support, fold fields, and local C-alpha RMSD.
+      Selection requires the strong fold class before the local-geometry rule.
       It is a review table, not a combined activity score.
   - id: eco1_rt_local_structure_region_metrics
     owner: eco1_rt_repack
@@ -820,10 +821,12 @@ datasets:
     status: materialized
     description: >-
       Materialized selected panel built from v3 rows that pass the generation
-      constraints and local-backbone rule. Exact F10/R13 substitutions and the
-      Wang R13A evidence match are reported but do not filter or rank rows. The
-      RT-msDNA oligomeric state is not established. The panel contains two distal, three peripheral, and three
-      combined sequences. The first pair in each group maximizes
+      constraints, strong-fold rule, and local-backbone rule. Exact F10/R13
+      substitutions and the Wang R13A evidence match are reported but do not
+      filter or rank rows. The RT-msDNA oligomeric state is not established.
+      The panel contains two distal, three peripheral, and three combined
+      sequences with stable Eco1RT-G3-D, Eco1RT-G3-P, and Eco1RT-G3-DP aliases.
+      The first pair in each group maximizes
       mutated-position Jaccard distance and then exact-substitution Jaccard
       distance; each third peripheral or combined row maximizes its minimum
       distance from that pair. Policy allocation defines experimental
@@ -836,7 +839,8 @@ datasets:
     description: >-
       Flat reviewer-facing canonical 320-aa RT protein sequence table for all
       eight selected sequences. It records the mapped 309-aa source sequence,
-      both sequence hashes, compact substitutions, and explicit not-DNA status.
+      stable variant alias, both sequence hashes, compact substitutions, and
+      explicit not-DNA status.
   - id: eco1_rt_twist_full_cds_handoff
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -845,9 +849,10 @@ datasets:
     description: >-
       Hash-linked handoff for all eight selected 963-bp Eco1 RT CDS designs.
       The bundle includes a Twist CSV, FASTA, and one annotated GenBank file per
-      candidate. It reports exact F10/R13 states, the Wang R13A evidence match,
-      and unresolved RT-msDNA assembly state. Internal BsaI and BsmBI sites are
-      absent. The substitution-only codon policy records E. coli K-12 MG1655 as
+      candidate using the stable Eco1RT-G3 aliases. It reports exact F10/R13
+      states, the Wang R13A evidence match, and unresolved RT-msDNA assembly
+      state. Internal BsaI and BsmBI sites are absent. The substitution-only
+      codon policy records E. coli K-12 MG1655 as
       the assay host and cites the exact Kazusa E. coli K-12 codon-frequency
       record used for changed residues. Assembly flanks and the live vendor
       complexity check remain pending.

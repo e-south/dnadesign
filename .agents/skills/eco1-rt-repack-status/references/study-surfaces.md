@@ -326,11 +326,12 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   checks before MSA execution. It passes locally for the regenerated Ec86
   clade 9 and II-A3/`42_1` source FASTA bundles.
 - The active v3 policy, 1007-row candidate pool, ColabFold report, fold review,
-  `1007 -> 738 -> 335/226/177 -> 8` selection trace, selected panel, and RT-only
-  sequence export are materialized under the v3 policy hash. Selection uses one
-  non-distal local-geometry cutoff and deterministic greedy farthest-first
-  mutation-set distance. Charge is a reported design contrast, not an activity
-  score. ESMC and SAE are optional review context and do not select rows. The
+  `1007 -> 978 -> 732 -> 335/220/177 -> 8` selection trace, selected panel, and
+  RT-only sequence export are materialized under the v3 policy hash. Selection
+  requires the strong fold class and one non-distal local-geometry cutoff, then
+  uses deterministic greedy farthest-first mutation-set distance. Charge is a
+  reported design contrast, not an activity score. ESMC and SAE are optional
+  review context and do not select rows. The
   executable generic surfaces are the ProteinMPNN adapter, candidate-table
   package, optional model adapters, ColabFold normalizer, structure registry,
   and fold-check contract package.

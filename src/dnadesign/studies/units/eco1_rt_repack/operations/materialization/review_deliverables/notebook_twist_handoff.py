@@ -25,9 +25,9 @@ def render_twist_handoff(row: dict[str, Any], *, mo: Any, manifest_path: Path) -
     if (
         not isinstance(loaded, dict)
         or loaded.get("schema_id") != "eco1_rt.twist_full_cds_handoff"
-        or loaded.get("schema_version") != 2
+        or loaded.get("schema_version") != 3
     ):
-        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff schema version 2 at {manifest_path}")
+        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff schema version 3 at {manifest_path}")
     assay_host = dict(loaded.get("assay_host") or {})
     codon_policy = dict(loaded.get("codon_policy") or {})
     codon_source = dict(codon_policy.get("codon_table_source") or {})

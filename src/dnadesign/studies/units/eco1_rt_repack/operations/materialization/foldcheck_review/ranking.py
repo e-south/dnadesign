@@ -19,6 +19,9 @@ import pyarrow.parquet as pq
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.constants import (
     FOLDCHECK_RANKING_SCHEMA_ID,
+    STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM,
+    STRONG_FOLD_MIN_MEAN_PLDDT,
+    STRONG_FOLD_REVIEW_CLASS,
     WT_SEQUENCE_ID,
 )
 from dnadesign.thread.adapters.colabfold.metrics import ca_coordinates, ca_rmsd
@@ -257,8 +260,8 @@ def _review_class(*, plddt: float | None, wt_runtime_ca_rmsd: float | None) -> s
         return "structural_outlier"
     if plddt < 90.0:
         return "low_confidence"
-    if wt_runtime_ca_rmsd <= 1.25 and plddt >= 91.5:
-        return "strong_fold_preserved"
+    if wt_runtime_ca_rmsd <= STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM and plddt >= STRONG_FOLD_MIN_MEAN_PLDDT:
+        return STRONG_FOLD_REVIEW_CLASS
     if wt_runtime_ca_rmsd <= 2.0:
         return "good_fold_preserved"
     return "review_band"

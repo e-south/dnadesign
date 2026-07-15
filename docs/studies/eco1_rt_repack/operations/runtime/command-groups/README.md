@@ -32,10 +32,11 @@ src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/ou
 ```
 
 The full v3 path is materialized: 1007 unique ProteinMPNN candidates, ColabFold
-models, fold review, 738 local-geometry pass rows, three policy comparison
-pools, one eight-row selected panel, review plots, canonical selected proteins,
-and exact full-CDS Twist handoff sequences for all eight rows. Every downstream
-stage must match the v3 policy version and manifest hash.
+models, fold review, 978 strong-class rows, 732 rows that also pass local
+geometry, three policy comparison pools, one eight-row selected panel, review
+plots, canonical selected proteins, and exact full-CDS Twist handoff sequences
+for all eight rows. Every downstream stage must match the v3 policy version and
+manifest hash.
 
 ### 1. Materialize Policies And Requests
 
@@ -137,10 +138,10 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
   --output-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3
 ```
 
-Fold confidence and global RMSD are review evidence. The active structural
-filter is one rule: every named non-distal local region must be at or below the
-declared 2.5 A cutoff after one global mapped C-alpha fit. Distal RMSD is
-reported only.
+The active structural screen first requires the strong class: mean pLDDT at
+least 91.5 and same-run candidate-to-WT C-alpha RMSD at most 1.25 A. Every
+named non-distal local region must then be at or below the declared 2.5 A
+cutoff after one global mapped C-alpha fit. Distal RMSD is reported only.
 
 ### 6. Select The Panel
 
@@ -150,8 +151,9 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
   --output-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3
 ```
 
-The visible flow is complete candidates, local-geometry pass, assignment to the
-distal, peripheral, and combined policy pools, and the eight-row selected panel.
+The visible flow is complete candidates, strong-class models, local-geometry
+pass, assignment to the distal, peripheral, and combined policy pools, and the
+eight-row selected panel.
 The first pair in each policy maximizes
 mutated-position Jaccard distance before exact-substitution distance. Each third
 peripheral or combined row maximizes minimum distance from the corresponding
@@ -204,9 +206,11 @@ reference. Distal, peripheral, and combined chapters open and close one model
 at a time. Each frame reports exact full-length WT sequence identity and
 substitution count, with evenly distributed candidate dwell time. These values
 describe sequence change rather than predicted function. Candidate sticks show
-all modeled side chains rather than mutation-only highlights. The 269 models outside the local review cutoff remain in the
-quantitative funnel but are not presented as poor folds; all 1,007 ColabFold
-models belong to accepted strong- or good-fold review classes.
+all modeled side chains rather than mutation-only highlights. The movie is a
+local-geometry visualization, so it includes six good-class peripheral models
+that are not eligible for final selection. All 1,007 ColabFold model files were
+parsed; the active funnel excludes 29 good-class rows before applying the local
+review.
 `selected-electrostatics` gives the reference and each selected model one full
 turn with an opaque protein surface and a fixed unit-bearing Coulombic scale.
 Each target starts 180 degrees from the approved interactive pose, completes

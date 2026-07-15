@@ -19,7 +19,8 @@ This study compares WT Eco1 RT with complete ProteinMPNN-designed sequences
 that either repack distal scaffold positions, redesign a non-acidifying,
 MSA-supported peripheral nucleic-acid-facing shell, or do both, while keeping
 declared catalytic, direct-contact, Wang thumb-track, and mapped residues
-255-311 fixed and requiring preserved predicted local backbone geometry.
+255-311 fixed and requiring the declared strong ColabFold class plus preserved
+predicted local backbone geometry.
 
 The selected rows are protein hypotheses. The method does not establish
 activity, affinity, processivity, strand displacement, or safety.
@@ -30,7 +31,7 @@ Selection requires:
 
 1. complete ProteinMPNN sequences with one v3 policy id and matching policy
    manifest hash;
-2. accepted ColabFold models with pLDDT and reference-alignment metrics;
+2. ColabFold models with pLDDT and reference-alignment metrics;
 3. local C-alpha RMSD by named region after one global mapped fit;
 4. canonical mutation positions and exact substitutions;
 5. peripheral charge events and regional MSA support;
@@ -41,22 +42,31 @@ select rows.
 
 ### Visible Selection Flow
 
-The notebook and manifest show four stages:
+The notebook and manifest show five stages:
 
 1. **Accepted sequences**: complete, provenance-linked ProteinMPNN outputs.
-2. **Constraint and local geometry pass**: rows retaining the generation
+2. **Strong ColabFold models**: mean pLDDT at or above 91.5 and same-run
+   candidate-to-WT C-alpha RMSD at or below 1.25 A.
+3. **Constraint and local geometry pass**: rows retaining the generation
    invariants and local C-alpha RMSD at or below 2.5 A in every non-distal
    review region.
-3. **Design groups**: assign passing rows to distal, peripheral, or combined
+4. **Design groups**: assign passing rows to distal, peripheral, or combined
    groups by their complete generation policy. This is experimental-design
    assignment, not a quality gate.
-4. **Selected panel**: retain two distal, three peripheral, and three combined
+5. **Selected panel**: retain two distal, three peripheral, and three combined
    sequences. Within each group, use mutated-position and exact-substitution
    distance, followed by the declared late evidence.
 
 Protected-position checks that remove no rows are recorded as invariants in the
-candidate table. The chemistry and support stage remains visible because it
-validates the declared generation contract.
+candidate table. Chemistry and support checks validate the generation contract
+but do not appear as row-reducing stages because they remove no v3 rows.
+
+### Strong Fold Rule
+
+The strong class requires both mean pLDDT at or above 91.5 and same-run
+candidate-to-WT C-alpha RMSD at or below 1.25 A. These are declared review
+thresholds, not functional boundaries. They remove 29 good-class rows before
+the local-geometry rule.
 
 ### Local Geometry Rule
 

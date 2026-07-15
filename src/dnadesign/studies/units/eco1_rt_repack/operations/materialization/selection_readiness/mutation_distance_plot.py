@@ -25,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.plot_support import (
     ordered_panel_rows,
     plot_row,
+    short_selected_variant,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     SELECTION_PLOT_PLAIN_TITLES,
@@ -317,14 +318,7 @@ def _hamming_distance(left: str, right: str) -> int:
 
 
 def _selected_label(row: dict[str, object]) -> str:
-    policy_id = str(row.get("policy_id") or "")
-    prefix = {
-        "distal_scaffold_repack_v1": "D",
-        "near_dna_rna_acid_free_v1": "P",
-        "combined_near_acid_free_plus_distal_v1": "C",
-    }.get(policy_id, "V")
-    rank = int(row.get("within_group_rank") or row.get("selection_rank") or 0)
-    return f"{prefix}{rank}"
+    return short_selected_variant(row)
 
 
 __all__ = [

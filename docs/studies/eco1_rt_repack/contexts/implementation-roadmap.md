@@ -56,11 +56,12 @@ artifact mechanics must use public `dnadesign.thread` APIs.
 
 5. **Fold and local-structure evidence**
    - Normalize one ColabFold model per candidate and the WT control.
+   - Require the strong class: mean pLDDT at least 91.5 and same-run candidate-to-WT C-alpha RMSD at most 1.25 A.
    - Fit mapped C-alpha coordinates once, then calculate residual RMSD for each named region.
    - Apply one declared 2.5 A cutoff to all non-distal review regions; retain distal RMSD as review context.
 
 6. **Selection**
-   - Keep accepted fold models that pass the local-geometry contract.
+   - Keep strong-class fold models that pass the local-geometry contract.
    - Validate the declared peripheral chemistry and proximal MSA support.
    - Report exact F10/R13 substitutions and the Wang R13A evidence match without filtering or ranking by them.
    - Assign selection-contract rows to distal, peripheral, and combined policy pools without treating policy as quality.
@@ -77,9 +78,10 @@ artifact mechanics must use public `dnadesign.thread` APIs.
    - Export RT-only protein sequences and hashes.
    - Do not claim DNA, codon, restriction-site, construct, or assay readiness until the owning downstream stage materializes those records.
 
-The materialized v3 flow is `1007` accepted sequences, `738` local-geometry
-and generation-contract pass rows, policy pools of `335` distal, `226`
-peripheral, and `177` combined rows, followed by one eight-row selected panel.
+The materialized v3 flow is `1007` accepted sequences, `978` strong-class
+models, `732` rows that also pass local geometry and the generation contract,
+policy pools of `335` distal, `220` peripheral, and `177` combined rows,
+followed by one eight-row selected panel.
 These counts come from candidate,
 local-geometry, and selection tables rather than request totals.
 

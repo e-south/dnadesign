@@ -15,9 +15,9 @@ This study compares WT Eco1 RT with complete ProteinMPNN-designed sequences
 that either repack distal scaffold positions, redesign a non-acidifying,
 MSA-supported peripheral nucleic-acid-facing shell, or do both, while keeping
 declared catalytic, direct-contact, Wang thumb-track, and mapped residues
-255-311 fixed, requiring preserved predicted local backbone geometry, and
-reporting substitutions at the Wang-described alpha-1 protomer interface for
-review.
+255-311 fixed, requiring a declared strong ColabFold class and preserved
+predicted local backbone geometry, and reporting substitutions at the
+Wang-described alpha-1 protomer interface for review.
 
 The study does not claim improved activity, affinity, processivity, strand
 displacement, safety, or a monomeric RT-msDNA assembly state.
@@ -29,7 +29,7 @@ displacement, safety, or a monomeric RT-msDNA assembly state.
 | Structure and residue map | Define Eco1 numbering and retained DNA/RNA geometry. |
 | Conservation and generation-policy records | Define fixed positions, open positions, and allowed amino acids. |
 | ProteinMPNN pool | Supply complete sequence proposals, not mutation parts or functional predictions. |
-| ColabFold and local RMSD | Identify predicted global or regional structural disruption. |
+| ColabFold and local RMSD | Screen model confidence, whole-model similarity, and regional backbone disruption. |
 | Chemistry and MSA audit | Describe mutation geography, charge events, and homolog support without scoring activity. |
 | Panel selection | Reduce mutation-set overlap within the distal, peripheral, and combined groups. |
 | Notebook and sequence export | Expose the trace, structures, and complete protein hypotheses without adding criteria. |
@@ -49,12 +49,19 @@ local-structure review, and eight-sequence selection are materialized under
 The selection flow is:
 
 1. `1007` accepted complete ProteinMPNN sequences;
-2. `738` sequences retaining the generation constraints and local C-alpha RMSD
-   at or below the declared `2.5 A` cutoff in every non-distal review region
-   after one global mapped fit;
-3. three design groups containing `335` distal, `226` peripheral, and `177`
+2. `978` sequences in the declared strong ColabFold class, defined as mean
+   pLDDT at or above `91.5` and same-run candidate-to-WT C-alpha RMSD at or
+   below `1.25 A`;
+3. `732` sequences that also retain the generation constraints and local
+   C-alpha RMSD at or below `2.5 A` in every non-distal review region after one
+   global mapped fit;
+4. three design groups containing `335` distal, `220` peripheral, and `177`
    combined rows; group assignment does not remove rows;
-4. eight selected sequences: two distal, three peripheral, and three combined.
+5. eight selected sequences: two distal, three peripheral, and three combined.
+
+The three structural thresholds are declared review choices, not
+literature-derived functional boundaries. The pLDDT and same-run WT RMSD rules
+define the strong class; the `2.5 A` value is a separate regional RMSD rule.
 
 The two distal rows contain `16-17` substitutions and no peripheral-shell
 changes. The three peripheral rows contain `32-35` substitutions, all in the
@@ -103,9 +110,10 @@ context surface. Active residues override that background with `8%`
 transparency, matching cartoon colors, and thicker side-chain sticks. The
 qualitative Coulombic movie uses an opaque protein
 surface and one fixed `-10` to `+10 kcal/(mol e)` scale at `298 K`. All `1,007`
-ColabFold models were accepted as preserved folds: `978` are in the strong-fold
-review class and `29` are in the good-fold review class. There is no rejected
-fold class to animate as a failure comparison. The proposal movie therefore
+ColabFold models were parsed successfully: `978` are in the strong-fold review
+class and `29` are in the good-fold review class. Selection requires the strong
+class. There is no failed model-output class to animate as a failure
+comparison. The proposal movie therefore
 fits the `738` models retained by the local-geometry review to one cryo-EM
 reference over the same `309` mapped C-alpha atoms. One centered stream cycles
 the distal, peripheral, and combined chapters, and at most two atomic models
@@ -180,9 +188,11 @@ mutation plot reports that boundary separately.
 The visible flow separates eligibility from experimental design:
 
 1. accepted complete sequences;
-2. one constraint and local-geometry rule across all non-distal review regions;
-3. assignment of passing rows to the three design groups;
-4. mutation-set selection of two distal, three peripheral, and three combined
+2. the strong ColabFold class: mean pLDDT at or above `91.5` and same-run
+   candidate-to-WT C-alpha RMSD at or below `1.25 A`;
+3. one local-geometry rule across all non-distal review regions;
+4. assignment of passing rows to the three design groups;
+5. mutation-set selection of two distal, three peripheral, and three combined
    sequences.
 
 Protected-position, direct-contact, Wang-track, acidic-gain, and proximal MSA
@@ -232,9 +242,14 @@ Primary citations and their narrow study roles are listed in
 ### Selected Panel
 
 The selected panel contains eight sequences: two distal, three peripheral, and
-three combined. Exact candidate ids, ranks, mutation counts, and sequence hashes
-are read from `selection/candidate_selection_panel.parquet`; they are not
-duplicated here.
+three combined. Stable aliases are `Eco1RT-G3-D01` and `Eco1RT-G3-D02`,
+`Eco1RT-G3-P01` through `Eco1RT-G3-P03`, and `Eco1RT-G3-DP01` through
+`Eco1RT-G3-DP03`. `G3` records the generation-policy version; `D`, `P`, and
+`DP` identify distal, peripheral, and combined redesign. The two-digit suffix
+is the deterministic within-group selection order, not a predicted quality
+rank. Use `Eco1RT-WT` for the unchanged experimental reference. Candidate ids,
+sequence hashes, mutations, and alias mappings are authoritative in
+`selection/candidate_selection_panel.parquet`.
 
 A panel required to share a monomerization intervention would need R13A fixed
 in every complete generation policy, followed by fold review of those new
@@ -258,8 +273,10 @@ codon optimization is disabled. The handoff hashes the codon table with its
 other inputs.
 
 The bundle contains one upload CSV, one FASTA, and one annotated GenBank file
-per candidate. GenBank variation features use compact amino-acid labels such as
-`A47K`. The manifest reports global and 50-bp-window GC measurements, maximum
+per candidate. FASTA records and GenBank filenames use the stable
+`Eco1RT-G3-*` aliases; the handoff manifest retains candidate ids and hashes.
+GenBank variation features use compact amino-acid labels such as `A47K`. The
+manifest reports global and 50-bp-window GC measurements, maximum
 homopolymer length, repeated 20-mer count, internal BsaI/BsmBI checks, exact
 F10/R13 states, the Wang R13A evidence match, and the unresolved RT-msDNA
 assembly state for every ordered sequence.

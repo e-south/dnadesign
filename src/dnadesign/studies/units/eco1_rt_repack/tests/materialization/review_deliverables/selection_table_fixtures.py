@@ -22,6 +22,7 @@ def panel_row(
     na_facing: int,
     chemistry_warnings: int,
 ) -> dict[str, object]:
+    rank = int(slot.rsplit("_", 1)[-1])
     trace_json = (
         f'{{"selection_support_alt_observed_fraction": {msa_fraction}, '
         f'"selection_support_unobserved_mutation_count": 1, '
@@ -42,17 +43,19 @@ def panel_row(
         f'"distal_scaffold_mutation_count": {mutation_count}}}'
     )
     return {
+        "variant_id": f"Eco1RT-G3-T{rank:02d}",
         "selection_slot": slot,
         "candidate_id": candidate_id,
         "policy_id": policy_id,
         "design_group_id": "peripheral_shell_repack",
-        "within_group_rank": int(slot.rsplit("_", 1)[-1]),
-        "selection_rank": int(slot.rsplit("_", 1)[-1]),
+        "within_group_rank": rank,
+        "selection_rank": rank,
         "selection_contract_pass": True,
         "fold_review_class": "strong_fold_preserved",
         "mutation_count_total": mutation_count,
         "canonical_mutations": [f"A{position}G" for position in range(1, mutation_count + 1)],
         "mean_plddt": 92.4,
+        "wt_runtime_ca_rmsd": 0.82,
         "local_structure_max_gated_ca_rmsd_angstrom": 1.8,
         "within_group_nearest_mutated_position_jaccard_distance": 0.4,
         "within_group_nearest_exact_substitution_jaccard_distance": 0.7,

@@ -290,9 +290,9 @@ def _twist_handoff_row(*, output_root: Path, manifest_path: Path) -> dict[str, A
     if (
         not isinstance(loaded, dict)
         or loaded.get("schema_id") != "eco1_rt.twist_full_cds_handoff"
-        or loaded.get("schema_version") != 2
+        or loaded.get("schema_version") != 3
     ):
-        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff schema version 2 at {manifest_path}")
+        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff schema version 3 at {manifest_path}")
     sequence_count = len(list(loaded.get("sequences") or []))
     return make_deliverable_row(
         deliverable_id=_TWIST_HANDOFF_DELIVERABLE_ID,

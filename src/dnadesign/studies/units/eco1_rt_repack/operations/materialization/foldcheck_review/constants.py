@@ -40,3 +40,6 @@ FULL_STRUCTURE_SET_SCHEMA_ID = "eco1_rt.foldcheck_full_structure_set"
 ATLAS_SUBSET_SCHEMA_ID = "eco1_rt.atlas_subset_manifest"
 VISUAL_MANIFEST_SCHEMA_ID = "eco1_rt.foldcheck_review_visual_manifest"
 WT_SEQUENCE_ID = "wild_type"
+STRONG_FOLD_REVIEW_CLASS = "strong_fold_preserved"
+STRONG_FOLD_MIN_MEAN_PLDDT = 91.5
+STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM = 1.25

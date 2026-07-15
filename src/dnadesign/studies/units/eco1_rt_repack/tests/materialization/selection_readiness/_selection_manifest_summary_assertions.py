@@ -68,12 +68,17 @@ def assert_selection_summary_and_trace(
     funnel_stages = manifest["selection_funnel_stages"]
     assert [row["stage_id"] for row in funnel_stages] == [
         "candidate_pool",
+        "strong_fold_screen",
         "local_geometry_screen",
         "design_groups",
         "selected_panel",
     ]
     stage_by_id = {row["stage_id"]: row for row in funnel_stages}
     assert stage_by_id["candidate_pool"]["remaining_count"] == len(triage)
+    assert stage_by_id["strong_fold_screen"]["remaining_count"] == sum(
+        row["fold_review_class"] == "strong_fold_preserved" for row in triage
+    )
+    assert stage_by_id["local_geometry_screen"]["remaining_count"] == len(contract_rows)
     assert stage_by_id["design_groups"]["remaining_count"] == len(contract_rows)
     assert stage_by_id["design_groups"]["selector_role"] == "experimental_design"
     assert stage_by_id["selected_panel"]["remaining_count"] == len(panel)
@@ -99,8 +104,16 @@ def assert_selection_summary_and_trace(
 
 
 def assert_local_structure_manifest(manifest: dict[str, Any]) -> None:
-    assert "hard_gate_allowed_fold_classes" not in manifest
-    assert "default_excluded_fold_classes" not in manifest
+    assert manifest["fold_review_threshold_policy"] == {
+        "required_review_class": "strong_fold_preserved",
+        "minimum_mean_plddt": 91.5,
+        "maximum_wt_runtime_ca_rmsd_angstrom": 1.25,
+        "interpretation": (
+            "This is a declared model-review class, not a literature-derived functional boundary. The "
+            "WT-runtime RMSD is a whole-model comparison metric and is distinct from the regional local RMSD "
+            "gate."
+        ),
+    }
     assert "local_structure_rmsd_threshold_policy" in manifest
     source_basis_by_id = {row["id"]: row for row in manifest["local_structure_source_basis"]}
     assert source_basis_by_id["tao_et_al_2026_functional_residue_preservation"]["source_ref"] == (

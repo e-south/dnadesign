@@ -15,6 +15,7 @@ import json
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel_contract import (
     SELECTION_POLICY_ID,
+    variant_id_for_policy,
 )
 
 
@@ -30,7 +31,8 @@ def build_panel_row(
     """Return one selected-panel row with trace fields kept in one schema owner."""
 
     reason = (
-        "Selected after the declared fixed-position, generation-chemistry, and local-geometry checks. Within "
+        "Selected after the declared fixed-position, generation-chemistry, strong-fold, and local-geometry checks. "
+        "Within "
         "each generation policy, the first pair maximizes mutated-position Jaccard distance and then exact-"
         "substitution distance. A third row, where allocated, maximizes its minimum distance from that pair. "
         "Chemistry counts, regional MSA support, local RMSD, fold metrics, and sequence hash are available only "
@@ -118,10 +120,13 @@ def build_panel_row(
         "cryoem_mapped_ca_rmsd": row["cryoem_mapped_ca_rmsd"],
         "sae_window_status": row["sae_window_status"],
     }
+    policy_id = str(row.get("policy_id") or "")
+    variant_id = variant_id_for_policy(policy_id=policy_id, within_group_rank=within_group_rank)
     return {
+        "variant_id": variant_id,
         "candidate_id": row["candidate_id"],
         "sequence_hash": row["sequence_hash"],
-        "policy_id": row.get("policy_id"),
+        "policy_id": policy_id,
         "primary_policy_id": row.get("primary_policy_id"),
         "selection_support_policy_id": row.get("selection_support_policy_id"),
         "selection_support_policy_source": row.get("selection_support_policy_source"),

@@ -37,7 +37,7 @@ from .plot_support import (
     plot_row,
     policy_label,
     position_tick_indices,
-    short_candidate,
+    short_selected_variant,
     tie_break_trace,
 )
 from .review_axes import (
@@ -96,7 +96,7 @@ def build_regional_mutation_burden_matrix(
                     counts[4] += 1
         else:
             counts.insert(3, boundary_count)
-        row_labels.append(f"{_short_group_label(panel_row)}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{_short_group_label(panel_row)}  {short_selected_variant(panel_row)}")
         matrix.append(counts)
     return region_labels, row_labels, matrix
 
@@ -135,7 +135,7 @@ def write_selected_substitutions_across_rt_plot(
             if position in position_index:
                 values[position_index[position]] = mutation_category(str(parsed["wt"]), str(parsed["alt"]))
         matrix.append(values)
-        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_selected_variant(panel_row)}")
     if not matrix:
         raise ValueError("selected-substitution plot requires selected candidates")
     fig, ax = plt.subplots(figsize=(18.2, 5.75))

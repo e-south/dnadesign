@@ -19,7 +19,11 @@ from typing import Any
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
     COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
     DISTAL_SCAFFOLD_POLICY_ID,
+    GENERATION_POLICY_VERSION,
     NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel_contract import (
+    VARIANT_ID_PREFIX,
 )
 
 _GENERATION_POLICY_LABELS = {
@@ -150,6 +154,15 @@ def short_candidate(candidate_id: str) -> str:
     return candidate_id.replace(prefix, "") if candidate_id.startswith(prefix) else candidate_id
 
 
+def short_selected_variant(row: dict[str, object]) -> str:
+    """Return a compact stable alias for one selected row."""
+
+    variant_id = str(row.get("variant_id") or "")
+    if variant_id:
+        return variant_id.removeprefix(f"{VARIANT_ID_PREFIX}-G{GENERATION_POLICY_VERSION}-")
+    return short_candidate(str(row.get("candidate_id") or ""))
+
+
 def matrix_text_color(value: float, *, max_value: float) -> str:
     return "#ffffff" if max_value > 0 and value >= max_value * 0.55 else "#24292f"
 
@@ -165,5 +178,6 @@ __all__ = [
     "policy_label",
     "position_tick_indices",
     "short_candidate",
+    "short_selected_variant",
     "tie_break_trace",
 ]

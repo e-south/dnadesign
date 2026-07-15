@@ -23,7 +23,8 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 def assert_materialized_selection_tables(result: Any, inputs: dict[str, Any]) -> tuple[list[dict], list[dict]]:
     triage = pq.read_table(result.candidate_triage_table_path).to_pylist()
     low_conf = next(row for row in triage if row["candidate_id"] == "candidate_low_conf")
-    assert low_conf["hard_gate_status"] == "eligible"
+    assert low_conf["hard_gate_status"] == "ineligible"
+    assert "fold_review_class_not_strong" in low_conf["hard_gate_failure_reasons_json"]
     assert next(row for row in triage if row["candidate_id"] == "candidate_blocked_by_mask")["hard_gate_status"] == (
         "ineligible"
     )
@@ -34,6 +35,16 @@ def assert_materialized_selection_tables(result: Any, inputs: dict[str, Any]) ->
     assert len(panel) == SELECTED_PANEL_SIZE
     assert [row["selection_rank"] for row in panel] == list(range(1, 9))
     assert [row["within_group_rank"] for row in panel] == [1, 2, 1, 2, 3, 1, 2, 3]
+    assert [row["variant_id"] for row in panel] == [
+        "Eco1RT-G3-D01",
+        "Eco1RT-G3-D02",
+        "Eco1RT-G3-P01",
+        "Eco1RT-G3-P02",
+        "Eco1RT-G3-P03",
+        "Eco1RT-G3-DP01",
+        "Eco1RT-G3-DP02",
+        "Eco1RT-G3-DP03",
+    ]
     assert [row["selection_slot"] for row in panel] == [
         "selected_distal_scaffold_repack_01",
         "selected_distal_scaffold_repack_02",
@@ -96,6 +107,7 @@ def _assert_panel_fields(panel: list[dict]) -> None:
         "selection_support_policy_id",
         "selection_support_policy_source",
         "policy_id",
+        "variant_id",
         "selection_rank",
         "design_group_id",
         "within_group_rank",

@@ -28,7 +28,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
     ordered_panel_rows,
     plot_row,
     policy_label,
-    short_candidate,
+    short_selected_variant,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.visual_inventory import (
     SELECTION_PLOT_PLAIN_TITLES,
@@ -68,7 +68,7 @@ def build_selected_local_structure_matrix(
     status_matrix: list[list[str]] = []
     for panel_row in ordered_panel_rows(panel_rows):
         candidate_id = str(panel_row["candidate_id"])
-        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_selected_variant(panel_row)}")
         values: list[float | None] = []
         statuses: list[str] = []
         for region_id in LOCAL_STRUCTURE_REGION_IDS:

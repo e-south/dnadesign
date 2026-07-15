@@ -202,6 +202,7 @@ def test_na_facing_chemistry_balance_matrix_fails_on_missing_selected_field() ->
 def test_selection_plot_funnel_stage_ids_use_public_trace_ontology() -> None:
     assert {plot.funnel_stage_id for plot in CURRENT_SELECTION_PLOTS} <= {
         "",
+        "strong_fold_screen",
         "local_geometry_screen",
         "selected_panel",
     }

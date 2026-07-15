@@ -34,14 +34,16 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import PathPatch, Rectangle  # noqa: E402
 from matplotlib.path import Path as MplPath  # noqa: E402
 
-_STAGE_IDS = ("candidate_pool", "local_geometry_screen", "design_groups", "selected_panel")
+_STAGE_IDS = ("candidate_pool", "strong_fold_screen", "local_geometry_screen", "design_groups", "selected_panel")
 _STAGE_SHORT_LABELS = {
     "candidate_pool": "ProteinMPNN\ncomplete sequences",
+    "strong_fold_screen": "ColabFold\nstrong-fold class",
     "local_geometry_screen": "ColabFold\nlocal RMSD review",
     "design_groups": "Generation\npolicy",
     "selected_panel": "Within-group\nJaccard selection",
 }
 _REJECTION_LABELS = {
+    "strong_fold_screen": "Outside strong-fold class",
     "local_geometry_screen": "Local geometry not retained",
     "design_groups": "",
     "selected_panel": "Not selected",
@@ -131,6 +133,7 @@ def write_hypothesis_panel_flow_plot(
     stage_by_id = {stage.stage_id: stage for stage in stages}
     row_by_id = {str(row["stage_id"]): row for row in hypothesis_panel_selection_trace_rows}
     initial_count = stage_by_id["candidate_pool"].count
+    strong_count = stage_by_id["strong_fold_screen"].count
     geometry_count = stage_by_id["local_geometry_screen"].count
     selected_count = stage_by_id["selected_panel"].count
     group_row = row_by_id["design_groups"]
@@ -156,32 +159,45 @@ def write_hypothesis_panel_flow_plot(
         ),
     )
     if sum(pool_count for _label, pool_count, _selected, _color in groups) != geometry_count:
-        raise ValueError("Design-group counts do not sum to the local-geometry-pass count")
+        raise ValueError("Design-group counts do not sum to the strong-fold and local-geometry-pass count")
     if sum(selected for _label, _pool, selected, _color in groups) != selected_count:
         raise ValueError("Selected counts do not sum to the selected-panel count")
 
-    fig, ax = plt.subplots(figsize=(12.4, 6.35))
+    fig, ax = plt.subplots(figsize=(14.2, 6.35))
     ax.set_xlim(0, 1.08)
     ax.set_ylim(0, 1)
     ax.axis("off")
     node_width = 0.014
-    flow_top = 0.78
+    flow_top = 0.72
     scale = 0.56 / initial_count
-    accepted_x, geometry_x, group_x, selected_x = (0.055, 0.245, 0.505, 0.82)
+    accepted_x, strong_x, geometry_x, group_x, selected_x = (0.035, 0.22, 0.405, 0.65, 0.88)
     accepted_height = initial_count * scale
+    strong_height = strong_count * scale
     geometry_height = geometry_count * scale
 
     _draw_filter_transition(
         ax,
         source_x=accepted_x,
-        target_x=geometry_x,
+        target_x=strong_x,
         node_width=node_width,
         flow_top=flow_top,
         source_height=accepted_height,
-        retained_height=geometry_height,
-        removed_label=f"{initial_count - geometry_count:,} local-geometry\nfailures",
-        reject_y=0.11,
+        retained_height=strong_height,
+        removed_label=f"{initial_count - strong_count:,} outside\nstrong-fold class",
+        reject_y=0.10,
         color=OKABE_ITO["blue"],
+    )
+    _draw_filter_transition(
+        ax,
+        source_x=strong_x,
+        target_x=geometry_x,
+        node_width=node_width,
+        flow_top=flow_top,
+        source_height=strong_height,
+        retained_height=geometry_height,
+        removed_label=f"{strong_count - geometry_count:,} local-geometry\nfailures",
+        reject_y=0.055,
+        color=OKABE_ITO["sky"],
     )
     ax.add_patch(
         Rectangle(
@@ -189,8 +205,11 @@ def write_hypothesis_panel_flow_plot(
         )
     )
     ax.add_patch(
+        Rectangle((strong_x, flow_top - strong_height), node_width, strong_height, color=OKABE_ITO["sky"], zorder=4)
+    )
+    ax.add_patch(
         Rectangle(
-            (geometry_x, flow_top - geometry_height), node_width, geometry_height, color=OKABE_ITO["sky"], zorder=4
+            (geometry_x, flow_top - geometry_height), node_width, geometry_height, color=OKABE_ITO["green"], zorder=4
         )
     )
 
@@ -235,9 +254,16 @@ def write_hypothesis_panel_flow_plot(
             )
         )
         midpoint = (cursor_top + pool_bottom) / 2
-        ax.text(0.415, midpoint, f"{label}\n{pool_count:,}", ha="center", va="center", fontsize=10.8)
         ax.text(
-            0.68,
+            (geometry_x + group_x) / 2,
+            midpoint,
+            f"{label}\n{pool_count:,}",
+            ha="center",
+            va="center",
+            fontsize=10.8,
+        )
+        ax.text(
+            (group_x + selected_x) / 2,
             midpoint,
             f"{pool_count - group_selected_count:,} not selected",
             ha="center",
@@ -257,15 +283,24 @@ def write_hypothesis_panel_flow_plot(
 
     headers = (
         (accepted_x, "ProteinMPNN\ncomplete sequences", initial_count),
-        (geometry_x, "ColabFold\nlocal Cα RMSD ≤2.5 Å", geometry_count),
+        (strong_x, "Strong ColabFold models\npLDDT ≥ 91.5\nWT Cα RMSD ≤ 1.25 Å", strong_count),
+        (geometry_x, "Local structure retained\nlocal Cα RMSD ≤ 2.5 Å", geometry_count),
         (group_x, "Generation\npolicy", geometry_count),
         (selected_x, "Within-group Jaccard\nselected panel", selected_count),
     )
     for x_position, label, count in headers:
-        ax.text(x_position + node_width / 2, 0.925, label, ha="center", va="center", fontsize=11.0, color="#24292F")
         ax.text(
             x_position + node_width / 2,
-            0.855,
+            0.90,
+            label,
+            ha="center",
+            va="center",
+            fontsize=10.6,
+            color="#24292F",
+        )
+        ax.text(
+            x_position + node_width / 2,
+            0.785,
             f"{count:,}",
             ha="center",
             va="center",
@@ -280,9 +315,9 @@ def write_hypothesis_panel_flow_plot(
         f"{label}: {pool_count:,} passing and {selected} selected" for label, pool_count, selected, _color in groups
     )
     alt = (
-        f"Candidate flow from {initial_count:,} complete sequences through {geometry_count:,} sequences retaining "
-        f"local geometry to an {selected_count}-sequence panel. {group_summary}. Ribbon widths are proportional "
-        "to sequence count."
+        f"Candidate flow from {initial_count:,} complete sequences through {strong_count:,} strong-fold models and "
+        f"{geometry_count:,} sequences retaining local geometry to an {selected_count}-sequence panel. "
+        f"{group_summary}. Ribbon widths are proportional to sequence count."
     )
     save_accessible_svg(fig, path, title=title, description=alt)
     return plot_row(
@@ -292,8 +327,8 @@ def write_hypothesis_panel_flow_plot(
         input_hashes=input_hashes,
         alt_text=alt,
         description=(
-            "Quantifies complete ProteinMPNN sequences, the ColabFold local-RMSD review, the three generation "
-            "policies, and within-policy mutation-set selection."
+            "Quantifies complete ProteinMPNN sequences, the strong-fold and local-RMSD screens, the three "
+            "generation policies, and within-policy mutation-set selection."
         ),
         interpretation_limit=(
             "The flow records computational screening and experimental design. It does not measure RT activity, "

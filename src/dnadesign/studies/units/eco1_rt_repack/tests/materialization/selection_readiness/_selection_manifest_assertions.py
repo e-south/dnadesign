@@ -33,6 +33,9 @@ def assert_materialized_selection_manifest(
     triage: list[dict],
     panel: list[dict],
 ) -> None:
+    assert manifest["schema_version"] == 4
+    assert manifest["selection_policy_id"] == "eco1_rt_selected_panel_v4"
+    assert manifest["selected_variant_ids"] == [str(row["variant_id"]) for row in panel]
     assert manifest["path_policy"] == "paths_relative_to_selection_manifest"
     assert all(not Path(value).is_absolute() for value in manifest["source_tables"].values())
     assert all(not Path(value).is_absolute() for value in manifest["artifacts"].values())

@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-fold-validation-policy
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-11
+last_verified: 2026-07-15
 status: active-v3-structural-review
 ---
 
@@ -43,10 +43,12 @@ repository.
    candidates.
 2. Normalize model provenance, pLDDT, PAE fields when available, and model-file
    paths.
-3. Fit each candidate model once to the 7V9U-backed reference over mapped
+3. Require the strong fold class: mean pLDDT at or above `91.5` and same-run
+   candidate-to-WT C-alpha RMSD at or below `1.25 A`.
+4. Fit each candidate model once to the 7V9U-backed reference over mapped
    C-alpha atoms.
-4. Measure regional C-alpha RMSD without fitting each region again.
-5. Keep candidates at or below the declared `2.5 A` cutoff in every non-distal
+5. Measure regional C-alpha RMSD without fitting each region again.
+6. Keep candidates at or below the declared `2.5 A` cutoff in every non-distal
    review region.
 
 The non-distal regions are:
@@ -58,21 +60,28 @@ The non-distal regions are:
 - mapped residues `255-311` in the C-terminal primer-RNA recognition context;
 - the peripheral retained DNA/RNA shell.
 
-Distal RMSD is reported but does not filter rows. The `2.5 A` cutoff is a
-study-declared review rule, not a literature-derived functional boundary.
+Distal RMSD is reported but does not filter rows. The pLDDT, same-run WT RMSD,
+and local `2.5 A` cutoffs are study-declared review rules, not
+literature-derived functional boundaries.
 
 ### Metric Semantics
 
 | Field | Meaning | Use |
 | --- | --- | --- |
-| `plddt` | ColabFold confidence summary. | Review context and late selection tie-break. |
+| `plddt` | Mean per-residue ColabFold confidence on a 0-100 scale. | Require `>=91.5` as one part of the strong fold class. |
 | `pae_summary` | Predicted alignment-error summary when available. | Review domain-orientation uncertainty. |
-| `wt_runtime_ca_rmsd` | Candidate-to-WT RMSD within the same ColabFold run. | Detect same-runtime structural outliers. |
+| `wt_runtime_ca_rmsd` | Candidate-to-WT C-alpha RMSD within the same ColabFold run. | Require `<=1.25 A` as the other part of the strong fold class. |
 | `cryoem_mapped_ca_rmsd` | Candidate-to-7V9U-backed reference RMSD over mapped C-alpha atoms. | Review overall scaffold similarity. |
 | regional C-alpha RMSD | Residual RMSD after one global mapped fit. | Apply the declared local-geometry rule. |
-| `review_class` | Fold-review label derived from model metrics. | Audit context; it is not a separate visible funnel stage when it removes no rows. |
+| `review_class` | Fold-review label derived from mean pLDDT and same-run WT RMSD. | Require `strong_fold_preserved` before the local-geometry gate. |
 
 No model-derived field is an activity score.
+
+The active funnel contains `1007` candidate models, `978` strong-class models,
+and `732` models that also pass every non-distal local-geometry region. The
+strong gate removes `29` good-class rows. The local rule removes another `246`
+rows from the strong-class pool. The final policy pools contain `335` distal,
+`220` peripheral, and `177` combined rows.
 
 ### Fail-Fast Rules
 

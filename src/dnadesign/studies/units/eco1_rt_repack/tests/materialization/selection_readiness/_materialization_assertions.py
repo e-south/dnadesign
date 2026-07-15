@@ -53,7 +53,9 @@ def assert_selection_plot_contract(
     hypothesis_flow_text = plot_text_by_id["selection_hypothesis_panel_flow"]
     assert "Sequence generation and structural review produce the selected panel" in hypothesis_flow_text
     assert "ColabFold" in hypothesis_flow_text
-    assert "local Cα RMSD ≤2.5 Å" in hypothesis_flow_text
+    assert "pLDDT ≥ 91.5" in hypothesis_flow_text
+    assert "WT Cα RMSD ≤ 1.25 Å" in hypothesis_flow_text
+    assert "local Cα RMSD ≤ 2.5 Å" in hypothesis_flow_text
     assert "Generation" in hypothesis_flow_text
     assert "policy" in hypothesis_flow_text
     assert "WT R13" not in hypothesis_flow_text

@@ -57,10 +57,11 @@ Out of scope:
   selected panel, optional ESMC/SAE annotation, and RT-only handoff.
 - The answer reports the materialized v3 path: 1008 requested sequences across
   distal, peripheral, and combined peripheral-plus-distal policies; 1007 unique
-  candidates; 738 local-geometry-pass rows; policy pools of 335 distal, 226
-  peripheral, and 177 combined rows; and an eight-row selected panel containing
-  two distal, three peripheral, and three combined sequences. All active rows
-  carry the v3 policy hash.
+  candidates; 978 strong-class models; 732 rows that also pass local geometry;
+  policy pools of 335 distal, 220 peripheral, and 177 combined rows; and an
+  eight-row selected panel containing two distal, three peripheral, and three
+  combined sequences. All active rows carry the v3 policy hash. Selected
+  aliases run from `Eco1RT-G3-D01` through `Eco1RT-G3-DP03`.
 - State that the fold workflow models one RT chain and does not establish
   RT-msDNA oligomeric state. Wang tested R13A as an interface-disrupting
   substitution; no sequence in the v3 pool contains R13A. Report exact F10/R13
@@ -82,10 +83,12 @@ Out of scope:
   this study's repacking policy.
 - Report ESMC LLR and SAE windows as review evidence only. They do not select
   panel rows, do not define candidate acceptance, and do not show improved
-  strand displacement. Current panel eligibility also requires local-structure
-  metrics to stay at or below the declared 2.5 A review cutoff in every
-  non-distal region after one global mapped C-alpha fit. Distal RMSD is review
-  context. Within each policy, the first pair is chosen by exhaustive
+  strand displacement. Current panel eligibility requires the strong fold
+  class (mean pLDDT at least 91.5 and same-run candidate-to-WT C-alpha RMSD at
+  most 1.25 A), followed by local-structure metrics at or below the declared
+  2.5 A review cutoff in every non-distal region after one global mapped
+  C-alpha fit. Distal RMSD is review context. Within each policy, the first pair
+  is chosen by exhaustive
   mutated-position Jaccard distance and then exact-substitution distance; each
   additional peripheral or combined row maximizes minimum distance from its
   policy pair. Charge counts, regional MSA support, local RMSD, fold metrics,

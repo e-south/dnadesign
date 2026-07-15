@@ -19,6 +19,7 @@ from pathlib import Path
 from .constants import CODON_POLICY_ID
 
 HANDOFF_SEQUENCE_CSV_FIELDS = [
+    "variant_id",
     "candidate_id",
     "selection_slot",
     "selection_rank",
@@ -124,6 +125,7 @@ def build_candidate_handoff_sequence_rows(
             )
         output_rows.append(
             {
+                "variant_id": str(panel_row.get("variant_id") or ""),
                 "candidate_id": candidate_id,
                 "selection_slot": str(panel_row.get("selection_slot") or ""),
                 "selection_rank": int(panel_row["selection_rank"]),

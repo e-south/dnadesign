@@ -24,6 +24,7 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
     if not table_path.exists():
         return mo.md(f"Selection panel table unavailable: `{table_path}`")
     selected_columns = [
+        "variant_id",
         "selection_slot",
         "selection_rank",
         "design_group_id",
@@ -66,6 +67,7 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
 
 def _display_row(row: dict[str, Any]) -> dict[str, object]:
     return {
+        "variant": str(row.get("variant_id") or ""),
         "slot": str(row.get("selection_slot") or ""),
         "selection rank": _int_or_none(row.get("selection_rank")),
         "design group": str(row.get("design_group_id") or ""),

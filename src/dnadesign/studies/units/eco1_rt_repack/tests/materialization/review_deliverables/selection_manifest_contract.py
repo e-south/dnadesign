@@ -23,6 +23,16 @@ SELECTION_FUNNEL_STAGES = [
         "is_hard_gate": False,
     },
     {
+        "stage_id": "strong_fold_screen",
+        "stage_label": "Strong ColabFold models",
+        "selector_role": "fold_confidence_screen",
+        "method": "Keep models in the declared strong-fold class.",
+        "input_count": 2,
+        "removed_count": 0,
+        "remaining_count": 2,
+        "is_hard_gate": True,
+    },
+    {
         "stage_id": "local_geometry_screen",
         "stage_label": "Local geometry retained",
         "selector_role": "hard_gate",
@@ -74,7 +84,7 @@ PANEL_TIE_BREAK_ORDER = [
 def selection_trace_rows() -> list[dict[str, object]]:
     return [
         {
-            "selection_policy_id": "eco1_rt_selected_panel_v3",
+            "selection_policy_id": "eco1_rt_selected_panel_v4",
             "stage_order": index,
             "stage_id": stage["stage_id"],
             "stage_label": stage["stage_label"],

@@ -199,7 +199,9 @@ def validate_selected_panel(panel_rows: Sequence[dict[str, object]]) -> None:
     """Fail unless the selected-panel allocation is complete and unique."""
 
     candidate_ids = [str(row.get("candidate_id") or "") for row in panel_rows]
+    variant_ids = [str(row.get("variant_id") or "") for row in panel_rows]
     duplicates = sorted(candidate_id for candidate_id, count in Counter(candidate_ids).items() if count > 1)
+    duplicate_variant_ids = sorted(variant_id for variant_id, count in Counter(variant_ids).items() if count > 1)
     policy_counts = Counter(str(row.get("policy_id") or "") for row in panel_rows)
     selection_ranks = sorted(int(row["selection_rank"]) for row in panel_rows)
     invalid_contract_rows = [
@@ -208,6 +210,8 @@ def validate_selected_panel(panel_rows: Sequence[dict[str, object]]) -> None:
     if (
         len(panel_rows) == SELECTED_PANEL_SIZE
         and not duplicates
+        and not duplicate_variant_ids
+        and all(variant_ids)
         and not invalid_contract_rows
         and dict(policy_counts) == EXPECTED_SELECTED_POLICY_COUNTS
         and selection_ranks == list(range(1, SELECTED_PANEL_SIZE + 1))
@@ -218,6 +222,7 @@ def validate_selected_panel(panel_rows: Sequence[dict[str, object]]) -> None:
         f"expected policy counts {EXPECTED_SELECTED_POLICY_COUNTS}, observed {dict(policy_counts)}; "
         f"selection ranks: {selection_ranks}; "
         f"duplicate candidate ids: {_format_list(duplicates)}; "
+        f"duplicate variant ids: {_format_list(duplicate_variant_ids)}; "
         f"contract-failing rows: {_format_list(invalid_contract_rows)}."
     )
 
@@ -226,16 +231,19 @@ def selected_panel_coverage_summary(panel_rows: Sequence[dict[str, object]]) -> 
     """Return manifest-ready selected-panel composition fields."""
 
     candidate_ids = [str(row.get("candidate_id") or "") for row in panel_rows]
+    variant_ids = [str(row.get("variant_id") or "") for row in panel_rows]
     policy_counts = Counter(str(row.get("policy_id") or "") for row in panel_rows)
     duplicate_candidate_ids = sorted(
         candidate_id for candidate_id, count in Counter(candidate_ids).items() if count > 1
     )
+    duplicate_variant_ids = sorted(variant_id for variant_id, count in Counter(variant_ids).items() if count > 1)
     contract_failure_ids = [
         str(row.get("candidate_id") or "") for row in panel_rows if not bool(row.get("selection_contract_pass"))
     ]
     return {
         "selected_panel_size": SELECTED_PANEL_SIZE,
         "selected_row_count": len(panel_rows),
+        "selected_variant_ids": variant_ids,
         "policy_allocation_role": "experimental_design",
         "selected_generation_policy_counts": {key: policy_counts[key] for key in sorted(policy_counts)},
         "rt_msdna_oligomeric_state_review_status_counts": dict(
@@ -246,11 +254,13 @@ def selected_panel_coverage_summary(panel_rows: Sequence[dict[str, object]]) -> 
             )
         ),
         "duplicate_candidate_ids": duplicate_candidate_ids,
+        "duplicate_variant_ids": duplicate_variant_ids,
         "contract_failure_candidate_ids": contract_failure_ids,
         "valid": (
             len(panel_rows) == SELECTED_PANEL_SIZE
             and dict(policy_counts) == EXPECTED_SELECTED_POLICY_COUNTS
             and not duplicate_candidate_ids
+            and not duplicate_variant_ids
             and not contract_failure_ids
         ),
     }

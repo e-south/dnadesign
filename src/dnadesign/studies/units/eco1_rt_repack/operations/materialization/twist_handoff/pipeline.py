@@ -131,7 +131,7 @@ def materialize_twist_handoff(
         qc = sequence_qc(dna)
         selection_rank = int(panel["selection_rank"])
         design_group_id = str(panel["design_group_id"])
-        sequence_id = f"selected_{selection_rank:02d}_{design_group_id}"
+        sequence_id = str(panel["variant_id"])
         metadata = {
             "sequence_id": sequence_id,
             "candidate_id": candidate_id,
@@ -190,7 +190,7 @@ def materialize_twist_handoff(
         SeqIO.write(record, path, "genbank")
     manifest = {
         "schema_id": "eco1_rt.twist_full_cds_handoff",
-        "schema_version": 2,
+        "schema_version": 3,
         "sequence_status": "quote_and_upload_ready",
         "cloning_status": "blocked_pending_assembly_flanks_and_vendor_portal_complexity_check",
         "selected_panel_source_count": len(panel_rows),

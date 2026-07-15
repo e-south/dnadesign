@@ -40,11 +40,21 @@ def test_materializes_quote_ready_full_cds_handoff(tmp_path: Path) -> None:
     result = materialize_twist_handoff(repo_root=REPO_ROOT, output_root=output_root, **inputs)
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == 3
     assert manifest["sequence_status"] == "quote_and_upload_ready"
     assert manifest["cloning_status"] == "blocked_pending_assembly_flanks_and_vendor_portal_complexity_check"
     assert len(manifest["sequences"]) == 8
     assert [row["selection_rank"] for row in manifest["sequences"]] == list(range(1, 9))
+    assert [row["sequence_id"] for row in manifest["sequences"]] == [
+        "Eco1RT-G3-D01",
+        "Eco1RT-G3-D02",
+        "Eco1RT-G3-P01",
+        "Eco1RT-G3-P02",
+        "Eco1RT-G3-DP01",
+        "Eco1RT-G3-DP02",
+        "Eco1RT-G3-P03",
+        "Eco1RT-G3-DP03",
+    ]
     assert manifest["selected_panel_source_count"] == 8
     assert manifest["selected_panel_composition"] == {
         "distal_scaffold_repack_v1": 2,

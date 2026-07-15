@@ -65,6 +65,7 @@ def handoff_sequence_list_html(rows: list[dict[str, str]]) -> str:
 
 
 def _handoff_sequence_card_html(row: dict[str, str]) -> str:
+    variant_id = html.escape(str(row.get("variant_id") or ""))
     candidate_id = html.escape(str(row.get("candidate_id") or ""))
     selection_slot = html.escape(str(row.get("selection_slot") or ""))
     dna_status = html.escape(str(row.get("dna_design_status") or ""))
@@ -73,7 +74,8 @@ def _handoff_sequence_card_html(row: dict[str, str]) -> str:
     return f"""
       <article class="eco1-handoff-sequence-card" data-candidate-id="{candidate_id}">
         <header>
-          <strong>{candidate_id}</strong>
+          <strong>{variant_id or candidate_id}</strong>
+          <span>{candidate_id}</span>
           <span>{selection_slot}</span>
           <span>DNA: {dna_status}</span>
           <span>restriction screen: {restriction_status}</span>

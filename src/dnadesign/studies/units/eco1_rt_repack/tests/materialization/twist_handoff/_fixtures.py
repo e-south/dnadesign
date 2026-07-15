@@ -17,6 +17,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from Bio import SeqIO
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.panel_contract import (
+    variant_id_for_policy,
+)
 from dnadesign.thread.foldcheck import sequence_hash
 
 REPO_ROOT = Path(__file__).resolve().parents[8]
@@ -52,6 +55,10 @@ def write_twist_handoff_inputs(root: Path) -> dict[str, Path]:
         token = f"{ref}{position}{alt}"
         panel_rows.append(
             {
+                "variant_id": variant_id_for_policy(
+                    policy_id=policy_id,
+                    within_group_rank=within_group_rank,
+                ),
                 "candidate_id": candidate_id,
                 "selection_slot": f"slot_{index}",
                 "selection_rank": index,

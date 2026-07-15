@@ -32,21 +32,32 @@ def _passed_local_structure_review(**overrides: object) -> dict[str, object]:
     return values
 
 
-def test_review_label_does_not_add_a_numeric_gate_after_fold_acceptance() -> None:
+def test_review_band_is_excluded_by_strong_fold_gate() -> None:
     status, reasons = _hard_gate_status(
         candidate={"status": "accepted", "protected_mutation_count": 0},
         fold={"foldcheck_status": "accepted", "review_class": "review_band"},
         local_structure_review=_passed_local_structure_review(),
     )
 
-    assert status == "eligible"
-    assert reasons == []
+    assert status == "ineligible"
+    assert reasons == ["fold_review_class_not_strong"]
 
 
-def test_good_fold_without_other_blockers_remains_eligible_for_local_geometry_review() -> None:
+def test_good_fold_is_excluded_by_strong_fold_gate() -> None:
     status, reasons = _hard_gate_status(
         candidate={"status": "accepted", "protected_mutation_count": 0},
         fold={"foldcheck_status": "accepted", "review_class": "good_fold_preserved"},
+        local_structure_review=_passed_local_structure_review(),
+    )
+
+    assert status == "ineligible"
+    assert reasons == ["fold_review_class_not_strong"]
+
+
+def test_strong_fold_without_other_blockers_is_eligible() -> None:
+    status, reasons = _hard_gate_status(
+        candidate={"status": "accepted", "protected_mutation_count": 0},
+        fold={"foldcheck_status": "accepted", "review_class": "strong_fold_preserved"},
         local_structure_review=_passed_local_structure_review(),
     )
 
@@ -62,7 +73,7 @@ def test_review_label_does_not_override_hard_blockers() -> None:
     )
 
     assert status == "ineligible"
-    assert reasons == ["protected_mutation_violation"]
+    assert reasons == ["fold_review_class_not_strong", "protected_mutation_violation"]
 
 
 def test_catalytic_or_direct_contact_mutation_fails_hard_gate() -> None:

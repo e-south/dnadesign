@@ -122,11 +122,12 @@ def test_selection_flow_has_no_procurement_subset() -> None:
 
     assert [row["stage_id"] for row in trace] == [
         "candidate_pool",
+        "strong_fold_screen",
         "local_geometry_screen",
         "design_groups",
         "selected_panel",
     ]
-    design_groups = trace[2]
+    design_groups = trace[3]
     assert design_groups["selector_role"] == "experimental_design"
     assert design_groups["is_hard_gate"] is False
     assert design_groups["removed_count"] == 0

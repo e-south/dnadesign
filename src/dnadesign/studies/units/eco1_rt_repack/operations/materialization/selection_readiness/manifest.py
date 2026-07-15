@@ -17,6 +17,11 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_review.constants import (
+    STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM,
+    STRONG_FOLD_MIN_MEAN_PLDDT,
+    STRONG_FOLD_REVIEW_CLASS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
     CREATED_BY,
     PLOTS_DIR_NAME,
@@ -75,14 +80,15 @@ def write_selection_readiness_manifest(
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "schema_id": "eco1_rt.selection_readiness_manifest",
-        "schema_version": 3,
+        "schema_version": 4,
         "status": "materialized",
         "created_by": CREATED_BY,
         "created_at": created_at,
         "selection_policy_id": SELECTION_POLICY_ID,
         "governing_rule": (
-            "From complete sequences that retain the declared fixed-position and generation-chemistry invariants "
-            "and pass the 2.5 A local-geometry review rule, select two distal, three peripheral, and three combined "
+            "From complete sequences that retain the declared fixed-position and generation-chemistry invariants, "
+            "require the strong fold class and the 2.5 A local-geometry review rule, then select two distal, three "
+            "peripheral, and three combined "
             "sequences. Within each group, mutated-position Jaccard distance precedes exact-substitution Jaccard "
             "distance; chemistry, MSA, structure, fold metrics, and sequence hash are used only if earlier criteria "
             "tie. Exact F10 "
@@ -97,6 +103,16 @@ def write_selection_readiness_manifest(
                 "The selected panel contains two distal, three peripheral, and three combined complete-sequence "
                 "hypotheses. The groups are experimental comparisons, not quality levels. The rows are not "
                 "functional winners or biological replicates; their RT-msDNA oligomeric state is not established."
+            ),
+        },
+        "fold_review_threshold_policy": {
+            "required_review_class": STRONG_FOLD_REVIEW_CLASS,
+            "minimum_mean_plddt": STRONG_FOLD_MIN_MEAN_PLDDT,
+            "maximum_wt_runtime_ca_rmsd_angstrom": STRONG_FOLD_MAX_WT_RUNTIME_CA_RMSD_ANGSTROM,
+            "interpretation": (
+                "This is a declared model-review class, not a literature-derived functional boundary. The "
+                "WT-runtime RMSD is a whole-model comparison metric and is distinct from the regional local RMSD "
+                "gate."
             ),
         },
         "local_structure_rmsd_threshold_policy": {
@@ -166,6 +182,7 @@ def write_selection_readiness_manifest(
         ),
         "selection_funnel_stages": hypothesis_panel_selection_trace_rows,
         "selected_candidate_ids": [str(row["candidate_id"]) for row in panel_rows],
+        "selected_variant_ids": [str(row["variant_id"]) for row in panel_rows],
         "panel_coverage": selected_panel_coverage_summary(panel_rows),
         "handoff_readiness": build_handoff_readiness(
             selection_root=path.parent,

@@ -152,7 +152,7 @@ def test_twist_handoff_manifest_renders_sequence_and_cloning_status(tmp_path: Pa
         yaml.safe_dump(
             {
                 "schema_id": "eco1_rt.twist_full_cds_handoff",
-                "schema_version": 2,
+                "schema_version": 3,
                 "sequence_status": "quote_and_upload_ready",
                 "cloning_status": "blocked_pending_assembly_flanks_and_vendor_portal_complexity_check",
                 "assay_host": {

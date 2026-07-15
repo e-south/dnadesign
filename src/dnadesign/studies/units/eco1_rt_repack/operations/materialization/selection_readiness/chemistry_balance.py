@@ -23,7 +23,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.shared.re
     save_accessible_svg,
 )
 
-from .plot_support import matrix_text_color, ordered_panel_rows, plot_row, policy_label, short_candidate
+from .plot_support import matrix_text_color, ordered_panel_rows, plot_row, policy_label, short_selected_variant
 from .review_axis_contracts import (
     NA_FACING_CHARGE_FIELD,
     NA_FACING_CHEMISTRY_METRICS,
@@ -53,7 +53,7 @@ def build_na_facing_chemistry_balance_matrix(
         if triage_row is None:
             raise ValueError(f"Selection panel references missing triage row: {candidate_id}")
         _require_na_facing_chemistry_fields(candidate_id=candidate_id, triage_row=triage_row)
-        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_candidate(candidate_id)}")
+        row_labels.append(f"{policy_label(str(panel_row['policy_id']))}  {short_selected_variant(panel_row)}")
         charge_delta.append(int(triage_row[NA_FACING_CHARGE_FIELD]))
         matrix.append([int(triage_row[metric.field]) for metric in NA_FACING_CHEMISTRY_METRICS])
     return row_labels, charge_delta, [metric.label for metric in NA_FACING_CHEMISTRY_METRICS], matrix
