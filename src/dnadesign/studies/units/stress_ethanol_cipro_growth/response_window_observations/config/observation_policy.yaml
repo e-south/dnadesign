@@ -1,0 +1,159 @@
+schema_id: stress_ethanol_cipro_growth.response_window_observation_policy.v1
+schema_version: "1"
+study_id: stress_ethanol_cipro_growth
+policy_id: equal_experiment_weight_response_observations_v1
+approval:
+  status: review_required
+  approved_by: null
+  approved_at: null
+  rationale: Repeat comparability must be adjudicated before candidate labels are published.
+source_manifests:
+  reader_bundle_sha256: f49ef80d12b76d4e92cb73feaf5423187d898de8c1ee7df0099c9fe0c3fc497d  # pragma: allowlist secret
+  candidate_bindings_sha256: 273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8  # pragma: allowlist secret
+label_identity:
+  y_space: reader_response_window_vector_v1
+  observed_round: 0
+  batch_id: pre_round0_response_corpus_v1
+  primary_reduction_id: event_logmean_6_12h_post
+  value_order: [r00, r10, r01, r11, b00, b10, b01, b11]
+aggregation:
+  experiment_unit: reader_experiment
+  experiment_weighting: equal
+  singleton: identity
+  exactly_two: midpoint_not_robust
+  three_or_more: componentwise_median
+  uncertainty:
+    method: hierarchical_joint_bootstrap
+    experiment_resampling: with_replacement
+    reader_draw_resampling: one_joint_draw_per_sampled_experiment
+    samples: 2000
+    confidence_level: 0.90
+    random_seed: 7
+    minimum_reader_draws_per_experiment: 100
+  event_time_sensitivity: separate
+unbound_reader_designs:
+  - {design_id: pDual-10-ES5p, reason: absent_from_study_candidate_bindings}
+  - {design_id: pDual-10-ES8p, reason: absent_from_study_candidate_bindings}
+  - {design_id: pDual-10-ES9p, reason: absent_from_study_candidate_bindings}
+  - {design_id: pDual-10-ES14p, reason: absent_from_study_candidate_bindings}
+repeat_decisions:
+  - candidate_id: 687595af953278a6262ce4098d265489e9aec9be
+    reader_design_ids: [pDual-10-ES10p]
+    reader_experiment_ids: [20260117_sfxi_ref-pDual10, 20260619_sfxi_sensor-panel-m9-glu-1-10]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 0f87f1782ff87562775ede346ba2d70038b678ec
+    reader_design_ids: [pDual-10-ES12p]
+    reader_experiment_ids: [20260117_sfxi_ref-pDual10, 20260620_sfxi_sensor-panel-m9-glu-12-19]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 53a22effaf67926c919918bec9313e8ef9e60304
+    reader_design_ids: [pDual-10-ES13p]
+    reader_experiment_ids: [20260117_sfxi_ref-pDual10, 20260620_sfxi_sensor-panel-m9-glu-12-19]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 7871958259f60506b8ffedfeff6683b53c5c688b
+    reader_design_ids: [pDual-10-ES22p]
+    reader_experiment_ids: [20260121_sfxi_ref-pDual10, 20260621_sfxi_sensors-opal-20-28]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 435c9049d7a0b9df2aedb3724cff0c7f8486992d
+    reader_design_ids: [pDual-10-ES25p]
+    reader_experiment_ids: [20260121_sfxi_ref-pDual10, 20260621_sfxi_sensors-opal-20-28]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 7d19c4330b78ea3eebeaaaaede6a7f4be72f3412
+    reader_design_ids: [pDual-10-ES26p]
+    reader_experiment_ids: [20260121_sfxi_ref-pDual10, 20260621_sfxi_sensors-opal-20-28]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 4aefb5bf64c8c5a1afd64ee269ea8172779167f8
+    reader_design_ids: [pDual-10-ES27p]
+    reader_experiment_ids: [20260121_sfxi_ref-pDual10, 20260621_sfxi_sensors-opal-20-28]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: c33e022ac822d1ca608940a561e4fb76802faa74
+    reader_design_ids: [pDual-10-ES28p]
+    reader_experiment_ids: [20260121_sfxi_ref-pDual10, 20260621_sfxi_sensors-opal-20-28]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: c986c251d60dc4a33ef4caaafc40e38093db17bb
+    reader_design_ids: [pDual-10-ES29p]
+    reader_experiment_ids: [20260121_sfxi_ref-pDual10, 20260622_sfxi_sensor-panel-m9-glu-29-30-sulAp-spyp]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: e0cdedf311d28b733f95ccd8fe0a10b0280f8978
+    reader_design_ids: [pDual-10-ES30p]
+    reader_experiment_ids: [20260121_sfxi_ref-pDual10, 20260622_sfxi_sensor-panel-m9-glu-29-30-sulAp-spyp]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 97b4ac8535ae8c1f67c079b0644e87777d29e1d1
+    reader_design_ids: [pDual-10-spyp]
+    reader_experiment_ids: [20260622_sfxi_sensor-panel-m9-glu-29-30-sulAp-spyp, 20260706_sfxi_sensor-panel-m9-glu-secg]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated
+  - candidate_id: 2fe51277935496ce8f02932e2866143258c80d55
+    reader_design_ids: [pDual-10-sulAp]
+    reader_experiment_ids: [20260622_sfxi_sensor-panel-m9-glu-29-30-sulAp-spyp, 20260706_sfxi_sensor-panel-m9-glu-secg]
+    status: review_required
+    classification: unresolved
+    evidence_artifact: null
+    evidence_sha256: null
+    adjudicated_by: null
+    adjudicated_at: null
+    reason: cross_experiment_comparability_not_adjudicated

@@ -39,10 +39,14 @@ def _coerce_float_list(value: Any) -> list[float]:
         stripped = value.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
             value = json.loads(stripped)
+    if hasattr(value, "tolist"):
+        value = value.tolist()
     try:
-        arr = np.asarray(value, dtype=float).ravel()
+        arr = np.asarray(value, dtype=float)
     except Exception as exc:
         raise OpalError(f"observed label y_obs must be numeric vector-like: {exc}") from exc
+    if arr.ndim != 1:
+        raise OpalError("observed label y_obs must be a one-dimensional numeric vector.")
     if arr.size == 0 or not np.all(np.isfinite(arr)):
         raise OpalError("observed label y_obs must be finite and non-empty.")
     return arr.tolist()
@@ -420,6 +424,9 @@ def label_source_from_config(cfg: RootConfig, store: RecordsStore) -> TrainingLa
                 campaign_slug=cfg.campaign.slug,
                 study_id=study_id,
                 y_space=str(cfg.labels.y_space or ""),
+                candidate_path="records.parquet",
+                candidate_id_column=cfg.labels.id_column,
+                candidate_x_column=cfg.data.x_column_name,
             )
         return SharedObservedLabelSource(
             store=ObservedLabelStore(

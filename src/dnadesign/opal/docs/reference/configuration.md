@@ -1,7 +1,7 @@
 ## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-15
 
 `campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
 keys. There is no compatibility parser.
@@ -113,13 +113,13 @@ labels:
   source:
     kind: usr_sidecar
     dataset: candidates
-    path: _opal/response_window_observed_labels.parquet
-    manifest_path: _opal/response_window_observed_labels.manifest.json
+    path: _opal/response_window_labels_v1/observed_labels.parquet
+    manifest_path: _opal/response_window_labels_v1/promotion.manifest.json
   y_space: reader_response_window_vector_v1
   id_column: id
   round_column: observed_round
   batch_column: batch_id
-  dedup_policy: latest_by_round
+  dedup_policy: error_on_duplicate
 
 writeback:
   prediction_records: ledger_only
@@ -210,7 +210,7 @@ OPAL verifies the manifest each time it reads the sidecar and rejects generic
 `ingest-y` writes. When absent, the sidecar remains an OPAL-managed mutable
 label source.
 
-The pinned manifest uses this metric-neutral contract:
+The pinned manifest uses this objective-agnostic observed-label contract:
 
 ```json
 {
@@ -220,23 +220,31 @@ The pinned manifest uses this metric-neutral contract:
   "y_space": "reader_response_window_vector_v1",
   "study_provenance": {
     "schema_id": "example_two_factor_study.observed_labels.v1",
-    "path": "_opal/response_window_observed_labels.provenance.json",
+    "path": "_opal/response_window_labels_v1/study_provenance.json",
     "sha256": "<lowercase 64-character SHA-256>"
   },
+  "candidate_artifact": {
+    "path": "records.parquet",
+    "sha256": "<lowercase 64-character SHA-256>",
+    "row_count": 42000,
+    "columns": ["id", "sequence", "<configured X column>"],
+    "schema_sha256": "<lowercase 64-character SHA-256>"
+  },
   "label_artifact": {
-    "path": "_opal/response_window_observed_labels.parquet",
+    "path": "_opal/response_window_labels_v1/observed_labels.parquet",
     "sha256": "<lowercase 64-character SHA-256>",
     "row_count": 24
   }
 }
 ```
 
-The campaign slug, study ID, Y-space ID, study-provenance artifact, label path,
-digests, and Parquet row count must match exactly. Paths cannot escape the
-dataset root. The study-owned provenance artifact records the assay bundle,
+The campaign slug, study ID, Y-space ID, study-provenance artifact, candidate
+snapshot, label path, digests, schemas, columns, and Parquet row counts must
+match exactly. The candidate snapshot must contain the configured candidate-ID
+and X columns. Paths cannot escape the dataset root. The study-owned provenance artifact records the assay bundle,
 identity binding, reduction, and aggregation contracts needed to interpret Y;
 OPAL verifies its digest without interpreting study fields. The study publisher
-stages all three artifacts as one promotion. OPAL reads and verifies that
+stages the label, provenance, and promotion records as one publication. OPAL reads and verifies that
 promotion but does not publish or revise it.
 
 ### Defaults and fail-fast behavior

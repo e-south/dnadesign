@@ -54,13 +54,13 @@ labels:
   source:
     kind: usr_sidecar
     dataset: usr_prom_eth_cip_opal_candidates
-    path: "_opal/response_window_observed_labels.parquet"
-    manifest_path: "_opal/response_window_observed_labels.manifest.json"
+    path: "_opal/response_window_labels_v1/observed_labels.parquet"
+    manifest_path: "_opal/response_window_labels_v1/promotion.manifest.json"
   y_space: reader_response_window_vector_v1
   id_column: id
   round_column: observed_round
   batch_column: batch_id
-  dedup_policy: latest_by_round
+  dedup_policy: error_on_duplicate
 
 writeback:
   prediction_records: ledger_only

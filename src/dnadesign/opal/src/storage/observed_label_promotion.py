@@ -21,6 +21,7 @@ from typing import Any
 import pyarrow.parquet as pq
 
 from ..core.utils import OpalError, file_sha256
+from .candidate_snapshot import verify_candidate_snapshot
 
 OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION = "opal.observed_label_promotion.v1"
 _MANIFEST_FIELDS = {
@@ -29,10 +30,15 @@ _MANIFEST_FIELDS = {
     "study_id",
     "y_space",
     "study_provenance",
+    "candidate_artifact",
     "label_artifact",
 }
 _STUDY_PROVENANCE_FIELDS = {"schema_id", "path", "sha256"}
 _LABEL_ARTIFACT_FIELDS = {"path", "sha256", "row_count"}
+
+
+class _DuplicateJsonKeyError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -45,6 +51,10 @@ class ObservedLabelPromotionBinding:
     campaign_slug: str
     study_id: str
     y_space: str
+    candidate_path: str = "records.parquet"
+    candidate_id_column: str = "id"
+    candidate_x_column: str | None = None
+    candidate_root: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -62,6 +72,11 @@ class VerifiedObservedLabelPromotion:
     study_provenance_schema_id: str
     study_provenance_path: Path
     study_provenance_sha256: str
+    candidate_path: Path
+    candidate_sha256: str
+    candidate_row_count: int
+    candidate_columns: tuple[str, ...]
+    candidate_schema_sha256: str
 
 
 def _resolve_dataset_relative(
@@ -101,12 +116,23 @@ def _read_manifest(path: Path) -> tuple[dict[str, Any], str]:
         raise OpalError(f"Observed-label promotion manifest not found: {path}")
     try:
         raw = path.read_bytes()
-        payload = json.loads(raw.decode("utf-8"))
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_json_object)
+    except _DuplicateJsonKeyError as exc:
+        raise OpalError(f"Observed-label promotion manifest has {exc}: {path}") from exc
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise OpalError(f"Failed to read observed-label promotion manifest {path}: {exc}") from exc
     if not isinstance(payload, dict):
         raise OpalError(f"Observed-label promotion manifest must be a JSON object: {path}")
     return payload, sha256(raw).hexdigest()
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise _DuplicateJsonKeyError(f"duplicate JSON key {key!r}")
+        payload[key] = value
+    return payload
 
 
 def verify_observed_label_promotion(
@@ -170,6 +196,14 @@ def verify_observed_label_promotion(
             f"expected {provenance_expected_sha256}, found {provenance_actual_sha256}."
         )
 
+    candidate = verify_candidate_snapshot(
+        payload.get("candidate_artifact"),
+        root=binding.dataset_root if binding.candidate_root is None else binding.candidate_root,
+        expected_path=binding.candidate_path,
+        id_column=binding.candidate_id_column,
+        x_column=binding.candidate_x_column,
+    )
+
     artifact = payload.get("label_artifact")
     if not isinstance(artifact, dict):
         raise OpalError("Observed-label promotion manifest field 'label_artifact' must be a JSON object.")
@@ -229,4 +263,9 @@ def verify_observed_label_promotion(
         study_provenance_schema_id=provenance_schema_id,
         study_provenance_path=provenance_path,
         study_provenance_sha256=provenance_actual_sha256,
+        candidate_path=candidate.path,
+        candidate_sha256=candidate.sha256,
+        candidate_row_count=candidate.row_count,
+        candidate_columns=candidate.columns,
+        candidate_schema_sha256=candidate.schema_sha256,
     )

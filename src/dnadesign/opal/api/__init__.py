@@ -11,6 +11,16 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from .observed_labels import (
+    OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION,
+    OBSERVED_LABELS_API_VERSION,
+    ObservedLabelPromotionBinding,
+    ObservedLabelVerificationError,
+    VerifiedObservedLabelPromotion,
+    VerifiedObservedLabelSnapshot,
+    candidate_snapshot_record,
+    verify_observed_label_snapshot,
+)
 from .response_magnitude_feasibility import (
     RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION,
     ResponseMagnitudeFeasibilityComponents,
@@ -37,6 +47,10 @@ from .sfxi import (
 )
 
 __all__ = [
+    "OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION",
+    "OBSERVED_LABELS_API_VERSION",
+    "ObservedLabelPromotionBinding",
+    "ObservedLabelVerificationError",
     "RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION",
     "ResponseMagnitudeFeasibilityComponents",
     "ResponseMagnitudeFeasibilityScore",
@@ -48,7 +62,10 @@ __all__ = [
     "SFXI_STATE_ORDER",
     "SFXIScoringConfig",
     "SFXIScoringResult",
+    "VerifiedObservedLabelPromotion",
+    "VerifiedObservedLabelSnapshot",
     "binary_target_mask",
+    "candidate_snapshot_record",
     "calibrate_response_magnitude_feasibility",
     "response_magnitude_feasibility_components",
     "score_response_magnitude_feasibility",
@@ -57,4 +74,5 @@ __all__ = [
     "to_sfxi_reference_overlay_records",
     "validate_sfxi_reference_overlay_records",
     "validated_response_magnitude",
+    "verify_observed_label_snapshot",
 ]

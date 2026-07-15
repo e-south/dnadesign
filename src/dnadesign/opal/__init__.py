@@ -52,6 +52,10 @@ _PUBLIC_EXPORTS = {
     "parse_tags": ".src.plots.config",
     "PluginRef": ".src.config.types",
     "prune_stale_artifacts": ".src.reporting.artifact_garden",
+    "OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION": ".api.observed_labels",
+    "OBSERVED_LABELS_API_VERSION": ".api.observed_labels",
+    "ObservedLabelPromotionBinding": ".api.observed_labels",
+    "ObservedLabelVerificationError": ".api.observed_labels",
     "RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION": ".api.response_magnitude_feasibility",
     "read_optional_table": ".src.analysis.campaign_progress",
     "read_selection_artifact": ".src.reporting.verify_outputs",
@@ -83,6 +87,10 @@ _PUBLIC_EXPORTS = {
     "unavailable_table": ".src.analysis.campaign_progress",
     "validate_x_parquet_column": ".src.storage.x_contracts",
     "validated_response_magnitude": ".api.response_magnitude_feasibility",
+    "VerifiedObservedLabelPromotion": ".api.observed_labels",
+    "VerifiedObservedLabelSnapshot": ".api.observed_labels",
+    "candidate_snapshot_record": ".api.observed_labels",
+    "verify_observed_label_snapshot": ".api.observed_labels",
     "x_provenance_status_lines": ".src.analysis.campaign_progress",
 }
 

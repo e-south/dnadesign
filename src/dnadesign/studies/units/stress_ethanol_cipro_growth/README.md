@@ -1,3 +1,12 @@
+---
+id: stress-ethanol-cipro-growth-source
+title: Stress promoter study source surfaces
+owner: stress_ethanol_cipro_growth
+status: active
+last_verified: 2026-07-15
+first_hop: ../../../../../docs/studies/stress_ethanol_cipro_growth/routes/README.md
+---
+
 # Stress / Ethanol / Ciprofloxacin Growth Study
 
 This package holds study-owned implementation, durable review prose, and static
@@ -24,11 +33,13 @@ when the task needs executable study surfaces or checked-in review artifacts.
 ```text
 stress_ethanol_cipro_growth/
   promoter_candidate_bindings/ # exact alias -> candidate/sequence authority
+  response_window_observations/ # Reader evidence -> candidate observations
   decision/
     opal/
       batch0/               # pre-assay OPAL candidate-table handoff
       densegen_axis_probe/  # DenseGen-label OPAL probe and TFBS learnability
       reader_promoter_evidence/ # OPAL discovery of Reader evidence bundles
+      response_window_label_promotion/ # verified observations -> OPAL labels
       response_metastudy/   # SFXI/RMF evidence and promotion review
   operations/
     status/                 # OPS status/preflight provider implementation
@@ -44,6 +55,8 @@ stress_ethanol_cipro_growth/
   namespace-qualified promoter aliases, canonical candidate/sequence identity,
   and BaseRender adapter projections. Reader, synthesis, OPAL adapters, and
   other study narratives consume this artifact without redefining identity.
+- `response_window_observations/`: objective-neutral, study-owned repeat evidence,
+  aggregation, uncertainty, and atomic candidate-observation publication.
 - `decision/opal/batch0/`: OPAL candidate-table sampling for this study only.
 - `decision/opal/densegen_axis_probe/`: study-local OPAL probes that consume
   DenseGen construction metadata through study-owned contracts.
@@ -53,6 +66,8 @@ stress_ethanol_cipro_growth/
 - `decision/opal/response_metastudy/`: compares the declared SFXI source
   evidence with response-window and RMF requirements without merging their
   vector contracts.
+- `decision/opal/response_window_label_promotion/`: thin adapter from one
+  verified observation bundle to OPAL's immutable label manifest.
 - `operations/status/service.py`: study status service orchestration and OPS
   contract binding.
 - `operations/status/snapshot.py`: record-backed snapshot assembly.

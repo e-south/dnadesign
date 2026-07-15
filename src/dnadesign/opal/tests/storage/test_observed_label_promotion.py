@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.opal.src.core.utils import OpalError, file_sha256
@@ -29,6 +31,7 @@ from dnadesign.opal.src.storage.observed_label_promotion import (
 LABEL_RELATIVE_PATH = "_opal/observed_labels.parquet"
 MANIFEST_RELATIVE_PATH = "_opal/observed_labels.manifest.json"
 PROVENANCE_RELATIVE_PATH = "_opal/study_label_provenance.json"
+CANDIDATE_RELATIVE_PATH = "records.parquet"
 
 
 def _label_frame() -> pd.DataFrame:
@@ -46,6 +49,14 @@ def _label_frame() -> pd.DataFrame:
 
 
 def _write_promotion(dataset_root: Path) -> tuple[Path, Path, dict]:
+    candidate_path = dataset_root / CANDIDATE_RELATIVE_PATH
+    pd.DataFrame(
+        {
+            "id": ["candidate_a", "candidate_b", "candidate_unmeasured"],
+            "sequence": ["ACGT", "TGCA", "AAAA"],
+            "x_feature": [[0.0, 1.0], [1.0, 0.0], [0.5, 0.5]],
+        }
+    ).to_parquet(candidate_path, index=False)
     label_path = dataset_root / LABEL_RELATIVE_PATH
     label_path.parent.mkdir(parents=True, exist_ok=True)
     _label_frame().to_parquet(label_path, index=False)
@@ -61,6 +72,7 @@ def _write_promotion(dataset_root: Path) -> tuple[Path, Path, dict]:
             "path": PROVENANCE_RELATIVE_PATH,
             "sha256": file_sha256(provenance_path),
         },
+        "candidate_artifact": _candidate_artifact(candidate_path),
         "label_artifact": {
             "path": LABEL_RELATIVE_PATH,
             "sha256": file_sha256(label_path),
@@ -80,7 +92,20 @@ def _binding(dataset_root: Path) -> ObservedLabelPromotionBinding:
         campaign_slug="promoter",
         study_id="stress_promoter",
         y_space="response_window_vector_v1",
+        candidate_x_column="x_feature",
     )
+
+
+def _candidate_artifact(path: Path) -> dict[str, object]:
+    parquet = pq.ParquetFile(path)
+    schema = parquet.schema_arrow
+    return {
+        "path": CANDIDATE_RELATIVE_PATH,
+        "sha256": file_sha256(path),
+        "row_count": int(parquet.metadata.num_rows),
+        "columns": schema.names,
+        "schema_sha256": sha256(schema.serialize().to_pybytes()).hexdigest(),
+    }
 
 
 def _store_with_label_frame(dataset_root: Path, frame: pd.DataFrame) -> ObservedLabelStore:
@@ -107,6 +132,9 @@ def test_verify_observed_label_promotion_accepts_exact_artifact(tmp_path: Path) 
     assert verified.row_count == 2
     assert verified.study_provenance_schema_id == "stress-study.labels.v1"
     assert verified.study_provenance_path == (tmp_path / PROVENANCE_RELATIVE_PATH).resolve()
+    assert verified.candidate_path == (tmp_path / CANDIDATE_RELATIVE_PATH).resolve()
+    assert verified.candidate_row_count == 3
+    assert verified.candidate_columns == ("id", "sequence", "x_feature")
 
 
 @pytest.mark.parametrize(
@@ -123,6 +151,15 @@ def test_verify_observed_label_promotion_accepts_exact_artifact(tmp_path: Path) 
         (
             lambda payload: payload["study_provenance"].update({"unexpected": "field"}),
             "study_provenance fields must be exactly",
+        ),
+        (lambda payload: payload["candidate_artifact"].update({"path": "other.parquet"}), "path"),
+        (lambda payload: payload["candidate_artifact"].update({"sha256": "0" * 64}), "SHA-256"),
+        (lambda payload: payload["candidate_artifact"].update({"row_count": 2}), "row_count"),
+        (lambda payload: payload["candidate_artifact"].update({"columns": ["id"]}), "candidate/X columns"),
+        (lambda payload: payload["candidate_artifact"].update({"schema_sha256": "0" * 64}), "schema identity"),
+        (
+            lambda payload: payload["candidate_artifact"].update({"unexpected": "field"}),
+            "candidate_artifact fields must be exactly",
         ),
         (lambda payload: payload["label_artifact"].update({"path": "_opal/other.parquet"}), "path"),
         (lambda payload: payload["label_artifact"].update({"sha256": "0" * 64}), "SHA-256"),
@@ -160,6 +197,34 @@ def test_verify_observed_label_promotion_rejects_dataset_escape(tmp_path: Path) 
 
     with pytest.raises(OpalError, match="manifest_path must remain within the USR dataset root"):
         verify_observed_label_promotion(binding)
+
+
+def test_verify_observed_label_promotion_rejects_duplicate_json_keys(tmp_path: Path) -> None:
+    _, manifest_path, _ = _write_promotion(tmp_path)
+    raw = manifest_path.read_text(encoding="utf-8")
+    raw = raw.replace(
+        '"campaign_slug": "promoter",',
+        '"campaign_slug": "promoter",\n  "campaign_slug": "other",',
+        1,
+    )
+    manifest_path.write_text(raw, encoding="utf-8")
+
+    with pytest.raises(OpalError, match="duplicate JSON key.*campaign_slug"):
+        verify_observed_label_promotion(_binding(tmp_path))
+
+
+def test_verify_observed_label_promotion_rejects_nested_duplicate_json_keys(tmp_path: Path) -> None:
+    _, manifest_path, _ = _write_promotion(tmp_path)
+    raw = manifest_path.read_text(encoding="utf-8")
+    raw = raw.replace(
+        f'"path": "{PROVENANCE_RELATIVE_PATH}",',
+        f'"path": "{PROVENANCE_RELATIVE_PATH}",\n    "path": "_opal/other.json",',
+        1,
+    )
+    manifest_path.write_text(raw, encoding="utf-8")
+
+    with pytest.raises(OpalError, match="duplicate JSON key.*path"):
+        verify_observed_label_promotion(_binding(tmp_path))
 
 
 def test_verify_observed_label_promotion_reports_non_file_artifact_as_contract_error(tmp_path: Path) -> None:
@@ -210,6 +275,29 @@ def test_manifest_pinned_store_reverifies_before_each_load(tmp_path: Path) -> No
         store.load()
 
 
+@pytest.mark.parametrize("mutation", ["sequence", "id", "x"], ids=["sequence", "candidate-id", "x-vector"])
+def test_manifest_pinned_store_rejects_candidate_snapshot_drift(tmp_path: Path, mutation: str) -> None:
+    label_path, _, _ = _write_promotion(tmp_path)
+    store = ObservedLabelStore(
+        path=label_path,
+        y_space="response_window_vector_v1",
+        promotion=_binding(tmp_path),
+    )
+    assert len(store.load()) == 2
+    candidate_path = tmp_path / CANDIDATE_RELATIVE_PATH
+    candidates = pd.read_parquet(candidate_path)
+    if mutation == "sequence":
+        candidates.loc[0, "sequence"] = "CCCC"
+    elif mutation == "id":
+        candidates.loc[0, "id"] = "candidate_changed"
+    else:
+        candidates.at[0, "x_feature"] = [9.0, 9.0]
+    candidates.to_parquet(candidate_path, index=False)
+
+    with pytest.raises(OpalError, match="candidate artifact SHA-256"):
+        store.load()
+
+
 def test_manifest_pinned_store_rejects_store_path_outside_verified_binding(tmp_path: Path) -> None:
     _write_promotion(tmp_path)
     other_path = tmp_path / "_opal" / "other_labels.parquet"
@@ -230,6 +318,15 @@ def test_manifest_pinned_store_rejects_mixed_y_spaces(tmp_path: Path) -> None:
     store = _store_with_label_frame(tmp_path, frame)
 
     with pytest.raises(OpalError, match="one Y space"):
+        store.observed_ids()
+
+
+def test_manifest_pinned_store_rejects_nested_vector_shape(tmp_path: Path) -> None:
+    frame = _label_frame()
+    frame["y_obs"] = [[[0.0] * 4, [1.0] * 4], [[1.0] * 4, [2.0] * 4]]
+    store = _store_with_label_frame(tmp_path, frame)
+
+    with pytest.raises(OpalError, match="one-dimensional"):
         store.observed_ids()
 
 

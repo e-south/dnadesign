@@ -1,7 +1,7 @@
 ## OPAL Architecture and Data Flow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-15
 
 OPAL executes each round through the stages below.
 
@@ -77,6 +77,6 @@ OPAL is fail-fast by design:
 - a configured shared label sidecar fails rather than falling back to
   campaign-local label history when it is missing, malformed, or points at
   unknown candidate IDs
-- a manifest-pinned sidecar fails when campaign, study, Y space, path, digest,
-  or row count differs from its promotion manifest; generic ingest cannot
-  mutate that source
+- a manifest-pinned sidecar fails when campaign, study, Y space, candidate/X
+  snapshot, path, digest, schema, columns, or row count differs from its
+  promotion manifest; generic ingest cannot mutate that source

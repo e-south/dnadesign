@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 
 import pandas as pd
@@ -215,6 +216,13 @@ def test_ingest_y_rejects_manifest_pinned_label_source_without_mutation(tmp_path
                     "schema_id": "stress-study.labels.v1",
                     "path": "_opal/study_label_provenance.json",
                     "sha256": file_sha256(provenance),
+                },
+                "candidate_artifact": {
+                    "path": "records.parquet",
+                    "sha256": file_sha256(records),
+                    "row_count": int(pq.ParquetFile(records).metadata.num_rows),
+                    "columns": pq.ParquetFile(records).schema_arrow.names,
+                    "schema_sha256": sha256(pq.ParquetFile(records).schema_arrow.serialize().to_pybytes()).hexdigest(),
                 },
                 "label_artifact": {
                     "path": "_opal/observed_labels.parquet",

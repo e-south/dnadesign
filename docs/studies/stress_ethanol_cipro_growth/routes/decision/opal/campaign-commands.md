@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-opal-campaign-commands
 surface: study-runbook
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 parent_route: README.md
 type: runbook
 plane: control-plane
@@ -32,11 +32,47 @@ validation must verify their digests, eligibility, and all three views.
 ### Promotion and execution
 
 The study-owned repeat-aggregation and `opal.observed_label_promotion.v1`
-publisher is not implemented. Generic `opal ingest-y` cannot modify this
-manifest-pinned source. Execute only after the study atomically publishes its
-label Parquet, provenance, and manifest under the frozen analysis policy.
+publisher are implemented and fail closed. The current policy has 12 unresolved
+repeated candidates and no study approval, so no production observation or
+label bundle exists. Generic `opal ingest-y` cannot modify this manifest-pinned
+source. Execute only after repeat triage, named approval, atomic publication,
+and independent verification of the label Parquet, provenance, and manifest.
 
-After that publisher exists and the three artifacts verify, use:
+Preview the current label-truth gate without writing artifacts:
+
+```bash
+uv run python -m \
+  dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
+  preview \
+  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
+```
+
+Only after the policy is approved and preview reports
+`ready_to_materialize: true`, materialize a named observation bundle and publish
+the create-only OPAL handoff:
+
+```bash
+OBS_ROOT=src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations
+OBS_BUNDLE="$OBS_ROOT/approved_v1"
+DATASET=src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates
+
+uv run python -m \
+  dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
+  materialize \
+  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
+  --out-dir "$OBS_BUNDLE" \
+  --allowed-output-root "$OBS_ROOT"
+
+uv run python -m \
+  dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_window_label_promotion \
+  publish \
+  --observation-bundle "$OBS_BUNDLE" \
+  --dataset-root "$DATASET"
+```
+
+After the three published artifacts verify, use:
 
 ```bash
 CONFIG=src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
