@@ -104,7 +104,7 @@ def _selected_overview_cell() -> str:
             _header_lines = build_notebook_campaign_header_lines(
                 selected_campaign_model, selection_view=selected_selection_view, heading_level=2
             )
-            selected_campaign_brief_md = mo.md(_header_lines[2] if len(_header_lines) > 2 else "")
+            selected_campaign_brief_md = mo.md("\\n".join(_header_lines))
             _overview_rows = build_notebook_at_a_glance_rows(
                 selected_campaign_model, selection_view=selected_selection_view
             )

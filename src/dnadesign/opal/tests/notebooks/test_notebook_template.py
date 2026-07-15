@@ -102,6 +102,12 @@ def test_notebook_template_uses_medium_width() -> None:
     assert 'marimo.App(width="full")' not in text
 
 
+def test_notebook_template_keeps_evidence_status_in_first_viewport() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+
+    assert 'selected_campaign_brief_md = mo.md("\\n".join(_header_lines))' in text
+
+
 def test_notebook_campaign_summary_exposes_rmf_target_partition() -> None:
     selection_view = {
         "id": "ethanol",

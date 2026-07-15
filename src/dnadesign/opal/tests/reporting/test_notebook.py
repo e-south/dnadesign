@@ -14,7 +14,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import yaml
+
 from dnadesign.opal.src.analysis.notebook_components import (
+    build_notebook_at_a_glance_rows,
+    build_notebook_campaign_header_lines,
     build_notebook_validity_rows,
     build_notebook_visual_surface_model,
 )
@@ -104,6 +108,145 @@ def test_notebook_view_model_loads_run_scoped_selection_batch(tmp_path: Path, mo
 
     assert calls == [("0", "run-1")]
     assert payload["selection_batch"]["unique_count"] == 1
+
+
+def test_notebook_view_model_loads_latest_selection_batch_without_run_pin(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path)
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path)
+    write_ledger(workdir, run_id="run-1", round_index=0)
+
+    import dnadesign.opal.src.reporting.notebook as notebook_reporting
+
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_load_selection_batch(config: Path, *, round_selector: str, run_id: str | None):
+        calls.append((round_selector, run_id))
+        assert config == config_path.resolve()
+        return {
+            "schema_version": "opal.selection_batch.v1",
+            "as_of_round": 0,
+            "run_id": "run-1",
+            "unique_count": 1,
+            "rows": [{"id": "a", "selection_view_ids": ["primary"]}],
+        }
+
+    monkeypatch.setattr(notebook_reporting, "load_selection_batch", fake_load_selection_batch)
+
+    payload = build_notebook_view_model(config_path, round_selector="latest")
+
+    assert calls == [("latest", None)]
+    assert payload["status"]["run_id_selector"] is None
+    assert payload["selection_batch"]["run_id"] == "run-1"
+    assert payload["selection_batch"]["unique_count"] == 1
+
+
+def test_notebook_view_model_surfaces_manifest_pinned_label_block_as_non_claim(
+    tmp_path: Path,
+) -> None:
+    dataset_root = tmp_path / "usr" / "datasets" / "demo_candidates"
+    dataset_root.mkdir(parents=True)
+    records_path = dataset_root / "records.parquet"
+    write_records(records_path)
+    workdir = tmp_path / "campaign"
+    workdir.mkdir()
+    config_path = workdir / "campaign.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "opal.campaign.v3",
+                "ownership": {
+                    "owner_scope": "study_campaign",
+                    "study_id": "stress_promoter",
+                    "dataset_id": "demo_candidates",
+                    "portable": False,
+                },
+                "campaign": {"name": "Promoter RMF", "slug": "promoter_rmf", "workdir": str(workdir)},
+                "data": {
+                    "location": {
+                        "kind": "usr",
+                        "path": str(tmp_path / "usr" / "datasets"),
+                        "dataset": "demo_candidates",
+                    },
+                    "x_column_name": "X",
+                    "y_column_name": "response_window_vector",
+                    "y_expected_length": 1,
+                },
+                "labels": {
+                    "source": {
+                        "kind": "usr_sidecar",
+                        "dataset": "demo_candidates",
+                        "path": "_opal/observed_labels.parquet",
+                        "manifest_path": "_opal/observed_labels.manifest.json",
+                    },
+                    "y_space": "reader_response_window_vector_v1",
+                },
+                "writeback": {"prediction_records": "ledger_only"},
+                "transforms_x": {"name": "identity", "params": {}},
+                "transforms_y": {
+                    "name": "vector_from_table_v1",
+                    "params": {"value_columns": ["value"]},
+                },
+                "model": {"name": "random_forest", "params": {"n_estimators": 5, "random_state": 0}},
+                "selection_views": [
+                    {
+                        "id": "primary",
+                        "objective": {"name": "scalar_identity_v1", "params": {}},
+                        "selection": {
+                            "name": "top_n",
+                            "params": {
+                                "top_k": 1,
+                                "score_ref": "scalar",
+                                "objective_mode": "maximize",
+                                "tie_handling": "competition_rank",
+                            },
+                        },
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    payload = build_notebook_view_model(config_path, round_selector="latest")
+
+    label_status = payload["label_source_status"]
+    assert label_status["manifest_pinned"] is True
+    assert label_status["valid"] is False
+    assert "Observed-label promotion manifest not found" in label_status["error"]
+    blocking = [row for row in payload["warnings"] if row["severity"] == "error"]
+    assert [row["category"] for row in blocking] == ["LabelSourceContractError"]
+    assert blocking[0]["message"] == label_status["error"]
+
+    validity = {row["field"]: row["value"] for row in build_notebook_validity_rows(payload)}
+    assert validity["Label readiness"] == "blocked"
+    assert validity["Blocking issues"] == 1
+    assert validity["Label contract"] == label_status["error"]
+
+    selection_view = payload["campaign"]["selection_views"][0]
+    glance = {
+        row["field"]: row["value"]
+        for row in build_notebook_at_a_glance_rows(
+            payload,
+            selection_view=selection_view,
+        )
+    }
+    assert glance["label readiness"] == "blocked"
+    assert glance["label contract"] == label_status["error"]
+    assert glance["claim boundary"] == (
+        "No model or selection claim is available until the observed-label contract verifies."
+    )
+    header = "\n".join(build_notebook_campaign_header_lines(payload, selection_view=selection_view))
+    assert "**Evidence status:** Blocked." in header
+    assert "No model or selection claim is available" in header
+    assert f"**Blocking label contract:** {label_status['error']}" in header
 
 
 def test_notebook_view_model_includes_configured_plot_inventory(tmp_path: Path) -> None:

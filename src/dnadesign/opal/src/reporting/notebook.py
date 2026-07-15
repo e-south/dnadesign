@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from ..analysis.campaign import CampaignAnalysis
 from ..analysis.notebook_components import (
     discover_label_staging_inputs,
@@ -31,6 +33,12 @@ from ..plots.manifests import (
     PLOT_MANIFEST_INDEX_SCHEMA_VERSION,
     load_plot_artifact_manifest,
     load_plot_manifest_index,
+)
+from ..storage.label_sources import (
+    CampaignHistoryLabelSource,
+    SharedObservedLabelSource,
+    label_source_from_config,
+    label_source_status,
 )
 from .artifact_garden import build_artifact_garden_audit
 from .progress import build_campaign_progress
@@ -51,6 +59,7 @@ def build_notebook_view_model(
     analysis = CampaignAnalysis.from_config_path(Path(config_path) if config_path is not None else None, allow_dir=True)
     cfg = analysis.config
     ws = analysis.workspace
+    store = analysis.records_store()
     warnings: list[dict[str, Any]] = []
     resolved_round_selector, resolved_run_id = resolve_notebook_run_scope(
         analysis,
@@ -72,6 +81,26 @@ def build_notebook_view_model(
             "error": str(exc),
         }
         warnings.append(_warning("ProgressContractError", str(exc), severity="error"))
+
+    try:
+        label_readiness = _build_label_source_readiness(cfg=cfg, store=store)
+    except Exception as exc:
+        source_cfg = cfg.labels.source
+        label_readiness = {
+            "kind": getattr(source_cfg, "kind", "unknown"),
+            "valid": False,
+            "manifest_pinned": bool(getattr(source_cfg, "manifest_path", None)),
+            "error": str(exc),
+        }
+    if _label_source_is_blocking(label_readiness):
+        warnings.append(
+            _warning(
+                "LabelSourceContractError",
+                str(label_readiness.get("error") or "Manifest-pinned observed-label source is not verified."),
+                path=label_readiness.get("manifest_path") or label_readiness.get("path"),
+                severity="error",
+            )
+        )
 
     if review_manifest_path is not None:
         review_paths = [Path(review_manifest_path)]
@@ -115,7 +144,7 @@ def build_notebook_view_model(
     stale_artifacts.extend(_detect_unmanifested_plot_outputs(ws.outputs_dir / "plots", plot_manifests))
 
     selection_batch = None
-    if resolved_run_id is not None:
+    if ws.ledger_runs_path.exists():
         try:
             selection_batch = load_selection_batch(
                 analysis.config_path,
@@ -142,7 +171,7 @@ def build_notebook_view_model(
             "metadata": dict(getattr(cfg.campaign, "metadata", {}) or {}),
             "workdir": str(ws.workdir),
             "config_path": str(analysis.config_path),
-            "records_path": str(analysis.records_store().records_path),
+            "records_path": str(store.records_path),
             "x_column": cfg.data.x_column_name,
             "y_column": cfg.data.y_column_name,
             "label_source": getattr(cfg.labels.source, "kind", "campaign_history"),
@@ -167,6 +196,7 @@ def build_notebook_view_model(
         "review_manifest_paths": review_manifest_paths,
         "review_manifests": review_manifests,
         "configured_plots": configured_plots,
+        "label_source_status": label_readiness,
         "label_staging": discover_label_staging_inputs(ws.workdir),
         "reader_evidence": discover_reader_evidence_manifests(ws.workdir),
         "reader_evidence_artifacts": discover_reader_evidence_artifacts(ws.workdir),
@@ -176,6 +206,31 @@ def build_notebook_view_model(
         "stale_artifacts": stale_artifacts,
         "warnings": warnings,
     }
+
+
+def _build_label_source_readiness(*, cfg: Any, store: Any) -> dict[str, Any]:
+    """Return label readiness without scanning records when required artifacts are absent."""
+
+    source = label_source_from_config(cfg, store)
+    status_frame = pd.DataFrame(columns=["id"])
+    if isinstance(source, CampaignHistoryLabelSource):
+        if store.label_hist_col() in store.schema_columns():
+            status_frame = store.load_label_status_frame()
+    elif isinstance(source, SharedObservedLabelSource):
+        observed = source.store
+        manifest_exists = True
+        if observed.promotion is not None:
+            manifest_path = Path(observed.promotion.dataset_root) / observed.promotion.manifest_path
+            manifest_exists = manifest_path.exists()
+        if observed.path.exists() and manifest_exists:
+            status_frame = store.load_label_status_frame()
+    return label_source_status(cfg, store, status_frame, strict=False)
+
+
+def _label_source_is_blocking(status: dict[str, Any]) -> bool:
+    if status.get("valid") is False:
+        return True
+    return bool(status.get("manifest_pinned")) and status.get("valid") is not True
 
 
 def smoke_check_notebook(path: str | Path, *, run_marimo_check: bool = True) -> dict[str, Any]:

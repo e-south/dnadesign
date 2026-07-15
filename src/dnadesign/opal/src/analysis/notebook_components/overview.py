@@ -64,7 +64,12 @@ def build_notebook_campaign_header_lines(
     marker = "#" * level
     description = _campaign_description(campaign)
     target = _objective_target_summary(selection_view)
-    return [f"{marker} {title}", "", description, "", f"**Objective target:** {target}."]
+    lines = [f"{marker} {title}", "", description]
+    evidence_lines = _campaign_evidence_status_lines(view_model)
+    if evidence_lines:
+        lines.extend(("", *evidence_lines))
+    lines.extend(("", f"**Objective target:** {target}."))
+    return lines
 
 
 def _campaign_title(campaign: Mapping[str, Any]) -> str:
@@ -147,6 +152,7 @@ def build_notebook_at_a_glance_rows(
     status = mapping(view_model.get("status"))
     workdir = campaign.get("workdir")
     selected_count = selection_count(view_model)
+    label_status = mapping(view_model.get("label_source_status"))
     rows = [
         {"field": "campaign", "value": row["campaign"]},
         {"field": "description", "value": _campaign_description(campaign)},
@@ -160,11 +166,17 @@ def build_notebook_at_a_glance_rows(
         {"field": "selection view", "value": selection_view.get("id")},
         {"field": "objective target", "value": _objective_target_summary(selection_view)},
         {"field": "label source", "value": row["label_source"]},
+        {"field": "label readiness", "value": _label_source_readiness_label(label_status)},
         {"field": "label context", "value": row["label_context"] or "not recorded"},
         {"field": "campaign metadata", "value": row["metadata_context"] or "not recorded"},
         {"field": "config", "value": compact_path(campaign.get("config_path"), base=workdir)},
         {"field": "workspace", "value": compact_path(workdir, max_parts=1)},
     ]
+    if label_status.get("error"):
+        rows.append({"field": "label contract", "value": str(label_status["error"])})
+    claim_boundary = _campaign_claim_boundary(view_model)
+    if claim_boundary:
+        rows.append({"field": "claim boundary", "value": claim_boundary})
     if selected_count is not None:
         rows.append({"field": "selected count", "value": selected_count})
     rows.extend(
@@ -253,8 +265,10 @@ def build_notebook_trust_rows(view_model: Mapping[str, Any]) -> list[dict[str, A
         if isinstance(item, Mapping)
     ]
     blocking_count = sum(1 for item in warnings if item.get("severity") == "error")
+    label_status = mapping(view_model.get("label_source_status"))
     return [
         {"field": "status", "value": status.get("progress_status") or "unknown"},
+        {"field": "label readiness", "value": _label_source_readiness_label(label_status)},
         {"field": "rounds", "value": status.get("round_count") or 0},
         {"field": "state file", "value": "present" if state.get("exists") else "missing"},
         {
@@ -305,8 +319,10 @@ def build_notebook_validity_rows(view_model: Mapping[str, Any]) -> list[dict[str
     review_state = len(mapping(view_model.get("review_manifests")))
     state_text = "present" if state.get("exists") else "missing"
     artifact_schema = artifact_garden.get("schema_version") or "unavailable"
-    return [
+    label_status = mapping(view_model.get("label_source_status"))
+    rows = [
         {"field": "Campaign status", "value": status.get("progress_status") or "unknown"},
+        {"field": "Label readiness", "value": _label_source_readiness_label(label_status)},
         {"field": "Progress schema", "value": progress.get("schema_version") or "missing"},
         {"field": "State file", "value": state_text},
         {"field": "Review manifests", "value": review_state},
@@ -319,6 +335,9 @@ def build_notebook_validity_rows(view_model: Mapping[str, Any]) -> list[dict[str
         {"field": "Prune requires apply", "value": prune_plan.get("requires_apply", True)},
         {"field": "Blocking issues", "value": blocking_count},
     ]
+    if label_status.get("error"):
+        rows.append({"field": "Label contract", "value": str(label_status["error"])})
+    return rows
 
 
 def build_notebook_distrust_lines(view_model: Mapping[str, Any]) -> list[str]:
@@ -334,6 +353,7 @@ def build_notebook_distrust_rows(view_model: Mapping[str, Any]) -> list[dict[str
     visual_surface = build_notebook_visual_surface_model(view_model)
     warnings = sequence(view_model.get("warnings"))
     stale = sequence(view_model.get("stale_artifacts"))
+    label_status = mapping(view_model.get("label_source_status"))
     rows = [
         {
             "field": "surface boundary",
@@ -354,4 +374,52 @@ def build_notebook_distrust_rows(view_model: Mapping[str, Any]) -> list[dict[str
         rows.append({"field": "warnings", "value": len(warnings)})
     if stale:
         rows.append({"field": "stale artifacts ignored by active manifests", "value": len(stale)})
+    if _label_source_readiness_label(label_status) == "blocked":
+        rows.append(
+            {
+                "field": "label contract",
+                "value": str(label_status.get("error") or "Manifest-pinned observed-label source is not verified."),
+            }
+        )
     return rows
+
+
+def _label_source_readiness_label(status: Mapping[str, Any]) -> str:
+    if not status:
+        return "not reported"
+    if status.get("valid") is True:
+        return "ready"
+    if status.get("valid") is False or (status.get("manifest_pinned") and status.get("valid") is not True):
+        return "blocked"
+    return "not verified"
+
+
+def _campaign_claim_boundary(view_model: Mapping[str, Any]) -> str:
+    label_status = mapping(view_model.get("label_source_status"))
+    if not label_status:
+        return ""
+    readiness = _label_source_readiness_label(label_status)
+    status = mapping(view_model.get("status"))
+    if readiness == "blocked":
+        return "No model or selection claim is available until the observed-label contract verifies."
+    if readiness != "ready":
+        return "No model or selection claim is available until label readiness verifies."
+    if int(status.get("round_count") or 0) == 0:
+        return "No model or selection claim is available until a campaign run completes."
+    return "Review evidence is scoped to the selected campaign run; synthesis authorization remains study-owned."
+
+
+def _campaign_evidence_status_lines(view_model: Mapping[str, Any]) -> list[str]:
+    label_status = mapping(view_model.get("label_source_status"))
+    if not label_status:
+        return []
+    readiness = _label_source_readiness_label(label_status)
+    boundary = _campaign_claim_boundary(view_model)
+    if readiness == "blocked":
+        lines = [f"**Evidence status:** Blocked. {boundary}"]
+        if label_status.get("error"):
+            lines.append(f"**Blocking label contract:** {label_status['error']}")
+        return lines
+    if readiness == "ready":
+        return [f"**Evidence status:** Observed-label source verified. {boundary}"]
+    return [f"**Evidence status:** Label readiness is not verified. {boundary}"]
