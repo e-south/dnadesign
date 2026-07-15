@@ -55,11 +55,11 @@ def build_response_separation_rows(
                         "response_separation": float(components.response_separation[index]),
                         "on_magnitude_floor": float(components.on_magnitude_floor[index]),
                         "off_magnitude_ceiling": float(components.off_magnitude_ceiling[index]),
-                        "passes_response_zero": bool(components.response_separation[index] > 0.0),
+                        "passes_response_zero": bool(components.response_separation[index] >= 0.0),
                         "passes_on_magnitude_floor_zero": bool(components.on_magnitude_floor[index] >= 0.0),
                         "passes_off_magnitude_ceiling_zero": bool(components.off_magnitude_ceiling[index] <= 0.0),
                         "passes_all_zero_constraints": bool(
-                            components.response_separation[index] > 0.0
+                            components.response_separation[index] >= 0.0
                             and components.on_magnitude_floor[index] >= 0.0
                             and components.off_magnitude_ceiling[index] <= 0.0
                         ),

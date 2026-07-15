@@ -34,6 +34,19 @@ def test_response_separation_keeps_components_separate() -> None:
     assert not row["passes_all_zero_constraints"]
 
 
+def test_zero_response_separation_matches_the_rmf_boundary() -> None:
+    summary = pd.DataFrame([_summary_row("primary", "candidate-1", (0.0, 1.0, 1.0, 1.0))])
+    summary.loc[:, ["b00", "b01"]] = -1.0
+    summary.loc[:, ["b10", "b11"]] = 1.0
+    ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
+
+    row = response_magnitude.build_response_separation_rows(summary, target_views=(ethanol,)).iloc[0]
+
+    assert row["response_separation"] == 0.0
+    assert row["passes_response_zero"]
+    assert row["passes_all_zero_constraints"]
+
+
 def test_response_separation_stability_uses_declared_primary_reduction() -> None:
     summaries = pd.DataFrame(
         [
