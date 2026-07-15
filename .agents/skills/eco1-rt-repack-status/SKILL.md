@@ -2,7 +2,7 @@
 name: eco1-rt-repack-status
 description: Report record-backed status for eco1_rt_repack. Use for Eco1 RT phase, datasets, generation policy, fold/selection review, or RT-lnRNA handoff. Do not use for another study or for family-level routing.
 metadata:
-  version: 0.1.22
+  version: 0.1.23
   category: workflow-automation
   tags: [studies, eco1-rt-repack, thread, status, routes]
 ---
@@ -23,7 +23,7 @@ MSA-observed, non-acidifying substitutions in the declared peripheral
 nucleic-acid-facing shell for a diversity-seeking experimental panel.
 
 The study does not claim improved activity, affinity, processivity, strand
-displacement, or safety.
+displacement, safety, or a monomeric RT-msDNA assembly state.
 
 ## Scope
 
@@ -61,6 +61,10 @@ Out of scope:
   peripheral, and 177 combined rows; and an eight-row selected panel containing
   two distal, three peripheral, and three combined sequences. All active rows
   carry the v3 policy hash.
+- State that the fold workflow models one RT chain and does not establish
+  RT-msDNA oligomeric state. Wang tested R13A as an interface-disrupting
+  substitution; no sequence in the v3 pool contains R13A. Report exact F10/R13
+  states without treating them as gates or monomer evidence.
 - Eco1-specific policy remains in the study; reusable ProteinMPNN request and
   sample-ingest mechanics route through `dnadesign.thread.adapters.proteinmpnn`,
   reusable candidate-table mechanics route through `dnadesign.thread.candidates`,

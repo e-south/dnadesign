@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-implementation-roadmap
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-11
+last_verified: 2026-07-15
 status: active-runtime-sequence
 primary_audience:
   - dnadesign-maintainers
@@ -62,12 +62,12 @@ artifact mechanics must use public `dnadesign.thread` APIs.
 6. **Selection**
    - Keep accepted fold models that pass the local-geometry contract.
    - Validate the declared peripheral chemistry and proximal MSA support.
-   - Report R13 and other alpha-1 substitutions without filtering or ranking by them.
+   - Report exact F10/R13 substitutions and the Wang R13A evidence match without filtering or ranking by them.
    - Assign selection-contract rows to distal, peripheral, and combined policy pools without treating policy as quality.
    - Select the most mutation-set-dissimilar pair within each pool.
    - Add one peripheral and one combined row by maximum minimum distance from the corresponding pair.
    - Retain all eight rows: two distal, three peripheral, and three combined.
-   - Use chemistry, MSA support, local RMSD, fold metrics, and sequence hash as later tie-breaks.
+   - Use chemistry, MSA support, local RMSD, fold metrics, and sequence hash only if earlier criteria tie.
 
 7. **Review bundle**
    - Regenerate the selection manifest, plots, selected structure browser, and marimo notebook.

@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-selection-hardening-dev-spec
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-13
+last_verified: 2026-07-15
 status: active-selection-contract
 primary_audience:
   - future-agents
@@ -34,7 +34,7 @@ Selection requires:
 3. local C-alpha RMSD by named region after one global mapped fit;
 4. canonical mutation positions and exact substitutions;
 5. peripheral charge events and regional MSA support;
-6. R13 and alpha-1 mutation annotations.
+6. exact F10/R13 substitutions and the Wang R13A evidence-match annotation.
 
 ESMC and SAE are optional model checks. They are not required inputs and do not
 select rows.
@@ -98,6 +98,12 @@ independent mechanisms. Report shared positions and substitutions within each
 policy because cross-policy distances are inflated by different open-position
 sets.
 
+The first pair is globally maximal within its group. A three-row group is built
+by adding the candidate farthest from that pair; it is not a global search over
+all possible triples. In the materialized panel, position distance determines
+all identities and exact-substitution distance resolves one distal tie. The
+remaining evidence fields are available tie-breakers but did not choose a row.
+
 Policy allocation defines the experimental comparison: two distal, three
 peripheral, and three combined rows in one selected panel. These sequence
 instances are not biological replicates, and the policy groups are not quality
@@ -118,6 +124,21 @@ All selected peripheral and combined rows change C233 and G254; five change
 K230. The two distal rows do not. These positions belong to the designable
 `230-254` boundary, not the fixed `255-311` set. Review figures must show that
 boundary separately.
+
+### RT-msDNA Assembly Scope
+
+Wang reports that two Ec86 RT-msDNA protomers form a homodimer through
+reciprocal contacts between RT alpha-1 residues F10/R13 and msDNA in the other
+protomer. R13A disrupted the interaction while retaining msDNA and the tested
+antiphage phenotype. The paper did not test other F10 or R13 substitutions as
+general monomerization mutations.
+
+The candidate structures contain one RT chain and do not evaluate oligomeric
+state. No selected sequence contains R13A. Exact F10/R13 states and whether a
+sequence matches the tested R13A substitution are review fields, not selection
+criteria. A monomerization panel would require R13A to be fixed upstream in
+every complete generation policy and the resulting sequences to be folded and
+reviewed as new candidates.
 
 ### Minimal Review Bundle
 
@@ -140,7 +161,7 @@ generation summaries are context. They must not appear as extra selectors.
 
 | Source | Role | Limit |
 | --- | --- | --- |
-| Wang et al. 2022, DOI `10.1038/s41564-022-01197-7`; RCSB `7V9U` | Ec86 RT-msDNA/RNA geometry, direct contacts, electropositive-surface context, and the alpha-1/R13 protomer-interface observation. | R13A disrupted the two-protomer interaction but retained msDNA and the tested antiphage phenotype; alpha-1 was not conserved in the compared retron RTs. R13 is therefore an annotation, not a functional gate. |
+| Wang et al. 2022, DOI `10.1038/s41564-022-01197-7`; RCSB `7V9U` | Ec86 RT-msDNA/RNA geometry, direct contacts, electropositive-surface context, and the F10/R13 cross-protomer interface. | R13A disrupted the two-protomer interaction while retaining msDNA and the tested antiphage phenotype. This does not establish the assembly state or function of other F10/R13 substitutions. |
 | Inouye et al. 1999, DOI `10.1074/jbc.274.44.31236` | C-terminal 91-residue primer-template recognition context. | Does not define a structural cutoff. |
 | Inouye et al. 2004, DOI `10.1074/jbc.M408462200` | `255-320` primer-recognition RNA-binding fragment. | Does not make C-terminal redesign routine. |
 | Tao et al. 2026, DOI `10.1038/s41587-026-03149-6` | Constraint-first RT redesign, ProteinMPNN generation, and structural filtering. | Does not validate Eco1 shells, cutoffs, or activity claims. |

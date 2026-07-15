@@ -49,7 +49,7 @@ datasets:
     kind: checked_in_record
     path: docs/studies/eco1_rt_repack/workbench/provenance/structure-preprocessing.yaml
     status: selected_policy
-    description: Study-owned provenance policy for raw RCSB 7V9U dimer context, selected ec86kit protomer-1 model, retained protein/DNA/RNA chains, excluded paired protomer context, and the explicit non-objective of preserving paired-protomer dimerization in this first profile.
+    description: Study-owned provenance policy for raw RCSB 7V9U dimer context, the selected ec86kit protomer-1 modeling unit, retained protein/DNA/RNA chains, and excluded paired-protomer context. The selected protomer does not establish oligomeric state.
   - id: eco1_rt_residue_numbering_policy
     owner: eco1_rt_repack
     kind: checked_in_record
@@ -199,7 +199,7 @@ datasets:
     kind: generated_artifact
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
     status: materialized_local
-    description: Local generated raw-to-protomer provenance manifest for RCSB 7V9U/ec86kit protomer 1; verifies RT chain A, retained DNA chain D, retained RNA chains E/F, excluded paired-protomer context, and the explicit non-objective of preserving dimerization.
+    description: Local generated raw-to-protomer provenance manifest for RCSB 7V9U/ec86kit protomer 1; verifies RT chain A, retained DNA chain D, retained RNA chains E/F, and excluded paired-protomer context. It does not determine oligomeric state.
   - id: eco1_rt_conservation_profile
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -597,11 +597,12 @@ datasets:
     status: materialized
     description: >-
       Source-derived residue map, structural screen, selected-mutation map,
-      16:9 protected-evidence movie with one full turn per category, and a 16:9
-      WT-plus-selected qualitative ChimeraX Coulombic movie with one full turn
-      per sequence and a fixed unit-bearing potential scale. The notebook
-      exposes these artifacts through one communication-visual evidence set;
-      none adds a selection rule.
+      16:9 protected-evidence movie with one full turn per category, a centered
+      cycle over all 738 local-geometry-retained ColabFold models, and a 16:9
+      reference-plus-selected qualitative ChimeraX Coulombic movie with one
+      full turn per sequence and a fixed unit-bearing potential scale. The
+      notebook exposes present artifacts through one communication-visual
+      evidence set; none adds a selection rule.
   - id: eco1_rt_msa_plurality_mask_panel
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -692,12 +693,13 @@ datasets:
     path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_mutation_set_dissimilarity.svg
     status: materialized
     description: >-
-      Compact review visual showing pairwise mutated-position Jaccard distance
-      among the selected protein candidates and its distribution among
-      structurally retained pairs generated with the same fixed and open
-      residue rules. Exact-substitution distance remains in the selected-panel
-      table and selection tie-break. The visual audits residual overlap; it
-      does not establish independent mechanisms or measure RT activity.
+      Compact review visual showing within-group mutated-position Jaccard
+      distances among selected candidates and separate cumulative pair
+      distributions for the distal, peripheral, and combined pools.
+      Cross-group cells are omitted because the policies expose different
+      positions. Exact-substitution distance remains in the selected-panel
+      table. The visual audits overlap; it does not establish independent
+      mechanisms or measure RT activity.
   - id: eco1_rt_selection_selected_substitutions_across_rt
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -818,8 +820,9 @@ datasets:
     status: materialized
     description: >-
       Materialized selected panel built from v3 rows that pass the generation
-      constraints and local-backbone rule. R13 is reported but does not filter
-      or rank rows. The panel contains two distal, three peripheral, and three
+      constraints and local-backbone rule. Exact F10/R13 substitutions and the
+      Wang R13A evidence match are reported but do not filter or rank rows. The
+      RT-msDNA oligomeric state is not established. The panel contains two distal, three peripheral, and three
       combined sequences. The first pair in each group maximizes
       mutated-position Jaccard distance and then exact-substitution Jaccard
       distance; each third peripheral or combined row maximizes its minimum
@@ -842,8 +845,11 @@ datasets:
     description: >-
       Hash-linked handoff for all eight selected 963-bp Eco1 RT CDS designs.
       The bundle includes a Twist CSV, FASTA, and one annotated GenBank file per
-      candidate. Internal BsaI and BsmBI sites are absent. Assembly flanks and
-      the live vendor complexity check remain pending.
+      candidate. It reports exact F10/R13 states, the Wang R13A evidence match,
+      and unresolved RT-msDNA assembly state. Internal BsaI and BsmBI sites are
+      absent. The substitution-only codon policy and codon-table hash are
+      recorded; the codon table's external source provenance is not. Assembly
+      flanks and the live vendor complexity check remain pending.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact

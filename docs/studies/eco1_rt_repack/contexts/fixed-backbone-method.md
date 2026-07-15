@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-fixed-backbone-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-12
+last_verified: 2026-07-15
 ---
 
 ## Fixed-Backbone Method
@@ -47,7 +47,8 @@ a monolithic recipe:
 - Wang et al. provides the Eco1/Ec86 structural context and direct-contact
   priors. The current mask consumes the audited direct-contact rows as active
   protection evidence; RT1-RT7 intervals remain review labels, not blanket mask
-  authority.
+  authority. Wang's R13A result concerns the interface between two RT-msDNA
+  protomers. A single-chain fold model does not establish that assembly state.
 - Inouye et al. 1999 and Inouye et al. 2004 provide Ec86-specific evidence
   that the C-terminal/thumb region participates in cognate primer-RNA
   recognition. This supports a visible C-terminal/thumb review axis. It does

@@ -2,7 +2,7 @@
 doc_id: eco1-rt-repack-command-groups
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-13
+last_verified: 2026-07-15
 status: active
 ---
 
@@ -150,15 +150,16 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
   --output-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3
 ```
 
-The visible flow is complete candidates, local-geometry pass, generation
-chemistry/support confirmation, assignment to the distal, peripheral, and combined policy pools,
-and the eight-row selected panel. The first pair in each policy maximizes
+The visible flow is complete candidates, local-geometry pass, assignment to the
+distal, peripheral, and combined policy pools, and the eight-row selected panel.
+The first pair in each policy maximizes
 mutated-position Jaccard distance before exact-substitution distance. Each third
 peripheral or combined row maximizes minimum distance from the corresponding
-pair. Charge counts, MSA support,
-local RMSD, fold metrics, and sequence hash are later tie-breaks.
-R13 and other alpha-1 substitutions are reported annotations; they do not
-filter or rank candidates.
+pair. Charge counts, MSA support, local RMSD, fold metrics, and sequence hash
+are used only if earlier criteria tie; they did not determine the selected ids.
+Exact F10/R13 substitutions and a Wang R13A evidence-match field are reported;
+they do not filter or rank candidates. The fold review does not establish the
+RT-msDNA oligomeric state.
 
 ### 7. Build The Twist Handoff
 
@@ -169,10 +170,11 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 
 This writes eight exact 963-bp CDS designs, a vendor CSV, FASTA, one annotated
 GenBank file per sequence, and a hash-linked manifest. Unchanged residues retain
-the authoritative WT codon; changed residues use one recorded E. coli codon
-policy. Vendor codon optimization is disabled. The sequence bundle excludes
-internal BsaI and BsmBI sites. Assembly flanks and junctions remain a separate
-cloning decision.
+the authoritative WT codon; changed residues use the highest-frequency codon
+in the packaged E. coli table. This is substitution-only minimal recoding, not
+whole-gene codon optimization. Vendor codon optimization is disabled. The
+sequence bundle excludes internal BsaI and BsmBI sites. Assembly flanks and
+junctions remain a separate cloning decision.
 
 ### 8. Build The Review Notebook
 
@@ -182,15 +184,32 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
   --selection-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection
 ```
 
-To refresh the 16:9 protected-evidence movie and WT-plus-selected qualitative
-Coulombic movie, add `--render-communication-chimerax`. Each category or
-sequence receives one five-second full turn. The protected movie uses a
-translucent surface over the protein cartoon and active-category side chains;
-the Coulombic movie uses an opaque surface and a fixed unit-bearing scale. This
-explicit path opens one graphical ChimeraX process at a time, writes
-hash-tracked outputs, and exits. Default
-materialization reuses current outputs and omits absent optional files from the
-notebook dropdown.
+Movie rendering is explicit because the three targets have different costs:
+
+```bash
+uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables \
+  --repo-root . \
+  --selection-root src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection \
+  --render-communication-movie protected-evidence \
+  --render-communication-movie proposal-backbones \
+  --render-communication-movie selected-electrostatics
+```
+
+`protected-evidence` gives each protected or open residue category one full
+turn on the retained complex. `proposal-backbones` cycles all 738 models
+retained by the declared local-geometry review over one centered cryo-EM RT
+reference. Distal, peripheral, and combined chapters open and close one model
+at a time. Each frame reports exact full-length WT sequence identity and
+substitution count, with evenly distributed candidate dwell time. These values
+describe sequence change rather than predicted function. Candidate sticks show
+all modeled side chains rather than mutation-only highlights. The 269 models outside the local review cutoff remain in the
+quantitative funnel but are not presented as poor folds; all 1,007 ColabFold
+models belong to accepted strong- or good-fold review classes.
+`selected-electrostatics` gives the reference and each selected model one full
+turn with an opaque protein surface and a fixed unit-bearing Coulombic scale.
+Each target starts 180 degrees from the approved interactive pose, completes
+full turns, is hash-tracked, and is reusable. Default materialization does not
+launch ChimeraX and omits absent movies from notebook choices.
 
 Validate the generated notebook:
 

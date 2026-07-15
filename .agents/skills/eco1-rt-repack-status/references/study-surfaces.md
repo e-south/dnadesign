@@ -36,8 +36,8 @@ Use these surfaces in this order for Eco1 RT repack status or routing.
   Eco1/Ec86 protomer authority.
 - `workbench/provenance/structure-preprocessing.yaml`: raw 7V9U
   dimer-to-selected-protomer provenance policy, including selected protein,
-  DNA, RNA, excluded paired-protomer context, and the explicit non-objective of
-  preserving paired-protomer dimerization.
+  DNA, RNA, and excluded paired-protomer context. The selected protomer is a
+  modeling unit and does not establish RT-msDNA oligomeric state.
 - `workbench/provenance/residue-numbering-policy.yaml`: selected numbering
   policy that remains separate from the local materialized
   `residue_map.parquet`.

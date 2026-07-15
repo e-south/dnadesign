@@ -1,7 +1,7 @@
 ## Eco1 RT Repack Vocabulary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-07
+**Last verified:** 2026-07-15
 
 | Term | Meaning |
 | --- | --- |
@@ -11,7 +11,7 @@
 | `ResidueMap` | Generic residue-numbering map across structure, protein, CDS, and design positions. |
 | `ConservationProfile` | Generic per-position conservation evidence mapped to the residue map. |
 | `ContactProfile` | Generic per-position structure-contact evidence mapped to retained context atoms. |
-| `StructurePreprocessingManifest` | Study-owned runtime manifest that records raw 7V9U dimer context, selected ec86kit protomer-1 model, retained protein/DNA/RNA chains, excluded paired-protomer context, explicit dimerization non-objective, and upstream hashes before geometry is computed. |
+| `StructurePreprocessingManifest` | Study-owned runtime manifest that records raw 7V9U dimer context, the selected ec86kit protomer-1 modeling unit, retained protein/DNA/RNA chains, excluded paired-protomer context, and upstream hashes before geometry is computed. The selected protomer does not establish oligomeric state. |
 | `ContactGeometryProfile` | Study-owned per-position atom-class geometry evidence from the selected 7V9U protomer context. It records side-chain, backbone, DNA/RNA split, contact-density, and retained-chain-count measurements; it is evidence for mask policy, not a mask by itself. |
 | `ContactRiskProfile` | Study-owned evidence review that joins contact, contact-geometry, conservation, manual-mask, and Wang candidate-prior evidence. This profile is not a mask by itself. |
 | `Clade9Plurality25DirectContact5aPolicy` | Selected simple Eco1 mask policy. It protects NAxxH/YADD/VTG, Wang/Ec86 direct substrate-contact priors, positions evolutionarily conserved at >=25% WT plurality in the Ec86 clade 9 MSA, and mapped residues within 5 A of retained DNA/RNA. |

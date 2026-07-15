@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-msa-method
 surface: study-context
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-07
+last_verified: 2026-07-15
 ---
 
 ## MSA Method
@@ -567,5 +567,6 @@ NAxxH/YADD/VTG, Wang/Ec86 direct substrate-contact priors, Ec86 clade 9 >=25%
 WT-plurality conservation calls, and mapped residues within 5 A of retained
 DNA/RNA.
 Terminal residues `1`, `2`, and `312-320` are `non_fixed_missing_backbone`.
-Paired-protomer dimerization is not a retention objective for this profile, so
-pre-RT1 residues are not fixed solely to preserve the dimer.
+The selected structure contains one RT-msDNA/RNA protomer, so paired-protomer
+assembly is not evaluated by the fold workflow. Pre-RT1 residues are not fixed
+solely to preserve or disrupt the Wang-described interface.

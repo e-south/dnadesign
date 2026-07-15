@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack
 surface: study-root
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-13
+last_verified: 2026-07-15
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: runtime-and-contract-checks
@@ -22,11 +22,12 @@ can keep declared catalytic, direct-contact, Wang thumb-track, and mapped
 residues 255-311 fixed, preserve local C-alpha backbone geometry, and introduce
 MSA-observed, non-acidifying substitutions in the declared peripheral
 nucleic-acid-facing shell for a mutation-set-diverse experimental panel. Final
-selection reports R13 and other alpha-1 substitutions without treating them as
-functional gates.
+selection reports exact F10/R13 substitutions without treating them as
+functional gates or oligomeric-state evidence.
 
 The output is a set of protein hypotheses for testing. It is not evidence of
-improved activity, affinity, processivity, strand displacement, or safety.
+improved activity, affinity, processivity, strand displacement, safety, or a
+monomeric RT-msDNA assembly state.
 
 ### Method
 
@@ -44,6 +45,10 @@ improved activity, affinity, processivity, strand displacement, or safety.
    each group, minimize overlap in mutated positions first and exact
    substitutions second; use chemistry, MSA support, and structure metrics only
    for later ties.
+
+The structural reference contains one RT-msDNA/RNA protomer. This is a modeling
+scope, not an oligomeric-state result. Wang tested R13A as an interface-
+disrupting substitution; none of the 1,007 v3 sequences contains R13A.
 
 Charge events, MSA support, fold metrics, local RMSD, and mutation count are
 review fields and late tie-breakers. They are not activity scores. ESMC and SAE
