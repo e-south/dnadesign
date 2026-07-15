@@ -89,7 +89,7 @@ def write_design_space_map(
             (),
         ),
         (
-            "Fixed motif neighborhoods (Wang; Simon)",
+            "Fixed motif context windows (study choice)",
             _positions_with_value(position_rows, "motif_context_codes"),
             MOTIF_COLOR,
             motif_segments,
@@ -224,7 +224,8 @@ def write_design_space_map(
 
     alt_text = (
         "Landscape residue-position figure showing clade-9 WT frequency above eight evidence and design-space "
-        "tracks. The fixed motif neighborhoods are 99-115, 189-204, and 237-251; exact NAxxH, YADD, and VTG "
+        "tracks. The declared fixed motif context windows are 99-115, 189-204, and 237-251; exact "
+        "literature-annotated NAxxH, YADD, and VTG "
         "anchors at 105-109, 195-198, and 243-245 are labeled as darker slivers. "
         "Wang/7V9U-derived "
         "contact tracks and "
@@ -256,9 +257,9 @@ def write_design_space_map(
             "track is adjacent to the WT-frequency profile and states the declared 25% plurality rule."
         ),
         interpretation_limit=(
-            "The motif-neighborhood widths, 25% plurality rule, and 5 A/10 A distance boundaries are declared "
+            "The motif-context widths, 25% plurality rule, and 5 A/10 A distance boundaries are declared "
             "design choices, not functional discontinuities. The named motif anchors are narrower than their fixed "
-            "neighborhoods."
+            "context windows."
         ),
         title="Conservation and structure define the redesign space",
         role=COMMUNICATION_ROLE,

@@ -102,7 +102,7 @@ def materialize_review_deliverables(
     output_root: Path | None = None,
     selection_root: Path | None = None,
     render_chimerax_png: bool = False,
-    render_communication_chimerax: bool = False,
+    render_communication_movie_ids: tuple[str, ...] = (),
 ) -> MaterializedReviewDeliverables:
     """Materialize the first Eco1 manuscript/review deliverable bundle."""
 
@@ -296,9 +296,10 @@ def materialize_review_deliverables(
             selection_panel_path=selected_source.selection_panel_path,
             foldcheck_full_structure_set_path=selected_source.foldcheck_root / "foldcheck_full_structure_set.yaml",
             reference_structure_path=communication_reference_path,
+            alignment_reference_backbone_path=foldcheck_reference_backbone_path,
             reference_structure_format=communication_reference_format,
             mask_residues=mask_residues,
-            render_chimerax=render_communication_chimerax,
+            render_movie_ids=render_communication_movie_ids,
         )
     )
     deliverables.extend(

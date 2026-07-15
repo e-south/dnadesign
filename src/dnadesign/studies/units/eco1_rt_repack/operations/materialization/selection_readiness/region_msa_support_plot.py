@@ -114,11 +114,21 @@ def write_regionwise_msa_support_plot(
                     text = f"{value:.0%} observed\n{missing_count} {suffix} not seen"
                 color = matrix_text_color(value, max_value=1.0)
             ax.text(col_index, row_index, text, ha="center", va="center", fontsize=8.2, color=color)
-    ax.set_title(title, fontsize=TITLE_SIZE, pad=12)
+    ax.set_title(title, fontsize=TITLE_SIZE, pad=30)
+    ax.text(
+        0.5,
+        1.01,
+        "100% observed means every selected amino acid appears at that position in the alignment",
+        transform=ax.transAxes,
+        ha="center",
+        va="bottom",
+        fontsize=9.0,
+        color="#57606A",
+    )
     ax.tick_params(axis="both", length=0)
     for spine in ax.spines.values():
         spine.set_visible(False)
-    fig.subplots_adjust(left=0.31, right=0.96, top=0.90, bottom=0.27)
+    fig.subplots_adjust(left=0.31, right=0.96, top=0.88, bottom=0.27)
     path = plot_root / "selection_regionwise_msa_support.svg"
     alt = (
         "Heatmap of selected Eco1 RT candidates showing the fraction of designed substitutions observed in "

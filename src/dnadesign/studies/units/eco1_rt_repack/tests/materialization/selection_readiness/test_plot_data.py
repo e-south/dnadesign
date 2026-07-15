@@ -15,6 +15,8 @@ import pytest
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies.constants import (
     COMBINED_NEAR_PLUS_DISTAL_POLICY_ID,
+    DISTAL_SCAFFOLD_POLICY_ID,
+    NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
     NA_FACING_CHEMISTRY_METRICS,
@@ -65,6 +67,42 @@ def test_selected_mutation_dissimilarity_matrices_are_symmetric_with_zero_diagon
     assert all(token_matrix[index][index] == 0 for index in range(len(token_matrix)))
     assert position_matrix == [list(row) for row in zip(*position_matrix, strict=True)]
     assert token_matrix == [list(row) for row in zip(*token_matrix, strict=True)]
+
+
+def test_mutation_distance_context_keeps_generation_policies_separate() -> None:
+    candidate_rows = [
+        {"candidate_id": "d1", "policy_id": DISTAL_SCAFFOLD_POLICY_ID, "canonical_mutations": ["A10G"]},
+        {"candidate_id": "d2", "policy_id": DISTAL_SCAFFOLD_POLICY_ID, "canonical_mutations": ["A20G"]},
+        {
+            "candidate_id": "p1",
+            "policy_id": NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
+            "canonical_mutations": ["A30G"],
+        },
+        {
+            "candidate_id": "p2",
+            "policy_id": NEAR_DNA_RNA_ACID_FREE_POLICY_ID,
+            "canonical_mutations": ["A30G", "A40G"],
+        },
+    ]
+    panel_rows = [
+        {"candidate_id": "d1", "policy_id": DISTAL_SCAFFOLD_POLICY_ID, "selection_rank": 1},
+        {"candidate_id": "d2", "policy_id": DISTAL_SCAFFOLD_POLICY_ID, "selection_rank": 2},
+        {"candidate_id": "p1", "policy_id": NEAR_DNA_RNA_ACID_FREE_POLICY_ID, "selection_rank": 3},
+        {"candidate_id": "p2", "policy_id": NEAR_DNA_RNA_ACID_FREE_POLICY_ID, "selection_rank": 4},
+    ]
+    triage_rows = [{"candidate_id": row["candidate_id"], "selection_contract_pass": True} for row in candidate_rows]
+
+    context = mutation_distance_plot.build_within_policy_position_distance_context(
+        panel_rows=panel_rows,
+        candidate_rows=candidate_rows,
+        triage_rows=triage_rows,
+    )
+
+    assert set(context) == {DISTAL_SCAFFOLD_POLICY_ID, NEAR_DNA_RNA_ACID_FREE_POLICY_ID}
+    assert context[DISTAL_SCAFFOLD_POLICY_ID]["candidate_pair_distances"] == [1.0]
+    assert context[DISTAL_SCAFFOLD_POLICY_ID]["selected_pair_distances"] == [1.0]
+    assert context[NEAR_DNA_RNA_ACID_FREE_POLICY_ID]["candidate_pair_distances"] == [0.5]
+    assert context[NEAR_DNA_RNA_ACID_FREE_POLICY_ID]["selected_pair_distances"] == [0.5]
 
 
 def test_regional_mutation_burden_matrix_handles_eight_selected_rows() -> None:

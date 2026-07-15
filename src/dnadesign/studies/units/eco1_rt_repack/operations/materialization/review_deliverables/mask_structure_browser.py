@@ -26,7 +26,11 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 )
 
 from ..shared.rt_annotation_context import RTAnnotationContext, RTAnnotationFeature
-from .communication_visuals.structure_scenes import structure_scene_specs
+from .communication_visuals.structure_scenes import (
+    SCENE_KIND_DESIGN,
+    SCENE_KIND_FIXED,
+    structure_scene_specs,
+)
 from .molecular_scene_contract import (
     REFERENCE_MODEL_ID,
     molecular_visual_contract,
@@ -42,17 +46,12 @@ from .structure_browser_common import (
 )
 
 MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME = "mask_structure_browser_manifest.yaml"
-GROUP_MASK_INPUT_EVIDENCE = "Current mask evidence"
-GROUP_RT_ANNOTATION_SPANS = "RT annotation spans"
+GROUP_FIXED_POSITIONS = "Fixed positions"
+GROUP_RT_ANNOTATION_SPANS = "RT annotations"
 GROUP_DESIGN_SPACES = "Design spaces"
 _RT_CONTEXT_HIGHLIGHT_COLOR = "#6f4c7d"
 _RT_CORE_INTERVAL_HIGHLIGHT_COLOR = "#28566a"
 _RT_MOTIF_HIGHLIGHT_COLOR = "#8a4a11"
-_MASK_PROTECTED_COLOR = RESIDUE_CATEGORY_HIGHLIGHT_COLOR
-_MASK_INPUT_CONSERVATION_COLOR = "#0072B2"
-_MASK_INPUT_CONTACT_COLOR = "#E69F00"
-_MASK_INPUT_PRIOR_COLOR = "#6A3D9A"
-_MASK_INPUT_MOTIF_COLOR = "#8A4A11"
 _TRACK_CONTEXT = "retron_rt_context_spans"
 _TRACK_CORE_INTERVALS = "retron_rt_core_intervals"
 _TRACK_MOTIF_ANCHORS = "retron_rt_motif_anchors"
@@ -79,14 +78,14 @@ def write_mask_structure_browser_manifest(
 
     panel_root.mkdir(parents=True, exist_ok=True)
     manifest_path = panel_root / MASK_STRUCTURE_BROWSER_MANIFEST_FILE_NAME
-    title = "The Ec86 structure maps the active mask evidence"
+    title = "The Ec86 structure maps fixed and open residue sets"
     alt_text = (
-        "Interactive Ec86 reference structure viewer with selectable active mask evidence and RT annotation spans."
+        "Interactive Ec86 reference structure viewer with selectable fixed positions, open design spaces, and RT "
+        "annotations."
     )
     description = (
-        "Shows the Ec86/7V9U reference structure with one active mask-evidence or RT annotation choice "
-        "highlighted at a time. The base structure remains off-white so the selected residue set is "
-        "visually separable."
+        "Shows the Ec86/7V9U reference structure with one generation-policy residue set or RT annotation "
+        "highlighted at a time. Fixed and open positions come from the active generation-policy manifest."
     )
     if not reference_structure_path.exists():
         return _missing_mask_row(manifest_path, reference_structure_path)
@@ -136,7 +135,7 @@ def write_mask_structure_browser_manifest(
         "structures": views,
         "structure_count": len(views),
         "interpretation_limit": (
-            "This browser view maps active mask evidence and RT annotations onto the reference structure. "
+            "This browser maps the declared generation contract and RT annotations onto the reference structure. "
             "It does not evaluate candidate fold quality or RT activity."
         ),
     }
@@ -201,17 +200,7 @@ def _mask_structure_views(
         reference_structure_format=reference_structure_format,
     )
     views.extend(
-        _mask_input_evidence_views(
-            mask_residues=mask_residues,
-            reference_path=reference_path,
-            reference_structure_format=reference_structure_format,
-            manifest_root=manifest_root,
-            reference_number_by_canonical=reference_number_by_canonical,
-            selection_coordinate_basis=selection_coordinate_basis,
-        )
-    )
-    views.extend(
-        _design_space_views(
+        _generation_policy_views(
             policy_position_rows=policy_position_rows,
             reference_path=reference_path,
             reference_structure_format=reference_structure_format,
@@ -233,7 +222,7 @@ def _mask_structure_views(
     return views
 
 
-def _design_space_views(
+def _generation_policy_views(
     *,
     policy_position_rows: list[dict[str, Any]],
     reference_path: Path,
@@ -244,13 +233,15 @@ def _design_space_views(
 ) -> list[dict[str, Any]]:
     views: list[dict[str, Any]] = []
     for scene in structure_scene_specs(policy_position_rows):
-        if str(scene.get("group") or "") != "3 Design spaces":
+        scene_kind = str(scene.get("scene_kind") or "")
+        if scene_kind not in {SCENE_KIND_FIXED, SCENE_KIND_DESIGN}:
             continue
+        group = GROUP_FIXED_POSITIONS if scene_kind == SCENE_KIND_FIXED else GROUP_DESIGN_SPACES
         views.extend(
             reference_selection_view(
                 view_id=str(scene["scene_id"]),
                 label=str(scene["label"]),
-                group=GROUP_DESIGN_SPACES,
+                group=group,
                 description=str(scene["description"]),
                 canonical_residue_numbers=set(scene["positions"]),
                 reference_path=reference_path,
@@ -259,79 +250,6 @@ def _design_space_views(
                 reference_number_by_canonical=reference_number_by_canonical,
                 selection_coordinate_basis=selection_coordinate_basis,
                 color=str(scene["color"]),
-            )
-        )
-    return views
-
-
-def _mask_input_evidence_views(
-    *,
-    mask_residues: list[dict[str, Any]],
-    reference_path: Path,
-    reference_structure_format: str,
-    manifest_root: Path,
-    reference_number_by_canonical: dict[int, int],
-    selection_coordinate_basis: str,
-) -> list[dict[str, Any]]:
-    rows_by_position = {int(row["canonical_position"]): row for row in mask_residues}
-    view_specs = (
-        (
-            "active_mask_protected_positions",
-            "Protected residues",
-            "Residues fixed by the current Eco1 RT mask rule.",
-            _positions_with_field(rows_by_position, "protected"),
-            _MASK_PROTECTED_COLOR,
-        ),
-        (
-            "active_mask_motif_anchors",
-            "Catalytic and retron motif anchors",
-            "NAxxH, YADD, VTG, and other motif-anchor residues fixed by the current mask rule.",
-            _positions_with_field(rows_by_position, "motif_protected"),
-            _MASK_INPUT_MOTIF_COLOR,
-        ),
-        (
-            "active_mask_wang_ec86_direct_contact_prior",
-            "Wang/Ec86 substrate-contact priors",
-            "Residues from the Ec86 structural prior that directly contact substrate.",
-            _positions_with_field(rows_by_position, "wang_ec86_direct_contact_prior"),
-            _MASK_INPUT_PRIOR_COLOR,
-        ),
-        (
-            "active_mask_clade9_25pct_wt_plurality",
-            "Clade 9 >=25% WT plurality",
-            "Residues fixed because the Eco1 amino acid is the clade 9 plurality residue at the mask threshold.",
-            _positions_with_any_field(
-                rows_by_position,
-                ("selected_conservation_rule_passed", "evolutionarily_conserved_clade9_25pct_plurality"),
-            ),
-            _MASK_INPUT_CONSERVATION_COLOR,
-        ),
-        (
-            "active_mask_direct_retained_dna_rna_contact_5a",
-            "Retained DNA/RNA <=5 A",
-            "Residues fixed because they are within 5 A of retained DNA/RNA atoms.",
-            _positions_with_any_field(
-                rows_by_position,
-                ("selected_retained_dna_rna_contact", "direct_retained_dna_rna_contact_5a"),
-            ),
-            _MASK_INPUT_CONTACT_COLOR,
-        ),
-    )
-    views: list[dict[str, Any]] = []
-    for view_id, label, description, positions, color in view_specs:
-        views.extend(
-            reference_selection_view(
-                view_id=view_id,
-                label=label,
-                group=GROUP_MASK_INPUT_EVIDENCE,
-                description=description,
-                canonical_residue_numbers=positions,
-                reference_path=reference_path,
-                reference_structure_format=reference_structure_format,
-                manifest_root=manifest_root,
-                reference_number_by_canonical=reference_number_by_canonical,
-                selection_coordinate_basis=selection_coordinate_basis,
-                color=color,
             )
         )
     return views
@@ -351,12 +269,10 @@ def reference_selection_view(
     selection_coordinate_basis: str,
     color: str,
 ) -> list[dict[str, Any]]:
-    canonical_numbers = sorted(set(int(position) for position in canonical_residue_numbers))
-    residue_numbers = [
-        reference_number_by_canonical[position]
-        for position in canonical_numbers
-        if position in reference_number_by_canonical
-    ]
+    canonical_numbers = sorted(
+        {int(position) for position in canonical_residue_numbers if int(position) in reference_number_by_canonical}
+    )
+    residue_numbers = [reference_number_by_canonical[position] for position in canonical_numbers]
     if not residue_numbers:
         return []
     return [
@@ -388,14 +304,6 @@ def reference_selection_view(
     ]
 
 
-def _positions_with_field(rows_by_position: dict[int, dict[str, Any]], field: str) -> set[int]:
-    return {position for position, row in rows_by_position.items() if bool(row.get(field))}
-
-
-def _positions_with_any_field(rows_by_position: dict[int, dict[str, Any]], fields: tuple[str, ...]) -> set[int]:
-    return {position for position, row in rows_by_position.items() if any(bool(row.get(field)) for field in fields)}
-
-
 def _rt_annotation_structure_views(
     *,
     rt_annotation_context: RTAnnotationContext,
@@ -419,10 +327,7 @@ def _rt_annotation_structure_views(
                 view_id=feature.feature_id,
                 label=feature.label,
                 group=GROUP_RT_ANNOTATION_SPANS,
-                description=(
-                    f"Display-only RT annotation span from {feature.start}-{feature.end}; "
-                    "included for structural orientation, not as a mask rule."
-                ),
+                description=_rt_annotation_description(feature),
                 canonical_residue_numbers=canonical_residue_numbers,
                 reference_path=reference_path,
                 reference_structure_format=reference_structure_format,
@@ -433,6 +338,23 @@ def _rt_annotation_structure_views(
             )
         )
     return views
+
+
+def _rt_annotation_description(feature: RTAnnotationFeature) -> str:
+    if feature.track_id == _TRACK_CONTEXT:
+        return (
+            f"Fixed context window from {feature.start}-{feature.end} around an exact motif anchor; "
+            "the flanking residues are a precautionary study choice."
+        )
+    if feature.track_id == _TRACK_MOTIF_ANCHORS:
+        return (
+            f"Exact literature-annotated motif anchor from {feature.start}-{feature.end}; "
+            "it remains fixed within the wider declared context window."
+        )
+    return (
+        f"Display-only RT annotation span from {feature.start}-{feature.end}; "
+        "included for structural orientation, not as a protection rule."
+    )
 
 
 def _rt_annotation_color(feature: RTAnnotationFeature) -> str:

@@ -43,7 +43,10 @@ def render_selection_panel_table(row: dict[str, Any], *, mo: Any, table_path: Pa
         "nucleic_acid_facing_acidic_gain_count",
         "thumb_contact_track_mutation_count",
         "c_terminal_primer_rna_recognition_mutation_count",
-        "wang_alpha1_r13_review_status",
+        "wang_alpha1_f10_substitution",
+        "wang_alpha1_r13_substitution",
+        "wang_r13a_interface_disruption_evidence_match",
+        "rt_msdna_oligomeric_state_review_status",
         "wang_alpha1_mutation_count",
     ]
     parquet_file = pq.ParquetFile(table_path)
@@ -86,7 +89,10 @@ def _display_row(row: dict[str, Any]) -> dict[str, object]:
         "acidic gains": _int_or_none(row.get("nucleic_acid_facing_acidic_gain_count")),
         "Wang thumb-track edits": _int_or_none(row.get("thumb_contact_track_mutation_count")),
         "residues 255-311 edits": _int_or_none(row.get("c_terminal_primer_rna_recognition_mutation_count")),
-        "R13": str(row.get("wang_alpha1_r13_review_status") or ""),
+        "F10": str(row.get("wang_alpha1_f10_substitution") or ""),
+        "R13": str(row.get("wang_alpha1_r13_substitution") or ""),
+        "matches tested R13A": bool(row.get("wang_r13a_interface_disruption_evidence_match")),
+        "RT-msDNA assembly state": str(row.get("rt_msdna_oligomeric_state_review_status") or ""),
         "alpha-1 mutations": _int_or_none(row.get("wang_alpha1_mutation_count")),
     }
 

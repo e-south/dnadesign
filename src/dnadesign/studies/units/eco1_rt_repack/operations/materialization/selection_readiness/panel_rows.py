@@ -33,9 +33,11 @@ def build_panel_row(
         "Selected after the declared fixed-position, generation-chemistry, and local-geometry checks. Within "
         "each generation policy, the first pair maximizes mutated-position Jaccard distance and then exact-"
         "substitution distance. A third row, where allocated, maximizes its minimum distance from that pair. "
-        "Chemistry counts, regional MSA support, local RMSD, fold metrics, and sequence hash are later tie-breaks. "
+        "Chemistry counts, regional MSA support, local RMSD, fold metrics, and sequence hash are available only "
+        "if the mutation-set criteria tie. "
         "Policy groups define experimental comparisons, not quality tiers. ESMC and SAE "
-        "are not selection inputs. R13 and other alpha-1 substitutions are reported but do not rank rows."
+        "are not selection inputs. Exact F10/R13 substitutions are reported but do not rank rows, and the "
+        "RT-msDNA oligomeric state is not inferred from these sequences."
     )
     trace = {
         "selection_policy_id": SELECTION_POLICY_ID,
@@ -56,6 +58,13 @@ def build_panel_row(
         "wang_alpha1_r13_mutation_count": row.get("wang_alpha1_r13_mutation_count"),
         "wang_alpha1_r13_review_status": row.get("wang_alpha1_r13_review_status"),
         "wang_alpha1_mutation_count": row.get("wang_alpha1_mutation_count"),
+        "wang_alpha1_f10_substitution": row.get("wang_alpha1_f10_substitution"),
+        "wang_alpha1_r13_substitution": row.get("wang_alpha1_r13_substitution"),
+        "wang_alpha1_cross_protomer_contact_mutation_count": row.get(
+            "wang_alpha1_cross_protomer_contact_mutation_count"
+        ),
+        "wang_r13a_interface_disruption_evidence_match": row.get("wang_r13a_interface_disruption_evidence_match"),
+        "rt_msdna_oligomeric_state_review_status": row.get("rt_msdna_oligomeric_state_review_status"),
         "selection_support_profile_id": row["selection_support_profile_id"],
         "selection_support_alt_observed_fraction": row["selection_support_alt_observed_fraction"],
         "selection_support_alt_frequency_mean": row["selection_support_alt_frequency_mean"],
@@ -138,6 +147,13 @@ def build_panel_row(
         "wang_alpha1_r13_mutation_count": row.get("wang_alpha1_r13_mutation_count"),
         "wang_alpha1_r13_review_status": row.get("wang_alpha1_r13_review_status"),
         "wang_alpha1_mutation_count": row.get("wang_alpha1_mutation_count"),
+        "wang_alpha1_f10_substitution": row.get("wang_alpha1_f10_substitution"),
+        "wang_alpha1_r13_substitution": row.get("wang_alpha1_r13_substitution"),
+        "wang_alpha1_cross_protomer_contact_mutation_count": row.get(
+            "wang_alpha1_cross_protomer_contact_mutation_count"
+        ),
+        "wang_r13a_interface_disruption_evidence_match": row.get("wang_r13a_interface_disruption_evidence_match"),
+        "rt_msdna_oligomeric_state_review_status": row.get("rt_msdna_oligomeric_state_review_status"),
         "near_retained_dna_rna_acidic_gain_review_status": row.get("near_retained_dna_rna_acidic_gain_review_status"),
         "proximal_msa_support_review_status": row.get("proximal_msa_support_review_status"),
         "selection_support_alt_observed_fraction": row.get("selection_support_alt_observed_fraction"),

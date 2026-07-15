@@ -184,7 +184,8 @@ def _panel_table_row(*, output_root: Path, manifest_path: Path, loaded: dict[str
         },
         alt_text="Compact table of eight selected Eco1 RT sequence hypotheses.",
         description=(
-            "Lists complete sequence hypotheses with design group, selection rank, R13 annotation, fold metrics, "
+            "Lists complete sequence hypotheses with design group, selection rank, exact F10/R13 annotations, "
+            "RT-msDNA assembly-state review status, fold metrics, "
             "within-group mutation-set distance, regional MSA support, mutation "
             "geography, and peripheral DNA/RNA chemistry."
         ),

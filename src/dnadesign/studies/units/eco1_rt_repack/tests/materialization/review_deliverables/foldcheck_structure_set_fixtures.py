@@ -15,6 +15,9 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.manifest import (
+    sha256,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.review_deliverables.structure_file_fixtures import (
     write_mmcif_all_atom_reference,
     write_pdb,
@@ -42,6 +45,11 @@ def write_foldcheck_full_structure_set(review_root: Path) -> None:
         coordinate_offset=24.0,
         include_sidechains=True,
     )
+    structure_paths = {
+        "wild_type": structure_root / "wild_type.pdb",
+        "thread_candidate_alpha": structure_root / "thread_candidate_alpha.pdb",
+        "thread_candidate_beta": structure_root / "thread_candidate_beta.pdb",
+    }
     review_root.joinpath("foldcheck_full_structure_set.yaml").write_text(
         yaml.safe_dump(
             {
@@ -55,6 +63,7 @@ def write_foldcheck_full_structure_set(review_root: Path) -> None:
                     {
                         "candidate_id": "wild_type",
                         "local_model_artifact_path": "structures/full_fold_set/wild_type.pdb",
+                        "source_model_artifact_hash": "sha256:" + sha256(structure_paths["wild_type"]),
                         "copy_status": "already_local",
                         "display_label": "WT ColabFold baseline",
                         "full_sequence_identity_percent": 100.0,
@@ -65,9 +74,10 @@ def write_foldcheck_full_structure_set(review_root: Path) -> None:
                     {
                         "candidate_id": "thread_candidate_alpha",
                         "local_model_artifact_path": "structures/full_fold_set/thread_candidate_alpha.pdb",
+                        "source_model_artifact_hash": "sha256:" + sha256(structure_paths["thread_candidate_alpha"]),
                         "copy_status": "already_local",
                         "display_label": "ProteinMPNN variant rank 1",
-                        "full_sequence_identity_percent": 94.4,
+                        "full_sequence_identity_percent": 99.375,
                         "design_position_recovery_percent": 72.0,
                         "proteinmpnn_rank": 1,
                         "wt_runtime_ca_rmsd": 0.82,
@@ -75,9 +85,10 @@ def write_foldcheck_full_structure_set(review_root: Path) -> None:
                     {
                         "candidate_id": "thread_candidate_beta",
                         "local_model_artifact_path": "structures/full_fold_set/thread_candidate_beta.pdb",
+                        "source_model_artifact_hash": "sha256:" + sha256(structure_paths["thread_candidate_beta"]),
                         "copy_status": "already_local",
                         "display_label": "ProteinMPNN variant rank 2",
-                        "full_sequence_identity_percent": 93.8,
+                        "full_sequence_identity_percent": 99.0625,
                         "design_position_recovery_percent": 55.0,
                         "proteinmpnn_rank": 2,
                         "wt_runtime_ca_rmsd": 3.12,

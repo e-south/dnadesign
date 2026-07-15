@@ -51,6 +51,7 @@ def test_structure_story_declares_surface_scenes_without_overwriting_evidence(tm
         "native_rt_dna_rna_complex",
         "protected_catalytic_motifs",
         "protected_direct_contacts",
+        "protected_wang_thumb_track",
         "protected_conserved_positions",
         "protected_primer_recognition_context",
         "protected_union",

@@ -18,12 +18,12 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection
 )
 
 PLAIN_DELIVERABLE_TITLES = {
-    "msa_plurality_mask_panel": "Clade 9 conservation defines the baseline mask",
+    "msa_plurality_mask_panel": "Clade 9 conservation supports fixed-position choices",
     "msa_subtype_plurality_panel": "The Eco1 subtype MSA gives a closer conservation view",
-    "mask_structure_context_script": "ChimeraX can reproduce the active mask view",
-    "mask_structure_context_orientation_template": "The ChimeraX template preserves mask colors",
-    "mask_structure_context_png": "The Ec86 structure shows active fixed residues",
-    "mask_structure_browser_manifest": "The Ec86 structure maps the active mask evidence",
+    "mask_structure_context_script": "ChimeraX can reproduce the declared fixed-position view",
+    "mask_structure_context_orientation_template": "The ChimeraX template preserves residue-set colors",
+    "mask_structure_context_png": "The Ec86 structure shows declared fixed residues",
+    "mask_structure_browser_manifest": "The Ec86 structure maps fixed and open residue sets",
     "foldcheck_review_biohub_esmc_sae_coverage": "Biohub ESMC returns SAE coverage for accepted rows",
     "foldcheck_review_structure_overlay_panel": "ColabFold structures align to the Ec86 reference",
     "biohub_esmc_sequence_scoring_manifest": "ESMC scoring records WT-context inputs",

@@ -84,8 +84,10 @@ def write_selection_readiness_manifest(
             "From complete sequences that retain the declared fixed-position and generation-chemistry invariants "
             "and pass the 2.5 A local-geometry review rule, select two distal, three peripheral, and three combined "
             "sequences. Within each group, mutated-position Jaccard distance precedes exact-substitution Jaccard "
-            "distance; chemistry, MSA, structure, fold metrics, and sequence hash are later tie-breaks. R13 and "
-            "other alpha-1 substitutions are annotations, not eligibility or ranking criteria."
+            "distance; chemistry, MSA, structure, fold metrics, and sequence hash are used only if earlier criteria "
+            "tie. Exact F10 "
+            "and R13 substitutions are annotations, not eligibility or ranking criteria. The single-chain fold "
+            "review does not establish the RT-msDNA oligomeric state."
         ),
         "selected_panel_policy": {
             "policy_id": SELECTION_POLICY_ID,
@@ -94,7 +96,7 @@ def write_selection_readiness_manifest(
             "interpretation": (
                 "The selected panel contains two distal, three peripheral, and three combined complete-sequence "
                 "hypotheses. The groups are experimental comparisons, not quality levels. The rows are not "
-                "functional winners or biological replicates."
+                "functional winners or biological replicates; their RT-msDNA oligomeric state is not established."
             ),
         },
         "local_structure_rmsd_threshold_policy": {

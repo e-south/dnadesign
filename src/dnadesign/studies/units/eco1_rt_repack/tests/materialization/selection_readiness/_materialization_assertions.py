@@ -72,15 +72,20 @@ def assert_selection_plot_contract(
     assert_svg_aspect_ratio_at_least(selected_substitutions_text, minimum=2.2)
     assert selected_substitutions_text.count("Eco1 RT residue position") == 1
     mutation_distance_text = plot_text_by_id["selection_mutation_set_dissimilarity"]
-    assert "All same-group candidate pairs" in mutation_distance_text
-    assert "Selected same-group pairs" in mutation_distance_text
+    assert "Cumulative fraction of pairs" in mutation_distance_text
+    assert "Selected pair" in mutation_distance_text
+    assert "Only within-group distances are shown" in mutation_distance_text
+    for label in ("Distal", "Peripheral", "Combined"):
+        assert label in mutation_distance_text
     assert "d_J" in mutation_distance_text
     assert "selection_local_structure_stratification" in plot_text_by_id
     local_structure_stratification_text = plot_text_by_id["selection_local_structure_stratification"]
     assert "review cutoff" in local_structure_stratification_text
     assert "Selected rows" in local_structure_stratification_text
     assert "selection_local_structure_threshold_sensitivity" in plot_text_by_id
-    assert "selection_regionwise_msa_support" in plot_text_by_id
+    regionwise_msa_text = plot_text_by_id["selection_regionwise_msa_support"]
+    assert "Clade-9 MSA support for selected substitutions" in regionwise_msa_text
+    assert "every selected amino acid appears at that position" in regionwise_msa_text
     assert "selection_near_region_charge_sensitivity" not in plot_text_by_id
     assert "selection_design_class_contrast" not in plot_text_by_id
     assert "selection_design_class_gate_counts" not in plot_text_by_id

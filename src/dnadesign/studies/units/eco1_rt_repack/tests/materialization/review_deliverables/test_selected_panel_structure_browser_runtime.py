@@ -118,7 +118,22 @@ def test_selected_panel_structure_browser_uses_selection_root_override(tmp_path:
     )
     pq.write_table(pa.Table.from_pylist([beta_panel_row]), active_selection_root / "candidate_selection_panel.parquet")
     pq.write_table(
-        pa.Table.from_pylist([triage_row(candidate_id="thread_candidate_beta", msa_fraction=0.6, charge_delta=0)]),
+        pa.Table.from_pylist(
+            [
+                triage_row(
+                    candidate_id="thread_candidate_alpha",
+                    msa_fraction=0.7,
+                    charge_delta=0,
+                    mutation_count=2,
+                ),
+                triage_row(
+                    candidate_id="thread_candidate_beta",
+                    msa_fraction=0.6,
+                    charge_delta=0,
+                    mutation_count=3,
+                ),
+            ]
+        ),
         active_selection_root / "candidate_triage_table.parquet",
     )
     result = materialize_review_deliverables(

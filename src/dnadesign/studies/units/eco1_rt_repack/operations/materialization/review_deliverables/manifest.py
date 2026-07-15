@@ -89,7 +89,7 @@ def write_manifest(
             "input_manifest": path.name,
             "scope": "eco1_rt_repack review deliverables",
             "description": (
-                "Marimo notebook for Eco1 mask evidence, ProteinMPNN sequence proposals, "
+                "Marimo notebook for Eco1 fixed and open residue sets, ProteinMPNN sequence proposals, "
                 "fold checks, panel selection, and supporting ESMC/SAE model checks."
             ),
         },

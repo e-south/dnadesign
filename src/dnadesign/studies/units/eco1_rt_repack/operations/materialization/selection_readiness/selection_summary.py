@@ -39,12 +39,18 @@ def build_selection_summary(
                 [row for row in triage_rows if bool(row.get("selection_contract_pass"))],
                 "policy_id",
             ),
+            "wang_r13a_interface_disruption_evidence_match": sum(
+                bool(row.get("wang_r13a_interface_disruption_evidence_match")) for row in triage_rows
+            ),
             "selected_panel": len(panel_rows),
         },
         "gate_counts": {
             "hard_gate_status": _count_by(triage_rows, "hard_gate_status"),
             "local_structure_gate_status": _count_by(triage_rows, "local_structure_gate_status"),
             "wang_alpha1_r13_review_status": _count_by(triage_rows, "wang_alpha1_r13_review_status"),
+            "rt_msdna_oligomeric_state_review_status": _count_by(
+                triage_rows, "rt_msdna_oligomeric_state_review_status"
+            ),
         },
         "local_structure_region_threshold_counts": _nested_count_by(
             local_structure_rows,

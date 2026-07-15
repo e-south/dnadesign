@@ -74,9 +74,7 @@ def test_mask_structure_browser_uses_exported_backbone_residue_numbers(tmp_path:
             encoding="utf-8"
         )
     )
-    protected_view = next(
-        row for row in manifest["structures"] if row["candidate_id"] == "active_mask_protected_positions"
-    )
+    protected_view = next(row for row in manifest["structures"] if row["candidate_id"] == "protected_union")
     style = protected_view["selection_styles"][0]
     assert style["source_coordinate_basis"] == "canonical_position"
     assert style["selection_coordinate_basis"] == "proteinmpnn_export_residue_number"

@@ -22,9 +22,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     notebook_structure_browser as structure_browser,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    structure_browser_common as browser_colors,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_DESIGNS_AND_FOLD_TRIAGE,
 )
@@ -55,7 +52,8 @@ def test_candidate_structure_browser_can_overlay_reference_mask_highlights(tmp_p
     highlight_lookup = structure_browser.structure_highlight_lookup(rows, selected_row=selected)
 
     assert "No residue highlight" in highlight_lookup
-    selected_highlight = highlight_lookup["Protected residues | 4 residues"]
+    selected_highlight = highlight_lookup["Combined protected set | 4 residues"]
+    protected_color = str(selected_highlight["selection_styles"][0]["color"])
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
         selected_row=selected,
@@ -69,8 +67,6 @@ def test_candidate_structure_browser_can_overlay_reference_mask_highlights(tmp_p
 
     assert "<residue-highlight-dropdown>" in rendered_text
     assert "Selected residue highlight" in rendered_text
-    assert "Protected residues" in rendered_text
+    assert "Combined protected set" in rendered_text
     assert "Selected SAE feature" not in rendered_text
-    assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
-        unescaped_rendered
-    )
+    assert f'"stick":{{"color":"{protected_color}","radius":0.22}}' in unescaped_rendered

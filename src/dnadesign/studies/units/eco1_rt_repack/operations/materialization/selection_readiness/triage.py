@@ -16,11 +16,12 @@ from collections.abc import Sequence
 
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.constants import (
     SAE_WINDOW_SELECTION_THRESHOLD,
-    WANG_ALPHA1_INTERFACE_POSITION,
-    WANG_ALPHA1_INTERFACE_POSITIONS,
+    WANG_ALPHA1_CONTEXT_POSITIONS,
+    WANG_TESTED_INTERFACE_DISRUPTING_SUBSTITUTION,
 )
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.mutation_distance import (
     canonical_mutation_positions,
+    canonical_mutation_tokens,
 )
 
 from .selection_policy_context import resolve_selection_policy_context
@@ -75,6 +76,7 @@ def build_triage_rows(
             local_structure_review=local_structure_review,
         )
         mutation_positions = canonical_mutation_positions(candidate.get("canonical_mutations"))
+        wang_alpha1_review = _wang_alpha1_review_fields(candidate.get("canonical_mutations"))
         row = {
             "candidate_id": candidate_id,
             "sequence_hash": str(candidate["sequence_hash"]),
@@ -85,8 +87,9 @@ def build_triage_rows(
             "source_policy_ids": candidate.get("source_policy_ids") or [],
             "mutation_count_total": int(candidate.get("mutation_count") or 0),
             "sequence_distance_to_wt": int(candidate.get("mutation_count") or 0),
-            "wang_alpha1_r13_mutation_count": int(WANG_ALPHA1_INTERFACE_POSITION in mutation_positions),
-            "wang_alpha1_mutation_count": len(mutation_positions & WANG_ALPHA1_INTERFACE_POSITIONS),
+            "wang_alpha1_r13_mutation_count": int(wang_alpha1_review["wang_alpha1_r13_substitution"] != "WT"),
+            "wang_alpha1_mutation_count": len(mutation_positions & WANG_ALPHA1_CONTEXT_POSITIONS),
+            **wang_alpha1_review,
             "nearest_selected_distance_aa": None,
             "fold_review_class": str((fold or {}).get("review_class") or ""),
             "mean_plddt": _float_or_none((fold or {}).get("plddt")),
@@ -116,6 +119,33 @@ def build_triage_rows(
         row.update(_selection_candidate_fields(row))
         rows.append(row)
     return rows
+
+
+def _wang_alpha1_review_fields(canonical_mutations: object) -> dict[str, object]:
+    """Describe the Wang alpha-1 contacts without inferring oligomeric state."""
+
+    tokens = canonical_mutation_tokens(canonical_mutations)
+    f10_substitution = _single_substitution_at_position(tokens, position=10)
+    r13_substitution = _single_substitution_at_position(tokens, position=13)
+    evidence_match = r13_substitution == WANG_TESTED_INTERFACE_DISRUPTING_SUBSTITUTION
+    return {
+        "wang_alpha1_f10_substitution": f10_substitution,
+        "wang_alpha1_r13_substitution": r13_substitution,
+        "wang_alpha1_cross_protomer_contact_mutation_count": sum(
+            substitution != "WT" for substitution in (f10_substitution, r13_substitution)
+        ),
+        "wang_r13a_interface_disruption_evidence_match": evidence_match,
+        "rt_msdna_oligomeric_state_review_status": (
+            "wang_r13a_interface_disruption_match" if evidence_match else "not_established"
+        ),
+    }
+
+
+def _single_substitution_at_position(tokens: frozenset[str], *, position: int) -> str:
+    matches = sorted(token for token in tokens if token[1:-1] == str(position))
+    if len(matches) > 1:
+        raise ValueError(f"Multiple canonical substitutions reported at Eco1 position {position}: {matches}")
+    return matches[0] if matches else "WT"
 
 
 def _hard_gate_status(

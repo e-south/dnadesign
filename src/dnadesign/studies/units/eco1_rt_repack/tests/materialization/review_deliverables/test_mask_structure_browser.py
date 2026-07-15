@@ -22,9 +22,6 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_de
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
     notebook_structure_browser as structure_browser,
 )
-from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables import (
-    structure_browser_common as browser_colors,
-)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.constants import (
     SECTION_CONSTRAINT_EVIDENCE,
 )
@@ -50,14 +47,15 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         selected_section=SECTION_CONSTRAINT_EVIDENCE,
         selected_deliverable_id="mask_structure_browser_manifest",
     )
-    assert group_lookup["Current mask evidence"] == "Current mask evidence"
+    assert group_lookup["Fixed positions"] == "Fixed positions"
+    assert group_lookup["Design spaces"] == "Design spaces"
     assert "Reference mask evidence" not in group_lookup
     assert "Design-class fixed masks" not in group_lookup
     lookup = structure_browser.structure_browser_lookup(
         rows,
         selected_section=SECTION_CONSTRAINT_EVIDENCE,
         selected_deliverable_id="mask_structure_browser_manifest",
-        selected_group="Current mask evidence",
+        selected_group="Fixed positions",
     )
     stale_labels = (
         "Catalytic motif anchors",
@@ -73,10 +71,12 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     )
     for stale_label in stale_labels:
         assert stale_label not in combined_labels
-    assert "Protected residues | 4 residues" in lookup
-    assert "Catalytic and retron motif anchors | 1 residues" in lookup
-    assert "Wang/Ec86 substrate-contact priors | 1 residues" in lookup
-    selected = lookup["Protected residues | 4 residues"]
+    assert "Combined protected set | 4 residues" in lookup
+    assert "NAxxH, YADD, and VTG context windows | 1 residues" in lookup
+    assert "Direct DNA/RNA contacts <=5 A (Wang et al.; 7V9U) | 1 residues" in lookup
+    assert "Wang thumb-contact track | 1 residues" in lookup
+    selected = lookup["Combined protected set | 4 residues"]
+    protected_color = str(selected["selection_styles"][0]["color"])
 
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),
@@ -93,8 +93,8 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
 
     assert "<iframe" in rendered_text
     assert "3Dmol" in rendered_text
-    assert "Protected residues" in rendered_text
-    assert "Current mask evidence" in rendered_text
+    assert "Combined protected set" in rendered_text
+    assert "Fixed positions" in rendered_text
     assert "Reference selection:" not in rendered_text
     assert "No candidate structure is shown" in rendered_text
     assert "Side-chain display:" not in rendered_text
@@ -106,18 +106,16 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
     assert "<dna-color-toggle>" not in rendered_text
     assert "<rna-color-toggle>" not in rendered_text
     assert "What this structure view shows" not in rendered_text
-    assert "Residues fixed by the current Eco1 RT mask rule." in rendered_text
+    assert "The protected union is fixed before ProteinMPNN samples complete sequences." in rendered_text
     assert "Interpretation limit:" not in rendered_text
     assert "does not evaluate candidate fold quality or RT activity" in rendered_text
     assert "eco1-rt-repack:reference-complex:camera-v5" in rendered_text
     assert "localStorage" in rendered_text
     assert (
-        "data-selection-id=&quot;active_mask_protected_positions&quot;" in rendered_text
-        or 'data-selection-id="active_mask_protected_positions"' in rendered_text
+        "data-selection-id=&quot;protected_union&quot;" in rendered_text
+        or 'data-selection-id="protected_union"' in rendered_text
     )
-    assert f'"stick":{{"color":"{browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}","radius":0.22}}' in (
-        unescaped_rendered
-    )
+    assert f'"stick":{{"color":"{protected_color}","radius":0.22}}' in unescaped_rendered
     assert 'addSurface("VDW",{"color":"#E8E4DA","opacity":0.65}' in unescaped_rendered
     assert unescaped_rendered.count("addCustom(") >= 2
     assert "addCurve(" not in unescaped_rendered
@@ -132,7 +130,7 @@ def test_structure_browser_runtime_renders_mask_selection_html(tmp_path: Path) -
         str(style["color"])
         for row in rows
         if str(row.get("structure_view_mode") or "") == "reference_selection"
-        and str(row.get("candidate_id") or "") == "active_mask_protected_positions"
+        and str(row.get("candidate_id") or "") == "protected_union"
         for style in row.get("selection_styles", [])
     }
-    assert selection_colors == {browser_colors.RESIDUE_CATEGORY_HIGHLIGHT_COLOR}
+    assert selection_colors == {protected_color}

@@ -26,6 +26,8 @@ def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_pa
     """Render selection-readiness counts and policy from the selection manifest."""
 
     loaded = _load_selection_manifest(manifest_path)
+    selection_summary = _dict_or_empty(loaded.get("selection_summary"))
+    candidate_counts = _dict_or_empty(selection_summary.get("candidate_counts"))
     funnel_stages = [dict(stage) for stage in list(loaded.get("selection_funnel_stages") or [])]
     selected_ids = [str(value) for value in list(loaded.get("selected_candidate_ids") or [])]
     policy_rows = [
@@ -33,10 +35,8 @@ def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_pa
         {"field": "Selection policy", "value": str(loaded.get("selection_policy_id") or "")},
         {"field": "Governing rule", "value": str(loaded.get("governing_rule") or "")},
     ]
-    panel_summary = _dict_or_empty(_dict_or_empty(loaded.get("selection_summary")).get("selected_mutation_overlap"))
-    overlap_by_policy = _dict_or_empty(
-        _dict_or_empty(loaded.get("selection_summary")).get("selected_mutation_overlap_by_policy")
-    )
+    panel_summary = _dict_or_empty(selection_summary.get("selected_mutation_overlap"))
+    overlap_by_policy = _dict_or_empty(selection_summary.get("selected_mutation_overlap_by_policy"))
     panel_coverage = _dict_or_empty(loaded.get("panel_coverage"))
     selected_panel_size = int(panel_coverage.get("selected_panel_size") or len(selected_ids))
     panel_summary_rows = [
@@ -90,14 +90,22 @@ def render_selection_funnel_summary(row: dict[str, Any], *, mo: Any, manifest_pa
     ]
     selected_rows = [{"candidate_id": candidate_id} for candidate_id in selected_ids]
     title = html.escape(str(row.get("title") or "Selection flow and panel summary"))
+    r13a_match_count = int(candidate_counts.get("wang_r13a_interface_disruption_evidence_match") or 0)
+    r13a_note = (
+        "No generated sequence matches the tested R13A substitution."
+        if r13a_match_count == 0
+        else f"{r13a_match_count} generated sequences match the tested R13A substitution."
+    )
     stage_note = (
         "Local geometry screens predicted structural disruption. Generation records confirm the fixed/open residue "
-        "sets and allowed amino-acid alphabets. R13 is reported but does not filter or rank rows. The three design "
-        "groups represent different interventions, not quality levels. All eight rows form one selected panel."
+        "sets and allowed amino-acid alphabets. Exact F10 and R13 states are reported but do not filter or rank "
+        f"rows. {r13a_note} Oligomeric state was not evaluated. The three design groups represent different "
+        "interventions, not quality levels. All eight rows form one selected panel."
     )
     distance_note = (
         "Global panel distance is increased by policies that open different residue sets. The policy-stratified "
-        "table is the relevant check for mutation-profile collapse within each design group."
+        "table is the relevant check for mutation-profile collapse within each design group. The pair-first "
+        "procedure is deterministic but does not claim a globally optimal three-sequence subset."
     )
     return mo.vstack(
         [

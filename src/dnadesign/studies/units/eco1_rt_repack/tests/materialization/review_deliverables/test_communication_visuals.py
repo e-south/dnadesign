@@ -61,7 +61,8 @@ def test_communication_visuals_are_additive_file_backed_notebook_options(tmp_pat
     assert _ALWAYS_AVAILABLE_VISUAL_IDS.issubset(communication_ids)
     assert "communication_electrostatic_surface" not in communication_ids
     assert "communication_structure_story_movie" not in communication_ids
-    assert "communication_candidate_cycle_movie" not in communication_ids
+    assert "communication_proposal_backbone_cycle_movie" not in communication_ids
+    assert "communication_selected_electrostatic_cycle_movie" not in communication_ids
     assert all("slide" not in deliverable_id for deliverable_id in communication_ids)
     for row in communication_rows:
         assert row["role"] == "communication_facing"
@@ -142,8 +143,15 @@ def test_communication_visual_materialization_removes_unmanifested_visuals(tmp_p
     panel_root.mkdir(parents=True, exist_ok=True)
     stale_svg_path = panel_root / "stale.svg"
     stale_png_path = panel_root / "stale.png"
+    retired_manifest_path = panel_root / "eco1_selected_candidate_cycle_render_manifest.yaml"
+    retired_log_path = panel_root / "eco1_selected_candidate_cycle_chimerax.log"
+    retired_frame_root = panel_root / ".eco1_selected_candidate_cycle_frames"
     stale_svg_path.write_text("<svg/>", encoding="utf-8")
     stale_png_path.write_bytes(b"png")
+    retired_manifest_path.write_text("status: stale\n", encoding="utf-8")
+    retired_log_path.write_text("stale\n", encoding="utf-8")
+    retired_frame_root.mkdir()
+    retired_frame_root.joinpath("frame-00001.png").write_bytes(b"png")
 
     materialize_review_deliverables(
         repo_root=Path.cwd(),
@@ -153,6 +161,9 @@ def test_communication_visual_materialization_removes_unmanifested_visuals(tmp_p
 
     assert not stale_svg_path.exists()
     assert not stale_png_path.exists()
+    assert not retired_manifest_path.exists()
+    assert not retired_log_path.exists()
+    assert not retired_frame_root.exists()
 
 
 def test_communication_video_is_centered_and_bounded_for_notebook_review(tmp_path: Path) -> None:

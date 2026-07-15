@@ -70,8 +70,18 @@ def write_selection_readiness_manifest(selection_root: Path) -> None:
     pq.write_table(
         pa.Table.from_pylist(
             [
-                triage_row(candidate_id="thread_candidate_alpha", msa_fraction=0.75, charge_delta=1),
-                triage_row(candidate_id="thread_candidate_beta", msa_fraction=0.6, charge_delta=-1),
+                triage_row(
+                    candidate_id="thread_candidate_alpha",
+                    msa_fraction=0.75,
+                    charge_delta=1,
+                    mutation_count=2,
+                ),
+                triage_row(
+                    candidate_id="thread_candidate_beta",
+                    msa_fraction=0.6,
+                    charge_delta=-1,
+                    mutation_count=3,
+                ),
             ]
         ),
         selection_root / "candidate_triage_table.parquet",

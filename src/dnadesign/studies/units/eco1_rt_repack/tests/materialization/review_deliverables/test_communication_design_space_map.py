@@ -47,7 +47,8 @@ def test_communication_design_space_map_names_motifs_sources_and_threshold(tmp_p
     assert (
         "Open: peripheral shell &gt;5 to \N{LESS-THAN OR EQUAL TO}10 \N{LATIN CAPITAL LETTER A WITH RING ABOVE}"
     ) in svg_text
-    assert "Fixed motif neighborhoods" in svg_text
+    assert "Fixed motif context windows (study choice)" in svg_text
+    assert "Fixed motif neighborhoods (Wang; Simon)" not in svg_text
 
 
 def test_communication_design_space_map_uses_exact_motif_anchor_spans() -> None:

@@ -38,6 +38,9 @@ def assert_selection_handoff_manifest(manifest: dict[str, Any], *, panel: list[d
     assert manifest["panel_coverage"]["selected_panel_size"] == SELECTED_PANEL_SIZE
     assert manifest["panel_coverage"]["selected_row_count"] == len(panel)
     assert manifest["panel_coverage"]["policy_allocation_role"] == "experimental_design"
+    assert manifest["panel_coverage"]["rt_msdna_oligomeric_state_review_status_counts"] == {
+        "not_established": len(panel)
+    }
     assert manifest["panel_coverage"]["duplicate_candidate_ids"] == []
     assert manifest["panel_coverage"]["contract_failure_candidate_ids"] == []
     assert manifest["panel_coverage"]["valid"] is True

@@ -281,7 +281,7 @@ def write_hypothesis_panel_flow_plot(
     )
     alt = (
         f"Candidate flow from {initial_count:,} complete sequences through {geometry_count:,} sequences retaining "
-        f"local geometry to a {selected_count}-sequence panel. {group_summary}. Ribbon widths are proportional "
+        f"local geometry to an {selected_count}-sequence panel. {group_summary}. Ribbon widths are proportional "
         "to sequence count."
     )
     save_accessible_svg(fig, path, title=title, description=alt)

@@ -31,21 +31,40 @@ from ..structure_browser_common import (
 from .catalog import (
     COMMUNICATION_ROLE,
     STRUCTURE_STORY_BROWSER_ID,
+    STRUCTURE_STORY_FRAME_DIRECTORY_NAME,
+    STRUCTURE_STORY_LOG_FILE_NAME,
     STRUCTURE_STORY_MOVIE_FILE_NAME,
     STRUCTURE_STORY_MOVIE_ID,
     STRUCTURE_STORY_RENDER_MANIFEST_FILE_NAME,
     STRUCTURE_STORY_SCRIPT_FILE_NAME,
     STRUCTURE_STORY_SCRIPT_ID,
 )
-from .chimerax_story import (
-    CHIMERAX_FRAME_DIRECTORY_NAME,
-    materialize_chimerax_outputs,
-    write_chimerax_script,
+from .chimerax_story import write_chimerax_script
+from .movie_runtime import MovieRenderSpec, materialize_chimerax_movie
+from .pose import (
+    CHIMERAX_HOLD_FRAMES_PER_SCENE,
+    CHIMERAX_MOVIE_FRAME_RATE,
+    CHIMERAX_MOVIE_HEIGHT,
+    CHIMERAX_MOVIE_WIDTH,
+    CHIMERAX_ROTATION_DEGREES_PER_SCENE,
+    CHIMERAX_ROTATION_FRAMES_PER_SCENE,
+    CHIMERAX_START_ORIENTATION_OFFSET_DEGREES,
 )
 from .structure_browser_story import build_structure_browser_payload
 from .structure_scenes import structure_scene_specs
 
 BROWSER_MANIFEST_FILE_NAME = "structure_story_browser_manifest.yaml"
+_RENDER_SPEC = MovieRenderSpec(
+    schema_id="eco1_rt.communication_structure_story_render",
+    schema_version=4,
+    renderer="ChimeraX protected-evidence 16:9 PNG saves",
+    output_key="structure_story_movie",
+    frame_width=CHIMERAX_MOVIE_WIDTH,
+    frame_height=CHIMERAX_MOVIE_HEIGHT,
+    frame_rate=CHIMERAX_MOVIE_FRAME_RATE,
+    frames_per_scene=CHIMERAX_ROTATION_FRAMES_PER_SCENE,
+    hold_frames_per_scene=CHIMERAX_HOLD_FRAMES_PER_SCENE,
+)
 
 
 def write_structure_story(
@@ -57,7 +76,7 @@ def write_structure_story(
     policy_position_rows: list[dict[str, Any]],
     mask_set_path: Path,
     policy_positions_path: Path,
-    render_chimerax: bool,
+    render_requested: bool,
 ) -> list[dict[str, Any]]:
     """Write interactive structure scenes plus the optional rotation movie."""
 
@@ -86,7 +105,7 @@ def write_structure_story(
 
     script_path = panel_root / STRUCTURE_STORY_SCRIPT_FILE_NAME
     movie_path = panel_root / STRUCTURE_STORY_MOVIE_FILE_NAME
-    frame_directory = panel_root / CHIMERAX_FRAME_DIRECTORY_NAME
+    frame_directory = panel_root / STRUCTURE_STORY_FRAME_DIRECTORY_NAME
     render_manifest_path = panel_root / STRUCTURE_STORY_RENDER_MANIFEST_FILE_NAME
     write_chimerax_script(
         script_path=script_path,
@@ -95,19 +114,27 @@ def write_structure_story(
         reference_number_by_canonical=reference_number_by_canonical,
         scene_specs=scene_specs,
     )
-    render_status, render_reason = materialize_chimerax_outputs(
-        script_path=script_path,
-        reference_structure_path=reference_structure_path,
-        movie_path=movie_path,
-        frame_directory=frame_directory,
-        render_manifest_path=render_manifest_path,
-        render_chimerax=render_chimerax,
-    )
     source_paths = {
         "reference_structure": reference_structure_path,
         "mask_set": mask_set_path,
         "generation_policy_positions": policy_positions_path,
     }
+    render_status, render_reason = materialize_chimerax_movie(
+        script_path=script_path,
+        movie_path=movie_path,
+        frame_directory=frame_directory,
+        render_manifest_path=render_manifest_path,
+        log_path=panel_root / STRUCTURE_STORY_LOG_FILE_NAME,
+        source_paths=source_paths,
+        render_requested=render_requested,
+        spec=_RENDER_SPEC,
+        expected_raw_frame_count=len(scene_specs) * CHIMERAX_ROTATION_FRAMES_PER_SCENE,
+        encoding_metadata={
+            "rotation_degrees_per_scene": CHIMERAX_ROTATION_DEGREES_PER_SCENE,
+            "rotation_frames_per_scene": CHIMERAX_ROTATION_FRAMES_PER_SCENE,
+            "starting_orientation_offset_degrees": CHIMERAX_START_ORIENTATION_OFFSET_DEGREES,
+        },
+    )
     return [
         make_deliverable_row(
             deliverable_id=STRUCTURE_STORY_BROWSER_ID,
@@ -122,12 +149,13 @@ def write_structure_story(
             ],
             input_hashes=file_hashes(source_paths),
             alt_text=(
-                "Interactive Ec86 RT-DNA-RNA structure story with a translucent protein surface and separate "
-                "views for NAxxH/YADD/VTG contexts, direct contacts, conserved positions, primer-recognition context, "
-                "the protected union, and the three design spaces."
+                "Interactive Ec86 RT-DNA-RNA structure story with a translucent protein context surface and "
+                "stronger active-residue surface patches, cartoon segments, and side-chain sticks in separate "
+                "views for NAxxH/YADD/VTG contexts, direct contacts, the Wang thumb track, conserved positions, "
+                "primer-recognition context, the protected union, and the three design spaces."
             ),
             description=(
-                "Uses one retained-complex structure and one camera memory key so mask evidence and design spaces "
+                "Uses one retained-complex structure and one camera memory key so fixed positions and design spaces "
                 "can be inspected without conflating overlapping residue categories."
             ),
             interpretation_limit=(
@@ -137,8 +165,9 @@ def write_structure_story(
             title="The retained complex separates protected evidence from design space",
             role=COMMUNICATION_ROLE,
             method_summary=(
-                "Each view resets to the same RT-DNA-RNA reference. The protein uses a translucent VDW surface; "
-                "DNA and RNA retain gold and salmon nucleic-acid ribbons with matching ladder rungs."
+                "Each view resets to the same RT-DNA-RNA reference. The protein uses a translucent VDW context "
+                "surface; active residues use higher-opacity surface patches, matching cartoon segments, and "
+                "side-chain sticks. DNA and RNA retain gold and salmon ribbons with matching ladder rungs."
             ),
             evidence_summary={"scene_count": len(browser_payload["structures"])},
         ),
@@ -170,8 +199,9 @@ def write_structure_story(
             title="Protected evidence and design spaces are revealed on one structure",
             alt_text=(
                 "ChimeraX rotation movie that gives each motif, contact, conservation, primer-recognition, protected-"
-                "union, and design-space category a full five-second turn. A translucent protein surface reveals the "
-                "gray cartoon, and only the active category's side chains are shown."
+                "union, and design-space category a full five-second turn. A translucent protein context surface "
+                "reveals the gray cartoon, while active residues use stronger surface patches, matching cartoon "
+                "segments, and thicker side-chain sticks."
             ),
             description=(
                 "Presents the mask logic as ordered full-turn views from one structure and controlled camera path."

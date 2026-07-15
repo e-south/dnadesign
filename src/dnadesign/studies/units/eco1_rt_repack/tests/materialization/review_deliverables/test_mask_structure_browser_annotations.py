@@ -78,11 +78,30 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
     }
     assert manifest["protein_surface_default"] is False
     rows_by_id = {row["candidate_id"]: row for row in manifest["structures"]}
+    assert manifest["title"] == "The Ec86 structure maps fixed and open residue sets"
+    assert "active_mask_protected_positions" not in rows_by_id
+    assert {
+        "protected_catalytic_motifs",
+        "protected_direct_contacts",
+        "protected_wang_thumb_track",
+        "protected_conserved_positions",
+        "protected_primer_recognition_context",
+        "protected_union",
+        "designable_peripheral_shell",
+        "designable_distal_scaffold",
+        "designable_combined_space",
+    }.issubset(rows_by_id)
+    assert rows_by_id["protected_union"]["group"] == "Fixed positions"
+    assert rows_by_id["designable_peripheral_shell"]["group"] == "Design spaces"
+    assert rows_by_id["protected_catalytic_motifs"]["selection_styles"][0]["canonical_residue_numbers"] == [3]
+    assert rows_by_id["protected_wang_thumb_track"]["selection_styles"][0]["canonical_residue_numbers"] == [4]
+    assert rows_by_id["protected_primer_recognition_context"]["selection_styles"][0]["canonical_residue_numbers"] == [2]
     rt1 = rows_by_id["rt1_interval"]
     region_x = rows_by_id["retron_x_context"]
+    naxxh = rows_by_id["retron_x_naxxh"]
 
     assert rt1["display_label"] == "RT1"
-    assert rt1["group"] == "RT annotation spans"
+    assert rt1["group"] == "RT annotations"
     assert rt1["structure_view_mode"] == "reference_selection"
     assert rt1["selection_residue_count"] == 2
     assert rt1["selection_styles"][0]["canonical_residue_numbers"] == [2, 3]
@@ -90,6 +109,9 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
     assert rt1["selection_styles"][0]["selection_id"] == "rt1_interval"
     assert "display-only rt annotation" in rt1["description"].lower()
     assert region_x["selection_styles"][0]["canonical_residue_numbers"] == [2, 3, 4]
+    assert "fixed context window" in region_x["description"].lower()
+    assert "study choice" in region_x["description"].lower()
+    assert "exact literature-annotated motif anchor" in naxxh["description"].lower()
     assert "rt_annotation_tracks" in manifest["source_hashes"]
     for row in manifest["structures"]:
         styles = {style["molecule_class"]: style for style in row["molecule_styles"]}
@@ -106,7 +128,7 @@ def test_mask_structure_browser_exposes_rt_annotation_spans_as_reference_highlig
         rows,
         selected_section=SECTION_CONSTRAINT_EVIDENCE,
         selected_deliverable_id="mask_structure_browser_manifest",
-        selected_group="RT annotation spans",
+        selected_group="RT annotations",
     )
     assert "RT1 | 2 residues" in highlight_lookup
     assert "RT2 | 2 residues" in highlight_lookup

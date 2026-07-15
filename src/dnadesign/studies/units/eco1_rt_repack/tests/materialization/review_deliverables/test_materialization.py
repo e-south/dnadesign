@@ -68,7 +68,7 @@ def test_review_deliverables_materialize_manifest_figures_and_notebook(tmp_path:
     assert deliverables["foldcheck_review_structure_overlay_skipped"]["status"] == "skipped_runtime_unavailable"
     assert deliverables["mask_structure_browser_manifest"]["status"] == "rendered"
     assert deliverables["mask_structure_browser_manifest"]["title"] == (
-        "The Ec86 structure maps the active mask evidence"
+        "The Ec86 structure maps fixed and open residue sets"
     )
     assert deliverables["interactive_structure_browser_manifest"]["status"] == "rendered"
     assert deliverables["interactive_structure_browser_manifest"]["title"] == (

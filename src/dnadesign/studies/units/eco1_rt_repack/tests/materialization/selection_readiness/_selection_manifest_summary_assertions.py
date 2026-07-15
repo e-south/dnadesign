@@ -35,9 +35,13 @@ def assert_selection_summary_and_trace(
         "selection_contract_pass_by_policy": dict(
             sorted(Counter(str(row["policy_id"]) for row in contract_rows).items())
         ),
+        "wang_r13a_interface_disruption_evidence_match": sum(
+            bool(row["wang_r13a_interface_disruption_evidence_match"]) for row in triage
+        ),
         "selected_panel": SELECTED_PANEL_SIZE,
     }
     assert summary["gate_counts"]["hard_gate_status"] == manifest["gate_counts"]["hard_gate_status"]
+    assert summary["gate_counts"]["rt_msdna_oligomeric_state_review_status"] == {"not_established": len(triage)}
     assert summary["selected_mutation_overlap"]["shared_exact_substitution_count"] == 0
     assert summary["selected_mutation_overlap"]["shared_exact_substitutions"] == []
     assert summary["selected_mutation_overlap"]["unique_mutated_position_count"] == 16

@@ -110,7 +110,7 @@ def test_structure_browser_runtime_can_toggle_reference_and_mutation_overlay(tmp
 def test_candidate_highlight_rebinds_reference_selection_to_query_model(tmp_path: Path) -> None:
     selected, rows = _candidate_context(tmp_path)
     highlight_lookup = structure_browser.structure_highlight_lookup(rows, selected_row=selected)
-    protected = next(row for label, row in highlight_lookup.items() if label.startswith("Protected residues"))
+    protected = next(row for label, row in highlight_lookup.items() if label.startswith("Combined protected set"))
 
     rendered = structure_browser.render_structure_browser(
         mo=FakeMo(),

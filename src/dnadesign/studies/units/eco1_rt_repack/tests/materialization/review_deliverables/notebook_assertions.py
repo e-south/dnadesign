@@ -94,9 +94,14 @@ def assert_review_notebook_contract(notebook_text: str) -> None:
     assert "N-terminal-enriched distant-repacking control" in combined_text
     assert "not a direct strand-displacement hypothesis" in combined_text
     assert "Select eight sequences" in combined_text
+    assert "not a global three-row optimum" in combined_text
     assert "first-order" not in combined_text
-    assert "alpha-1/R13 states remain visible" in combined_text
-    assert "R13 is reported but does not filter or rank rows" in combined_text
+    assert "exact alpha-1 F10/R13 states remain visible" in combined_text
+    assert "Exact F10 and R13 states are reported" in combined_text
+    assert "do not filter or rank" in combined_text
+    assert "No generated sequence matches the tested R13A substitution" in combined_text
+    assert "Oligomeric state was not evaluated" in combined_text
+    assert "does not claim a globally optimal three-sequence subset" in combined_text
     assert "safe mutation" not in combined_text
     assert "ESMC and" in combined_text
     assert "SAE are optional model checks" in combined_text

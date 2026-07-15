@@ -90,7 +90,7 @@ CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
         plot_id="selection_regionwise_msa_support",
         file_name="selection_regionwise_msa_support.svg",
-        plain_title="Natural-sequence support for selected substitutions",
+        plain_title="Clade-9 MSA support for selected substitutions",
         selection_role="gate_audit_and_tie_break_context",
         funnel_stage_id="",
         notebook_group="selection_rationale",
@@ -101,12 +101,13 @@ CURRENT_SELECTION_PLOTS = (
     SelectionPlot(
         plot_id="selection_mutation_set_dissimilarity",
         file_name="selection_mutation_set_dissimilarity.svg",
-        plain_title="Selected sequences differ at many redesigned positions",
+        plain_title="Selected mutation-position distances",
         selection_role="within_policy_and_panel_distance_audit",
         funnel_stage_id="selected_panel",
         notebook_group="core_funnel",
         not_a_selector_reason=(
-            "Audits mutation-set dissimilarity within and across policy contrasts; it is not functional evidence."
+            "Audits within-group mutation-set dissimilarity; cross-group values are descriptive because the open "
+            "position sets differ."
         ),
     ),
     SelectionPlot(

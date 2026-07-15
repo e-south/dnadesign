@@ -238,6 +238,13 @@ def selected_panel_coverage_summary(panel_rows: Sequence[dict[str, object]]) -> 
         "selected_row_count": len(panel_rows),
         "policy_allocation_role": "experimental_design",
         "selected_generation_policy_counts": {key: policy_counts[key] for key in sorted(policy_counts)},
+        "rt_msdna_oligomeric_state_review_status_counts": dict(
+            sorted(
+                Counter(
+                    str(row.get("rt_msdna_oligomeric_state_review_status") or "missing") for row in panel_rows
+                ).items()
+            )
+        ),
         "duplicate_candidate_ids": duplicate_candidate_ids,
         "contract_failure_candidate_ids": contract_failure_ids,
         "valid": (

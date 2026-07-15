@@ -57,7 +57,7 @@ def write_generation_policy_positions(path: Path) -> None:
                     "is_direct_contact_le_5a": position == 5,
                     "is_near_region_gt5_le10a": is_near,
                     "is_wang_thumb_track": position == 4,
-                    "is_c_terminal_thumb_context": False,
+                    "is_c_terminal_thumb_context": position == 2,
                     "is_conserved_core": position in {2, 4},
                     "motif_context_codes": ["fixture_motif"] if position == 3 else [],
                     "is_open_position": is_open,

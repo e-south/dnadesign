@@ -15,6 +15,9 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.communication_visuals.catalog import (  # noqa: E501
+    COMMUNICATION_MOVIE_TARGETS,
+)
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.review_deliverables.pipeline import (
     materialize_review_deliverables,
 )
@@ -38,9 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Opt in to launching ChimeraX to render the optional mask-context PNG.",
     )
     parser.add_argument(
-        "--render-communication-chimerax",
-        action="store_true",
-        help=("Opt in to the communication-facing ChimeraX protected-evidence and selected-surface movies."),
+        "--render-communication-movie",
+        action="append",
+        choices=COMMUNICATION_MOVIE_TARGETS,
+        default=[],
+        help=("Opt in to one communication-facing ChimeraX movie. Repeat the option to render multiple targets."),
     )
     return parser
 
@@ -54,7 +59,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_root=args.output_root,
         selection_root=args.selection_root,
         render_chimerax_png=args.render_chimerax_png,
-        render_communication_chimerax=args.render_communication_chimerax,
+        render_communication_movie_ids=tuple(args.render_communication_movie),
     )
     print(f"review_deliverable_manifest: {result.manifest_path}")
     print(f"review_deliverable_notebook: {result.notebook_path}")

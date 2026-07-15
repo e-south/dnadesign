@@ -14,6 +14,7 @@ from __future__ import annotations
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.triage import (
     _hard_gate_status,
     _selection_candidate_fields,
+    _wang_alpha1_review_fields,
 )
 
 
@@ -194,3 +195,24 @@ def test_wang_alpha1_r13_wild_type_passes_when_other_contract_checks_pass() -> N
 
     assert fields["selection_contract_pass"] is True
     assert fields["wang_alpha1_r13_review_status"] == "retained_wt"
+
+
+def test_wang_alpha1_review_records_exact_contact_substitutions_without_claiming_monomeric_state() -> None:
+    fields = _wang_alpha1_review_fields(["F10E", "R13K", "A20G"])
+
+    assert fields == {
+        "wang_alpha1_f10_substitution": "F10E",
+        "wang_alpha1_r13_substitution": "R13K",
+        "wang_alpha1_cross_protomer_contact_mutation_count": 2,
+        "wang_r13a_interface_disruption_evidence_match": False,
+        "rt_msdna_oligomeric_state_review_status": "not_established",
+    }
+
+
+def test_wang_alpha1_review_marks_only_the_tested_r13a_substitution_as_an_evidence_match() -> None:
+    fields = _wang_alpha1_review_fields(["R13A"])
+
+    assert fields["wang_alpha1_f10_substitution"] == "WT"
+    assert fields["wang_alpha1_r13_substitution"] == "R13A"
+    assert fields["wang_r13a_interface_disruption_evidence_match"] is True
+    assert fields["rt_msdna_oligomeric_state_review_status"] == "wang_r13a_interface_disruption_match"

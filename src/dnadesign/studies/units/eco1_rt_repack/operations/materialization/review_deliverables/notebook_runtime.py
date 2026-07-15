@@ -110,21 +110,22 @@ def render_intro(mo: Any) -> Any:
         "N-terminal-enriched distant-repacking control, not a direct strand-displacement hypothesis; the peripheral "
         "and combined groups test nucleic-acid-facing redesign. These are experimental comparisons, not quality tiers.",
         "Select eight sequences: two distal, three peripheral, and three combined. Within each group, minimize "
-        "overlap in mutated positions first and exact substitutions second; use chemistry, MSA, and structure "
-        "evidence only for later ties.",
+        "overlap in mutated positions first and exact substitutions second. The first pair is exhaustive; each "
+        "third row is the candidate farthest from that pair, not a global three-row optimum.",
     )
     stage_html = "".join(f"<li style='margin:0 0 0.24rem 0;'>{item}</li>" for item in stage_items)
     generation_note = (
         "ProteinMPNN fixed motif neighborhoods 99-115, 189-204, and 237-251; their exact NAxxH, YADD, and VTG "
         "anchors are 105-109, 195-198, and 243-245. The extra flanks are precautionary study choices. Mapped "
         "residues 255-311 are fixed, while 230-254 remain designable and are reported separately. Recurrent C233 "
-        "changes and alpha-1/R13 states remain visible in the evidence tables; neither is treated as an activity score."
+        "changes and exact alpha-1 F10/R13 states remain visible in the evidence tables. The folded structures use "
+        "one RT chain and do not establish the RT-msDNA oligomeric state."
     )
     claim_limit = (
         "Charge shifts, MSA support, fold metrics, and local RMSD are review evidence, not activity scores. ESMC and "
         "SAE are optional model checks and do not select candidates. The sequence instances are not biological "
         "replicates, and the panel does not establish improved activity, affinity, processivity, strand displacement, "
-        "or safety."
+        "safety, or RT-msDNA oligomeric state."
     )
     paragraph_style = (
         "margin:0; width:100%; max-width:none; color:inherit; opacity:0.86; "
