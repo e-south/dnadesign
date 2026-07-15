@@ -22,6 +22,9 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
     SCHEMA_ID,
     SCHEMA_VERSION,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
+    ReaderResponseBundle,
+)
 
 from ...source_evidence import sfxi_round0_source_evidence_dir
 from ..core.contracts import (
@@ -43,7 +46,6 @@ from .measurement_selection import (
     ResponseMeasurementSelection,
 )
 from .publication import METASTUDY_SCHEMA_VERSION, source_inventory
-from .reader_response_bundle import ReaderResponseBundle
 
 
 def write_metastudy_manifest(
@@ -66,8 +68,26 @@ def write_metastudy_manifest(
     shuffled_model_validation_summary: dict[str, object],
     response_metric_screen: dict[str, object],
 ) -> dict[str, object]:
+    label_truth = {
+        "state": "not_ready",
+        "source": "stress_ethanol_cipro_growth.response_window_observations",
+        "screen_source_scope": measurement_selection.scope,
+        "screen_source_label_truth_role": measurement_selection.label_truth_role,
+        "repeat_aggregation": "study_artifact_not_promoted",
+        "observed_label_promotion_manifest": None,
+    }
+    decision_gates = {
+        "label_truth_ready": False,
+        "model_support_ready": bool(response_metric_screen["model_support_ready"]),
+        "selection_policy_promoted": False,
+        "synthesis_authorized": False,
+        "posture": "retrospective_screen_only",
+        "opal_operational_state_included": False,
+    }
     manifest = {
         "schema_version": METASTUDY_SCHEMA_VERSION,
+        "label_truth": label_truth,
+        "decision_gates": decision_gates,
         "canonical_sfxi_sources": {
             "documentation": "src/dnadesign/opal/docs/plugins/objectives/sfxi.md",
             "math_helpers": "src/dnadesign/opal/src/objectives/sfxi_math.py",
@@ -118,7 +138,7 @@ def write_metastudy_manifest(
                 "reader_alias_namespace": READER_ALIAS_NAMESPACE,
                 "binding_count": candidate_identity_bindings.binding_count,
                 "candidate_count": candidate_identity_bindings.candidate_count,
-                "resolved_response_label_count": len(candidate_identity_bindings.rows),
+                "resolved_model_screen_candidate_count": len(candidate_identity_bindings.rows),
                 "declared_unbound_reader_design_count": candidate_identity_bindings.excluded_design_count,
                 "files": source_inventory(
                     candidate_identity_bindings.bundle_root,
@@ -130,7 +150,7 @@ def write_metastudy_manifest(
                 "schema_version": RESPONSE_SELECTION_SCHEMA_VERSION,
                 "selection_id": measurement_selection.selection_id,
                 "scope": measurement_selection.scope,
-                "promotion_aggregation": measurement_selection.promotion_aggregation,
+                "label_truth_role": measurement_selection.label_truth_role,
                 "row_count": len(measurement_selection.rows),
                 "excluded_designs": measurement_selection.excluded_designs.to_dict(orient="records"),
                 "config": source_inventory(paths.repo_root, [measurement_selection.config_path])[0],
@@ -183,7 +203,11 @@ def _provenance_files(
     ]
     package_root = Path(__file__).resolve().parents[1]
     files.append(package_root / "README.md")
-    files.append(package_root / "config/reader_response_window.yaml")
+    files.append(
+        paths.repo_root
+        / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
+        / "response_window_observations/config/reader_response_window.yaml"
+    )
     files.extend(package_root.rglob("*.py"))
     files.append(stress_campaign.config_path)
     for source in SFXI_SOURCE_PROVENANCE:

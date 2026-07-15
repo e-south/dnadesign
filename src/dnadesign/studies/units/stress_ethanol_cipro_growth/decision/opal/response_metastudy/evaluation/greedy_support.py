@@ -20,15 +20,17 @@ def build_greedy_support_evidence(
     retrospective_enrichment: pd.DataFrame,
     *,
     primary_reduction_id: str,
+    model_role: str,
     confidence_level: float = 0.95,
 ) -> pd.DataFrame:
-    """Summarize held-out enrichment without converting it into slot counts."""
+    """Summarize one explicit model role without converting evidence into slots."""
 
     if not 0.5 < confidence_level < 1.0:
         raise ValueError("greedy-support confidence_level must be between 0.5 and 1.0.")
     required_screen = {
         "representation_id",
         "model_id",
+        "model_role",
         "promotion_eligible",
         "all_target_view_metrics_finite",
         "weakest_required_ordering_spearman",
@@ -46,25 +48,37 @@ def build_greedy_support_evidence(
     _require_columns(model_screen, required_screen, context="model screen")
     _require_columns(retrospective_enrichment, required_enrichment, context="retrospective enrichment")
 
-    eligible = model_screen.loc[
+    role_rows = model_screen.loc[
         model_screen["representation_id"].astype(str).eq(primary_reduction_id)
         & model_screen["promotion_eligible"].astype(bool)
-        & model_screen["all_target_view_metrics_finite"].astype(bool)
+        & model_screen["model_role"].astype(str).eq(model_role)
     ]
-    if eligible.empty:
-        raise ValueError(f"no eligible model screen exists for primary reduction {primary_reduction_id!r}.")
-    best = eligible.sort_values(
-        ["weakest_required_ordering_spearman", "median_channel_spearman", "model_id"],
-        ascending=[False, False, True],
-        kind="mergesort",
-    ).iloc[0]
+    if model_role == "campaign_model":
+        if len(role_rows) != 1:
+            raise ValueError(
+                f"expected one campaign model for primary reduction {primary_reduction_id!r}; found {len(role_rows)}."
+            )
+        selected = role_rows.iloc[0]
+        evidence_basis = "configured_campaign_model"
+    elif model_role == "fixed_challenger":
+        eligible = role_rows.loc[role_rows["all_target_view_metrics_finite"].astype(bool)]
+        if eligible.empty:
+            raise ValueError(f"no finite fixed challenger exists for primary reduction {primary_reduction_id!r}.")
+        selected = eligible.sort_values(
+            ["weakest_required_ordering_spearman", "median_channel_spearman", "model_id"],
+            ascending=[False, False, True],
+            kind="mergesort",
+        ).iloc[0]
+        evidence_basis = "best_fixed_challenger"
+    else:
+        raise ValueError("greedy-support model_role must be 'campaign_model' or 'fixed_challenger'.")
     evidence = retrospective_enrichment.loc[
         retrospective_enrichment["representation_id"].astype(str).eq(primary_reduction_id)
-        & retrospective_enrichment["model_id"].astype(str).eq(str(best["model_id"]))
+        & retrospective_enrichment["model_id"].astype(str).eq(str(selected["model_id"]))
         & retrospective_enrichment["selection_defined"].astype(bool)
     ].copy()
     if evidence.empty:
-        raise ValueError("best primary model has no defined grouped enrichment rows.")
+        raise ValueError(f"{evidence_basis} has no defined grouped enrichment rows.")
 
     records: list[dict[str, object]] = []
     for selection_view_id, rows in evidence.groupby("selection_view_id", sort=True):
@@ -76,7 +90,9 @@ def build_greedy_support_evidence(
             {
                 "selection_view_id": str(selection_view_id),
                 "representation_id": primary_reduction_id,
-                "model_id": str(best["model_id"]),
+                "model_id": str(selected["model_id"]),
+                "model_role": model_role,
+                "evidence_basis": evidence_basis,
                 "held_out_group_count": groups,
                 "groups_beating_median": successes,
                 "fraction_beating_group_median": fraction,

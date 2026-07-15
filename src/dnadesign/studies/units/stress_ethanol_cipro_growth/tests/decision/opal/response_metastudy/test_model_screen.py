@@ -19,6 +19,47 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
     StressTargetView,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.evaluation import (
+    grouped_models,
+    model_screen,
+)
+
+
+def test_fixed_screen_includes_exact_campaign_random_forest_target_treatment() -> None:
+    specs = {spec.id: spec for spec in evaluation.DEFAULT_MODEL_SCREEN_SPECS}
+
+    assert specs["campaign_random_forest"].kind == "random_forest"
+    assert specs["campaign_random_forest"].role == "campaign_model"
+    assert specs["campaign_random_forest"].target_transform == "none"
+    assert specs["mean_baseline"].role == "baseline"
+    assert specs["pls4"].role == "fixed_challenger"
+    assert specs["robust_target_random_forest"].target_transform == "robust_magnitude"
+
+
+def test_campaign_screen_preserves_configured_random_forest_fit_parameters() -> None:
+    spec = next(spec for spec in evaluation.DEFAULT_MODEL_SCREEN_SPECS if spec.id == "campaign_random_forest")
+
+    model = grouped_models._build_model(
+        spec,
+        train_rows=20,
+        random_forest_params={
+            "n_estimators": 100,
+            "criterion": "friedman_mse",
+            "bootstrap": True,
+            "oob_score": True,
+            "random_state": 7,
+            "n_jobs": -1,
+            "emit_feature_importance": True,
+        },
+    )
+
+    fitted_params = model.get_params(deep=False)
+    assert fitted_params["n_estimators"] == 100
+    assert fitted_params["criterion"] == "friedman_mse"
+    assert fitted_params["bootstrap"] is True
+    assert fitted_params["oob_score"] is True
+    assert fitted_params["random_state"] == 7
+    assert fitted_params["n_jobs"] == -1
 
 
 def test_factorial_contrast_preserves_all_response_separations() -> None:
@@ -65,6 +106,15 @@ def test_only_declared_reduction_and_its_contrast_are_promotion_eligible() -> No
         "primary__factorial_contrast7": True,
         "sensitivity": False,
     }
+    campaign_spec = next(spec for spec in evaluation.DEFAULT_MODEL_SCREEN_SPECS if spec.id == "campaign_random_forest")
+    assert {
+        representation.id: model_screen._model_evidence_role(representation, campaign_spec)
+        for representation in representations
+    } == {
+        "primary": "campaign_model",
+        "primary__factorial_contrast7": "fixed_challenger",
+        "sensitivity": "fixed_challenger",
+    }
 
 
 def test_grouped_model_screen_returns_margin_and_enrichment_evidence() -> None:
@@ -104,6 +154,9 @@ def test_grouped_model_screen_returns_margin_and_enrichment_evidence() -> None:
         "event_logmean_6_12h_post__factorial_contrast7",
     }
     assert (summary["model_id"] == "pls2").all()
+    assert (summary["model_role"] == "fixed_challenger").all()
+    assert (group_metrics["model_role"] == "fixed_challenger").all()
+    assert (enrichment["model_role"] == "fixed_challenger").all()
     assert summary["ethanol__response_separation_spearman"].notna().all()
     assert np.allclose(
         summary["weakest_required_ordering_spearman"],

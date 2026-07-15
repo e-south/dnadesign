@@ -26,20 +26,24 @@ from sklearn.preprocessing import StandardScaler
 
 from .model_validation_support import validated_model_params
 
+CAMPAIGN_MODEL_SCREEN_ID = "campaign_random_forest"
+
 
 @dataclass(frozen=True)
 class ModelScreenSpec:
-    """One fixed model and target-transform challenger."""
+    """One fixed model, its evidence role, and target treatment."""
 
     id: str
     kind: Literal["mean", "random_forest", "pca_ridge", "pls"]
+    role: Literal["baseline", "campaign_model", "fixed_challenger"] = "fixed_challenger"
     components: int | None = None
     ridge_alpha: float | None = None
     target_transform: Literal["none", "robust_magnitude", "standard_all"] = "none"
 
 
 DEFAULT_MODEL_SCREEN_SPECS: tuple[ModelScreenSpec, ...] = (
-    ModelScreenSpec(id="mean_baseline", kind="mean"),
+    ModelScreenSpec(id="mean_baseline", kind="mean", role="baseline"),
+    ModelScreenSpec(id=CAMPAIGN_MODEL_SCREEN_ID, kind="random_forest", role="campaign_model"),
     ModelScreenSpec(id="robust_target_random_forest", kind="random_forest", target_transform="robust_magnitude"),
     ModelScreenSpec(
         id="pca4_ridge10",
@@ -193,9 +197,14 @@ def _build_model(
             raise ValueError("mean baseline must use target_transform='none'.")
         return DummyRegressor(strategy="mean")
     if spec.kind == "random_forest":
-        if spec.target_transform != "robust_magnitude":
-            raise ValueError("random-forest challenger must use robust_magnitude target transform.")
-        return RandomForestRegressor(**validated_model_params(random_forest_params))
+        if spec.target_transform not in {"none", "robust_magnitude"}:
+            raise ValueError("random-forest challenger must use no target transform or robust_magnitude.")
+        return RandomForestRegressor(
+            **validated_model_params(
+                random_forest_params,
+                preserve_oob_score=spec.role == "campaign_model",
+            )
+        )
     if spec.components is None or spec.components <= 0 or spec.components >= train_rows:
         raise ValueError(f"{spec.id}: components must be positive and smaller than every training fold.")
     if spec.kind == "pca_ridge":  # pragma: no cover - fitted through the cached path.
@@ -216,4 +225,10 @@ def validate_model_screen_specs(specs: Sequence[ModelScreenSpec]) -> tuple[Model
     return values
 
 
-__all__ = ["DEFAULT_MODEL_SCREEN_SPECS", "ModelScreenSpec", "grouped_predictions", "validate_model_screen_specs"]
+__all__ = [
+    "CAMPAIGN_MODEL_SCREEN_ID",
+    "DEFAULT_MODEL_SCREEN_SPECS",
+    "ModelScreenSpec",
+    "grouped_predictions",
+    "validate_model_screen_specs",
+]

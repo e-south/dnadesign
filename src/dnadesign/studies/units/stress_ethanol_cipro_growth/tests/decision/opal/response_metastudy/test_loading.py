@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
     SFXI_SOURCE_PROVENANCE,
@@ -175,6 +176,50 @@ def test_stress_campaign_contract_rejects_missing_candidate_records(tmp_path) ->
         load_stress_campaign_contract(paths)
 
 
+def test_stress_campaign_contract_preserves_configured_model_and_response_vector(tmp_path: Path) -> None:
+    campaign_root, _ = _copy_campaign_config(tmp_path)
+    records = tmp_path / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet"
+    records.parent.mkdir(parents=True)
+    records.touch()
+    paths = MetastudyPaths(
+        repo_root=tmp_path,
+        reader_bundle_root=tmp_path / "reader-bundle",
+        out_dir=tmp_path / "out",
+        campaign_root=campaign_root,
+    )
+
+    contract = load_stress_campaign_contract(paths)
+
+    assert contract.model_params == {
+        "n_estimators": 100,
+        "criterion": "friedman_mse",
+        "bootstrap": True,
+        "oob_score": True,
+        "random_state": 7,
+        "n_jobs": -1,
+        "emit_feature_importance": True,
+    }
+
+
+def test_stress_campaign_contract_rejects_response_vector_transform_drift(tmp_path: Path) -> None:
+    campaign_root, target_config = _copy_campaign_config(tmp_path)
+    payload = yaml.safe_load(target_config.read_text(encoding="utf-8"))
+    payload["transforms_y"]["params"]["value_columns"] = ["b00", "b10", "b01", "b11", "r00", "r10", "r01", "r11"]
+    target_config.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    records = tmp_path / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet"
+    records.parent.mkdir(parents=True)
+    records.touch()
+    paths = MetastudyPaths(
+        repo_root=tmp_path,
+        reader_bundle_root=tmp_path / "reader-bundle",
+        out_dir=tmp_path / "out",
+        campaign_root=campaign_root,
+    )
+
+    with pytest.raises(ValueError, match="ordered Reader response-window vector"):
+        load_stress_campaign_contract(paths)
+
+
 def test_sfxi_evidence_frame_rejects_missing_persisted_ledgers(tmp_path) -> None:
     source = _sfxi_source()
     target_view = _target_view()
@@ -246,6 +291,16 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
         (0.0, 0.0, 1.0, 1.0),
         (0.0, 0.0, 0.0, 1.0),
     )
+
+
+def _copy_campaign_config(tmp_path: Path) -> tuple[Path, Path]:
+    repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file())
+    source_config = repo_root / "src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml"
+    campaign_root = tmp_path / "src/dnadesign/opal/campaigns"
+    target_config = campaign_root / "secg_rmf_greedy/configs/campaign.yaml"
+    target_config.parent.mkdir(parents=True)
+    target_config.write_text(source_config.read_text(encoding="utf-8"), encoding="utf-8")
+    return campaign_root, target_config
 
 
 def _require_repository_sfxi_artifacts(repo_root: Path) -> None:

@@ -30,12 +30,12 @@ CONFIG = Path(
 
 def _payload() -> dict[str, object]:
     return {
-        "schema_id": "stress_ethanol_cipro_growth.response_measurement_selection.v2",
-        "schema_version": "2",
+        "schema_id": "stress_ethanol_cipro_growth.response_measurement_selection.v3",
+        "schema_version": "3",
         "study_id": "stress_ethanol_cipro_growth",
         "selection_id": "response_metastudy_model_screen_v1",
         "scope": "model_screen_only",
-        "promotion_aggregation": "not_defined",
+        "label_truth_role": "none",
         "excluded_designs": [],
         "measurements": [
             {"reader_experiment_id": "experiment-a", "design_id": "design-a"},
@@ -68,7 +68,7 @@ def test_response_measurement_selection_resolves_exact_reader_rows(tmp_path: Pat
 
     assert result.rows.to_dict(orient="records") == [{"reader_experiment_id": "experiment-a", "design_id": "design-a"}]
     assert result.scope == "model_screen_only"
-    assert result.promotion_aggregation == "not_defined"
+    assert result.label_truth_role == "none"
     assert result.excluded_designs.empty
 
 

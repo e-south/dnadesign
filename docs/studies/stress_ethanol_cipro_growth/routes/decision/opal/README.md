@@ -50,7 +50,7 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - SFXI source labels: `_opal/observed_labels.parquet` under the candidate
   table dataset.
 - Prospective response-window observed labels:
-  `_opal/response_window_observed_labels.parquet` after study promotion; the
+  `_opal/response_window_labels_v1/observed_labels.parquet` after study promotion; the
   sidecar is not yet materialized.
 - SFXI round-0 label input: the three source runs used one deduplicated 35-row
   Reader vec8 pool, independent of the 18-row physical batch-0 synthesis seed.

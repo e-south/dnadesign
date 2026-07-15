@@ -40,10 +40,15 @@ def validated_xy(x: np.ndarray, y: np.ndarray, *, n_splits: int) -> tuple[np.nda
     return x_values, y_values
 
 
-def validated_model_params(model_params: Mapping[str, object]) -> dict[str, object]:
+def validated_model_params(
+    model_params: Mapping[str, object],
+    *,
+    preserve_oob_score: bool = False,
+) -> dict[str, object]:
     params = dict(model_params)
     params.pop("emit_feature_importance", None)
-    params["oob_score"] = False
+    if not preserve_oob_score:
+        params["oob_score"] = False
     allowed = set(RandomForestRegressor().get_params(deep=False))
     unknown = sorted(set(params) - allowed)
     if unknown:

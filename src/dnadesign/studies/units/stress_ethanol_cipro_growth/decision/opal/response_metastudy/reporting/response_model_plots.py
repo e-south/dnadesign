@@ -27,6 +27,7 @@ from .plot_vocabulary import target_view_label
 
 _MODEL_ORDER = (
     "mean_baseline",
+    "campaign_random_forest",
     "robust_target_random_forest",
     "pca4_ridge10",
     "pca8_ridge10",
@@ -37,6 +38,7 @@ _MODEL_ORDER = (
 )
 _MODEL_LABELS = {
     "mean_baseline": "Mean baseline",
+    "campaign_random_forest": "Configured campaign RF",
     "robust_target_random_forest": "Robust target RF",
     "pca4_ridge10": "PCA-4 + ridge",
     "pca8_ridge10": "PCA-8 + ridge",
@@ -119,8 +121,8 @@ def write_label_model_screen(frame: pd.DataFrame, path: Path) -> None:
                 fontsize=8,
                 color=contrast_text_color(image, values[row, column]),
             )
-    ax.set_title("Grouped model screen across candidate and sensitivity label representations", pad=34)
-    ax.set_xlabel("Candidate label representation")
+    ax.set_title("Grouped model screen across response representations", pad=34)
+    ax.set_xlabel("Response representation")
     ax.set_ylabel("Fixed model screen")
     colorbar = fig.colorbar(image, ax=ax, fraction=0.025, pad=0.03)
     colorbar.set_label("Median within-experiment Spearman correlation")

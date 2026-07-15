@@ -147,6 +147,7 @@ def _group_metric_rows(
                 "representation_id": representation.id,
                 "promotion_eligible": representation.promotion_eligible,
                 "model_id": model_spec.id,
+                "model_role": _model_evidence_role(representation, model_spec),
                 "target_transform": model_spec.target_transform,
                 "selection_view_id": target_view.id,
                 "reader_experiment_id": group,
@@ -180,6 +181,7 @@ def _screen_summary(
         "representation_id": representation.id,
         "promotion_eligible": representation.promotion_eligible,
         "model_id": model_spec.id,
+        "model_role": _model_evidence_role(representation, model_spec),
         "target_transform": model_spec.target_transform,
         "validation": "leave_one_reader_experiment_out",
         "metric_scope": "median_within_held_out_experiment",
@@ -267,6 +269,7 @@ def _retrospective_enrichment(
                     "representation_id": representation.id,
                     "promotion_eligible": representation.promotion_eligible,
                     "model_id": model_spec.id,
+                    "model_role": _model_evidence_role(representation, model_spec),
                     "selection_view_id": target_view.id,
                     "reader_experiment_id": group,
                     "selected_candidate_id": (
@@ -284,6 +287,14 @@ def _retrospective_enrichment(
                 }
             )
     return pd.DataFrame.from_records(rows)
+
+
+def _model_evidence_role(representation: LabelRepresentation, model_spec: ModelScreenSpec) -> str:
+    if model_spec.role != "campaign_model":
+        return model_spec.role
+    if representation.promotion_eligible and representation.decoder == "identity_response_magnitude":
+        return "campaign_model"
+    return "fixed_challenger"
 
 
 def _components(values: np.ndarray, target_view: StressTargetView) -> ResponseMagnitudeFeasibilityComponents:

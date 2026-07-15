@@ -193,7 +193,7 @@ def write_visuals(
         paths["retrospective_enrichment"],
     )
     write_greedy_support_evidence(
-        response_screen.greedy_support,
+        response_screen.campaign_greedy_support,
         paths["greedy_support_evidence"],
     )
     write_repeated_design_agreement(

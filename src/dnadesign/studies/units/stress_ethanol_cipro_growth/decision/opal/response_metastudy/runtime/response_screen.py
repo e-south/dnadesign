@@ -32,6 +32,7 @@ from ..evaluation.response_magnitude import (
     summarize_response_separation_stability,
 )
 from ..evaluation.response_uncertainty import estimate_response_calibration_from_reader_draws
+from .model_evidence_manifest import build_model_evidence_manifest
 
 
 def build_response_metric_screen(
@@ -100,10 +101,17 @@ def build_response_metric_screen(
         random_forest_params=random_forest_params,
     )
     enrichment_summary = summarize_retrospective_enrichment(enrichment)
-    greedy_support = build_greedy_support_evidence(
+    campaign_greedy_support = build_greedy_support_evidence(
         model_screen,
         enrichment,
         primary_reduction_id=primary_reduction_id,
+        model_role="campaign_model",
+    )
+    challenger_greedy_support = build_greedy_support_evidence(
+        model_screen,
+        enrichment,
+        primary_reduction_id=primary_reduction_id,
+        model_role="fixed_challenger",
     )
     return ResponseMetricScreen(
         event_intervals=event_intervals,
@@ -116,7 +124,8 @@ def build_response_metric_screen(
         model_group_metrics=model_group_metrics,
         retrospective_enrichment=enrichment,
         enrichment_summary=enrichment_summary,
-        greedy_support=greedy_support,
+        campaign_greedy_support=campaign_greedy_support,
+        best_fixed_challenger_greedy_support=challenger_greedy_support,
         repeated_measurements=repeated_measurements,
         repeated_agreement=repeated_agreement,
     )
@@ -160,18 +169,15 @@ def response_screen_manifest(
     *,
     primary_reduction_id: str,
     campaign_calibration_parity: Mapping[str, object],
+    campaign_model_params: Mapping[str, object],
 ) -> dict[str, object]:
     """Return the compact promotion posture recorded in the bundle manifest."""
 
-    eligible = screen.model_screen.loc[
-        screen.model_screen["promotion_eligible"].astype(bool)
-        & screen.model_screen["all_target_view_metrics_finite"].astype(bool)
-    ]
-    best = eligible.sort_values(
-        ["weakest_required_ordering_spearman", "median_channel_spearman"],
-        ascending=False,
-        kind="mergesort",
-    ).iloc[0]
+    model_evidence = build_model_evidence_manifest(
+        screen.model_screen,
+        primary_reduction_id=primary_reduction_id,
+        campaign_model_params=campaign_model_params,
+    )
     event_gap = (
         screen.event_intervals["event_interval_end_assay_h"] - screen.event_intervals["event_interval_start_assay_h"]
     )
@@ -194,10 +200,11 @@ def response_screen_manifest(
     bootstrap_samples = int(screen.calibration["bootstrap_samples"].iloc[0])
     return {
         "status": "screen_complete_not_promoted",
+        "evidence_timing": "retrospective",
         "primary_reduction_candidate": primary_reduction_id,
         "reader_event_experiment_count": int(len(screen.event_intervals)),
         "reader_event_gap_h": {"min": float(event_gap.min()), "max": float(event_gap.max())},
-        "label_count": int(screen.labels["id"].nunique()),
+        "model_screen_candidate_count": int(screen.labels["id"].nunique()),
         "reduction_count": int(screen.labels["reduction_id"].nunique()),
         "review_calibration_by_selection_view": {
             str(selection_view_id): {
@@ -229,35 +236,19 @@ def response_screen_manifest(
             str(row.selection_view_id): int(row.zero_constraint_feasible_count)
             for row in primary.itertuples(index=False)
         },
-        "best_fixed_model_screen": {
-            "representation_id": str(best["representation_id"]),
-            "model_id": str(best["model_id"]),
-            "weakest_target_view_response_separation_spearman": float(
-                best["weakest_target_view_response_separation_spearman"]
-            ),
-            "weakest_target_view_feasibility_spearman": float(best["weakest_target_view_feasibility_spearman"]),
-            "weakest_required_ordering_spearman": float(best["weakest_required_ordering_spearman"]),
-            "minimum_defined_group_count": int(best["minimum_defined_group_count"]),
-            "metric_scope": str(best["metric_scope"]),
-            "posture": "challenger_only_no_hyperparameter_promotion",
-        },
-        "model_support_ready": bool(
-            float(best["weakest_target_view_response_separation_spearman"])
-            >= RESPONSE_REVIEW_SPEC.model_min_within_group_spearman
-            and float(best["weakest_target_view_feasibility_spearman"])
-            >= RESPONSE_REVIEW_SPEC.model_min_within_group_spearman
-            and int(best["minimum_defined_group_count"]) >= RESPONSE_REVIEW_SPEC.model_min_defined_group_count
-        ),
+        **model_evidence,
         "repeated_design_count": int(len(screen.repeated_agreement)),
         "maximum_screen_source_to_cross_experiment_median_abs_difference": float(
             screen.repeated_agreement["maximum_selected_to_median_abs_difference"].max()
         ),
         "ratio_domain_policy": "error_at_or_below_declared_positive_floor",
         "prospective_hill_climb_demonstrated": False,
-        "greedy_support": screen.greedy_support.to_dict(orient="records"),
+        "campaign_greedy_support": screen.campaign_greedy_support.to_dict(orient="records"),
+        "best_fixed_challenger_greedy_support": screen.best_fixed_challenger_greedy_support.to_dict(orient="records"),
         "interpretation": (
             "Signed margins define relative improvement without positive exemplars. Available evidence is "
-            "retrospective and does not yet establish whether greedy or mixed next-round selection is superior."
+            "retrospective and does not yet establish whether greedy or mixed next-round selection is superior. "
+            "Campaign-model support and challenger comparisons are reported separately."
         ),
     }
 
@@ -277,7 +268,8 @@ def write_response_screen_tables(screen: ResponseMetricScreen, tables_dir: Path)
         "label_model_group_metrics": screen.model_group_metrics,
         "retrospective_enrichment": screen.retrospective_enrichment,
         "retrospective_enrichment_summary": screen.enrichment_summary,
-        "greedy_support": screen.greedy_support,
+        "campaign_greedy_support": screen.campaign_greedy_support,
+        "best_fixed_challenger_greedy_support": screen.best_fixed_challenger_greedy_support,
         "repeated_design_measurements": screen.repeated_measurements,
         "repeated_design_agreement": screen.repeated_agreement,
     }

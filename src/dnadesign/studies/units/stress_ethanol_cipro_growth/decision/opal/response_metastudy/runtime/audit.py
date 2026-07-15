@@ -16,6 +16,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
+    build_all_primary_measurements,
+    load_reader_response_bundle,
+)
+
 from ..core.contracts import (
     DEFAULT_RECOMMENDATION_THRESHOLDS,
     SFXI_SOURCE_PROVENANCE,
@@ -55,18 +60,13 @@ from .loading import (
 from .manifest import write_metastudy_manifest
 from .measurement_selection import load_response_measurement_selection
 from .publication import create_staging_dir, publish_staging_dir, remove_staging_dir, sha256_arrays
-from .reader_response_bundle import (
-    build_all_primary_measurements,
-    build_selected_bootstrap_draws,
-    build_selected_response_labels,
-    load_reader_response_bundle,
-)
 from .response_screen import (
     build_response_metric_screen,
     response_screen_manifest,
 )
 from .review_bundle import ReviewBundleEvidence, materialize_review_bundle
 from .run_contracts import assert_shared_label_sources, predictor_parity
+from .selected_reader_rows import build_selected_bootstrap_draws, build_selected_response_labels
 
 
 def run_metastudy(
@@ -137,7 +137,7 @@ def _materialize_metastudy(
     reader_request_path = (
         paths.repo_root
         / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "decision/opal/response_metastudy/config/reader_response_window.yaml"
+        / "response_window_observations/config/reader_response_window.yaml"
     )
     reader_bundle = load_reader_response_bundle(
         paths.reader_bundle_root,
@@ -358,5 +358,6 @@ def _materialize_metastudy(
             response_screen,
             primary_reduction_id=reader_bundle.primary_reduction_id,
             campaign_calibration_parity=campaign_calibration_parity,
+            campaign_model_params=stress_campaign.model_params,
         ),
     )

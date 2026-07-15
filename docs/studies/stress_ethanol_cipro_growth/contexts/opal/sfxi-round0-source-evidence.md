@@ -51,7 +51,7 @@ are not routes for label promotion or campaign execution.
 
 `secg_rmf_greedy` does not consume SFXI vec8 labels. It requires the typed
 eight-component response-window sidecar at
-`usr_prom_eth_cip_opal_candidates/_opal/response_window_observed_labels.parquet`.
+`usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v1/observed_labels.parquet`.
 That sidecar is absent, so RMF ingestion and execution remain inactive.
 
 Reader response-window generation, study-owned metric review, and OPAL commands

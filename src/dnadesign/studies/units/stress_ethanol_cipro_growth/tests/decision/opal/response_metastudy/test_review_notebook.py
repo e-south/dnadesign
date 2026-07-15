@@ -82,7 +82,7 @@ def test_review_summary_is_rmf_specific_and_fail_fast() -> None:
         "response_metric_screen": {
             "status": "screen_complete_not_promoted",
             "primary_reduction_candidate": "event_logmean_6_12h_post",
-            "label_count": 35,
+            "model_screen_candidate_count": 35,
             "reader_event_experiment_count": 8,
             "prospective_hill_climb_demonstrated": False,
             "best_fixed_model_screen": {"weakest_target_view_response_separation_spearman": 0.15},
@@ -104,7 +104,7 @@ def test_review_summary_is_rmf_specific_and_fail_fast() -> None:
 
     assert summary.decision == "RMF remains inactive for production selection"
     assert "0.15" in summary.basis
-    assert summary.evidence_base == "35 observed labels across 8 Reader experiments"
+    assert summary.evidence_base == "35 screen-selected candidates across 8 Reader experiments"
 
 
 def test_review_summary_rejects_unpromoted_screen_with_hill_climb_claim() -> None:
@@ -112,7 +112,7 @@ def test_review_summary_rejects_unpromoted_screen_with_hill_climb_claim() -> Non
         "response_metric_screen": {
             "status": "screen_complete_not_promoted",
             "primary_reduction_candidate": "event_logmean_6_12h_post",
-            "label_count": 35,
+            "model_screen_candidate_count": 35,
             "reader_event_experiment_count": 8,
             "prospective_hill_climb_demonstrated": True,
             "best_fixed_model_screen": {"weakest_target_view_response_separation_spearman": 0.15},

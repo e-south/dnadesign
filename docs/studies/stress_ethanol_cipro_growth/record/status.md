@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-07-14
+- Last verified: 2026-07-15
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
@@ -97,7 +97,7 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   declares one shared eight-output RF with ethanol, ciprofloxacin, and AND
   selection views, greedy `top_k: 6` per view, sequence deduplication, and an
   exact expected logical batch size of 18. It is inactive: the typed
-  `_opal/response_window_observed_labels.parquet` sidecar has not been
+  `_opal/response_window_labels_v1/observed_labels.parquet` sidecar has not been
   promoted or materialized, no unified run exists, and no synthesis is
   authorized.
 - Candidate TFBS metadata: `verified`; the 2026-07-12 rematerialization repaired
@@ -117,17 +117,20 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   295 design/reduction rows, 147500 joint bootstrap rows, and 12 repeated design
   IDs. The primary reduction is the 6-12 hour post-event log mean; adjacent
   windows, normalized linear AUC, and delta remain response sensitivity
-  analyses. The leading eligible challenger is PLS4 over the primary eight-component
+  analyses. The strongest descriptive fixed challenger is PLS4 over the primary eight-component
   summary, with weakest selection-view response-separation Spearman 0.15 and
   feasibility Spearman 0.45. Retrospective grouped enrichment is strongest for
   ciprofloxacin and weakest for ethanol, but all exact 95% intervals include
   0.5 and do not establish calibrated success probabilities. Under the
   study's time and assay-capacity constraints, the prospective policy is
-  prespecified greedy top-six per selection view. Promotion still requires one
-  repeated-experiment aggregation rule, implementation of the study-owned
-  publisher for the typed OPAL label artifact and promotion manifest, and an
-  explicit study run decision. Generic `opal ingest-y` cannot publish this
-  source. This is not a synthesis handoff.
+  prespecified greedy top-six per selection view. A study-owned equal-experiment
+  observation policy, hierarchical uncertainty path, atomic observation bundle,
+  and typed OPAL promotion adapter are implemented. All 12 repeated candidates
+  and the policy approval remain under review, so no production observation or
+  label artifact exists. The exact configured campaign RF is evaluated
+  separately from descriptive challengers and is the only basis for the model
+  support gate. Generic `opal ingest-y` cannot publish this source. This is not
+  a synthesis handoff.
 - Synthesis handoff: `generated_pending_acceptance` scaffold exists in
   `synthesis_handoffs.yaml`; batch zero is the granular single-axis/AND
   pre-assay seed order with actual parsed TFBS regulator and slot-pattern
@@ -152,10 +155,11 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
   fixed-length X. The SFXI labels and ledgers exist; the typed response-window
   observed labels and RMF campaign run do not. Do not synthesize response-window
   Y from an SFXI score.
-- Freeze the Reader reduction, repeated-experiment aggregation, typed
-  response-window Y schema, RMF calibration, model seed, eligibility rules,
-  and greedy top-six policy before executing `secg_rmf_greedy`. Then implement
-  and run the study publisher once, verify its pinned artifacts, fit once,
+- Approve the pinned Reader reduction and repeated-experiment policy only after
+  repeat triage, then publish and verify the typed response-window Y artifact.
+  Keep RMF calibration, model seed, eligibility rules, and greedy top-six policy
+  frozen before executing `secg_rmf_greedy`. Then run the study publisher once,
+  verify its pinned artifacts, fit once,
   verify all three selection views, and inspect the 18-row logical batch.
 - Use the response metric metastudy `report.md`, generated `review.py`,
   `tables/pressure_tests.csv`, `tables/setpoint_support.csv`,
@@ -164,7 +168,8 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
   `tables/response_separation_review_scales.csv`,
   `tables/label_model_screen.csv`,
   `tables/retrospective_enrichment_summary.csv`,
-  `tables/greedy_support.csv`, and primary plots before
+  `tables/campaign_greedy_support.csv`,
+  `tables/best_fixed_challenger_greedy_support.csv`, and primary plots before
   changing campaign YAMLs or measured-round synthesis handoffs. Do not claim
   ethanol-responsive, ciprofloxacin-responsive, or AND-responsive promoters
   from predicted OPAL scores alone.

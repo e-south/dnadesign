@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-response-metastudy
 title: Response metric metastudy
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 audience:
   - scientist
   - maintainer
@@ -14,7 +14,7 @@ audience:
 
 **Status:** round-0 metric, label, and predictor review
 **Owner:** `stress_ethanol_cipro_growth` study
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-15
 **Implementation:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy`
 **Generated evidence:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_metastudy/latest`
 
@@ -38,10 +38,12 @@ ledgers, and synthesis handoffs.
 
 ### Ownership
 
-- Reader owns event resolution, trajectory reduction, replicate aggregation,
-  joint bootstrap draws, reference subtraction, and assay review visuals.
+- Reader owns event resolution, trajectory reduction, within-experiment
+  replicate aggregation, joint bootstrap draws, reference subtraction, and
+  assay review visuals.
 - The stress study owns target masks, Reader-to-candidate joins, label
-  representation comparisons, grouped model evaluation, and promotion policy.
+  representation comparisons, cross-experiment aggregation, grouped model
+  evaluation, and promotion policy.
 - OPAL owns canonical SFXI, Response-Magnitude Feasibility (RMF) math, model fitting,
   candidate scoring, selection, and ledgers after promotion.
 
@@ -75,11 +77,12 @@ the `reader.design_id` binding, rejects missing or duplicate resolution, and
 does not import the binding builder.
 
 The selection is limited to retrospective model screening. It makes the source
-choice for repeated designs explicit, does not read an SFXI source CSV, and does
-not define the repeat aggregation required for observed-label promotion.
+choice for repeated designs explicit, does not read an SFXI source CSV, and has
+no label-truth role. Cross-experiment evidence and approval live in the
+study-level `response_window_observations/` package.
 
 The response-metastudy publication schema is
-`stress_ethanol_cipro_growth.response_metastudy.v9`.
+`stress_ethanol_cipro_growth.response_metastudy.v10`.
 
 ### Evidence Flow
 
@@ -97,8 +100,9 @@ The response-metastudy publication schema is
    Reader-owned event-relative reductions.
 7. Apply ethanol, ciprofloxacin, AND, and OR pressure-test masks to raw Reader
    state summaries and joint bootstrap draws.
-8. Compare fixed mean, robust RF, fold-fitted PCA-ridge, and PLS challengers with
-   complete Reader experiments held out.
+8. Compare the exact configured campaign RF separately from the fixed mean,
+   robust-target RF, fold-fitted PCA-ridge, and PLS challengers with complete
+   Reader experiments held out.
 9. Measure repeated-design agreement, retrospective enrichment, and the risk of
    a prespecified greedy top-six policy.
 10. Publish typed tables, a manifest-backed plot catalog, a report, and one
@@ -137,7 +141,8 @@ Reader response-window contract:
   publication, and manifests.
 - `reporting/`: declarative plot contracts, plot writers, report sections, and
   Marimo generation.
-- `config/reader_response_window.yaml`: study-owned Reader service request.
+- `response_window_observations/config/reader_response_window.yaml`: study-owned
+  Reader service request shared by evidence and decision workflows.
 
 Reader trajectory loaders, event inference, and time reducers do not exist in
 the study package.
@@ -167,10 +172,12 @@ The Reader bundle contains 8 experiments, 5 reductions, 295 design/reduction
 rows, 147,500 joint bootstrap rows, and 12 repeated design IDs. The primary
 reduction is `event_logmean_6_12h_post`.
 
-The leading screened model challenger is PLS4 over the primary eight-component
+The strongest descriptive fixed challenger in this snapshot is PLS4 over the primary eight-component
 summary. Its weakest response-separation Spearman is 0.15 and weakest
 feasibility Spearman is 0.45 across active views. This defines a directional
-experiment, not a calibrated success probability.
+experiment, not a calibrated success probability or a campaign-model change.
+The exact configured campaign RF is reported on its own row and is the only
+model that can satisfy the campaign-model support gate.
 
 Retrospective enrichment is strongest for ciprofloxacin, intermediate for AND,
 and weakest for ethanol, but all exact 95% intervals include 0.5. The configured
@@ -235,10 +242,11 @@ the destination only after the complete run succeeds.
 
 ### Promotion Boundary
 
-No objective or model is promoted until the study has one repeated-experiment
-aggregation rule, one typed OPAL label contract, grouped evidence for all active
-selection views, and an explicit run decision. The nearest-12-hour vec8 remains
-immutable provenance after any new label is promoted.
+No objective or model is promoted until the checked-in repeat policy is
+approved, its typed OPAL label publication verifies, grouped evidence covers all
+active selection views, and the study records an explicit run decision. The
+nearest-12-hour vec8 remains immutable provenance after any new label is
+promoted.
 
 The metastudy can reject unsupported choices. A biological hill climb exists
 only after a prospective selected set is built, measured, and compared with its

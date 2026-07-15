@@ -67,11 +67,13 @@ def test_response_model_modules_stay_semantically_bounded() -> None:
     limits = {
         "evaluation/model_screen.py": 360,
         "evaluation/grouped_models.py": 240,
+        "evaluation/greedy_support.py": 160,
         "evaluation/model_representations.py": 180,
         "runtime/audit.py": 360,
         "runtime/campaign_calibration.py": 120,
-        "runtime/reader_display_contract.py": 80,
-        "runtime/reader_response_bundle.py": 320,
+        "runtime/model_evidence_manifest.py": 200,
+        "runtime/publication.py": 230,
+        "runtime/selected_reader_rows.py": 120,
         "runtime/response_screen.py": 280,
         "runtime/review_bundle.py": 200,
         "reporting/notebook.py": 240,
@@ -82,6 +84,16 @@ def test_response_model_modules_stay_semantically_bounded() -> None:
         "reporting/response_assay_plots.py": 300,
         "reporting/response_model_plots.py": 240,
         "reporting/rmf_contract_plot.py": 100,
+        "model_evidence/cli.py": 100,
+        "model_evidence/contracts.py": 80,
+        "model_evidence/evaluator_protocol.py": 100,
+        "model_evidence/fields.py": 140,
+        "model_evidence/json_io.py": 80,
+        "model_evidence/projection.py": 240,
+        "model_evidence/protocol_projection.py": 120,
+        "model_evidence/source_evidence.py": 190,
+        "model_evidence/storage.py": 180,
+        "model_evidence/verification.py": 200,
     }
     observed = {relative: _module_body_line_count(PACKAGE / relative) for relative in limits}
     assert {path: lines for path, lines in observed.items() if lines > limits[path]} == {}

@@ -83,6 +83,46 @@ def test_review_bundle_verifier_ignores_only_marimo_runtime_state(tmp_path: Path
         verify_bundle_artifacts(tmp_path)
 
 
+def test_review_bundle_verifier_rejects_duplicate_manifest_keys(tmp_path: Path) -> None:
+    artifact = tmp_path / "report.md"
+    artifact.write_text("artifact", encoding="utf-8")
+    artifacts = json.dumps(artifact_inventory(tmp_path, {"report": artifact}))
+    (tmp_path / "manifest.json").write_text(
+        "{" + f'"schema_version":"{METASTUDY_SCHEMA_VERSION}",' * 2 + f'"artifacts":{artifacts}' + "}",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="duplicate JSON key 'schema_version'"):
+        verify_bundle_artifacts(tmp_path)
+
+
+def test_review_bundle_verifier_rejects_non_finite_manifest_numbers(tmp_path: Path) -> None:
+    artifact = tmp_path / "report.md"
+    artifact.write_text("artifact", encoding="utf-8")
+    manifest = {
+        "schema_version": METASTUDY_SCHEMA_VERSION,
+        "artifacts": artifact_inventory(tmp_path, {"report": artifact}),
+    }
+    rendered = json.dumps(manifest)[:-1] + ', "invalid_metric": NaN}'
+    (tmp_path / "manifest.json").write_text(rendered, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="non-finite JSON value 'NaN'"):
+        verify_bundle_artifacts(tmp_path)
+
+
+def test_review_bundle_verifier_rejects_pre_v10_schema(tmp_path: Path) -> None:
+    artifact = tmp_path / "report.md"
+    artifact.write_text("artifact", encoding="utf-8")
+    manifest = {
+        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v9",
+        "artifacts": artifact_inventory(tmp_path, {"report": artifact}),
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="schema is missing or unsupported"):
+        verify_bundle_artifacts(tmp_path)
+
+
 def test_metastudy_run_removes_staging_directory_on_interrupt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

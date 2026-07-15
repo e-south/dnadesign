@@ -19,7 +19,10 @@ import pandas as pd
 import pytest
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
-    reader_response_bundle,
+    selected_reader_rows,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations import (
+    reader_bundle,
 )
 
 
@@ -29,7 +32,7 @@ def test_reader_bundle_loads_only_after_contract_and_digest_verification(tmp_pat
     request_path.write_text("schema_version: reader.response_window.request.v3\n", encoding="utf-8")
     _attach_request_digest(root, request_path)
 
-    bundle = reader_response_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
+    bundle = reader_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
 
     assert bundle.primary_reduction_id == "primary"
     assert len(bundle.designs) == 2
@@ -45,7 +48,31 @@ def test_reader_bundle_rejects_record_digest_drift(tmp_path: Path) -> None:
     pd.DataFrame({"changed": [1]}).to_parquet(root / "tables" / "designs.parquet", index=False)
 
     with pytest.raises(ValueError, match="digest mismatch"):
-        reader_response_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
+        reader_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
+
+
+def test_reader_bundle_rejects_manifest_path_decoy_for_record_artifact(tmp_path: Path) -> None:
+    root = _bundle_fixture(tmp_path)
+    request_path = tmp_path / "request.yaml"
+    request_path.write_text("schema_version: reader.response_window.request.v3\n", encoding="utf-8")
+    _attach_request_digest(root, request_path)
+    verified_path = root / "verified" / "designs.parquet"
+    verified_path.parent.mkdir()
+    verified_path.write_bytes((root / "tables" / "designs.parquet").read_bytes())
+    decoy = pd.read_parquet(root / "tables" / "designs.parquet")
+    decoy.loc[0, "r00"] = 99.0
+    decoy.to_parquet(root / "tables" / "designs.parquet", index=False)
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"]["tables/designs.parquet"] = {
+        "path": "verified/designs.parquet",
+        "sha256": _sha256(verified_path),
+        "bytes": verified_path.stat().st_size,
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="path disagrees with its manifest identity"):
+        reader_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
 
 
 def test_reader_bundle_rejects_study_request_drift(tmp_path: Path) -> None:
@@ -56,7 +83,7 @@ def test_reader_bundle_rejects_study_request_drift(tmp_path: Path) -> None:
     request_path.write_text("schema_version: reader.response_window.request.v3\nstudy_id: changed\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="request digest disagrees"):
-        reader_response_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
+        reader_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
 
 
 def test_reader_bundle_rejects_incomplete_display_ontology(tmp_path: Path) -> None:
@@ -70,7 +97,20 @@ def test_reader_bundle_rejects_incomplete_display_ontology(tmp_path: Path) -> No
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(ValueError, match="label every response state"):
-        reader_response_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
+        reader_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
+
+
+def test_reader_bundle_rejects_duplicate_manifest_keys(tmp_path: Path) -> None:
+    root = _bundle_fixture(tmp_path)
+    request_path = tmp_path / "request.yaml"
+    request_path.write_text("schema_version: reader.response_window.request.v3\n", encoding="utf-8")
+    _attach_request_digest(root, request_path)
+    manifest_path = root / "manifest.json"
+    raw = manifest_path.read_text(encoding="utf-8")
+    manifest_path.write_text(raw.replace("{", '{"study_id":"ambiguous",', 1), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        reader_bundle.load_reader_response_bundle(root, expected_request_path=request_path)
 
 
 def test_selected_bootstrap_draws_reject_missing_candidate(tmp_path: Path) -> None:
@@ -84,7 +124,7 @@ def test_selected_bootstrap_draws_reject_missing_candidate(tmp_path: Path) -> No
         "b01": 0.1,
         "b11": 0.3,
     }
-    bundle = reader_response_bundle.ReaderResponseBundle(
+    bundle = reader_bundle.ReaderResponseBundle(
         root=tmp_path,
         manifest_path=tmp_path / "manifest.json",
         manifest={"primary_reduction_id": "primary"},
@@ -110,7 +150,7 @@ def test_selected_bootstrap_draws_reject_missing_candidate(tmp_path: Path) -> No
     )
 
     with pytest.raises(ValueError, match="lacks one or more selected labels"):
-        reader_response_bundle.build_selected_bootstrap_draws(
+        selected_reader_rows.build_selected_bootstrap_draws(
             bundle,
             candidate_identity_bindings=candidate_identity_bindings,
         )
@@ -167,13 +207,13 @@ def _bundle_fixture(tmp_path: Path) -> Path:
         relative = path.relative_to(root).as_posix()
         artifacts[relative] = {"path": relative, "sha256": _sha256(path), "bytes": path.stat().st_size}
     manifest = {
-        "schema_version": reader_response_bundle.READER_BUNDLE_SCHEMA,
+        "schema_version": reader_bundle.READER_BUNDLE_SCHEMA,
         "study_id": "stress_ethanol_cipro_growth",
         "request_id": "test",
         "request": {"artifact_id": "request.yaml", "sha256": "pending"},
         "state_order": ["00", "10", "01", "11"],
         "display": {
-            "schema_version": reader_response_bundle.READER_DISPLAY_SCHEMA,
+            "schema_version": reader_bundle.READER_DISPLAY_SCHEMA,
             "study_label": "Example response study",
             "event_label": "Stress addition",
             "state_labels": {
@@ -194,13 +234,13 @@ def _bundle_fixture(tmp_path: Path) -> Path:
             ],
         },
         "primary_reduction_id": "primary",
-        "contracts": reader_response_bundle.EXPECTED_CONTRACTS,
+        "contracts": reader_bundle.EXPECTED_CONTRACTS,
         "records": {
             record_id: {
-                "contract_id": reader_response_bundle.EXPECTED_CONTRACTS[record_id],
+                "contract_id": reader_bundle.EXPECTED_CONTRACTS[record_id],
                 "artifact_id": artifact_id,
             }
-            for record_id, artifact_id in reader_response_bundle.EXPECTED_RECORD_ARTIFACTS.items()
+            for record_id, artifact_id in reader_bundle.EXPECTED_RECORD_ARTIFACTS.items()
         },
         "counts": {"design_rows": 2, "bootstrap_draw_rows": 2, "experiments": 1},
         "artifacts": artifacts,

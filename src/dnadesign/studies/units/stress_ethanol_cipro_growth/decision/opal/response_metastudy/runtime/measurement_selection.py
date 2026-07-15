@@ -17,15 +17,15 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-SCHEMA_ID = "stress_ethanol_cipro_growth.response_measurement_selection.v2"
-SCHEMA_VERSION = "2"
+SCHEMA_ID = "stress_ethanol_cipro_growth.response_measurement_selection.v3"
+SCHEMA_VERSION = "3"
 _TOP_LEVEL_FIELDS = {
     "schema_id",
     "schema_version",
     "study_id",
     "selection_id",
     "scope",
-    "promotion_aggregation",
+    "label_truth_role",
     "measurements",
     "excluded_designs",
 }
@@ -45,7 +45,7 @@ class ResponseMeasurementSelection:
     config_path: Path
     selection_id: str
     scope: str
-    promotion_aggregation: str
+    label_truth_role: str
 
 
 def load_response_measurement_selection(
@@ -74,9 +74,9 @@ def load_response_measurement_selection(
     if payload["study_id"] != "stress_ethanol_cipro_growth":
         raise ResponseMeasurementSelectionError("Response measurement selection study_id mismatch.")
     selection_id = _required_text(payload["selection_id"], field="selection_id")
-    if payload["scope"] != "model_screen_only" or payload["promotion_aggregation"] != "not_defined":
+    if payload["scope"] != "model_screen_only" or payload["label_truth_role"] != "none":
         raise ResponseMeasurementSelectionError(
-            "Response measurement selection must be model_screen_only with promotion_aggregation not_defined."
+            "Response measurement selection must be model_screen_only with label_truth_role none."
         )
     rows = _measurement_rows(payload["measurements"])
     excluded_designs = _exclusion_rows(payload["excluded_designs"])
@@ -93,7 +93,7 @@ def load_response_measurement_selection(
         config_path=path,
         selection_id=selection_id,
         scope="model_screen_only",
-        promotion_aggregation="not_defined",
+        label_truth_role="none",
     )
 
 

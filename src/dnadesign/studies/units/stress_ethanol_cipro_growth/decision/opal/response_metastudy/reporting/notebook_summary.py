@@ -69,7 +69,7 @@ def build_review_summary(bundle_manifest: Mapping[str, object]) -> ReviewSummary
             f"after stress addition, {method_labels[method]} (`{primary_reduction_id}`)"
         ),
         evidence_base=(
-            f"{int(response_screen['label_count'])} observed labels across "
+            f"{int(response_screen['model_screen_candidate_count'])} screen-selected candidates across "
             f"{int(response_screen['reader_event_experiment_count'])} Reader experiments"
         ),
         prospective_hill_climb="not yet measured",

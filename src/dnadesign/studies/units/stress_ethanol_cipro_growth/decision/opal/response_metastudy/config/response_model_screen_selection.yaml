@@ -1,9 +1,9 @@
-schema_id: stress_ethanol_cipro_growth.response_measurement_selection.v2
-schema_version: "2"
+schema_id: stress_ethanol_cipro_growth.response_measurement_selection.v3
+schema_version: "3"
 study_id: stress_ethanol_cipro_growth
 selection_id: response_metastudy_model_screen_v1
 scope: model_screen_only
-promotion_aggregation: not_defined
+label_truth_role: none
 excluded_designs:
   - {design_id: pDual-10-ES5p, reason: absent_from_study_candidate_bindings}
   - {design_id: pDual-10-ES8p, reason: absent_from_study_candidate_bindings}

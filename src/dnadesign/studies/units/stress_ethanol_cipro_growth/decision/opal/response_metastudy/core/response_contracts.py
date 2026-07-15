@@ -33,7 +33,8 @@ class ResponseMetricScreen:
     model_group_metrics: pd.DataFrame
     retrospective_enrichment: pd.DataFrame
     enrichment_summary: pd.DataFrame
-    greedy_support: pd.DataFrame
+    campaign_greedy_support: pd.DataFrame
+    best_fixed_challenger_greedy_support: pd.DataFrame
     repeated_measurements: pd.DataFrame
     repeated_agreement: pd.DataFrame
 

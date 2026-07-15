@@ -9,7 +9,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .grouped_models import ModelScreenSpec
+from .grouped_models import CAMPAIGN_MODEL_SCREEN_ID, DEFAULT_MODEL_SCREEN_SPECS, ModelScreenSpec
 from .model_representations import (
     build_label_representations,
     decode_to_response_magnitude,
@@ -18,6 +18,8 @@ from .model_representations import (
 from .model_screen import screen_label_models
 
 __all__ = [
+    "CAMPAIGN_MODEL_SCREEN_ID",
+    "DEFAULT_MODEL_SCREEN_SPECS",
     "ModelScreenSpec",
     "build_label_representations",
     "decode_to_response_magnitude",

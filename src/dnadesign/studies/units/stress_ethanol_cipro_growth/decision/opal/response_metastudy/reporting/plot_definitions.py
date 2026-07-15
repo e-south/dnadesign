@@ -337,10 +337,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         alt_text=(
             "Heatmap of the weakest median within-experiment Spearman correlation across response separation, "
             "feasibility, ethanol, ciprofloxacin, and AND for each label representation and fixed model challenger; "
-            "adjacent-window, AUC, and pre-window-delta columns are marked as sensitivity analyses. PLS with four "
-            "components "
-            "is the strongest fixed challenger for the primary summary, but its weakest required ordering is 0.15, so "
-            "no model is promoted."
+            "adjacent-window, AUC, and pre-window-delta columns are marked as sensitivity analyses. The configured "
+            "campaign model, baseline, and fixed challengers remain separate, and the screen does not promote a model."
         ),
     ),
     PlotSpec(
@@ -363,11 +361,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         review_step=4,
         visual_type="grouped evidence interval plot",
         premise="Pure greedy selection requires grouped evidence that predicted leaders enrich held-out measurements.",
-        decision_value=("Shows target-view-specific retrospective enrichment and its finite-sample uncertainty."),
+        decision_value=("Shows configured-campaign-model retrospective enrichment and its finite-sample uncertainty."),
         alt_text=(
             "Points and exact 95 percent binomial intervals show the fraction of held-out Reader experiments where "
-            "each target view's predicted best design beat that experiment's median true score. Counts are 3 of 8 for "
-            "ethanol, 7 of 8 for ciprofloxacin, and 4 of 8 for AND; every interval includes 0.5."
+            "the configured campaign random forest's predicted best design beat that experiment's median true score "
+            "for each target view. The intervals are retrospective risk evidence, not selection authority."
         ),
     ),
     PlotSpec(

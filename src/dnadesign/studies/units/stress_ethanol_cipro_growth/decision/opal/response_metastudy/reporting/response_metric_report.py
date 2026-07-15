@@ -134,7 +134,7 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "### Evidence For Greedy Selection",
         "",
         _markdown_table(
-            screen.greedy_support[
+            screen.campaign_greedy_support[
                 [
                     "selection_view_id",
                     "held_out_group_count",
@@ -148,10 +148,10 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
             ]
         ),
         "",
-        "All exact intervals include 0.5. The ciprofloxacin point estimate is higher than the ethanol and AND "
-        "estimates, but these data do not distinguish any target view from chance or establish calibrated success "
-        "probabilities. The configured mechanism under review is greedy top-six per selection view; it remains "
-        "inactive, and these intervals are risk evidence rather than slot-allocation authority.",
+        "These intervals evaluate the configured campaign random forest, not the strongest retrospective "
+        "challenger. The configured mechanism under review is greedy top-six per selection view; it remains "
+        "inactive, and these intervals are risk evidence rather than slot-allocation authority. Fixed-challenger "
+        "support is retained separately for descriptive comparison.",
         "",
     ]
 

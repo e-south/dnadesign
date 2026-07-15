@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import shutil
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from uuid import uuid4
 
 _MARIMO_RUNTIME_DIR = "__marimo__"
-METASTUDY_SCHEMA_VERSION = "stress_ethanol_cipro_growth.response_metastudy.v9"
+METASTUDY_SCHEMA_VERSION = "stress_ethanol_cipro_growth.response_metastudy.v10"
 
 
 def create_staging_dir(final_dir: Path, *, overwrite: bool) -> Path:
@@ -90,7 +91,7 @@ def verify_bundle_artifacts(root: Path) -> dict[str, object]:
     manifest_path = bundle_root / "manifest.json"
     if not manifest_path.is_file():
         raise FileNotFoundError(f"Metastudy manifest is missing: {manifest_path}")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = _load_strict_json(manifest_path)
     if not isinstance(manifest, dict) or manifest.get("schema_version") != METASTUDY_SCHEMA_VERSION:
         raise ValueError("Metastudy bundle schema is missing or unsupported.")
     artifacts = manifest.get("artifacts")
@@ -170,3 +171,32 @@ def sha256_arrays(*arrays: object) -> str:
         view = memoryview(array)  # type: ignore[arg-type]
         digest.update(view.cast("B"))
     return digest.hexdigest()
+
+
+def _load_strict_json(path: Path) -> object:
+    def reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"Metastudy manifest contains duplicate JSON key {key!r}.")
+            result[key] = value
+        return result
+
+    def reject_constant(value: str) -> object:
+        raise ValueError(f"Metastudy manifest contains non-finite JSON value {value!r}.")
+
+    def finite_float(value: str) -> float:
+        parsed = float(value)
+        if not math.isfinite(parsed):
+            raise ValueError(f"Metastudy manifest contains non-finite JSON number {value!r}.")
+        return parsed
+
+    try:
+        return json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=reject_duplicates,
+            parse_constant=reject_constant,
+            parse_float=finite_float,
+        )
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Metastudy manifest is not valid JSON: {path}") from exc

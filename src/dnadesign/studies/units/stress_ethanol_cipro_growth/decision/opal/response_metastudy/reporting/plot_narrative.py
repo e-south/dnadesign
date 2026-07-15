@@ -137,6 +137,6 @@ PLOT_DATA_TABLES: dict[str, str] = {
     "response_uncertainty_sources": "tables/response_separation_uncertainty.csv",
     "label_model_screen": "tables/label_model_screen.csv",
     "retrospective_enrichment": "tables/retrospective_enrichment_summary.csv",
-    "greedy_support_evidence": "tables/greedy_support.csv",
+    "greedy_support_evidence": "tables/campaign_greedy_support.csv",
     "repeated_design_agreement": "tables/repeated_design_agreement.csv",
 }

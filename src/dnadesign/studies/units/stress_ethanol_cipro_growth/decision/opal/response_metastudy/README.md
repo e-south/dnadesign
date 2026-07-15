@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-metastudy-package
 title: Response metric metastudy package
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 ---
 
 # Response Metric Metastudy
@@ -13,10 +13,11 @@ next-build policy.
 
 ## Boundaries
 
-- Reader owns event resolution, trajectory reduction, replicate aggregation,
-  reference subtraction, uncertainty records, and assay visuals.
+- Reader owns event resolution, trajectory reduction, within-experiment well
+  summaries, reference subtraction, uncertainty records, and assay visuals.
 - The study package owns stress target masks, exact Reader-to-label joins,
-  objective-specific evaluation, grouped model tests, and study recommendations.
+  repeat-experiment aggregation, objective-specific evaluation, grouped model
+  tests, and study recommendations.
 - OPAL owns objective primitives, campaign training, candidate scoring,
   selection, and ledgers after observed-Y promotion.
 
@@ -33,13 +34,19 @@ Reader reduction math.
   greedy-support evidence.
 - `runtime/`: OPAL loading, Reader-bundle verification, orchestration,
   publication, and manifest construction.
+- `model_evidence/`: frozen evaluation protocols plus immutable scientific
+  checkpoints for the model-evidence trajectory. OPAL run progress is outside
+  this package.
 - `reporting/`: declarative plot catalog, assay plots, model plots, metric-contract
   plots, report, and Marimo generator.
-- `config/reader_response_window.yaml`: strict study request consumed by Reader.
 - `config/response_model_screen_selection.yaml`: exact Reader experiment/design
   pairs used only by the retrospective response model screen. It contains no
   candidate IDs, accounts explicitly for Reader designs that have no study
-  candidate binding, and defines no promotion aggregation.
+  candidate binding, and has no label-truth role.
+
+The objective-neutral response-window Reader request and candidate-observation
+policy live in the study-level `response_window_observations/` package. The metastudy consumes
+their verified output; it does not own assay reduction or label truth.
 
 Generated evidence belongs under
 `workbench/outputs/response_metastudy/`; it is never hand-edited.
@@ -50,7 +57,7 @@ First materialize the Reader bundle from `reader/`:
 
 ```bash
 uv run reader response-window build \
-  ../dnadesign/src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/reader_response_window.yaml \
+  ../dnadesign/src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/config/reader_response_window.yaml \
   --reader-root . \
   --out-dir outputs/reviews/stress_response_window/latest \
   --overwrite \
@@ -95,7 +102,7 @@ drift from the Reader-derived review calibration beyond six-decimal rounding.
 - The response model screen does not read SFXI source CSVs. Its explicit source
   choice for repeated designs is screen-only and is not a repeat-aggregation
   rule for observed-label promotion.
-- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v9`.
+- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v10`.
 
 Reader emits `[r00, r10, r01, r11, b00, b10, b01, b11]`. The `r` values are
 reduced `log2(YFP/CFP)` response, while the `b` values are same-state
@@ -117,6 +124,8 @@ observed labels remains inactive.
 - `tables/`: policy, label, model, uncertainty, repeated-measurement, and
   greedy-support evidence.
 - `plots/`: primary decision, metric diagnostic, and screen appendix figures.
+- `model_evidence/`: optional immutable checkpoints projected from verified
+  metastudy bundles; see `model_evidence/README.md`.
 
 The primary tier is intentionally limited to four figures: target-mask effects
 on measured SpyP and sulAp summaries, response-window stability, grouped
@@ -131,8 +140,9 @@ Response-window evidence is evaluated only from its declared `r` and `b`
 fields; the study does not translate those fields into an SFXI vector. The SFXI
 source selections are too effect-dominated for synthesis. The Reader primary
 response reduction is the duration-weighted mean log2 ratio from 6-12 hours
-after the intervention. PLS4 is the leading fixed model challenger, but grouped
-evidence remains too weak to assign calibrated success probabilities.
+after the intervention. The configured campaign random forest is evaluated as
+the campaign model. Fixed challengers and the mean baseline remain separate
+comparators; none is promoted by the present grouped evidence.
 
 Grouped enrichment is strongest for ciprofloxacin and weakest for ethanol, but
 all exact 95% intervals include 0.5. The configured selection mechanism under
@@ -140,6 +150,20 @@ review is greedy top-six per selection view; it remains inactive, and these
 intervals are risk evidence rather than slot-allocation authority. Promotion
 still requires one repeated-experiment aggregation rule, the study-owned
 candidate-binding artifact, and one provenance-preserving OPAL label contract.
+
+The model-evidence trajectory records the same frozen grouped screen after each
+eligible corpus update. A protocol change begins a separate series. Current
+checkpoints are retrospective and nonpromoted; prospective evidence begins only
+when predictions are fixed before the corresponding measurements are observed.
+
+After each measured batch, record one checkpoint only after Reader evidence,
+candidate bindings, repeat adjudication, and the metastudy bundle verify. Review
+candidate count, channel-level X-to-Y rank preservation and error, the weakest
+selection-view ordering, group support, and configured-campaign greedy support
+together. Improvement is not required to be monotonic at low sample counts;
+the immutable series makes regressions and uncertainty visible instead of
+silently replacing an earlier screen. Challenger-model progress remains
+descriptive and cannot satisfy the configured campaign-model gate.
 
 Study rationale and claim boundaries:
 `docs/studies/stress_ethanol_cipro_growth/contexts/opal/response-magnitude-feasibility.md`.

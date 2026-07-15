@@ -73,9 +73,10 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
     assert "same measured SpyP and sulAp summaries" in measured.decision_value
     model_screen = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "label_model_screen")
     assert "sequence features" in model_screen.title
-    assert "weakest required ordering is 0.15" in model_screen.alt_text
+    assert "configured campaign model, baseline, and fixed challengers remain separate" in model_screen.alt_text
     greedy = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "greedy_support_evidence")
-    assert "every interval includes 0.5" in greedy.alt_text
+    assert "configured campaign random forest" in greedy.alt_text
+    assert "not selection authority" in greedy.alt_text
 
 
 def test_plot_manifest_preserves_catalog_order_and_fields() -> None:

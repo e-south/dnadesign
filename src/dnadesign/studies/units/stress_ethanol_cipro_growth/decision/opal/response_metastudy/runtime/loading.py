@@ -28,6 +28,7 @@ from ..core.contracts import (
     StressCampaignContract,
     StressTargetView,
 )
+from ..evaluation.model_validation_support import validated_model_params
 
 REQUIRED_PREDICTION_COLUMNS = {
     "id",
@@ -40,6 +41,7 @@ REQUIRED_PREDICTION_COLUMNS = {
     "obj__effect_scaled",
 }
 _VEC8_COLUMNS = ("v00", "v10", "v01", "v11", "y00_star", "y10_star", "y01_star", "y11_star")
+_RESPONSE_WINDOW_COLUMNS = ("r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11")
 
 
 _TARGET_VIEW_LABELS = {
@@ -59,7 +61,7 @@ _RMF_CALIBRATION_FIELDS = {
 
 
 def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContract:
-    """Load the configured stress campaign and derive its metric-neutral target views."""
+    """Load the configured stress campaign and derive its typed selection views."""
 
     campaign_dir = paths.campaign_root / STRESS_RMF_GREEDY_CAMPAIGN_SLUG
     config_path = campaign_dir / "configs/campaign.yaml"
@@ -89,6 +91,7 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
     data = payload.get("data")
     if not isinstance(data, dict) or int(data.get("y_expected_length", -1)) != 8:
         raise ValueError("Stress campaign must declare one eight-value response label.")
+    _validate_campaign_model_io(payload)
     location = data.get("location")
     if not isinstance(location, dict) or location.get("kind") != "usr":
         raise ValueError("Stress campaign must use the study USR candidate table.")
@@ -103,6 +106,7 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
     model = payload.get("model")
     if not isinstance(model, dict) or model.get("name") != "random_forest" or not isinstance(model.get("params"), dict):
         raise ValueError("Stress campaign must declare random_forest model parameters.")
+    validated_model_params(model["params"], preserve_oob_score=True)
     return StressCampaignContract(
         slug=STRESS_RMF_GREEDY_CAMPAIGN_SLUG,
         config_path=config_path.resolve(),
@@ -112,6 +116,23 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
         model_params=dict(model["params"]),
         rmf_calibration_by_view=rmf_calibration_by_view,
     )
+
+
+def _validate_campaign_model_io(payload: dict[str, object]) -> None:
+    transforms_x = payload.get("transforms_x")
+    if transforms_x != {"name": "identity", "params": {}}:
+        raise ValueError("Stress campaign response screen requires the configured identity X transform.")
+    transforms_y = payload.get("transforms_y")
+    if not isinstance(transforms_y, dict) or transforms_y.get("name") != "vector_from_table_v1":
+        raise ValueError("Stress campaign response screen requires vector_from_table_v1 labels.")
+    params = transforms_y.get("params")
+    if not isinstance(params, dict):
+        raise ValueError("Stress campaign response label transform must declare parameters.")
+    if params.get("id_column") != "id" or tuple(params.get("value_columns", ())) != _RESPONSE_WINDOW_COLUMNS:
+        raise ValueError(
+            "Stress campaign response label transform must preserve the ordered Reader response-window vector "
+            f"{_RESPONSE_WINDOW_COLUMNS}."
+        )
 
 
 def _parse_target_view(raw: object) -> StressTargetView:
