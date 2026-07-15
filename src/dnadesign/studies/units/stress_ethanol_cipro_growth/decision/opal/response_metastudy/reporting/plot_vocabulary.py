@@ -20,7 +20,7 @@ TARGET_VIEW_LABELS = {
     "ethanol": "Ethanol",
     "ciprofloxacin": "Ciprofloxacin",
     "and": "AND",
-    "or": "OR (prospective)",
+    "or": "OR (pressure test)",
 }
 POLICY_LABELS = {policy.id: policy.label for policy in audit_policy_specs()}
 POLICY_COMPACT_LABELS = {

@@ -22,7 +22,7 @@ def test_plot_vocabulary_names_every_visible_domain_value() -> None:
     assert plot_vocabulary.target_view_label("ethanol") == "Ethanol"
     assert plot_vocabulary.target_view_label("ciprofloxacin") == "Ciprofloxacin"
     assert plot_vocabulary.target_view_label("and") == "AND"
-    assert plot_vocabulary.target_view_label("or") == "OR (prospective)"
+    assert plot_vocabulary.target_view_label("or") == "OR (pressure test)"
     assert plot_vocabulary.policy_label("sfxi_beta1_gamma1") == "Canonical SFXI beta=1 gamma=1"
     assert plot_vocabulary.compact_policy_label("sfxi_beta1_gamma1") == "Canonical SFXI"
     assert plot_vocabulary.panel_role_label("canonical_sfxi_shared_overlap") == "Canonical SFXI shared overlap"

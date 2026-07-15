@@ -300,12 +300,12 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="response_constraint_coverage.png",
         tier="metric_diagnostic",
         visual_type="constraint support bars",
-        premise="The same 35 observations provide uneven support for the four target masks.",
+        premise="The same 35 observations provide uneven support for the campaign masks and the OR pressure test.",
         decision_value="Separates response ordering from all three response and fluorescence requirements by target.",
         alt_text=(
             "Grouped bars compare the number of observed designs where every target-ON YFP-to-CFP response exceeds "
             "every target-OFF response with the number that also meet the provisional pDual-10-relative ON and OFF "
-            "fluorescence boundaries for each active mask and the prospective OR mask."
+            "fluorescence boundaries for the three campaign masks and the OR pressure-test mask."
         ),
     ),
     PlotSpec(
@@ -317,8 +317,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         decision_value="Compares replicate-bootstrap variation with event-time interval sensitivity by component.",
         alt_text=(
             "Grouped bars show median replicate-bootstrap standard deviation and maximum event-bound deviation for "
-            "response separation, ON fluorescence, and OFF fluorescence under each active target mask and the "
-            "prospective OR mask."
+            "response separation, ON fluorescence, and OFF fluorescence under the three campaign masks and the "
+            "OR pressure-test mask."
         ),
     ),
     PlotSpec(
