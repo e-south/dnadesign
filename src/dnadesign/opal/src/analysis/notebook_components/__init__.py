@@ -68,12 +68,6 @@ from .overview import (
     build_notebook_at_a_glance_rows,
     build_notebook_campaign_header_lines,
     build_notebook_campaign_summary_row,
-    build_notebook_distrust_lines,
-    build_notebook_distrust_rows,
-    build_notebook_status_line,
-    build_notebook_trust_rows,
-    build_notebook_validity_lines,
-    build_notebook_validity_rows,
 )
 from .plot_method import (
     build_notebook_plot_card_rows,
@@ -126,6 +120,14 @@ from .selection_overlap import (
     render_notebook_campaign_set_selection_overlap_image,
 )
 from .selection_views import build_notebook_selection_view_options, resolve_notebook_selection_view
+from .trust import (
+    build_notebook_distrust_lines,
+    build_notebook_distrust_rows,
+    build_notebook_status_line,
+    build_notebook_trust_rows,
+    build_notebook_validity_lines,
+    build_notebook_validity_rows,
+)
 from .visual_hierarchy import (
     annotate_notebook_visual_choices,
     build_notebook_visual_group_options,
