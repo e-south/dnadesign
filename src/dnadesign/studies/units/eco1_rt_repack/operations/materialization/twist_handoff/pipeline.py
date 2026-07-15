@@ -49,6 +49,15 @@ DEFAULT_WT_GENBANK = Path(
     "docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-eco1-rt.gb"
 )
 DEFAULT_OUTPUT_ROOT = DEFAULT_V3_ROOT / "twist_handoff"
+ASSAY_HOST_SPECIES = "Escherichia coli"
+ASSAY_HOST_STRAIN = "K-12 MG1655"
+ASSAY_HOST_NCBI_TAXONOMY_ID = 511145
+CODON_TABLE_SOURCE_NAME = "Kazusa Codon Usage Database"
+CODON_TABLE_SOURCE_URL = "https://www.kazusa.or.jp/codon/cgi-bin/showcodon.cgi?species=83333"
+CODON_TABLE_REFERENCE_ORGANISM = "Escherichia coli K-12"
+CODON_TABLE_REFERENCE_NCBI_TAXONOMY_ID = 83333
+CODON_TABLE_REFERENCE_CDS_COUNT = 14
+CODON_TABLE_REFERENCE_CODON_COUNT = 5122
 
 
 def materialize_twist_handoff(
@@ -181,11 +190,16 @@ def materialize_twist_handoff(
         SeqIO.write(record, path, "genbank")
     manifest = {
         "schema_id": "eco1_rt.twist_full_cds_handoff",
-        "schema_version": 1,
+        "schema_version": 2,
         "sequence_status": "quote_and_upload_ready",
         "cloning_status": "blocked_pending_assembly_flanks_and_vendor_portal_complexity_check",
         "selected_panel_source_count": len(panel_rows),
         "selected_panel_composition": EXPECTED_SELECTED_POLICY_COUNTS,
+        "assay_host": {
+            "species": ASSAY_HOST_SPECIES,
+            "strain": ASSAY_HOST_STRAIN,
+            "ncbi_taxonomy_id": ASSAY_HOST_NCBI_TAXONOMY_ID,
+        },
         "assembly_state_scope": {
             "rt_msdna_oligomeric_state": "not_established",
             "interpretation": (
@@ -201,7 +215,15 @@ def materialize_twist_handoff(
             "unchanged_residues": "preserve_authoritative_wt_codon",
             "changed_residues": "highest_frequency_ecoli_codon",
             "codon_table": _portable_path(root, paths["codon_table"]),
-            "codon_table_source_provenance": "not_recorded_in_repository",
+            "codon_table_source": {
+                "name": CODON_TABLE_SOURCE_NAME,
+                "url": CODON_TABLE_SOURCE_URL,
+                "reference_organism": CODON_TABLE_REFERENCE_ORGANISM,
+                "reference_ncbi_taxonomy_id": CODON_TABLE_REFERENCE_NCBI_TAXONOMY_ID,
+                "reference_cds_count": CODON_TABLE_REFERENCE_CDS_COUNT,
+                "reference_codon_count": CODON_TABLE_REFERENCE_CODON_COUNT,
+            },
+            "host_suitability_scope": "k12_lineage_reference_for_substituted_residues_only",
             "vendor_codon_optimization": False,
         },
         "input_hashes": {name: _sha256_uri(path) for name, path in paths.items()},

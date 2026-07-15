@@ -48,7 +48,11 @@ monomeric RT-msDNA assembly state.
 
 The structural reference contains one RT-msDNA/RNA protomer. This is a modeling
 scope, not an oligomeric-state result. Wang tested R13A as an interface-
-disrupting substitution; none of the 1,007 v3 sequences contains R13A.
+disrupting substitution; none of the 1,007 v3 sequences contains R13A. The
+`distal` label refers only to distance from DNA/RNA retained with that protomer.
+It does not mean that every open residue is distant from the full Ec86
+assembly; F10 and R13 are reported separately because Wang places them at the
+cross-protomer RT-msDNA interface.
 
 Charge events, MSA support, fold metrics, local RMSD, and mutation count are
 review fields and late tie-breakers. They are not activity scores. ESMC and SAE

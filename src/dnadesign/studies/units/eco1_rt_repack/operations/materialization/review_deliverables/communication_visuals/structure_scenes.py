@@ -122,8 +122,8 @@ def structure_scene_specs(rows: list[dict[str, Any]]) -> tuple[dict[str, Any], .
             "Open distal scaffold >10 A",
             "3 Design spaces",
             SCENE_KIND_DESIGN,
-            "The N-terminal-enriched distal set provides a distant-repacking comparison, not a direct contact "
-            "hypothesis.",
+            "The N-terminal-enriched set is more than 10 A from DNA/RNA retained with one protomer. F10 and R13 "
+            "remain separate cross-protomer interface annotations.",
             _open_positions(rows, DISTAL_SCAFFOLD_POLICY_ID),
             POLICY_COLORS[DISTAL_SCAFFOLD_POLICY_ID],
         ),

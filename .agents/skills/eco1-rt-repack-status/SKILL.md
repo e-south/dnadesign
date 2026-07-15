@@ -170,6 +170,11 @@ Out of scope:
   panel-selection path.
 - Do not promote candidates into RT-lnRNA construct subjects without the
   downstream study's explicit acceptance contract.
+- Report E. coli K-12 MG1655 as the declared assay host. The Twist handoff uses
+  the exact Kazusa E. coli K-12 frequency record at taxonomy id 83333 only for
+  substituted residues while preserving WT codons elsewhere. Describe this as
+  substitution-only minimal recoding, not whole-gene codon optimization or an
+  expression claim. Vendor codon optimization remains disabled.
 - Route renderer-neutral molecule roles and py3Dmol behavior through
   `molecular-structure-visualization`; route ChimeraX GUI, REST, pose, and
   capture work through `chimerax-structure-review`. Eco1 complex views use gold

@@ -152,8 +152,20 @@ def test_twist_handoff_manifest_renders_sequence_and_cloning_status(tmp_path: Pa
         yaml.safe_dump(
             {
                 "schema_id": "eco1_rt.twist_full_cds_handoff",
+                "schema_version": 2,
                 "sequence_status": "quote_and_upload_ready",
                 "cloning_status": "blocked_pending_assembly_flanks_and_vendor_portal_complexity_check",
+                "assay_host": {
+                    "species": "Escherichia coli",
+                    "strain": "K-12 MG1655",
+                    "ncbi_taxonomy_id": 511145,
+                },
+                "codon_policy": {
+                    "codon_table_source": {
+                        "name": "Kazusa Codon Usage Database",
+                        "reference_organism": "Escherichia coli K-12",
+                    }
+                },
                 "sequences": [
                     {
                         "sequence_id": "selected_distal_01",
@@ -182,5 +194,7 @@ def test_twist_handoff_manifest_renders_sequence_and_cloning_status(tmp_path: Pa
     rendered_text = str(rendered)
     assert "quote_and_upload_ready" in rendered_text
     assert "blocked_pending_assembly_flanks" in rendered_text
+    assert "K-12 MG1655" in rendered_text
+    assert "Kazusa Codon Usage Database" in rendered_text
     assert "A47K" in rendered_text
     assert "selected_distal_01.gb" in rendered_text

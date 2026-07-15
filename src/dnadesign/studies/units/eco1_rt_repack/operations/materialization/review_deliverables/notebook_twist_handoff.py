@@ -22,15 +22,26 @@ def render_twist_handoff(row: dict[str, Any], *, mo: Any, manifest_path: Path) -
     """Render order-sequence readiness without implying cloning readiness."""
 
     loaded = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict) or loaded.get("schema_id") != "eco1_rt.twist_full_cds_handoff":
-        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff at {manifest_path}")
+    if (
+        not isinstance(loaded, dict)
+        or loaded.get("schema_id") != "eco1_rt.twist_full_cds_handoff"
+        or loaded.get("schema_version") != 2
+    ):
+        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff schema version 2 at {manifest_path}")
+    assay_host = dict(loaded.get("assay_host") or {})
+    codon_policy = dict(loaded.get("codon_policy") or {})
+    codon_source = dict(codon_policy.get("codon_table_source") or {})
     status_rows = [
         {"field": "Sequence status", "value": str(loaded.get("sequence_status") or "")},
         {"field": "Cloning status", "value": str(loaded.get("cloning_status") or "")},
+        {
+            "field": "Assay host",
+            "value": f"{assay_host.get('species', '')} {assay_host.get('strain', '')}".strip(),
+        },
         {"field": "Codon design", "value": "substitution-only minimal recoding"},
         {
             "field": "Codon-table source",
-            "value": str((loaded.get("codon_policy") or {}).get("codon_table_source_provenance") or ""),
+            "value": f"{codon_source.get('name', '')}; {codon_source.get('reference_organism', '')}".strip("; "),
         },
         {"field": "Vendor codon optimization", "value": "disabled"},
     ]
@@ -63,9 +74,9 @@ def render_twist_handoff(row: dict[str, Any], *, mo: Any, manifest_path: Path) -
     title = html.escape(str(row.get("title") or "Twist full-CDS handoff"))
     note = (
         "These are exact full-length CDS designs for vendor upload and complexity review. Native WT codons are "
-        "retained at unchanged residues; substitutions use the highest-frequency codon in the packaged E. coli "
-        "table. This is not whole-gene codon optimization. Assembly flanks and junctions are not yet part of the "
-        "sequences."
+        "retained at unchanged residues; substitutions use the highest-frequency codon in the cited Kazusa "
+        "E. coli K-12 table for the MG1655 assay host. This is not whole-gene codon optimization or an expression "
+        "claim. Assembly flanks and junctions are not yet part of the sequences."
     )
     return mo.vstack(
         [

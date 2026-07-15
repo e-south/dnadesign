@@ -40,6 +40,7 @@ def test_materializes_quote_ready_full_cds_handoff(tmp_path: Path) -> None:
     result = materialize_twist_handoff(repo_root=REPO_ROOT, output_root=output_root, **inputs)
 
     manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 2
     assert manifest["sequence_status"] == "quote_and_upload_ready"
     assert manifest["cloning_status"] == "blocked_pending_assembly_flanks_and_vendor_portal_complexity_check"
     assert len(manifest["sequences"]) == 8
@@ -51,13 +52,26 @@ def test_materializes_quote_ready_full_cds_handoff(tmp_path: Path) -> None:
         "combined_near_acid_free_plus_distal_v1": 3,
     }
     assert manifest["assembly_state_scope"]["rt_msdna_oligomeric_state"] == "not_established"
+    assert manifest["assay_host"] == {
+        "species": "Escherichia coli",
+        "strain": "K-12 MG1655",
+        "ncbi_taxonomy_id": 511145,
+    }
     assert manifest["codon_policy"]["policy_kind"] == "minimal_variant_aware_recoding"
     assert manifest["codon_policy"]["optimization_scope"] == "substituted_residues_only"
     assert manifest["codon_policy"]["global_codon_optimization"] is False
     assert manifest["codon_policy"]["codon_table"] == (
         "src/dnadesign/permuter/src/resources/codon_tables/codon_ecoli.csv"
     )
-    assert manifest["codon_policy"]["codon_table_source_provenance"] == "not_recorded_in_repository"
+    assert manifest["codon_policy"]["codon_table_source"] == {
+        "name": "Kazusa Codon Usage Database",
+        "url": "https://www.kazusa.or.jp/codon/cgi-bin/showcodon.cgi?species=83333",
+        "reference_organism": "Escherichia coli K-12",
+        "reference_ncbi_taxonomy_id": 83333,
+        "reference_cds_count": 14,
+        "reference_codon_count": 5122,
+    }
+    assert manifest["codon_policy"]["host_suitability_scope"] == ("k12_lineage_reference_for_substituted_residues_only")
     assert set(manifest["input_hashes"]) == {
         "candidate_pool",
         "candidate_selection_panel",

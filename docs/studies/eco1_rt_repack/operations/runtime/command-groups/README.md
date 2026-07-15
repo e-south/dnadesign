@@ -171,10 +171,12 @@ uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materializati
 This writes eight exact 963-bp CDS designs, a vendor CSV, FASTA, one annotated
 GenBank file per sequence, and a hash-linked manifest. Unchanged residues retain
 the authoritative WT codon; changed residues use the highest-frequency codon
-in the packaged E. coli table. This is substitution-only minimal recoding, not
-whole-gene codon optimization. Vendor codon optimization is disabled. The
-sequence bundle excludes internal BsaI and BsmBI sites. Assembly flanks and
-junctions remain a separate cloning decision.
+in the packaged E. coli table. The manifest records E. coli K-12 MG1655 as the
+assay host and cites the exact Kazusa E. coli K-12 frequency record used by the
+table. This is substitution-only minimal recoding, not whole-gene codon
+optimization. Vendor codon optimization is disabled. The sequence bundle
+excludes internal BsaI and BsmBI sites. Assembly flanks, junctions, and the live
+vendor complexity result remain separate order decisions.
 
 ### 8. Build The Review Notebook
 

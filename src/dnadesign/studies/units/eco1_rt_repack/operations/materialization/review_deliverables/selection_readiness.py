@@ -287,8 +287,12 @@ def _handoff_readiness_row(*, output_root: Path, manifest_path: Path, loaded: di
 
 def _twist_handoff_row(*, output_root: Path, manifest_path: Path) -> dict[str, Any]:
     loaded = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict) or loaded.get("schema_id") != "eco1_rt.twist_full_cds_handoff":
-        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff at {manifest_path}")
+    if (
+        not isinstance(loaded, dict)
+        or loaded.get("schema_id") != "eco1_rt.twist_full_cds_handoff"
+        or loaded.get("schema_version") != 2
+    ):
+        raise ValueError(f"Expected eco1_rt.twist_full_cds_handoff schema version 2 at {manifest_path}")
     sequence_count = len(list(loaded.get("sequences") or []))
     return make_deliverable_row(
         deliverable_id=_TWIST_HANDOFF_DELIVERABLE_ID,

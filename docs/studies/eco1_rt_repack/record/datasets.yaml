@@ -847,9 +847,10 @@ datasets:
       The bundle includes a Twist CSV, FASTA, and one annotated GenBank file per
       candidate. It reports exact F10/R13 states, the Wang R13A evidence match,
       and unresolved RT-msDNA assembly state. Internal BsaI and BsmBI sites are
-      absent. The substitution-only codon policy and codon-table hash are
-      recorded; the codon table's external source provenance is not. Assembly
-      flanks and the live vendor complexity check remain pending.
+      absent. The substitution-only codon policy records E. coli K-12 MG1655 as
+      the assay host and cites the exact Kazusa E. coli K-12 codon-frequency
+      record used for changed residues. Assembly flanks and the live vendor
+      complexity check remain pending.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact

@@ -66,9 +66,12 @@ experimental comparisons, not quality tiers or biological replicates.
 The distal policy opens 25 positions more than `10 A` from retained DNA/RNA.
 They are concentrated at residues `3-32`, with three additional positions at
 `61`, `75`, and `79`. This is an N-terminal-enriched distant-repacking control
-for general repacking and fold preservation, not a direct strand-displacement
-hypothesis. Its value is comparative: it separates broad repacking effects from
-the peripheral nucleic-acid-facing intervention.
+under the selected one-protomer distance calculation, not a direct
+strand-displacement hypothesis or a globally interface-distal set. Its value is
+comparative: it separates N-terminal-enriched repacking from the peripheral
+nucleic-acid-facing intervention. F10 and R13 require separate review because
+Wang places them at a cross-protomer RT-msDNA interface that is not represented
+by the one-protomer distance label.
 
 Wang describes a homodimer of two RT-msDNA protomers. F10 and R13 in alpha-1 of
 each RT contact msDNA in the other protomer. R13A disrupted this interaction
@@ -245,12 +248,14 @@ The synthesis handoff contains all eight selected full-length CDS designs. Each
 record is `963 bp`, including the WT stop
 codon, and translates to the corresponding canonical `320 aa` fold input.
 Unchanged amino acids retain the authoritative WT codon; changed amino acids use
-the highest-frequency codon in the packaged E. coli table. This is
-substitution-only minimal recoding, not whole-gene codon optimization.
-Independent vendor codon optimization is disabled. The handoff hashes the
-codon table with its other inputs, but the repository does not record the
-table's external source. That citation should be resolved or the limitation
-accepted before the method is frozen.
+the highest-frequency codon in the packaged E. coli table. The assay host is
+E. coli K-12 MG1655. The packaged frequencies exactly match the Kazusa E. coli
+K-12 record (`NCBI taxonomy id 83333`; `14` CDSs and `5,122` codons):
+<https://www.kazusa.or.jp/codon/cgi-bin/showcodon.cgi?species=83333>. This is a
+K-12-lineage reference for substitution-only minimal recoding, not whole-gene
+codon optimization or a claim of expression improvement. Independent vendor
+codon optimization is disabled. The handoff hashes the codon table with its
+other inputs.
 
 The bundle contains one upload CSV, one FASTA, and one annotated GenBank file
 per candidate. GenBank variation features use compact amino-acid labels such as
@@ -259,10 +264,19 @@ homopolymer length, repeated 20-mer count, internal BsaI/BsmBI checks, exact
 F10/R13 states, the Wang R13A evidence match, and the unresolved RT-msDNA
 assembly state for every ordered sequence.
 
+Across the eight CDSs, global GC is `33.6-36.9%`, the lowest 50-bp-window GC is
+`16-20%`, and the longest homopolymer is `8-10 bp`; no repeated 20-mer or
+internal BsaI/BsmBI site is present. The low-GC windows may produce a complex
+vendor score, but they are not silently recoded. Twist's portal result is the
+manufacturability decision: <https://www.twistbioscience.com/faq/gene-synthesis/what-lengths-synthetic-dna-does-twist-currently-offer-synthesis?active=8803>.
+
 The exact sequences are ready for Twist upload, complexity review, and a live
 quote. At Twist's advertised `$0.07/bp` floor, eight `963-bp` fragments total
 about `$539` before shipping or complexity charges. They are not cloning-ready
-because assembly flanks and junctions have not been declared or screened.
+because assembly flanks and junctions have not been declared or screened. Any
+vendor-requested synonymous repair should be limited to the flagged sequence
+feature and then rerun through translation, restriction-site, junction, and
+sequence-hash checks; broad vendor codon optimization remains disabled.
 
 Handoff manifest:
 `outputs/thread/generation_policies_v3/twist_handoff/twist_handoff_manifest.yaml`.
