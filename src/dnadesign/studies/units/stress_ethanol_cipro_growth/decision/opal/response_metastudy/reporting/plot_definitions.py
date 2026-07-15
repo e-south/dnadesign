@@ -316,7 +316,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         premise="Metric scales should reflect the dominant measured uncertainty source.",
         decision_value="Compares replicate-bootstrap variation with event-time interval sensitivity by component.",
         alt_text=(
-            "Grouped bars show median replicate-bootstrap standard deviation and event-bound half range for "
+            "Grouped bars show median replicate-bootstrap standard deviation and maximum event-bound deviation for "
             "response separation, ON fluorescence, and OFF fluorescence under each active target mask and the "
             "prospective OR mask."
         ),

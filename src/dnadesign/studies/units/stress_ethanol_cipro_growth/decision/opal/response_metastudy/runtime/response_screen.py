@@ -155,7 +155,12 @@ def summarize_retrospective_enrichment(enrichment: pd.DataFrame) -> pd.DataFrame
     )
 
 
-def response_screen_manifest(screen: ResponseMetricScreen, *, primary_reduction_id: str) -> dict[str, object]:
+def response_screen_manifest(
+    screen: ResponseMetricScreen,
+    *,
+    primary_reduction_id: str,
+    campaign_calibration_parity: Mapping[str, object],
+) -> dict[str, object]:
     """Return the compact promotion posture recorded in the bundle manifest."""
 
     eligible = screen.model_screen.loc[
@@ -201,6 +206,7 @@ def response_screen_manifest(screen: ResponseMetricScreen, *, primary_reduction_
             }
             for selection_view_id, rows in screen.calibration.groupby("selection_view_id", sort=True)
         },
+        "campaign_calibration_parity": dict(campaign_calibration_parity),
         "response_screen_protocol": {
             "bootstrap_samples": bootstrap_samples,
             "scale_quantile": RESPONSE_REVIEW_SPEC.scale_quantile,

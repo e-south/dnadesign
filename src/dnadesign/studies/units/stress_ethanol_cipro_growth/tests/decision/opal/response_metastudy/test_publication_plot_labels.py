@@ -23,6 +23,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     model_validation_plot,
     plot_style,
     primary_plots,
+    response_assay_plots,
 )
 
 CANONICAL = "sfxi_beta1_gamma1"
@@ -37,7 +38,13 @@ def captured_figures(monkeypatch: pytest.MonkeyPatch) -> list[plt.Figure]:
         plot_style.save_metastudy_figure(figure, path)
         figures.append(figure)
 
-    for module in (diagnostic_plots, metric_behavior_plots, model_validation_plot, primary_plots):
+    for module in (
+        diagnostic_plots,
+        metric_behavior_plots,
+        model_validation_plot,
+        primary_plots,
+        response_assay_plots,
+    ):
         monkeypatch.setattr(module, "save_metastudy_figure", capture)
     return figures
 
@@ -169,6 +176,32 @@ def test_selected_profile_heatmap_facets_policy_and_preserves_square_tiles(
         ["Ethanol", "Ciprofloxacin", "AND"],
         ["Ethanol", "Ciprofloxacin", "AND"],
     ]
+
+
+def test_response_uncertainty_names_event_envelope_by_its_current_semantics(
+    captured_figures: list[plt.Figure],
+    tmp_path: Path,
+) -> None:
+    frame = pd.DataFrame(
+        {
+            "selection_view_id": ["ethanol"],
+            "response_separation__bootstrap_sd": [0.2],
+            "response_separation__event_half_range": [0.05],
+            "on_magnitude_floor__bootstrap_sd": [0.3],
+            "on_magnitude_floor__event_half_range": [0.04],
+            "off_magnitude_ceiling__bootstrap_sd": [0.25],
+            "off_magnitude_ceiling__event_half_range": [0.03],
+        }
+    )
+
+    response_assay_plots.write_response_uncertainty_sources(
+        frame,
+        tmp_path / "response_uncertainty_sources.png",
+    )
+
+    labels = _visible_text(captured_figures[0])
+    assert "Maximum event-bound deviation" in labels
+    assert "Event-bound half range" not in labels
 
 
 def _visible_text(figure: plt.Figure) -> set[str]:

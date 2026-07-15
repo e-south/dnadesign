@@ -212,7 +212,7 @@ def write_response_uncertainty_sources(frame: pd.DataFrame, path: Path) -> None:
     width = 0.36
     fig, ax = plt.subplots(figsize=(12.0, 4.8))
     ax.bar(x - width / 2.0, work["replicate"], width, label="Replicate bootstrap SD")
-    ax.bar(x + width / 2.0, work["event"], width, label="Event-bound half range")
+    ax.bar(x + width / 2.0, work["event"], width, label="Maximum event-bound deviation")
     ax.set_xticks(x, labels, rotation=30, ha="right")
     ax.set_ylabel("Uncertainty in log2(YFP / CFP) response\nor pDual-10-relative fluorescence")
     ax.set_title("Median assay uncertainty by source and metric component")

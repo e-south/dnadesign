@@ -69,6 +69,7 @@ def test_response_model_modules_stay_semantically_bounded() -> None:
         "evaluation/grouped_models.py": 240,
         "evaluation/model_representations.py": 180,
         "runtime/audit.py": 360,
+        "runtime/campaign_calibration.py": 120,
         "runtime/reader_display_contract.py": 80,
         "runtime/reader_response_bundle.py": 320,
         "runtime/response_screen.py": 280,

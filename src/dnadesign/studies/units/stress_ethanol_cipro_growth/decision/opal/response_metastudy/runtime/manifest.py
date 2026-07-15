@@ -119,6 +119,7 @@ def write_metastudy_manifest(
                 "binding_count": candidate_identity_bindings.binding_count,
                 "candidate_count": candidate_identity_bindings.candidate_count,
                 "resolved_response_label_count": len(candidate_identity_bindings.rows),
+                "declared_unbound_reader_design_count": candidate_identity_bindings.excluded_design_count,
                 "files": source_inventory(
                     candidate_identity_bindings.bundle_root,
                     [candidate_identity_bindings.manifest_path, candidate_identity_bindings.records_path],
@@ -131,6 +132,7 @@ def write_metastudy_manifest(
                 "scope": measurement_selection.scope,
                 "promotion_aggregation": measurement_selection.promotion_aggregation,
                 "row_count": len(measurement_selection.rows),
+                "excluded_designs": measurement_selection.excluded_designs.to_dict(orient="records"),
                 "config": source_inventory(paths.repo_root, [measurement_selection.config_path])[0],
             },
             "state_order": list(STRESS_STATE_IDS),

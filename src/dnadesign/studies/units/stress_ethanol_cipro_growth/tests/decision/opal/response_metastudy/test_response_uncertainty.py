@@ -21,6 +21,9 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.evaluation import (
     response_uncertainty,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
+    campaign_calibration,
+)
 
 
 def test_reader_joint_draws_produce_finite_constraint_scales() -> None:
@@ -74,6 +77,28 @@ def test_reader_joint_draws_fail_when_a_candidate_is_missing() -> None:
         )
 
 
+def test_campaign_calibration_parity_accepts_only_rounding_error() -> None:
+    calibration, configured = _campaign_calibration(scale=0.1234564)
+
+    result = campaign_calibration.verify_campaign_rmf_calibration_parity(
+        calibration,
+        configured_by_view=configured,
+    )
+
+    assert result["matches_reader_evidence"] is True
+    assert float(result["max_abs_error"]) == pytest.approx(4.0e-7)
+
+
+def test_campaign_calibration_parity_rejects_reader_evidence_drift() -> None:
+    calibration, configured = _campaign_calibration(scale=0.1238)
+
+    with pytest.raises(ValueError, match="campaign RMF calibration drifted from Reader evidence"):
+        campaign_calibration.verify_campaign_rmf_calibration_parity(
+            calibration,
+            configured_by_view=configured,
+        )
+
+
 def _reader_records(*, samples: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     labels = pd.DataFrame([_state_row(candidate_id) for candidate_id in ("a", "b")])
     rng = np.random.default_rng(7)
@@ -86,6 +111,31 @@ def _reader_records(*, samples: int) -> tuple[pd.DataFrame, pd.DataFrame]:
                 row[column] = float(base[column]) + float(rng.normal(0.0, 0.05))
             rows.append(row)
     return labels, pd.DataFrame(rows)
+
+
+def _campaign_calibration(*, scale: float) -> tuple[pd.DataFrame, dict[str, dict[str, float]]]:
+    rows: list[dict[str, object]] = []
+    configured: dict[str, dict[str, float]] = {}
+    for view_id in ("ethanol", "ciprofloxacin", "and"):
+        configured[view_id] = {
+            "response_separation_min": 0.0,
+            "on_magnitude_min": 0.0,
+            "off_magnitude_max": 0.0,
+            "response_separation_scale": 0.123456,
+            "on_magnitude_scale": 0.123456,
+            "off_magnitude_scale": 0.123456,
+        }
+        for component in ("response_separation", "on_magnitude_floor", "off_magnitude_ceiling"):
+            rows.append(
+                {
+                    "selection_view_id": view_id,
+                    "component": component,
+                    "threshold": 0.0,
+                    "scale": scale,
+                    "scale_basis": "reader_joint_bootstrap_plus_conservative_event_bound",
+                }
+            )
+    return pd.DataFrame.from_records(rows), configured
 
 
 def _state_row(candidate_id: str) -> dict[str, object]:

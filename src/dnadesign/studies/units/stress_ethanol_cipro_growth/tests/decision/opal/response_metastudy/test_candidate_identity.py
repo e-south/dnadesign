@@ -36,6 +36,11 @@ def _measurement_selection(*, design_id: str = "design-a") -> pd.DataFrame:
     )
 
 
+def _excluded_designs(*, design_id: str | None = None) -> pd.DataFrame:
+    rows = [] if design_id is None else [{"design_id": design_id, "reason": "absent_from_study_candidate_bindings"}]
+    return pd.DataFrame.from_records(rows, columns=["design_id", "reason"])
+
+
 def test_load_response_candidate_identity_bindings_uses_exact_study_alias(tmp_path: Path) -> None:
     bundle = write_candidate_bindings(
         tmp_path / "bindings",
@@ -44,6 +49,7 @@ def test_load_response_candidate_identity_bindings_uses_exact_study_alias(tmp_pa
 
     resolved = candidate_identity.load_response_candidate_identity_bindings(
         measurement_selection=_measurement_selection(),
+        excluded_designs=_excluded_designs(),
         bundle_root=bundle,
     )
 
@@ -67,6 +73,7 @@ def test_load_response_candidate_identity_bindings_rejects_missing_reader_alias(
     with pytest.raises(PromoterCandidateBindingsError, match="unresolved Reader design aliases"):
         candidate_identity.load_response_candidate_identity_bindings(
             measurement_selection=_measurement_selection(design_id="design-missing"),
+            excluded_designs=_excluded_designs(),
             bundle_root=bundle,
         )
 
@@ -86,5 +93,20 @@ def test_load_response_candidate_identity_bindings_rejects_duplicate_candidate_r
     with pytest.raises(PromoterCandidateBindingsError, match="duplicate candidate IDs"):
         candidate_identity.load_response_candidate_identity_bindings(
             measurement_selection=measurements,
+            excluded_designs=_excluded_designs(),
+            bundle_root=bundle,
+        )
+
+
+def test_load_response_candidate_identity_bindings_rejects_exclusion_that_now_resolves(tmp_path: Path) -> None:
+    bundle = write_candidate_bindings(
+        tmp_path / "bindings",
+        [("candidate-1", "design-a", "densegen_tfbs"), ("candidate-2", "design-unbound", "densegen_tfbs")],
+    )
+
+    with pytest.raises(PromoterCandidateBindingsError, match="declared absent.*but resolve"):
+        candidate_identity.load_response_candidate_identity_bindings(
+            measurement_selection=_measurement_selection(),
+            excluded_designs=_excluded_designs(design_id="design-unbound"),
             bundle_root=bundle,
         )

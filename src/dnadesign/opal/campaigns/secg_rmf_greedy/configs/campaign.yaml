@@ -103,9 +103,9 @@ selection_views:
           response_separation_min: 0.0
           on_magnitude_min: 0.0
           off_magnitude_max: 0.0
-          response_separation_scale: 0.509639
-          on_magnitude_scale: 0.626835
-          off_magnitude_scale: 0.420265
+          response_separation_scale: 0.509942
+          on_magnitude_scale: 0.626884
+          off_magnitude_scale: 0.420417
     selection:
       name: top_n
       params:
@@ -125,9 +125,9 @@ selection_views:
           response_separation_min: 0.0
           on_magnitude_min: 0.0
           off_magnitude_max: 0.0
-          response_separation_scale: 0.390695
-          on_magnitude_scale: 0.337692
-          off_magnitude_scale: 0.504743
+          response_separation_scale: 0.390950
+          on_magnitude_scale: 0.337726
+          off_magnitude_scale: 0.504853
     selection:
       name: top_n
       params:
@@ -147,9 +147,9 @@ selection_views:
           response_separation_min: 0.0
           on_magnitude_min: 0.0
           off_magnitude_max: 0.0
-          response_separation_scale: 0.491307
-          on_magnitude_scale: 0.371660
-          off_magnitude_scale: 0.424453
+          response_separation_scale: 0.491582
+          on_magnitude_scale: 0.371687
+          off_magnitude_scale: 0.424486
     selection:
       name: top_n
       params:

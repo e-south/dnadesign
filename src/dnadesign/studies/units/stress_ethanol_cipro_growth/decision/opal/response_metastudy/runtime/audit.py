@@ -40,6 +40,7 @@ from ..evaluation.response_examples import build_response_example_rows
 from ..evaluation.scoring import score_sfxi_evidence
 from ..evaluation.summaries import summarize_policies
 from ..evaluation.support import build_setpoint_support
+from .campaign_calibration import verify_campaign_rmf_calibration_parity
 from .candidate_identity import load_response_candidate_identity_bindings
 from .loading import (
     assert_candidate_alignment,
@@ -149,6 +150,7 @@ def _materialize_metastudy(
     )
     candidate_identity_bindings = load_response_candidate_identity_bindings(
         measurement_selection=measurement_selection.rows,
+        excluded_designs=measurement_selection.excluded_designs,
         bundle_root=candidate_binding_bundle_root,
     )
     response_labels = build_selected_response_labels(
@@ -196,6 +198,10 @@ def _materialize_metastudy(
         groups=candidate_identity_bindings.rows["reader_experiment_id"].astype(str).to_numpy(),
         random_forest_params=stress_campaign.model_params,
         target_views=target_views,
+    )
+    campaign_calibration_parity = verify_campaign_rmf_calibration_parity(
+        response_screen.calibration,
+        configured_by_view=stress_campaign.rmf_calibration_by_view,
     )
     response_examples = build_response_example_rows(
         response_screen.uncertainty,
@@ -351,5 +357,6 @@ def _materialize_metastudy(
         response_metric_screen=response_screen_manifest(
             response_screen,
             primary_reduction_id=reader_bundle.primary_reduction_id,
+            campaign_calibration_parity=campaign_calibration_parity,
         ),
     )

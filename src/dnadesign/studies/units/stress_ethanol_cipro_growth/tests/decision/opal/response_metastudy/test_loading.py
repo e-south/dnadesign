@@ -239,6 +239,7 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
 
     assert tuple(target_views) == ("ethanol", "ciprofloxacin", "and")
     assert stress_campaign.model_params["random_state"] == 7
+    assert stress_campaign.rmf_calibration_by_view["ethanol"]["response_separation_scale"] == pytest.approx(0.509942)
     assert tuple(run.source.lifecycle for run in sfxi_evidence) == ("provenance_only",) * 3
     assert tuple(run.target_view.target_mask for run in sfxi_evidence) == (
         (0.0, 1.0, 0.0, 1.0),

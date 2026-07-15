@@ -48,6 +48,15 @@ _TARGET_VIEW_LABELS = {
     "and": "AND-responsive",
 }
 
+_RMF_CALIBRATION_FIELDS = {
+    "response_separation_min",
+    "on_magnitude_min",
+    "off_magnitude_max",
+    "response_separation_scale",
+    "on_magnitude_scale",
+    "off_magnitude_scale",
+}
+
 
 def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContract:
     """Load the configured stress campaign and derive its metric-neutral target views."""
@@ -71,6 +80,9 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
             f"Stress campaign selection views must be exactly {EXPECTED_STRESS_TARGET_VIEW_IDS}; found {observed_ids}."
         )
     target_views = tuple(_parse_target_view(raw) for raw in raw_views)
+    rmf_calibration_by_view = {
+        target_view.id: _parse_rmf_calibration(raw) for raw, target_view in zip(raw_views, target_views, strict=True)
+    }
     if len({view.target_mask for view in target_views}) != len(target_views):
         raise ValueError("Stress campaign selection-view target masks must be unique.")
 
@@ -98,6 +110,7 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
         candidate_records_path=records_path,
         x_column_name=x_column_name,
         model_params=dict(model["params"]),
+        rmf_calibration_by_view=rmf_calibration_by_view,
     )
 
 
@@ -119,6 +132,26 @@ def _parse_target_view(raw: object) -> StressTargetView:
         label=_TARGET_VIEW_LABELS[view_id],
         target_mask=tuple(float(value) for value in raw_mask),  # type: ignore[arg-type]
     )
+
+
+def _parse_rmf_calibration(raw: object) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        raise ValueError("Stress campaign selection-view rows must be mappings.")
+    view_id = str(raw.get("id"))
+    objective = raw.get("objective")
+    params = objective.get("params") if isinstance(objective, dict) else None
+    calibration = params.get("calibration") if isinstance(params, dict) else None
+    if not isinstance(calibration, dict) or set(calibration) != _RMF_CALIBRATION_FIELDS:
+        raise ValueError(
+            f"Stress target view {view_id!r} calibration fields must be exactly {sorted(_RMF_CALIBRATION_FIELDS)}."
+        )
+    parsed = {field: float(calibration[field]) for field in sorted(_RMF_CALIBRATION_FIELDS)}
+    if not all(np.isfinite(value) for value in parsed.values()):
+        raise ValueError(f"Stress target view {view_id!r} calibration values must be finite.")
+    scale_fields = {field for field in _RMF_CALIBRATION_FIELDS if field.endswith("_scale")}
+    if any(parsed[field] <= 0.0 for field in scale_fields):
+        raise ValueError(f"Stress target view {view_id!r} calibration scales must be positive.")
+    return parsed
 
 
 def load_sfxi_evidence_frame(

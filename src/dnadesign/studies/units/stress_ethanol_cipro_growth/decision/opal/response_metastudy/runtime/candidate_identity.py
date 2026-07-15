@@ -36,11 +36,13 @@ class ResponseCandidateIdentityBindings:
     records_path: Path
     binding_count: int
     candidate_count: int
+    excluded_design_count: int
 
 
 def load_response_candidate_identity_bindings(
     *,
     measurement_selection: pd.DataFrame,
+    excluded_designs: pd.DataFrame,
     bundle_root: Path,
 ) -> ResponseCandidateIdentityBindings:
     """Resolve every selected Reader design alias to study-owned candidate identity."""
@@ -49,6 +51,7 @@ def load_response_candidate_identity_bindings(
     verification = verify_promoter_candidate_bindings(root, allowed_root=root)
     binding_rows = load_promoter_candidate_bindings(root, allowed_root=root)
     measurements = _validated_measurements(measurement_selection)
+    exclusions = _validated_exclusions(excluded_designs)
     reader_bindings = binding_rows.loc[
         binding_rows["alias_namespace"].astype(str).eq(READER_ALIAS_NAMESPACE),
         ["alias", "candidate_id"],
@@ -65,6 +68,12 @@ def load_response_candidate_identity_bindings(
         raise PromoterCandidateBindingsError(
             f"Response metastudy has unresolved Reader design aliases in {READER_ALIAS_NAMESPACE!r}: {missing[:10]}"
         )
+    bound_exclusions = sorted(set(exclusions["design_id"].astype(str)) & set(reader_bindings["alias"].astype(str)))
+    if bound_exclusions:
+        raise PromoterCandidateBindingsError(
+            "Response exclusions declared absent_from_study_candidate_bindings but resolve through "
+            f"the study binding artifact: {bound_exclusions[:10]}"
+        )
     rows = resolved.loc[:, ["resolved_candidate_id", "design_id", "reader_experiment_id"]].rename(
         columns={"resolved_candidate_id": "id"}
     )
@@ -80,6 +89,7 @@ def load_response_candidate_identity_bindings(
         records_path=verification.bindings_parquet,
         binding_count=int(verification.binding_count),
         candidate_count=int(verification.candidate_count),
+        excluded_design_count=len(exclusions),
     )
 
 
@@ -100,6 +110,27 @@ def _validated_measurements(measurement_selection: pd.DataFrame) -> pd.DataFrame
     if measurements.duplicated().any():
         raise PromoterCandidateBindingsError("Response measurement selection contains duplicate Reader pairs.")
     return measurements
+
+
+def _validated_exclusions(excluded_designs: pd.DataFrame) -> pd.DataFrame:
+    required = {"design_id", "reason"}
+    missing_columns = sorted(required - set(excluded_designs.columns))
+    if missing_columns:
+        raise PromoterCandidateBindingsError(
+            f"Response measurement exclusions lack required columns: {missing_columns}"
+        )
+    exclusions = excluded_designs.loc[:, ["design_id", "reason"]].copy()
+    for column in ("design_id", "reason"):
+        missing_value = exclusions[column].isna() | exclusions[column].astype(str).str.strip().eq("")
+        if missing_value.any():
+            raise PromoterCandidateBindingsError(f"Response measurement exclusion column {column!r} is empty.")
+        exclusions[column] = exclusions[column].astype(str)
+    unexpected_reasons = sorted(set(exclusions["reason"]) - {"absent_from_study_candidate_bindings"})
+    if unexpected_reasons:
+        raise PromoterCandidateBindingsError(f"Unsupported response exclusion reasons: {unexpected_reasons}")
+    if exclusions["design_id"].duplicated().any():
+        raise PromoterCandidateBindingsError("Response measurement exclusions contain duplicate design IDs.")
+    return exclusions
 
 
 __all__ = ["ResponseCandidateIdentityBindings", "load_response_candidate_identity_bindings"]

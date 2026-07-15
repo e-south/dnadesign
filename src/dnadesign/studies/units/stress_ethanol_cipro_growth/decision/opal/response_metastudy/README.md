@@ -38,7 +38,8 @@ Reader reduction math.
 - `config/reader_response_window.yaml`: strict study request consumed by Reader.
 - `config/response_model_screen_selection.yaml`: exact Reader experiment/design
   pairs used only by the retrospective response model screen. It contains no
-  candidate IDs and defines no promotion aggregation.
+  candidate IDs, accounts explicitly for Reader designs that have no study
+  candidate binding, and defines no promotion aggregation.
 
 Generated evidence belongs under
 `workbench/outputs/response_metastudy/`; it is never hand-edited.
@@ -69,7 +70,8 @@ uv run python -m \
 
 The runtime stages output atomically. Existing output is replaced only after
 Reader contracts, source identities, OPAL parity, plots, tables, report, and
-manifest all succeed.
+manifest all succeed. It also rejects campaign RMF thresholds or scales that
+drift from the Reader-derived review calibration beyond six-decimal rounding.
 
 ## Architecture
 
@@ -86,7 +88,10 @@ manifest all succeed.
   `1`, record `promoter_candidate_bindings/bindings`). The response-owned
   screen selection declares exact Reader experiment/design pairs; the runtime
   resolves their candidate IDs only through exact `reader.design_id` aliases.
-  It consumes the public verifier and loader, not the binding builder.
+  It consumes the public verifier and loader, not the binding builder. Every
+  non-reference design in the Reader primary reduction must be selected once
+  or declared as absent from the study binding artifact; the runtime rejects
+  silent omissions and exclusions that later become resolvable.
 - The response model screen does not read SFXI source CSVs. Its explicit source
   choice for repeated designs is screen-only and is not a repeat-aggregation
   rule for observed-label promotion.
