@@ -41,6 +41,8 @@ comparability or aggregation.
   public API.
 - `aggregation.py`: candidate point estimates, hierarchical uncertainty,
   reduction sensitivity, and event-time sensitivity.
+- `censoring.py`: strict component-bound provenance, bounded-component
+  observability, and the exact-label publication gate.
 - `repeat_adjudication.py`: typed status, classification, reviewer, timestamp,
   evidence path, and evidence-digest rules for repeated experiments.
 - `repeat_diagnostics.py`: component-level experiment minima, medians, maxima,
@@ -100,6 +102,11 @@ Publication fails if an exact alias is missing or unexpectedly becomes bound,
 a source manifest changes, a repeat gains or loses an experiment, a sequence
 identity changes, bootstrap coverage is incomplete, any vector is non-finite,
 repeat review remains unresolved, or the study policy lacks named approval.
+Reader's per-component bound kind and clipping/overflow causes remain on every
+experiment contribution. A non-exact primary component is still visible in the
+preview, but it blocks publication as an exact observed label. This package does
+not replace, clamp, or impute that value. Supporting bounded labels requires a
+separate, explicit censor-aware study policy and contract revision.
 
 The current policy is intentionally `review_required`. A preview is valid
 evidence; it is not a candidate-label publication.
@@ -118,8 +125,9 @@ uv run python -m \
 
 The JSON result reports the total candidate corpus, the candidate observations
 that can be previewed, counts for each repeat-decision state, the maximum
-observed component range, exact source-manifest digests, study approval, and
-one `ready_to_materialize` decision. Do not run
+observed component range, bounded primary candidates/contributions/components,
+exact source-manifest digests, study approval, and one `ready_to_materialize`
+decision. Do not run
 `materialize` until the checked-in repeat decisions and named study approval are
 complete. `verify` is the read-only entrypoint for an approved bundle.
 

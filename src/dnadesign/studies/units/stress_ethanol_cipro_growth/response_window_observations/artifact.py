@@ -28,6 +28,7 @@ from .artifact_contract import (
 from .artifact_io import confined_path, file_sha256, publish_new_directory, read_json_object
 from .artifact_manifest import build_manifest, is_sha256, validate_manifest_identity
 from .artifact_validation import validate_frames
+from .censoring import bounded_label_blockers
 from .contracts import ResponseWindowObservationPreview
 from .source_integrity import verify_source_bundle_records
 from .sources import ResponseWindowObservationEvidence
@@ -41,9 +42,10 @@ def materialize_response_window_observations(
 ) -> ResponseWindowObservationWriteResult:
     """Atomically publish an approved, blocker-free study observation bundle."""
 
-    if evidence.preview.blockers:
+    blockers = tuple(sorted({*evidence.preview.blockers, *bounded_label_blockers(evidence.preview.contributions)}))
+    if blockers:
         raise ResponseWindowObservationArtifactError(
-            f"response-window observation publication is blocked: {list(evidence.preview.blockers)}"
+            f"response-window observation publication is blocked: {list(blockers)}"
         )
     if evidence.policy.approval_status != "approved":
         raise ResponseWindowObservationArtifactError("response-window observation policy is not approved.")

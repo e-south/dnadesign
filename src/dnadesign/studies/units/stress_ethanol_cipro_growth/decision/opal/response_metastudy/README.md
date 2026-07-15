@@ -157,9 +157,10 @@ comparators; none is promoted by the present grouped evidence.
 Grouped enrichment is strongest for ciprofloxacin and weakest for ethanol, but
 all exact 95% intervals include 0.5. The configured selection mechanism under
 review is greedy top-six per selection view; it remains inactive, and these
-intervals are risk evidence rather than slot-allocation authority. Promotion
-still requires one repeated-experiment aggregation rule, the study-owned
-candidate-binding artifact, and one provenance-preserving OPAL label contract.
+intervals are risk evidence rather than slot-allocation authority. The
+aggregation rule and candidate-binding artifact are declared. Label publication
+remains blocked until repeated candidates are adjudicated, the observation
+policy is approved, and the study publishes the verified typed OPAL handoff.
 
 The model-evidence trajectory records the same frozen grouped screen after each
 eligible corpus update. A protocol change begins a separate series. Current

@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .artifact import materialize_response_window_observations, verify_response_window_observations
+from .censoring import bounded_primary_summary
 from .sources import ResponseWindowObservationEvidence, preview_response_window_observation_evidence
 
 CONFIG_ROOT = Path(__file__).resolve().parent / "config"
@@ -120,6 +121,7 @@ def _preview_payload(evidence: ResponseWindowObservationEvidence) -> dict[str, o
         "blocked_repeated_candidate_count": int(status_counts.get("review_required", 0)),
         "maximum_repeat_component_range": maximum_range,
         "excluded_reader_design_count": len(evidence.resolved.excluded_reader_designs),
+        **bounded_primary_summary(evidence.preview.contributions),
         "blocker_count": len(blockers),
         "blockers": blockers,
         "ready_to_materialize": not blockers and evidence.policy.approval_status == "approved",

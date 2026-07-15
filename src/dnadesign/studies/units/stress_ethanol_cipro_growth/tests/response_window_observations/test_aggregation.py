@@ -178,6 +178,50 @@ def test_reduction_and_event_time_sensitivity_remain_separate() -> None:
     assert set(preview.event_time_sensitivity["component"]) == set(VALUE_COLUMNS)
 
 
+def test_bounded_primary_component_blocks_exact_label_publication_without_imputation() -> None:
+    measurements = _measurements(("candidate-a", "design-a", "experiment-a", 2.0))
+    primary = measurements["reduction_id"].eq("primary")
+    measurements.loc[primary, "r01_bound_kind"] = "lower"
+    measurements.loc[primary, "r01_has_instrument_overflow"] = True
+
+    preview = aggregation.aggregate_response_window_observations(
+        measurements,
+        _draws(measurements, offsets=(0.0,)),
+        policy=_policy(bootstrap_samples=100),
+        repeat_decisions=pd.DataFrame(columns=aggregation.DECISION_COLUMNS),
+    )
+
+    assert preview.observations.loc[0, "r01"] == 2.0
+    assert preview.blockers == (
+        "candidate-a: primary components [r01] are bounded; "
+        "exact-label publication requires an explicit censor-aware policy",
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda frame: frame.drop(columns="r00_bound_kind"), "missing censor provenance"),
+        (
+            lambda frame: frame.assign(r00_has_policy_clipping="False"),
+            "r00_has_policy_clipping.*must contain booleans",
+        ),
+        (lambda frame: frame.assign(r00_bound_kind="lower"), "r00.*disagrees with its bound kind"),
+        (lambda frame: frame.assign(r00_bound_kind="estimated"), "unsupported values"),
+    ],
+)
+def test_measurement_censor_provenance_fails_closed(mutate, message: str) -> None:
+    measurements = mutate(_measurements(("candidate-a", "design-a", "experiment-a", 2.0)))
+
+    with pytest.raises(aggregation.ResponseWindowAggregationError, match=message):
+        aggregation.aggregate_response_window_observations(
+            measurements,
+            _draws(_measurements(("candidate-a", "design-a", "experiment-a", 2.0)), offsets=(0.0,)),
+            policy=_policy(bootstrap_samples=100),
+            repeat_decisions=pd.DataFrame(columns=aggregation.DECISION_COLUMNS),
+        )
+
+
 def _policy(
     *,
     bootstrap_samples: int,
@@ -228,9 +272,18 @@ def _measurements(*rows: tuple[str, str, str, float]) -> pd.DataFrame:
                     "reduction_role": "primary" if reduction_id == "primary" else "sensitivity",
                     **{column: value + delta for column in VALUE_COLUMNS},
                     **{f"{column}_event_half_range": 0.1 for column in VALUE_COLUMNS},
+                    **_exact_censor_provenance(),
                 }
             )
     return pd.DataFrame.from_records(records)
+
+
+def _exact_censor_provenance() -> dict[str, object]:
+    return {
+        f"{component}_{suffix}": False if suffix != "bound_kind" else "exact"
+        for component in VALUE_COLUMNS
+        for suffix in ("has_policy_clipping", "has_instrument_overflow", "bound_kind")
+    }
 
 
 def _draws(measurements: pd.DataFrame, *, offsets: tuple[float, ...]) -> pd.DataFrame:

@@ -57,6 +57,21 @@ def test_materialization_refuses_any_scientific_blocker(tmp_path: Path) -> None:
     assert not (tmp_path / "published").exists()
 
 
+def test_materialization_recomputes_bounded_component_blockers(tmp_path: Path) -> None:
+    evidence = _evidence(tmp_path)
+    evidence.preview.contributions.loc[0, "r01_bound_kind"] = "lower"
+    evidence.preview.contributions.loc[0, "r01_has_instrument_overflow"] = True
+
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="censor-aware policy"):
+        artifact.materialize_response_window_observations(
+            evidence,
+            out_dir=tmp_path / "published",
+            allowed_output_root=tmp_path,
+        )
+
+    assert not (tmp_path / "published").exists()
+
+
 def test_complete_bundle_round_trips_and_detects_digest_drift(tmp_path: Path) -> None:
     evidence = _evidence(tmp_path)
     output = tmp_path / "published"
@@ -329,6 +344,11 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
                 "included_in_label": True,
                 "experiment_weight": 1.0,
                 **{column: 1.0 for column in VALUE_COLUMNS},
+                **{
+                    f"{component}_{suffix}": False if suffix != "bound_kind" else "exact"
+                    for component in VALUE_COLUMNS
+                    for suffix in ("has_policy_clipping", "has_instrument_overflow", "bound_kind")
+                },
             }
         ]
     )

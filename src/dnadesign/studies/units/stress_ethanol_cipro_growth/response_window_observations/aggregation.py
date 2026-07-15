@@ -14,6 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .censoring import bounded_label_blockers
 from .contracts import (
     CANDIDATE_METADATA_COLUMNS,
     DECISION_COLUMNS,
@@ -67,6 +68,7 @@ def aggregate_response_window_observations(
         primary,
         decision_by_id=decision_by_id,
     )
+    blockers.extend(bounded_label_blockers(contributions))
     draws = validated_bootstrap_draws(
         bootstrap_draws,
         primary_measurements=primary,

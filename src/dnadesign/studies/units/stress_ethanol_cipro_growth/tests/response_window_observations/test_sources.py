@@ -118,6 +118,7 @@ def _bundle() -> ReaderResponseBundle:
                     "n00": support,
                     **_values(1.0),
                     **{f"{column}_event_half_range": 0.1 for column in sources.VALUE_COLUMNS},
+                    **_exact_censor_provenance(),
                 }
             )
             for draw_index in range(2):
@@ -158,3 +159,11 @@ def _bindings() -> pd.DataFrame:
 
 def _values(value: float) -> dict[str, float]:
     return {column: value for column in sources.VALUE_COLUMNS}
+
+
+def _exact_censor_provenance() -> dict[str, object]:
+    return {
+        f"{component}_{suffix}": False if suffix != "bound_kind" else "exact"
+        for component in sources.VALUE_COLUMNS
+        for suffix in ("has_policy_clipping", "has_instrument_overflow", "bound_kind")
+    }

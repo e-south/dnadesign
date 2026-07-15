@@ -30,6 +30,7 @@ MODULE_BODY_LIMITS = {
     "artifact_repeat_validation.py": 150,
     "artifact_uncertainty_validation.py": 80,
     "artifact_validation.py": 120,
+    "censoring.py": 150,
     "cli.py": 140,
     "contracts.py": 100,
     "display_contract.py": 80,

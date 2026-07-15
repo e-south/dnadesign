@@ -14,6 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from .censoring import ResponseWindowCensoringError, validated_censor_provenance
 from .contracts import (
     DECISION_COLUMNS,
     EVENT_HALF_RANGE_COLUMNS,
@@ -37,7 +38,10 @@ def validated_measurements(frame: pd.DataFrame) -> pd.DataFrame:
     missing = sorted(required - set(frame.columns))
     if missing:
         raise ResponseWindowAggregationError(f"response measurements are missing columns: {missing}")
-    result = frame.copy()
+    try:
+        result = validated_censor_provenance(frame)
+    except ResponseWindowCensoringError as exc:
+        raise ResponseWindowAggregationError(str(exc)) from exc
     for column in ("candidate_id", "design_id", "reader_experiment_id", "reduction_id", "reduction_role"):
         invalid = result[column].isna() | result[column].astype(str).str.strip().eq("")
         if invalid.any():

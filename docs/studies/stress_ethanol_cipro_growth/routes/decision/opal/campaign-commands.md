@@ -32,9 +32,11 @@ typed response-window labels and its promotion manifest, then verifies all diges
 
 The study-owned repeat-aggregation and `opal.observed_label_promotion.v1`
 publisher are implemented and fail closed. The current policy has 12 unresolved
-repeated candidates and no study approval, so no production observation or
-label bundle exists. Generic `opal ingest-y` cannot modify this manifest-pinned
-source. Preview the label-truth gate without writing artifacts:
+repeated candidates, nine otherwise included candidates with bounded primary
+components, and no study approval, so no production observation or label bundle
+exists. A finite censor bound is not an exact observed label. Generic
+`opal ingest-y` cannot modify this manifest-pinned source. Preview the
+label-truth gate without writing artifacts:
 
 ```bash
 OBS=dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations

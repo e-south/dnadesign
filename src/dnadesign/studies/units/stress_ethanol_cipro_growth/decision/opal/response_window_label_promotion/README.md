@@ -60,4 +60,7 @@ new approved corpus must use a new versioned directory and an explicit campaign
 binding update; the publisher has no overwrite mode.
 
 No production artifact can be published while the study observation policy or
-any repeat decision remains under review.
+any repeat decision remains under review. The study observation publisher also
+fails closed when an included primary component is a lower, upper, or
+indeterminate bound. Label promotion cannot reinterpret that finite bound as an
+exact `y_obs` value.
