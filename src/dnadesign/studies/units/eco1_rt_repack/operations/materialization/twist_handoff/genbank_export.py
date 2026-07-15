@@ -54,7 +54,10 @@ def build_genbank_record(
                 "note": [
                     f"selection_rank={metadata['selection_rank']}; design_group_id={metadata['design_group_id']}; "
                     f"within_group_rank={metadata['within_group_rank']}; selection_slot={metadata['selection_slot']}; "
-                    f"wang_alpha1_r13={metadata['wang_alpha1_r13_review_status']}; "
+                    f"wang_alpha1_f10={metadata['wang_alpha1_f10_substitution']}; "
+                    f"wang_alpha1_r13={metadata['wang_alpha1_r13_substitution']}; "
+                    f"wang_r13a_evidence_match={metadata['wang_r13a_interface_disruption_evidence_match']}; "
+                    f"rt_msdna_oligomeric_state={metadata['rt_msdna_oligomeric_state_review_status']}; "
                     f"wang_alpha1_mutation_count={metadata['wang_alpha1_mutation_count']}; "
                     f"policy_id={metadata['policy_id']}; "
                     f"candidate_id={metadata['candidate_id']}"
@@ -87,7 +90,10 @@ def build_genbank_record(
 
 
 def _wang_alpha1_review_features(metadata: dict[str, Any]) -> list[SeqFeature]:
-    r13_status = str(metadata["wang_alpha1_r13_review_status"])
+    f10_substitution = str(metadata["wang_alpha1_f10_substitution"])
+    r13_substitution = str(metadata["wang_alpha1_r13_substitution"])
+    r13a_evidence_match = bool(metadata["wang_r13a_interface_disruption_evidence_match"])
+    assembly_status = str(metadata["rt_msdna_oligomeric_state_review_status"])
     return [
         SeqFeature(
             FeatureLocation((4 - 1) * 3, 16 * 3, strand=1),
@@ -96,7 +102,8 @@ def _wang_alpha1_review_features(metadata: dict[str, Any]) -> list[SeqFeature]:
                 "label": ["wang_alpha1_interface_review"],
                 "note": [
                     "Eco1 residues 4-16; Wang et al. 2022 alpha-1 protomer-interface context; "
-                    f"mutation count={metadata['wang_alpha1_mutation_count']}"
+                    f"mutation count={metadata['wang_alpha1_mutation_count']}; F10={f10_substitution}; "
+                    f"R13={r13_substitution}"
                 ],
             },
         ),
@@ -106,8 +113,9 @@ def _wang_alpha1_review_features(metadata: dict[str, Any]) -> list[SeqFeature]:
             qualifiers={
                 "label": ["wang_alpha1_R13_review"],
                 "note": [
-                    f"observed_status={r13_status}; Wang et al. 2022 reported that R13A disrupted the "
-                    "two-protomer contact while retaining msDNA production and antiphage defence"
+                    f"observed_substitution={r13_substitution}; tested_R13A_match={r13a_evidence_match}; "
+                    f"rt_msdna_oligomeric_state={assembly_status}; Wang et al. 2022 reported that R13A disrupted "
+                    "the two-protomer contact while retaining msDNA and the tested antiphage activity"
                 ],
             },
         ),

@@ -27,6 +27,11 @@ def render_twist_handoff(row: dict[str, Any], *, mo: Any, manifest_path: Path) -
     status_rows = [
         {"field": "Sequence status", "value": str(loaded.get("sequence_status") or "")},
         {"field": "Cloning status", "value": str(loaded.get("cloning_status") or "")},
+        {"field": "Codon design", "value": "substitution-only minimal recoding"},
+        {
+            "field": "Codon-table source",
+            "value": str((loaded.get("codon_policy") or {}).get("codon_table_source_provenance") or ""),
+        },
         {"field": "Vendor codon optimization", "value": "disabled"},
     ]
     sequence_rows = []
@@ -49,6 +54,7 @@ def render_twist_handoff(row: dict[str, Any], *, mo: Any, manifest_path: Path) -
                 "mutation_count": len(mutation_tokens),
                 "length_bp": sequence.get("length_bp"),
                 "gc_fraction": qc.get("gc_fraction"),
+                "gc_50bp_span_fraction": qc.get("gc_50bp_span_fraction"),
                 "max_homopolymer_run": qc.get("max_homopolymer_run"),
                 "forbidden_site_count": qc.get("forbidden_site_count"),
                 "genbank_file": str(sequence.get("genbank_file") or ""),
@@ -57,8 +63,9 @@ def render_twist_handoff(row: dict[str, Any], *, mo: Any, manifest_path: Path) -
     title = html.escape(str(row.get("title") or "Twist full-CDS handoff"))
     note = (
         "These are exact full-length CDS designs for vendor upload and complexity review. Native WT codons are "
-        "retained at unchanged residues; changed residues use one recorded E. coli codon policy. Assembly flanks "
-        "and junctions are not yet part of the sequences."
+        "retained at unchanged residues; substitutions use the highest-frequency codon in the packaged E. coli "
+        "table. This is not whole-gene codon optimization. Assembly flanks and junctions are not yet part of the "
+        "sequences."
     )
     return mo.vstack(
         [

@@ -18,6 +18,8 @@ from pathlib import Path
 
 from .sequence_contract import FORBIDDEN_SITES
 
+GC_WINDOW_BP = 50
+
 
 def highest_frequency_codons(path: Path) -> dict[str, str]:
     """Return one highest-frequency E. coli codon per canonical amino acid."""
@@ -55,12 +57,30 @@ def sequence_qc(dna: str) -> dict[str, int | float]:
     """Return deterministic fragment-level manufacturability checks."""
 
     counts = Counter(dna[index : index + 20] for index in range(len(dna) - 19))
+    window_gc = _window_gc_fractions(dna, window_bp=GC_WINDOW_BP)
+    window_gc_min = min(window_gc)
+    window_gc_max = max(window_gc)
     return {
         "gc_fraction": round((dna.count("G") + dna.count("C")) / len(dna), 6),
+        "gc_50bp_min_fraction": round(window_gc_min, 6),
+        "gc_50bp_max_fraction": round(window_gc_max, 6),
+        "gc_50bp_span_fraction": round(window_gc_max - window_gc_min, 6),
         "max_homopolymer_run": max(len(match.group(0)) for match in re.finditer(r"([ACGT])\1*", dna)),
         "repeated_20mer_count": sum(1 for count in counts.values() if count > 1),
         "forbidden_site_count": sum(dna.count(site) for site in FORBIDDEN_SITES),
     }
+
+
+def _window_gc_fractions(dna: str, *, window_bp: int) -> list[float]:
+    if len(dna) < window_bp:
+        raise ValueError(f"DNA length {len(dna)} is shorter than the {window_bp}-bp GC window")
+    is_gc = [base in "GC" for base in dna]
+    gc_count = sum(is_gc[:window_bp])
+    fractions = [gc_count / window_bp]
+    for index in range(window_bp, len(dna)):
+        gc_count += is_gc[index] - is_gc[index - window_bp]
+        fractions.append(gc_count / window_bp)
+    return fractions
 
 
 __all__ = ["encode_full_cds", "highest_frequency_codons", "sequence_qc"]

@@ -64,6 +64,7 @@ def materialize_twist_handoff(
     """Validate v3 selection closure and emit all eight selected CDS artifacts."""
 
     root = repo_root.expanduser().resolve()
+    codon_table_path = default_codon_table_path("ecoli").expanduser().resolve()
     paths = {
         "candidate_selection_panel": _resolve(
             root, candidate_selection_panel_path or DEFAULT_V3_ROOT / "selection/candidate_selection_panel.parquet"
@@ -75,6 +76,7 @@ def materialize_twist_handoff(
         "generation_policy_positions": _resolve(
             root, generation_policy_positions_path or DEFAULT_V3_ROOT / "generation_policy_positions.parquet"
         ),
+        "codon_table": codon_table_path,
         "wild_type_cds_genbank": _resolve(root, wild_type_genbank_path or DEFAULT_WT_GENBANK),
     }
     for path in paths.values():
@@ -90,7 +92,7 @@ def materialize_twist_handoff(
     validate_panel_shape(panel_rows)
     selected_panel_rows = selected_rows(panel_rows)
     pool_by_id = unique_rows(pool_rows, "candidate_id", "candidate pool")
-    codons = highest_frequency_codons(default_codon_table_path("ecoli"))
+    codons = highest_frequency_codons(paths["codon_table"])
 
     sequence_rows: list[dict[str, Any]] = []
     records: list[SeqRecord] = []
@@ -133,6 +135,12 @@ def materialize_twist_handoff(
             "within_group_rank": int(panel["within_group_rank"]),
             "wang_alpha1_r13_review_status": str(panel["wang_alpha1_r13_review_status"]),
             "wang_alpha1_mutation_count": int(panel["wang_alpha1_mutation_count"]),
+            "wang_alpha1_f10_substitution": str(panel["wang_alpha1_f10_substitution"]),
+            "wang_alpha1_r13_substitution": str(panel["wang_alpha1_r13_substitution"]),
+            "wang_r13a_interface_disruption_evidence_match": bool(
+                panel["wang_r13a_interface_disruption_evidence_match"]
+            ),
+            "rt_msdna_oligomeric_state_review_status": str(panel["rt_msdna_oligomeric_state_review_status"]),
             "selection_slot": str(panel["selection_slot"]),
             "genbank_file": f"genbank/{sequence_id}.gb",
             "policy_id": str(panel["policy_id"]),
@@ -178,10 +186,22 @@ def materialize_twist_handoff(
         "cloning_status": "blocked_pending_assembly_flanks_and_vendor_portal_complexity_check",
         "selected_panel_source_count": len(panel_rows),
         "selected_panel_composition": EXPECTED_SELECTED_POLICY_COUNTS,
+        "assembly_state_scope": {
+            "rt_msdna_oligomeric_state": "not_established",
+            "interpretation": (
+                "Single-chain fold models do not establish RT-msDNA assembly state. Wang et al. tested R13A as "
+                "an interface-disrupting substitution; exact F10/R13 states and R13A matches are reported per "
+                "sequence."
+            ),
+        },
         "codon_policy": {
+            "policy_kind": "minimal_variant_aware_recoding",
+            "optimization_scope": "substituted_residues_only",
+            "global_codon_optimization": False,
             "unchanged_residues": "preserve_authoritative_wt_codon",
             "changed_residues": "highest_frequency_ecoli_codon",
-            "codon_table": str(default_codon_table_path("ecoli")),
+            "codon_table": _portable_path(root, paths["codon_table"]),
+            "codon_table_source_provenance": "not_recorded_in_repository",
             "vendor_codon_optimization": False,
         },
         "input_hashes": {name: _sha256_uri(path) for name, path in paths.items()},
@@ -203,6 +223,13 @@ def _resolve(repo_root: Path, path: Path) -> Path:
 
 def _sha256_uri(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _portable_path(repo_root: Path, path: Path) -> str:
+    try:
+        return path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return str(path)
 
 
 def _text_sha256(value: str) -> str:

@@ -67,6 +67,10 @@ def write_twist_handoff_inputs(root: Path) -> dict[str, Path]:
                 "within_group_rank": within_group_rank,
                 "wang_alpha1_r13_review_status": "retained_wt",
                 "wang_alpha1_mutation_count": int(4 <= position <= 16),
+                "wang_alpha1_f10_substitution": token if position == 10 else "WT",
+                "wang_alpha1_r13_substitution": token if position == 13 else "WT",
+                "wang_r13a_interface_disruption_evidence_match": token == "R13A",
+                "rt_msdna_oligomeric_state_review_status": "not_established",
                 "eligible_for_handoff": True,
             }
         )

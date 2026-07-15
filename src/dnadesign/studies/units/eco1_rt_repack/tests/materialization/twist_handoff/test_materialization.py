@@ -50,9 +50,18 @@ def test_materializes_quote_ready_full_cds_handoff(tmp_path: Path) -> None:
         "near_dna_rna_acid_free_v1": 3,
         "combined_near_acid_free_plus_distal_v1": 3,
     }
+    assert manifest["assembly_state_scope"]["rt_msdna_oligomeric_state"] == "not_established"
+    assert manifest["codon_policy"]["policy_kind"] == "minimal_variant_aware_recoding"
+    assert manifest["codon_policy"]["optimization_scope"] == "substituted_residues_only"
+    assert manifest["codon_policy"]["global_codon_optimization"] is False
+    assert manifest["codon_policy"]["codon_table"] == (
+        "src/dnadesign/permuter/src/resources/codon_tables/codon_ecoli.csv"
+    )
+    assert manifest["codon_policy"]["codon_table_source_provenance"] == "not_recorded_in_repository"
     assert set(manifest["input_hashes"]) == {
         "candidate_pool",
         "candidate_selection_panel",
+        "codon_table",
         "foldcheck_fasta",
         "generation_policy_positions",
         "wild_type_cds_genbank",
@@ -64,12 +73,21 @@ def test_materializes_quote_ready_full_cds_handoff(tmp_path: Path) -> None:
         assert row["full_cds_sha256"].startswith("sha256:")
         assert row["wang_alpha1_r13_review_status"] in {"retained_wt", "substituted"}
         assert isinstance(row["wang_alpha1_mutation_count"], int)
+        assert row["wang_alpha1_f10_substitution"] == "WT" or row["wang_alpha1_f10_substitution"].startswith("F10")
+        assert row["wang_alpha1_r13_substitution"] == "WT" or row["wang_alpha1_r13_substitution"].startswith("R13")
+        assert row["wang_r13a_interface_disruption_evidence_match"] is False
+        assert row["rt_msdna_oligomeric_state_review_status"] == "not_established"
         assert set(row["qc"]) == {
             "gc_fraction",
+            "gc_50bp_min_fraction",
+            "gc_50bp_max_fraction",
+            "gc_50bp_span_fraction",
             "max_homopolymer_run",
             "repeated_20mer_count",
             "forbidden_site_count",
         }
+        assert row["qc"]["gc_50bp_min_fraction"] <= row["qc"]["gc_50bp_max_fraction"]
+        assert row["qc"]["gc_50bp_span_fraction"] <= 0.5
         assert row["qc"]["forbidden_site_count"] == 0
 
     fasta = list(SeqIO.parse(result.fasta_path, "fasta"))
@@ -121,6 +139,8 @@ def test_materializes_quote_ready_full_cds_handoff(tmp_path: Path) -> None:
         }
         assert "wang_alpha1_interface_review" in feature_labels
         assert "wang_alpha1_R13_review" in feature_labels
+        feature_notes = [str(note) for feature in record.features for note in feature.qualifiers.get("note", [])]
+        assert any("rt_msdna_oligomeric_state=not_established" in note for note in feature_notes)
 
 
 def test_fails_fast_when_panel_hash_does_not_match_foldcheck(tmp_path: Path) -> None:
