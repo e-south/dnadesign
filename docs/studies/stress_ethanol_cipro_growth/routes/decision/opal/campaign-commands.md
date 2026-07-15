@@ -25,9 +25,8 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 uv run opal validate -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --json
 ```
 
-The campaign remains inactive; `opal validate` must fail until the study
-publishes the typed response-window labels and promotion manifest. A passing
-validation must verify their digests, eligibility, and all three views.
+The campaign remains inactive; `opal validate` fails until the study publishes
+typed response-window labels and its promotion manifest, then verifies all digests and views.
 
 ### Promotion and execution
 
@@ -56,7 +55,7 @@ uv run opal init -c "$CONFIG" --json
 uv run opal run -c "$CONFIG" --round 0 --json
 ```
 
-### Verification
+### Notebook review and verification
 
 ```bash
 uv run opal verify-outputs -c "$CONFIG" --view ethanol --round latest --json
@@ -67,10 +66,11 @@ uv run opal ctx audit -c "$CONFIG" --round latest --json
 ```
 
 Required evidence: three six-row selection sets, one 18-row sequence-unique
-batch, one model artifact, one prediction ledger, and zero mismatches.
+selection batch, one model artifact, one prediction ledger, and zero mismatches.
 
 ```bash
 uv run opal notebook generate -c "$CONFIG" --round latest --force --json
+uv run opal notebook run -c "$CONFIG"
 uv run opal review -c "$CONFIG" --view ethanol --round latest --json
 ```
 
