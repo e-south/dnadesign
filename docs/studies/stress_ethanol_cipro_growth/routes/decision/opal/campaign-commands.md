@@ -35,44 +35,19 @@ The study-owned repeat-aggregation and `opal.observed_label_promotion.v1`
 publisher are implemented and fail closed. The current policy has 12 unresolved
 repeated candidates and no study approval, so no production observation or
 label bundle exists. Generic `opal ingest-y` cannot modify this manifest-pinned
-source. Execute only after repeat triage, named approval, atomic publication,
-and independent verification of the label Parquet, provenance, and manifest.
-
-Preview the current label-truth gate without writing artifacts:
+source. Preview the label-truth gate without writing artifacts:
 
 ```bash
-uv run python -m \
-  dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
-  preview \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
-  --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
+OBS=dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations
+READER=../reader/outputs/reviews/stress_response_window/latest
+BINDINGS=src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
+uv run python -m "$OBS" preview --reader-bundle "$READER" --candidate-bindings "$BINDINGS"
 ```
 
-Only after the policy is approved and preview reports
-`ready_to_materialize: true`, materialize a named observation bundle and publish
-the create-only OPAL handoff:
-
-```bash
-OBS_ROOT=src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations
-OBS_BUNDLE="$OBS_ROOT/approved_v1"
-DATASET=src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates
-
-uv run python -m \
-  dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
-  materialize \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
-  --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
-  --out-dir "$OBS_BUNDLE" \
-  --allowed-output-root "$OBS_ROOT"
-
-uv run python -m \
-  dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_window_label_promotion \
-  publish \
-  --observation-bundle "$OBS_BUNDLE" \
-  --dataset-root "$DATASET"
-```
-
-After the three published artifacts verify, use:
+The package READMEs for `response_window_observations` and
+`response_window_label_promotion` own materialization and verification details.
+Only continue after preview reports `ready_to_materialize: true` and the three
+published artifacts verify.
 
 ```bash
 CONFIG=src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
@@ -84,31 +59,20 @@ uv run opal run -c "$CONFIG" --round 0 --json
 ### Verification
 
 ```bash
-for view in ethanol ciprofloxacin and; do
-  uv run opal verify-outputs -c "$CONFIG" --view "$view" --round latest --json
-  uv run opal selection-set show -c "$CONFIG" --view "$view" --round latest --json
-  uv run opal objective-meta -c "$CONFIG" --view "$view" --round latest --json
-  uv run opal plot -c "$CONFIG" --view "$view" --round latest
-done
-
+uv run opal verify-outputs -c "$CONFIG" --view ethanol --round latest --json
+uv run opal selection-set show -c "$CONFIG" --view ethanol --round latest --json
 uv run opal selection-batch show -c "$CONFIG" --round latest --json
 uv run opal status -c "$CONFIG" --with-ledger --json
-uv run opal runs list -c "$CONFIG" --json
 uv run opal ctx audit -c "$CONFIG" --round latest --json
 ```
 
 Required evidence: three six-row selection sets, one 18-row sequence-unique
-batch, one model artifact, one prediction ledger, and zero mismatches; under-capacity batches fail.
-
-### Notebook review
+batch, one model artifact, one prediction ledger, and zero mismatches.
 
 ```bash
 uv run opal notebook generate -c "$CONFIG" --round latest --force --json
-uv run opal notebook run -c "$CONFIG"
 uv run opal review -c "$CONFIG" --view ethanol --round latest --json
 ```
-
-The notebook exposes named selection views, shared model diagnostics, and one selection batch handoff.
 
 ### Synthesis boundary
 
