@@ -53,10 +53,12 @@ def verify_observed_label_snapshot(
 ) -> VerifiedObservedLabelSnapshot:
     """Verify and materialize one immutable candidate-label snapshot.
 
-    Candidate IDs must occur exactly once across the complete snapshot. Each
-    label must be a finite one-dimensional vector of ``expected_y_width``
-    values. Manifest, provenance, artifact digest, and row-count verification
-    are delegated to OPAL's storage contract.
+    Each ``(candidate ID, observed round)`` event must occur exactly once.
+    The same candidate may reappear in a later round; campaign training policy
+    decides which event is used for fitting, while observed-event review keeps
+    the complete history. Each label must be a finite one-dimensional vector
+    of ``expected_y_width`` values. Manifest, provenance, artifact digest, and
+    row-count verification are delegated to OPAL's storage contract.
     """
 
     if isinstance(expected_y_width, bool) or not isinstance(expected_y_width, Integral) or expected_y_width < 1:
@@ -70,10 +72,6 @@ def verify_observed_label_snapshot(
             promotion=binding,
         )
         frame = store._validated_frame()
-        duplicate_ids = frame[store.id_column].duplicated(keep=False)
-        if duplicate_ids.any():
-            sample = sorted(frame.loc[duplicate_ids, store.id_column].astype(str).unique().tolist())[:10]
-            raise OpalError(f"Duplicate labels for ids at multiple rounds (sample={sample}).")
         frame = frame.sort_values([store.id_column, store.round_column, "_row_order"])
         labels = pd.DataFrame(
             {

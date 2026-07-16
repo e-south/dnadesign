@@ -11,7 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from time import time_ns
 from typing import Tuple
+from uuid import uuid4
 
 from ...config.types import RootConfig
 from ...core.round_context import PluginRegistryView, RoundCtx
@@ -25,7 +27,7 @@ def build_round_ctx(
     y_dim: int,
     n_train: int,
 ) -> Tuple[str, PluginRegistryView, RoundCtx]:
-    run_id = f"r{int(as_of_round)}-{now_iso()}"
+    run_id = f"r{int(as_of_round)}-{now_iso()}-{time_ns():020d}-{uuid4().hex}"
     reg = PluginRegistryView(
         model=cfg.model.name,
         objective="selection_views",

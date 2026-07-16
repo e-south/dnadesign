@@ -66,6 +66,7 @@ class TrainingBundle:
     rep: Any
     plan: Any
     train_df: pd.DataFrame
+    observed_events_df: pd.DataFrame
     train_ids: List[str]
     Y_train: np.ndarray
     R_train: np.ndarray
@@ -100,4 +101,5 @@ class ArtifactBundle:
     selected_df: pd.DataFrame
     selection_batch_df: pd.DataFrame
     labels_used_df: Optional[pd.DataFrame]
+    observed_events_df: pd.DataFrame
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]]

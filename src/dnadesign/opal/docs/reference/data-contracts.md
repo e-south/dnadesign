@@ -1,7 +1,7 @@
 ## OPAL Data and Artifact Contracts v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-15
+**Last verified:** 2026-07-16
 
 ### Candidate records
 
@@ -21,6 +21,10 @@ sidecar. For `usr_sidecar`, required columns are:
 
 OPAL rejects unknown IDs, mixed Y spaces, malformed lengths, and a missing
 configured sidecar. It does not infer or fall back to another label source.
+The immutable event key is `(id, observed_round)`: duplicate events fail, while
+the same candidate may appear again in a strictly later round. Cumulative
+training applies the campaign's declared cross-round policy, and run-scoped
+observed-event snapshots retain every verified event and exact `batch_id`.
 
 A USR sidecar may declare `labels.source.manifest_path`. That manifest must use
 `opal.observed_label_promotion.v1` and bind the artifact to the configured
@@ -60,7 +64,9 @@ consumers must not invent a default view.
 
 ### Run ledger
 
-`outputs/ledger/runs.parquet` stores one row per shared model fit:
+`outputs/ledger/runs.parquet` stores one row per shared model fit. Each fit has a
+collision-resistant `run_id`; committed run IDs are create-only across both the
+run and prediction ledgers:
 
 - model, X transform, Y ingest, and training-Y operation metadata
 - `objective__defs_json`: view-indexed objective declarations
@@ -72,7 +78,8 @@ consumers must not invent a default view.
 
 ### Round artifacts
 
-Each `outputs/rounds/round_<k>/` contains:
+Each `outputs/rounds/round_<k>/` contains mutable latest-run mirrors for command
+compatibility plus immutable evidence for every retained run:
 
 - `model/`: one shared model artifact and optional shared diagnostics
 - `predictions` in the append-only ledger, referenced by run ID
@@ -86,8 +93,16 @@ Each `outputs/rounds/round_<k>/` contains:
 - `selection/allocation_trace.parquet`: when coordinated allocation is
   configured, the ordered allocated and skipped-overlap decisions with view,
   slot, ranks, scores, batch key, and conflict owner
-- `labels/labels_used.parquet`: immutable training-label snapshot
+- `run_artifacts/<run-slug>/`: a digest-bound snapshot of every artifact named
+  by that run's ledger row, including model, selection, metadata, and label
+  evidence
 - logs and context snapshots
+
+The run ledger addresses each snapshot by its stable logical key, including
+`labels/labels_used.parquet` and `labels/observed_events.parquet`. A same-round
+resume replaces only the latest-run mirrors, retains every prior run directory,
+and creates a new immutable snapshot; it never rewrites evidence pinned by an
+earlier run.
 
 `selections.parquet` is the verification artifact for one view.
 `selection_batch.parquet` is the final physical-batch proposal for downstream
@@ -116,7 +131,8 @@ deliverables to that view. Shared model diagnostics are rendered once.
 
 ### Validation
 
-Ledger schemas are strict. Unknown columns, duplicate prediction IDs within a
-run, unresolved selection rows, non-finite values, mixed run IDs, and artifact
-digest mismatches are errors. `OPAL_LEDGER_ALLOW_EXTRA=1` exists only for
+Ledger schemas are strict. Unknown columns, duplicate or previously committed
+run IDs, duplicate prediction IDs within a run, unresolved selection rows,
+non-finite values, mixed run IDs, unsupported observed-label source kinds, and
+artifact digest mismatches are errors. `OPAL_LEDGER_ALLOW_EXTRA=1` exists only for
 controlled schema development and must not be used in production workflows.

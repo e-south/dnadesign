@@ -20,13 +20,18 @@ import pandas as pd
 
 from ...config.types import RootConfig
 from ...core.round_context import RoundCtx
-from ...core.utils import ensure_dir, file_sha256, now_iso, print_stderr
+from ...core.utils import OpalError, ensure_dir, file_sha256, now_iso, print_stderr
 from ...storage.artifacts import (
+    LABELS_USED_ARTIFACT_KEY,
+    OBSERVED_EVENTS_ARTIFACT_KEY,
     ArtifactPaths,
     append_round_log_event,
+    run_scoped_artifact_path,
+    snapshot_run_artifacts,
     write_feature_importance_csv,
     write_labels_used_parquet,
     write_model_meta,
+    write_observed_events_parquet,
     write_round_ctx,
     write_selection_parquet,
 )
@@ -39,6 +44,7 @@ from ...storage.writebacks import (
     build_run_meta_event,
     build_run_pred_events,
 )
+from .backlog import BACKLOG_COUNT_KEY, derive_pending_candidate_count
 from .contracts import ArtifactBundle, RoundInputs, ScoreBundle, TrainingBundle, XBundle
 
 
@@ -85,7 +91,16 @@ def write_round_artifacts(
         round_log_jsonl=rdir / "logs" / "round.log.jsonl",
         round_ctx_json=rdir / "metadata" / "round_ctx.json",
         objective_meta_json=rdir / "metadata" / "objective_meta.json",
-        labels_used_parquet=rdir / "labels" / "labels_used.parquet",
+        labels_used_parquet=run_scoped_artifact_path(
+            rdir,
+            run_id=run_id,
+            artifact_key=LABELS_USED_ARTIFACT_KEY,
+        ),
+        observed_events_parquet=run_scoped_artifact_path(
+            rdir,
+            run_id=run_id,
+            artifact_key=OBSERVED_EVENTS_ARTIFACT_KEY,
+        ),
         feature_importance_csv=rdir / "model" / "feature_importance.csv",
     )
     ensure_dir(apaths.model.parent)
@@ -115,6 +130,26 @@ def write_round_artifacts(
                 "note": [f"labels used in run {run_id} (as_of_round={int(req.as_of_round)})"] * len(training.train_df),
             }
         )
+
+    source_events = training.observed_events_df
+    observed_rounds = pd.to_numeric(source_events["observed_round"], errors="coerce")
+    if observed_rounds.isna().any() or (observed_rounds > int(req.as_of_round)).any():
+        raise OpalError("Observed-event snapshot contains labels observed after the run scope.")
+    event_ids = source_events["id"].astype(str).tolist()
+    observed_events_df = pd.DataFrame(
+        {
+            "run_id": [run_id] * len(source_events),
+            "as_of_round": [int(req.as_of_round)] * len(source_events),
+            "id": event_ids,
+            "display_label": source_events["display_label"].tolist(),
+            "sequence": [seq_map.get(candidate_id) for candidate_id in event_ids],
+            "observed_round": observed_rounds.astype(int).tolist(),
+            "batch_id": source_events["batch_id"].tolist(),
+            "y_space": source_events["y_space"].tolist(),
+            "y_obs": source_events["y_obs"].tolist(),
+            "label_source_kind": source_events["label_source_kind"].astype(str).tolist(),
+        }
+    )
 
     selected_rows: list[dict[str, object]] = []
     pool_ids = [str(value) for value in xbundle.id_order_pool]
@@ -170,6 +205,7 @@ def write_round_artifacts(
 
     ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
     labels_used_sha = write_labels_used_parquet(apaths.labels_used_parquet, labels_used_df)
+    observed_events_sha = write_observed_events_parquet(apaths.observed_events_parquet, observed_events_df)
 
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]] = {}
 
@@ -240,6 +276,10 @@ def write_round_artifacts(
                 labels_used_sha,
                 str(apaths.labels_used_parquet.resolve()),
             ),
+            OBSERVED_EVENTS_ARTIFACT_KEY: (
+                observed_events_sha,
+                str(apaths.observed_events_parquet.resolve()),
+            ),
         }
     )
     if allocation_trace_sha is not None:
@@ -248,11 +288,18 @@ def write_round_artifacts(
             str(apaths.selection_allocation_trace_parquet.resolve()),
         )
 
+    artifacts_paths_and_hashes = snapshot_run_artifacts(
+        rdir,
+        run_id=run_id,
+        artifacts=artifacts_paths_and_hashes,
+    )
+
     return ArtifactBundle(
         apaths=apaths,
         selected_df=selected_df,
         selection_batch_df=batch_df,
         labels_used_df=labels_used_df,
+        observed_events_df=observed_events_df,
         artifacts_paths_and_hashes=artifacts_paths_and_hashes,
     )
 
@@ -363,6 +410,7 @@ def update_campaign_state(
     req: object,
     rep: object,
     train_df: pd.DataFrame,
+    observed_events_df: pd.DataFrame,
     id_order_train: List[str],
     id_order_pool: List[str],
     selections: dict,
@@ -407,6 +455,12 @@ def update_campaign_state(
         "score_batch_size": getattr(req, "score_batch_size_override", None) or cfg.scoring.score_batch_size,
         "selection_view_ids": list(selections),
     }
+    backlog_count = derive_pending_candidate_count(
+        state=st,
+        workspace=ws,
+        current_selection_batch=selection_batch.rows,
+        observed_events=observed_events_df,
+    )
     labels_used_rounds = sorted(set(train_df["r"].astype(int).tolist()))
     round_dir = ws.round_dir(req.as_of_round)
     st.add_round(
@@ -461,6 +515,7 @@ def update_campaign_state(
                 "objective_meta_json": str(apaths.objective_meta_json.resolve()),
                 "model_meta_json": str(apaths.model_meta_json.resolve()),
                 "labels_used_parquet": str(apaths.labels_used_parquet.resolve()),
+                "observed_events_parquet": str(apaths.observed_events_parquet.resolve()),
                 "round_log_jsonl": str(apaths.round_log_jsonl.resolve()),
             },
             writebacks={
@@ -473,4 +528,5 @@ def update_campaign_state(
         )
     )
     st.rounds[-1].durations_sec = {"total": total_duration, "fit": fit_duration}
+    st.backlog = {BACKLOG_COUNT_KEY: backlog_count}
     st.save(ws.state_path)

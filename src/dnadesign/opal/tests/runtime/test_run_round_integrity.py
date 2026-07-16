@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel
 
+from dnadesign.opal.src.analysis.ledger import read_run_labels_used, read_run_observed_events, read_runs
 from dnadesign.opal.src.config.types import (
     CampaignBlock,
     DataBlock,
@@ -35,7 +36,7 @@ from dnadesign.opal.src.config.types import (
     TrainingBlock,
 )
 from dnadesign.opal.src.core.objective_result import ObjectiveResultV2
-from dnadesign.opal.src.core.utils import OpalError
+from dnadesign.opal.src.core.utils import OpalError, file_sha256
 from dnadesign.opal.src.registries.models import list_models, register_model
 from dnadesign.opal.src.registries.objectives import list_objectives, register_objective
 from dnadesign.opal.src.registries.selection import list_selections, register_selection
@@ -539,6 +540,27 @@ def test_run_round_allows_cli_prerun_log_without_resume(tmp_path: Path) -> None:
     )
 
     assert res.ok is True
+    runs = read_runs(workdir / "outputs" / "ledger" / "runs.parquet")
+    observed_events = read_run_observed_events(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=res.run_id,
+    ).frame.to_pandas()
+    assert observed_events[
+        ["id", "display_label", "observed_round", "batch_id", "y_space", "label_source_kind"]
+    ].to_dict(orient="records") == [
+        {
+            "id": "a",
+            "display_label": None,
+            "observed_round": 0,
+            "batch_id": None,
+            "y_space": None,
+            "label_source_kind": "campaign_history",
+        }
+    ]
+    state = CampaignState.load(workdir / "state.json")
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
 
 
 def test_run_round_resume_cleans_round_dir(tmp_path: Path) -> None:
@@ -586,6 +608,202 @@ def test_run_round_resume_cleans_round_dir(tmp_path: Path) -> None:
     assert res.ok is True
     assert not stale_file.exists()
     assert not stale_dir.exists()
+
+
+def test_run_round_resume_retains_each_run_evidence_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = tmp_path / "records.parquet"
+    _write_records(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+    monkeypatch.setattr(
+        "dnadesign.opal.src.runtime.round.context.now_iso",
+        lambda: "2026-07-16T14:53:58+00:00",
+    )
+    monkeypatch.setattr(
+        "dnadesign.opal.src.runtime.round.context.time_ns",
+        lambda: 1_752_678_838_000_000_000,
+    )
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+
+    first = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+    second = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+            allow_resume=True,
+        ),
+    )
+    state = CampaignState.load(workdir / "state.json")
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
+
+    runs = read_runs(workdir / "outputs" / "ledger" / "runs.parquet")
+    first_snapshot = read_run_observed_events(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=first.run_id,
+    )
+    second_snapshot = read_run_observed_events(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=second.run_id,
+    )
+    first_labels = read_run_labels_used(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=first.run_id,
+    )
+    second_labels = read_run_labels_used(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=second.run_id,
+    )
+
+    assert first.run_id != second.run_id
+    assert first_snapshot.path != second_snapshot.path
+    assert first_labels.path != second_labels.path
+    assert first_snapshot.path.is_file()
+    assert second_snapshot.path.is_file()
+    assert first_labels.path.is_file()
+    assert second_labels.path.is_file()
+    assert first_snapshot.sha256 != second_snapshot.sha256
+    assert first_labels.sha256 != second_labels.sha256
+    assert first_snapshot.frame.get_column("run_id").unique().to_list() == [first.run_id]
+    assert second_snapshot.frame.get_column("run_id").unique().to_list() == [second.run_id]
+    assert first_labels.frame.get_column("run_id").unique().to_list() == [first.run_id]
+    assert second_labels.frame.get_column("run_id").unique().to_list() == [second.run_id]
+
+    run_rows = {str(row["run_id"]): row for row in runs.to_dicts()}
+    first_artifacts = run_rows[first.run_id]["artifacts"]
+    second_artifacts = run_rows[second.run_id]["artifacts"]
+    shared_keys = sorted(set(first_artifacts) & set(second_artifacts))
+    assert shared_keys
+    for artifact_key in shared_keys:
+        first_reference = first_artifacts[artifact_key]
+        second_reference = second_artifacts[artifact_key]
+        if first_reference is None or second_reference is None:
+            continue
+        first_sha256, first_path_raw = first_reference
+        second_sha256, second_path_raw = second_reference
+        first_path = Path(first_path_raw)
+        second_path = Path(second_path_raw)
+        assert first_path != second_path, artifact_key
+        assert first_path.is_file(), artifact_key
+        assert second_path.is_file(), artifact_key
+        assert file_sha256(first_path) == first_sha256, artifact_key
+        assert file_sha256(second_path) == second_sha256, artifact_key
+
+
+def test_run_round_backlog_replaces_newly_observed_prior_selection(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = tmp_path / "records.parquet"
+    _write_records_scalar_multibatch(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+        selection_params={
+            "top_k": 1,
+            "score_ref": "scalar",
+            "tie_handling": "ordinal",
+            "objective_mode": "maximize",
+            "require_exact_top_k": True,
+        },
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+
+    first = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+    state = CampaignState.load(workdir / "state.json")
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
+    first_batch_path = Path(state.rounds[0].artifacts["selection_batch_parquet"])
+    first_selected_id = str(pd.read_parquet(first_batch_path).iloc[0]["id"])
+
+    records = pd.read_parquet(records_path)
+    hist_col = "opal__demo__label_hist"
+    row_index = records.index[records["id"].astype(str).eq(first_selected_id)].item()
+    history = list(records.at[row_index, hist_col])
+    history.append(
+        {
+            "kind": "label",
+            "observed_round": 1,
+            "y_obs": {"value": [2.0], "dtype": "vector", "schema": {"length": 1}},
+        }
+    )
+    records.at[row_index, hist_col] = history
+    records.to_parquet(records_path, index=False)
+
+    second = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=1,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+
+    assert first.run_id != second.run_id
+    state = CampaignState.load(workdir / "state.json")
+    assert len(state.rounds) == 2
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
+    second_batch_path = Path(state.rounds[1].artifacts["selection_batch_parquet"])
+    second_selected_id = str(pd.read_parquet(second_batch_path).iloc[0]["id"])
+    assert second_selected_id != first_selected_id
 
 
 def test_run_round_allow_resume_rejects_malformed_state_round_index(tmp_path: Path, monkeypatch) -> None:

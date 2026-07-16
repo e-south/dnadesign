@@ -20,8 +20,13 @@ import pandas as pd
 
 from ..core.utils import OpalError, ensure_dir, now_iso, print_stderr
 from ..registries.transforms_x import get_transform_x
-from ..storage.artifacts import append_round_log_event
+from ..storage.artifacts import (
+    RUN_ARTIFACTS_DIRECTORY,
+    append_round_log_event,
+    reserve_run_artifact_directory,
+)
 from ..storage.data_access import RecordsStore
+from ..storage.ledger import LedgerWriter
 from ..storage.workspace import CampaignWorkspace
 from .retention import apply_runtime_artifact_retention
 from .round.context import build_round_ctx
@@ -40,11 +45,24 @@ def _log(enabled: bool, msg: str) -> None:
         print_stderr(msg)
 
 
-def _clear_round_dir(rdir: Path, *, preserve_logs: bool = False) -> None:
+def _clear_round_dir(
+    rdir: Path,
+    *,
+    preserve_logs: bool = False,
+    preserve_run_artifacts: bool = False,
+) -> None:
     if not rdir.exists():
         return
+    preserved_names = {
+        name
+        for name, preserve in (
+            ("logs", preserve_logs),
+            (RUN_ARTIFACTS_DIRECTORY, preserve_run_artifacts),
+        )
+        if preserve
+    }
     for child in rdir.iterdir():
-        if preserve_logs and child.name == "logs":
+        if child.name in preserved_names:
             continue
         try:
             if child.is_dir():
@@ -117,7 +135,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             f"Round {int(req.as_of_round)} already contains artifacts in {rdir}. Use --resume to overwrite."
         )
     if req.allow_resume:
-        _clear_round_dir(rdir, preserve_logs=True)
+        _clear_round_dir(rdir, preserve_logs=True, preserve_run_artifacts=True)
     round_log_path = rdir / "logs" / "round.log.jsonl"
 
     inputs = RoundInputs(cfg=cfg, req=req, ws=ws, store=store, df=df, rdir=rdir)
@@ -199,6 +217,8 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         y_dim=training.y_dim,
         n_train=len(training.train_ids),
     )
+    LedgerWriter(ws).require_run_id_available(run_id)
+    reserve_run_artifact_directory(rdir, run_id=run_id)
     append_round_log_event(
         round_log_path,
         {"ts": now_iso(), "round": int(req.as_of_round), "run_id": run_id, "stage": "run_context"},
@@ -311,6 +331,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         req=req,
         rep=training.rep,
         train_df=training.train_df,
+        observed_events_df=training.observed_events_df,
         id_order_train=xbundle.id_order_train,
         id_order_pool=xbundle.id_order_pool,
         selections=score.selections,

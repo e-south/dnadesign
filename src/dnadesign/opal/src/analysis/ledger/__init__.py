@@ -25,12 +25,19 @@ from .io import (
 from .predictions import read_predictions, read_selection_view_predictions
 from .rounds import RoundSelector, available_rounds, latest_round, latest_run_id, parse_round_selector, round_suffix
 from .run_labels import LABELS_USED_ARTIFACT_KEY, RunLabelsUsed, read_run_labels_used
+from .run_observed_events import (
+    OBSERVED_EVENTS_ARTIFACT_KEY,
+    RunObservedEvents,
+    read_run_observed_events,
+)
 from .setpoints import load_predictions_with_setpoint
 
 __all__ = [
     "RoundSelector",
     "RunLabelsUsed",
+    "RunObservedEvents",
     "LABELS_USED_ARTIFACT_KEY",
+    "OBSERVED_EVENTS_ARTIFACT_KEY",
     "available_rounds",
     "ensure_labels_path",
     "ensure_predictions_dir",
@@ -41,6 +48,7 @@ __all__ = [
     "parse_round_selector",
     "read_labels",
     "read_run_labels_used",
+    "read_run_observed_events",
     "read_predictions",
     "read_selection_view_predictions",
     "read_runs",

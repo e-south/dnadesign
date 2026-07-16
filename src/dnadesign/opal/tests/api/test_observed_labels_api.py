@@ -63,14 +63,13 @@ def test_public_snapshot_api_materializes_the_complete_round_domain(tmp_path: Pa
     }
 
 
-@pytest.mark.parametrize("duplicate_round", [0, 1], ids=["same-round", "cross-round"])
-def test_public_snapshot_api_rejects_duplicate_candidate_labels(tmp_path: Path, duplicate_round: int) -> None:
+def test_public_snapshot_api_rejects_duplicate_candidate_round_events(tmp_path: Path) -> None:
     duplicate = (
         _label_frame()
         .iloc[[0]]
         .assign(
-            observed_round=duplicate_round,
-            batch_id=f"batch_{duplicate_round}",
+            observed_round=0,
+            batch_id="batch_0_repeat",
         )
     )
     frame = pd.concat([_label_frame(), duplicate], ignore_index=True)
@@ -78,6 +77,16 @@ def test_public_snapshot_api_rejects_duplicate_candidate_labels(tmp_path: Path, 
 
     with pytest.raises(ValueError, match="[Dd]uplicate"):
         verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=8)
+
+
+def test_public_snapshot_api_preserves_cross_round_candidate_events(tmp_path: Path) -> None:
+    later = _label_frame().iloc[[0]].assign(observed_round=1, batch_id="batch_1")
+    frame = pd.concat([_label_frame(), later], ignore_index=True)
+    _write_promotion(tmp_path, frame)
+
+    snapshot = verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=8)
+
+    assert snapshot.labels.loc[snapshot.labels["id"].eq("candidate_a"), "r"].tolist() == [0, 1]
 
 
 @pytest.mark.parametrize("expected_y_width", [0, -1, True, 8.0])

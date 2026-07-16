@@ -20,11 +20,16 @@ import pytest
 from dnadesign.opal.src.analysis.campaign import CampaignAnalysis
 from dnadesign.opal.src.analysis.ledger import read_run_labels_used, read_runs
 from dnadesign.opal.src.core.utils import OpalError, file_sha256
+from dnadesign.opal.src.storage.artifacts import LABELS_USED_ARTIFACT_KEY, run_scoped_artifact_path
 from dnadesign.opal.tests._cli_helpers import write_ledger
 
 
 def _labels_used_artifact(outputs_dir: Path) -> tuple[Path, str]:
-    path = outputs_dir / "rounds" / "round_0" / "labels" / "labels_used.parquet"
+    path = run_scoped_artifact_path(
+        outputs_dir / "rounds" / "round_0",
+        run_id="run-0",
+        artifact_key=LABELS_USED_ARTIFACT_KEY,
+    )
     path.parent.mkdir(parents=True)
     pl.DataFrame(
         {
@@ -111,6 +116,22 @@ def test_read_run_labels_used_rejects_digest_drift(tmp_path: Path) -> None:
     with pytest.raises(OpalError, match="SHA-256"):
         read_run_labels_used(
             _runs(path=path, sha256="0" * 64),
+            outputs_dir=outputs_dir,
+            round_k=0,
+            run_id="run-0",
+        )
+
+
+def test_read_run_labels_used_rejects_round_mutable_artifact_path(tmp_path: Path) -> None:
+    outputs_dir = tmp_path / "outputs"
+    run_scoped_path, _sha256 = _labels_used_artifact(outputs_dir)
+    mutable_path = outputs_dir / "rounds" / "round_0" / "labels" / "labels_used.parquet"
+    mutable_path.parent.mkdir(parents=True)
+    pl.read_parquet(run_scoped_path).write_parquet(mutable_path)
+
+    with pytest.raises(OpalError, match="run-scoped path"):
+        read_run_labels_used(
+            _runs(path=mutable_path, sha256=file_sha256(mutable_path)),
             outputs_dir=outputs_dir,
             round_k=0,
             run_id="run-0",

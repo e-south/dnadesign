@@ -1,7 +1,7 @@
 ## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-15
+**Last verified:** 2026-07-16
 
 `campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
 keys. There is no compatibility parser.
@@ -142,8 +142,8 @@ labels:
   source:
     kind: usr_sidecar
     dataset: candidates
-    path: _opal/response_window_labels_v1/observed_labels.parquet
-    manifest_path: _opal/response_window_labels_v1/promotion.manifest.json
+    path: _opal/observed_labels_v1/observed_labels.parquet
+    manifest_path: _opal/observed_labels_v1/promotion.manifest.json
   y_space: reader_response_window_vector_v1
   id_column: id
   round_column: observed_round
@@ -254,7 +254,7 @@ The pinned manifest uses this objective-agnostic observed-label contract:
   "y_space": "reader_response_window_vector_v1",
   "study_provenance": {
     "schema_id": "example_two_factor_study.observed_labels.v1",
-    "path": "_opal/response_window_labels_v1/study_provenance.json",
+    "path": "_opal/observed_labels_v1/study_provenance.json",
     "sha256": "<lowercase 64-character SHA-256>"
   },
   "candidate_exclusion_projection": {
@@ -270,7 +270,7 @@ The pinned manifest uses this objective-agnostic observed-label contract:
     "schema_sha256": "<lowercase 64-character SHA-256>"
   },
   "label_artifact": {
-    "path": "_opal/response_window_labels_v1/observed_labels.parquet",
+    "path": "_opal/observed_labels_v1/observed_labels.parquet",
     "sha256": "<lowercase 64-character SHA-256>",
     "row_count": 24
   }

@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-16
 audience:
   - operator
   - maintainer
@@ -13,7 +13,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-15
+**Last verified:** 2026-07-16
 
 ## OPAL Command Line Interface
 
@@ -189,7 +189,10 @@ opal run --config <yaml> --round <r> \
   declared selection view.
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
 * `--max-x-matrix-gib`: Override `safety.max_x_matrix_gib` for this run. Prefer lowering `--score-batch-size` before raising this on memory-constrained hosts.
-* `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/rounds/round_<r>/` already contains artifacts). When set, the round directory is wiped before writing new artifacts.
+* `--resume`: Allow replacing mutable latest-run mirrors (required if
+  `outputs/rounds/round_<r>/` already contains artifacts). Every artifact named
+  by the prior run ledger remains in that run's immutable snapshot; the new run
+  receives a separate snapshot.
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
 * `--json`: Output as machine-readable JSON (default output is plain text).
 
@@ -228,8 +231,9 @@ opal run --config <yaml> --round <r> \
   * `selections.parquet` (long form, keyed by `selection_view_id`)
   * `selection_batch.parquet` (final deduplicated batch)
   * `allocation_trace.parquet` (configured unique-slot allocation only)
-* `labels/`
-  * `labels_used.parquet` (training snapshot for this run)
+* `run_artifacts/<run-slug>/`
+  * immutable copies of every model, selection, metadata, and label artifact
+    named by this run's ledger row
 * `metadata/`
   * `round_ctx.json`
   * `objective_meta.json`

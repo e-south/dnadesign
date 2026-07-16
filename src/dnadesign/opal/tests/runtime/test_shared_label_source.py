@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from dnadesign.opal.src.analysis.ledger import read_run_observed_events, read_runs
 from dnadesign.opal.src.config.types import (
     CampaignBlock,
     CandidateScope,
@@ -66,6 +67,7 @@ def _labels(usr_root: Path) -> None:
             "id": ["a", "b"],
             "observed_round": [0, 1],
             "batch_id": ["batch0", "batch1"],
+            "display_label": ["Candidate A", None],
             "y_space": ["sfxi_vec8", "sfxi_vec8"],
             "y_obs": [[0.0], [1.0]],
             "src": ["assay", "assay"],
@@ -264,6 +266,34 @@ def test_run_round_shared_labels_keep_selection_ledgers_campaign_local(tmp_path:
     records_after = pd.read_parquet(records_path)
     assert "opal__eth__label_hist" not in records_after.columns
     assert "opal__cipro__label_hist" not in records_after.columns
+
+    eth_ledger_dir = Path(eth_res.ledger_path)
+    eth_observed_events = read_run_observed_events(
+        read_runs(eth_ledger_dir / "runs.parquet"),
+        outputs_dir=eth_ledger_dir.parent,
+        round_k=1,
+        run_id=eth_res.run_id,
+    ).frame.to_pandas()
+    assert eth_observed_events.columns.tolist() == [
+        "run_id",
+        "as_of_round",
+        "id",
+        "display_label",
+        "sequence",
+        "observed_round",
+        "batch_id",
+        "y_space",
+        "y_obs",
+        "label_source_kind",
+    ]
+    assert eth_observed_events[["id", "batch_id"]].to_dict(orient="records") == [
+        {"id": "a", "batch_id": "batch0"},
+        {"id": "b", "batch_id": "batch1"},
+    ]
+    assert eth_observed_events["display_label"].iloc[0] == "Candidate A"
+    assert pd.isna(eth_observed_events["display_label"].iloc[1])
+    assert eth_observed_events["as_of_round"].unique().tolist() == [1]
+    assert eth_observed_events["label_source_kind"].unique().tolist() == ["usr_sidecar"]
 
 
 def test_run_round_shared_sidecar_rejects_current_y_contamination(tmp_path: Path) -> None:

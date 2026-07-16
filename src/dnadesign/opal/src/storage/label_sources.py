@@ -73,6 +73,8 @@ class TrainingLabelSource(Protocol):
         dedup_policy: str,
     ) -> pd.DataFrame: ...
 
+    def observed_events(self, df: pd.DataFrame, as_of_round: int, *, y_space: str | None) -> pd.DataFrame: ...
+
     def labeled_id_set_leq_round(self, df: pd.DataFrame, as_of_round: int) -> set[str]: ...
 
     def labeled_id_set_any_round(self, df: pd.DataFrame) -> set[str]: ...
@@ -150,6 +152,8 @@ class ObservedLabelStore:
             raise OpalError("Observed label append requires labels with columns ['id', 'y'].")
         if not str(self.y_space).strip():
             raise OpalError("Observed label append requires non-empty y_space.")
+        if batch_id is None or not isinstance(batch_id, str) or not batch_id.strip() or batch_id != batch_id.strip():
+            raise OpalError("Observed label append requires batch_id to be a canonical, non-null, non-blank string.")
 
         known = _known_id_set(known_ids)
         incoming = labels.loc[:, ["id", "y"]].copy()
@@ -195,7 +199,7 @@ class ObservedLabelStore:
                 {
                     self.id_column: incoming["id"].astype(str).tolist(),
                     self.round_column: [int(observed_round)] * len(incoming),
-                    self.batch_column: [str(batch_id)] * len(incoming),
+                    self.batch_column: [batch_id] * len(incoming),
                     "y_space": [str(self.y_space)] * len(incoming),
                     "y_obs": [_coerce_float_list(v) for v in incoming["y"].tolist()],
                     "src": [str(src)] * len(incoming),
@@ -218,6 +222,42 @@ class ObservedLabelStore:
 
         out = df.copy()
         out[self.id_column] = out[self.id_column].astype(str)
+        if "display_label" not in out.columns:
+            out["display_label"] = pd.Series([None] * len(out), index=out.index, dtype=object)
+        else:
+            display_labels: list[str | None] = []
+            invalid_display_labels: list[bool] = []
+            for value in out["display_label"].tolist():
+                missing = pd.isna(value)
+                is_missing = isinstance(missing, (bool, np.bool_)) and bool(missing)
+                valid = is_missing or (isinstance(value, str) and bool(value) and value == value.strip())
+                display_labels.append(None if is_missing else value)
+                invalid_display_labels.append(not valid)
+            invalid_display_label_mask = pd.Series(invalid_display_labels, index=out.index)
+            if invalid_display_label_mask.any():
+                sample = (
+                    out.loc[invalid_display_label_mask, [self.id_column, self.round_column, "display_label"]]
+                    .head(10)
+                    .to_dict(orient="records")
+                )
+                raise OpalError(
+                    "Observed label source display_label values must be null or canonical non-blank strings "
+                    f"(sample={sample})."
+                )
+            out["display_label"] = pd.Series(display_labels, index=out.index, dtype=object)
+        raw_batch_ids = out[self.batch_column]
+        batch_id_strings = raw_batch_ids.map(lambda value: None if pd.isna(value) else str(value))
+        canonical_batch_ids = batch_id_strings.map(lambda value: None if pd.isna(value) else str(value).strip())
+        invalid_batch_ids = (
+            canonical_batch_ids.isna() | canonical_batch_ids.eq("") | batch_id_strings.ne(canonical_batch_ids)
+        )
+        if invalid_batch_ids.any():
+            sample = out.loc[invalid_batch_ids, [self.id_column, self.round_column]].head(10).to_dict(orient="records")
+            raise OpalError(
+                f"Observed label source batch column '{self.batch_column}' must contain canonical, non-null, "
+                f"non-blank identifiers (sample={sample})."
+            )
+        out[self.batch_column] = batch_id_strings.astype(str)
         out["y_space"] = out["y_space"].astype(str)
         expected_y_space = str(self.y_space)
         observed_y_spaces = sorted(out["y_space"].unique().tolist())
@@ -323,6 +363,29 @@ class ObservedLabelStore:
             }
         )
 
+    def observed_events(
+        self,
+        as_of_round: int,
+        *,
+        known_ids: Iterable[str] | None = None,
+    ) -> pd.DataFrame:
+        """Return every verified source event visible to a run, before cross-round deduplication."""
+
+        frame = self._validated_frame(known_ids=known_ids)
+        frame = frame.loc[frame[self.round_column] <= int(as_of_round)].copy()
+        frame = frame.sort_values([self.id_column, self.round_column, "_row_order"], kind="stable")
+        return pd.DataFrame(
+            {
+                "id": frame[self.id_column].astype(str).tolist(),
+                "display_label": frame["display_label"].tolist(),
+                "observed_round": frame[self.round_column].astype(int).tolist(),
+                "batch_id": frame[self.batch_column].astype(str).tolist(),
+                "y_space": frame["y_space"].astype(str).tolist(),
+                "y_obs": frame["y"].tolist(),
+                "label_source_kind": [self.kind] * len(frame),
+            }
+        )
+
     def observed_ids(
         self,
         *,
@@ -358,6 +421,26 @@ class CampaignHistoryLabelSource:
             dedup_policy=dedup_policy,
         )
 
+    def observed_events(self, df: pd.DataFrame, as_of_round: int, *, y_space: str | None) -> pd.DataFrame:
+        events = self.store.training_labels_with_round(
+            df,
+            int(as_of_round),
+            cumulative_training=True,
+            dedup_policy="all_rounds",
+        ).sort_values(["id", "r"], kind="stable")
+        resolved_y_space = None if y_space is None or not str(y_space).strip() else str(y_space).strip()
+        return pd.DataFrame(
+            {
+                "id": events["id"].astype(str).tolist(),
+                "display_label": [None] * len(events),
+                "observed_round": events["r"].astype(int).tolist(),
+                "batch_id": [None] * len(events),
+                "y_space": [resolved_y_space] * len(events),
+                "y_obs": events["y"].tolist(),
+                "label_source_kind": [self.kind] * len(events),
+            }
+        )
+
     def labeled_id_set_leq_round(self, df: pd.DataFrame, as_of_round: int) -> set[str]:
         return self.store.labeled_id_set_leq_round(df, int(as_of_round))
 
@@ -391,6 +474,18 @@ class SharedObservedLabelSource:
             int(as_of_round),
             cumulative_training=cumulative_training,
             dedup_policy=dedup_policy,
+            known_ids=self._ids(df),
+        )
+
+    def observed_events(self, df: pd.DataFrame, as_of_round: int, *, y_space: str | None) -> pd.DataFrame:
+        configured_y_space = "" if y_space is None else str(y_space).strip()
+        if configured_y_space != str(self.store.y_space):
+            raise OpalError(
+                "Configured label Y space does not match the shared observed-label store: "
+                f"configured={configured_y_space!r}, store={str(self.store.y_space)!r}."
+            )
+        return self.store.observed_events(
+            int(as_of_round),
             known_ids=self._ids(df),
         )
 

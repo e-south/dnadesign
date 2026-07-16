@@ -59,6 +59,13 @@ def stage_training(inputs: RoundInputs) -> TrainingBundle:
     train_df = plan.training_df
     if train_df.empty:
         raise OpalError(f"No labels ≤ round {req.as_of_round} for training.")
+    observed_events_df = label_source.observed_events(
+        df,
+        int(req.as_of_round),
+        y_space=cfg.labels.y_space,
+    )
+    if observed_events_df.empty:
+        raise OpalError(f"No observed-label events ≤ round {req.as_of_round} for the run snapshot.")
 
     train_ids = train_df["id"].astype(str).tolist()
     Y_train = np.stack(train_df["y"].map(lambda v: np.asarray(v, dtype=float)).to_list(), axis=0)
@@ -78,6 +85,7 @@ def stage_training(inputs: RoundInputs) -> TrainingBundle:
         rep=rep,
         plan=plan,
         train_df=train_df,
+        observed_events_df=observed_events_df,
         train_ids=train_ids,
         Y_train=Y_train,
         R_train=R_train,
