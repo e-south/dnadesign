@@ -27,9 +27,10 @@ from ..analysis.ledger import read_selection_view_predictions
 from ..core.leakage import assert_no_leakage_violations, build_prediction_identity_report
 from ..core.rounds import resolve_round_index_from_runs
 from ..core.utils import ExitCodes, OpalError, read_json, write_json
-from ..plots._mpl_utils import apply_plot_style, ensure_mpl_config_dir, scatter_smart
+from ..plots._mpl_utils import pretty_label
 from ..storage.ledger import LedgerReader
 from ..storage.x_contracts import validate_x_parquet_column
+from .review_plots import write_feature_importance_plot, write_score_vs_rank_plot
 from .summary import load_round_log, select_run_meta, summarize_round_log, summarize_run_meta
 
 REVIEW_SCHEMA_VERSION = "opal.campaign_review.v1"
@@ -129,12 +130,27 @@ def build_campaign_review(
     if include_plots:
         plots_dir.mkdir(parents=True, exist_ok=True)
         score_plot = plots_dir / f"score_vs_rank__round_{resolved_round}__run_{resolved_run_id}.png"
-        _write_score_vs_rank_plot(predictions, score_plot, title=f"{cfg.campaign.slug}: score vs rank")
-        plot_statuses.append({"name": "score_vs_rank", "status": "written", "path": str(score_plot)})
+        write_score_vs_rank_plot(
+            predictions,
+            _selected_mask(predictions["view__is_selected"]),
+            score_plot,
+            campaign_name=cfg.campaign.name,
+            selection_view_id=selection_view_id,
+            round_index=resolved_round,
+        )
+        plot_statuses.append(
+            {
+                "name": "score_vs_rank",
+                "status": "written",
+                "scope": "selection_view",
+                "path": str(score_plot),
+            }
+        )
         plot_paths.append(score_plot)
-        fi_status = _write_feature_importance_plot(
+        fi_status = write_feature_importance_plot(
             ws.round_model_dir(resolved_round) / "feature_importance.csv",
             plots_dir / f"feature_importance_top__round_{resolved_round}__run_{resolved_run_id}.png",
+            round_index=resolved_round,
         )
         plot_statuses.append(fi_status)
         if fi_status["status"] == "written":
@@ -286,6 +302,7 @@ def _jsonable(value: Any) -> Any:
 def render_campaign_review_markdown(manifest: Mapping[str, Any]) -> str:
     campaign = manifest.get("campaign") or {}
     run = manifest.get("run") or {}
+    view = _review_view_contract(manifest)
     progress = manifest.get("progress") or {}
     selection = manifest.get("selection") or {}
     preview = manifest.get("selection_preview") or []
@@ -302,7 +319,9 @@ def render_campaign_review_markdown(manifest: Mapping[str, Any]) -> str:
         f"- config: `{campaign.get('config_path')}`",
         f"- X column: `{campaign.get('x_column')}`",
         f"- model: `{campaign.get('model')}`",
-        f"- selection: `{campaign.get('selection')}`",
+        f"- selection view: `{view['label']}` (`{view['id']}`)",
+        f"- objective: `{view['objective']}`",
+        f"- selector: `{view['selection']}`",
         "",
         "## Run",
         "",
@@ -310,7 +329,8 @@ def render_campaign_review_markdown(manifest: Mapping[str, Any]) -> str:
         f"- round: `{run.get('as_of_round')}`",
         f"- train rows: `{run.get('stats_n_train')}`",
         f"- scored rows: `{run.get('stats_n_scored')}`",
-        f"- objective: `{run.get('objective')}`",
+        f"- score channel: `{view['score_ref']}`",
+        f"- requested top-k: `{view['top_k']}`",
         "",
         "## Progress",
         "",
@@ -359,6 +379,7 @@ def render_campaign_review_markdown(manifest: Mapping[str, Any]) -> str:
 def render_campaign_review_html(manifest: Mapping[str, Any], *, base_dir: Path) -> str:
     campaign = manifest.get("campaign") or {}
     run = manifest.get("run") or {}
+    view = _review_view_contract(manifest)
     progress = manifest.get("progress") or {}
     selection = manifest.get("selection") or {}
     preview = manifest.get("selection_preview") or []
@@ -400,8 +421,8 @@ def render_campaign_review_html(manifest: Mapping[str, Any], *, base_dir: Path) 
     ]
     body = f"""
     <header>
-      <p>OPAL campaign review</p>
-      <h1>{_e(campaign.get("slug"))}</h1>
+      <p>OPAL campaign review · {_e(view["label"])} selection view</p>
+      <h1>{_e(campaign.get("name"))}</h1>
     </header>
     <main>
       <section class="summary-grid">
@@ -419,8 +440,10 @@ def render_campaign_review_html(manifest: Mapping[str, Any], *, base_dir: Path) 
           <dt>Workdir</dt><dd><code>{_e(campaign.get("workdir"))}</code></dd>
           <dt>X column</dt><dd><code>{_e(campaign.get("x_column"))}</code></dd>
           <dt>Model</dt><dd>{_e(campaign.get("model"))}</dd>
-          <dt>Objective</dt><dd>{_e(run.get("objective"))}</dd>
-          <dt>Selection</dt><dd>{_e(campaign.get("selection"))}</dd>
+          <dt>Selection view</dt><dd>{_e(view["label"])} (<code>{_e(view["id"])}</code>)</dd>
+          <dt>Objective</dt><dd><code>{_e(view["objective"])}</code></dd>
+          <dt>Selector</dt><dd><code>{_e(view["selection"])}</code></dd>
+          <dt>Score channel</dt><dd><code>{_e(view["score_ref"])}</code></dd>
         </dl>
       </section>
       <section>
@@ -440,7 +463,41 @@ def render_campaign_review_html(manifest: Mapping[str, Any], *, base_dir: Path) 
       </section>
     </main>
     """
-    return _html_document(title=f"OPAL review: {campaign.get('slug')}", body=body)
+    return _html_document(title=f"OPAL review: {campaign.get('name')} · {view['label']}", body=body)
+
+
+def _review_view_contract(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    scope = manifest.get("review_scope") or {}
+    view_id = str(scope.get("selection_view_id") or "").strip()
+    if not view_id:
+        raise OpalError("Campaign review manifest is missing review_scope.selection_view_id.")
+
+    campaign = manifest.get("campaign") or {}
+    campaign_matches = [
+        row
+        for row in campaign.get("selection_views") or []
+        if isinstance(row, Mapping) and str(row.get("id") or "") == view_id
+    ]
+    run = manifest.get("run") or {}
+    run_matches = [
+        row
+        for row in run.get("selection_views") or []
+        if isinstance(row, Mapping) and str(row.get("selection_view_id") or "") == view_id
+    ]
+    if len(campaign_matches) != 1 or len(run_matches) != 1:
+        raise OpalError(
+            f"Campaign review selection view {view_id!r} must resolve exactly once in campaign and run metadata."
+        )
+    campaign_view = campaign_matches[0]
+    run_view = run_matches[0]
+    return {
+        "id": view_id,
+        "label": pretty_label(view_id),
+        "objective": campaign_view.get("objective"),
+        "selection": campaign_view.get("selection"),
+        "score_ref": run_view.get("score_ref"),
+        "top_k": run_view.get("top_k"),
+    }
 
 
 def _e(value: Any) -> str:
@@ -602,75 +659,3 @@ def _selection_summary(predictions: pd.DataFrame) -> tuple[dict[str, Any], list[
         },
         preview,
     )
-
-
-def _write_score_vs_rank_plot(predictions: pd.DataFrame, path: Path, *, title: str) -> None:
-    ensure_mpl_config_dir(workdir=path.parent)
-    apply_plot_style()
-    import matplotlib.pyplot as plt
-
-    df = predictions.copy()
-    df["view__selection_score"] = pd.to_numeric(df["view__selection_score"], errors="raise")
-    df["view__rank_competition"] = pd.to_numeric(df["view__rank_competition"], errors="raise").astype(int)
-    df = df.sort_values(["view__rank_competition", "id"])
-    selected = _selected_mask(df["view__is_selected"])
-    fig, ax = plt.subplots(figsize=(8.5, 5.0), constrained_layout=True)
-    scatter_smart(
-        ax,
-        df["view__rank_competition"].to_numpy(),
-        df["view__selection_score"].to_numpy(),
-        s=12,
-        alpha=0.35,
-        rasterize_at=20_000,
-    )
-    if selected.any():
-        scatter_smart(
-            ax,
-            df.loc[selected, "view__rank_competition"].to_numpy(),
-            df.loc[selected, "view__selection_score"].to_numpy(),
-            s=34,
-            alpha=0.9,
-            edgecolors="black",
-            rasterize_at=20_000,
-        )
-    ax.set_xlabel("selection rank")
-    ax.set_ylabel("selected objective score")
-    ax.set_title(title)
-    ax.set_xlim(left=int(df["view__rank_competition"].max()), right=1)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=160)
-    plt.close(fig)
-
-
-def _write_feature_importance_plot(source_path: Path, output_path: Path, *, top_n: int = 30) -> dict[str, Any]:
-    if not source_path.exists():
-        return {
-            "name": "feature_importance_top",
-            "status": "not_available",
-            "reason": f"feature importance artifact missing: {source_path}",
-        }
-    df = pd.read_csv(source_path)
-    missing = sorted({"feature_index", "importance"} - set(df.columns))
-    if missing:
-        raise OpalError(
-            f"feature_importance.csv missing campaign review column(s): {missing}",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    df["feature_index"] = pd.to_numeric(df["feature_index"], errors="raise").astype(int)
-    df["importance"] = pd.to_numeric(df["importance"], errors="raise")
-    df = df.sort_values(["importance", "feature_index"], ascending=[False, True]).head(int(top_n))
-    ensure_mpl_config_dir(workdir=output_path.parent)
-    apply_plot_style()
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(9.0, 5.2), constrained_layout=True)
-    labels = [str(idx) for idx in df["feature_index"].tolist()]
-    ax.bar(labels, df["importance"].to_numpy(), color="#446A8C")
-    ax.set_xlabel("feature_index")
-    ax.set_ylabel("importance")
-    ax.set_title(f"Top {len(df)} feature importances")
-    ax.tick_params(axis="x", rotation=90)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=160)
-    plt.close(fig)
-    return {"name": "feature_importance_top", "status": "written", "path": str(output_path)}

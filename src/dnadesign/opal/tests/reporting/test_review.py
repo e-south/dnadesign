@@ -67,8 +67,16 @@ def test_build_campaign_review_writes_portable_artifacts(tmp_path: Path) -> None
     text = result.review_path.read_text(encoding="utf-8")
     assert "# OPAL campaign review" in text
     assert "## Progress" in text
+    assert "- selection view: `Primary` (`primary`)" in text
+    assert "- objective: `sfxi_v1`" in text
+    assert "- selector: `top_n`" in text
+    assert "- score channel: `primary/sfxi`" in text
+    assert "`None`" not in text
     html = result.index_path.read_text(encoding="utf-8")
     assert "OPAL campaign review" in html
+    assert "Primary selection view" in html
+    assert "sfxi_v1" in html
+    assert "primary/sfxi" in html
     assert "score_vs_rank" in html
     assert result.manifest["campaign"]["x_contract"]["canonical"] is True
 
