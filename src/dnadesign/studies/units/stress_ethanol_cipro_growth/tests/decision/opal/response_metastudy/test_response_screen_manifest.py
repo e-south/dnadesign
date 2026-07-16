@@ -19,7 +19,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     response_screen_publication,
 )
 
-_PRIMARY_REDUCTION = "event_logmean_6_12h_post"
+_PRIMARY_REDUCTION = "event_logmean_4_8h_post"
 
 
 def test_manifest_gates_on_exact_campaign_model_not_best_challenger() -> None:
@@ -59,7 +59,7 @@ def test_manifest_gates_on_exact_campaign_model_not_best_challenger() -> None:
     manifest = response_screen_publication.response_screen_manifest(
         screen,
         primary_reduction_id=_PRIMARY_REDUCTION,
-        campaign_calibration_parity={"status": "aligned"},
+        campaign_to_screen_calibration={"status": "aligned"},
         campaign_model_params={"n_estimators": 100, "random_state": 7, "oob_score": True},
     )
 
@@ -134,7 +134,7 @@ def test_manifest_rejects_missing_exact_campaign_representation() -> None:
         response_screen_publication.response_screen_manifest(
             screen,
             primary_reduction_id=_PRIMARY_REDUCTION,
-            campaign_calibration_parity={"status": "aligned"},
+            campaign_to_screen_calibration={"status": "aligned"},
             campaign_model_params={"n_estimators": 100, "random_state": 7},
         )
 
@@ -171,7 +171,7 @@ def test_manifest_records_undefined_campaign_ordering_as_no_model_support() -> N
     manifest = response_screen_publication.response_screen_manifest(
         screen,
         primary_reduction_id=_PRIMARY_REDUCTION,
-        campaign_calibration_parity={"status": "aligned"},
+        campaign_to_screen_calibration={"status": "aligned"},
         campaign_model_params={"n_estimators": 100, "random_state": 7},
     )
 
@@ -217,8 +217,8 @@ def _screen(model_rows: list[dict[str, object]]) -> response_contracts.ResponseM
             "screen_role": ["primary"],
             "response_basis": ["event_relative"],
             "reduction_method": ["geometric_log_mean"],
-            "window_start_event_h": [6.0],
-            "window_end_event_h": [12.0],
+            "window_start_event_h": [4.0],
+            "window_end_event_h": [8.0],
         }
     )
     return response_contracts.ResponseMetricScreen(

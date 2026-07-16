@@ -24,6 +24,8 @@ REPEAT_DIAGNOSTIC_COLUMNS = (
     "median",
     "maximum",
     "range",
+    "label_source_reader_experiment_id",
+    "label_source_value",
     "status",
     "classification",
     "evidence_artifact",
@@ -48,8 +50,20 @@ def repeat_diagnostic_rows(
         if experiment_count < 2:
             continue
         decision = decision_by_id[str(candidate_id)]
+        label_source_id = decision["label_source_reader_experiment_id"]
         for component in VALUE_COLUMNS:
             values = frame[component].to_numpy(dtype=float)
+            has_label_source = (
+                label_source_id is not None and not pd.isna(label_source_id) and str(label_source_id).strip()
+            )
+            selected = (
+                frame.loc[
+                    frame["reader_experiment_id"].astype(str).eq(str(label_source_id)),
+                    component,
+                ]
+                if has_label_source
+                else pd.Series(dtype=float)
+            )
             rows.append(
                 {
                     "candidate_id": str(candidate_id),
@@ -59,6 +73,8 @@ def repeat_diagnostic_rows(
                     "median": float(np.median(values)),
                     "maximum": float(np.max(values)),
                     "range": float(np.max(values) - np.min(values)),
+                    "label_source_reader_experiment_id": label_source_id,
+                    "label_source_value": None if selected.empty else float(selected.iloc[0]),
                     "status": str(decision["status"]),
                     "classification": str(decision["classification"]),
                     "evidence_artifact": decision["evidence_artifact"],

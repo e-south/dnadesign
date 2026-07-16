@@ -20,6 +20,7 @@ from dnadesign.opal import (
     ObservedLabelPromotionBinding,
     ObservedLabelVerificationError,
     VerifiedObservedLabelSnapshot,
+    build_candidate_exclusion_projection,
     candidate_snapshot_record,
     load_config,
     verify_observed_label_snapshot,
@@ -46,6 +47,12 @@ from .contracts import (
     Y_SPACE,
     ResponseWindowLabelPromotionError,
 )
+from .exclusions import (
+    CANDIDATE_EXCLUSION_SET_ID,
+    build_candidate_selection_exclusion_provenance,
+    require_campaign_candidate_exclusion_parity,
+    validate_candidate_selection_exclusion_provenance,
+)
 
 _PROVENANCE_FIELDS = {
     "schema_id",
@@ -54,6 +61,7 @@ _PROVENANCE_FIELDS = {
     "created_at",
     "observation_bundle",
     "candidate_table",
+    "candidate_selection_exclusions",
     "label_contract",
 }
 
@@ -67,6 +75,7 @@ def build_study_provenance(
     label_count: int,
     observed_round: int,
     batch_id: str,
+    candidate_exclusion_entries: list[dict[str, str]],
 ) -> dict[str, object]:
     return {
         "schema_id": PROVENANCE_SCHEMA_ID,
@@ -83,6 +92,7 @@ def build_study_provenance(
             "records_sha256": candidate_records_sha256,
             "record_count": candidate_record_count,
         },
+        "candidate_selection_exclusions": build_candidate_selection_exclusion_provenance(candidate_exclusion_entries),
         "label_contract": {
             "y_space": Y_SPACE,
             "value_order": list(VALUE_COLUMNS),
@@ -100,6 +110,7 @@ def build_promotion_manifest(
     provenance_path: Path,
     candidate_path: Path,
     label_count: int,
+    candidate_exclusion_entries: list[dict[str, str]],
 ) -> dict[str, object]:
     return {
         "schema_version": OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION,
@@ -111,6 +122,10 @@ def build_promotion_manifest(
             "path": (relative_dir / PROVENANCE_FILENAME).as_posix(),
             "sha256": file_sha256(provenance_path),
         },
+        "candidate_exclusion_projection": build_candidate_exclusion_projection(
+            exclusion_set_id=CANDIDATE_EXCLUSION_SET_ID,
+            entries=candidate_exclusion_entries,
+        ),
         "candidate_artifact": candidate_snapshot_record(candidate_path),
         "label_artifact": {
             "path": (relative_dir / LABEL_FILENAME).as_posix(),
@@ -159,6 +174,14 @@ def verify_label_bundle(
         raise ResponseWindowLabelPromotionError("published study provenance fields disagree.")
     if provenance["schema_id"] != PROVENANCE_SCHEMA_ID or provenance["study_id"] != STUDY_ID:
         raise ResponseWindowLabelPromotionError("published study provenance identity disagrees.")
+    authoritative_exclusions = validate_candidate_selection_exclusion_provenance(
+        provenance["candidate_selection_exclusions"]
+    )
+    if config is not None:
+        require_campaign_candidate_exclusion_parity(
+            config,
+            authoritative_entries=authoritative_exclusions,
+        )
     return snapshot
 
 

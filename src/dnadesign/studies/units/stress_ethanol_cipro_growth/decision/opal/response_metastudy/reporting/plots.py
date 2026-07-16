@@ -173,6 +173,7 @@ def write_visuals(
     write_response_separation_stability(
         response_screen.stability,
         paths["response_separation_stability"],
+        primary_reduction_id=primary_reduction_id,
     )
     write_response_constraint_coverage(
         response_screen.stability,

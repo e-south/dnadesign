@@ -20,7 +20,7 @@ from pathlib import Path
 from uuid import uuid4
 
 _MARIMO_RUNTIME_DIR = "__marimo__"
-METASTUDY_SCHEMA_VERSION = "stress_ethanol_cipro_growth.response_metastudy.v11"
+METASTUDY_SCHEMA_VERSION = "stress_ethanol_cipro_growth.response_metastudy.v12"
 
 
 def create_staging_dir(final_dir: Path, *, overwrite: bool) -> Path:

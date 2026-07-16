@@ -20,17 +20,32 @@ import numpy as np
 import pandas as pd
 
 from .contracts import REPEAT_CLASSIFICATIONS, REPEAT_STATUSES, ResponseWindowAggregationError
+from .repeat_evidence import RepeatEvidenceContractError, validate_repeat_evidence_artifact
 
 _CLASSIFICATIONS_BY_STATUS = {
-    "comparable": {"assay_context_comparable", "corrected_technical_error"},
-    "excluded_noncomparable": {"noncomparable_assay_context", "plausible_biological_variation"},
+    "label_source_selected": {"source_agreement_accepted", "corrected_technical_error"},
+    "label_source_excluded": {
+        "noncomparable_assay_context",
+        "plausible_biological_variation",
+        "unresolved_source_disagreement",
+    },
     "remeasure_required": {"remeasurement_required"},
 }
 
 
-def validate_repeat_adjudications(frame: pd.DataFrame, *, evidence_root: Path | None = None) -> None:
+def validate_repeat_adjudications(
+    frame: pd.DataFrame,
+    *,
+    evidence_root: Path | None = None,
+    expected_reader_bundle_sha256: str | None = None,
+    expected_primary_reduction_id: str | None = None,
+) -> None:
     """Reject unsupported status text and optionally verify referenced evidence."""
 
+    if evidence_root is not None and (expected_reader_bundle_sha256 is None or expected_primary_reduction_id is None):
+        raise ResponseWindowAggregationError(
+            "repeat evidence validation requires the pinned Reader digest and primary reduction."
+        )
     invalid_statuses = sorted(set(frame["status"].astype(str)) - REPEAT_STATUSES)
     if invalid_statuses:
         raise ResponseWindowAggregationError(f"repeat decisions contain unsupported statuses: {invalid_statuses}")
@@ -38,17 +53,34 @@ def validate_repeat_adjudications(frame: pd.DataFrame, *, evidence_root: Path | 
     if invalid:
         raise ResponseWindowAggregationError(f"repeat decisions contain unsupported classifications: {invalid}")
     for row in frame.itertuples(index=False):
-        _validate_row(row, evidence_root=evidence_root)
+        _validate_row(
+            row,
+            evidence_root=evidence_root,
+            expected_reader_bundle_sha256=expected_reader_bundle_sha256,
+            expected_primary_reduction_id=expected_primary_reduction_id,
+        )
 
 
-def _validate_row(row: object, *, evidence_root: Path | None) -> None:
+def _validate_row(
+    row: object,
+    *,
+    evidence_root: Path | None,
+    expected_reader_bundle_sha256: str | None,
+    expected_primary_reduction_id: str | None,
+) -> None:
     status = str(row.status)
     classification = str(row.classification)
+    selected_experiment = row.label_source_reader_experiment_id
     evidence_fields = (row.evidence_artifact, row.evidence_sha256, row.adjudicated_by, row.adjudicated_at)
     if status == "review_required":
-        if classification != "unresolved" or any(not _missing(value) for value in evidence_fields):
+        if (
+            classification != "unresolved"
+            or not _missing(selected_experiment)
+            or any(not _missing(value) for value in evidence_fields)
+        ):
             raise ResponseWindowAggregationError(
-                f"{row.candidate_id}: review_required must remain unresolved without adjudication evidence."
+                f"{row.candidate_id}: review_required must remain unresolved without a selected label source or "
+                "adjudication evidence."
             )
         return
     if classification not in _CLASSIFICATIONS_BY_STATUS[status]:
@@ -57,6 +89,14 @@ def _validate_row(row: object, *, evidence_root: Path | None) -> None:
         )
     if any(_missing(value) for value in evidence_fields):
         raise ResponseWindowAggregationError(f"{row.candidate_id}: final repeat decision requires typed evidence.")
+    if status == "label_source_selected" and _missing(selected_experiment):
+        raise ResponseWindowAggregationError(
+            f"{row.candidate_id}: selected repeat decision requires one Reader experiment as its label source."
+        )
+    if status != "label_source_selected" and not _missing(selected_experiment):
+        raise ResponseWindowAggregationError(
+            f"{row.candidate_id}: only a selected repeat decision may name a Reader experiment as its label source."
+        )
     digest = str(row.evidence_sha256)
     if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise ResponseWindowAggregationError(f"{row.candidate_id}: repeat evidence digest is invalid.")
@@ -72,6 +112,19 @@ def _validate_row(row: object, *, evidence_root: Path | None) -> None:
         path = _evidence_path(evidence_root, str(row.evidence_artifact), candidate_id=str(row.candidate_id))
         if _sha256(path) != digest:
             raise ResponseWindowAggregationError(f"{row.candidate_id}: repeat evidence artifact digest mismatch.")
+        try:
+            validate_repeat_evidence_artifact(
+                path,
+                expected_reader_bundle_sha256=str(expected_reader_bundle_sha256),
+                expected_primary_reduction_id=str(expected_primary_reduction_id),
+                candidate_id=str(row.candidate_id),
+                reader_experiment_ids=row.reader_experiment_ids,
+                label_source_reader_experiment_id=(None if _missing(selected_experiment) else str(selected_experiment)),
+                status=status,
+                classification=classification,
+            )
+        except RepeatEvidenceContractError as exc:
+            raise ResponseWindowAggregationError(f"{row.candidate_id}: {exc}") from exc
 
 
 def _evidence_path(root: Path, value: str, *, candidate_id: str) -> Path:

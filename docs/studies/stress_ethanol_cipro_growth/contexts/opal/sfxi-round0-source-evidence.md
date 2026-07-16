@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-sfxi-round0-source-evidence
 title: SFXI round-0 source evidence
 owner: dnadesign-maintainers
 status: source_evidence
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 audience:
   - operator
   - agent
@@ -52,7 +52,9 @@ are not routes for label promotion or campaign execution.
 `secg_rmf_greedy` does not consume SFXI vec8 labels. It requires the typed
 eight-component response-window sidecar at
 `usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v1/observed_labels.parquet`.
-That sidecar is absent, so RMF ingestion and execution remain inactive.
+The verified sidecar contains 27 exact response-window labels and remains
+separate from this SFXI source evidence. RMF round 0 completed from that typed
+source; no SFXI vec8 row entered its label table.
 
 Reader response-window generation, study-owned metric review, and OPAL commands
 are routed through:

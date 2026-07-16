@@ -46,7 +46,7 @@ def build_protocol(
             "source": required_string(label_truth, "source"),
             "screen_source_scope": required_string(label_truth, "screen_source_scope"),
             "screen_source_label_truth_role": required_string(label_truth, "screen_source_label_truth_role"),
-            "repeat_aggregation": required_string(label_truth, "repeat_aggregation"),
+            "label_source_state": required_string(label_truth, "label_source_state"),
         },
         "response_screen_protocol": dict(screen_protocol),
         "fixed_model_definitions": fixed_model_definitions(screen),

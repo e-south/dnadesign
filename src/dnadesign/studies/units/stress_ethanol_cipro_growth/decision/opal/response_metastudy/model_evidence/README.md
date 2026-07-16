@@ -18,7 +18,7 @@ model evidence.
 Each checkpoint comes from a verified response-metastudy bundle. The snapshot
 records:
 
-- label-truth readiness and repeat-aggregation state;
+- label-truth readiness and label-source state;
 - the configured campaign model, the best fixed challenger, and the baseline;
 - all prespecified model-screen outcomes, channel-level X-to-Y performance,
   and per-selection-view ordering;
@@ -38,7 +38,7 @@ scientific decision.
 
 ## Comparability contract
 
-The frozen protocol contains the label-truth and repeat-aggregation contract,
+The frozen protocol contains the label-truth and label-source contract,
 target masks, grouped-validation design, metrics, decision thresholds,
 calibration estimator settings, model definitions, configured campaign model,
 and digests of the evaluator sources.
@@ -94,7 +94,7 @@ uv run python -m \
   record \
   --metastudy-bundle /path/to/verified/response_metastudy \
   --trajectory-root /path/to/model_evidence \
-  --evidence-id pre_batch0_retrospective \
+  --evidence-id pre_rmf_round0_retrospective \
   --json
 
 uv run python -m \
@@ -114,7 +114,8 @@ promote a model, authorize selection, or authorize synthesis.
 ## Per-batch review
 
 Use one evidence ID per eligible measured corpus, for example
-`pre_batch0_retrospective`, `batch0_prospective`, and `batch1_prospective`.
+`pre_rmf_round0_retrospective`, `rmf_round0_prospective`, and
+`rmf_round1_prospective`.
 Before recording, verify that predictions for a prospective checkpoint were
 fixed before its measurements were observed. After recording, compare within a
 single protocol series:

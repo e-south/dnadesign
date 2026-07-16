@@ -15,11 +15,13 @@ import numpy as np
 import pandas as pd
 
 from .artifact_contract import ResponseWindowObservationArtifactError
+from .artifact_label_source_validation import validate_repeat_diagnostic_label_source
 from .contracts import DECISION_COLUMNS, VALUE_COLUMNS, ResponseWindowAggregationError
 from .repeat_adjudication import validate_repeat_adjudications
 from .repeat_diagnostics import REPEAT_DIAGNOSTIC_COLUMNS
 
 _DECISION_SOURCE_COLUMNS = {
+    "label_source_reader_experiment_id": "label_source_reader_experiment_id",
     "status": "repeat_decision",
     "classification": "repeat_classification",
     "evidence_artifact": "repeat_evidence_artifact",
@@ -83,7 +85,7 @@ def _validate_singleton_fields(*, candidate_id: str, frame: pd.DataFrame) -> Non
     if set(frame["repeat_decision"].astype(str)) != {"singleton"}:
         raise ResponseWindowObservationArtifactError(f"{candidate_id}: singleton repeat status is invalid.")
     for source in _DECISION_SOURCE_COLUMNS.values():
-        if source in {"repeat_decision", "repeat_decision_reason"}:
+        if source in {"repeat_decision", "repeat_decision_reason", "label_source_reader_experiment_id"}:
             continue
         if frame[source].map(lambda value: not _missing(value)).any():
             raise ResponseWindowObservationArtifactError(
@@ -122,6 +124,13 @@ def _validate_diagnostic_values(
                 raise ResponseWindowObservationArtifactError(
                     f"repeat diagnostics disagree with contributions for {candidate_id!r} {component!r}."
                 )
+            validate_repeat_diagnostic_label_source(
+                row,
+                decision=decision,
+                contributions=frame,
+                candidate_id=candidate_id,
+                component=component,
+            )
             for field in _DECISION_SOURCE_COLUMNS:
                 if not _same(row[field], decision[field]):
                     raise ResponseWindowObservationArtifactError(

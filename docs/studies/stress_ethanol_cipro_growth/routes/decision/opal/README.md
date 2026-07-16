@@ -3,13 +3,13 @@ doc_id: study-stress-ethanol-cipro-growth-route-decision-opal
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 parent_route: ../../README.md
 type: route
 plane: control-plane
 owner_boundary: opal
 surface_role: decision
-current_state: round0_metric_review
+current_state: round0_selection_review
 entry_artifact: usr_prom_eth_cip_opal_candidates
 exit_artifact: opal_campaign_records_and_ledgers
 ---
@@ -19,7 +19,7 @@ exit_artifact: opal_campaign_records_and_ledgers
 Use this only after `routes/README.md` selects the OPAL campaign surface.
 ### Surface
 
-- Route state: `round0_metric_review`
+- Route state: `round0_selection_review`
 - Entry artifact: `usr_prom_eth_cip_opal_candidates` shared USR candidate table
 - Candidate table role: `opal_candidate_feature_table`
 - Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
@@ -42,30 +42,27 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 - Dataset id: `usr_prom_eth_cip_opal_candidates`
 - Role: `opal_candidate_feature_table`
 - Candidate universe: 157160 generated rows plus 25 measured pDual-10 Reader
-  rows: 23 SFXI source rows and 2 controls. Native/reference audit rows stay
-  outside this materialization contract unless explicitly added.
+  rows. Native/reference audit rows stay outside this materialization contract.
 - X column: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
 - X-selection state: LatentDNA selected this pre-assay X; RegulonDB/native
   appendix visualizations do not gate OPAL campaign readiness.
 - SFXI source labels: `_opal/observed_labels.parquet` under the candidate
   table dataset.
-- Prospective response-window observed labels:
-  `_opal/response_window_labels_v1/observed_labels.parquet` after study promotion; the
-  sidecar is not yet materialized.
+- Prospective response-window labels: the verified v1 publication contains 27
+  exact labels and eight measured-candidate exclusions.
 - SFXI round-0 label input: the three source runs used one deduplicated 35-row
   Reader vec8 pool, independent of the 18-row physical batch-0 synthesis seed.
 - SFXI source-run state: each RF/SFXI/top-N run used 35 labels, scored 154785
   candidates, and selected 6 rows. The runs remain metric-review evidence and
   have no executable campaign config.
-- RMF runtime: `secg_rmf_greedy` owns one shared eight-output RF and
-  three selection views: ethanol, ciprofloxacin, and AND. Each view uses greedy
-  `top_k: 6`; the logical batch requires 18 unique sequences.
-- The unified config is implemented but inactive until the typed
-  response-window observed-label sidecar and frozen promotion contract exist.
-  No synthesis is authorized.
-- Candidate eligibility: stress configs apply OPAL's generic
-  `restriction_site_exclusion`; the study SFXI strategy allows BamHI only in the
-  5 prime flank and EcoRI only in the 3 prime flank of the final insert.
+- RMF runtime: `secg_rmf_greedy` owns one shared eight-output RF and ethanol,
+  ciprofloxacin, and AND selection views. Round 0 used the promoted Y and a
+  deterministic allocator to produce six slots per view and 18 unique sequences.
+- The completed run is a prospectively frozen learning probe, not evidence that
+  the RF is a supported phenotype predictor. `model_support_ready` remains
+  false, and no synthesis is authorized.
+- Candidate eligibility applies OPAL's generic `restriction_site_exclusion`;
+  study-specific synthesis constraints remain study-owned.
 
 ### Physical Synthesis Handoff
 

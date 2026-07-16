@@ -1885,11 +1885,80 @@ def test_opal_candidate_table_contract_tracks_round0_augmented_materialization()
     }
     assert artifact["source_population"] == "dense_generated_promoters_plus_measured_reader_round0_rows"
     assert artifact["sfxi_source_label_pool_state"] == "present_35_rows"
-    assert artifact["response_window_label_sidecar_state"] == "absent_until_promotion"
+    assert artifact["response_window_label_sidecar_state"] == "verified_27_labels"
+    promotion = artifacts[artifact["response_window_label_promotion_artifact"]]
+    assert promotion["schema_version"] == "opal.observed_label_promotion.v1"
+    assert promotion["y_space"] == "reader_response_window_vector_v1"
+    assert promotion["reduction_id"] == "event_logmean_4_8h_post"
+    assert promotion["label_rows"] == 27
     assert "archive_sfxi_reference_control_rows" not in artifact.get("excludes", "")
     assert check["target_rows"] == artifact["row_count"]
     assert check["row_count_mode"] == "exact"
+    assert check["check_group"] == "opal_candidate_table"
     assert "measured Reader round-0 rows" in check["summary"]
+
+
+def test_opal_round0_ops_phase_routes_to_readonly_candidate_review() -> None:
+    operations = STUDY_DOCS / "operations"
+    lifecycle = yaml.safe_load((operations / "contract" / "lifecycle" / "mode.yaml").read_text(encoding="utf-8"))
+    phases = yaml.safe_load((operations / "contract" / "lifecycle" / "phases.yaml").read_text(encoding="utf-8"))
+    bindings = yaml.safe_load(
+        (operations / "contract" / "readiness" / "group-bindings.yaml").read_text(encoding="utf-8")
+    )
+    readiness = yaml.safe_load(
+        (operations / "contract" / "readiness" / "checks" / "opal_round0_candidate_review.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    surfaces = yaml.safe_load(
+        (operations / "contract" / "surfaces" / "execution" / "commands" / "opal" / "round0-review.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    artifacts = yaml.safe_load((operations / "contract" / "surfaces" / "artifacts.yaml").read_text(encoding="utf-8"))
+
+    phase_by_id = {phase["id"]: phase for phase in phases}
+    assert lifecycle["current_phase"] == {"strategy": "explicit", "id": "opal_round0_candidate_review"}
+    assert phase_by_id["opal_candidate_table_pre_assay"]["status"] == "complete"
+    review_phase = phase_by_id["opal_round0_candidate_review"]
+    assert review_phase["status"] == "in_progress"
+    assert review_phase["next_surface"].endswith("notebooks/opal_secg_rmf_greedy_analysis.py")
+    assert "does not authorize synthesis" in review_phase["notes"]
+    assert bindings["group_phase_bindings"]["opal"] == "opal_round0_candidate_review"
+
+    checks = readiness["checks"]["opal_round0_candidate_review"]
+    assert {check["check_id"] for check in checks} == {
+        "opal.response_window_labels.promotion",
+        "opal.round0.run_context",
+        "opal.round0.selection_batch",
+        "opal.campaign.validate",
+        "opal.round0.selection_batch.load",
+        "opal.round0.ethanol.verify_outputs",
+        "opal.round0.ciprofloxacin.verify_outputs",
+        "opal.round0.and.verify_outputs",
+    }
+    command_surface_ids = {check["surface"] for check in checks if check["kind"] == "command"}
+    for surface_id in command_surface_ids:
+        assert surfaces[surface_id]["writes_artifacts"] is False
+
+    assert surfaces["opal_campaign_validate_json"]["argv"][-1] == "--json"
+    for surface_id in {
+        "opal_selection_batch_round0_json",
+        "opal_verify_outputs_round0_ethanol_json",
+        "opal_verify_outputs_round0_ciprofloxacin_json",
+        "opal_verify_outputs_round0_and_json",
+    }:
+        argv = surfaces[surface_id]["argv"]
+        assert argv[argv.index("--round") + 1] == "0"
+
+    promotion = artifacts["opal_response_window_label_promotion"]
+    assert promotion["label_rows"] == 27
+    assert promotion["ref"].startswith("repo:")
+    selection_batch = artifacts["opal_round0_selection_batch"]
+    assert selection_batch["row_count"] == 18
+    assert selection_batch["deduplicate_by"] == "sequence"
+    assert selection_batch["authorization_state"] == "candidate_review_only"
+    assert selection_batch["ref"].startswith("repo:")
 
 
 def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None:
@@ -1938,6 +2007,6 @@ def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() ->
     assert len(routes.splitlines()) <= 140
     assert "routes/decision/opal/README.md" in routes
     assert "routes/analysis/latentdna.md" in routes
-    assert "round0_metric_review" in opal_route
+    assert "round0_selection_review" in opal_route
     assert "response-window label snapshot" in opal_context
     assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in latentdna_route

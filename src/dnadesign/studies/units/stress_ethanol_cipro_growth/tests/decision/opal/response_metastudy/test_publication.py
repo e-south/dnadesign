@@ -110,11 +110,11 @@ def test_review_bundle_verifier_rejects_non_finite_manifest_numbers(tmp_path: Pa
         verify_bundle_artifacts(tmp_path)
 
 
-def test_review_bundle_verifier_rejects_pre_v11_schema(tmp_path: Path) -> None:
+def test_review_bundle_verifier_rejects_pre_v12_schema(tmp_path: Path) -> None:
     artifact = tmp_path / "report.md"
     artifact.write_text("artifact", encoding="utf-8")
     manifest = {
-        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v10",
+        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v11",
         "artifacts": artifact_inventory(tmp_path, {"report": artifact}),
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")

@@ -36,6 +36,7 @@ from ..core.contracts import (
     StressCampaignContract,
 )
 from .candidate_identity import ResponseCandidateIdentityBindings
+from .label_truth import LABEL_TRUTH_SOURCE, LabelTruthState
 from .measurement_selection import (
     SCHEMA_ID as RESPONSE_SELECTION_SCHEMA_ID,
 )
@@ -48,6 +49,25 @@ from .measurement_selection import (
 from .publication import METASTUDY_SCHEMA_VERSION, source_inventory
 
 
+def build_label_truth_record(
+    state: LabelTruthState,
+    *,
+    screen_source_scope: str,
+    screen_source_label_truth_role: str,
+) -> dict[str, object]:
+    """Project verified label readiness without granting screen rows authority."""
+
+    promotion = state.observed_label_promotion_manifest
+    return {
+        "state": state.state,
+        "source": LABEL_TRUTH_SOURCE,
+        "screen_source_scope": screen_source_scope,
+        "screen_source_label_truth_role": screen_source_label_truth_role,
+        "label_source_state": state.label_source_state,
+        "observed_label_promotion_manifest": None if promotion is None else dict(promotion),
+    }
+
+
 def write_metastudy_manifest(
     *,
     paths: MetastudyPaths,
@@ -55,6 +75,7 @@ def write_metastudy_manifest(
     stress_campaign: StressCampaignContract,
     reader_bundle: ReaderResponseBundle,
     measurement_selection: ResponseMeasurementSelection,
+    label_truth_state: LabelTruthState,
     candidate_identity_bindings: ResponseCandidateIdentityBindings,
     policy_specs: Sequence[PolicySpec],
     top_k: int,
@@ -68,16 +89,13 @@ def write_metastudy_manifest(
     shuffled_model_validation_summary: dict[str, object],
     response_metric_screen: dict[str, object],
 ) -> dict[str, object]:
-    label_truth = {
-        "state": "not_ready",
-        "source": "stress_ethanol_cipro_growth.response_window_observations",
-        "screen_source_scope": measurement_selection.scope,
-        "screen_source_label_truth_role": measurement_selection.label_truth_role,
-        "repeat_aggregation": "study_artifact_not_promoted",
-        "observed_label_promotion_manifest": None,
-    }
+    label_truth = build_label_truth_record(
+        label_truth_state,
+        screen_source_scope=measurement_selection.scope,
+        screen_source_label_truth_role=measurement_selection.label_truth_role,
+    )
     decision_gates = {
-        "label_truth_ready": False,
+        "label_truth_ready": label_truth_state.ready,
         "model_support_ready": bool(response_metric_screen["model_support_ready"]),
         "selection_policy_promoted": False,
         "synthesis_authorized": False,
@@ -96,7 +114,7 @@ def write_metastudy_manifest(
         "candidate_objective": {
             "name": "response_magnitude_feasibility_v1",
             "public_api_version": RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION,
-            "status": "implemented_inactive_pending_label_aggregation_and_opal_promotion",
+            "status": "implemented",
             "documentation": "src/dnadesign/opal/docs/plugins/objectives/response-magnitude-feasibility.md",
             "public_api": "dnadesign.opal",
             "study_decision": (
@@ -119,7 +137,6 @@ def write_metastudy_manifest(
             "stress_campaign": {
                 "slug": stress_campaign.slug,
                 "config": source_inventory(paths.repo_root, [stress_campaign.config_path])[0],
-                "status": "configured_inactive_pending_label_promotion",
             },
             "target_views": [
                 {

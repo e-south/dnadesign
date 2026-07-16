@@ -69,14 +69,15 @@ def build_manifest(
             "observed_round": evidence.policy.observed_round,
             "batch_id": evidence.policy.batch_id,
             "experiment_unit": "reader_experiment",
-            "experiment_weighting": "equal",
+            "label_source_strategy": "explicit_policy_selection",
             "singleton_point_estimate": "identity",
-            "two_experiment_point_estimate": "midpoint_not_robust",
-            "three_or_more_point_estimate": "componentwise_median",
-            "uncertainty_method": "hierarchical_joint_bootstrap",
+            "repeated_point_estimate": "selected_reader_experiment_identity",
+            "primary_value_requirement": evidence.policy.primary_value_requirement,
+            "nonexact_label_action": evidence.policy.nonexact_label_action,
+            "uncertainty_method": "selected_reader_joint_bootstrap",
             "uncertainty_scope": "descriptive_not_population_coverage",
             "event_time_sensitivity": "separate",
-            "hierarchical_bootstrap_samples": evidence.policy.aggregation.bootstrap_samples,
+            "bootstrap_samples": evidence.policy.aggregation.bootstrap_samples,
             "candidate_count": len(evidence.preview.observations),
         },
         "records": {
@@ -93,7 +94,7 @@ def build_manifest(
 
 def validate_manifest_identity(payload: object) -> None:
     if not isinstance(payload, dict) or set(payload) != _MANIFEST_FIELDS:
-        raise ResponseWindowObservationArtifactError("observation manifest fields disagree with the v1 contract.")
+        raise ResponseWindowObservationArtifactError("observation manifest fields disagree with the v2 contract.")
     if (
         payload["schema_id"] != SCHEMA_ID
         or str(payload["schema_version"]) != SCHEMA_VERSION
@@ -137,14 +138,15 @@ def _validate_observation_contract(value: object) -> None:
         "observed_round",
         "batch_id",
         "experiment_unit",
-        "experiment_weighting",
+        "label_source_strategy",
         "singleton_point_estimate",
-        "two_experiment_point_estimate",
-        "three_or_more_point_estimate",
+        "repeated_point_estimate",
+        "primary_value_requirement",
+        "nonexact_label_action",
         "uncertainty_method",
         "uncertainty_scope",
         "event_time_sensitivity",
-        "hierarchical_bootstrap_samples",
+        "bootstrap_samples",
         "candidate_count",
     }
     if not isinstance(value, dict) or set(value) != expected:
@@ -152,11 +154,12 @@ def _validate_observation_contract(value: object) -> None:
     if (
         value["value_order"] != list(VALUE_COLUMNS)
         or value["experiment_unit"] != "reader_experiment"
-        or value["experiment_weighting"] != "equal"
+        or value["label_source_strategy"] != "explicit_policy_selection"
         or value["singleton_point_estimate"] != "identity"
-        or value["two_experiment_point_estimate"] != "midpoint_not_robust"
-        or value["three_or_more_point_estimate"] != "componentwise_median"
-        or value["uncertainty_method"] != "hierarchical_joint_bootstrap"
+        or value["repeated_point_estimate"] != "selected_reader_experiment_identity"
+        or value["primary_value_requirement"] != "exact"
+        or value["nonexact_label_action"] != "exclude_candidate"
+        or value["uncertainty_method"] != "selected_reader_joint_bootstrap"
         or value["uncertainty_scope"] != "descriptive_not_population_coverage"
         or value["event_time_sensitivity"] != "separate"
     ):
@@ -166,12 +169,12 @@ def _validate_observation_contract(value: object) -> None:
         or not isinstance(value["observed_round"], int)
         or value["observed_round"] < 0
         or value["y_space"] != "reader_response_window_vector_v1"
-        or value["primary_reduction_id"] != "event_logmean_6_12h_post"
+        or value["primary_reduction_id"] != "event_logmean_4_8h_post"
         or not isinstance(value["batch_id"], str)
         or not value["batch_id"].strip()
-        or isinstance(value["hierarchical_bootstrap_samples"], bool)
-        or not isinstance(value["hierarchical_bootstrap_samples"], int)
-        or value["hierarchical_bootstrap_samples"] < 100
+        or isinstance(value["bootstrap_samples"], bool)
+        or not isinstance(value["bootstrap_samples"], int)
+        or value["bootstrap_samples"] < 100
         or isinstance(value["candidate_count"], bool)
         or not isinstance(value["candidate_count"], int)
         or value["candidate_count"] < 1

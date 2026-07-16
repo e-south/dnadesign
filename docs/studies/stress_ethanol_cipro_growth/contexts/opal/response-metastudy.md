@@ -12,7 +12,7 @@ audience:
 
 ## Response Metric Metastudy
 
-**Status:** round-0 metric, label, and predictor review
+**Status:** round-0 selection review
 **Owner:** `stress_ethanol_cipro_growth` study
 **Last verified:** 2026-07-15
 **Implementation:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy`
@@ -42,8 +42,8 @@ ledgers, and synthesis handoffs.
   replicate aggregation, joint bootstrap draws, reference subtraction, and
   assay review visuals.
 - The stress study owns target masks, Reader-to-candidate joins, label
-  representation comparisons, cross-experiment aggregation, grouped model
-  evaluation, and promotion policy.
+  representation comparisons, repeated-candidate label-source decisions,
+  grouped model evaluation, and promotion policy.
 - OPAL owns canonical SFXI, Response-Magnitude Feasibility (RMF) math, model fitting,
   candidate scoring, selection, and ledgers after promotion.
 
@@ -78,11 +78,14 @@ does not import the binding builder.
 
 The selection is limited to retrospective model screening. It makes the source
 choice for repeated designs explicit, does not read an SFXI source CSV, and has
-no label-truth role. Cross-experiment evidence and approval live in the
-study-level `response_window_observations/` package.
+no label-truth or calibration-cohort role. Cross-experiment evidence, explicit
+label sources, and approval live in the study-level
+`response_window_observations/` package. Campaign scales use every exact,
+study-bound, non-reference primary Reader candidate-experiment unit rather than
+this screen selection.
 
 The response-metastudy publication schema is
-`stress_ethanol_cipro_growth.response_metastudy.v11`.
+`stress_ethanol_cipro_growth.response_metastudy.v12`.
 
 ### Evidence Flow
 
@@ -108,7 +111,7 @@ The response-metastudy publication schema is
    robust-target RF, fold-fitted PCA-ridge, and PLS challengers with complete
    Reader experiments held out.
 9. Measure repeated-design agreement, retrospective enrichment, and the risk of
-   a prespecified greedy top-six policy.
+   a prespecified coordinated six-slot policy.
 10. Publish typed tables, a manifest-backed plot catalog, a report, and one
     Marimo review notebook.
 
@@ -157,10 +160,10 @@ Reader's response-window handoff is
 `[r00, r10, r01, r11, b00, b10, b01, b11]`. Here `r_i` is reduced
 `log2(YFP/CFP)` response and `b_i` is same-state pDual-10-relative
 `log2(YFP/OD600)` fluorescence. These values are not the SFXI vec8 fields and
-must not use `sfxi_vec8` names. The primary reduction is the 6-12-hour
+must not use `sfxi_vec8` names. The primary reduction is the 4-8-hour
 post-event geometric log mean. Reader owns that reduction and its uncertainty;
-the study owns repeat aggregation and promotion of response-window observed Y;
-OPAL applies RMF and owns campaign scoring.
+the study owns repeated-candidate label sources and promotion of response-window
+observed Y; OPAL applies RMF and owns campaign scoring.
 
 ### Evidence Findings
 
@@ -172,22 +175,25 @@ effect-dominated:
 - weakest median top-six logic fidelity is 0.258;
 - mean pairwise target-view score correlation is 0.968.
 
-The Reader bundle contains 8 experiments, 5 reductions, 295 design/reduction
-rows, 147,500 joint bootstrap rows, and 12 repeated design IDs. The primary
-reduction is `event_logmean_6_12h_post`.
+The Reader bundle contains 8 experiments, 7 reductions, 413 design/reduction
+rows, 206,500 joint bootstrap rows, and 12 repeated design IDs. The primary
+reduction is `event_logmean_4_8h_post`.
 
 The strongest descriptive fixed challenger in this snapshot is PLS4 over the primary eight-component
-summary. Its weakest response-separation Spearman is 0.15 and weakest
-feasibility Spearman is 0.45 across active views. This defines a directional
+summary. Its weakest response-separation and feasibility Spearman values are
+both 0.45 across active views. This defines a directional
 experiment, not a calibrated success probability or a campaign-model change.
 The exact configured campaign RF is reported on its own row and is the only
 model that can satisfy the campaign-model support gate.
 
 Retrospective enrichment is strongest for ciprofloxacin, intermediate for AND,
-and weakest for ethanol, but all exact 95% intervals include 0.5. The configured
-selection mechanism under review is greedy top-six per view. It is not promoted
-or authorized for synthesis; the metastudy records its risk and does not derive
-slot allocations from these uncertain intervals.
+and weakest for ethanol, but all exact 95% intervals include 0.5. Round 0 used
+one shared RF and deterministic round-robin allocation to assign six
+sequence-unique slots per view. The preferred lists contained one overlap, so
+the AND view advanced once to produce 18 unique sequences. This operational
+completion does not promote the model or authorize synthesis; the metastudy
+records predictive risk and does not derive slot allocations from uncertain
+retrospective intervals.
 
 ### Plot Surface
 
@@ -246,11 +252,13 @@ the destination only after the complete run succeeds.
 
 ### Promotion Boundary
 
-No objective or model is promoted until the checked-in repeat policy is
-approved, its typed OPAL label publication verifies, grouped evidence covers all
-active selection views, and the study records an explicit run decision. The
-nearest-12-hour vec8 remains immutable provenance after any new label is
-promoted.
+The label-truth gate is complete: the checked-in source policy selects eight
+reviewed repeat sources, excludes four unresolved repeated candidates, and the
+typed publication verifies 27 exact labels plus eight measured-candidate
+exclusions. That result does not satisfy the independent model-support gate.
+`model_support_ready` remains false, round 0 is a prospective learning probe,
+and synthesis authorization remains a separate study decision. The
+nearest-12-hour SFXI vec8 remains immutable provenance and is not an RMF label.
 
 The metastudy can reject unsupported choices. A biological hill climb exists
 only after a prospective selected set is built, measured, and compared with its

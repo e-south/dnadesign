@@ -24,7 +24,7 @@ def response_screen_manifest(
     screen: ResponseMetricScreen,
     *,
     primary_reduction_id: str,
-    campaign_calibration_parity: Mapping[str, object],
+    campaign_to_screen_calibration: Mapping[str, object],
     campaign_model_params: Mapping[str, object],
 ) -> dict[str, object]:
     """Return the compact promotion posture recorded in the bundle manifest."""
@@ -80,7 +80,7 @@ def response_screen_manifest(
             }
             for selection_view_id, rows in screen.calibration.groupby("selection_view_id", sort=True)
         },
-        "campaign_calibration_parity": dict(campaign_calibration_parity),
+        "campaign_to_screen_calibration": dict(campaign_to_screen_calibration),
         "response_screen_protocol": {
             "bootstrap_samples": bootstrap_samples,
             "scale_quantile": RESPONSE_REVIEW_SPEC.scale_quantile,

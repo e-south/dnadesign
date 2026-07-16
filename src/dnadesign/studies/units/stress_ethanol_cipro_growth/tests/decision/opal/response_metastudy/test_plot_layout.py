@@ -73,7 +73,11 @@ def test_measured_response_examples_use_only_reader_values_and_rmf_components(
 
 
 def test_primary_matrix_plots_use_square_tiles(captured_figures: list[plt.Figure], tmp_path: Path) -> None:
-    response_assay_plots.write_response_separation_stability(_stability_rows(), tmp_path / "stability.png")
+    response_assay_plots.write_response_separation_stability(
+        _stability_rows(),
+        tmp_path / "stability.png",
+        primary_reduction_id="event_logmean_4_8h_post",
+    )
     response_model_plots.write_label_model_screen(_model_rows(), tmp_path / "models.png")
 
     try:

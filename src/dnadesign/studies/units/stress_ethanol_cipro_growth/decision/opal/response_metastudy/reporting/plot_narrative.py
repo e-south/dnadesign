@@ -106,7 +106,7 @@ PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
         "Retrospective enrichment neither assigns synthesis slots nor proves prospective improvement."
     ),
     "repeated_design_agreement": (
-        "Cross-experiment range does not identify the correct aggregation rule or a biological response."
+        "Cross-experiment range does not identify an authoritative label source or establish a biological cause."
     ),
 }
 

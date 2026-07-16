@@ -2,7 +2,7 @@
 id: stress-ethanol-cipro-growth-response-window-label-promotion
 title: Response-window label promotion
 owner: stress_ethanol_cipro_growth
-status: blocked_by_observation_policy
+status: active
 last_verified: 2026-07-15
 first_hop: publisher.py
 ---
@@ -35,10 +35,24 @@ _opal/response_window_labels_v1/
 study provenance, and labels before every read, and generic `ingest-y` cannot
 mutate it.
 
+The study provenance also records every measured candidate that is absent from
+the promoted label table and the study-issued reason for that disposition. The
+campaign must project that exact ID-and-reason set through the
+`candidate_id_exclusion` eligibility rule. Publication and later verification
+reject missing, extra, stale, or differently reasoned entries. The observation
+bundle remains the authority; the campaign configuration is only its selection
+projection.
+
 The campaign uses `error_on_duplicate`; duplicate candidate/round labels are a
 contract violation rather than a last-write-wins event.
 
-After an approved observation bundle exists, the explicit operator surface is:
+The verified v1 publication contains 27 exact candidate labels. It records
+eight measured-candidate exclusions, including the four repeated candidates
+with unresolved source disagreement. Eight other repeated candidates use their
+reviewed selected source. This publication makes no equal-experiment or
+population-level uncertainty claim.
+
+The explicit operator surface for a new approved version is:
 
 ```bash
 uv run python -m \

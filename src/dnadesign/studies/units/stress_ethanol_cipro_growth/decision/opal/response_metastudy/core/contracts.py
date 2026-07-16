@@ -64,8 +64,10 @@ class StressCampaignContract:
     target_views: tuple[StressTargetView, ...]
     candidate_records_path: Path
     x_column_name: str
+    response_reduction_id: str
     model_params: Mapping[str, object] = field(default_factory=dict)
     rmf_calibration_by_view: Mapping[str, Mapping[str, float]] = field(default_factory=dict)
+    rmf_calibration_cohort: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

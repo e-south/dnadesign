@@ -35,33 +35,43 @@ def validate_recomputed_observations(
         raise ResponseWindowObservationArtifactError(
             "published contributions must contain one evidence row per candidate and Reader experiment."
         )
-    included = contributions.loc[contributions["included_in_label"].astype(bool)].copy()
     observation_by_id = observations.set_index("candidate_id")
-    for candidate_id, frame in included.groupby("candidate_id", sort=True):
+    included_ids = set(contributions.loc[contributions["included_in_label"].astype(bool), "candidate_id"].astype(str))
+    if included_ids != set(observation_by_id.index.astype(str)):
+        raise ResponseWindowObservationArtifactError(
+            "published observations disagree with included contribution candidates."
+        )
+    for candidate_id, frame in contributions.groupby("candidate_id", sort=True):
         candidate_id = str(candidate_id)
+        if candidate_id not in included_ids:
+            continue
         row = observation_by_id.loc[candidate_id]
-        experiment_count = int(frame["reader_experiment_id"].astype(str).nunique())
-        if not _exact_int(row["experiment_count"], expected=experiment_count):
+        reader_experiment_count = int(frame["reader_experiment_id"].astype(str).nunique())
+        if not _exact_int(row["reader_experiment_count"], expected=reader_experiment_count):
             raise ResponseWindowObservationArtifactError(
                 f"observation experiment count disagrees with contributions for {candidate_id!r}."
             )
-        expected_method = _aggregation_method(experiment_count)
-        if row["aggregation_method"] != expected_method:
+        expected_method = "singleton_identity" if reader_experiment_count == 1 else "explicit_repeat_selection"
+        if row["label_source_method"] != expected_method:
             raise ResponseWindowObservationArtifactError(
-                f"observation aggregation method disagrees with contributions for {candidate_id!r}."
+                f"observation label-source method disagrees with contributions for {candidate_id!r}."
             )
         expected_design_ids = sorted(frame["design_id"].astype(str).unique().tolist())
         if _text_sequence(row["reader_design_ids"]) != expected_design_ids:
             raise ResponseWindowObservationArtifactError(
                 f"observation Reader design IDs disagree with contributions for {candidate_id!r}."
             )
-        weights = pd.to_numeric(frame["experiment_weight"], errors="coerce").to_numpy(dtype=float)
-        expected_weight = 1.0 / experiment_count
-        if not np.isfinite(weights).all() or not np.allclose(weights, expected_weight, rtol=_RTOL, atol=_ATOL):
+        selected = frame.loc[frame["included_in_label"].astype(bool)]
+        if len(selected) != 1:
             raise ResponseWindowObservationArtifactError(
-                f"observation contributions do not use equal experiment weights for {candidate_id!r}."
+                f"observation must have one included label source for {candidate_id!r}."
             )
-        expected_point = np.median(frame.loc[:, VALUE_COLUMNS].to_numpy(dtype=float), axis=0)
+        label_source_id = str(selected.iloc[0]["reader_experiment_id"])
+        if str(row["label_source_reader_experiment_id"]) != label_source_id:
+            raise ResponseWindowObservationArtifactError(
+                f"observation label-source experiment disagrees for {candidate_id!r}."
+            )
+        expected_point = selected.loc[:, VALUE_COLUMNS].iloc[0].to_numpy(dtype=float)
         observed_point = row.loc[list(VALUE_COLUMNS)].to_numpy(dtype=float)
         if not np.allclose(observed_point, expected_point, rtol=_RTOL, atol=_ATOL):
             raise ResponseWindowObservationArtifactError(
@@ -85,14 +95,6 @@ def _validate_uncertainty_points(observation_by_id: pd.DataFrame, uncertainty: p
             raise ResponseWindowObservationArtifactError(
                 f"uncertainty point estimate disagrees with observation for {candidate_id!r} {component!r}."
             )
-
-
-def _aggregation_method(experiment_count: int) -> str:
-    if experiment_count == 1:
-        return "single_experiment"
-    if experiment_count == 2:
-        return "two_experiment_midpoint"
-    return "componentwise_experiment_median"
 
 
 def _exact_int(value: object, *, expected: int) -> bool:

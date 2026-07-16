@@ -17,6 +17,11 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
+    ReaderResponseBundle,
+    load_reader_response_bundle,
+)
+
 from ...source_evidence import sfxi_round0_source_evidence_dir
 from ..core.contracts import (
     EXPECTED_STRESS_TARGET_VIEW_IDS,
@@ -58,6 +63,15 @@ _RMF_CALIBRATION_FIELDS = {
     "on_magnitude_scale",
     "off_magnitude_scale",
 }
+_RMF_CALIBRATION_COHORT_FIELDS = {
+    "cohort_id",
+    "unit",
+    "scale_quantile",
+    "reader_bundle_manifest_sha256",
+    "candidate_bindings_manifest_sha256",
+    "unit_count",
+    "excluded_nonexact_unit_count",
+}
 
 
 def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContract:
@@ -73,6 +87,13 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
     campaign = payload.get("campaign")
     if not isinstance(campaign, dict) or campaign.get("slug") != STRESS_RMF_GREEDY_CAMPAIGN_SLUG:
         raise ValueError(f"Stress campaign config must declare slug {STRESS_RMF_GREEDY_CAMPAIGN_SLUG!r}.")
+    metadata = campaign.get("metadata")
+    if not isinstance(metadata, dict) or metadata.get("study_id") != "stress_ethanol_cipro_growth":
+        raise ValueError("Stress campaign metadata must declare the stress study identity.")
+    response_reduction_id = metadata.get("response_reduction")
+    if not isinstance(response_reduction_id, str) or not response_reduction_id.strip():
+        raise ValueError("Stress campaign metadata must declare a response reduction.")
+    rmf_calibration_cohort = _parse_rmf_calibration_cohort(metadata.get("rmf_calibration"))
     raw_views = payload.get("selection_views")
     if not isinstance(raw_views, list):
         raise ValueError("Stress campaign must declare selection_views.")
@@ -113,9 +134,41 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
         target_views=target_views,
         candidate_records_path=records_path,
         x_column_name=x_column_name,
+        response_reduction_id=response_reduction_id.strip(),
         model_params=dict(model["params"]),
         rmf_calibration_by_view=rmf_calibration_by_view,
+        rmf_calibration_cohort=rmf_calibration_cohort,
     )
+
+
+def assert_campaign_response_reduction(
+    campaign: StressCampaignContract,
+    *,
+    primary_reduction_id: str,
+) -> None:
+    """Require campaign metadata to bind the exact Reader primary reduction."""
+
+    if campaign.response_reduction_id != str(primary_reduction_id):
+        raise ValueError(
+            "Stress campaign response reduction disagrees with the Reader primary reduction: "
+            f"campaign={campaign.response_reduction_id!r}, Reader={str(primary_reduction_id)!r}."
+        )
+
+
+def load_campaign_reader_bundle(
+    paths: MetastudyPaths,
+    campaign: StressCampaignContract,
+) -> ReaderResponseBundle:
+    """Load the configured Reader bundle and verify its campaign reduction."""
+
+    request_path = (
+        paths.repo_root
+        / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
+        / "response_window_observations/config/reader_response_window.yaml"
+    )
+    bundle = load_reader_response_bundle(paths.reader_bundle_root, expected_request_path=request_path)
+    assert_campaign_response_reduction(campaign, primary_reduction_id=bundle.primary_reduction_id)
+    return bundle
 
 
 def _validate_campaign_model_io(payload: dict[str, object]) -> None:
@@ -173,6 +226,33 @@ def _parse_rmf_calibration(raw: object) -> dict[str, float]:
     if any(parsed[field] <= 0.0 for field in scale_fields):
         raise ValueError(f"Stress target view {view_id!r} calibration scales must be positive.")
     return parsed
+
+
+def _parse_rmf_calibration_cohort(raw: object) -> dict[str, object]:
+    if not isinstance(raw, dict) or set(raw) != _RMF_CALIBRATION_COHORT_FIELDS:
+        raise ValueError(
+            f"Stress campaign RMF calibration cohort fields must be exactly {sorted(_RMF_CALIBRATION_COHORT_FIELDS)}."
+        )
+    result = dict(raw)
+    if result["cohort_id"] != "exact_primary_reader_candidate_experiments_v1":
+        raise ValueError("Stress campaign RMF calibration cohort identity disagrees.")
+    if result["unit"] != "reader_candidate_experiment":
+        raise ValueError("Stress campaign RMF calibration unit disagrees.")
+    if float(result["scale_quantile"]) != 0.9:
+        raise ValueError("Stress campaign RMF calibration quantile must be 0.9.")
+    for field in ("reader_bundle_manifest_sha256", "candidate_bindings_manifest_sha256"):
+        value = str(result[field])
+        if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+            raise ValueError(f"Stress campaign RMF calibration field {field!r} must be a SHA-256 digest.")
+        result[field] = value
+    for field in ("unit_count", "excluded_nonexact_unit_count"):
+        value = result[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"Stress campaign RMF calibration field {field!r} must be a nonnegative integer.")
+    if int(result["unit_count"]) == 0:
+        raise ValueError("Stress campaign RMF calibration cohort cannot be empty.")
+    result["scale_quantile"] = float(result["scale_quantile"])
+    return result
 
 
 def load_sfxi_evidence_frame(

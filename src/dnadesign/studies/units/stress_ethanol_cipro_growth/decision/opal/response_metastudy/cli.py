@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 from .runtime.audit import run_metastudy
+from .runtime.calibration_preview import preview_response_calibration
 
 DEFAULT_OUT_DIR = Path(
     "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_metastudy/latest"
@@ -42,12 +43,34 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--top-k", type=int, default=6)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--calibration-preview",
+        action="store_true",
+        help="Derive Reader-backed RMF calibration without writing metastudy output.",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
     if args.top_k <= 0:
         raise ValueError("--top-k must be positive.")
     repo_root = args.repo_root.resolve()
+    if args.calibration_preview:
+        if args.overwrite:
+            parser.error("--calibration-preview is read-only and cannot be combined with --overwrite.")
+        preview = preview_response_calibration(
+            repo_root=repo_root,
+            reader_bundle_root=args.reader_bundle.resolve(),
+            candidate_binding_bundle_root=args.candidate_bindings.resolve(),
+        )
+        if args.json:
+            print(json.dumps(preview, allow_nan=False, indent=2, sort_keys=True))
+        else:
+            print("stress_ethanol_cipro_growth RMF calibration preview")
+            print(f"primary_reduction={preview['primary_reduction_id']}")
+            print(f"campaign_matches={preview['campaign_matches_reader_calibration']}")
+            for row in preview["selection_views"]:  # type: ignore[union-attr]
+                print(f"{row['selection_view_id']}={row['derived_calibration']}")
+        return 0
     out_dir = args.out_dir
     if not out_dir.is_absolute():
         out_dir = repo_root / out_dir

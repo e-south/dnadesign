@@ -18,7 +18,6 @@ import pandas as pd
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
     build_all_primary_measurements,
-    load_reader_response_bundle,
 )
 
 from ..core.contracts import (
@@ -45,11 +44,13 @@ from ..evaluation.response_examples import build_response_example_rows
 from ..evaluation.scoring import score_sfxi_evidence
 from ..evaluation.summaries import summarize_policies
 from ..evaluation.support import build_setpoint_support
-from .campaign_calibration import verify_campaign_rmf_calibration_parity
+from .campaign_calibration import compare_campaign_to_screen_calibration
 from .candidate_identity import load_response_candidate_identity_bindings
+from .label_truth import resolve_configured_label_truth
 from .loading import (
     assert_candidate_alignment,
     assert_shared_observed_labels,
+    load_campaign_reader_bundle,
     load_candidate_matrix,
     load_label_source_frame,
     load_observed_label_frame,
@@ -112,6 +113,7 @@ def _materialize_metastudy(
     )
     paths.out_dir.mkdir(parents=True, exist_ok=True)
     stress_campaign = load_stress_campaign_contract(paths)
+    label_truth_state = resolve_configured_label_truth(stress_campaign.config_path)
     target_views = stress_campaign.target_views
     target_views_by_id = {view.id: view for view in target_views}
     sfxi_evidence = tuple(
@@ -134,15 +136,7 @@ def _materialize_metastudy(
     )
     assert_shared_label_sources(label_source_frames)
     label_sources = label_source_frames[0]
-    reader_request_path = (
-        paths.repo_root
-        / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "response_window_observations/config/reader_response_window.yaml"
-    )
-    reader_bundle = load_reader_response_bundle(
-        paths.reader_bundle_root,
-        expected_request_path=reader_request_path,
-    )
+    reader_bundle = load_campaign_reader_bundle(paths, stress_campaign)
     measurement_selection = load_response_measurement_selection(
         Path(__file__).resolve().parents[1] / "config/response_model_screen_selection.yaml",
         reader_designs=reader_bundle.designs,
@@ -203,9 +197,8 @@ def _materialize_metastudy(
         random_forest_params=stress_campaign.model_params,
         target_views=target_views,
     )
-    campaign_calibration_parity = verify_campaign_rmf_calibration_parity(
-        response_screen.calibration,
-        configured_by_view=stress_campaign.rmf_calibration_by_view,
+    campaign_to_screen_calibration = compare_campaign_to_screen_calibration(
+        response_screen.calibration, configured_by_view=stress_campaign.rmf_calibration_by_view
     )
     response_examples = build_response_example_rows(
         response_screen.uncertainty,
@@ -254,7 +247,6 @@ def _materialize_metastudy(
         np.ascontiguousarray(sfxi_y_train),
     )
     response_x_matrix_sha256 = sha256_arrays(np.ascontiguousarray(response_x_train))
-
     policy_specs = audit_policy_specs()
     scored = {
         policy.id: {evidence.target_view.id: score_sfxi_evidence(evidence, policy) for evidence in sfxi_evidence}
@@ -339,6 +331,7 @@ def _materialize_metastudy(
             recommendation=recommendation,
             canonical_sfxi_validation=canonical_sfxi_validation,
             primary_reduction_id=reader_bundle.primary_reduction_id,
+            label_truth_state=label_truth_state,
         ),
     )
     return write_metastudy_manifest(
@@ -347,6 +340,7 @@ def _materialize_metastudy(
         stress_campaign=stress_campaign,
         reader_bundle=reader_bundle,
         measurement_selection=measurement_selection,
+        label_truth_state=label_truth_state,
         candidate_identity_bindings=candidate_identity_bindings,
         policy_specs=policy_specs,
         top_k=top_k,
@@ -361,7 +355,7 @@ def _materialize_metastudy(
         response_metric_screen=response_screen_manifest(
             response_screen,
             primary_reduction_id=reader_bundle.primary_reduction_id,
-            campaign_calibration_parity=campaign_calibration_parity,
+            campaign_to_screen_calibration=campaign_to_screen_calibration,
             campaign_model_params=stress_campaign.model_params,
         ),
     )

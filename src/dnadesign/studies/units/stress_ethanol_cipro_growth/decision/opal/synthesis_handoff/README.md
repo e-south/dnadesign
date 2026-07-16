@@ -1,8 +1,8 @@
 # Stress OPAL Synthesis Handoff
 
 **Owner:** stress_ethanol_cipro_growth study
-**Lifecycle:** pre-assay batch zero recorded; measured-round contract inactive
-**Last verified:** 2026-07-14
+**Lifecycle:** round-0 source available; synthesis authorization pending
+**Last verified:** 2026-07-15
 
 Study-owned conversion from an OPAL logical selection batch to physical
 synthesis artifacts.
@@ -55,17 +55,23 @@ by multiple views appears once with every membership.
 The authority is
 `docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml`.
 
-A future measured-round record has this shape:
+The first physical assay batch selected by the RMF campaign has assay index 1
+and was chosen by the model fitted at OPAL round 0. Those axes are related but
+not interchangeable: `assay_batch_index` counts physical assay batches, while
+`model_as_of_round` identifies the label snapshot and model that made the
+selection.
+
+If synthesis is authorized, its reviewed handoff record uses this mapping:
 
 ```yaml
-- handoff_id: stress-opal-r1-rmf-v1
+- handoff_id: stress-opal-assay-b1-r0-rmf-v1
   lifecycle_status: generated_pending_acceptance
   source_authority: opal_selection_batch
   selection_epoch: opal_model_round
   assay_batch_index: 1
-  model_as_of_round: 1
+  model_as_of_round: 0
   campaign_slug: secg_rmf_greedy
-  run_id: <immutable-run-id>
+  run_id: r0-2026-07-16T01:32:16+00:00
   strategy_id: stress_promoter_insert:v1
   expected_selection_views:
     - {selection_view_id: ethanol, expected_rows: 6}

@@ -51,7 +51,7 @@ def test_reader_request_declares_comprehensive_geometric_windows() -> None:
             "event_logmean_0_12h_post",
         )
     }
-    assert [row["id"] for row in payload["reductions"] if row["role"] == "primary"] == ["event_logmean_6_12h_post"]
+    assert [row["id"] for row in payload["reductions"] if row["role"] == "primary"] == ["event_logmean_4_8h_post"]
 
 
 def test_window_evidence_compares_each_reduction_with_assay_and_model_diagnostics() -> None:

@@ -30,6 +30,7 @@ DECISION_COLUMNS = (
     "candidate_id",
     "reader_design_ids",
     "reader_experiment_ids",
+    "label_source_reader_experiment_id",
     "status",
     "classification",
     "evidence_artifact",
@@ -38,13 +39,14 @@ DECISION_COLUMNS = (
     "adjudicated_at",
     "reason",
 )
-REPEAT_STATUSES = frozenset({"comparable", "excluded_noncomparable", "remeasure_required", "review_required"})
+REPEAT_STATUSES = frozenset({"label_source_selected", "label_source_excluded", "remeasure_required", "review_required"})
 REPEAT_CLASSIFICATIONS = frozenset(
     {
-        "assay_context_comparable",
+        "source_agreement_accepted",
         "corrected_technical_error",
         "noncomparable_assay_context",
         "plausible_biological_variation",
+        "unresolved_source_disagreement",
         "remeasurement_required",
         "unresolved",
     }
@@ -70,7 +72,7 @@ class ResponseWindowAggregationPolicy:
         if not str(self.policy_id).strip() or not str(self.primary_reduction_id).strip():
             raise ResponseWindowAggregationError("aggregation policy identifiers must be non-empty.")
         if isinstance(self.bootstrap_samples, bool) or self.bootstrap_samples < 100:
-            raise ResponseWindowAggregationError("hierarchical bootstrap requires at least 100 samples.")
+            raise ResponseWindowAggregationError("selected-source bootstrap requires at least 100 samples.")
         if not math.isfinite(self.confidence_level) or not 0.0 < self.confidence_level < 1.0:
             raise ResponseWindowAggregationError("confidence_level must be finite and between zero and one.")
         if isinstance(self.random_seed, bool) or not isinstance(self.random_seed, int):

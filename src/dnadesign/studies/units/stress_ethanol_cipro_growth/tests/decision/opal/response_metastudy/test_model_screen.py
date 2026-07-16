@@ -62,6 +62,42 @@ def test_campaign_screen_preserves_configured_random_forest_fit_parameters() -> 
     assert fitted_params["n_jobs"] == -1
 
 
+@pytest.mark.parametrize(
+    "model_spec",
+    (
+        grouped_models.ModelScreenSpec(
+            id="campaign_random_forest",
+            kind="random_forest",
+            role="campaign_model",
+        ),
+        grouped_models.ModelScreenSpec(id="pls4", kind="pls", components=4),
+    ),
+    ids=("campaign_random_forest", "pls4"),
+)
+def test_grouped_predictions_do_not_learn_from_held_out_labels(
+    model_spec: grouped_models.ModelScreenSpec,
+) -> None:
+    rng = np.random.default_rng(17)
+    x = rng.normal(size=(15, 8))
+    y = rng.normal(size=(15, 8))
+    groups = np.repeat(np.asarray(["experiment-1", "experiment-2", "experiment-3"], dtype=object), 5)
+    held_out = groups == "experiment-2"
+    perturbed_y = y.copy()
+    perturbed_y[held_out] += 1_000.0
+    kwargs = {
+        "groups": groups,
+        "model_spec": model_spec,
+        "random_forest_params": {"n_estimators": 16, "random_state": 7, "n_jobs": 1},
+        "magnitude_start": 4,
+    }
+
+    baseline = grouped_models.grouped_predictions(x, y, pca_cache={}, **kwargs)
+    perturbed = grouped_models.grouped_predictions(x, perturbed_y, pca_cache={}, **kwargs)
+
+    np.testing.assert_array_equal(perturbed[held_out], baseline[held_out])
+    assert not np.allclose(perturbed[~held_out], baseline[~held_out])
+
+
 def test_factorial_contrast_preserves_all_response_separations() -> None:
     response_magnitude = np.asarray(
         [
@@ -125,13 +161,13 @@ def test_grouped_model_screen_returns_margin_and_enrichment_evidence() -> None:
     response_magnitude = np.column_stack((response, brightness))
     ids = [f"id-{index}" for index in range(len(x))]
     summaries = pd.DataFrame(response_magnitude, columns=["r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11"])
-    summaries.insert(0, "reduction_id", "event_logmean_6_12h_post")
+    summaries.insert(0, "reduction_id", "primary")
     summaries.insert(0, "id", ids)
     representations = evaluation.build_label_representations(
         ids=ids,
         response_summaries=summaries,
-        primary_reduction_id="event_logmean_6_12h_post",
-        promotion_reduction_ids=frozenset({"event_logmean_6_12h_post"}),
+        primary_reduction_id="primary",
+        promotion_reduction_ids=frozenset({"primary"}),
     )
     ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
 
@@ -150,8 +186,8 @@ def test_grouped_model_screen_returns_margin_and_enrichment_evidence() -> None:
     )
 
     assert set(summary["representation_id"]) == {
-        "event_logmean_6_12h_post",
-        "event_logmean_6_12h_post__factorial_contrast7",
+        "primary",
+        "primary__factorial_contrast7",
     }
     assert (summary["model_id"] == "pls2").all()
     assert (summary["model_role"] == "fixed_challenger").all()
@@ -176,13 +212,13 @@ def test_retrospective_enrichment_rejects_tied_mean_predictions() -> None:
     response_magnitude = rng.normal(size=(18, 8))
     ids = [f"id-{index}" for index in range(len(x))]
     summaries = pd.DataFrame(response_magnitude, columns=["r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11"])
-    summaries.insert(0, "reduction_id", "event_logmean_6_12h_post")
+    summaries.insert(0, "reduction_id", "primary")
     summaries.insert(0, "id", ids)
     representations = evaluation.build_label_representations(
         ids=ids,
         response_summaries=summaries,
-        primary_reduction_id="event_logmean_6_12h_post",
-        promotion_reduction_ids=frozenset({"event_logmean_6_12h_post"}),
+        primary_reduction_id="primary",
+        promotion_reduction_ids=frozenset({"primary"}),
     )
     ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
 

@@ -22,6 +22,7 @@ from .contracts import (
     VALUE_COLUMNS,
     ResponseWindowAggregationError,
 )
+from .label_sources import validate_label_source_identity
 from .repeat_adjudication import validate_repeat_adjudications
 
 
@@ -118,9 +119,16 @@ def validated_repeat_decisions(
                 f"{row.candidate_id}: repeat-policy experiment identities disagree; "
                 f"expected={observed_experiments}, found={experiments}."
             )
+        selected_experiment = validate_label_source_identity(
+            candidate_id=str(row.candidate_id),
+            status=str(row.status),
+            value=row.label_source_reader_experiment_id,
+            observed_experiments=observed_experiments,
+        )
         index = result.index[result["candidate_id"].eq(row.candidate_id)][0]
         result.at[index, "reader_design_ids"] = aliases
         result.at[index, "reader_experiment_ids"] = experiments
+        result.at[index, "label_source_reader_experiment_id"] = selected_experiment
     return result
 
 

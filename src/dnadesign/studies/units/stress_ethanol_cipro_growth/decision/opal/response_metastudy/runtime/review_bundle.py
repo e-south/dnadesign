@@ -21,6 +21,7 @@ from ..core.response_contracts import ResponseMetricScreen
 from ..reporting.notebook import write_review_notebook
 from ..reporting.plots import write_visuals
 from ..reporting.report import write_report
+from .label_truth import LabelTruthState
 from .publication import artifact_inventory
 from .response_screen_publication import write_response_screen_tables
 
@@ -47,6 +48,7 @@ class ReviewBundleEvidence:
     recommendation: dict[str, object]
     canonical_sfxi_validation: dict[str, object]
     primary_reduction_id: str
+    label_truth_state: LabelTruthState
 
 
 def materialize_review_bundle(
@@ -99,6 +101,7 @@ def materialize_review_bundle(
         canonical_sfxi_validation=evidence.canonical_sfxi_validation,
         thresholds=evidence.thresholds,
         primary_reduction_id=evidence.primary_reduction_id,
+        label_truth_ready=evidence.label_truth_state.ready,
     )
     review_notebook_path = write_review_notebook(paths.out_dir)
     artifacts = {

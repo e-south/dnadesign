@@ -56,10 +56,10 @@ def build_review_summary(bundle_manifest: Mapping[str, object]) -> ReviewSummary
     if method not in method_labels:
         raise ValueError(f"Unsupported primary reduction method: {method!r}")
     if response_screen.get("prospective_hill_climb_demonstrated") is not False:
-        raise ValueError("Inactive response screen cannot claim a prospective hill climb.")
+        raise ValueError("Unpromoted response screen cannot claim a prospective hill climb.")
 
     return ReviewSummary(
-        decision="RMF remains inactive for production selection",
+        decision="RMF production selection remains unsupported",
         basis=(
             "The leading fixed challenger has weakest target-view response-separation ordering of "
             f"{weakest_ordering:.2f}; prospective rank stability is not established"

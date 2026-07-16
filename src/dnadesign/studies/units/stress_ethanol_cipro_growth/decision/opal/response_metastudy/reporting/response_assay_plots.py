@@ -34,6 +34,7 @@ from .plot_vocabulary import (
 )
 from .plot_vocabulary import (
     reader_experiment_label,
+    representation_label,
 )
 
 _TARGET_VIEW_MASK_LABELS = {
@@ -85,7 +86,12 @@ def write_reader_event_intervals(frame: pd.DataFrame, path: Path) -> None:
     save_metastudy_figure(fig, path)
 
 
-def write_response_separation_stability(frame: pd.DataFrame, path: Path) -> None:
+def write_response_separation_stability(
+    frame: pd.DataFrame,
+    path: Path,
+    *,
+    primary_reduction_id: str,
+) -> None:
     correlation_columns = [
         "response_separation__spearman_to_primary",
         "on_magnitude_floor__spearman_to_primary",
@@ -122,7 +128,8 @@ def write_response_separation_stability(frame: pd.DataFrame, path: Path) -> None
                 fontsize=8,
                 color=contrast_text_color(image, values[row, column]),
             )
-    ax.set_title("Weakest component rank agreement with the 6-12 h post-stress log mean", pad=34)
+    primary_label = representation_label(primary_reduction_id).replace("\n", " ")
+    ax.set_title(f"Weakest component rank agreement with the {primary_label}", pad=34)
     ax.set_xlabel("Response reduction")
     ax.set_ylabel("Target mask")
     colorbar = fig.colorbar(image, ax=ax, fraction=0.025, pad=0.03)

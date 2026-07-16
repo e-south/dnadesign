@@ -64,13 +64,13 @@ reductions:
     window_end_event_h: 12.0
     method: geometric_time_mean
     response_basis: post_window
-    role: primary
+    role: sensitivity
   - id: event_logmean_4_8h_post
     window_start_event_h: 4.0
     window_end_event_h: 8.0
     method: geometric_time_mean
     response_basis: post_window
-    role: sensitivity
+    role: primary
   - id: event_logmean_8_12h_post
     window_start_event_h: 8.0
     window_end_event_h: 12.0

@@ -22,7 +22,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
 VALUE_COLUMNS = ("r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11")
 
 
-def test_two_experiments_receive_equal_weight_and_publish_a_midpoint() -> None:
+def test_selected_repeat_uses_only_the_explicit_label_source() -> None:
     measurements = _measurements(
         ("candidate-a", "design-a", "experiment-a", 0.0),
         ("candidate-a", "design-a", "experiment-b", 10.0),
@@ -33,20 +33,33 @@ def test_two_experiments_receive_equal_weight_and_publish_a_midpoint() -> None:
         measurements,
         draws,
         policy=_policy(bootstrap_samples=200),
-        repeat_decisions=_decisions(("candidate-a", "design-a", ("experiment-a", "experiment-b"), "comparable")),
+        repeat_decisions=_decisions(
+            (
+                "candidate-a",
+                "design-a",
+                ("experiment-a", "experiment-b"),
+                "label_source_selected",
+                "experiment-b",
+            )
+        ),
     )
 
     assert preview.blockers == ()
-    assert preview.observations.loc[0, list(VALUE_COLUMNS)].tolist() == [5.0] * len(VALUE_COLUMNS)
-    assert preview.observations.loc[0, "aggregation_method"] == "two_experiment_midpoint"
-    assert preview.observations.loc[0, "experiment_count"] == 2
-    assert preview.contributions.groupby("reader_experiment_id")["experiment_weight"].first().to_dict() == {
-        "experiment-a": 0.5,
-        "experiment-b": 0.5,
+    assert preview.observations.loc[0, list(VALUE_COLUMNS)].tolist() == [10.0] * len(VALUE_COLUMNS)
+    assert preview.observations.loc[0, "label_source_method"] == "explicit_repeat_selection"
+    assert preview.observations.loc[0, "reader_experiment_count"] == 2
+    assert preview.observations.loc[0, "label_source_reader_experiment_id"] == "experiment-b"
+    assert preview.contributions.groupby("reader_experiment_id")["selected_as_label_source"].first().to_dict() == {
+        "experiment-a": False,
+        "experiment-b": True,
+    }
+    assert preview.contributions.groupby("reader_experiment_id")["included_in_label"].first().to_dict() == {
+        "experiment-a": False,
+        "experiment-b": True,
     }
 
 
-def test_three_experiments_use_componentwise_median_not_pooled_well_weighting() -> None:
+def test_repeat_source_selection_is_explicit_not_chronology_inferred() -> None:
     measurements = _measurements(
         ("candidate-a", "design-a", "experiment-a", 0.0),
         ("candidate-a", "design-a", "experiment-b", 3.0),
@@ -59,15 +72,22 @@ def test_three_experiments_use_componentwise_median_not_pooled_well_weighting() 
         draws,
         policy=_policy(bootstrap_samples=100),
         repeat_decisions=_decisions(
-            ("candidate-a", "design-a", ("experiment-a", "experiment-b", "experiment-c"), "comparable")
+            (
+                "candidate-a",
+                "design-a",
+                ("experiment-a", "experiment-b", "experiment-c"),
+                "label_source_selected",
+                "experiment-b",
+            )
         ),
     )
 
     assert preview.observations.loc[0, list(VALUE_COLUMNS)].tolist() == [3.0] * len(VALUE_COLUMNS)
-    assert preview.observations.loc[0, "aggregation_method"] == "componentwise_experiment_median"
+    assert preview.observations.loc[0, "label_source_method"] == "explicit_repeat_selection"
+    assert preview.observations.loc[0, "label_source_reader_experiment_id"] == "experiment-b"
 
 
-def test_hierarchical_bootstrap_is_deterministic_and_keeps_joint_reader_draws() -> None:
+def test_selected_source_bootstrap_is_deterministic_and_keeps_joint_reader_draws() -> None:
     measurements = _measurements(
         ("candidate-a", "design-a", "experiment-a", 0.0),
         ("candidate-a", "design-a", "experiment-b", 10.0),
@@ -75,7 +95,15 @@ def test_hierarchical_bootstrap_is_deterministic_and_keeps_joint_reader_draws() 
     draws = _joint_draw_fixture(measurements)
     kwargs = {
         "policy": _policy(bootstrap_samples=250, random_seed=17),
-        "repeat_decisions": _decisions(("candidate-a", "design-a", ("experiment-a", "experiment-b"), "comparable")),
+        "repeat_decisions": _decisions(
+            (
+                "candidate-a",
+                "design-a",
+                ("experiment-a", "experiment-b"),
+                "label_source_selected",
+                "experiment-b",
+            )
+        ),
     }
 
     first = aggregation.aggregate_response_window_observations(measurements, draws, **kwargs)
@@ -101,11 +129,13 @@ def test_unresolved_repeat_is_a_label_truth_blocker_not_an_implicit_average() ->
         measurements,
         draws,
         policy=_policy(bootstrap_samples=100),
-        repeat_decisions=_decisions(("candidate-a", "design-a", ("experiment-a", "experiment-b"), "review_required")),
+        repeat_decisions=_decisions(
+            ("candidate-a", "design-a", ("experiment-a", "experiment-b"), "review_required", None)
+        ),
     )
 
     assert preview.observations["candidate_id"].tolist() == ["candidate-b"]
-    assert preview.blockers == ("candidate-a: repeated experiments require a comparable decision",)
+    assert preview.blockers == ("candidate-a: repeated experiments require an explicit label-source decision",)
     assert (
         preview.contributions.loc[preview.contributions["candidate_id"].eq("candidate-a"), "included_in_label"]
         .eq(False)
@@ -134,7 +164,13 @@ def test_repeat_policy_requires_exact_candidate_and_design_accounting() -> None:
             draws,
             policy=_policy(bootstrap_samples=100),
             repeat_decisions=_decisions(
-                ("candidate-a", "wrong-design", ("experiment-a", "experiment-b"), "comparable")
+                (
+                    "candidate-a",
+                    "wrong-design",
+                    ("experiment-a", "experiment-b"),
+                    "label_source_selected",
+                    "experiment-b",
+                )
             ),
         )
 
@@ -143,7 +179,15 @@ def test_repeat_policy_requires_exact_candidate_and_design_accounting() -> None:
             measurements,
             draws,
             policy=_policy(bootstrap_samples=100),
-            repeat_decisions=_decisions(("candidate-a", "design-a", ("experiment-a", "experiment-new"), "comparable")),
+            repeat_decisions=_decisions(
+                (
+                    "candidate-a",
+                    "design-a",
+                    ("experiment-a", "experiment-new"),
+                    "label_source_selected",
+                    "experiment-new",
+                )
+            ),
         )
 
 
@@ -160,7 +204,15 @@ def test_bootstrap_draws_must_match_exact_design_experiment_contributions() -> N
             measurements,
             draws,
             policy=_policy(bootstrap_samples=100),
-            repeat_decisions=_decisions(("candidate-a", "design-a", ("experiment-a", "experiment-b"), "comparable")),
+            repeat_decisions=_decisions(
+                (
+                    "candidate-a",
+                    "design-a",
+                    ("experiment-a", "experiment-b"),
+                    "label_source_selected",
+                    "experiment-b",
+                )
+            ),
         )
 
 
@@ -178,7 +230,7 @@ def test_reduction_and_event_time_sensitivity_remain_separate() -> None:
     assert set(preview.event_time_sensitivity["component"]) == set(VALUE_COLUMNS)
 
 
-def test_bounded_primary_component_blocks_exact_label_publication_without_imputation() -> None:
+def test_bounded_primary_component_is_excluded_without_imputation() -> None:
     measurements = _measurements(("candidate-a", "design-a", "experiment-a", 2.0))
     primary = measurements["reduction_id"].eq("primary")
     measurements.loc[primary, "r01_bound_kind"] = "lower"
@@ -191,11 +243,12 @@ def test_bounded_primary_component_blocks_exact_label_publication_without_imputa
         repeat_decisions=pd.DataFrame(columns=aggregation.DECISION_COLUMNS),
     )
 
-    assert preview.observations.loc[0, "r01"] == 2.0
-    assert preview.blockers == (
-        "candidate-a: primary components [r01] are bounded; "
-        "exact-label publication requires an explicit censor-aware policy",
-    )
+    assert preview.observations.empty
+    assert preview.blockers == ()
+    contribution = preview.contributions.iloc[0]
+    assert contribution["selected_as_label_source"]
+    assert not contribution["included_in_label"]
+    assert contribution["label_exclusion_reason"] == "nonexact_primary_component"
 
 
 @pytest.mark.parametrize(
@@ -228,7 +281,7 @@ def _policy(
     random_seed: int = 7,
 ) -> aggregation.ResponseWindowAggregationPolicy:
     return aggregation.ResponseWindowAggregationPolicy(
-        policy_id="equal_experiment_weight_v1",
+        policy_id="explicit_label_source_v1",
         primary_reduction_id="primary",
         bootstrap_samples=bootstrap_samples,
         confidence_level=0.90,
@@ -237,24 +290,23 @@ def _policy(
     )
 
 
-def _decisions(*rows: tuple[str, str, tuple[str, ...], str]) -> pd.DataFrame:
+def _decisions(*rows: tuple[str, str, tuple[str, ...], str, str | None]) -> pd.DataFrame:
     return pd.DataFrame.from_records(
         [
             {
                 "candidate_id": candidate_id,
                 "reader_design_ids": [design_id],
                 "reader_experiment_ids": list(experiment_ids),
+                "label_source_reader_experiment_id": selected_experiment_id,
                 "status": status,
-                "classification": "unresolved" if status == "review_required" else "assay_context_comparable",
+                "classification": "unresolved" if status == "review_required" else "source_agreement_accepted",
                 "evidence_artifact": None if status == "review_required" else "repeat-review.json",
                 "evidence_sha256": None if status == "review_required" else "a" * 64,
                 "adjudicated_by": None if status == "review_required" else "study-reviewer",
                 "adjudicated_at": None if status == "review_required" else "2026-07-15T12:00:00+00:00",
-                "reason": (
-                    "assay_context_review_pending" if status == "review_required" else "assay_contexts_comparable"
-                ),
+                "reason": ("label_source_review_pending" if status == "review_required" else "label_source_selected"),
             }
-            for candidate_id, design_id, experiment_ids, status in rows
+            for candidate_id, design_id, experiment_ids, status, selected_experiment_id in rows
         ]
     )
 

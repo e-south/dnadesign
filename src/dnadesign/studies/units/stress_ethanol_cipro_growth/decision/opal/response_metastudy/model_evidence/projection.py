@@ -42,6 +42,14 @@ DECISION_GATE_KEYS = (
     "selection_policy_promoted",
     "synthesis_authorized",
 )
+LABEL_TRUTH_KEYS = {
+    "state",
+    "source",
+    "screen_source_scope",
+    "screen_source_label_truth_role",
+    "label_source_state",
+    "observed_label_promotion_manifest",
+}
 
 
 @dataclass(frozen=True)
@@ -164,7 +172,7 @@ def _snapshot(
                 screen,
                 "maximum_screen_source_to_cross_experiment_median_abs_difference",
             ),
-            "aggregation_state": required_string(label_truth, "repeat_aggregation"),
+            "label_source_state": required_string(label_truth, "label_source_state"),
         },
         "upstream_manifests": upstream_manifests(
             source,
@@ -185,6 +193,7 @@ def _validate_decision_gates(
     screen: dict[str, object],
     label_truth: dict[str, object],
 ) -> None:
+    label_state = _validate_label_truth(label_truth)
     missing = [key for key in (*DECISION_GATE_KEYS, "opal_operational_state_included") if key not in gates]
     if missing:
         raise ModelEvidenceError(f"decision_gates.{missing[0]} is required.")
@@ -193,11 +202,29 @@ def _validate_decision_gates(
         raise ModelEvidenceError("decision_gates.opal_operational_state_included must be false.")
     if values["model_support_ready"] != required_bool(screen, "model_support_ready"):
         raise ModelEvidenceError("decision_gates.model_support_ready disagrees with the campaign model screen.")
-    label_state = enum_string(label_truth, "state", {"not_ready", "promoted"})
     if values["label_truth_ready"] != (label_state == "promoted"):
         raise ModelEvidenceError("decision_gates.label_truth_ready disagrees with label_truth.state.")
     if values["synthesis_authorized"] and not all(values[key] for key in DECISION_GATE_KEYS[:-1]):
         raise ModelEvidenceError("synthesis authorization requires all preceding decision gates.")
+
+
+def _validate_label_truth(label_truth: dict[str, object]) -> str:
+    if set(label_truth) != LABEL_TRUTH_KEYS:
+        raise ModelEvidenceError("label_truth fields disagree with the current manifest contract.")
+    state = enum_string(label_truth, "state", {"not_ready", "promoted"})
+    source_state = enum_string(label_truth, "label_source_state", {"not_verified", "verified"})
+    promotion = label_truth["observed_label_promotion_manifest"]
+    if state == "promoted":
+        if source_state != "verified":
+            raise ModelEvidenceError("promoted label truth requires a verified label source.")
+        if not isinstance(promotion, dict):
+            raise ModelEvidenceError("promoted label truth requires a promotion manifest.")
+    else:
+        if source_state != "not_verified":
+            raise ModelEvidenceError("not-ready label truth cannot claim a verified label source.")
+        if promotion is not None:
+            raise ModelEvidenceError("not-ready label truth cannot include a promotion manifest.")
+    return state
 
 
 def _validate_model_views(view_ids: tuple[str, ...], **records: dict[str, object]) -> None:

@@ -287,10 +287,10 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         premise=(
             "The primary reduction should preserve response and anchored fluorescence ordering across nearby summaries."
         ),
-        decision_value="Shows the weakest component agreement with the primary 6-12 hour post-stress log mean.",
+        decision_value="Shows the weakest component agreement with the primary 4-8 hour post-stress log mean.",
         alt_text=(
             "Heatmap of the minimum Spearman correlation across response separation, ON fluorescence, and OFF "
-            "fluorescence for each target mask and prespecified time reduction relative to the 6-12 hour "
+            "fluorescence for each target mask and prespecified time reduction relative to the 4-8 hour "
             "post-stress log mean. Nearby reductions retain high component ordering, with the weakest active-"
             "target-view agreement at approximately 0.92."
         ),

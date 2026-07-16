@@ -135,9 +135,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--campaign-config",
         type=Path,
-        help=(
-            "Unified OPAL campaign config used when --source opal-round. Defaults to the inactive stress RMF campaign."
-        ),
+        help=("Unified OPAL campaign config used when --source opal-round. Defaults to the stress RMF campaign."),
     )
     parser.add_argument(
         "--round",

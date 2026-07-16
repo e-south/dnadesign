@@ -101,8 +101,8 @@ def _evidence(tmp_path: Path):
         reduction_sensitivity=pd.DataFrame(),
         event_time_sensitivity=pd.DataFrame(),
         blockers=(
-            "b: repeated experiments require a comparable decision",
-            "c: repeated experiments require a comparable decision",
+            "b: repeated experiments require an explicit label-source decision",
+            "c: repeated experiments require an explicit label-source decision",
             "response-window observation policy requires study approval",
         ),
     )

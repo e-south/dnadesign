@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-candidate-table
 title: OPAL candidate table
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 audience:
   - operator
   - agent
@@ -69,9 +69,9 @@ panel = render_sequence_panel_image(candidate_row, config=config)
 - Keep X, Y, labels, model fitting, predictions, and round history in one OPAL
   campaign. Keep target masks and selectors in named selection views.
 - Treat observed assay labels as study-level truth, not selection-view truth.
-  The SFXI source runs used one shared pool. The study publisher will publish
+  The SFXI source runs used one shared pool. The study publisher has published
   one typed response-window sidecar and promotion manifest for the RMF
-  campaign; that publisher is not yet implemented.
+  campaign: 27 exact labels and eight measured-candidate exclusions.
 - OPAL run and explain read the unified response-window observed labels through
   `labels.source.kind: usr_sidecar` at
   `_opal/response_window_labels_v1/observed_labels.parquet`.
@@ -97,8 +97,8 @@ panel = render_sequence_panel_image(candidate_row, config=config)
 - Source of truth: one response-window label snapshot keyed by stable candidate
   `id`, observed round or batch, and the eight-component Y schema. Its
   digest-pinned study-provenance manifest records the Reader artifact,
-  candidate-binding artifact, reduction, and repeat-aggregation contracts. The
-  planned published path is
+  candidate-binding artifact, reduction, and repeated-candidate label-source
+  contracts. The published path is
   `usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v1/observed_labels.parquet`.
 - Consumer contract: one campaign fits the shared eight-output phenotype model.
   Ethanol, ciprofloxacin, and AND masks are named selection views over the same

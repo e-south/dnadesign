@@ -198,6 +198,85 @@ def test_checkpoint_requires_explicit_label_and_decision_gates(tmp_path: Path) -
         )
 
 
+def test_checkpoint_rejects_removed_repeat_aggregation_field(tmp_path: Path) -> None:
+    bundle = _metastudy_bundle(tmp_path / "bundle")
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["label_truth"]["repeat_aggregation"] = manifest["label_truth"].pop("label_source_state")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ModelEvidenceError, match="label_truth fields disagree"):
+        record_checkpoint(
+            metastudy_bundle=bundle,
+            trajectory_root=tmp_path / "trajectory",
+            evidence_id="pre_batch0_retrospective",
+        )
+
+
+def test_checkpoint_rejects_promoted_label_truth_without_manifest(tmp_path: Path) -> None:
+    bundle = _metastudy_bundle(tmp_path / "bundle")
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["label_truth"].update(state="promoted", label_source_state="verified")
+    manifest["decision_gates"]["label_truth_ready"] = True
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ModelEvidenceError, match="promoted label truth requires a promotion manifest"):
+        record_checkpoint(
+            metastudy_bundle=bundle,
+            trajectory_root=tmp_path / "trajectory",
+            evidence_id="pre_batch0_retrospective",
+        )
+
+
+def test_checkpoint_rejects_not_ready_label_truth_with_manifest(tmp_path: Path) -> None:
+    bundle = _metastudy_bundle(tmp_path / "bundle")
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["label_truth"]["observed_label_promotion_manifest"] = {
+        "path": "_opal/labels/promotion.manifest.json",
+        "sha256": "9" * 64,
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ModelEvidenceError, match="not-ready label truth cannot include a promotion manifest"):
+        record_checkpoint(
+            metastudy_bundle=bundle,
+            trajectory_root=tmp_path / "trajectory",
+            evidence_id="pre_batch0_retrospective",
+        )
+
+
+def test_promoted_label_truth_projects_verified_source_state(tmp_path: Path) -> None:
+    bundle = _metastudy_bundle(tmp_path / "bundle")
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["label_truth"].update(
+        state="promoted",
+        label_source_state="verified",
+        observed_label_promotion_manifest={
+            "path": "_opal/labels/promotion.manifest.json",
+            "sha256": "9" * 64,
+        },
+    )
+    manifest["decision_gates"]["label_truth_ready"] = True
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    record = record_checkpoint(
+        metastudy_bundle=bundle,
+        trajectory_root=tmp_path / "trajectory",
+        evidence_id="pre_batch0_retrospective",
+    )
+    checkpoint = json.loads(Path(record["checkpoint_path"]).read_text(encoding="utf-8"))
+
+    assert checkpoint["snapshot"]["decision_gates"]["label_truth_ready"] is True
+    assert checkpoint["snapshot"]["repeats"]["label_source_state"] == "verified"
+    assert checkpoint["snapshot"]["upstream_manifests"]["observed_label_promotion"] == {
+        "path": "_opal/labels/promotion.manifest.json",
+        "sha256": "9" * 64,
+    }
+
+
 def test_checkpoint_requires_complete_campaign_model_evidence(tmp_path: Path) -> None:
     bundle = _metastudy_bundle(tmp_path / "bundle")
     manifest_path = bundle / "manifest.json"
@@ -358,7 +437,7 @@ def _manifest(*, model_gate: float) -> dict[str, object]:
     challenger = _model_record("pls4", "fixed_challenger", views, ordering=0.15)
     baseline = _model_record("mean_baseline", "baseline", views, ordering=0.0)
     return {
-        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v11",
+        "schema_version": "stress_ethanol_cipro_growth.response_metastudy.v12",
         "source": {
             "reader_bundle": {
                 "manifest": {"path": "manifest.json", "sha256": "1" * 64, "bytes": 100},
@@ -421,7 +500,7 @@ def _manifest(*, model_gate: float) -> dict[str, object]:
             "source": "stress_ethanol_cipro_growth.response_window_observations",
             "screen_source_scope": "model_screen_only",
             "screen_source_label_truth_role": "none",
-            "repeat_aggregation": "study_artifact_not_promoted",
+            "label_source_state": "not_verified",
             "observed_label_promotion_manifest": None,
         },
         "decision_gates": {
@@ -468,15 +547,15 @@ def _manifest(*, model_gate: float) -> dict[str, object]:
                 "scale_quantile": 0.9,
                 "model_min_within_group_spearman": model_gate,
                 "model_min_defined_group_count": 6,
-                "model_reduction_ids": ["event_logmean_6_12h_post"],
+                "model_reduction_ids": ["event_logmean_4_8h_post"],
                 "reductions": [
                     {
-                        "id": "event_logmean_6_12h_post",
+                        "id": "event_logmean_4_8h_post",
                         "screen_role": "primary",
                         "response_basis": "post_window",
                         "method": "geometric_time_mean",
-                        "window_start_event_h": 6.0,
-                        "window_end_event_h": 12.0,
+                        "window_start_event_h": 4.0,
+                        "window_end_event_h": 8.0,
                     }
                 ],
             },
@@ -486,7 +565,7 @@ def _manifest(*, model_gate: float) -> dict[str, object]:
                     "model_id": "campaign_random_forest",
                     "model_role": "campaign_model",
                     "evidence_basis": "configured_campaign_model",
-                    "representation_id": "event_logmean_6_12h_post",
+                    "representation_id": "event_logmean_4_8h_post",
                     "held_out_group_count": 8,
                     "fraction_beating_group_median": 0.25,
                     "fraction_ci_low": 0.03,
@@ -501,7 +580,7 @@ def _manifest(*, model_gate: float) -> dict[str, object]:
                     "model_id": "pls4",
                     "model_role": "fixed_challenger",
                     "evidence_basis": "best_fixed_challenger",
-                    "representation_id": "event_logmean_6_12h_post",
+                    "representation_id": "event_logmean_4_8h_post",
                     "held_out_group_count": 8,
                     "fraction_beating_group_median": 0.5,
                     "fraction_ci_low": 0.15,
@@ -525,7 +604,7 @@ def _model_record(
     return {
         "model_id": model_id,
         "model_role": role,
-        "representation_id": "event_logmean_6_12h_post",
+        "representation_id": "event_logmean_4_8h_post",
         "target_transform": "none",
         "validation": "leave_one_reader_experiment_out",
         "metric_scope": "median_within_held_out_experiment",

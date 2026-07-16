@@ -97,7 +97,7 @@ def verify_response_window_observations(
     preview = ResponseWindowObservationPreview(
         observations=frames["observations"],
         contributions=frames["contributions"],
-        bootstrap_draws=frames["hierarchical_bootstrap_draws"],
+        bootstrap_draws=frames["bootstrap_draws"],
         uncertainty=frames["uncertainty"],
         repeat_diagnostics=frames["repeat_diagnostics"],
         reduction_sensitivity=frames["reduction_sensitivity"],
@@ -107,7 +107,7 @@ def verify_response_window_observations(
     contract = payload["observation_contract"]
     if int(contract["candidate_count"]) != len(preview.observations):
         raise ResponseWindowObservationArtifactError("observation candidate count disagrees with records.")
-    validate_frames(preview, bootstrap_samples=int(contract["hierarchical_bootstrap_samples"]))
+    validate_frames(preview, bootstrap_samples=int(contract["bootstrap_samples"]))
     return ResponseWindowObservationVerification(
         manifest_json=manifest_path,
         manifest_sha256=file_sha256(manifest_path),
@@ -152,7 +152,7 @@ def _record_frames(preview: ResponseWindowObservationPreview) -> dict[str, pd.Da
     return {
         "observations": preview.observations,
         "contributions": preview.contributions,
-        "hierarchical_bootstrap_draws": preview.bootstrap_draws,
+        "bootstrap_draws": preview.bootstrap_draws,
         "uncertainty": preview.uncertainty,
         "repeat_diagnostics": preview.repeat_diagnostics,
         "reduction_sensitivity": preview.reduction_sensitivity,

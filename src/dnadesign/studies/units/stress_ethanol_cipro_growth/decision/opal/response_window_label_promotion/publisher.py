@@ -21,6 +21,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
     VALUE_COLUMNS,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.artifact import (
+    RECORD_FILES,
     ResponseWindowObservationArtifactError,
     verify_response_window_observations,
 )
@@ -41,6 +42,10 @@ from .contracts import (
     confined_relative_directory,
     require_observation_contract,
     verify_candidate_identity,
+)
+from .exclusions import (
+    derive_candidate_selection_exclusions,
+    require_exclusion_candidates_in_records,
 )
 from .publication import (
     build_promotion_manifest,
@@ -66,6 +71,10 @@ def publish_response_window_labels(
     )
     contract = require_observation_contract(observation_manifest.get("observation_contract"))
     observations = pd.read_parquet(first_verification.observations_parquet)
+    contributions = pd.read_parquet(first_verification.manifest_json.parent / RECORD_FILES["contributions"])
+    candidate_exclusions = derive_candidate_selection_exclusions(observations, contributions)
+    if candidate_exclusions and campaign_config_path is None:
+        raise ResponseWindowLabelPromotionError("publication requires a campaign config for nonempty exclusions.")
     _require_stable_observation_read(
         observation_bundle_dir,
         expected_manifest_sha256=first_verification.manifest_sha256,
@@ -76,10 +85,11 @@ def publish_response_window_labels(
     if not records_path.is_file():
         raise ResponseWindowLabelPromotionError(f"OPAL candidate records not found: {records_path}")
     candidate_records_sha256 = file_sha256(records_path)
-    records = pd.read_parquet(records_path)
+    records = pd.read_parquet(records_path, columns=["id", "sequence"])
     if file_sha256(records_path) != candidate_records_sha256:
         raise ResponseWindowLabelPromotionError("OPAL candidate records changed while labels were being prepared.")
     verify_candidate_identity(observations, records=records)
+    require_exclusion_candidates_in_records(candidate_exclusions, records=records)
     labels = build_label_frame(
         observations,
         observed_round=int(contract["observed_round"]),
@@ -107,6 +117,7 @@ def publish_response_window_labels(
             label_count=len(labels),
             observed_round=int(contract["observed_round"]),
             batch_id=str(contract["batch_id"]),
+            candidate_exclusion_entries=candidate_exclusions,
         )
         provenance_path.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         promotion = build_promotion_manifest(
@@ -115,6 +126,7 @@ def publish_response_window_labels(
             provenance_path=provenance_path,
             candidate_path=records_path,
             label_count=len(labels),
+            candidate_exclusion_entries=candidate_exclusions,
         )
         promotion_path.write_text(json.dumps(promotion, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         verify_label_bundle(

@@ -152,9 +152,9 @@ def _(bundle_manifest, deliverable, mo, response_metastudy, tier):
                 """
                 Reader publishes the same eight measured values for every target view:
 
-                - `r_i` is the median across design wells of the 6-12 h mean
-                  `log2[(YFP / CFP)_design,i(t)]`.
-                - `b_i` is the design-well median 6-12 h mean
+                - `r_i` is the median across design wells of the declared primary-window mean
+                  `log2[(YFP / CFP)_design,i(t)]` shown in the review header.
+                - `b_i` is the design-well median over that same primary window
                   `log2[(YFP / OD600)_design,i(t)]` minus the same-state pDual-10 well median.
 
                 The study target mask changes only which states are treated as ON and OFF:

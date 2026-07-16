@@ -29,68 +29,43 @@ from .aggregation import (
     ResponseWindowAggregationPolicy,
 )
 from .contracts import ResponseWindowAggregationError
+from .policy_contract import (
+    AGGREGATION_FIELDS as _AGGREGATION_FIELDS,
+)
+from .policy_contract import (
+    APPROVAL_FIELDS as _APPROVAL_FIELDS,
+)
+from .policy_contract import (
+    APPROVAL_STATUSES,
+    SCHEMA_ID,
+    SCHEMA_VERSION,
+    STUDY_ID,
+)
+from .policy_contract import (
+    CENSORING_FIELDS as _CENSORING_FIELDS,
+)
+from .policy_contract import (
+    EXPECTED_AGGREGATION_SEMANTICS as _EXPECTED_AGGREGATION_SEMANTICS,
+)
+from .policy_contract import (
+    EXPECTED_CENSORING_SEMANTICS as _EXPECTED_CENSORING_SEMANTICS,
+)
+from .policy_contract import (
+    EXPECTED_UNCERTAINTY_SEMANTICS as _EXPECTED_UNCERTAINTY_SEMANTICS,
+)
+from .policy_contract import (
+    LABEL_FIELDS as _LABEL_FIELDS,
+)
+from .policy_contract import (
+    SOURCE_MANIFEST_FIELDS as _SOURCE_MANIFEST_FIELDS,
+)
+from .policy_contract import (
+    TOP_LEVEL_FIELDS as _TOP_LEVEL_FIELDS,
+)
+from .policy_contract import (
+    UNCERTAINTY_FIELDS as _UNCERTAINTY_FIELDS,
+)
 from .repeat_adjudication import validate_repeat_adjudications
-
-SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observation_policy.v1"
-SCHEMA_VERSION = "1"
-STUDY_ID = "stress_ethanol_cipro_growth"
-APPROVAL_STATUSES = frozenset({"review_required", "approved"})
-
-_TOP_LEVEL_FIELDS = {
-    "schema_id",
-    "schema_version",
-    "study_id",
-    "policy_id",
-    "approval",
-    "source_manifests",
-    "label_identity",
-    "aggregation",
-    "unbound_reader_designs",
-    "repeat_decisions",
-}
-_APPROVAL_FIELDS = {"status", "approved_by", "approved_at", "rationale"}
-_SOURCE_MANIFEST_FIELDS = {
-    "reader_bundle_sha256",
-    "candidate_bindings_sha256",
-}
-_LABEL_FIELDS = {
-    "y_space",
-    "observed_round",
-    "batch_id",
-    "primary_reduction_id",
-    "value_order",
-}
-_AGGREGATION_FIELDS = {
-    "experiment_unit",
-    "experiment_weighting",
-    "singleton",
-    "exactly_two",
-    "three_or_more",
-    "uncertainty",
-    "event_time_sensitivity",
-}
-_UNCERTAINTY_FIELDS = {
-    "method",
-    "experiment_resampling",
-    "reader_draw_resampling",
-    "samples",
-    "confidence_level",
-    "random_seed",
-    "minimum_reader_draws_per_experiment",
-}
-_EXPECTED_AGGREGATION_SEMANTICS = {
-    "experiment_unit": "reader_experiment",
-    "experiment_weighting": "equal",
-    "singleton": "identity",
-    "exactly_two": "midpoint_not_robust",
-    "three_or_more": "componentwise_median",
-    "event_time_sensitivity": "separate",
-}
-_EXPECTED_UNCERTAINTY_SEMANTICS = {
-    "method": "hierarchical_joint_bootstrap",
-    "experiment_resampling": "with_replacement",
-    "reader_draw_resampling": "one_joint_draw_per_sampled_experiment",
-}
 
 
 class ResponseWindowObservationPolicyError(ValueError):
@@ -139,6 +114,8 @@ class ResponseWindowObservationPolicy:
     observed_round: int
     batch_id: str
     value_order: tuple[str, ...]
+    primary_value_requirement: str
+    nonexact_label_action: str
     aggregation: ResponseWindowAggregationPolicy
     repeat_decisions: pd.DataFrame
     unbound_reader_designs: pd.DataFrame
@@ -192,12 +169,20 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
             f"label value order must be the Reader response-window order {VALUE_COLUMNS}."
         )
     observed_round = _nonnegative_int(label["observed_round"], field="label_identity.observed_round")
+    reader_bundle_sha256 = _required_sha256(
+        source_manifests["reader_bundle_sha256"],
+        field="source_manifests.reader_bundle_sha256",
+    )
+    primary_reduction_id = _required_text(
+        label["primary_reduction_id"],
+        field="label_identity.primary_reduction_id",
+    )
 
     aggregation = _mapping(payload["aggregation"], fields=_AGGREGATION_FIELDS, label="aggregation")
     observed_semantics = {field: aggregation[field] for field in _EXPECTED_AGGREGATION_SEMANTICS}
     if observed_semantics != _EXPECTED_AGGREGATION_SEMANTICS:
         raise ResponseWindowObservationPolicyError(
-            "response-window aggregation semantics disagree; experiment weighting, point estimates, and "
+            "response-window aggregation semantics disagree; label-source selection, point estimates, and "
             "event-time separation require an explicit schema revision."
         )
     uncertainty = _mapping(
@@ -208,10 +193,20 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
     observed_uncertainty = {field: uncertainty[field] for field in _EXPECTED_UNCERTAINTY_SEMANTICS}
     if observed_uncertainty != _EXPECTED_UNCERTAINTY_SEMANTICS:
         raise ResponseWindowObservationPolicyError(
-            "response-window uncertainty semantics disagree; joint hierarchical resampling is required."
+            "response-window uncertainty semantics disagree; selected-source joint resampling is required."
+        )
+    censoring = _mapping(payload["censoring"], fields=_CENSORING_FIELDS, label="censoring")
+    if censoring != _EXPECTED_CENSORING_SEMANTICS:
+        raise ResponseWindowObservationPolicyError(
+            "response-window censoring semantics disagree; exact primary labels require candidate exclusion."
         )
 
-    decisions = _repeat_decisions(payload["repeat_decisions"], evidence_root=config_path.parent)
+    decisions = _repeat_decisions(
+        payload["repeat_decisions"],
+        evidence_root=config_path.parent,
+        expected_reader_bundle_sha256=reader_bundle_sha256,
+        expected_primary_reduction_id=primary_reduction_id,
+    )
     exclusions = _unbound_reader_designs(payload["unbound_reader_designs"])
     return ResponseWindowObservationPolicy(
         config_path=config_path,
@@ -221,10 +216,7 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
         approved_by=approved_by,
         approved_at=approved_at,
         approval_rationale=_required_text(approval["rationale"], field="approval.rationale"),
-        reader_bundle_sha256=_required_sha256(
-            source_manifests["reader_bundle_sha256"],
-            field="source_manifests.reader_bundle_sha256",
-        ),
+        reader_bundle_sha256=reader_bundle_sha256,
         candidate_bindings_sha256=_required_sha256(
             source_manifests["candidate_bindings_sha256"],
             field="source_manifests.candidate_bindings_sha256",
@@ -233,11 +225,11 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
         observed_round=observed_round,
         batch_id=_required_text(label["batch_id"], field="label_identity.batch_id"),
         value_order=value_order,
+        primary_value_requirement=str(censoring["primary_value_requirement"]),
+        nonexact_label_action=str(censoring["nonexact_label_action"]),
         aggregation=ResponseWindowAggregationPolicy(
             policy_id=_required_text(payload["policy_id"], field="policy_id"),
-            primary_reduction_id=_required_text(
-                label["primary_reduction_id"], field="label_identity.primary_reduction_id"
-            ),
+            primary_reduction_id=primary_reduction_id,
             bootstrap_samples=_positive_int(uncertainty["samples"], field="aggregation.uncertainty.samples"),
             confidence_level=_finite_float(
                 uncertainty["confidence_level"], field="aggregation.uncertainty.confidence_level"
@@ -253,7 +245,13 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
     )
 
 
-def _repeat_decisions(value: object, *, evidence_root: Path) -> pd.DataFrame:
+def _repeat_decisions(
+    value: object,
+    *,
+    evidence_root: Path,
+    expected_reader_bundle_sha256: str,
+    expected_primary_reduction_id: str,
+) -> pd.DataFrame:
     if not isinstance(value, list):
         raise ResponseWindowObservationPolicyError("repeat_decisions must be a list.")
     rows: list[dict[str, object]] = []
@@ -273,6 +271,10 @@ def _repeat_decisions(value: object, *, evidence_root: Path) -> pd.DataFrame:
                 "reader_experiment_ids": _text_list(
                     row["reader_experiment_ids"],
                     field=f"repeat_decisions[{index}].reader_experiment_ids",
+                ),
+                "label_source_reader_experiment_id": _optional_text(
+                    row["label_source_reader_experiment_id"],
+                    field=f"repeat_decisions[{index}].label_source_reader_experiment_id",
                 ),
                 "status": status,
                 "classification": _required_text(
@@ -297,7 +299,12 @@ def _repeat_decisions(value: object, *, evidence_root: Path) -> pd.DataFrame:
     if frame["candidate_id"].duplicated().any():
         raise ResponseWindowObservationPolicyError("repeat decisions contain duplicate candidate IDs.")
     try:
-        validate_repeat_adjudications(frame, evidence_root=evidence_root)
+        validate_repeat_adjudications(
+            frame,
+            evidence_root=evidence_root,
+            expected_reader_bundle_sha256=expected_reader_bundle_sha256,
+            expected_primary_reduction_id=expected_primary_reduction_id,
+        )
     except ResponseWindowAggregationError as exc:
         raise ResponseWindowObservationPolicyError(str(exc)) from exc
     return frame

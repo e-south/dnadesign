@@ -19,6 +19,7 @@ from ..core.contracts import RecommendationThresholds
 from ..core.policies import CANONICAL_SFXI_POLICY_ID, primary_policy_ids
 from ..core.response_contracts import ResponseMetricScreen
 from .model_validation_report import model_validation_summary_table
+from .plot_vocabulary import representation_label
 from .response_metric_report import response_metric_report_lines
 
 
@@ -40,6 +41,7 @@ def write_report(
     canonical_sfxi_validation: dict[str, object],
     thresholds: RecommendationThresholds,
     primary_reduction_id: str,
+    label_truth_ready: bool,
 ) -> Path:
     report_path = out_dir / "report.md"
     canonical = summary[summary["policy_id"] == CANONICAL_SFXI_POLICY_ID].iloc[0]
@@ -73,6 +75,12 @@ def write_report(
     support_at_guardrail = setpoint_support[
         (setpoint_support["logic_threshold"] - thresholds.min_target_view_median_logic).abs() < 1.0e-12
     ]
+    primary_reduction_label = representation_label(primary_reduction_id).replace("\n", " ")
+    label_truth_summary = (
+        "The configured observed-label publication is verified."
+        if label_truth_ready
+        else "The configured observed-label publication is not yet available."
+    )
     text = [
         "# Response Metric Metastudy",
         "",
@@ -87,7 +95,7 @@ def write_report(
         "",
         "## Minimal Data And Score Path",
         "",
-        f"- Reader label candidate: `{primary_reduction_id}`, the 6-12 hour post-stress window mean.",
+        f"- Reader label candidate: `{primary_reduction_id}`, the {primary_reduction_label}.",
         "- Response state: `r_i = median-well window mean log2(YFP / CFP)`.",
         "- Anchored fluorescence state: `b_i = median design-well window mean log2(YFP / OD600) "
         "- median same-state pDual-10 well mean`.",
@@ -147,7 +155,7 @@ def write_report(
         "",
         "## Assay Time-Course Robustness",
         "",
-        "Reader publishes seven event-relative reductions: a primary 6-12 hour post-event log mean, four declared "
+        f"Reader publishes seven event-relative reductions: a primary {primary_reduction_label}, four declared "
         "window checks, a "
         "duration-normalized linear AUC, and a pre-window-delta check. Response uses log2 YFP/CFP. The magnitude "
         "channel is same-state pDual-10-relative log2 YFP/OD600 fluorescence.",
@@ -165,11 +173,11 @@ def write_report(
         *response_metric_report_lines(response_screen, primary_reduction_id=primary_reduction_id),
         "## Activation Boundary",
         "",
-        "`response_magnitude_feasibility_v1` is implemented but inactive. The Reader response-window bundle now "
-        "provides raw four-state response, reference-relative magnitude, event bounds, and joint bootstrap draws. "
-        "Activation still requires one candidate-level repeat aggregation rule and an explicit OPAL label/promotion "
-        "contract. SFXI vec8 labels use a distinct metric contract and are not accepted for RMF activation. OR "
-        "remains a pressure-test mask, not a configured campaign or synthesis allocation.",
+        "`response_magnitude_feasibility_v1` is implemented. The Reader response-window bundle provides raw "
+        "four-state response, reference-relative fluorescence, event bounds, and joint bootstrap draws. "
+        f"{label_truth_summary} Model support, selection-policy promotion, and synthesis authorization remain "
+        "separate decisions. SFXI vec8 labels use a distinct metric contract and are not accepted as RMF labels. "
+        "OR remains a pressure-test mask, not a configured campaign or synthesis allocation.",
         "",
         "## Predicted Setpoint Support",
         "",

@@ -91,7 +91,7 @@ def test_complete_bundle_round_trips_and_detects_digest_drift(tmp_path: Path) ->
         "manifest.json",
         "observations.parquet",
         "contributions.parquet",
-        "hierarchical_bootstrap_draws.parquet",
+        "bootstrap_draws.parquet",
         "uncertainty.parquet",
         "repeat_diagnostics.parquet",
         "reduction_sensitivity.parquet",
@@ -202,8 +202,9 @@ def test_verifier_rejects_duplicate_manifest_keys(tmp_path: Path) -> None:
     ("column", "value", "message"),
     [
         ("r00", 9.0, "point estimate"),
-        ("experiment_count", 2, "experiment count"),
-        ("aggregation_method", "componentwise_experiment_median", "aggregation method"),
+        ("reader_experiment_count", 2, "experiment count"),
+        ("label_source_method", "explicit_repeat_selection", "label-source method"),
+        ("label_source_reader_experiment_id", "experiment-z", "label-source experiment"),
     ],
 )
 def test_verifier_recomputes_observation_semantics_from_contributions(
@@ -226,7 +227,7 @@ def test_verifier_recomputes_observation_semantics_from_contributions(
         artifact.verify_response_window_observations(output, allowed_root=tmp_path)
 
 
-def test_verifier_recomputes_equal_experiment_weights(tmp_path: Path) -> None:
+def test_verifier_recomputes_selected_label_source(tmp_path: Path) -> None:
     output = tmp_path / "published"
     artifact.materialize_response_window_observations(
         _evidence(tmp_path),
@@ -234,10 +235,10 @@ def test_verifier_recomputes_equal_experiment_weights(tmp_path: Path) -> None:
         allowed_output_root=tmp_path,
     )
     contributions = pd.read_parquet(output / "contributions.parquet")
-    contributions.loc[0, "experiment_weight"] = 0.5
+    contributions.loc[0, "selected_as_label_source"] = False
     _rewrite_record(output, "contributions", contributions)
 
-    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="equal experiment weights"):
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="included contributions"):
         artifact.verify_response_window_observations(output, allowed_root=tmp_path)
 
 
@@ -318,8 +319,9 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
     observation = {
         "candidate_id": "candidate-a",
         "reader_design_ids": ["design-a"],
-        "experiment_count": 1,
-        "aggregation_method": "single_experiment",
+        "reader_experiment_count": 1,
+        "label_source_reader_experiment_id": "experiment-a",
+        "label_source_method": "singleton_identity",
         "display_label": "Candidate A",
         "sequence_sha256": hashlib.sha256(b"ACGT").hexdigest(),
         "source_class": "densegen",
@@ -341,8 +343,10 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
                 "repeat_evidence_sha256": None,
                 "repeat_adjudicated_by": None,
                 "repeat_adjudicated_at": None,
+                "label_source_reader_experiment_id": "experiment-a",
+                "selected_as_label_source": True,
                 "included_in_label": True,
-                "experiment_weight": 1.0,
+                "label_exclusion_reason": None,
                 **{column: 1.0 for column in VALUE_COLUMNS},
                 **{
                     f"{component}_{suffix}": False if suffix != "bound_kind" else "exact"
@@ -367,13 +371,13 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
             {
                 "candidate_id": "candidate-a",
                 "component": component,
+                "label_source_reader_experiment_id": "experiment-a",
                 "point_estimate": 1.0,
-                "hierarchical_bootstrap_sd": 0.1,
-                "experiment_count": 1,
+                "bootstrap_sd": 0.1,
                 "descriptive_interval_low": 0.8,
                 "descriptive_interval_high": 1.2,
                 "nominal_interval_mass": 0.9,
-                "interval_scope": "descriptive_hierarchical_bootstrap",
+                "interval_scope": "descriptive_selected_source_joint_bootstrap",
                 "population_coverage_claimed": False,
                 "bootstrap_samples": 100,
             }
@@ -384,9 +388,10 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
         [
             {
                 "candidate_id": "candidate-a",
+                "design_id": "design-a",
+                "reader_experiment_id": "experiment-a",
                 "reduction_id": policy.aggregation.primary_reduction_id,
                 "reduction_role": "primary",
-                "experiment_count": 1,
                 **{column: 1.0 for column in VALUE_COLUMNS},
                 **{f"{column}__delta_from_primary": 0.0 for column in VALUE_COLUMNS},
                 "maximum_abs_delta_from_primary": 0.0,
@@ -397,10 +402,10 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
         [
             {
                 "candidate_id": "candidate-a",
+                "design_id": "design-a",
+                "reader_experiment_id": "experiment-a",
                 "component": component,
-                "experiment_count": 1,
-                "median_event_time_half_range": 0.1,
-                "maximum_event_time_half_range": 0.1,
+                "event_time_half_range": 0.1,
             }
             for component in VALUE_COLUMNS
         ]

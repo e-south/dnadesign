@@ -14,13 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observations.v1"
-SCHEMA_VERSION = "1"
+SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observations.v2"
+SCHEMA_VERSION = "2"
 STUDY_ID = "stress_ethanol_cipro_growth"
 RECORD_FILES = {
     "observations": "observations.parquet",
     "contributions": "contributions.parquet",
-    "hierarchical_bootstrap_draws": "hierarchical_bootstrap_draws.parquet",
+    "bootstrap_draws": "bootstrap_draws.parquet",
     "uncertainty": "uncertainty.parquet",
     "repeat_diagnostics": "repeat_diagnostics.parquet",
     "reduction_sensitivity": "reduction_sensitivity.parquet",

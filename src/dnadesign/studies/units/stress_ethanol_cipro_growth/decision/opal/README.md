@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-decision
 title: OPAL decision surfaces
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 ---
 
 ## OPAL Decision Surfaces
@@ -14,8 +14,9 @@ biological guardrails outside generic OPAL core.
 OPAL registers SFXI and RMF as independent objective plugins. `top_n` and
 `expected_improvement` are selectors, not metric identities. The current stress
 campaign is configured to model the response-window eight-component Y and
-apply RMF inside its selection views. Observed-label promotion has not occurred,
-so the campaign remains inactive.
+apply RMF inside its selection views. Its verified source contains 27 exact
+labels and eight measured-candidate exclusions. Round 0 completed as a frozen
+learning probe with one shared RF and 18 sequence-unique allocations.
 
 - `batch0/`: pre-assay candidate-table materialization and provenance review.
 - `densegen_axis_probe/`: DenseGen construction-label OPAL probes, including
@@ -24,7 +25,8 @@ so the campaign remains inactive.
   display-only manifests for the `secg_rmf_greedy` campaign.
 - `response_metastudy/`: read-only metric, label, and predictor review over the
   digest-pinned SFXI source ledgers plus Reader's response-window bundle. It
-  records the evidence and risks behind the inactive RMF campaign.
+  records evidence and risk without changing campaign state or promoting a
+  model.
 - `synthesis_handoff/`: study-owned physical synthesis handoff for selected
   OPAL promoters, including cloning-strategy transforms, vendor-neutral
   manifests, and vendor export adapters. It wraps the checked-in batch0

@@ -26,6 +26,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     StressTargetView,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime.loading import (
+    assert_campaign_response_reduction,
     assert_sfxi_run_contract,
     assert_shared_observed_labels,
     load_candidate_matrix,
@@ -199,6 +200,27 @@ def test_stress_campaign_contract_preserves_configured_model_and_response_vector
         "n_jobs": -1,
         "emit_feature_importance": True,
     }
+    assert contract.response_reduction_id == "event_logmean_4_8h_post"
+    assert contract.rmf_calibration_cohort["cohort_id"] == "exact_primary_reader_candidate_experiments_v1"
+    assert contract.rmf_calibration_cohort["unit_count"] == 41
+    assert_campaign_response_reduction(contract, primary_reduction_id="event_logmean_4_8h_post")
+
+
+def test_stress_campaign_contract_rejects_reader_primary_reduction_drift(tmp_path: Path) -> None:
+    campaign_root, _ = _copy_campaign_config(tmp_path)
+    records = tmp_path / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet"
+    records.parent.mkdir(parents=True)
+    records.touch()
+    paths = MetastudyPaths(
+        repo_root=tmp_path,
+        reader_bundle_root=tmp_path / "reader-bundle",
+        out_dir=tmp_path / "out",
+        campaign_root=campaign_root,
+    )
+    contract = load_stress_campaign_contract(paths)
+
+    with pytest.raises(ValueError, match="response reduction disagrees"):
+        assert_campaign_response_reduction(contract, primary_reduction_id="event_logmean_6_12h_post")
 
 
 def test_stress_campaign_contract_rejects_response_vector_transform_drift(tmp_path: Path) -> None:
@@ -235,6 +257,7 @@ def test_sfxi_evidence_frame_rejects_missing_persisted_ledgers(tmp_path) -> None
         target_views=(target_view,),
         candidate_records_path=tmp_path / "records.parquet",
         x_column_name="x",
+        response_reduction_id="event_logmean_4_8h_post",
     )
 
     with pytest.raises(FileNotFoundError, match="Required SFXI source artifact is missing"):
@@ -284,7 +307,7 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
 
     assert tuple(target_views) == ("ethanol", "ciprofloxacin", "and")
     assert stress_campaign.model_params["random_state"] == 7
-    assert stress_campaign.rmf_calibration_by_view["ethanol"]["response_separation_scale"] == pytest.approx(0.509942)
+    assert stress_campaign.rmf_calibration_by_view["ethanol"]["response_separation_scale"] == pytest.approx(0.352901)
     assert tuple(run.source.lifecycle for run in sfxi_evidence) == ("provenance_only",) * 3
     assert tuple(run.target_view.target_mask for run in sfxi_evidence) == (
         (0.0, 1.0, 0.0, 1.0),

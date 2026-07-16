@@ -16,8 +16,8 @@ next-build policy.
 - Reader owns event resolution, trajectory reduction, within-experiment well
   summaries, reference subtraction, uncertainty records, and assay visuals.
 - The study package owns stress target masks, exact Reader-to-label joins,
-  repeat-experiment aggregation, objective-specific evaluation, grouped model
-  tests, and study recommendations.
+  repeated-candidate label-source decisions, objective-specific evaluation,
+  grouped model tests, and study recommendations.
 - OPAL owns objective primitives, campaign training, candidate scoring,
   selection, and ledgers after observed-Y promotion.
 
@@ -76,14 +76,33 @@ uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
   --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
+  --calibration-preview \
+  --json
+```
+
+The preview is read-only. It derives assay scales from every exact, study-bound,
+non-reference primary Reader candidate-experiment row. This declared cohort is
+independent of the retrospective model-screen selection and repeated-candidate
+label decisions. The output records the cohort rule, Reader and candidate-binding
+digests, counts, target masks, exact derived values, and six-decimal campaign
+parity.
+
+Publish the complete review bundle:
+
+```bash
+uv run python -m \
+  dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
+  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --overwrite \
   --json
 ```
 
 The runtime stages output atomically. Existing output is replaced only after
-Reader contracts, source identities, OPAL parity, plots, tables, report, and
-manifest all succeed. It also rejects campaign RMF thresholds or scales that
-drift from the Reader-derived review calibration beyond six-decimal rounding.
+Reader contracts, source identities, plots, tables, report, and manifest all
+succeed. Its model-screen calibration remains diagnostic. A difference between
+that screen and the declared campaign cohort is reported and does not redefine
+the campaign scale contract.
 
 ## Architecture
 
@@ -105,17 +124,17 @@ drift from the Reader-derived review calibration beyond six-decimal rounding.
   or declared as absent from the study binding artifact; the runtime rejects
   silent omissions and exclusions that later become resolvable.
 - The response model screen does not read SFXI source CSVs. Its explicit source
-  choice for repeated designs is screen-only and is not a repeat-aggregation
-  rule for observed-label promotion.
-- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v11`.
+  choice for repeated designs is screen-only and has no label-source or
+  calibration-cohort authority.
+- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v12`.
 
 Reader emits `[r00, r10, r01, r11, b00, b10, b01, b11]`. The `r` values are
 reduced `log2(YFP/CFP)` response, while the `b` values are same-state
 pDual-10-relative `log2(YFP/OD600)` fluorescence. They are not SFXI vec8. The
 eight-component vector is response-window Y, not an RMF vec8. The primary
-reduction is the 6-12-hour post-event geometric log mean. Reader owns the
-reduction; OPAL applies the RMF objective. Promotion of response-window
-observed labels remains inactive.
+reduction is the 4-8-hour post-event geometric log mean. Reader owns the
+reduction; OPAL applies the RMF objective. Response-window labels enter OPAL
+only through the study's verified, manifest-pinned publication contract.
 
 Every active view uses global target-state separation: the least responsive ON
 state is compared with the most responsive OFF state under the declared mask.
@@ -149,18 +168,19 @@ SFXI source evidence is evaluated only under its declared vec8 contract.
 Response-window evidence is evaluated only from its declared `r` and `b`
 fields; the study does not translate those fields into an SFXI vector. The SFXI
 source selections are too effect-dominated for synthesis. The Reader primary
-response reduction is the duration-weighted mean log2 ratio from 6-12 hours
+response reduction is the duration-weighted mean log2 ratio from 4-8 hours
 after the intervention. The configured campaign random forest is evaluated as
 the campaign model. Fixed challengers and the mean baseline remain separate
 comparators; none is promoted by the present grouped evidence.
 
 Grouped enrichment is strongest for ciprofloxacin and weakest for ethanol, but
-all exact 95% intervals include 0.5. The configured selection mechanism under
-review is greedy top-six per selection view; it remains inactive, and these
-intervals are risk evidence rather than slot-allocation authority. The
-aggregation rule and candidate-binding artifact are declared. Label publication
-remains blocked until repeated candidates are adjudicated, the observation
-policy is approved, and the study publishes the verified typed OPAL handoff.
+all exact 95% intervals include 0.5. Round 0 used the configured RF and a
+deterministic round-robin allocator to assign six sequence-unique slots per
+view. It is not scientifically promoted, and the intervals remain risk evidence
+rather than slot-allocation authority. The candidate-binding artifact and
+explicit label-source policy are declared and approved. The generated manifest
+reports typed-label readiness separately from model support, selection-policy
+promotion, and synthesis authorization.
 
 The model-evidence trajectory records the same frozen grouped screen after each
 eligible corpus update. A protocol change begins a separate series. Current

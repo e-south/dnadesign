@@ -81,7 +81,7 @@ def test_review_summary_is_rmf_specific_and_fail_fast() -> None:
     manifest = {
         "response_metric_screen": {
             "status": "screen_complete_not_promoted",
-            "primary_reduction_candidate": "event_logmean_6_12h_post",
+            "primary_reduction_candidate": "event_logmean_4_8h_post",
             "model_screen_candidate_count": 35,
             "reader_event_experiment_count": 8,
             "prospective_hill_climb_demonstrated": False,
@@ -89,11 +89,11 @@ def test_review_summary_is_rmf_specific_and_fail_fast() -> None:
             "response_screen_protocol": {
                 "reductions": [
                     {
-                        "id": "event_logmean_6_12h_post",
+                        "id": "event_logmean_4_8h_post",
                         "screen_role": "primary",
                         "method": "geometric_time_mean",
-                        "window_start_event_h": 6.0,
-                        "window_end_event_h": 12.0,
+                        "window_start_event_h": 4.0,
+                        "window_end_event_h": 8.0,
                     }
                 ]
             },
@@ -102,7 +102,7 @@ def test_review_summary_is_rmf_specific_and_fail_fast() -> None:
 
     summary = build_review_summary(manifest)
 
-    assert summary.decision == "RMF remains inactive for production selection"
+    assert summary.decision == "RMF production selection remains unsupported"
     assert "0.15" in summary.basis
     assert summary.evidence_base == "35 screen-selected candidates across 8 Reader experiments"
 
@@ -111,7 +111,7 @@ def test_review_summary_rejects_unpromoted_screen_with_hill_climb_claim() -> Non
     manifest = {
         "response_metric_screen": {
             "status": "screen_complete_not_promoted",
-            "primary_reduction_candidate": "event_logmean_6_12h_post",
+            "primary_reduction_candidate": "event_logmean_4_8h_post",
             "model_screen_candidate_count": 35,
             "reader_event_experiment_count": 8,
             "prospective_hill_climb_demonstrated": True,
@@ -119,11 +119,11 @@ def test_review_summary_rejects_unpromoted_screen_with_hill_climb_claim() -> Non
             "response_screen_protocol": {
                 "reductions": [
                     {
-                        "id": "event_logmean_6_12h_post",
+                        "id": "event_logmean_4_8h_post",
                         "screen_role": "primary",
                         "method": "geometric_time_mean",
-                        "window_start_event_h": 6.0,
-                        "window_end_event_h": 12.0,
+                        "window_start_event_h": 4.0,
+                        "window_end_event_h": 8.0,
                     }
                 ]
             },

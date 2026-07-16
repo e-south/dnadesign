@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/campaign_calibration.py
 
-Verify parity between Reader-derived RMF calibration and the campaign contract.
+Compare the retrospective screen calibration with the campaign contract.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -25,13 +25,13 @@ _CAMPAIGN_CALIBRATION_FIELDS = {
 }
 
 
-def verify_campaign_rmf_calibration_parity(
+def compare_campaign_to_screen_calibration(
     calibration: pd.DataFrame,
     *,
     configured_by_view: Mapping[str, Mapping[str, float]],
     absolute_tolerance: float = 5.0e-7,
 ) -> dict[str, object]:
-    """Verify that campaign parameters match the Reader-derived review calibration."""
+    """Report, but do not gate on, campaign-to-screen calibration differences."""
 
     required = {"selection_view_id", "component", "threshold", "scale", "scale_basis"}
     missing = sorted(required - set(calibration.columns))
@@ -44,7 +44,7 @@ def verify_campaign_rmf_calibration_parity(
             "campaign RMF calibration views must match the configured stress views: "
             f"missing={sorted(expected_views - observed_views)}, extra={sorted(observed_views - expected_views)}"
         )
-    errors: list[str] = []
+    differences: list[str] = []
     max_abs_error = 0.0
     for view_id in EXPECTED_STRESS_TARGET_VIEW_IDS:
         configured = configured_by_view[view_id]
@@ -54,7 +54,7 @@ def verify_campaign_rmf_calibration_parity(
                 & calibration["component"].astype(str).eq(component)
             ]
             if len(rows) != 1:
-                errors.append(f"{view_id}.{component}: expected one Reader calibration row, found {len(rows)}")
+                differences.append(f"{view_id}.{component}: expected one screen calibration row, found {len(rows)}")
                 continue
             row = rows.iloc[0]
             for kind, configured_field, observed_column in (
@@ -66,18 +66,19 @@ def verify_campaign_rmf_calibration_parity(
                 difference = abs(configured_value - observed_value)
                 max_abs_error = max(max_abs_error, difference)
                 if not np.isclose(configured_value, observed_value, rtol=0.0, atol=absolute_tolerance):
-                    errors.append(
+                    differences.append(
                         f"{view_id}.{component}.{kind}: campaign={configured_value:.12g}, "
-                        f"Reader-derived={observed_value:.12g}, abs_error={difference:.12g}"
+                        f"screen={observed_value:.12g}, abs_error={difference:.12g}"
                     )
-    if errors:
-        raise ValueError("campaign RMF calibration drifted from Reader evidence: " + "; ".join(errors))
     return {
-        "matches_reader_evidence": True,
+        "comparison_role": "diagnostic_only",
+        "matches_screen_calibration": not differences,
         "absolute_tolerance": float(absolute_tolerance),
         "max_abs_error": float(max_abs_error),
         "scale_basis": sorted(calibration["scale_basis"].astype(str).unique()),
+        "differences": differences,
+        "production_calibration_authority": "declared_study_calibration_cohort",
     }
 
 
-__all__ = ["verify_campaign_rmf_calibration_parity"]
+__all__ = ["compare_campaign_to_screen_calibration"]

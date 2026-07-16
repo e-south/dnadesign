@@ -77,26 +77,66 @@ def test_reader_joint_draws_fail_when_a_candidate_is_missing() -> None:
         )
 
 
-def test_campaign_calibration_parity_accepts_only_rounding_error() -> None:
+def test_campaign_to_screen_calibration_comparison_accepts_only_rounding_error() -> None:
     calibration, configured = _campaign_calibration(scale=0.1234564)
 
-    result = campaign_calibration.verify_campaign_rmf_calibration_parity(
+    result = campaign_calibration.compare_campaign_to_screen_calibration(
         calibration,
         configured_by_view=configured,
     )
 
-    assert result["matches_reader_evidence"] is True
+    assert result["matches_screen_calibration"] is True
+    assert result["comparison_role"] == "diagnostic_only"
     assert float(result["max_abs_error"]) == pytest.approx(4.0e-7)
 
 
-def test_campaign_calibration_parity_rejects_reader_evidence_drift() -> None:
+def test_campaign_to_screen_calibration_comparison_reports_drift_without_blocking() -> None:
     calibration, configured = _campaign_calibration(scale=0.1238)
 
-    with pytest.raises(ValueError, match="campaign RMF calibration drifted from Reader evidence"):
-        campaign_calibration.verify_campaign_rmf_calibration_parity(
-            calibration,
-            configured_by_view=configured,
-        )
+    result = campaign_calibration.compare_campaign_to_screen_calibration(
+        calibration,
+        configured_by_view=configured,
+    )
+
+    assert result["matches_screen_calibration"] is False
+    assert len(result["differences"]) == 9
+
+
+def test_fold_calibration_is_invariant_to_held_out_experiment_uncertainty() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "selection_view_id": view_id,
+                "reader_experiment_id": experiment_id,
+                **{
+                    f"{component}__combined_sd": value
+                    for component in ("response_separation", "on_magnitude_floor", "off_magnitude_ceiling")
+                },
+            }
+            for view_id in ("ethanol", "ciprofloxacin", "and")
+            for experiment_id, value in (("e1", 0.2), ("e2", 0.3))
+        ]
+    )
+    changed = rows.copy()
+    held_out = changed["reader_experiment_id"].eq("e2")
+    combined = [column for column in changed.columns if column.endswith("__combined_sd")]
+    changed.loc[held_out, combined] = 1_000.0
+
+    baseline = response_uncertainty.build_calibration_table(
+        rows,
+        scale_quantile=0.9,
+        bootstrap_samples=100,
+        exclude_experiment="e2",
+    )
+    perturbed = response_uncertainty.build_calibration_table(
+        changed,
+        scale_quantile=0.9,
+        bootstrap_samples=100,
+        exclude_experiment="e2",
+    )
+
+    pd.testing.assert_frame_equal(baseline, perturbed)
+    assert set(baseline["excluded_experiment"]) == {"e2"}
 
 
 def _reader_records(*, samples: int) -> tuple[pd.DataFrame, pd.DataFrame]:

@@ -69,13 +69,20 @@ def bounded_component_rows(frame: pd.DataFrame) -> pd.DataFrame:
                 "bound_kind",
                 "has_policy_clipping",
                 "has_instrument_overflow",
+                "selected_as_label_source",
                 "included_in_label",
             ]
         )
     normalized = validated_censor_provenance(frame)
     identity = [
         column
-        for column in ("candidate_id", "design_id", "reader_experiment_id", "included_in_label")
+        for column in (
+            "candidate_id",
+            "design_id",
+            "reader_experiment_id",
+            "selected_as_label_source",
+            "included_in_label",
+        )
         if column in normalized.columns
     ]
     rows: list[pd.DataFrame] = []
@@ -119,16 +126,23 @@ def bounded_primary_summary(contributions: pd.DataFrame) -> dict[str, int]:
             "bounded_primary_candidate_count": 0,
             "bounded_primary_contribution_count": 0,
             "bounded_primary_component_count": 0,
+            "bounded_primary_selected_source_candidate_count": 0,
             "bounded_primary_label_candidate_count": 0,
         }
     contribution_columns = ["candidate_id", "design_id", "reader_experiment_id"]
     included = (
         bounded.loc[bounded["included_in_label"].astype(bool)] if "included_in_label" in bounded.columns else bounded
     )
+    selected = (
+        bounded.loc[bounded["selected_as_label_source"].astype(bool)]
+        if "selected_as_label_source" in bounded.columns
+        else bounded
+    )
     return {
         "bounded_primary_candidate_count": int(bounded["candidate_id"].nunique()),
         "bounded_primary_contribution_count": int(len(bounded[contribution_columns].drop_duplicates())),
         "bounded_primary_component_count": len(bounded),
+        "bounded_primary_selected_source_candidate_count": int(selected["candidate_id"].nunique()),
         "bounded_primary_label_candidate_count": int(included["candidate_id"].nunique()),
     }
 

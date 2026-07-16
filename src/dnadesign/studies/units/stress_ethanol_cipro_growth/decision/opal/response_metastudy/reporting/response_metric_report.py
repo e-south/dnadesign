@@ -124,8 +124,9 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "- Ratio-domain policy: values at or below the declared positive floor abort materialization.",
         "",
         "The response-owned screen selection makes this retrospective source choice explicit. Repeated "
-        "experiments are not independent labels; promotion must declare one aggregation rule and retain every "
-        "contributing Reader record.",
+        "experiments are not independent campaign labels. The study's explicit label-source policy selects one "
+        "reviewed experiment for each included repeated candidate while retaining every contributing Reader "
+        "record.",
         "",
         "### Grouped Model Screen",
         "",
@@ -164,8 +165,9 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
             ]
         ),
         "",
-        "This proxy can reject an unsupported model. It cannot demonstrate a biological hill climb because no "
-        "prospective selection has yet been built, measured, and compared with its round-0 baseline.",
+        "This retrospective proxy can reject an unsupported model. It cannot demonstrate a biological hill "
+        "climb; that requires predictions frozen before a prospective selection is measured and comparison "
+        "against its declared baseline.",
         "",
         "### Evidence For Greedy Selection",
         "",
@@ -185,9 +187,10 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         ),
         "",
         "These intervals evaluate the configured campaign random forest, not the strongest retrospective "
-        "challenger. The configured mechanism under review is greedy top-six per selection view; it remains "
-        "inactive, and these intervals are risk evidence rather than slot-allocation authority. Fixed-challenger "
-        "support is retained separately for descriptive comparison.",
+        "challenger. The campaign coordinates six sequence-unique slots per view from ordinal RMF rankings; "
+        "these intervals are risk evidence rather than slot-allocation authority. Runtime state and synthesis "
+        "authorization are outside this metastudy. Fixed-challenger support is retained separately for "
+        "descriptive comparison.",
         "",
     ]
 

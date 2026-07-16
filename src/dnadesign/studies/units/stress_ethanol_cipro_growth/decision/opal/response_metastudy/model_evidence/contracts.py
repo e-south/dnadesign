@@ -16,9 +16,9 @@ import json
 import re
 from typing import Any
 
-PROTOCOL_ID = "stress_response_window_grouped_model_evidence_v1"
-PROTOCOL_SCHEMA_VERSION = "stress_ethanol_cipro_growth.model_evidence_protocol.v1"
-CHECKPOINT_SCHEMA_VERSION = "stress_ethanol_cipro_growth.model_evidence_checkpoint.v1"
+PROTOCOL_ID = "stress_response_window_grouped_model_evidence_v2"
+PROTOCOL_SCHEMA_VERSION = "stress_ethanol_cipro_growth.model_evidence_protocol.v2"
+CHECKPOINT_SCHEMA_VERSION = "stress_ethanol_cipro_growth.model_evidence_checkpoint.v2"
 LATEST_SCHEMA_VERSION = "stress_ethanol_cipro_growth.model_evidence_latest.v1"
 CATALOG_SCHEMA_VERSION = "stress_ethanol_cipro_growth.model_evidence_catalog.v1"
 

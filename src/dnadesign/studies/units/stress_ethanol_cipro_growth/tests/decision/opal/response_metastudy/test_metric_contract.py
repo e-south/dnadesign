@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
+from dnadesign.opal import score_response_magnitude_feasibility
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
     SfxiEvidenceFrame,
     SfxiSourceProvenance,
@@ -61,6 +63,63 @@ def test_rmf_cardinality_screen_exposes_hard_extrema_noise_bias() -> None:
     assert one_on.loc[8, "off_magnitude_ceiling_bias"] > one_on.loc[2, "off_magnitude_ceiling_bias"]
     one_off = screen[screen["mask_topology"].eq("one OFF")].set_index("state_count")
     assert one_off.loc[8, "on_magnitude_floor_bias"] < one_off.loc[4, "on_magnitude_floor_bias"]
+
+
+@pytest.mark.parametrize("target_view", TARGET_VIEWS, ids=lambda view: view.id)
+def test_active_rmf_views_penalize_leak_and_insufficient_dynamic_range(target_view: StressTargetView) -> None:
+    mask = np.asarray(target_view.target_mask, dtype=bool)
+    calibration = {
+        "response_separation_min": 0.0,
+        "on_magnitude_min": 0.0,
+        "off_magnitude_max": 0.0,
+        "response_separation_scale": 1.0,
+        "on_magnitude_scale": 1.0,
+        "off_magnitude_scale": 1.0,
+    }
+    response = np.where(mask, 1.0, 0.0)
+    magnitude = np.where(mask, 1.0, -1.0)
+
+    ideal = score_response_magnitude_feasibility(
+        np.concatenate([response, magnitude])[None, :],
+        target_mask=target_view.target_mask,
+        calibration=calibration,
+    )
+    assert ideal.components.response_separation[0] == pytest.approx(1.0)
+    assert ideal.components.on_magnitude_floor[0] == pytest.approx(1.0)
+    assert ideal.components.off_magnitude_ceiling[0] == pytest.approx(-1.0)
+    assert ideal.feasibility_margin[0] == pytest.approx(1.0)
+
+    compressed_response = response.copy()
+    compressed_response[mask] = 0.25
+    compressed = _rmf_score(compressed_response, magnitude, target_view=target_view, calibration=calibration)
+    assert compressed.response_constraint_margin[0] == pytest.approx(0.25)
+    assert compressed.feasibility_margin[0] == pytest.approx(0.25)
+
+    dim_on = magnitude.copy()
+    dim_on[np.flatnonzero(mask)[0]] = -0.25
+    dim = _rmf_score(response, dim_on, target_view=target_view, calibration=calibration)
+    assert dim.on_magnitude_constraint_margin[0] == pytest.approx(-0.25)
+    assert dim.feasibility_margin[0] == pytest.approx(-0.25)
+
+    leaky_off = magnitude.copy()
+    leaky_off[np.flatnonzero(~mask)[0]] = 0.25
+    leaky = _rmf_score(response, leaky_off, target_view=target_view, calibration=calibration)
+    assert leaky.off_magnitude_constraint_margin[0] == pytest.approx(-0.25)
+    assert leaky.feasibility_margin[0] == pytest.approx(-0.25)
+
+    wrong_response = response.copy()
+    wrong_response[np.flatnonzero(mask)[0]] = -0.25
+    wrong = _rmf_score(wrong_response, magnitude, target_view=target_view, calibration=calibration)
+    assert wrong.response_constraint_margin[0] == pytest.approx(-0.25)
+    assert wrong.feasibility_margin[0] == pytest.approx(-0.25)
+
+
+def _rmf_score(response, magnitude, *, target_view: StressTargetView, calibration):
+    return score_response_magnitude_feasibility(
+        np.concatenate([response, magnitude])[None, :],
+        target_mask=target_view.target_mask,
+        calibration=calibration,
+    )
 
 
 def test_setpoint_support_counts_each_target_view_independently() -> None:
