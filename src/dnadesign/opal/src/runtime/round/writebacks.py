@@ -115,6 +115,22 @@ def write_round_artifacts(
     model_meta_sha = write_model_meta(apaths.model_meta_json, model_meta)
 
     seq_map = build_sequence_map(df)
+    deduplicate_by = str(cfg.selection_batch.deduplicate_by or "id").strip()
+    if deduplicate_by not in df.columns:
+        raise OpalError(f"selection_batch candidate data is missing column {deduplicate_by!r}.")
+    dedup_columns = list(dict.fromkeys(["id", deduplicate_by]))
+    dedup_rows = df.loc[:, dedup_columns].copy()
+    dedup_rows["id"] = dedup_rows["id"].astype(str)
+    if dedup_rows["id"].duplicated().any():
+        raise OpalError("selection_batch candidate ids must be unique before artifact writeback.")
+    if dedup_rows[deduplicate_by].isna().any():
+        raise OpalError(f"selection_batch deduplicate column {deduplicate_by!r} contains null values.")
+    if deduplicate_by == "id":
+        batch_key_by_id = {candidate_id: candidate_id for candidate_id in dedup_rows["id"]}
+    else:
+        batch_key_by_id = {
+            candidate_id: str(batch_key) for candidate_id, batch_key in dedup_rows.itertuples(index=False, name=None)
+        }
 
     labels_used_df = None
     if not training.train_df.empty:
@@ -169,6 +185,8 @@ def write_round_artifacts(
                     "tie_handling": selection.tie_handling,
                     "id": candidate_id,
                     "sequence": seq_map.get(candidate_id),
+                    "selection_batch_key": batch_key_by_id[candidate_id],
+                    "deduplicate_by": deduplicate_by,
                     "selection_order": (
                         allocation_slot if allocation_slot > 0 else int(selection.ranks_ordinal[int(idx)])
                     ),

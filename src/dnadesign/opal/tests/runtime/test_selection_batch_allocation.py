@@ -226,23 +226,45 @@ def test_allocation_fails_when_unique_quota_exceeds_pool() -> None:
         )
 
 
-def test_allocation_rejects_ambiguous_deduplication_keys() -> None:
-    ids = ["a", "b", "c"]
-    candidates = pd.DataFrame({"id": ids, "sequence": ["AAA", "AAA", "CCC"]})
+def test_allocation_deduplicates_shared_keys_across_distinct_candidate_ids() -> None:
+    ids = ["a", "b", "c", "d"]
+    candidates = pd.DataFrame({"id": ids, "sequence": ["AAA", "AAA", "CCC", "DDD"]})
     selections = {
-        view_id: _selection(view_id, id_order_pool=ids, ranked_ids=["c", "b", "a"], top_k=1)
-        for view_id in ["target_a", "target_b"]
+        "target_a": _selection(
+            "target_a",
+            id_order_pool=ids,
+            ranked_ids=["a", "c", "d", "b"],
+            top_k=1,
+        ),
+        "target_b": _selection(
+            "target_b",
+            id_order_pool=ids,
+            ranked_ids=["b", "c", "d", "a"],
+            top_k=1,
+        ),
     }
 
-    with pytest.raises(OpalError, match="maps to multiple candidate ids"):
-        allocate_unique_selection_slots(
-            candidate_df=candidates,
-            id_order_pool=ids,
-            selections=selections,
-            deduplicate_by="sequence",
-            expected_unique_count=2,
-            allocation=_allocation("target_a", "target_b"),
-        )
+    allocated = allocate_unique_selection_slots(
+        candidate_df=candidates,
+        id_order_pool=ids,
+        selections=selections,
+        deduplicate_by="sequence",
+        expected_unique_count=2,
+        allocation=_allocation("target_a", "target_b"),
+    )
+
+    assert _selected_ids(allocated.selections["target_a"], ids) == ["a"]
+    assert _selected_ids(allocated.selections["target_b"], ids) == ["c"]
+    assert allocated.trace["id"].tolist() == ["a", "b", "c"]
+    assert allocated.trace["decision"].tolist() == [
+        "allocated",
+        "skipped_already_allocated",
+        "allocated",
+    ]
+    assert allocated.summary["initial_unique_count"] == 1
+    assert allocated.summary["skipped_overlap_count"] == 1
+    assert allocated.summary["replacement_count"] == 1
+    assert allocated.summary["final_unique_count"] == 2
 
 
 def test_cli_top_k_override_cannot_drift_an_allocated_batch_contract() -> None:

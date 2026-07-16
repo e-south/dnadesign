@@ -58,7 +58,6 @@ def allocate_unique_selection_slots(
         candidate_df=candidate_df,
         id_order_pool=pool_ids,
         deduplicate_by=key_column,
-        require_unique_keys=True,
     )
     priority, quota_total = validate_allocation_contract(
         selections=selections,

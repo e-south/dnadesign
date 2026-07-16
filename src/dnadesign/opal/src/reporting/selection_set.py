@@ -24,11 +24,13 @@ from ..core.rounds import resolve_round_index_from_runs
 from ..core.utils import OpalError
 from ..storage.ledger import LedgerReader
 from ..storage.workspace import CampaignWorkspace
+from .selection_batch_contract import SELECTION_BATCH_REQUIRED_COLUMNS, validate_selection_batch_rows
+from .selection_batch_verification import verify_file_digest, verify_selection_batch_memberships
 from .summary import select_run_meta
-from .verify_outputs import compare_selection_to_ledger, read_selection_artifact, read_selection_table
+from .verify_outputs import compare_selection_to_ledger, read_selection_table
 
 SELECTION_SET_SCHEMA_VERSION = "opal.selection_set.v2"
-SELECTION_BATCH_SCHEMA_VERSION = "opal.selection_batch.v2"
+SELECTION_BATCH_SCHEMA_VERSION = "opal.selection_batch.v3"
 
 
 def _campaign_json(cfg_path: Path, cfg: Any, ws: CampaignWorkspace) -> dict[str, str]:
@@ -65,6 +67,16 @@ def _artifact_path(run_row: pd.Series, *, key: str, explicit: str | Path | None)
         if isinstance(value, str):
             return Path(value)
     return None
+
+
+def _artifact_reference(run_row: pd.Series, *, key: str) -> tuple[str, Path] | None:
+    artifacts = run_row.get("artifacts")
+    if not isinstance(artifacts, dict) or key not in artifacts:
+        return None
+    value = artifacts[key]
+    if not isinstance(value, (list, tuple, np.ndarray)) or len(value) < 2:
+        return None
+    return str(value[0]), Path(value[1])
 
 
 def _require_view(cfg: Any, selection_view_id: str) -> str:
@@ -207,18 +219,6 @@ def load_selection_set(
     }
 
 
-def _json_value(value: Any) -> Any:
-    if isinstance(value, np.ndarray):
-        return [_json_value(item) for item in value.tolist()]
-    if isinstance(value, list):
-        return [_json_value(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _json_value(item) for key, item in value.items()}
-    if isinstance(value, np.generic):
-        return value.item()
-    return value
-
-
 def load_selection_batch(
     config_path: str | Path,
     *,
@@ -235,19 +235,82 @@ def load_selection_batch(
     _, run_row = _resolve_run(reader, round_selector=round_selector, run_id=run_id)
     resolved_run_id = str(run_row["run_id"])
     as_of_round = int(run_row["as_of_round"])
-    path = _artifact_path(
-        run_row,
-        key="selection/selection_batch.parquet",
-        explicit=selection_batch_path,
-    )
-    if path is None:
+    batch_reference = _artifact_reference(run_row, key="selection/selection_batch.parquet")
+    if batch_reference is None:
         raise OpalError("Run ledger is missing the selection/selection_batch.parquet artifact reference.")
-    frame = read_selection_artifact(path, required_columns=("id", "selection_view_ids", "selection_memberships"))
-    if "selection_batch_key" not in frame.columns or "deduplicate_by" not in frame.columns:
-        raise OpalError("Selection batch is missing selection_batch_key or deduplicate_by.")
-    if frame["selection_batch_key"].astype(str).duplicated().any():
-        raise OpalError("Selection batch contains duplicate selection_batch_key values.")
-    rows = [{key: _json_value(value) for key, value in row.items()} for row in frame.to_dict(orient="records")]
+    batch_sha256, ledger_batch_path = batch_reference
+    path = Path(selection_batch_path) if selection_batch_path is not None else ledger_batch_path
+    if selection_batch_path is None:
+        verified_batch_sha256 = verify_file_digest(
+            path,
+            expected_sha256=batch_sha256,
+            artifact_key="selection/selection_batch.parquet",
+        )
+        batch_digest_status = "pass"
+    else:
+        verified_batch_sha256 = None
+        batch_digest_status = "explicit_override"
+
+    selections_reference = _artifact_reference(run_row, key="selection/selections.parquet")
+    if selections_reference is None:
+        raise OpalError("Run ledger is missing the selection/selections.parquet artifact reference.")
+    selections_sha256, selections_path = selections_reference
+    verified_selections_sha256 = verify_file_digest(
+        selections_path,
+        expected_sha256=selections_sha256,
+        artifact_key="selection/selections.parquet",
+    )
+    frame = read_selection_table(path)
+    missing = sorted(SELECTION_BATCH_REQUIRED_COLUMNS - set(frame.columns))
+    if missing:
+        raise OpalError(f"Selection batch is missing required columns: {missing}.")
+    configured_view_ids = tuple(view.id for view in cfg.selection_views)
+    deduplicate_by = str(cfg.selection_batch.deduplicate_by or "id").strip()
+    allocation = cfg.selection_batch.allocation
+    allocation_strategy = None if allocation is None else str(allocation.strategy)
+    allocation_view_priority = configured_view_ids if allocation is None else tuple(allocation.view_priority)
+    quota_by_view = {view.id: int(view.selection.params["top_k"]) for view in cfg.selection_views}
+    allocation_trace_path: Path | None = None
+    allocation_trace_digest: dict[str, str | None] = {
+        "status": "not_applicable",
+        "expected_sha256": None,
+        "verified_sha256": None,
+    }
+    if allocation is not None:
+        trace_reference = _artifact_reference(run_row, key="selection/allocation_trace.parquet")
+        if trace_reference is None:
+            raise OpalError("Run ledger is missing the selection/allocation_trace.parquet artifact reference.")
+        trace_sha256, allocation_trace_path = trace_reference
+        verified_trace_sha256 = verify_file_digest(
+            allocation_trace_path,
+            expected_sha256=trace_sha256,
+            artifact_key="selection/allocation_trace.parquet",
+        )
+        allocation_trace_digest = {
+            "status": "pass",
+            "expected_sha256": trace_sha256,
+            "verified_sha256": verified_trace_sha256,
+        }
+    rows = validate_selection_batch_rows(
+        frame,
+        campaign_slug=str(cfg.campaign.slug),
+        run_id=resolved_run_id,
+        as_of_round=as_of_round,
+        configured_view_ids=configured_view_ids,
+        deduplicate_by=deduplicate_by,
+        allocation_strategy=allocation_strategy,
+        allocation_view_priority=allocation_view_priority,
+        quota_by_view=quota_by_view,
+    )
+    membership_verification = verify_selection_batch_memberships(
+        rows,
+        selections_path=selections_path,
+        allocation_trace_path=allocation_trace_path,
+        campaign_slug=str(cfg.campaign.slug),
+        run_id=resolved_run_id,
+        as_of_round=as_of_round,
+        deduplicate_by=deduplicate_by,
+    )
     return {
         "schema_version": SELECTION_BATCH_SCHEMA_VERSION,
         "campaign": _campaign_json(cfg_path, cfg, ws),
@@ -255,6 +318,23 @@ def load_selection_batch(
         "as_of_round": as_of_round,
         "run_id": resolved_run_id,
         "selection_batch_path": str(path),
+        "deduplicate_by": deduplicate_by,
+        "allocation_strategy": allocation_strategy or "logical_union",
         "unique_count": len(rows),
+        "verification": {
+            "status": "pass",
+            "batch_digest": {
+                "status": batch_digest_status,
+                "expected_sha256": batch_sha256,
+                "verified_sha256": verified_batch_sha256,
+            },
+            "selections_digest": {
+                "status": "pass",
+                "expected_sha256": selections_sha256,
+                "verified_sha256": verified_selections_sha256,
+            },
+            "allocation_trace_digest": allocation_trace_digest,
+            "memberships": membership_verification,
+        },
         "rows": rows,
     }

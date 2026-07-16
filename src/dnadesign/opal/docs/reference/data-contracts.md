@@ -110,6 +110,25 @@ study review. Under the default policy it is the logical union; under explicit
 allocation it contains the exact unique-slot result. Neither artifact
 authorizes synthesis.
 
+`opal selection-batch show/export` exposes this artifact as
+`opal.selection_batch.v3`. The loader requires `run_id`, `as_of_round`, and
+`campaign_slug` provenance on every row and verifies them against the resolved
+run. Selection rows carry the projected `selection_batch_key` and
+`deduplicate_by` fields used for that run. The loader verifies the batch and
+long-form selection artifacts against their run-ledger SHA-256 digests, then
+reconciles each nested batch membership to the corresponding candidate/view
+selection row: batch key, ranks, scores, score reference, selection origin, and
+allocation slot must agree. Coordinated allocations additionally require the
+digest-bound allocation trace; `preferred_view_ids` must match its complete set
+of top-k preferences for the deduplication key. It also verifies configured
+view membership and allocation ownership.
+Logical-union rows are returned in competition-rank order;
+coordinated rows follow allocation slot and declared view priority. Rows that
+do not satisfy the v3 contract fail validation; the loader does not infer or
+upgrade missing provenance. An explicit batch-path audit override bypasses only
+the batch-file digest and must still reconcile to the digest-bound selection
+artifact.
+
 ### Public inspection contracts
 
 - `opal selection-set show/export --view <id>` projects and verifies one view.

@@ -26,9 +26,13 @@ def candidate_key_by_id(
     candidate_df: pd.DataFrame,
     id_order_pool: List[str],
     deduplicate_by: str,
-    require_unique_keys: bool,
 ) -> dict[str, str]:
-    """Validate and project candidate IDs to one explicit batch key."""
+    """Validate and project candidate IDs to explicit batch keys.
+
+    Candidate IDs are unique identities. Batch keys may be shared by more than
+    one candidate because coordinated allocation uses those shared keys to
+    deduplicate equivalent candidates.
+    """
 
     key_column = str(deduplicate_by or "id").strip()
     required_columns = list(dict.fromkeys(["id", key_column]))
@@ -59,15 +63,6 @@ def candidate_key_by_id(
         raise OpalError(f"selection_batch candidate data is missing candidate pool ids: {unknown_ids[:10]}")
     pool_key_by_id = {candidate_id: key_by_id[candidate_id] for candidate_id in pool_ids}
 
-    if require_unique_keys:
-        id_by_key: dict[str, str] = {}
-        for candidate_id, key in pool_key_by_id.items():
-            prior_id = id_by_key.setdefault(key, candidate_id)
-            if prior_id != candidate_id:
-                raise OpalError(
-                    f"selection_batch {key_column} value {key!r} maps to multiple candidate ids: "
-                    f"{prior_id!r}, {candidate_id!r}."
-                )
     return pool_key_by_id
 
 
