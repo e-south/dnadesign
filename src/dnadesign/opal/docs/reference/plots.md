@@ -265,6 +265,64 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
     and Student-t mean confidence intervals separately.
   - writes tidy CSV columns `round`, `cohort`, `metric`, `summary`, and
     `value`
+- **`observed_objective_over_rounds`**: measured candidate objective values by
+  observed batch under one commensurate objective contract.
+  - shows every candidate, the batch median, the between-candidate IQR, and an
+    optional cumulative-best trajectory and zero boundary;
+  - requires `round_selector: all`, no global `run_id`, and an explicit
+    `params.run_series` map with exactly one run and contract digest per round;
+  - the contract digest binds the selection view, objective parameters,
+    calibration, target mask, score reference and direction, Y ingest, Y-space,
+    label-source kind, and verified observed-event artifact;
+  - cumulative run snapshots must retain every prior candidate-round event
+    unchanged. Duplicate, changed, or dropped events fail closed;
+  - campaign-history labels without batch IDs are grouped under a derived
+    `round-<observed_round>` batch label. A non-empty Y-space remains required;
+  - objective plugins must explicitly declare pointwise observed replay. RMF
+    supports it because its scores depend only on the eight observed values and
+    fixed parameters. SFXI does not because its score includes training-state
+    normalization;
+  - the IQR is between-candidate spread, not assay uncertainty or a confidence
+    interval. Observed round and batch identify measurement timing, not
+    selection provenance;
+  - batch candidate counts are printed on the axis and preserved in tidy data.
+    The cumulative best is monotone by construction. Neither it nor a batch
+    shift establishes X-to-Y learning, predictor improvement, selection-policy
+    improvement, or a causal round effect. Those claims require a prospectively
+    frozen prediction-and-baseline analysis that binds the selection policy.
+
+  Compute each pinned digest through the public helper, then place it in the
+  plot configuration:
+
+  ```python
+  from dnadesign.opal.api import observed_objective_run_contract_sha256
+
+  digest = observed_objective_run_contract_sha256(
+      outputs_dir=campaign_dir / "outputs",
+      selection_view_id="ethanol",
+      as_of_round=1,
+      run_id="r1-...",
+  )
+  ```
+
+  ```yaml
+  - name: observed_objective_history
+    kind: observed_objective_over_rounds
+    round_selector: all
+    params:
+      zero_boundary: true
+      show_cumulative_best: true
+      run_series:
+        schema_version: opal.observed_objective_run_series.v1
+        runs:
+          - as_of_round: 0
+            run_id: r0-...
+            contract_sha256: <sha256>
+          - as_of_round: 1
+            run_id: r1-...
+            contract_sha256: <sha256>
+  ```
+
 - **`percent_high_activity_over_rounds`**: thresholded scalar distribution plus
   optional percent-above-threshold line over rounds.
   - params: `metric`, `threshold`, `mode`, `hue`, `size_by`,

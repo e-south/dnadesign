@@ -39,6 +39,8 @@ _PLUGINS_LOADED = False
 _DECLARED_SCORE_CHANNELS_ATTR = "__opal_score_channels__"
 _DECLARED_UNCERTAINTY_CHANNELS_ATTR = "__opal_uncertainty_channels__"
 _DECLARED_SCORE_MODES_ATTR = "__opal_score_modes__"
+_OBSERVED_REPLAY_CONTRACT_ATTR = "__opal_observed_replay_contract__"
+_SUPPORTED_OBSERVED_REPLAY_CONTRACTS = frozenset({"pointwise_params_v1"})
 
 
 def _validate_objective_signature(func: _ObjectiveFn, *, name: str) -> None:
@@ -143,6 +145,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: _ObjectiveFn) -> _ObjectiveFn:
         _DECLARED_SCORE_CHANNELS_ATTR,
         _DECLARED_UNCERTAINTY_CHANNELS_ATTR,
         _DECLARED_SCORE_MODES_ATTR,
+        _OBSERVED_REPLAY_CONTRACT_ATTR,
     ):
         if hasattr(fn, attr):
             setattr(_wrapped, attr, getattr(fn, attr))
@@ -236,3 +239,24 @@ def get_objective_declared_channels(name: str) -> Dict[str, Any]:
         ),
         "score_modes": _declared_score_modes(fn),
     }
+
+
+def get_objective_observed_replay_contract(name: str) -> str | None:
+    """Return an objective's opt-in contract for replaying observed point estimates."""
+
+    _ensure_all_loaded()
+    try:
+        fn = _REG_O[name]
+    except KeyError:
+        avail = ", ".join(sorted(_REG_O))
+        raise KeyError(f"objective '{name}' not found. Available: [{avail}].")
+    raw = getattr(fn, _OBSERVED_REPLAY_CONTRACT_ATTR, None)
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if value not in _SUPPORTED_OBSERVED_REPLAY_CONTRACTS:
+        raise ValueError(
+            f"objective '{name}' declares unsupported observed replay contract {raw!r}; "
+            f"supported={sorted(_SUPPORTED_OBSERVED_REPLAY_CONTRACTS)}."
+        )
+    return value

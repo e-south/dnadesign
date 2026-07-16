@@ -21,6 +21,11 @@ from .observed_labels import (
     candidate_snapshot_record,
     verify_observed_label_snapshot,
 )
+from .observed_objective_history import (
+    OBSERVED_OBJECTIVE_HISTORY_API_VERSION,
+    RUN_SERIES_SCHEMA_VERSION,
+    observed_objective_run_contract_sha256,
+)
 from .response_magnitude_feasibility import (
     RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION,
     ResponseMagnitudeFeasibilityComponents,
@@ -49,11 +54,13 @@ from .sfxi import (
 __all__ = [
     "OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION",
     "OBSERVED_LABELS_API_VERSION",
+    "OBSERVED_OBJECTIVE_HISTORY_API_VERSION",
     "ObservedLabelPromotionBinding",
     "ObservedLabelVerificationError",
     "RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION",
     "ResponseMagnitudeFeasibilityComponents",
     "ResponseMagnitudeFeasibilityScore",
+    "RUN_SERIES_SCHEMA_VERSION",
     "SFXI_API_VERSION",
     "SFXI_REFERENCE_OVERLAY_FIELDS",
     "SFXI_REFERENCE_OVERLAY_NAMESPACE",
@@ -67,6 +74,7 @@ __all__ = [
     "binary_target_mask",
     "candidate_snapshot_record",
     "calibrate_response_magnitude_feasibility",
+    "observed_objective_run_contract_sha256",
     "response_magnitude_feasibility_components",
     "score_response_magnitude_feasibility",
     "score_vec8",

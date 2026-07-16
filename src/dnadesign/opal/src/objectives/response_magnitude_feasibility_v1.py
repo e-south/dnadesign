@@ -122,6 +122,7 @@ response_magnitude_feasibility_v1.__opal_score_modes__ = {
     "on_magnitude_floor": "maximize",
     "off_magnitude_ceiling": "minimize",
 }
+response_magnitude_feasibility_v1.__opal_observed_replay_contract__ = "pointwise_params_v1"
 
 
 __all__ = [

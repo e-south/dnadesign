@@ -135,6 +135,7 @@ _MATH_LABELS = {
     "mse_to_reference": r"MSE to reference, $d^{-1}\sum_i(\bar{y}_i-r_i)^2$",
     "support_distance": r"Nearest labeled logic distance, $\min_j\|\hat{\ell}-\ell_j\|_2$",
     "score_uncertainty": r"Score uncertainty, $\sigma(\hat{S}_{\mathrm{tree}})$",
+    "feasibility_margin": r"RMF feasibility margin, $S_{\mathrm{RMF}}$",
     "factorial_a": r"A effect, $\frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$",
     "factorial_b": r"B effect, $\frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$",
     "factorial_ab": r"AB interaction, $\frac{v_{11}+v_{00}-v_{10}-v_{01}}{2}$",

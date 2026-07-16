@@ -144,6 +144,13 @@ def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) ->
             "(off_max - off_magnitude) / off_scale. Feasibility is their row-wise minimum; "
             "zero is the configured boundary."
         ),
+        "observed_objective_over_rounds": (
+            "OPAL replays the configured pointwise objective once for each immutable observed candidate vector. "
+            "Within each observed batch, the horizontal line is the candidate median and the vertical whisker "
+            "spans the candidate 25th to 75th percentiles. Cumulative best is the maximum through that round for "
+            "maximize objectives, or the minimum for minimize objectives. These are between-candidate summaries, "
+            "not assay uncertainty or confidence intervals."
+        ),
     }
     description = descriptions.get(
         kind,
@@ -286,6 +293,11 @@ def plot_encoding_text(*, kind: str, params: Mapping[str, Any]) -> str:
         )
     if kind == "response_magnitude_feasibility_constraint_decomposition":
         return "x=standardized requirement; y=selected candidate; color=signed margin with zero as the pass boundary"
+    if kind == "observed_objective_over_rounds":
+        return (
+            "x=observed batch; y=pointwise observed objective value; point=candidate; "
+            "horizontal line=batch median; vertical whisker=between-candidate IQR; diamond=cumulative best"
+        )
     return ""
 
 
