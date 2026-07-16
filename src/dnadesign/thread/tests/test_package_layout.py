@@ -62,6 +62,7 @@ _FOLDCHECK_FILES = {"__init__.py", "hashes.py", "models.py", "report.py", "reque
 _STRUCTURE_PREDICTION_FILES = {"__init__.py", "hashes.py", "models.py", "registry.py"}
 _STRUCTURE_VIEW_FILES = {
     "__init__.py",
+    "_mmcif.py",
     "html.py",
     "models.py",
     "nucleic_geometry.py",

@@ -74,6 +74,25 @@ END
 
 _SIDECHAIN_MMCIF = """\
 data_fixture
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_entity_id
+_atom_site.label_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.occupancy
+_atom_site.B_iso_or_equiv
+_atom_site.pdbx_PDB_model_num
 ATOM 1 N N . SER A 1 3 0.000 0.000 0.000 A 3 ? 1.00 80.00 1
 ATOM 2 C CA . SER A 1 3 1.000 0.000 0.000 A 3 ? 1.00 80.00 1
 ATOM 3 C CB . SER A 1 3 1.000 1.000 0.000 A 3 ? 1.00 80.00 1
@@ -660,7 +679,7 @@ def test_py3dmol_backend_maps_mmcif_contract_to_3dmol_cif_loader() -> None:
     )
 
     unescaped_html = html_lib.unescape(html).replace(" ", "")
-    assert 'addModel("data_fixture\\nATOM' in unescaped_html
+    assert 'addModel("data_fixture\\nloop_\\n_atom_site.group_PDB' in unescaped_html
     assert '","cif");' in unescaped_html
     assert '","mmcif");' not in unescaped_html
 

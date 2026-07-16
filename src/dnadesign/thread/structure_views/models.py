@@ -16,6 +16,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
 
+from ._mmcif import iter_mmcif_atom_site_records
+
 StructureFormat = Literal["pdb", "mmcif"]
 _BACKBONE_ATOM_NAMES = frozenset({"N", "CA", "C", "O", "OXT"})
 DNA_RESIDUE_NAMES = frozenset({"DA", "DC", "DG", "DT"})
@@ -229,27 +231,18 @@ def _summarize_mmcif_atom_content(structure_text: str) -> StructureAtomContent:
     residue_keys: set[tuple[str, str, str, str]] = set()
     sidechain_atom_count = 0
     sidechain_residue_keys: set[tuple[str, str, str, str]] = set()
-    for line in structure_text.splitlines():
-        stripped = line.strip()
-        if not stripped.startswith(("ATOM ", "HETATM ")):
+    for record in iter_mmcif_atom_site_records(structure_text):
+        if record.residue_name not in STANDARD_AMINO_ACID_RESIDUE_NAMES:
             continue
-        try:
-            parts = shlex.split(stripped)
-        except ValueError:
-            continue
-        if len(parts) < 10:
-            continue
-        atom_name = parts[3].strip().upper()
-        residue_name = parts[5].strip().upper()
-        if residue_name not in STANDARD_AMINO_ACID_RESIDUE_NAMES:
-            continue
-        chain_id = parts[12] if len(parts) > 12 else parts[6]
-        residue_number = parts[13] if len(parts) > 13 else parts[8]
-        insertion_code = parts[14] if len(parts) > 14 else "?"
-        residue_key = (chain_id, residue_number, insertion_code, residue_name)
+        residue_key = (
+            record.chain_id,
+            record.residue_number,
+            record.insertion_code,
+            record.residue_name,
+        )
         atom_count += 1
         residue_keys.add(residue_key)
-        if atom_name not in _BACKBONE_ATOM_NAMES:
+        if record.atom_name not in _BACKBONE_ATOM_NAMES:
             sidechain_atom_count += 1
             sidechain_residue_keys.add(residue_key)
     return StructureAtomContent(
