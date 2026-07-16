@@ -157,6 +157,9 @@ where = ["src"]
   "units/retron_hairpin_design/status/ops/status.registry.yaml",
   "units/stress_ethanol_cipro_growth/operations/status/ops/status.registry.yaml",
   "units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml",
+  "units/stress_ethanol_cipro_growth/response_window_observations/config/*.yaml",
+  "units/stress_ethanol_cipro_growth/response_window_observations/config/evidence/*.json",
+  "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.yaml",
   "units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/*.yaml",
 ]
 "dnadesign.usr" = [
