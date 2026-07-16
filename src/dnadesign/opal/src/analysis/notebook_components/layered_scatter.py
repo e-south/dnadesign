@@ -1,4 +1,13 @@
-"""Generic manifest-backed layered-scatter controls for generated notebooks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/layered_scatter.py
+
+Build manifest-backed layered-scatter contracts for generated notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

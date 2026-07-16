@@ -1,4 +1,13 @@
-"""Integrity contracts for manifest-declared plot data."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/plots/test_plot_manifest_integrity.py
+
+Test integrity contracts for manifest-declared plot data.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

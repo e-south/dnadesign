@@ -1,4 +1,13 @@
-"""Verify and extend immutable response-window label promotions."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_window_label_promotion/cumulative.py
+
+Verify and extend immutable response-window label promotions.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

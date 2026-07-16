@@ -1,4 +1,13 @@
-"""Generated marimo cells for manifest-declared layered-scatter controls."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_set_template/layered_scatter_cells.py
+
+Generate marimo cells for manifest-declared layered-scatter controls.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

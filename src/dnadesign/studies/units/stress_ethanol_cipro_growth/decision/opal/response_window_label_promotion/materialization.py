@@ -1,4 +1,13 @@
-"""Stage, verify, atomically publish, and finalize one label promotion."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_window_label_promotion/materialization.py
+
+Stage, verify, atomically publish, and finalize one response-window label promotion.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Render manifest-backed layered-scatter notebook figures."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/layered_scatter_rendering.py
+
+Render manifest-backed layered-scatter notebook figures.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

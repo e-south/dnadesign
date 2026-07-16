@@ -1,4 +1,13 @@
-"""Contract tests for generic notebook layered-scatter review controls."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/notebooks/test_layered_scatter_notebook.py
+
+Test contracts for generic notebook layered-scatter review controls.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

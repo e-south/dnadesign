@@ -1,4 +1,13 @@
-"""Fail-closed integrity tests for manifest-backed notebook scatter data."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/notebooks/test_layered_scatter_integrity.py
+
+Test fail-closed integrity checks for manifest-backed notebook scatter data.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

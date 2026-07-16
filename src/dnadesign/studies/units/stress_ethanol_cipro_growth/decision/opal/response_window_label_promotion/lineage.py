@@ -1,4 +1,13 @@
-"""Serialize promotion publication and maintain its authoritative lineage head."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_window_label_promotion/lineage.py
+
+Serialize label promotion publication and maintain its authoritative lineage head.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

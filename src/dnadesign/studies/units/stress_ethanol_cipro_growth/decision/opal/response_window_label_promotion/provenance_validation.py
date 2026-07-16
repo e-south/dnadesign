@@ -1,4 +1,13 @@
-"""Deep verification for response-window label study provenance."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_window_label_promotion/provenance_validation.py
+
+Verify response-window label study provenance against published artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

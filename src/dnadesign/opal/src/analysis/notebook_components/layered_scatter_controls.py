@@ -1,4 +1,13 @@
-"""Persistent controls for manifest-backed notebook scatter layers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/analysis/notebook_components/layered_scatter_controls.py
+
+Build persistent controls for manifest-backed notebook scatter layers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

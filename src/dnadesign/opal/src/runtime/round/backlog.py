@@ -1,4 +1,13 @@
-"""Derive campaign backlog state from selections and observed labels."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/runtime/round/backlog.py
+
+Derive campaign backlog state from selections and observed labels.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
