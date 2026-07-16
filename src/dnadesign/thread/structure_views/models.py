@@ -11,12 +11,14 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import shlex
 from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
 
-from ._mmcif import iter_mmcif_atom_site_records
+from ._mmcif import (
+    filter_mmcif_atom_site_records_by_residue_name,
+    iter_mmcif_atom_site_records,
+)
 
 StructureFormat = Literal["pdb", "mmcif"]
 _BACKBONE_ATOM_NAMES = frozenset({"N", "CA", "C", "O", "OXT"})
@@ -108,26 +110,22 @@ def molecule_classes_in_structure_text(
 ) -> frozenset[MoleculeClass]:
     """Return molecule roles present in PDB or mmCIF coordinate text."""
 
+    if structure_format == "mmcif":
+        return frozenset(
+            molecule_class
+            for record in iter_mmcif_atom_site_records(structure_text)
+            if (molecule_class := _molecule_class_for_residue_name(record.residue_name)) is not None
+        )
+    if structure_format != "pdb":
+        raise ValueError(f"Unsupported structure format for molecule classification: {structure_format}")
+
     classes: set[MoleculeClass] = set()
     for line in structure_text.splitlines():
-        if not line.startswith(("ATOM  ", "HETATM", "ATOM ")):
+        if not line.startswith(("ATOM  ", "HETATM")):
             continue
-        if structure_format == "pdb":
-            residue_name = line[17:20].strip().upper()
-        else:
-            try:
-                parts = shlex.split(line.strip())
-            except ValueError:
-                continue
-            if len(parts) < 6:
-                continue
-            residue_name = parts[5].strip().upper()
-        if residue_name in STANDARD_AMINO_ACID_RESIDUE_NAMES:
-            classes.add("protein")
-        elif residue_name in DNA_RESIDUE_NAMES:
-            classes.add("dna")
-        elif residue_name in RNA_RESIDUE_NAMES:
-            classes.add("rna")
+        molecule_class = _molecule_class_for_residue_name(line[17:20].strip().upper())
+        if molecule_class is not None:
+            classes.add(molecule_class)
     return frozenset(classes)
 
 
@@ -146,46 +144,37 @@ def filter_structure_text_by_molecule_classes(
         return "\n".join(
             line
             for line in structure_text.splitlines()
-            if _coordinate_line_is_visible(
+            if _pdb_coordinate_line_is_visible(
                 line,
-                structure_format=structure_format,
                 visible_molecule_classes=visible,
             )
         )
     if structure_format == "mmcif":
-        return "\n".join(
-            line
-            for line in structure_text.splitlines()
-            if _coordinate_line_is_visible(
-                line,
-                structure_format=structure_format,
-                visible_molecule_classes=visible,
+        excluded_residue_names = frozenset(
+            residue_name
+            for molecule_class, residue_names in (
+                ("protein", STANDARD_AMINO_ACID_RESIDUE_NAMES),
+                ("dna", DNA_RESIDUE_NAMES),
+                ("rna", RNA_RESIDUE_NAMES),
             )
+            if molecule_class not in visible
+            for residue_name in residue_names
+        )
+        return filter_mmcif_atom_site_records_by_residue_name(
+            structure_text,
+            excluded_residue_names=excluded_residue_names,
         )
     raise ValueError(f"Unsupported structure format for molecule filtering: {structure_format}")
 
 
-def _coordinate_line_is_visible(
+def _pdb_coordinate_line_is_visible(
     line: str,
     *,
-    structure_format: StructureFormat,
     visible_molecule_classes: set[MoleculeClass],
 ) -> bool:
-    if structure_format == "pdb":
-        if not line.startswith(("ATOM  ", "HETATM")):
-            return True
-        residue_name = line[17:20].strip().upper()
-    else:
-        stripped = line.strip()
-        if not stripped.startswith(("ATOM ", "HETATM ")):
-            return True
-        try:
-            parts = shlex.split(stripped)
-        except ValueError:
-            return True
-        if len(parts) < 6:
-            return True
-        residue_name = parts[5].strip().upper()
+    if not line.startswith(("ATOM  ", "HETATM")):
+        return True
+    residue_name = line[17:20].strip().upper()
     molecule_class = _molecule_class_for_residue_name(residue_name)
     return molecule_class is None or molecule_class in visible_molecule_classes
 

@@ -18,13 +18,14 @@ from typing import Iterator
 
 @dataclass(frozen=True)
 class MmcifAtomSiteRecord:
-    """Identity fields needed by structure-view atom summaries."""
+    """Identity fields and source lines for one parsed atom-site record."""
 
     atom_name: str
     residue_name: str
     chain_id: str
     residue_number: str
     insertion_code: str
+    source_line_indices: tuple[int, ...]
 
 
 def iter_mmcif_atom_site_records(structure_text: str) -> Iterator[MmcifAtomSiteRecord]:
@@ -55,25 +56,49 @@ def iter_mmcif_atom_site_records(structure_text: str) -> Iterator[MmcifAtomSiteR
             line_index = _skip_loop_values(lines, line_index)
             continue
 
-        value_buffer: list[str] = []
+        value_buffer: list[tuple[str, int]] = []
         while line_index < len(lines):
             stripped = lines[line_index].strip()
             if _is_loop_boundary(stripped):
                 break
+            source_line_index = line_index
             line_index += 1
             if not stripped:
                 continue
             try:
-                value_buffer.extend(shlex.split(stripped, comments=False, posix=True))
+                values = shlex.split(stripped, comments=False, posix=True)
             except ValueError:
                 value_buffer.clear()
                 continue
+            value_buffer.extend((value, source_line_index) for value in values)
             while len(value_buffer) >= len(headers):
-                row = value_buffer[: len(headers)]
+                row_values = value_buffer[: len(headers)]
                 del value_buffer[: len(headers)]
-                record = _atom_site_record(row, field_indices)
+                record = _atom_site_record(
+                    [value for value, _ in row_values],
+                    field_indices,
+                    source_line_indices=tuple(dict.fromkeys(index for _, index in row_values)),
+                )
                 if record is not None:
                     yield record
+
+
+def filter_mmcif_atom_site_records_by_residue_name(
+    structure_text: str,
+    *,
+    excluded_residue_names: frozenset[str],
+) -> str:
+    """Remove parsed atom-site rows for excluded residues without corrupting shared lines."""
+
+    excluded_line_indices: set[int] = set()
+    retained_line_indices: set[int] = set()
+    for record in iter_mmcif_atom_site_records(structure_text):
+        target = excluded_line_indices if record.residue_name in excluded_residue_names else retained_line_indices
+        target.update(record.source_line_indices)
+    removable_line_indices = excluded_line_indices - retained_line_indices
+    return "\n".join(
+        line for index, line in enumerate(structure_text.splitlines()) if index not in removable_line_indices
+    )
 
 
 def _atom_site_field_indices(headers: list[str]) -> dict[str, tuple[int, ...]] | None:
@@ -98,6 +123,8 @@ def _atom_site_field_indices(headers: list[str]) -> dict[str, tuple[int, ...]] |
 def _atom_site_record(
     row: list[str],
     field_indices: dict[str, tuple[int, ...]],
+    *,
+    source_line_indices: tuple[int, ...],
 ) -> MmcifAtomSiteRecord | None:
     group = _first_known_value(row, field_indices["group"])
     atom_name = _first_known_value(row, field_indices["atom"])
@@ -114,6 +141,7 @@ def _atom_site_record(
         chain_id=chain_id,
         residue_number=residue_number,
         insertion_code=_first_known_value(row, field_indices["insertion"]) or "",
+        source_line_indices=source_line_indices,
     )
 
 
