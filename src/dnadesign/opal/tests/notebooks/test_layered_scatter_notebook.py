@@ -148,7 +148,7 @@ def test_layered_scatter_memory_is_campaign_and_plot_scoped(tmp_path: Path) -> N
     assert first["key"].startswith("layered_scatter_v1:")
 
 
-def test_layered_scatter_memory_is_selection_view_scoped(tmp_path: Path) -> None:
+def test_layered_scatter_memory_persists_across_selection_views(tmp_path: Path) -> None:
     ethanol_choice = _choice(tmp_path)
     ciprofloxacin_choice = _choice(tmp_path, filename="frontier_ciprofloxacin.csv")
     ciprofloxacin_choice["manifest"]["selection_view_id"] = "ciprofloxacin"
@@ -157,7 +157,26 @@ def test_layered_scatter_memory_is_selection_view_scoped(tmp_path: Path) -> None
     ciprofloxacin = build_notebook_layered_scatter_contract(ciprofloxacin_choice)
 
     assert ethanol is not None and ciprofloxacin is not None
-    assert ethanol["key"] != ciprofloxacin["key"]
+    assert ethanol["key"] == ciprofloxacin["key"]
+
+
+def test_layered_scatter_memory_stays_isolated_by_run_round_and_plot(tmp_path: Path) -> None:
+    baseline_choice = _choice(tmp_path)
+    run_choice = _choice(tmp_path, filename="frontier_run.csv")
+    run_choice["manifest"]["run_id"] = "r1"
+    round_choice = _choice(tmp_path, filename="frontier_round.csv")
+    round_choice["manifest"]["rounds"] = [1]
+    plot_choice = _choice(tmp_path, filename="frontier_plot.csv")
+    plot_choice["manifest"]["kind"] = "another_layered_scatter"
+
+    contracts = [
+        build_notebook_layered_scatter_contract(choice)
+        for choice in (baseline_choice, run_choice, round_choice, plot_choice)
+    ]
+
+    assert all(contract is not None for contract in contracts)
+    keys = [contract["key"] for contract in contracts if contract is not None]
+    assert len(set(keys)) == len(keys)
 
 
 def test_layered_scatter_batch_labels_preserve_meaningful_acronyms(tmp_path: Path) -> None:

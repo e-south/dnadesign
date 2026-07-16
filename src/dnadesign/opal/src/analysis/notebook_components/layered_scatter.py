@@ -242,12 +242,12 @@ def _state_bool(state: Mapping[str, Any], key: str, default: bool) -> bool:
 
 
 def _layered_scatter_memory_key(manifest: Mapping[str, Any], *, workdir: str) -> str:
+    # Selection views change the evidence shown, not the operator's display preferences.
     identity = {
         "workdir": str(Path(workdir).expanduser().resolve()),
         "plot": manifest.get("plot_id") or manifest.get("name") or manifest.get("kind"),
         "kind": manifest.get("kind"),
         "run_id": manifest.get("run_id"),
-        "selection_view_id": manifest.get("selection_view_id"),
         "rounds": manifest.get("rounds"),
     }
     payload = json.dumps(identity, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
