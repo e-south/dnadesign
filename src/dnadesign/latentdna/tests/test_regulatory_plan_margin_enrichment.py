@@ -208,6 +208,37 @@ def test_regulatory_plan_margin_artifacts_support_configured_plan_ids() -> None:
     assert set(artifacts.rank_tests_table.column("plan").to_pylist()) == {"axis_a", "axis_b"}
 
 
+def test_regulatory_plan_margin_artifacts_skip_empty_nearest_plan_tail_groups() -> None:
+    artifacts = build_regulatory_plan_margin_artifacts(
+        matrix=_matrix(),
+        rows_table=pa.Table.from_pylist(_rows()),
+        relations_table=_relations(),
+        view_id="bidir_context",
+        cohort_column="design_family",
+        centroid_groups={
+            "background": ["background_only"],
+            "ethanol": ["ethanol"],
+            "cipro": ["ciprofloxacin"],
+            "dual": ["ethanol_ciprofloxacin"],
+            "mixed": ["ethanol", "ciprofloxacin"],
+        },
+        native_filter={"column": "derived__parent_dataset", "equals": "usr_regulondb_native_promoters"},
+        native_parent_column="derived__parent_id",
+        relation_key="usr_id",
+        regulator_column="regulator_abbrev",
+        thresholds=[0.34],
+        tail_modes=["margin_top_quantile_nearest_plan_only"],
+        min_global_promoters=1,
+        min_tail_hits=1,
+        common_regulators=[],
+        expected_output_rows=6,
+    )
+
+    assert "mixed" not in artifacts.tail_membership_table.column("plan").to_pylist()
+    assert "mixed" not in artifacts.enrichment_table.column("plan").to_pylist()
+    assert "mixed" in artifacts.rank_tests_table.column("plan").to_pylist()
+
+
 def test_regulatory_plan_margin_artifacts_fail_fast_on_duplicate_native_parent_ids() -> None:
     rows = _rows()
     rows[-1]["derived__parent_id"] = rows[-2]["derived__parent_id"]

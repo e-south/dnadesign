@@ -239,19 +239,23 @@ def _enrichment_rows(
         key = (str(row["plan"]), float(row["threshold"]), str(row["tail_mode"]))
         tail_sets.setdefault(key, set()).add(str(row["native_parent_id"]))
 
-    groups = [
-        CategoricalEnrichmentGroup(
-            labels={
-                "plan": plan,
-                "threshold": float(threshold),
-                "tail_mode": tail_mode,
-            },
-            members=frozenset(tail_sets[(plan, threshold, tail_mode)]),
-        )
-        for plan in plan_order
-        for threshold in thresholds
-        for tail_mode in tail_modes
-    ]
+    groups: list[CategoricalEnrichmentGroup] = []
+    for plan in plan_order:
+        for threshold in thresholds:
+            for tail_mode in tail_modes:
+                members = frozenset(tail_sets[(plan, threshold, tail_mode)])
+                if not members:
+                    continue
+                groups.append(
+                    CategoricalEnrichmentGroup(
+                        labels={
+                            "plan": plan,
+                            "threshold": float(threshold),
+                            "tail_mode": tail_mode,
+                        },
+                        members=members,
+                    )
+                )
     generic_rows = categorical_enrichment_rows(
         universe_ids=native_parent_ids,
         features_by_subject=regulators_by_parent,
