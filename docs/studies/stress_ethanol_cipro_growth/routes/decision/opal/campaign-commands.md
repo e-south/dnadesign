@@ -48,7 +48,7 @@ uv run opal init -c "$CONFIG" --json
 uv run opal run -c "$CONFIG" --round 0 --json
 ```
 
-### Review and verification
+### Notebook review and verification
 
 ```bash
 for VIEW in ethanol ciprofloxacin and; do
@@ -59,12 +59,13 @@ for VIEW in ethanol ciprofloxacin and; do
 done
 uv run opal selection-batch show -c "$CONFIG" --round latest --json \
   | jq -e '.unique_count == 18 and ([.rows[].selection_batch_key] | unique | length) == 18'
+uv run opal status -c "$CONFIG" --with-ledger --json
 uv run opal notebook generate -c "$CONFIG" --round latest --force --json
 uv run opal notebook run -c "$CONFIG"
 ```
 
 Required evidence is three six-row selection sets, one 18-row sequence-unique
-batch, one model artifact, one prediction ledger, and zero mismatches. These
+selection batch, one model artifact, one prediction ledger, and zero mismatches. These
 checks establish artifact integrity, not predictive validity.
 
 ### Synthesis boundary
