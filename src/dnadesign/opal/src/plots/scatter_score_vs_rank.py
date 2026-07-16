@@ -45,7 +45,7 @@ from ._param_utils import (
 @register_plot(
     "scatter_score_vs_rank",
     meta=PlotMeta(
-        summary="Scatter objective score vs rank; optional hue/size by diagnostics.",
+        summary="Objective score by selection rank; selected candidates are outlined.",
         premise="Selection rank must preserve descending objective-score order.",
         decision_value="Confirms the operative ranking direction and exposes score compression or ties near top-K.",
         rationale="A direct score-rank curve verifies that the selector preserves the declared objective order.",

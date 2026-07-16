@@ -31,6 +31,7 @@ def render_notebook_review_control_surface(
     plot_scope_ui: Any = None,
     layered_scatter_controls: Mapping[str, Any] | None = None,
     baserender_role_ui: Any = None,
+    baserender_selection_view_ui: Any = None,
     baserender_round_ui: Any = None,
     baserender_run_ui: Any = None,
     baserender_record_selector: Any = None,
@@ -54,6 +55,7 @@ def render_notebook_review_control_surface(
         _visual_controls(
             baserender_record_selector=baserender_record_selector,
             baserender_role_ui=baserender_role_ui,
+            baserender_selection_view_ui=baserender_selection_view_ui,
             baserender_round_ui=baserender_round_ui,
             baserender_run_ui=baserender_run_ui,
             visual_group_ui=visual_group_ui,
@@ -85,6 +87,7 @@ def _visual_controls(
     *,
     baserender_record_selector: Any,
     baserender_role_ui: Any,
+    baserender_selection_view_ui: Any,
     baserender_round_ui: Any,
     baserender_run_ui: Any,
     plot_scope_ui: Any,
@@ -100,6 +103,7 @@ def _visual_controls(
         controls.extend(
             _present(
                 baserender_role_ui,
+                baserender_selection_view_ui,
                 baserender_round_ui,
                 baserender_run_ui,
                 baserender_record_selector,

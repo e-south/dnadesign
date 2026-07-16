@@ -41,20 +41,12 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
 
         render_route = str(contract.get("render_route") or "figure")
         if render_route == "sequence_panel":
-            render_row = dict(record_row)
-            title_column = "__opal_baserender_record_title"
-            render_row[title_column] = f"Record {record_id}"
-            render_adapter_columns = dict(adapter_columns)
-            render_adapter_columns["overlay_text"] = title_column
-            render_style_overrides = dict(style_overrides)
-            render_style_overrides.setdefault("overlay_align", "center")
-            render_style_overrides.setdefault("overlay_title_color", "#111827")
             panel = render_sequence_panel_image(
-                render_row,
+                dict(record_row),
                 adapter_kind=adapter_kind,
-                adapter_columns=render_adapter_columns,
+                adapter_columns=adapter_columns,
                 adapter_policies=dict(contract.get("adapter_policies") or {}),
-                style_overrides=render_style_overrides,
+                style_overrides=style_overrides,
                 target_width_px=int(contract.get("target_width_px") or 2600),
                 target_height_px=int(contract.get("target_height_px") or 430),
                 vertical_anchor=str(contract.get("vertical_anchor") or "top"),
@@ -96,11 +88,16 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
         raise ValueError(f"BaseRender image encoding failed for `{record_id}`.") from exc
     if not image_bytes:
         raise ValueError(f"BaseRender image bytes were empty for `{record_id}`.")
-    caption = str(contract.get("caption") or "BaseRender record view.")
+    caption = _format_caption(
+        contract.get("caption"),
+        adapter_kind=adapter_kind,
+        sequence_length=sequence_length,
+        feature_count=feature_count,
+    )
     return {
         "record_id": record_id,
         "image_bytes": image_bytes,
-        "caption": f"{caption} Record `{record_id}`.",
+        "caption": caption,
         "alt_text": _format_alt_text(
             contract.get("alt_text_template") or caption,
             record_id=record_id,
@@ -110,6 +107,22 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
         "sequence_length": sequence_length,
         "feature_count": feature_count,
     }
+
+
+def _format_caption(
+    configured: object,
+    *,
+    adapter_kind: str,
+    sequence_length: int,
+    feature_count: int,
+) -> str:
+    defaults = {
+        "densegen_tfbs": "DenseGen TFBS annotation",
+        "usr_genbank_annotations_v1": "GenBank source annotation",
+        "generic_features": "Sequence feature annotation",
+    }
+    base = str(configured or defaults.get(adapter_kind, "Sequence annotation")).strip().rstrip(".")
+    return f"{base} · {sequence_length:,} bp · {feature_count:,} annotated elements"
 
 
 def _format_alt_text(template: object, *, record_id: str, sequence_length: int, feature_count: int) -> str:

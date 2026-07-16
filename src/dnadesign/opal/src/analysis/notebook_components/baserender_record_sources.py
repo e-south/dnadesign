@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
+from ._support import compact_identifier
+
 
 def id_column(contract: Mapping[str, Any]) -> str:
     adapter_columns = contract.get("adapter_columns")
@@ -109,6 +111,25 @@ def join_metadata_rows(
     )
 
 
+def require_unique_record_ids(pl: Any, scan: Any, *, id_column_name: str) -> None:
+    """Fail when a selected BaseRender identity resolves to more than one row."""
+
+    duplicate_ids = (
+        scan.select(pl.col(id_column_name).cast(pl.Utf8).alias(id_column_name))
+        .drop_nulls()
+        .group_by(id_column_name)
+        .agg(pl.len().alias("__row_count"))
+        .filter(pl.col("__row_count") > 1)
+        .sort(id_column_name)
+        .limit(10)
+        .collect()
+        .get_column(id_column_name)
+        .to_list()
+    )
+    if duplicate_ids:
+        raise ValueError(f"Found duplicate BaseRender record id rows: {duplicate_ids}.")
+
+
 def contract_valid_filters(pl: Any, contract: Mapping[str, Any], schema: Mapping[str, Any]) -> list[Any]:
     filters = []
     policies = contract.get("adapter_policies")
@@ -159,10 +180,7 @@ def normalise_record_ids(record_ids: Iterable[Any] | None) -> list[str]:
 
 
 def compact_record_id(record_id: str) -> str:
-    text = str(record_id).strip()
-    if len(text) <= 24:
-        return text
-    return f"{text[:12]}...{text[-8:]}"
+    return compact_identifier(record_id)
 
 
 def required_columns(contract: Mapping[str, Any]) -> list[str]:

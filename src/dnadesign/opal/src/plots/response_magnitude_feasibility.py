@@ -25,6 +25,7 @@ from ._mpl_utils import (
     ensure_mpl_config_dir,
     observed_batch_marker_map,
     pretty_batch_label,
+    pretty_label,
     scatter_smart,
     wrap_plot_title,
 )
@@ -216,10 +217,13 @@ def render_frontier(context: Any, params: dict) -> None:
     ax.axhline(data.calibration["on_magnitude_min"], color="#555555", linestyle="--", linewidth=1.1, zorder=1)
     ax.set_xlabel(response_label, fontsize=9.5, labelpad=7)
     ax.set_ylabel(magnitude_label, fontsize=9.5, labelpad=7)
+    title = _selection_view_title(
+        params.get("title", "RMF candidate constraint landscape"),
+        context=context,
+    )
     ax.tick_params(axis="both", labelsize=8.5)
     ax.set_title(
-        f"{wrap_plot_title(params.get('title', 'RMF candidate constraint landscape'), width=62)}\n"
-        f"{_target_context(data, params)}",
+        f"{wrap_plot_title(title, width=62)}\n{_target_context(data, params)}",
         loc="left",
         fontweight="semibold",
         fontsize=10.5,
@@ -254,7 +258,7 @@ def render_frontier(context: Any, params: dict) -> None:
         else {candidate_id: short_candidate_id(candidate_id) for candidate_id in alias_ids}
     )
     context.artifact_metadata["notebook_view"] = {
-        "title": str(params.get("title") or "RMF candidate constraint landscape"),
+        "title": title,
         "context": _target_context(data, params),
         "x_label": response_label,
         "y_label": magnitude_label,
@@ -274,7 +278,7 @@ def render_frontier(context: Any, params: dict) -> None:
 @register_plot(
     _DECOMPOSITION_KIND,
     meta=PlotMeta(
-        summary="Selected-candidate heatmap of the three standardized constraints and their maximin score.",
+        summary="Predicted requirement margins and maximin score for selected candidates.",
         premise="The weakest standardized requirement determines each selected candidate's feasibility score.",
         decision_value="Identifies which requirement limits every selected candidate before experimental handoff.",
         rationale="A component heatmap makes the non-compensatory maximin rule directly inspectable.",
@@ -379,9 +383,12 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
         labelpad=7,
     )
     ax.set_ylabel("Competition rank · candidate", fontsize=9.5, labelpad=7)
+    title = _selection_view_title(
+        params.get("title", "Predicted RMF margins for selected candidates"),
+        context=context,
+    )
     ax.set_title(
-        f"{wrap_plot_title(params.get('title', 'Selected-candidate RMF constraints'), width=62)}\n"
-        f"{_target_context(data, params)}",
+        f"{wrap_plot_title(title, width=62)}\n{_target_context(data, params)}",
         loc="left",
         fontweight="semibold",
         fontsize=10.5,
@@ -555,6 +562,17 @@ def _target_context(data: ResponseMagnitudeFeasibilityPlotData, params: Mapping[
     target_name = str(params.get("target_name") or "").strip()
     prefix = f"{target_name} target" if target_name else "Target"
     return f"{prefix} ON: {', '.join(on_labels)} | OFF: {', '.join(off_labels)}"
+
+
+def _selection_view_title(value: object, *, context: Any) -> str:
+    title = str(value or "").strip()
+    if not title:
+        raise ValueError("RMF plot title must be non-empty.")
+    view_id = str(getattr(context, "selection_view_id", "") or "").strip()
+    if not view_id:
+        return title
+    view_label = "AND" if view_id.lower() == "and" else pretty_label(view_id)
+    return f"{title} · {view_label} view"
 
 
 def _figsize(value: object) -> tuple[float, float]:

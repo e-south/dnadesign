@@ -29,8 +29,10 @@ def _layout_cell() -> str:
         def _(
             active_view_mode,
             artifact_garden_panel,
+            baserender_diagnostic_panel,
             baserender_record_selector,
             baserender_role_ui,
+            baserender_selection_view_ui,
             baserender_round_ui,
             baserender_run_ui,
             campaign_summary_df,
@@ -70,6 +72,7 @@ def _layout_cell() -> str:
                 active_view_mode=active_view_mode,
                 baserender_record_selector=baserender_record_selector,
                 baserender_role_ui=baserender_role_ui,
+                baserender_selection_view_ui=baserender_selection_view_ui,
                 baserender_round_ui=baserender_round_ui,
                 baserender_run_ui=baserender_run_ui,
                 campaign_ui=campaign_ui,
@@ -90,6 +93,8 @@ def _layout_cell() -> str:
             if active_view_mode != "Campaign set":
                 _items.append(selected_campaign_context_panel)
             _items.append(plot_panel)
+            if baserender_diagnostic_panel is not None:
+                _items.append(baserender_diagnostic_panel)
             _campaign_inventory_label = "Raw campaign inventory" if collection_visuals else "Campaigns at a glance"
             _accordion_items = {
                 _campaign_inventory_label: opal_table(campaign_summary_df, page_size=12),

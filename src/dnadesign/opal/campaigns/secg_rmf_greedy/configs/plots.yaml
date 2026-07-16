@@ -39,6 +39,7 @@ plots:
       show_selection_view: true
       legend_location: upper_left
       rasterize_at: 10000
+      caption: "Predicted RMF score versus active-view competition rank. Open diamonds mark candidates allocated to this view; zero is the configured feasibility boundary. Rank 1 is at the right on a reversed logarithmic axis."
       y_axis:
         reference_lines:
           - value: 0.0
@@ -49,9 +50,9 @@ plots:
     round_selector: latest
     tags: [decision, rmf, selection]
     params:
-      title: "Selected-candidate RMF constraints"
+      title: "Predicted RMF margins for allocated candidates"
       candidate_label_mode: alias
-      caption: "Rows use active-view competition ranks after unique-batch allocation; skipped ranks were assigned to another view."
+      caption: "Each row is a model prediction for a candidate allocated to this selection view. Columns show the three standardized requirement margins and their maximin RMF score; zero is the configured feasibility boundary. Ranks are active-view competition ranks, so skipped ranks were allocated to another view."
       state_labels:
         "00": "No stress"
         "10": "EtOH"

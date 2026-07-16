@@ -14,6 +14,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from typing import Any, Literal, Mapping
 
+from ._support import display_name
+from .baserender_record_sources import compact_record_id
 from .selection_batch_panel import render_notebook_selection_batch_panel
 from .visual_panel_collection import render_collection_plot_panel, render_selection_overlap_panel
 
@@ -44,8 +46,10 @@ def render_notebook_visual_panel(
     baserender_record_row: Mapping[str, Any] | None = None,
     baserender_record_selector: Any = None,
     baserender_role_ui: Any = None,
+    baserender_selection_view_ui: Any = None,
     baserender_round_ui: Any = None,
     baserender_run_ui: Any = None,
+    baserender_selection_record: Mapping[str, Any] | None = None,
     build_notebook_baserender_contract_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None = None,
     build_notebook_baserender_label_rows: Callable[..., list[dict[str, Any]]] | None = None,
     control_surface: Literal["inline", "external"] = "inline",
@@ -71,6 +75,7 @@ def render_notebook_visual_panel(
             plot_scope_ui=plot_scope_ui,
             is_baserender=is_baserender,
             baserender_role_ui=baserender_role_ui,
+            baserender_selection_view_ui=baserender_selection_view_ui,
             baserender_round_ui=baserender_round_ui,
             baserender_run_ui=baserender_run_ui,
             baserender_record_selector=baserender_record_selector,
@@ -86,6 +91,7 @@ def render_notebook_visual_panel(
             baserender_campaign_model=baserender_campaign_model,
             baserender_record_id=baserender_record_id,
             baserender_record_row=baserender_record_row,
+            baserender_selection_record=baserender_selection_record,
             build_notebook_baserender_contract_rows=build_notebook_baserender_contract_rows,
             build_notebook_baserender_label_rows=build_notebook_baserender_label_rows,
             controls=controls,
@@ -167,6 +173,7 @@ def _render_visual_controls(
     plot_scope_ui: Any,
     is_baserender: bool,
     baserender_role_ui: Any,
+    baserender_selection_view_ui: Any,
     baserender_round_ui: Any,
     baserender_run_ui: Any,
     baserender_record_selector: Any,
@@ -177,6 +184,7 @@ def _render_visual_controls(
             control
             for control in (
                 baserender_role_ui,
+                baserender_selection_view_ui,
                 baserender_round_ui,
                 baserender_run_ui,
                 baserender_record_selector,
@@ -201,6 +209,7 @@ def _render_baserender_panel(
     baserender_campaign_model: Mapping[str, Any] | None,
     baserender_record_id: Any,
     baserender_record_row: Mapping[str, Any] | None,
+    baserender_selection_record: Mapping[str, Any] | None,
     build_notebook_baserender_contract_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None,
     build_notebook_baserender_label_rows: Callable[..., list[dict[str, Any]]] | None,
     controls: Any | None,
@@ -230,13 +239,26 @@ def _render_baserender_panel(
     if baserender_record_row is None:
         visual = mo.md("No contract-valid selected sequence is available for this round/run.")
     else:
+        selection_record = dict(baserender_selection_record or {})
+        view_id = str(selection_record.get("selection_view_id") or "").strip()
+        rank_value = selection_record.get("view_rank")
+        if not view_id or rank_value is None:
+            raise ValueError("Selected sequence render requires its selection view and competition rank.")
+        rank = int(rank_value)
+        if rank <= 0:
+            raise ValueError(f"Selected sequence render has invalid competition rank {rank}.")
         payload = _require_callable(
             render_notebook_baserender_record,
             "render_notebook_baserender_record",
         )(baserender_record_row, contract)
         slug = str((baserender_campaign_model or {}).get("campaign", {}).get("slug") or "unknown campaign")
         round_text = f"round {selected_baserender_round}" if selected_baserender_round is not None else "unknown round"
-        visual = mo.image(
+        view_label = "AND" if view_id.lower() == "and" else display_name(view_id)
+        heading = mo.md(
+            f"#### {view_label} selection · competition rank {rank}\n"
+            f"Candidate `{compact_record_id(str(payload['record_id']))}`"
+        )
+        image = mo.image(
             payload["image_bytes"],
             alt=f"{payload['alt_text']} Selected in campaign {slug}, {round_text}.",
             caption=str(payload["caption"]),
@@ -251,8 +273,17 @@ def _render_baserender_panel(
                 "background-color": "#FFFFFF",
             },
         )
+        visual = mo.vstack([heading, image], gap=0.1)
+    selection_detail_rows = list(selected_baserender_status_rows)
+    if baserender_selection_record:
+        selection_detail_rows.extend(
+            [
+                {"field": "selected record", "value": str(baserender_record_id)},
+                {"field": "competition rank", "value": int(baserender_selection_record["view_rank"])},
+            ]
+        )
     detail_items = [
-        opal_table(pl.DataFrame(list(selected_baserender_status_rows)), page_size=8),
+        opal_table(pl.DataFrame(selection_detail_rows), page_size=8),
         label_panel,
         opal_table(
             pl.DataFrame(
@@ -269,7 +300,7 @@ def _render_baserender_panel(
         items=[
             controls,
             visual,
-            mo.accordion({"Selection evidence": mo.vstack(detail_items, gap=0.35)}, multiple=True),
+            mo.accordion({"Sequence and selection evidence": mo.vstack(detail_items, gap=0.35)}, multiple=True),
         ],
     )
 

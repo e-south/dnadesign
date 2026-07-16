@@ -21,22 +21,40 @@ from .baserender import (
     build_notebook_baserender_contract,
     build_notebook_baserender_contract_rows,
 )
+from .baserender_campaign_context import load_notebook_baserender_campaign_context
+from .baserender_diagnostics import render_notebook_baserender_diagnostic_panel
+from .baserender_record_selection import (
+    build_notebook_selected_baserender_records,
+    resolve_notebook_baserender_record_selection,
+)
 from .baserender_records import (
     build_notebook_baserender_label_rows,
     build_notebook_baserender_record_annotation_counts,
     build_notebook_baserender_record_choices,
     build_notebook_baserender_record_choices_with_counts,
     build_notebook_baserender_record_options,
-    build_notebook_selected_baserender_record_ids,
+    has_notebook_baserender_record_options,
     load_notebook_baserender_record_row,
     select_notebook_baserender_default_record_id,
 )
 from .baserender_render import (
     render_notebook_baserender_record,
 )
+from .baserender_selection_scope import (
+    build_notebook_baserender_role_control,
+    build_notebook_baserender_selection_view_control,
+    resolve_notebook_baserender_campaign_model,
+    resolve_notebook_baserender_selection_view_id,
+)
+from .baserender_selector import (
+    build_notebook_baserender_review_state,
+    build_notebook_baserender_selector_model,
+    render_notebook_baserender_selector,
+)
 from .campaign_set_baserender import (
     CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
     build_notebook_collection_baserender_role_choices,
+    build_notebook_collection_baserender_role_control,
 )
 from .campaign_set_comparison import render_notebook_campaign_set_metric_comparison_image
 from .campaign_set_gallery import (
@@ -159,7 +177,12 @@ __all__ = [
     "build_notebook_baserender_record_choices",
     "build_notebook_baserender_record_choices_with_counts",
     "build_notebook_baserender_record_options",
-    "build_notebook_selected_baserender_record_ids",
+    "build_notebook_baserender_review_state",
+    "build_notebook_baserender_selector_model",
+    "build_notebook_baserender_role_control",
+    "build_notebook_baserender_selection_view_control",
+    "build_notebook_selected_baserender_records",
+    "has_notebook_baserender_record_options",
     "build_notebook_selection_batch_choice",
     "build_notebook_selection_batch_rows",
     "build_notebook_selection_batch_summary_rows",
@@ -168,6 +191,7 @@ __all__ = [
     "build_notebook_campaign_summary_row",
     "resolve_notebook_selection_view",
     "build_notebook_collection_baserender_role_choices",
+    "build_notebook_collection_baserender_role_control",
     "build_notebook_campaign_set_metric_comparison_rows",
     "build_notebook_campaign_set_plot_gallery_items",
     "build_notebook_campaign_set_vector_reference_mse_rows",
@@ -220,8 +244,11 @@ __all__ = [
     "filter_notebook_visual_choices_by_group",
     "filter_notebook_layered_scatter_rows",
     "load_notebook_baserender_record_row",
+    "load_notebook_baserender_campaign_context",
     "list_notebook_campaign_paths",
     "render_notebook_baserender_record",
+    "render_notebook_baserender_diagnostic_panel",
+    "render_notebook_baserender_selector",
     "render_notebook_campaign_set_metric_comparison_image",
     "render_notebook_campaign_set_vector_heatmap_comparison_image",
     "render_notebook_campaign_set_plot_gallery_image",
@@ -238,6 +265,9 @@ __all__ = [
     "render_notebook_zoomable_image",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
+    "resolve_notebook_baserender_selection_view_id",
+    "resolve_notebook_baserender_record_selection",
+    "resolve_notebook_baserender_campaign_model",
     "select_notebook_baserender_default_record_id",
     "select_notebook_plot_scope",
 ]

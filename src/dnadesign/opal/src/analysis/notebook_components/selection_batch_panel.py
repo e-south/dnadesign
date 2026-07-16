@@ -33,13 +33,14 @@ def render_notebook_selection_batch_panel(
     items = [
         controls,
         mo.md(f"### {title}"),
+        mo.md("Physical batch proposal only; synthesis authorization remains study-owned."),
         opal_table(pl.DataFrame(rows), page_size=18),
         mo.accordion(
             {"Batch contract": opal_table(pl.DataFrame(summary), page_size=6)},
             multiple=True,
         ),
     ]
-    return mo.vstack([item for item in items if item is not None], gap=0.45)
+    return mo.vstack([item for item in items if item is not None], gap=0.35)
 
 
 __all__ = ["render_notebook_selection_batch_panel"]

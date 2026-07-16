@@ -430,7 +430,8 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     frontier_axis = frontier.axes[0]
     assert frontier._suptitle is None
     assert frontier_axis.get_title(loc="left") == (
-        "RMF candidate constraint landscape\nTarget ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin"
+        "RMF candidate constraint landscape · Ethanol view\n"
+        "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin"
     )
     assert frontier_axis.get_xlabel() == "ON-OFF response separation, $d_{response}$\nWindow mean log2(YFP / CFP)"
     assert frontier_axis.get_ylabel() == (
@@ -447,7 +448,9 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     decomposition = captured.pop()
     decomposition_axis = decomposition.axes[0]
     assert decomposition._suptitle is None
-    assert decomposition_axis.get_title(loc="left").startswith("Selected-candidate RMF constraints\n")
+    assert decomposition_axis.get_title(loc="left").startswith(
+        "Predicted RMF margins for selected candidates · Ethanol view\n"
+    )
     assert "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin" in (
         decomposition_axis.get_title(loc="left")
     )
@@ -628,8 +631,10 @@ def test_secg_rmf_plot_config_uses_one_interactive_frontier_and_rank_diagnostic(
     )
     assert decomposition["params"]["candidate_label_mode"] == "alias"
     assert decomposition["params"]["caption"] == (
-        "Rows use active-view competition ranks after unique-batch allocation; "
-        "skipped ranks were assigned to another view."
+        "Each row is a model prediction for a candidate allocated to this selection view. "
+        "Columns show the three standardized requirement margins and their maximin RMF score; "
+        "zero is the configured feasibility boundary. Ranks are active-view competition ranks, "
+        "so skipped ranks were allocated to another view."
     )
 
     rank = next(entry for entry in payload["plots"] if entry.get("name") == "rmf_score_vs_rank")

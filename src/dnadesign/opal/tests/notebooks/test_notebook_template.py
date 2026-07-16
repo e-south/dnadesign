@@ -54,14 +54,16 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_plot_scope_options,
     build_notebook_reader_evidence_artifact_rows,
     build_notebook_run_summary_lines,
-    build_notebook_selected_baserender_record_ids,
+    build_notebook_selected_baserender_records,
     build_notebook_selection_batch_choice,
     build_notebook_selection_batch_rows,
+    build_notebook_selection_batch_summary_rows,
     build_notebook_selection_view_options,
     build_notebook_validity_lines,
     build_notebook_visual_group_options,
     build_notebook_visual_surface_model,
     filter_notebook_visual_choices_by_group,
+    has_notebook_baserender_record_options,
     load_notebook_baserender_record_row,
     render_notebook_baserender_record,
     render_notebook_campaign_set_metric_comparison_image,
@@ -312,6 +314,44 @@ def test_notebook_review_control_surface_groups_reader_controls_with_deliverable
     }
 
 
+def test_notebook_review_control_surface_only_shows_baserender_scope_controls_with_choices() -> None:
+    mo = _ControlSurfaceFakeMo()
+    singleton_scope = render_notebook_review_control_surface(
+        active_view_mode="Campaign",
+        selection_view_ui="selection-view",
+        visual_group_ui="section",
+        plot_ui="deliverable",
+        baserender_round_ui=None,
+        baserender_run_ui=None,
+        baserender_record_selector="selected-sequence",
+        selected_visual_choice={"surface_kind": "baserender"},
+        mo=mo,
+    )
+    multiple_scope = render_notebook_review_control_surface(
+        active_view_mode="Campaign",
+        selection_view_ui="selection-view",
+        visual_group_ui="section",
+        plot_ui="deliverable",
+        baserender_selection_view_ui="render-selection-view",
+        baserender_round_ui="selection-round",
+        baserender_run_ui="selection-run",
+        baserender_record_selector="selected-sequence",
+        selected_visual_choice={"surface_kind": "baserender"},
+        mo=mo,
+    )
+
+    assert singleton_scope["items"] == ["selection-view", "section", "deliverable", "selected-sequence"]
+    assert multiple_scope["items"] == [
+        "selection-view",
+        "section",
+        "deliverable",
+        "render-selection-view",
+        "selection-round",
+        "selection-run",
+        "selected-sequence",
+    ]
+
+
 def test_notebook_review_control_surface_rejects_unknown_view_mode() -> None:
     with pytest.raises(ValueError, match="active_view_mode must be 'Campaign' or 'Campaign set'"):
         render_notebook_review_control_surface(
@@ -369,19 +409,29 @@ def test_notebook_visual_hierarchy_groups_without_hiding_deliverables() -> None:
 
 def test_notebook_selection_batch_choice_preserves_view_memberships() -> None:
     payload = {
-        "schema_version": "opal.selection_batch.v2",
+        "schema_version": "opal.selection_batch.v3",
         "as_of_round": 1,
         "run_id": "run-1",
+        "deduplicate_by": "sequence",
+        "allocation_strategy": "round_robin_next_best_unallocated",
         "unique_count": 2,
         "rows": [
             {
-                "id": "candidate-a",
+                "id": "candidate-a-with-a-long-stable-identifier",
                 "sequence": "AAAA",
-                "selection_view_ids": ["ethanol", "and"],
+                "selection_view_ids": ["ethanol"],
                 "selection_memberships": [
-                    {"selection_view_id": "ethanol", "rank": 1, "score": -0.2},
-                    {"selection_view_id": "and", "rank": 4, "score": -0.7},
+                    {
+                        "selection_view_id": "ethanol",
+                        "rank": 1,
+                        "score": -0.2,
+                        "allocation_slot": 1,
+                        "selection_origin": "preferred_top_k",
+                    },
                 ],
+                "preferred_view_ids": ["ethanol", "and"],
+                "allocation_view_id": "ethanol",
+                "allocation_slot": 1,
                 "selection_batch_key": "AAAA",
                 "deduplicate_by": "sequence",
             },
@@ -389,7 +439,18 @@ def test_notebook_selection_batch_choice_preserves_view_memberships() -> None:
                 "id": "candidate-b",
                 "sequence": "CCCC",
                 "selection_view_ids": ["ciprofloxacin"],
-                "selection_memberships": [{"selection_view_id": "ciprofloxacin", "rank": 2, "score": 1.3}],
+                "selection_memberships": [
+                    {
+                        "selection_view_id": "ciprofloxacin",
+                        "rank": 2,
+                        "score": 1.3,
+                        "allocation_slot": 2,
+                        "selection_origin": "next_best_unallocated",
+                    }
+                ],
+                "preferred_view_ids": [],
+                "allocation_view_id": "ciprofloxacin",
+                "allocation_slot": 2,
                 "selection_batch_key": "CCCC",
                 "deduplicate_by": "sequence",
             },
@@ -399,22 +460,98 @@ def test_notebook_selection_batch_choice_preserves_view_memberships() -> None:
     choice = build_notebook_selection_batch_choice(payload)
 
     assert choice["surface_kind"] == SELECTION_BATCH_SURFACE_KIND
-    assert choice["label"] == "Selection batch"
+    assert choice["label"] == "Selection batch proposal"
     assert choice["review_group"] == "handoff"
     assert build_notebook_selection_batch_rows(choice) == [
         {
-            "candidate": "candidate-a",
-            "selection views": "Ethanol, AND",
-            "view count": 2,
-            "view ranks": "Ethanol 1; AND 4",
+            "candidate": "candidate-a-...entifier",
+            "allocated view": "Ethanol",
+            "competition rank": 1,
+            "preferred by": "Ethanol, AND",
+            "allocation origin": "Preferred top k",
+            "view slot": 1,
         },
         {
             "candidate": "candidate-b",
-            "selection views": "Ciprofloxacin",
-            "view count": 1,
-            "view ranks": "Ciprofloxacin 2",
+            "allocated view": "Ciprofloxacin",
+            "competition rank": 2,
+            "preferred by": "None",
+            "allocation origin": "Next best unallocated",
+            "view slot": 2,
         },
     ]
+    assert build_notebook_selection_batch_summary_rows(choice)[3:6] == [
+        {
+            "field": "row order",
+            "value": "Allocation slot, then competition rank and view.",
+        },
+        {
+            "field": "batch formation",
+            "value": "Coordinated unique-slot allocation",
+        },
+        {"field": "deduplicated by", "value": "sequence"},
+    ]
+
+
+def test_notebook_selection_batch_orders_logical_union_by_competition_rank() -> None:
+    payload = {
+        "schema_version": "opal.selection_batch.v3",
+        "as_of_round": 0,
+        "run_id": "run-0",
+        "deduplicate_by": "id",
+        "allocation_strategy": "logical_union",
+        "unique_count": 3,
+        "rows": [
+            {
+                "id": candidate_id,
+                "selection_view_ids": ["primary"],
+                "selection_memberships": [
+                    {
+                        "selection_view_id": "primary",
+                        "rank": rank,
+                        "allocation_slot": None,
+                        "selection_origin": "preferred_top_k",
+                    }
+                ],
+                "preferred_view_ids": ["primary"],
+                "allocation_view_id": None,
+                "allocation_slot": None,
+            }
+            for candidate_id, rank in (("candidate-five", 5), ("candidate-one", 1), ("candidate-three", 3))
+        ],
+    }
+
+    choice = build_notebook_selection_batch_choice(payload)
+
+    assert [row["candidate"] for row in build_notebook_selection_batch_rows(choice)] == [
+        "candidate-one",
+        "candidate-three",
+        "candidate-five",
+    ]
+    assert build_notebook_selection_batch_summary_rows(choice)[3:6] == [
+        {
+            "field": "row order",
+            "value": "Competition rank, then view and candidate.",
+        },
+        {
+            "field": "batch formation",
+            "value": "Logical union of view selections",
+        },
+        {"field": "deduplicated by", "value": "id"},
+    ]
+
+
+def test_notebook_selection_batch_rejects_stale_presentation_contract() -> None:
+    with pytest.raises(ValueError, match="requires schema 'opal.selection_batch.v3'"):
+        build_notebook_selection_batch_choice(
+            {
+                "schema_version": "opal.selection_batch.v2",
+                "deduplicate_by": "id",
+                "allocation_strategy": "logical_union",
+                "unique_count": 0,
+                "rows": [],
+            }
+        )
 
 
 def test_campaign_set_selection_overlap_choice_and_renderer(tmp_path: Path) -> None:
@@ -494,6 +631,63 @@ def test_notebook_visual_panel_rejects_unknown_control_surface() -> None:
             select_notebook_plot_scope=lambda *_, **__: {},
             control_surface="legacy",
         )
+
+
+def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -> None:
+    class _FakeMo:
+        def md(self, text: str) -> dict[str, object]:
+            return {"kind": "md", "text": text}
+
+        def image(self, data: bytes, **kwargs: object) -> dict[str, object]:
+            return {"kind": "image", "data": data, **kwargs}
+
+        def vstack(self, items: list[object], *, gap: float) -> dict[str, object]:
+            return {"kind": "vstack", "items": items, "gap": gap}
+
+        def accordion(self, items: dict[str, object], **kwargs: object) -> dict[str, object]:
+            return {"kind": "accordion", "items": items, **kwargs}
+
+    panel = render_notebook_visual_panel(
+        active_view_mode="Campaign",
+        baserender_campaign_model={"campaign": {"slug": "secg_rmf_greedy"}},
+        baserender_record_id="candidate-record-alpha-with-long-id",
+        baserender_record_row={"id": "candidate-record-alpha-with-long-id", "sequence": "ACGT"},
+        baserender_selection_record={
+            "record_id": "candidate-record-alpha-with-long-id",
+            "selection_view_id": "and",
+            "view_rank": 7,
+        },
+        build_notebook_baserender_contract_rows=lambda _: [],
+        build_notebook_baserender_label_rows=lambda *_, **__: [],
+        build_notebook_plot_card_rows=lambda _: [],
+        build_notebook_plot_method_sections=lambda _: {},
+        control_surface="external",
+        mo=_FakeMo(),
+        opal_table=lambda *_, **__: {"kind": "table"},
+        pl=pl,
+        render_notebook_baserender_record=lambda *_: {
+            "record_id": "candidate-record-alpha-with-long-id",
+            "image_bytes": b"png",
+            "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
+            "alt_text": "DenseGen TFBS annotation",
+        },
+        render_notebook_plot_choice_image=lambda *_, **__: None,
+        selected_baserender_round=0,
+        selected_baserender_status_rows=(),
+        selected_campaign_baserender_contract={"available": True},
+        selected_campaign_labels_df=None,
+        selected_visual_choice={"surface_kind": "baserender"},
+        select_notebook_plot_scope=lambda *_, **__: {},
+    )
+
+    visual = panel["items"][0]
+    assert visual["gap"] == 0.1
+    assert visual["items"][0]["text"] == (
+        "#### AND selection · competition rank 7\nCandidate `candidate-re...-long-id`"
+    )
+    assert visual["items"][1]["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
+    assert "candidate-record-alpha-with-long-id" not in visual["items"][0]["text"]
+    assert "Sequence and selection evidence" in panel["items"][1]["items"]
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -1662,23 +1856,24 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     assert "build_notebook_collection_baserender_role_choices" in text
     assert '"surface_kind": "baserender"' in text
     assert '"surface_kind": CAMPAIGN_SET_BASERENDER_SURFACE_KIND' in text
-    assert 'label="Selected sequence"' in text
-    assert "build_notebook_baserender_record_choices" in text
-    assert "build_notebook_baserender_record_annotation_counts" in text
-    assert "build_notebook_baserender_record_choices_with_counts" in text
-    assert "select_notebook_baserender_default_record_id" in text
-    assert "baserender_record_annotation_counts" in text
-    assert "baserender_record_choices" in text
+    assert "build_notebook_baserender_review_state" in text
+    assert "resolve_notebook_baserender_record_selection" in text
+    assert "load_notebook_baserender_campaign_context" in text
     assert "baserender_record_id" in text
     assert 'label="Selection round"' in text
     assert 'label="Selection run"' in text
-    assert 'label="Label source"' in text
+    assert "build_notebook_collection_baserender_role_control" in text
     assert 'str(selected_round_selector).strip().lower() == "all"' in text
     assert "baserender_campaign_model" in text
     assert "selected_baserender_round" in text
     assert "baserender_selected_round" not in text
-    assert "selected_baserender_ids" in text
-    assert "record_ids=selected_baserender_ids" in text
+    assert "selected_baserender_records" in text
+    assert "selected_baserender_selection_view_id" in text
+    assert "baserender_selection_view_ui" in text
+    assert "selection_view_id=selected_baserender_selection_view_id" in text
+    assert "baserender_selection_record" in text
+    assert "baserender_has_renderable_records" in text
+    assert "baserender_diagnostic_panel" in text
     assert "selected_campaign_analysis.read_run_labels_used(" in text
     assert "selected_campaign_analysis.read_labels()" not in text
     assert "render_notebook_baserender_record" in text
@@ -1690,10 +1885,26 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     ).read_text()
     assert '"width": "100%"' in helper_text
     assert '"background-color": "#FFFFFF"' in helper_text
-    assert "Selection evidence" in helper_text
+    assert "Sequence and selection evidence" in helper_text
     assert "Collection plot evidence" in collection_helper_text
     assert "densegen__used_tfbs_detail" not in text
     ast.parse(text)
+
+
+def test_campaign_set_notebook_hides_singleton_baserender_scope_controls_without_losing_scope() -> None:
+    text = render_campaign_set_notebook(
+        [Path("campaign_a.yaml"), Path("campaign_b.yaml")],
+        round_selector="latest",
+    )
+
+    assert "if len(baserender_rounds) > 1:" in text
+    assert "else baserender_rounds[0]" in text
+    assert "if len(baserender_run_options) > 1 else None" in text
+    assert "else baserender_run_options[0]" in text
+    assert "run_id=selected_baserender_run_id" in text
+    assert "run_id=str(baserender_run_ui.value)" not in text
+    assert "build_notebook_baserender_selection_view_control" in text
+    assert "resolve_notebook_baserender_selection_view_id" in text
 
 
 def test_collection_baserender_role_choices_follow_selected_campaign_set() -> None:
@@ -1878,7 +2089,7 @@ def test_collection_baserender_role_choices_use_generic_fallback_labels() -> Non
     ]
 
 
-def test_selected_baserender_record_ids_filter_and_sort_selected_rows() -> None:
+def test_selected_baserender_records_preserve_view_and_competition_rank() -> None:
     class _CampaignAnalysis:
         def read_selection_view_predictions(self, **kwargs: object) -> pl.DataFrame:
             assert kwargs["selection_view_id"] == "ethanol"
@@ -1894,22 +2105,57 @@ def test_selected_baserender_record_ids_filter_and_sort_selected_rows() -> None:
                 }
             )
 
-    ids, rows = build_notebook_selected_baserender_record_ids(
+    records, rows = build_notebook_selected_baserender_records(
         _CampaignAnalysis(),
         selection_view_id="ethanol",
         round_value=3,
         run_id="run-3",
     )
 
-    assert ids == ["first", "second"]
+    assert records == [
+        {
+            "record_id": "first",
+            "selection_view_id": "ethanol",
+            "view_rank": 1,
+        },
+        {
+            "record_id": "second",
+            "selection_view_id": "ethanol",
+            "view_rank": 2,
+        },
+    ]
     assert rows == [
+        {"field": "selection view", "value": "Ethanol"},
         {"field": "selection round", "value": 3},
         {"field": "selection run", "value": "run-3"},
         {"field": "selected records", "value": 2},
     ]
-    assert build_notebook_selected_baserender_record_ids(
+    assert build_notebook_selected_baserender_records(
         _CampaignAnalysis(), selection_view_id="ethanol", round_value=3, run_id=None
     )[1] == [{"field": "selection scope", "value": "no run available"}]
+
+
+def test_selected_baserender_records_do_not_expose_partial_invalid_evidence() -> None:
+    class _CampaignAnalysis:
+        def read_selection_view_predictions(self, **_: object) -> pl.DataFrame:
+            return pl.DataFrame(
+                {
+                    "id": ["valid-first", "invalid-second"],
+                    "view__rank_competition": [1, 0],
+                    "view__is_selected": [True, True],
+                }
+            )
+
+    records, status = build_notebook_selected_baserender_records(
+        _CampaignAnalysis(),
+        selection_view_id="ethanol",
+        round_value=0,
+        run_id="run-0",
+    )
+
+    assert records == []
+    assert status[0]["field"] == "selection ledger"
+    assert "invalid competition rank" in str(status[0]["value"])
 
 
 def test_baserender_record_choices_compact_record_ids_without_losing_identity() -> None:
@@ -1945,21 +2191,27 @@ def test_baserender_record_choices_label_counts_and_default_to_annotated_record(
     choices = build_notebook_baserender_record_choices_with_counts(
         record_ids,
         counts,
-        annotation_label="TFBS",
+        annotation_label="annotated elements",
+        view_ranks={
+            "fixture-record-no-annotations": 7,
+            "fixture-record-five-tfbs-sites": 9,
+        },
     )
 
     assert choices == [
         {
-            "label": "1. fixture-reco...otations | 0 TFBS",
+            "label": "Rank 7 · fixture-reco...otations · 0 annotated elements",
             "record_id": "fixture-record-no-annotations",
         },
         {
-            "label": "2. fixture-reco...bs-sites | 5 TFBS",
+            "label": "Rank 9 · fixture-reco...bs-sites · 5 annotated elements",
             "record_id": "fixture-record-five-tfbs-sites",
         },
     ]
     assert select_notebook_baserender_default_record_id(record_ids, counts) == "fixture-record-five-tfbs-sites"
     assert select_notebook_baserender_default_record_id(record_ids, {}) == record_ids[0]
+    assert has_notebook_baserender_record_options(record_ids)
+    assert not has_notebook_baserender_record_options(["(no renderable records)"])
 
 
 def test_baserender_densegen_contract_uses_metadata_records_path_for_annotations(tmp_path: Path) -> None:
@@ -2207,6 +2459,178 @@ def test_notebook_baserender_record_options_include_empty_densegen_annotation_ro
     assert load_notebook_baserender_record_row(records_path, "good", contract)["id"] == "good"
 
 
+def test_notebook_baserender_record_options_reject_noncanonical_densegen_annotation_rows(tmp_path: Path) -> None:
+    noncanonical_feature_type = pa.list_(
+        pa.struct(
+            [
+                ("tf", pa.string()),
+                ("tfbs", pa.string()),
+                ("orientation", pa.string()),
+                ("offset", pa.int64()),
+            ]
+        )
+    )
+    records_path = tmp_path / "records.parquet"
+    table = pa.table(
+        {
+            "id": pa.array(["noncanonical"]),
+            "sequence": pa.array(["TTGACATATAAT"]),
+            "densegen__used_tfbs_detail": pa.array(
+                [[{"tf": "lexA", "tfbs": "TTGACA", "orientation": "fwd", "offset": 0}]],
+                type=noncanonical_feature_type,
+            ),
+        }
+    )
+    pq.write_table(table, records_path)
+    contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
+
+    with pytest.raises(ValueError, match="Selected BaseRender evidence is incomplete"):
+        build_notebook_baserender_record_options(
+            records_path,
+            contract,
+            record_ids=["noncanonical"],
+        )
+
+
+def test_notebook_baserender_record_options_reject_partial_selected_evidence(tmp_path: Path) -> None:
+    feature_type = pa.list_(
+        pa.struct(
+            [
+                ("regulator", pa.string()),
+                ("sequence", pa.string()),
+                ("orientation", pa.string()),
+                ("offset", pa.int64()),
+            ]
+        )
+    )
+    records_path = tmp_path / "records.parquet"
+    table = pa.table(
+        {
+            "id": pa.array(["good", "bad"]),
+            "sequence": pa.array(["TTGACATATAAT", "TTGACATATAAT"]),
+            "densegen__used_tfbs_detail": pa.array(
+                [
+                    [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                    [{"regulator": None, "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                ],
+                type=feature_type,
+            ),
+        }
+    )
+    pq.write_table(table, records_path)
+    contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
+
+    with pytest.raises(ValueError, match="incomplete.*bad"):
+        build_notebook_baserender_record_options(
+            records_path,
+            contract,
+            record_ids=["good", "bad"],
+        )
+
+
+def test_notebook_baserender_record_options_reject_duplicate_record_rows(tmp_path: Path) -> None:
+    feature_type = pa.list_(
+        pa.struct(
+            [
+                ("regulator", pa.string()),
+                ("sequence", pa.string()),
+                ("orientation", pa.string()),
+                ("offset", pa.int64()),
+            ]
+        )
+    )
+    records_path = tmp_path / "records.parquet"
+    table = pa.table(
+        {
+            "id": pa.array(["duplicate", "duplicate"]),
+            "sequence": pa.array(["TTGACATATAAT", "TTGACATATAAT"]),
+            "densegen__used_tfbs_detail": pa.array(
+                [
+                    [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                    [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                ],
+                type=feature_type,
+            ),
+        }
+    )
+    pq.write_table(table, records_path)
+    contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
+
+    with pytest.raises(ValueError, match="duplicate BaseRender record id"):
+        build_notebook_baserender_record_options(records_path, contract, record_ids=["duplicate"])
+
+
+def test_notebook_baserender_record_options_reject_mixed_validity_duplicate_rows(tmp_path: Path) -> None:
+    feature_type = pa.list_(
+        pa.struct(
+            [
+                ("regulator", pa.string()),
+                ("sequence", pa.string()),
+                ("orientation", pa.string()),
+                ("offset", pa.int64()),
+            ]
+        )
+    )
+    records_path = tmp_path / "records.parquet"
+    table = pa.table(
+        {
+            "id": pa.array(["duplicate", "duplicate"]),
+            "sequence": pa.array([None, "TTGACATATAAT"]),
+            "densegen__used_tfbs_detail": pa.array(
+                [
+                    None,
+                    [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                ],
+                type=feature_type,
+            ),
+        }
+    )
+    pq.write_table(table, records_path)
+    contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
+
+    with pytest.raises(ValueError, match="duplicate BaseRender record id"):
+        build_notebook_baserender_record_options(records_path, contract, record_ids=["duplicate"])
+
+
+def test_notebook_baserender_record_options_reject_duplicate_metadata_rows(tmp_path: Path) -> None:
+    feature_type = pa.list_(
+        pa.struct(
+            [
+                ("regulator", pa.string()),
+                ("sequence", pa.string()),
+                ("orientation", pa.string()),
+                ("offset", pa.int64()),
+            ]
+        )
+    )
+    records_path = tmp_path / "records.parquet"
+    metadata_path = tmp_path / "metadata.parquet"
+    records = pa.table({"id": pa.array(["duplicate"]), "sequence": pa.array(["TTGACATATAAT"])})
+    metadata = pa.table(
+        {
+            "id": pa.array(["duplicate", "duplicate"]),
+            "densegen__used_tfbs_detail": pa.array(
+                [
+                    [{"regulator": "lexA", "sequence": "GGGGGG", "orientation": "fwd", "offset": 0}],
+                    [{"regulator": "lexA", "sequence": "TTGACA", "orientation": "fwd", "offset": 0}],
+                ],
+                type=feature_type,
+            ),
+        }
+    )
+    pq.write_table(records, records_path)
+    pq.write_table(metadata, metadata_path)
+    contract = build_notebook_baserender_contract(
+        records.column_names,
+        records_path=str(records_path),
+        metadata_records_path=str(metadata_path),
+        metadata_schema_columns=metadata.column_names,
+    )
+
+    with pytest.raises(ValueError, match="duplicate BaseRender record id"):
+        build_notebook_baserender_record_options(records_path, contract, record_ids=["duplicate"])
+
+
 def test_notebook_baserender_record_options_filter_to_selected_ids(tmp_path: Path) -> None:
     feature_type = pa.list_(
         pa.struct(
@@ -2235,13 +2659,19 @@ def test_notebook_baserender_record_options_filter_to_selected_ids(tmp_path: Pat
     pq.write_table(table, records_path)
     contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
 
-    assert build_notebook_baserender_record_options(records_path, contract, record_ids=["second"]) == ["second"]
+    assert build_notebook_baserender_record_options(
+        records_path,
+        contract,
+        record_ids=["second", "first"],
+    ) == ["second", "first"]
     assert build_notebook_baserender_record_options(records_path, contract, record_ids=[]) == [
         "(no renderable records)"
     ]
 
 
-def test_notebook_baserender_render_passes_record_id_as_sequence_panel_title(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_notebook_baserender_render_keeps_campaign_context_outside_sequence_canvas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import dnadesign.opal.src.analysis.notebook_components.baserender_render as baserender_render
 
     captured: dict[str, object] = {}
@@ -2271,11 +2701,11 @@ def test_notebook_baserender_render_passes_record_id_as_sequence_panel_title(mon
     row = captured["row"]
     kwargs = captured["kwargs"]
     assert isinstance(row, dict)
-    assert row["__opal_baserender_record_title"] == "Record record-abc"
+    assert "__opal_baserender_record_title" not in row
     assert isinstance(kwargs, dict)
-    assert kwargs["adapter_columns"]["overlay_text"] == "__opal_baserender_record_title"
-    assert kwargs["style_overrides"]["overlay_align"] == "center"
+    assert "overlay_text" not in kwargs["adapter_columns"]
     assert payload["record_id"] == "record-abc"
+    assert payload["caption"] == "DenseGen TFBS annotation · 4 bp · 0 annotated elements"
 
 
 def test_notebook_baserender_render_uses_high_resolution_content_fit_canvas(tmp_path: Path) -> None:

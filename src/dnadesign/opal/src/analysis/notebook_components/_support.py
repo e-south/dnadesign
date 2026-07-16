@@ -45,6 +45,15 @@ def display_name(value: Any) -> str:
     return pretty_title(text)
 
 
+def compact_identifier(value: Any) -> str:
+    """Return a stable compact identifier without changing its underlying value."""
+
+    text = str(value or "").strip()
+    if len(text) <= 24:
+        return text
+    return f"{text[:12]}...{text[-8:]}"
+
+
 def compact_path(value: Any, *, base: Any | None = None, max_parts: int = 3) -> str:
     """Return a notebook-friendly path label without discarding evidence fields."""
 

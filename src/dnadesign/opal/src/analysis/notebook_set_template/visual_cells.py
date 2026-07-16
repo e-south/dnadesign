@@ -59,6 +59,7 @@ def _visual_choices_cell() -> str:
             CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
             active_view_mode,
             annotate_notebook_visual_choices,
+            baserender_has_renderable_records,
             baserender_role_ui,
             build_notebook_collection_visual_choices,
             build_notebook_reader_evidence_visual_choices,
@@ -66,7 +67,6 @@ def _visual_choices_cell() -> str:
             campaign_plot_choices,
             collection_visuals,
             reader_evidence_surface,
-            selected_baserender_ids,
             selected_campaign_baserender_contract, selected_campaign_model,
             selected_collection_set_choice,
         ):
@@ -83,7 +83,7 @@ def _visual_choices_cell() -> str:
                 if (
                     baserender_role_ui is not None
                     and selected_campaign_baserender_contract.get("available")
-                    and selected_baserender_ids
+                    and baserender_has_renderable_records
                 ):
                     visual_choices.append(
                         {
@@ -94,7 +94,10 @@ def _visual_choices_cell() -> str:
                     )
             else:
                 visual_choices = []
-                if selected_campaign_baserender_contract.get("available") and selected_baserender_ids:
+                if (
+                    selected_campaign_baserender_contract.get("available")
+                    and baserender_has_renderable_records
+                ):
                     visual_choices.append(
                         {
                             "label": "Selected sequence render",

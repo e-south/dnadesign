@@ -44,7 +44,7 @@ def build_notebook_baserender_contract(
             render_route="figure",
             renderer_name="sequence_rows",
             records_path=records_path,
-            caption="BaseRender generic feature view.",
+            caption="Sequence feature annotation.",
         )
 
     densegen_config = baserender.sequence_panel_config_for_adapter("densegen_tfbs")
@@ -67,7 +67,7 @@ def build_notebook_baserender_contract(
             records_path=records_path,
             metadata_records_path=metadata_records_path if has_metadata_annotations else None,
             metadata_required_columns=metadata_required if has_metadata_annotations else [],
-            caption="BaseRender TFBS metadata view.",
+            caption="DenseGen TFBS annotation.",
             style_overrides=dict(densegen_config.style_overrides or {}),
             target_width_px=int(densegen_config.target_width_px),
             target_height_px=int(densegen_config.target_height_px),

@@ -15,8 +15,32 @@ from typing import Any, Iterable, Mapping
 
 from ...plots._mpl_utils import pretty_label
 from ._support import mapping, sequence
+from .baserender_selection_scope import build_notebook_baserender_role_control
 
 CAMPAIGN_SET_BASERENDER_SURFACE_KIND = "campaign_set_baserender"
+
+
+def build_notebook_collection_baserender_role_control(
+    campaigns: Iterable[Mapping[str, Any]],
+    collection: Mapping[str, Any] | None,
+    selected_collection_set_choice: Mapping[str, Any] | None,
+    *,
+    active_view_mode: str,
+    mo: Any,
+) -> tuple[list[dict[str, str]], Any | None]:
+    """Build role choices and their campaign-set label-source control."""
+
+    choices = (
+        build_notebook_collection_baserender_role_choices(campaigns, collection, selected_collection_set_choice)
+        if active_view_mode == "Campaign set"
+        else []
+    )
+    control = build_notebook_baserender_role_control(
+        active_view_mode=active_view_mode,
+        role_choices=choices,
+        mo=mo,
+    )
+    return choices, control
 
 
 def build_notebook_collection_baserender_role_choices(

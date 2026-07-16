@@ -28,10 +28,12 @@ from .baserender_record_sources import (
     metadata_source_columns,
     normalise_record_ids,
     record_source_columns,
+    require_unique_record_ids,
 )
 from .baserender_record_sources import (
     source_columns as contract_source_columns,
 )
+from .baserender_record_validation import public_adapter_valid_record_ids
 
 
 def build_notebook_baserender_record_options(
@@ -71,15 +73,29 @@ def build_notebook_baserender_record_options(
     label_ids = label_ids_for_round(labels_df, round_value=round_value)
     if label_ids:
         scan = scan.filter(pl.col(identifier).cast(pl.Utf8).is_in(label_ids))
-    records = (
-        scan.select(pl.col(identifier).cast(pl.Utf8).alias("__record_id"))
-        .drop_nulls()
-        .unique(maintain_order=True)
-        .limit(max(1, int(limit)))
-        .collect()
+    records_scan = (
+        scan.select(pl.col(identifier).cast(pl.Utf8).alias("__record_id")).drop_nulls().unique(maintain_order=True)
     )
+    if record_ids is None:
+        records_scan = records_scan.limit(max(1, int(limit)))
+    records = records_scan.collect()
     options = records.get_column("__record_id").to_list() if "__record_id" in records.columns else []
-    return [str(item) for item in options if str(item).strip()] or [NO_RENDERABLE_RECORDS_LABEL]
+    renderable = public_adapter_valid_record_ids(
+        records_path,
+        contract,
+        record_ids=[str(item) for item in options if str(item).strip()],
+    )
+    available = set(renderable)
+    if record_ids is not None:
+        unavailable = [record_id for record_id in selected_ids if record_id not in available]
+        if unavailable:
+            raise ValueError(
+                "Selected BaseRender evidence is incomplete; contract-invalid or missing record ids: "
+                f"{unavailable[:10]}."
+            )
+        ordered = [record_id for record_id in selected_ids if record_id in available]
+        return ordered or [NO_RENDERABLE_RECORDS_LABEL]
+    return renderable or [NO_RENDERABLE_RECORDS_LABEL]
 
 
 def build_notebook_baserender_record_choices(record_ids: Iterable[Any]) -> list[dict[str, str]]:
@@ -95,6 +111,13 @@ def build_notebook_baserender_record_choices(record_ids: Iterable[Any]) -> list[
         }
         for index, record_id in enumerate(values, start=1)
     ]
+
+
+def has_notebook_baserender_record_options(record_ids: Iterable[Any]) -> bool:
+    """Return whether a record-option collection contains a renderable identity."""
+
+    values = normalise_record_ids(record_ids)
+    return bool(values) and NO_RENDERABLE_RECORDS_LABEL not in values
 
 
 def build_notebook_baserender_record_annotation_counts(
@@ -155,8 +178,9 @@ def build_notebook_baserender_record_choices_with_counts(
     annotation_counts: Mapping[str, int],
     *,
     annotation_label: str = "annotations",
+    view_ranks: Mapping[str, int] | None = None,
 ) -> list[dict[str, str]]:
-    """Return dropdown labels with annotation counts while preserving selected-record identity."""
+    """Return compact dropdown labels with annotation counts and optional view ranks."""
 
     rows = build_notebook_baserender_record_choices(record_ids)
     if not rows or rows[0]["record_id"] == NO_RENDERABLE_RECORDS_LABEL:
@@ -166,9 +190,18 @@ def build_notebook_baserender_record_choices_with_counts(
     for row in rows:
         record_id = str(row["record_id"])
         count = max(0, int(annotation_counts.get(record_id, 0)))
+        if view_ranks is not None:
+            if record_id not in view_ranks:
+                raise ValueError(f"Selected BaseRender record {record_id!r} is missing its competition rank.")
+            rank = int(view_ranks[record_id])
+            if rank <= 0:
+                raise ValueError(f"Selected BaseRender record {record_id!r} has invalid competition rank {rank}.")
+            display = f"Rank {rank} · {compact_record_id(record_id)} · {count} {label}"
+        else:
+            display = f"{row['label']} | {count} {label}"
         out.append(
             {
-                "label": f"{row['label']} | {count} {label}",
+                "label": display,
                 "record_id": record_id,
             }
         )
@@ -191,63 +224,6 @@ def select_notebook_baserender_default_record_id(
     return values[0]
 
 
-def build_notebook_selected_baserender_record_ids(
-    campaign_analysis: Any,
-    *,
-    selection_view_id: str,
-    round_value: Any | None,
-    run_id: Any | None,
-) -> tuple[list[str], list[dict[str, Any]]]:
-    """Return selected record ids and compact status rows for BaseRender review."""
-
-    selected_ids: list[str] = []
-    status_rows: list[dict[str, Any]] = []
-    if round_value is None:
-        return selected_ids, [{"field": "selection scope", "value": "no rounds available"}]
-    run_text = str(run_id or "").strip()
-    if not run_text:
-        return selected_ids, [{"field": "selection scope", "value": "no run available"}]
-
-    try:
-        import polars as pl
-
-        round_int = int(round_value)
-        pred_df = campaign_analysis.read_selection_view_predictions(
-            selection_view_id=selection_view_id,
-            columns=[
-                "id",
-                "as_of_round",
-                "run_id",
-                "view__rank_competition",
-                "view__is_selected",
-            ],
-            round_selector=[round_int],
-            run_id=run_text,
-        )
-        selected_df = (
-            pred_df.filter(pl.col("view__is_selected").fill_null(False)) if not pred_df.is_empty() else pred_df
-        )
-        sort_columns = [column for column in ("view__rank_competition", "id") if column in selected_df.columns]
-        if sort_columns:
-            selected_df = selected_df.sort(sort_columns)
-        if "id" in selected_df.columns:
-            selected_ids = [
-                str(value)
-                for value in selected_df.get_column("id").cast(pl.Utf8).drop_nulls().to_list()
-                if str(value).strip()
-            ]
-        status_rows.extend(
-            [
-                {"field": "selection round", "value": round_int},
-                {"field": "selection run", "value": run_text},
-                {"field": "selected records", "value": len(selected_ids)},
-            ]
-        )
-    except Exception as exc:
-        status_rows.append({"field": "selection ledger", "value": f"unavailable: {exc}"})
-    return selected_ids, status_rows
-
-
 def load_notebook_baserender_record_row(
     records_path: str | Path,
     record_id: str,
@@ -265,13 +241,16 @@ def load_notebook_baserender_record_row(
     if identifier not in source_columns:
         source_columns.append(identifier)
     scan = pl.scan_parquet(str(records_path)).select(source_columns)
+    scan = scan.filter(pl.col(identifier).cast(pl.Utf8) == str(record_id))
+    require_unique_record_ids(pl, scan, id_column_name=identifier)
     schema = scan.collect_schema()
     for expr in contract_valid_filters(pl, contract, schema):
         scan = scan.filter(expr)
     metadata_path = metadata_records_path(contract)
     if metadata_path is not None:
         scan = join_metadata_rows(pl, scan, metadata_path, id_column_name=identifier, contract=contract)
-    row_df = scan.filter(pl.col(identifier).cast(pl.Utf8) == str(record_id)).limit(1).collect()
+    require_unique_record_ids(pl, scan, id_column_name=identifier)
+    row_df = scan.collect()
     if row_df.is_empty():
         return None
     return row_df.to_dicts()[0]
