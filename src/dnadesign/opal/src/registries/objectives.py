@@ -31,6 +31,7 @@ class _ObjectiveFn(Protocol):
 
 # Registry: name -> callable(y_pred, *, params, ctx, train_view) -> ObjectiveResult
 _REG_O: Dict[str, _ObjectiveFn] = {}
+_OBJECTIVE_FAMILIES: Dict[str, str] = {}
 
 _BUILTINS_LOADED = False
 _PLUGINS_LOADED = False
@@ -84,14 +85,19 @@ def _ensure_all_loaded() -> None:
     _ensure_plugins_loaded()
 
 
-def register_objective(name: str):
-    """Decorator to register an objective by name."""
+def register_objective(name: str, *, family: str = "generic"):
+    """Decorator to register an objective and its plot-compatibility family."""
+
+    objective_family = str(family)
+    if not objective_family or objective_family != objective_family.strip():
+        raise ValueError("objective family must be a non-empty canonical string")
 
     def _wrap(func: _ObjectiveFn):
         if name in _REG_O:
             raise ValueError(f"objective '{name}' already registered")
         _validate_objective_signature(func, name=name)
         _REG_O[name] = func
+        _OBJECTIVE_FAMILIES[name] = objective_family
         _dbg(f"registered objective: {name}")
         return func
 
@@ -164,6 +170,17 @@ def get_objective(name: str) -> _ObjectiveFn:
 def list_objectives() -> List[str]:
     _ensure_all_loaded()
     return sorted(_REG_O)
+
+
+def get_objective_family(name: str) -> str:
+    """Return the declared plot-compatibility family for an objective."""
+
+    _ensure_all_loaded()
+    try:
+        return _OBJECTIVE_FAMILIES[name]
+    except KeyError:
+        avail = ", ".join(sorted(_REG_O))
+        raise KeyError(f"objective '{name}' not found. Available: [{avail}].")
 
 
 def _declared_channels(fn: _ObjectiveFn, *, attr_name: str, label: str) -> tuple[str, ...]:

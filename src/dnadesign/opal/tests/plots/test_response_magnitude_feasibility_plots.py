@@ -391,6 +391,13 @@ def test_response_separation_plot_metadata_is_manuscript_explicit() -> None:
         assert meta["capability"]["objective_family"] == "response_magnitude_feasibility"
 
 
+def test_rmf_frontier_metadata_names_run_pinned_observed_events() -> None:
+    requirements = describe_plot_kind("response_magnitude_feasibility_frontier")["requires"]
+
+    assert "labels/observed_events.parquet" in requirements
+    assert "labels.parquet" not in requirements
+
+
 def test_rmf_plots_show_target_boundaries_and_observed_labels(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

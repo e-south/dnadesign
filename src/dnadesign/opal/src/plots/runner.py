@@ -22,7 +22,7 @@ import polars as pl
 import typer
 
 from ..analysis.ledger import RoundSelector, available_rounds, parse_round_selector, round_suffix
-from ..core.utils import now_iso
+from ..core.utils import ExitCodes, OpalError, now_iso
 from ..plots._context import PlotContext
 from ..plots._mpl_utils import ensure_mpl_config_dir
 from ..plots.manifests import (
@@ -50,11 +50,41 @@ class PlotRequest:
     rounds_sel: RoundSelector
     run_id: Optional[str]
     selection_view_id: str
+    objective_name: str
+    objective_family: str
     multi_view_campaign: bool
     round_suffix: str
     name_filter: Optional[str]
     tag_filters: List[str]
     emit_status: bool = True
+
+
+def _validate_plot_objective_compatibility(
+    *,
+    plot_name: str,
+    plot_kind: str,
+    plot_family: str,
+    selection_view_id: str,
+    objective_name: str,
+    objective_family: str,
+) -> None:
+    if plot_family == "generic":
+        return
+    if plot_family == "unknown":
+        raise OpalError(
+            f"[plot] Plot {plot_name!r} (kind={plot_kind!r}) does not declare an objective family. "
+            "Register explicit PlotMeta with objective_family='generic' or the exact specialized family.",
+            ExitCodes.BAD_ARGS,
+        )
+    if plot_family == objective_family:
+        return
+    raise OpalError(
+        f"[plot] Plot {plot_name!r} (kind={plot_kind!r}) requires objective family "
+        f"{plot_family!r}, but selection view {selection_view_id!r} uses objective "
+        f"{objective_name!r} in family {objective_family!r}. Select a compatible "
+        "specialized plot or a generic plot.",
+        ExitCodes.BAD_ARGS,
+    )
 
 
 def resolve_run_round(runs_df: pl.DataFrame, run_id: str) -> int:
@@ -334,6 +364,16 @@ def run_plots(req: PlotRequest) -> bool:
                 if req.name_filter:
                     raise ValueError(f"[plot] Plot '{pname}' does not match tags: {req.tag_filters}")
                 continue
+
+        capability = describe_plot_kind(pkind)["capability"]
+        _validate_plot_objective_compatibility(
+            plot_name=pname,
+            plot_kind=pkind,
+            plot_family=str(capability["objective_family"]),
+            selection_view_id=req.selection_view_id,
+            objective_name=req.objective_name,
+            objective_family=req.objective_family,
+        )
 
         data_paths = dict(builtin_resolved)
         apply_data_entries(

@@ -21,6 +21,7 @@ from ...analysis.ledger import parse_round_selector, round_suffix
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...plots.config import list_configured_plot_specs, list_configured_plots, load_plot_config
 from ...plots.runner import PlotRequest, resolve_run_round, run_plots
+from ...registries.objectives import get_objective_family
 from ...registries.plots import describe_plot_kind, get_plot_meta, list_plots
 from ..formatting import bullet_list
 from ..registry import cli_command
@@ -247,6 +248,9 @@ def _run_plot_command(
         view = configured_views[0]
     elif view not in configured_views:
         raise OpalError(f"[plot] Unknown --view {view!r}. Available: {configured_views}", ExitCodes.BAD_ARGS)
+    selected_view = next(selection_view for selection_view in cfg.selection_views if selection_view.id == view)
+    objective_name = selected_view.objective.name
+    objective_family = get_objective_family(objective_name)
 
     try:
         rounds_sel = parse_round_selector(round)
@@ -294,6 +298,8 @@ def _run_plot_command(
         rounds_sel=rounds_sel,
         run_id=run_id,
         selection_view_id=view,
+        objective_name=objective_name,
+        objective_family=objective_family,
         multi_view_campaign=len(configured_views) > 1,
         round_suffix=suffix,
         name_filter=name,

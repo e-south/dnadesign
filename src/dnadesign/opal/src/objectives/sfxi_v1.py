@@ -276,7 +276,7 @@ def _scalar_uncertainty_delta(
         "objective/<self>/uncertainty_by_name",
     ],
 )
-@register_objective("sfxi_v1")
+@register_objective("sfxi_v1", family="sfxi")
 def sfxi_v1(
     *,
     y_pred: np.ndarray,

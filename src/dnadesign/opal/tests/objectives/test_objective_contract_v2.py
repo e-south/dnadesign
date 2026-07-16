@@ -19,7 +19,11 @@ from scipy.stats import norm
 
 from dnadesign.opal.src.core.objective_result import ObjectiveResultV2, validate_objective_result_v2
 from dnadesign.opal.src.core.utils import OpalError
-from dnadesign.opal.src.registries.objectives import list_objectives, register_objective
+from dnadesign.opal.src.registries.objectives import (
+    get_objective_family,
+    list_objectives,
+    register_objective,
+)
 from dnadesign.opal.src.registries.selection import normalize_selection_result
 from dnadesign.opal.src.selection.expected_improvement import ei
 from dnadesign.opal.src.selection.top_n import top_n
@@ -55,6 +59,12 @@ def test_register_objective_accepts_optional_extension_kwargs() -> None:
         return _ObjResult(score=np.ones(len(y_pred), dtype=float))
 
     assert name in list_objectives()
+
+
+def test_objective_registry_declares_plot_compatibility_family() -> None:
+    assert get_objective_family("sfxi_v1") == "sfxi"
+    assert get_objective_family("response_magnitude_feasibility_v1") == "response_magnitude_feasibility"
+    assert get_objective_family("scalar_identity_v1") == "generic"
 
 
 def test_expected_improvement_requires_uncertainty() -> None:

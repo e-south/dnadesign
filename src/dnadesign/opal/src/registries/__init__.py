@@ -13,7 +13,7 @@ Module Author(s): Eric J. South
 from .models import get_model, list_models, register_model
 
 # Objectives
-from .objectives import get_objective, list_objectives, register_objective
+from .objectives import get_objective, get_objective_family, list_objectives, register_objective
 
 # Plots
 from .plots import get_plot, list_plots, register_plot
@@ -54,6 +54,7 @@ __all__ = [
     # Objectives
     "register_objective",
     "get_objective",
+    "get_objective_family",
     "list_objectives",
     # Selections
     "register_selection",

@@ -34,16 +34,40 @@ def _png_dimensions(path: Path) -> tuple[int, int]:
     return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
 
 
-@register_plot("test_plot_cli_minimal")
+@register_plot(
+    "test_plot_cli_minimal",
+    meta=PlotMeta(summary="Test-only generic plot.", objective_family="generic"),
+)
 def _plot_minimal(ctx: PlotContext, params: dict) -> None:
     ctx.output_dir.mkdir(parents=True, exist_ok=True)
     out = ctx.output_dir / ctx.filename
     out.write_text(f"ok:{params.get('tag', 'none')}")
 
 
-@register_plot("test_plot_cli_no_output")
+@register_plot(
+    "test_plot_cli_sfxi_only",
+    meta=PlotMeta(
+        summary="Test-only SFXI plot.",
+        objective_family="sfxi",
+    ),
+)
+def _plot_sfxi_only(ctx: PlotContext, params: dict) -> None:
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+    (ctx.output_dir / ctx.filename).write_text("wrong objective family was rendered")
+
+
+@register_plot(
+    "test_plot_cli_no_output",
+    meta=PlotMeta(summary="Test-only generic plot without output.", objective_family="generic"),
+)
 def _plot_no_output(ctx: PlotContext, params: dict) -> None:
     return None
+
+
+@register_plot("test_plot_cli_unknown_family")
+def _plot_unknown_family(ctx: PlotContext, params: dict) -> None:
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+    (ctx.output_dir / ctx.filename).write_text("undeclared objective family was rendered")
 
 
 @register_plot(
@@ -96,6 +120,61 @@ def test_plot_cli_writes_output(tmp_path):
     index = json.loads(index_path.read_text())
     assert index["schema_version"] == "opal.plot_manifest_index.v1"
     assert index["plot_count"] == 1
+
+
+def test_plot_cli_rejects_specialized_plot_for_incompatible_objective(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[{"name": "sfxi_only", "kind": "test_plot_cli_sfxi_only"}],
+        objective_name="response_magnitude_feasibility_v1",
+        objective_params={
+            "state_ids": ["00", "10", "01", "11"],
+            "target_mask": [0, 1, 0, 1],
+            "calibration": {
+                "response_separation_min": 0.0,
+                "on_magnitude_min": 0.0,
+                "off_magnitude_max": 0.0,
+                "response_separation_scale": 1.0,
+                "on_magnitude_scale": 1.0,
+                "off_magnitude_scale": 1.0,
+            },
+        },
+        selection_params={"score_ref": "feasibility_margin"},
+    )
+
+    result = CliRunner().invoke(_build(), ["--no-color", "plot", "-c", str(campaign)])
+
+    assert result.exit_code == ExitCodes.BAD_ARGS
+    assert "requires objective family 'sfxi'" in result.output
+    assert "response_magnitude_feasibility_v1" in result.output
+    assert not (workdir / "outputs" / "plots" / "sfxi_only.png").exists()
+
+
+def test_plot_cli_rejects_plot_without_declared_objective_family(tmp_path):
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(
+        campaign,
+        workdir=workdir,
+        records_path=records,
+        plots=[{"name": "unknown_family", "kind": "test_plot_cli_unknown_family"}],
+    )
+
+    result = CliRunner().invoke(_build(), ["--no-color", "plot", "-c", str(campaign)])
+
+    assert result.exit_code == ExitCodes.BAD_ARGS
+    assert "does not declare an objective family" in result.output
+    assert not (workdir / "outputs" / "plots" / "unknown_family.png").exists()
 
 
 def test_plot_cli_name_filter_preserves_other_manifest_index_entries(tmp_path):

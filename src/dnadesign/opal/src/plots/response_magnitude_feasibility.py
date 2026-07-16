@@ -16,6 +16,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
+from ..analysis.ledger import OBSERVED_EVENTS_ARTIFACT_KEY
 from ..registries.plots import PlotMeta, register_plot
 from ._mpl_utils import (
     DEFAULT_SQUARE_FIGSIZE,
@@ -83,7 +84,7 @@ _DECOMPOSITION_KIND = "response_magnitude_feasibility_constraint_decomposition"
             "pred__score_channels",
             "view__rank_competition",
             "view__is_selected",
-            "labels.parquet",
+            OBSERVED_EVENTS_ARTIFACT_KEY,
         ],
         notes=[
             "Reads one response_magnitude_feasibility_v1 run and recomputes feasibility from canonical public math."

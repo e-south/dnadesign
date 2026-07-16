@@ -17,6 +17,7 @@ from typing import Any, Sequence
 from ..analysis.campaign import CampaignAnalysis
 from ..analysis.ledger import parse_round_selector, round_suffix
 from ..core.utils import OpalError
+from ..registries.objectives import get_objective_family
 from .config import load_plot_config
 from .runner import PlotRequest, resolve_run_round, run_plots
 
@@ -46,6 +47,9 @@ def run_campaign_plots(
         selection_view_id = configured_views[0]
     elif selection_view_id not in configured_views:
         raise OpalError(f"Unknown selection_view_id {selection_view_id!r}. Available: {configured_views}")
+    selected_view = next(view for view in analysis.config.selection_views if view.id == selection_view_id)
+    objective_name = selected_view.objective.name
+    objective_family = get_objective_family(objective_name)
     plot_cfg = load_plot_config(
         campaign_cfg=campaign_cfg,
         campaign_yaml=cfg_path,
@@ -87,6 +91,8 @@ def run_campaign_plots(
         rounds_sel=rounds_sel,
         run_id=run_id,
         selection_view_id=selection_view_id,
+        objective_name=objective_name,
+        objective_family=objective_family,
         multi_view_campaign=len(configured_views) > 1,
         round_suffix=suffix,
         name_filter=name,

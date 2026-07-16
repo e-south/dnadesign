@@ -27,7 +27,7 @@ from .response_magnitude_feasibility_math import (
 
 
 @roundctx_contract(category="objective", requires=["core/labels_as_of_round"], produces=[])
-@register_objective(OBJECTIVE_NAME)
+@register_objective(OBJECTIVE_NAME, family="response_magnitude_feasibility")
 def response_magnitude_feasibility_v1(
     *,
     y_pred: np.ndarray,
