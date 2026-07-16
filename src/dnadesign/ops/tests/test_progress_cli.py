@@ -1302,6 +1302,32 @@ def test_cli_progress_show_reports_stress_ethanol_cipro_growth_record_surface() 
         assert "handoff outputs pending promoter/demo_anchor_set" in payload["summary"]
 
 
+def test_cli_progress_show_resolves_dot_prefixed_study_dir_against_repo_root() -> None:
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        repo_root = _repo_root()
+        study_dir = repo_root / "docs" / "studies" / "stress_ethanol_cipro_growth"
+
+        result = runner.invoke(
+            app,
+            [
+                "progress",
+                "show",
+                "studies.stress-ethanol-cipro-growth.status",
+                "--repo-root",
+                str(repo_root),
+                "--study-dir",
+                "./docs/studies/stress_ethanol_cipro_growth",
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["evidence"]["study_selection_source"] == "explicit"
+        assert payload["evidence"]["study_dir"] == str(study_dir)
+
+
 def test_cli_progress_show_marks_pipeline_only_execution_surfaces_as_derived() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():

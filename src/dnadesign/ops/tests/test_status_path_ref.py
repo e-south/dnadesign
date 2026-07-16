@@ -28,6 +28,16 @@ def test_path_ref_repo_base_resolution(tmp_path: Path) -> None:
     assert resolved == target.resolve()
 
 
+def test_path_ref_repo_base_resolves_dot_prefixed_path_without_manifest(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    target = repo_root / "usr" / "datasets"
+    target.mkdir(parents=True)
+
+    resolved = resolve_path_ref("./usr/datasets", repo_root=repo_root, default_base="repo")
+
+    assert resolved == target.resolve()
+
+
 def test_path_ref_manifest_base_resolution(tmp_path: Path) -> None:
     manifest_dir = tmp_path / "manifests"
     target = manifest_dir / "artifacts" / "latest.json"
