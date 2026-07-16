@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-command-groups
 surface: study-runtime-command-group-map
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-05-18
+last_verified: 2026-07-15
 entrypoint: self
 canonical_payload: pipeline.yaml
 ---
@@ -11,7 +11,7 @@ canonical_payload: pipeline.yaml
 ## Stress Runtime Command Groups
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-07-15
 
 Use this page when an agent needs runtime command-group orientation without
 opening the full `pipeline.yaml` first. The full YAML is the canonical payload
@@ -25,7 +25,7 @@ consumed by status, preflight, OPAL, LatentDNA, and docs-contract checks.
 | Infer runbooks, model families, sidecar completion, and SCC posture | [Infer lane](lanes/infer.yaml) | `pipeline.yaml:study_pipeline.infer` |
 | LatentDNA representation comparison and browser review surfaces | [LatentDNA lane](lanes/latentdna.yaml) | `pipeline.yaml:study_pipeline.latentdna` |
 | Cluster exploratory follow-up | [Cluster lane](lanes/cluster.yaml) | `pipeline.yaml:study_pipeline.cluster` |
-| OPAL candidate table and campaign viewer handoff | [OPAL lane](lanes/opal.yaml) | `pipeline.yaml:study_pipeline.opal` |
+| OPAL round-0 candidate batch and campaign review | [OPAL lane](lanes/opal.yaml) | `pipeline.yaml:study_pipeline.opal` |
 
 ### Navigation Rule
 

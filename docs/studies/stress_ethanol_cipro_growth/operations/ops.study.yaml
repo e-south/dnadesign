@@ -27,7 +27,11 @@ parts:
   - contract/surfaces/execution/commands/notify/profile-doctor.yaml
   - contract/surfaces/execution/commands/notify/resolve-events.yaml
   - contract/surfaces/execution/commands/latentdna.yaml
-  - contract/surfaces/execution/commands/opal.yaml
+  - contract/surfaces/execution/commands/opal/candidate-table.yaml
+  - contract/surfaces/execution/commands/opal/round0-review.yaml
+  - contract/surfaces/execution/commands/opal/campaign-inspection.yaml
+  - contract/surfaces/execution/commands/opal/synthesis-handoffs.yaml
+  - contract/surfaces/execution/commands/opal/densegen-axis-probe.yaml
   snapshot: contract/status/snapshot.yaml
   preflight:
   - contract/readiness/scope.yaml
@@ -44,3 +48,4 @@ parts:
   - contract/readiness/checks/infer_batch_preparation/batch-runbooks.yaml
   - contract/readiness/checks/latentdna_reference_normalization_audit.yaml
   - contract/readiness/checks/opal_candidate_table_pre_assay.yaml
+  - contract/readiness/checks/opal_round0_candidate_review.yaml

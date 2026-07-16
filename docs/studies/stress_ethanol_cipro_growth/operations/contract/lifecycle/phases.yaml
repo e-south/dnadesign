@@ -74,9 +74,13 @@
   required_for_main_study_state: false
   next_surface: repo:src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md
 - id: opal_candidate_table_pre_assay
-  status: in_progress
+  status: complete
   output_dataset: usr_prom_eth_cip_opal_candidates
   next_surface: repo:docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md
+- id: opal_round0_candidate_review
+  status: in_progress
+  next_surface: repo:src/dnadesign/opal/campaigns/secg_rmf_greedy/notebooks/opal_secg_rmf_greedy_analysis.py
+  notes: Round-0 candidate evidence is ready for review; this phase does not authorize synthesis.
 - id: infer_anchor_only_20b
   status: planned
   required_for_main_study_state: false

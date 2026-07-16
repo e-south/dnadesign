@@ -32,7 +32,7 @@
 ### Study Phase
 
 - Declared phase: `opal_candidate_table_pre_assay`; the nested OPAL
-  decision route is in `round0_metric_review`. The study remains pre-assay
+  decision route is in `round0_selection_review`. The study remains pre-assay
   because no revised selection has been authorized for synthesis.
 - LatentDNA has selected the pre-assay X. RegulonDB/native appendix visualization
   does not gate OPAL readiness.
@@ -85,7 +85,7 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
 - LatentDNA native TF-axis overlay: `verified`; the deliverable renders over the existing context-anchor bidirectional view after RegulonDB native core60 rows were appended through `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, regulatory interactions were populated, and matching 7B feature sidecars were filled.
 - RegulonDB functional annotation sidecars: `verified`; `usr_regulondb_native_promoters/_relations/` now carries BioCyc KB 29.6 regulator GO terms, promoter-regulator-GO term rows, and regulator coverage rows. LatentDNA has a separate BioCyc GO biological-process appendix plot that reuses the native plan-margin tail tables for interpretation. These are source-backed annotation sidecars, not OPAL inputs or mechanistic labels.
 - Cluster: `planned`; use `../routes/README.md` for the exploratory-clustering handoff.
-- OPAL: `round0_metric_review`; three digest-pinned SFXI source runs remain
+- OPAL: `round0_selection_review`; three digest-pinned SFXI source runs remain
   immutable diagnostic evidence. Their run IDs are
   `r0-2026-07-09T18:37:10+00:00` (ethanol),
   `r0-2026-07-09T18:37:49+00:00` (ciprofloxacin), and
@@ -93,13 +93,15 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   candidates, and selected 6 rows. No executable campaign configs exist for
   these source runs.
 - RMF campaign: `secg_rmf_greedy` is the sole executable stress-study OPAL
-  config. It
-  declares one shared eight-output RF with ethanol, ciprofloxacin, and AND
-  selection views, greedy `top_k: 6` per view, sequence deduplication, and an
-  exact expected logical batch size of 18. It is inactive: the typed
-  `_opal/response_window_labels_v1/observed_labels.parquet` sidecar has not been
-  promoted or materialized, no unified run exists, and no synthesis is
-  authorized.
+  config. It declares one shared eight-output RF with ethanol,
+  ciprofloxacin, and AND selection views. Round 0 completed as run
+  `r0-2026-07-16T01:32:16+00:00` from 27 exact promoted response-window labels.
+  Each view received six sequence-unique slots through the declared
+  round-robin next-best-unallocated allocator. The preferred lists contained
+  one cross-view overlap; the AND view advanced once, producing the required
+  18-sequence batch. This is a prospectively frozen learning probe.
+  `model_support_ready` remains false, and the completed selection does not
+  authorize synthesis.
 - Candidate TFBS metadata: `verified`; the 2026-07-12 rematerialization repaired
   79505 dropped `densegen__used_tfbs_detail` values by binding the authoritative
   DenseGen sidecar. The readiness contract now fails if any DenseGen-backed row
@@ -113,21 +115,24 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
 - Response metric metastudy: `verified`. Canonical beta=1 gamma=1 SFXI recomputes
   exactly, but 18 top-six slots collapse to 11 sequences, 2 candidates occur in
   all three campaigns, and scoring is effect dominated. Reader now publishes a
-  verified `reader.response_window.bundle.v4` for 8 experiments, 5 reductions,
-  295 design/reduction rows, 147500 joint bootstrap rows, and 12 repeated design
-  IDs. The primary reduction is the 6-12 hour post-event log mean; adjacent
-  windows, normalized linear AUC, and delta remain response sensitivity
-  analyses. The strongest descriptive fixed challenger is PLS4 over the primary eight-component
-  summary, with weakest selection-view response-separation Spearman 0.15 and
-  feasibility Spearman 0.45. Retrospective grouped enrichment is strongest for
+  verified `reader.response_window.bundle.v5` for 8 experiments, 7 reductions,
+  413 design/reduction rows, 206500 joint bootstrap rows, and 12 repeated design
+  IDs. The primary reduction is the 4-8 hour post-event log mean; the other
+  declared windows, normalized linear AUC, and delta remain response sensitivity
+  analyses. The strongest descriptive fixed challenger is PLS4 over the primary
+  eight-component summary, with weakest selection-view response-separation and
+  feasibility Spearman values of 0.45. Retrospective grouped enrichment is strongest for
   ciprofloxacin and weakest for ethanol, but all exact 95% intervals include
   0.5 and do not establish calibrated success probabilities. Under the
-  study's time and assay-capacity constraints, the prospective policy is
-  prespecified greedy top-six per selection view. A study-owned equal-experiment
-  observation policy, hierarchical uncertainty path, atomic observation bundle,
-  and typed OPAL promotion adapter are implemented. All 12 repeated candidates
-  and the policy approval remain under review, so no production observation or
-  label artifact exists. The exact configured campaign RF is evaluated
+  study's time and assay-capacity constraints, the prospective policy assigns
+  six sequence-unique slots per selection view. The study observation contract
+  selects the latest reviewed source where source agreement is accepted,
+  excludes unresolved source disagreements, and uses the selected Reader
+  source's joint bootstrap without an equal-experiment or population-level
+  uncertainty claim. Eight repeated candidates have selected sources; ES22,
+  ES25, ES28, and ES30 are excluded. The verified observation bundle and typed
+  OPAL publication contain 27 exact labels and eight measured-candidate
+  exclusions. The exact configured campaign RF is evaluated
   separately from descriptive challengers and is the only basis for the model
   support gate. Generic `opal ingest-y` cannot publish this source. This is not
   a synthesis handoff.
@@ -147,20 +152,18 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
 ### Next Actions
 
 - Keep the SFXI round-0 selections in their declared y-space as metric-review
-  evidence, not a
-  synthesis-ready handoff. The candidate table is already materialized as
+  evidence, not a synthesis-ready handoff. The candidate table is materialized as
   157160 generated promoter rows from `background_only`, `ethanol`,
   `ciprofloxacin`, and `ethanol_ciprofloxacin` plus 25 measured pDual-10 Reader
   rows, with `latentdna__evo2_7b__context_anchor_mean_bidir_concat` as its
-  fixed-length X. The SFXI labels and ledgers exist; the typed response-window
-  observed labels and RMF campaign run do not. Do not synthesize response-window
-  Y from an SFXI score.
-- Approve the pinned Reader reduction and repeated-experiment policy only after
-  repeat triage, then publish and verify the typed response-window Y artifact.
-  Keep RMF calibration, model seed, eligibility rules, and greedy top-six policy
-  frozen before executing `secg_rmf_greedy`. Then run the study publisher once,
-  verify its pinned artifacts, fit once,
-  verify all three selection views, and inspect the 18-row logical batch.
+  fixed-length X. The SFXI labels remain separate from the promoted
+  response-window Y. Do not synthesize response-window Y from an SFXI score.
+- Review round 0 through the pinned label snapshot, RF model artifact, three
+  six-row selection sets, allocation trace, and 18-row logical batch. Preserve
+  the frozen prediction and allocation evidence before the new constructs are
+  measured. Treat the result as a learning probe while `model_support_ready`
+  remains false. Physical synthesis still requires a separate study-owned
+  handoff and lifecycle decision.
 - Use the response metric metastudy `report.md`, generated `review.py`,
   `tables/pressure_tests.csv`, `tables/setpoint_support.csv`,
   `tables/reader_event_intervals.csv`,

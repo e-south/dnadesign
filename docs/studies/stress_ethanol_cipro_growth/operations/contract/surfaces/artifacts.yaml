@@ -31,7 +31,39 @@ opal_candidate_feature_table:
     measured_pdual10_sfxi_reference_rows: 23
     measured_pdual10_control_rows: 2
   sfxi_source_label_pool_state: present_35_rows
-  response_window_label_sidecar_state: absent_until_promotion
+  response_window_label_sidecar_state: verified_27_labels
+  response_window_label_promotion_artifact: opal_response_window_label_promotion
+opal_response_window_label_promotion:
+  artifact_type: file
+  role: observed_label_promotion_manifest
+  ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v1/promotion.manifest.json
+  schema_version: opal.observed_label_promotion.v1
+  study_id: stress_ethanol_cipro_growth
+  campaign_slug: secg_rmf_greedy
+  y_space: reader_response_window_vector_v1
+  reduction_id: event_logmean_4_8h_post
+  label_rows: 27
+  manifest_sha256: 0bc4025006126a541854c30cb5f03c36eb20a9616ee08a73b4734bcc482c0659  # pragma: allowlist secret
+  label_artifact_sha256: 4546d3d9f2f4740639c88647ca165e61bb9a5afdddffce7087a218c5ec1f5cca  # pragma: allowlist secret
+opal_round0_run_context:
+  artifact_type: file
+  role: opal_round_context
+  ref: repo:src/dnadesign/opal/campaigns/secg_rmf_greedy/outputs/rounds/round_0/metadata/round_ctx.json
+  campaign_slug: secg_rmf_greedy
+  round_index: 0
+  run_id: r0-2026-07-16T01:32:16+00:00
+  sha256: b56d6ffca6b29f8bcb589b1e5c1a4e4fc74f843a707b68203aa63e58e3f8eeae  # pragma: allowlist secret
+opal_round0_selection_batch:
+  artifact_type: file
+  role: opal_selection_batch
+  ref: repo:src/dnadesign/opal/campaigns/secg_rmf_greedy/outputs/rounds/round_0/selection/selection_batch.parquet
+  campaign_slug: secg_rmf_greedy
+  round_index: 0
+  run_id: r0-2026-07-16T01:32:16+00:00
+  row_count: 18
+  deduplicate_by: sequence
+  sha256: a71ac31555314ab9aa2f837e1e0c306a35397e41211a155dc34c4d256a6b2061  # pragma: allowlist secret
+  authorization_state: candidate_review_only
 reference_native_dataset:
   artifact_type: dataset
   dataset_id: usr_promoter_references

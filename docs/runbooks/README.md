@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-07-15
 
 For command-first routing, start with `uv run ops catalog list --simple`, then
 open the linked runbook or tool doc once you know the route.
@@ -51,7 +51,7 @@ This table is generated from `*.registry.yaml` sidecars. Edit those files instea
 | `usr.data-plane.construct-infer-source-of-truth` | [Construct -> USR -> Infer Shared Dataset Runbook](../../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff. |
 | `usr.data-plane.permuter-construct-infer-handoff` | [Permuter -> Construct -> Infer Shared Dataset Runbook](../../src/dnadesign/usr/docs/operations/assembly/permuter-construct-infer-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Route Permuter-originated RT-lnRNA (rt_lnrna) variants through study-owned construct-subject promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals. |
 | `studies.stress-ethanol-cipro-growth.status` | [Stress Ethanol Cipro Growth Status](../studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md) | `contract` | `data-plane` | `iterative` | `stress-ethanol-cipro-growth-status` | Read the stress_ethanol_cipro_growth study record and report its current phase, datasets, and owner handoffs. |
-| `studies.stress-ethanol-cipro-growth.preflight` | [Stress Ethanol Cipro Growth Preflight](../studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md) | `contract` | `data-plane` | `iterative` | `stress-ethanol-cipro-growth-preflight` | Run the stress_ethanol_cipro_growth preflight suite across its declared DenseGen, Construct, Infer, Notify, LatentDNA, and OPAL candidate-table surfaces. |
+| `studies.stress-ethanol-cipro-growth.preflight` | [Stress Ethanol Cipro Growth Preflight](../studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md) | `contract` | `data-plane` | `iterative` | `stress-ethanol-cipro-growth-preflight` | Run the stress_ethanol_cipro_growth preflight suite across its declared DenseGen, Construct, Infer, Notify, LatentDNA, and OPAL round-0 review surfaces. |
 | `studies.retron-hairpin-design.status` | [Retron Hairpin Design Status](../studies/retron_hairpin_design/operations/catalog/contracts/status.md) | `contract` | `data-plane` | `iterative` | `retron-hairpin-design-status` | Read the retron_hairpin_design study record and summarize its declared route or track, command groups, and native-agent bootstrap context. |
 | `studies.retron-hairpin-design.preflight` | [Retron Hairpin Design Preflight](../studies/retron_hairpin_design/operations/catalog/contracts/preflight.md) | `contract` | `data-plane` | `iterative` | `retron-hairpin-design-preflight` | Run the retron_hairpin_design preflight suite across declared workspace-layout and command-validation surfaces without mutating outputs. |
 | `usr.data-plane.promoter-feature-matrix` | [Promoter Characterization Feature Matrix](../../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL. |

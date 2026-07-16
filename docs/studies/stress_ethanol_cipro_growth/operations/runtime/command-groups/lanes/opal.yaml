@@ -3,9 +3,9 @@ schema_version: 1
 study_id: stress_ethanol_cipro_growth
 lane_id: opal
 owner: opal
-last_verified: 2026-05-18
+last_verified: 2026-07-15
 surface_role: decision
-current_state: candidate_table_materialized_pre_assay
+current_state: round0_candidate_review
 route_detail: repo:docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md
 canonical_payload:
   path: repo:docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml
@@ -13,7 +13,8 @@ canonical_payload:
     - study_pipeline.opal
 entry_artifacts:
   - usr_prom_eth_cip_opal_candidates
+  - opal_response_window_label_promotion
 exit_artifacts:
-  - opal_campaign_records
-  - opal_campaign_ledgers
-navigation_note: Open this lane for candidate-table or campaign-viewer work after the route map selects OPAL.
+  - opal_round0_run_context
+  - opal_round0_selection_batch
+navigation_note: Open the campaign notebook and round-0 review commands for candidate review. This lane does not authorize synthesis.

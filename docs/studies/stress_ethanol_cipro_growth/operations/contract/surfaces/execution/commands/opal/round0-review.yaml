@@ -1,0 +1,70 @@
+opal_campaign_validate_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - opal
+  - validate
+  - -c
+  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - --json
+opal_selection_batch_round0_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - opal
+  - selection-batch
+  - show
+  - -c
+  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - --round
+  - '0'
+  - --json
+opal_verify_outputs_round0_ethanol_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - opal
+  - verify-outputs
+  - -c
+  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - --view
+  - ethanol
+  - --round
+  - '0'
+  - --json
+opal_verify_outputs_round0_ciprofloxacin_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - opal
+  - verify-outputs
+  - -c
+  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - --view
+  - ciprofloxacin
+  - --round
+  - '0'
+  - --json
+opal_verify_outputs_round0_and_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - opal
+  - verify-outputs
+  - -c
+  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - --view
+  - and
+  - --round
+  - '0'
+  - --json

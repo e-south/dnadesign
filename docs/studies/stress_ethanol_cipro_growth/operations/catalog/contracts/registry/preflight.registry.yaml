@@ -6,7 +6,7 @@ plane: data-plane
 owner_boundary: studies
 entry_artifact: "`docs/studies/stress_ethanol_cipro_growth/` plus the study-owned execution surfaces declared in `operations/ops.study.yaml`"
 exit_artifact: a read-only command-level readiness summary for this study
-summary: Run the stress_ethanol_cipro_growth preflight suite across its declared DenseGen, Construct, Infer, Notify, LatentDNA, and OPAL candidate-table surfaces.
+summary: Run the stress_ethanol_cipro_growth preflight suite across its declared DenseGen, Construct, Infer, Notify, LatentDNA, and OPAL round-0 review surfaces.
 execution_kind: iterative
 status_kind: stress-ethanol-cipro-growth-preflight
 keywords:

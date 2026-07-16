@@ -1,0 +1,40 @@
+densegen_axis_probe_progress_json:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe
+  - progress
+  - --run-root
+  - <run-root>
+  - --json
+densegen_axis_probe_report_json:
+  surface_type: command
+  writes_artifacts: true
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe
+  - report
+  - --run-root
+  - <run-root>
+  - --json
+densegen_axis_probe_plot_refresh_json:
+  surface_type: command
+  writes_artifacts: true
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe
+  - plot
+  - --run-root
+  - <run-root>
+  - --round
+  - all
+  - --json
