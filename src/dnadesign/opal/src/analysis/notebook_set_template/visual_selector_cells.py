@@ -33,7 +33,7 @@ def _visual_memory_cell() -> str:
         def _(mo):
             plot_scope_label_memory, set_plot_scope_label_memory = mo.state({})
             visual_group_label_memory, set_visual_group_label_memory = mo.state(None)
-            visual_label_memory, set_visual_label_memory = mo.state(None)
+            visual_label_memory, set_visual_label_memory = mo.state({})
             return (
                 plot_scope_label_memory,
                 set_plot_scope_label_memory,
@@ -92,13 +92,17 @@ def _visual_selector_cell() -> str:
     return block(
         """
         @app.cell
-        def _(mo, set_visual_label_memory, visual_choices_in_group, visual_label_memory):
+        def _(mo, selected_visual_group_label, set_visual_label_memory,
+              visual_choices_in_group, visual_label_memory):
             if visual_choices_in_group:
                 _labels = [choice["label"] for choice in visual_choices_in_group]
-                _preferred = visual_label_memory()
-                _preferred = _preferred if _preferred in _labels else _labels[0]
+                _memory_key = str(selected_visual_group_label or "ungrouped")
+                _memory = dict(visual_label_memory())
+                _preferred = _memory.get(_memory_key) if _memory.get(_memory_key) in _labels else _labels[0]
+                def _remember_visual(value):
+                    set_visual_label_memory({**_memory, _memory_key: str(value)})
                 plot_ui = mo.ui.dropdown(
-                    _labels, value=_preferred, label="Deliverable", on_change=set_visual_label_memory
+                    _labels, value=_preferred, label="Deliverable", on_change=_remember_visual
                 )
             else:
                 plot_ui = None

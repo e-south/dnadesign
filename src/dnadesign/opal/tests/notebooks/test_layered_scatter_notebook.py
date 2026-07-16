@@ -148,6 +148,18 @@ def test_layered_scatter_memory_is_campaign_and_plot_scoped(tmp_path: Path) -> N
     assert first["key"].startswith("layered_scatter_v1:")
 
 
+def test_layered_scatter_memory_is_selection_view_scoped(tmp_path: Path) -> None:
+    ethanol_choice = _choice(tmp_path)
+    ciprofloxacin_choice = _choice(tmp_path, filename="frontier_ciprofloxacin.csv")
+    ciprofloxacin_choice["manifest"]["selection_view_id"] = "ciprofloxacin"
+
+    ethanol = build_notebook_layered_scatter_contract(ethanol_choice)
+    ciprofloxacin = build_notebook_layered_scatter_contract(ciprofloxacin_choice)
+
+    assert ethanol is not None and ciprofloxacin is not None
+    assert ethanol["key"] != ciprofloxacin["key"]
+
+
 def test_layered_scatter_batch_labels_preserve_meaningful_acronyms(tmp_path: Path) -> None:
     contract = build_notebook_layered_scatter_contract(
         _choice(tmp_path, observed_batch_ids=("batch_2_RMF", "batch_2_RMF"))
@@ -416,12 +428,20 @@ def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:
     helper_text = inspect.getsource(build_notebook_layered_scatter_controls)
 
     assert 'label="Prediction pool"' in helper_text
-    assert 'label="Selected"' in helper_text
+    assert 'label="Selected overlay"' in helper_text
     assert 'label="Observed batches"' in helper_text
     assert 'label="Labels"' in helper_text
     assert "build_notebook_layered_scatter_controls(" in text
     assert "plot_view_state" in text
-    assert "read_notebook_layered_scatter_state(layered_scatter_controls)" in text
+    assert 'scatter_prediction_pool_ui = layered_scatter_controls["prediction_pool"]' in text
+    assert 'scatter_selected_ui = layered_scatter_controls["selected"]' in text
+    assert 'scatter_observed_batches_ui = layered_scatter_controls["observed_batches"]' in text
+    assert 'scatter_labels_ui = layered_scatter_controls["labels"]' in text
+    assert '"prediction_pool": scatter_prediction_pool_ui' in text
+    assert '"selected": scatter_selected_ui' in text
+    assert '"observed_batches": scatter_observed_batches_ui' in text
+    assert '"labels": scatter_labels_ui' in text
+    assert "read_notebook_layered_scatter_state(layered_scatter_controls)" not in text
     assert "build_notebook_layered_scatter_contract(_s)" in text
     assert "select_notebook_plot_scope(" in text
     assert "plot_scope_ui.value" in text

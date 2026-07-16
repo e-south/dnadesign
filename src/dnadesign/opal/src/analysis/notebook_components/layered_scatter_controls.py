@@ -57,7 +57,7 @@ def build_notebook_layered_scatter_controls(
         ),
         "selected": mo.ui.switch(
             value=bool(remembered.get("show_selected", True)),
-            label="Selected",
+            label="Selected overlay",
             on_change=lambda value: remember("show_selected", bool(value)),
         ),
         "observed_batches": mo.ui.multiselect(

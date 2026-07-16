@@ -50,6 +50,7 @@ def render_notebook_review_control_surface(
         selection_view_ui=selection_view_ui,
         view_mode_ui=view_mode_ui,
         collection_set_ui=collection_set_ui,
+        selected_visual_choice=selected_visual_choice,
     )
     controls.extend(
         _visual_controls(
@@ -77,9 +78,15 @@ def _primary_controls(
     selection_view_ui: Any,
     view_mode_ui: Any,
     collection_set_ui: Any,
+    selected_visual_choice: Mapping[str, Any] | None,
 ) -> list[Any]:
     if active_view_mode == "Campaign":
-        return _present(campaign_ui, selection_view_ui, view_mode_ui)
+        scoped_selection_view_ui = (
+            None
+            if str((selected_visual_choice or {}).get("selection_scope") or "selection_view") == "campaign"
+            else selection_view_ui
+        )
+        return _present(campaign_ui, scoped_selection_view_ui, view_mode_ui)
     return _present(view_mode_ui, collection_set_ui)
 
 

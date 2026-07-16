@@ -216,6 +216,19 @@ def test_notebook_template_uses_direct_visual_choice_and_layered_controls() -> N
     assert "layered_scatter_controls" in text
 
 
+def test_notebook_deliverable_memory_is_scoped_by_review_section() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+
+    assert "visual_label_memory, set_visual_label_memory = mo.state({})" in text
+    assert "selected_visual_group_label" in text
+    assert '_memory_key = str(selected_visual_group_label or "ungrouped")' in text
+    assert "_memory = dict(visual_label_memory())" in text
+    assert "_preferred = _memory.get(_memory_key)" in text
+    assert "def _remember_visual(value):" in text
+    assert "on_change=_remember_visual" in text
+    assert 'str((selected_visual_choice or {}).get("selection_scope") or "selection_view")' in text
+
+
 def test_notebook_template_uses_visual_surface_component() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     surface_text = render_visual_surface_cells()
@@ -292,6 +305,24 @@ def test_notebook_review_control_surface_groups_plot_controls_by_semantics() -> 
             "plot-scope",
         ],
     }
+
+
+def test_notebook_review_control_surface_hides_selection_view_for_campaign_scoped_visual() -> None:
+    rendered = render_notebook_review_control_surface(
+        active_view_mode="Campaign",
+        campaign_ui="campaign",
+        selection_view_ui="selection-view",
+        view_mode_ui="view",
+        visual_group_ui="section",
+        plot_ui="deliverable",
+        selected_visual_choice={
+            "surface_kind": "selection_batch",
+            "selection_scope": "campaign",
+        },
+        mo=_ControlSurfaceFakeMo(),
+    )
+
+    assert rendered["items"] == ["campaign", "view", "section", "deliverable"]
 
 
 def test_notebook_review_control_surface_groups_reader_controls_with_deliverable() -> None:
@@ -460,6 +491,7 @@ def test_notebook_selection_batch_choice_preserves_view_memberships() -> None:
     choice = build_notebook_selection_batch_choice(payload)
 
     assert choice["surface_kind"] == SELECTION_BATCH_SURFACE_KIND
+    assert choice["selection_scope"] == "campaign"
     assert choice["label"] == "Selection batch proposal"
     assert choice["review_group"] == "handoff"
     assert build_notebook_selection_batch_rows(choice) == [
@@ -1726,11 +1758,11 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert 'label="Review section"' in text
     assert 'label="Deliverable"' in text
     assert "visual_group_label_memory, set_visual_group_label_memory = mo.state(None)" in text
-    assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
+    assert "visual_label_memory, set_visual_label_memory = mo.state({})" in text
     assert "plot_scope_label_memory, set_plot_scope_label_memory = mo.state({})" in text
     assert "on_change=set_visual_group_label_memory" in text
-    assert "_preferred = visual_label_memory()" in text
-    assert "on_change=set_visual_label_memory" in text
+    assert "_preferred = _memory.get(_memory_key)" in text
+    assert "on_change=_remember_visual" in text
     assert "on_change=_remember_scope" in text
     assert "Plot:" not in text
     assert "Campaigns at a glance" in text

@@ -47,6 +47,7 @@ def build_notebook_selection_batch_choice(payload: Mapping[str, Any] | None) -> 
         "label": "Selection batch proposal",
         "title": "Deduplicated selection batch proposal",
         "surface_kind": SELECTION_BATCH_SURFACE_KIND,
+        "selection_scope": "campaign",
         "review_group": "handoff",
         "review_rank": 0,
         "as_of_round": payload.get("as_of_round"),

@@ -90,7 +90,9 @@ def _layout_cell() -> str:
             )
             if review_control_surface is not None:
                 _items.append(review_control_surface)
-            if active_view_mode != "Campaign set":
+            if (active_view_mode != "Campaign set"
+                and str((selected_visual_choice or {}).get("selection_scope") or "selection_view")
+                != "campaign"):
                 _items.append(selected_campaign_context_panel)
             _items.append(plot_panel)
             if baserender_diagnostic_panel is not None:
