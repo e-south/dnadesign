@@ -88,11 +88,12 @@ For a binary target mask `p`, RMF computes:
 response_separation   = min(r_i where p_i=1) - max(r_i where p_i=0)
 on_magnitude_floor    = min(b_i where p_i=1)
 off_magnitude_ceiling = max(b_i where p_i=0)
-feasibility_margin    = min(z_response, z_on, z_off)
+feasibility_margin    = min(q_response, q_on, q_off)
 ```
 
-The `z` values are signed margins around declared boundaries divided by
-positive assay-derived scales. The campaign scales come from the declared
+The `q` values are signed decision margins around declared boundaries divided
+by positive assay-derived scales; they are not classical z-scores. The campaign
+scales come from the declared
 
 `exact_primary_reader_candidate_experiments_v1` cohort: 41 exact
 candidate-experiment units covering 32 candidates across eight Reader

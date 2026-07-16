@@ -2,7 +2,7 @@
 
 **Owner:** stress_ethanol_cipro_growth study
 **Lifecycle:** active candidate-table materialization; pre-assay seed recorded
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-16
 
 This directory materializes the shared OPAL candidate table and preserves the
 reviewed 18-row pre-assay seed. The seed combines DenseGen design metadata, the
@@ -45,7 +45,7 @@ passes them to BaseRender's configured `densegen_tfbs` adapter.
 
 The SFXI source runs used the `_opal/observed_labels.parquet`
 sidecar. The unified RMF campaign instead requires
-`_opal/response_window_labels_v1/observed_labels.parquet`, fits one shared eight-output
+`_opal/response_window_labels_v4/observed_labels.parquet`, fits one shared eight-output
 model, and writes predictions, view-specific selections, and the logical
 selection batch to one campaign ledger. `records.parquet` remains the
 candidate/X table. Fork the USR candidate table only when a future campaign

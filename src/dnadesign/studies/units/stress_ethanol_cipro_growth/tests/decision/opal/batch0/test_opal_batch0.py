@@ -1808,8 +1808,8 @@ def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
     assert cfg.data.y_expected_length == 8
     assert cfg.labels.source.kind == "usr_sidecar"
     assert cfg.labels.source.dataset == "usr_prom_eth_cip_opal_candidates"
-    assert cfg.labels.source.path == "_opal/response_window_labels_v1/observed_labels.parquet"
-    assert cfg.labels.source.manifest_path == "_opal/response_window_labels_v1/promotion.manifest.json"
+    assert cfg.labels.source.path == "_opal/response_window_labels_v4/observed_labels.parquet"
+    assert cfg.labels.source.manifest_path == "_opal/response_window_labels_v4/promotion.manifest.json"
     assert cfg.labels.y_space == "reader_response_window_vector_v1"
     assert cfg.labels.round_column == "observed_round"
     assert cfg.labels.dedup_policy == "error_on_duplicate"
@@ -1859,7 +1859,7 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
     assert "response-window label snapshot" in docs
     assert "digest-pinned study-provenance manifest" in docs
     assert "_opal/observed_labels.parquet" in docs
-    assert "_opal/response_window_labels_v1/observed_labels.parquet" in docs
+    assert "_opal/response_window_labels_v4/observed_labels.parquet" in docs
     assert "decision.opal.batch0.provenance" in docs
     assert "raw Infer vector concat" in docs
 

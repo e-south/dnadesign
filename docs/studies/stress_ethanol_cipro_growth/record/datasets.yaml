@@ -241,8 +241,8 @@ datasets:
       `opal_candidate__design_family`, and `opal_candidate__sfxi_ref__collection_id`
       provenance columns plus one fixed-length vector-valued X column named
       `latentdna__evo2_7b__context_anchor_mean_bidir_concat`. SFXI source
-      labels remain at `_opal/observed_labels.parquet`; the inactive RMF route
-      requires `_opal/response_window_labels_v1/observed_labels.parquet`. Shared
+      labels remain at `_opal/observed_labels.parquet`; the unified RMF campaign
+      reads `_opal/response_window_labels_v4/observed_labels.parquet`. Shared
       predictions, view-specific selections, and the logical selection batch
       remain OPAL runtime artifacts. The X value is the Fwd+RC 1 kb context-anchor Evo2 7B
       intermediate embedding vector; it is not UMAP, centroid distance, an

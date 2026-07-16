@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 from dnadesign.opal import (
@@ -25,12 +24,6 @@ from dnadesign.opal import (
     load_config,
     verify_observed_label_snapshot,
 )
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.aggregation import (
-    VALUE_COLUMNS,
-)
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.artifact import (
-    SCHEMA_ID as OBSERVATION_SCHEMA_ID,
-)
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.artifact_io import (
     file_sha256,
     read_json_object,
@@ -38,7 +31,6 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
 
 from .contracts import (
     CAMPAIGN_SLUG,
-    DEFAULT_CAMPAIGN_CONFIG_PATH,
     LABEL_FILENAME,
     PROMOTION_FILENAME,
     PROVENANCE_FILENAME,
@@ -49,58 +41,9 @@ from .contracts import (
 )
 from .exclusions import (
     CANDIDATE_EXCLUSION_SET_ID,
-    build_candidate_selection_exclusion_provenance,
     require_campaign_candidate_exclusion_parity,
-    validate_candidate_selection_exclusion_provenance,
 )
-
-_PROVENANCE_FIELDS = {
-    "schema_id",
-    "schema_version",
-    "study_id",
-    "created_at",
-    "observation_bundle",
-    "candidate_table",
-    "candidate_selection_exclusions",
-    "label_contract",
-}
-
-
-def build_study_provenance(
-    *,
-    observation_manifest: dict[str, object],
-    observation_manifest_sha256: str,
-    candidate_records_sha256: str,
-    candidate_record_count: int,
-    label_count: int,
-    observed_round: int,
-    batch_id: str,
-    candidate_exclusion_entries: list[dict[str, str]],
-) -> dict[str, object]:
-    return {
-        "schema_id": PROVENANCE_SCHEMA_ID,
-        "schema_version": "1",
-        "study_id": STUDY_ID,
-        "created_at": datetime.now(UTC).isoformat(),
-        "observation_bundle": {
-            "schema_id": OBSERVATION_SCHEMA_ID,
-            "manifest_sha256": observation_manifest_sha256,
-            "policy_id": observation_manifest["policy"]["policy_id"],
-            "source_manifests": observation_manifest["source_manifests"],
-        },
-        "candidate_table": {
-            "records_sha256": candidate_records_sha256,
-            "record_count": candidate_record_count,
-        },
-        "candidate_selection_exclusions": build_candidate_selection_exclusion_provenance(candidate_exclusion_entries),
-        "label_contract": {
-            "y_space": Y_SPACE,
-            "value_order": list(VALUE_COLUMNS),
-            "observed_round": observed_round,
-            "batch_id": batch_id,
-            "row_count": label_count,
-        },
-    }
+from .provenance_validation import validate_study_provenance
 
 
 def build_promotion_manifest(
@@ -109,7 +52,7 @@ def build_promotion_manifest(
     label_path: Path,
     provenance_path: Path,
     candidate_path: Path,
-    label_count: int,
+    label_event_count: int,
     candidate_exclusion_entries: list[dict[str, str]],
 ) -> dict[str, object]:
     return {
@@ -130,7 +73,7 @@ def build_promotion_manifest(
         "label_artifact": {
             "path": (relative_dir / LABEL_FILENAME).as_posix(),
             "sha256": file_sha256(label_path),
-            "row_count": label_count,
+            "row_count": label_event_count,
         },
     }
 
@@ -140,16 +83,8 @@ def verify_label_bundle(
     *,
     relative_dir: PurePosixPath,
     expected_width: int,
-    campaign_config_path: Path | None = DEFAULT_CAMPAIGN_CONFIG_PATH,
     candidate_root: Path | None = None,
 ) -> VerifiedObservedLabelSnapshot:
-    config = None if campaign_config_path is None else load_config(campaign_config_path)
-    if config is not None:
-        _require_campaign_dataset(
-            config,
-            dataset_root if candidate_root is None else candidate_root,
-            relative_dir=relative_dir,
-        )
     binding = ObservedLabelPromotionBinding(
         dataset_root=dataset_root,
         manifest_path=(relative_dir / PROMOTION_FILENAME).as_posix(),
@@ -158,8 +93,8 @@ def verify_label_bundle(
         study_id=STUDY_ID,
         y_space=Y_SPACE,
         candidate_path="records.parquet",
-        candidate_id_column="id" if config is None else config.labels.id_column,
-        candidate_x_column=None if config is None else config.data.x_column_name,
+        candidate_id_column="id",
+        candidate_x_column=None,
         candidate_root=candidate_root,
     )
     try:
@@ -170,18 +105,63 @@ def verify_label_bundle(
         )
     except (ObservedLabelVerificationError, OSError, UnicodeError, ValueError) as exc:
         raise ResponseWindowLabelPromotionError(f"published OPAL label contract failed: {exc}") from exc
-    if set(provenance) != _PROVENANCE_FIELDS:
-        raise ResponseWindowLabelPromotionError("published study provenance fields disagree.")
-    if provenance["schema_id"] != PROVENANCE_SCHEMA_ID or provenance["study_id"] != STUDY_ID:
-        raise ResponseWindowLabelPromotionError("published study provenance identity disagrees.")
-    authoritative_exclusions = validate_candidate_selection_exclusion_provenance(
-        provenance["candidate_selection_exclusions"]
+    validate_study_provenance(
+        provenance,
+        bundle_root=dataset_root,
+        candidate_root=dataset_root if candidate_root is None else candidate_root,
+        label_path=snapshot.promotion.label_path,
+        candidate_sha256=snapshot.promotion.candidate_sha256,
+        candidate_row_count=snapshot.promotion.candidate_row_count,
     )
-    if config is not None:
-        require_campaign_candidate_exclusion_parity(
-            config,
-            authoritative_entries=authoritative_exclusions,
-        )
+    return snapshot
+
+
+def verify_campaign_binding(
+    dataset_root: Path,
+    *,
+    relative_dir: PurePosixPath,
+    expected_width: int,
+    campaign_config_path: Path,
+) -> VerifiedObservedLabelSnapshot:
+    """Verify one campaign's explicit projection of a verified study bundle."""
+
+    study_snapshot = verify_label_bundle(
+        dataset_root,
+        relative_dir=relative_dir,
+        expected_width=expected_width,
+    )
+    config = load_config(campaign_config_path)
+    _require_campaign_dataset(config, dataset_root, relative_dir=relative_dir)
+    binding = ObservedLabelPromotionBinding(
+        dataset_root=dataset_root,
+        manifest_path=(relative_dir / PROMOTION_FILENAME).as_posix(),
+        label_path=(relative_dir / LABEL_FILENAME).as_posix(),
+        campaign_slug=CAMPAIGN_SLUG,
+        study_id=STUDY_ID,
+        y_space=Y_SPACE,
+        candidate_path="records.parquet",
+        candidate_id_column=config.labels.id_column,
+        candidate_x_column=config.data.x_column_name,
+    )
+    try:
+        snapshot = verify_observed_label_snapshot(binding, expected_y_width=expected_width)
+    except ObservedLabelVerificationError as exc:
+        raise ResponseWindowLabelPromotionError(f"campaign-bound OPAL label contract failed: {exc}") from exc
+    if snapshot.promotion.manifest_sha256 != study_snapshot.promotion.manifest_sha256:
+        raise ResponseWindowLabelPromotionError("campaign binding resolved a different promotion manifest.")
+    provenance = read_json_object(
+        snapshot.promotion.study_provenance_path,
+        label="response-window label study provenance",
+    )
+    authoritative_exclusions = validate_study_provenance(
+        provenance,
+        bundle_root=dataset_root,
+        candidate_root=dataset_root,
+        label_path=snapshot.promotion.label_path,
+        candidate_sha256=snapshot.promotion.candidate_sha256,
+        candidate_row_count=snapshot.promotion.candidate_row_count,
+    )
+    require_campaign_candidate_exclusion_parity(config, authoritative_entries=authoritative_exclusions)
     return snapshot
 
 
@@ -213,7 +193,7 @@ def publish_new_directory(*, staged_dir: Path, output_dir: Path) -> None:
 
 __all__ = [
     "build_promotion_manifest",
-    "build_study_provenance",
     "publish_new_directory",
+    "verify_campaign_binding",
     "verify_label_bundle",
 ]

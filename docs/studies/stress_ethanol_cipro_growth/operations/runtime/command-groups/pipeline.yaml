@@ -296,9 +296,9 @@ study_pipeline:
       y_space: reader_response_window_vector_v1
       reduction_id: event_logmean_4_8h_post
       label_rows: 27
-      manifest: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v1/promotion.manifest.json
-      manifest_sha256: 0bc4025006126a541854c30cb5f03c36eb20a9616ee08a73b4734bcc482c0659  # pragma: allowlist secret
-      label_artifact_sha256: 4546d3d9f2f4740639c88647ca165e61bb9a5afdddffce7087a218c5ec1f5cca  # pragma: allowlist secret
+      manifest: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v4/promotion.manifest.json
+      manifest_sha256: 12a6ae8c1f3720f9f72dc00bf556787e1a73953058cd8ab8d8030d516f023ef3  # pragma: allowlist secret
+      label_artifact_sha256: 746196094ae181d8bb18336545beac2cce644fa916b193731b66cabd2d742f92  # pragma: allowlist secret
     selection_views:
       ethanol: [0, 1, 0, 1]
       ciprofloxacin: [0, 0, 1, 1]

@@ -83,8 +83,8 @@ labels:
   source:
     kind: usr_sidecar
     dataset: usr_prom_eth_cip_opal_candidates
-    path: "_opal/response_window_labels_v1/observed_labels.parquet"
-    manifest_path: "_opal/response_window_labels_v1/promotion.manifest.json"
+    path: "_opal/response_window_labels_v4/observed_labels.parquet"
+    manifest_path: "_opal/response_window_labels_v4/promotion.manifest.json"
   y_space: reader_response_window_vector_v1
   id_column: id
   round_column: observed_round
