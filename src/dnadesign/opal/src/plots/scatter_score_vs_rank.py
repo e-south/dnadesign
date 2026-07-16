@@ -21,6 +21,7 @@ from ._mpl_utils import (
     annotate_plot_meta,
     apply_notebook_axes_style,
     apply_plot_style,
+    apply_y_axis_scale,
     categorical_style,
     ensure_mpl_config_dir,
     legend_below_single_row,
@@ -34,6 +35,7 @@ from ._mpl_utils import (
 )
 from ._param_utils import (
     event_columns_for,
+    get_bool,
     get_float,
     get_str,
     normalize_metric_field,
@@ -56,7 +58,14 @@ from ._param_utils import (
         params={
             "score_field": "Ledger field for y-axis (default view__selection_score).",
             "rank_mode": "sequential|competition (default sequential).",
+            "rank_scale": "linear|log (default linear). Log scale resolves the top-ranked tail in large pools.",
             "rank_label": "Optional explicit x-axis label, including favorable direction.",
+            "show_selection_view": "Append the active selection-view label to the title (default false).",
+            "legend_location": "below|upper_left (default below).",
+            "y_axis": "Optional mapping with limits, reference_lines, and include_zero_tick.",
+            "y_limits": "Optional explicit two-item y-axis limits; overrides y_axis.limits.",
+            "y_reference_lines": "Optional labeled y-axis reference lines; overrides y_axis.reference_lines.",
+            "include_zero_tick": "Include a zero tick when zero is inside the visible y range.",
             "hue_field": "Optional obj__/pred__/sel__ field for color.",
             "size_by": "Optional obj__/pred__/sel__ field for size.",
             "alpha": "Point alpha (default 0.45).",
@@ -97,7 +106,10 @@ def render(context, params: dict) -> None:
     score_field = normalize_metric_field(score_field) or "view__selection_score"
     score_label = plot_metric_label(params, score_field)
     rank_mode = (get_str(params, ["rank_mode"], "sequential") or "sequential").lower()
+    rank_scale = (get_str(params, ["rank_scale"], "linear") or "linear").lower()
     rank_label = get_str(params, ["rank_label"], None)
+    show_selection_view = get_bool(params, ["show_selection_view"], False)
+    legend_location = (get_str(params, ["legend_location"], "below") or "below").lower()
     # "sequential" | "competition"
     alpha = get_float(params, ["alpha"], 0.45)
     hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
@@ -124,6 +136,10 @@ def render(context, params: dict) -> None:
     rasterize_at_log = int(rasterize_at) if rasterize_at is not None else 0
     show_meta = bool(params.get("show_meta", False))
     manual_layout = False
+    if rank_scale not in {"linear", "log"}:
+        raise ValueError("rank_scale must be 'linear' or 'log'.")
+    if legend_location not in {"below", "upper_left"}:
+        raise ValueError("legend_location must be 'below' or 'upper_left'.")
 
     # Pull from predictions (full schema) and always join setpoint
     need = {
@@ -209,7 +225,7 @@ def render(context, params: dict) -> None:
             linestyle=style["linestyle"],
             linewidth=1.6,
             alpha=min(0.9, alpha + 0.2),
-            label=f"Round {r}",
+            label=f"Prediction pool · round {r}",
             zorder=2,
         )
         color_kw = {}
@@ -244,9 +260,21 @@ def render(context, params: dict) -> None:
                 )
         ax.set_xlabel(_rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label))
         ax.set_ylabel(score_label)
-        ax.set_title(pretty_title(params.get("title", f"{score_label} vs rank, round {r}")))
-        _set_rank_xlim(ax, float(sub[x_field].max()))
-        ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
+        ax.set_title(
+            _score_rank_title(
+                params.get("title", f"{score_label} vs rank, round {r}"),
+                context=context,
+                show_selection_view=show_selection_view,
+            ),
+            loc="left",
+            fontweight="semibold",
+            fontsize=10.5,
+            pad=8,
+            linespacing=1.35,
+        )
+        _set_rank_axis(ax, float(sub[x_field].max()), scale=rank_scale)
+        if rank_scale == "linear":
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
         # On-plot meta + log
         context.logger.info(
             "params score_vs_rank: round=%s rank_mode=%s hue=%s size_by=%s alpha=%.2f rasterize_at=%d points=%d",
@@ -330,9 +358,21 @@ def render(context, params: dict) -> None:
                     )
         ax.set_xlabel(_rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label))
         ax.set_ylabel(score_label)
-        ax.set_title(pretty_title(params.get("title", f"{score_label} vs rank by round")))
-        _set_rank_xlim(ax, float(df[x_field].max()))
-        ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
+        ax.set_title(
+            _score_rank_title(
+                params.get("title", f"{score_label} vs rank by round"),
+                context=context,
+                show_selection_view=show_selection_view,
+            ),
+            loc="left",
+            fontweight="semibold",
+            fontsize=10.5,
+            pad=8,
+            linespacing=1.35,
+        )
+        _set_rank_axis(ax, float(df[x_field].max()), scale=rank_scale)
+        if rank_scale == "linear":
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=6, integer=True))
         if hue_field is None:
             fig.subplots_adjust(left=0.14, right=0.80, bottom=0.16, top=0.86)
             mappable = ScalarMappable(norm=round_norm, cmap=round_colors)
@@ -360,7 +400,39 @@ def render(context, params: dict) -> None:
                 extras={"rank": rank_mode, "rounds": f"{len(rounds)}"},
             )
 
-    if manual_layout:
+    y_axis_raw = params.get("y_axis")
+    if y_axis_raw is not None and not isinstance(y_axis_raw, dict):
+        raise ValueError("y_axis must be a mapping when provided.")
+    y_axis = y_axis_raw or {}
+    y_limits = params.get("y_limits", y_axis.get("limits"))
+    y_reference_lines = params.get("y_reference_lines", y_axis.get("reference_lines"))
+    has_y_reference_lines = y_reference_lines not in (None, "", False, [])
+    apply_y_axis_scale(
+        ax,
+        limits=y_limits,
+        reference_lines=y_reference_lines,
+        include_zero_tick=bool(params.get("include_zero_tick", y_axis.get("include_zero_tick", False))),
+    )
+    if has_y_reference_lines and y_limits in (None, "", False):
+        ax.margins(y=0.03)
+
+    if legend_location == "upper_left":
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(
+                handles,
+                labels,
+                loc="upper left",
+                bbox_to_anchor=(0.0, 0.94 if has_y_reference_lines else 1.0),
+                fontsize=8,
+                ncol=min(2, len(handles)),
+                frameon=False,
+                handletextpad=0.45,
+                columnspacing=0.8,
+            )
+        if not manual_layout:
+            fig.tight_layout(pad=0.35)
+    elif manual_layout:
         pass
     elif not legend_below_single_row(fig, ax):
         fig.tight_layout(pad=0.35)
@@ -379,9 +451,30 @@ def render(context, params: dict) -> None:
         context.save_df(df[keep])
 
 
-def _set_rank_xlim(ax, max_rank: float) -> None:
-    pad = max(1.0, float(max_rank) * 0.01)
-    ax.set_xlim(float(max_rank) + pad, 1.0 - pad)
+def _set_rank_axis(ax, max_rank: float, *, scale: str) -> None:
+    from matplotlib.ticker import FuncFormatter
+
+    maximum = float(max_rank)
+    if not maximum >= 1.0:
+        raise ValueError("Rank axis requires max_rank >= 1.")
+    if scale == "log":
+        ax.set_xscale("log")
+        ax.set_xlim(maximum * 1.08, 0.9)
+    elif scale == "linear":
+        ax.set_xlim(maximum * 1.01, 0.5)
+    else:
+        raise ValueError("rank_scale must be 'linear' or 'log'.")
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _position: f"{int(value):,}" if value >= 1 else ""))
+
+
+def _score_rank_title(value: object, *, context: object, show_selection_view: bool) -> str:
+    title = pretty_title(value)
+    if not show_selection_view:
+        return title
+    selection_view_id = str(getattr(context, "selection_view_id", "") or "").strip()
+    if not selection_view_id:
+        raise ValueError("show_selection_view requires an active selection_view_id.")
+    return f"{title}\nSelection view: {pretty_label(selection_view_id)}"
 
 
 def _rank_axis_label(*, x_field: str, rank_mode: str, rank_label: str | None) -> str:

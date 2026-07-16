@@ -27,17 +27,18 @@ def render_visual_panel_cell() -> str:
             build_notebook_collection_visual_card_rows,
             collection_visual_description, build_notebook_plot_card_rows,
             build_notebook_plot_method_sections, mo, opal_table, pl, plot_scope_ui, plot_ui,
+            plot_view_state,
             build_notebook_selection_batch_rows, build_notebook_selection_batch_summary_rows,
             reader_evidence_visual,
             render_notebook_baserender_record, render_notebook_campaign_set_selection_overlap_image,
             render_notebook_plot_choice_image,
             render_notebook_visual_panel,
             selected_baserender_round, selected_baserender_status_rows, selected_campaign_baserender_contract,
-            selected_campaign_labels_df, selected_display_visual_choice, select_notebook_plot_scope,
+            selected_campaign_labels_df, selected_visual_choice, select_notebook_plot_scope,
         ):
             if (
-                selected_display_visual_choice is not None
-                and selected_display_visual_choice.get("surface_kind") == "reader_evidence"
+                selected_visual_choice is not None
+                and selected_visual_choice.get("surface_kind") == "reader_evidence"
             ):
                 plot_panel = reader_evidence_visual
             else:
@@ -65,6 +66,7 @@ def render_visual_panel_cell() -> str:
                     opal_table=opal_table,
                     pl=pl,
                     plot_scope_ui=plot_scope_ui,
+                    plot_view_state=plot_view_state,
                     plot_ui=plot_ui,
                     render_notebook_baserender_record=render_notebook_baserender_record,
                     render_notebook_campaign_set_selection_overlap_image=render_notebook_campaign_set_selection_overlap_image,
@@ -74,7 +76,7 @@ def render_visual_panel_cell() -> str:
                     selected_baserender_status_rows=selected_baserender_status_rows,
                     selected_campaign_baserender_contract=selected_campaign_baserender_contract,
                     selected_campaign_labels_df=selected_campaign_labels_df,
-                    selected_visual_choice=selected_display_visual_choice,
+                    selected_visual_choice=selected_visual_choice,
                     select_notebook_plot_scope=select_notebook_plot_scope,
                 )
             return plot_panel

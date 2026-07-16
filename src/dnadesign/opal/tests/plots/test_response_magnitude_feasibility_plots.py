@@ -35,9 +35,11 @@ from dnadesign.opal.src.plots.response_magnitude_feasibility_data import (
     ResponseMagnitudeFeasibilityPlotData,
     load_response_magnitude_feasibility_plot_data,
     parse_response_magnitude_feasibility_channels,
+    response_magnitude_feasibility_observed_frame,
     response_magnitude_feasibility_plot_frame,
 )
 from dnadesign.opal.src.registries.plots import describe_plot_kind
+from dnadesign.opal.src.storage.artifacts import run_scoped_artifact_path
 
 
 class _DummyWorkspace:
@@ -81,6 +83,10 @@ def _plot_data() -> ResponseMagnitudeFeasibilityPlotData:
     observed = pd.DataFrame(
         {
             "id": ["observed-a"],
+            "observed_round": [0],
+            "batch_id": ["batch-0"],
+            "batch_key": ["batch-0"],
+            "display_label": ["Observed A"],
             RESPONSE_REF: [0.1],
             ON_MAGNITUDE_REF: [0.3],
             OFF_MAGNITUDE_REF: [-0.2],
@@ -106,22 +112,29 @@ def _plot_data() -> ResponseMagnitudeFeasibilityPlotData:
     )
 
 
-def test_rmf_plot_loads_observations_from_run_pinned_labels(
+def test_rmf_plot_loads_all_observations_from_run_pinned_event_snapshot(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     outputs_dir = tmp_path / "outputs"
-    labels_path = outputs_dir / "rounds" / "round_0" / "labels" / "labels_used.parquet"
+    labels_path = run_scoped_artifact_path(
+        outputs_dir / "rounds" / "round_0",
+        run_id="r0",
+        artifact_key="labels/observed_events.parquet",
+    )
     labels_path.parent.mkdir(parents=True)
     pl.DataFrame(
         {
             "run_id": ["r0"],
             "as_of_round": [0],
             "observed_round": [0],
+            "batch_id": ["pre-round-0"],
+            "display_label": ["Observed A"],
             "id": ["observed-a"],
             "sequence": ["ACGT"],
+            "y_space": ["reader_response_window_vector_v1"],
             "y_obs": [[-1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0]],
-            "src": ["training_snapshot"],
+            "label_source_kind": ["usr_sidecar"],
         }
     ).write_parquet(labels_path)
     calibration = {
@@ -163,7 +176,7 @@ def test_rmf_plot_loads_observations_from_run_pinned_labels(
             ],
             "artifacts": [
                 {
-                    "labels/labels_used.parquet": [
+                    "labels/observed_events.parquet": [
                         file_sha256(labels_path),
                         str(labels_path.resolve()),
                     ]
@@ -208,7 +221,9 @@ def test_rmf_plot_loads_observations_from_run_pinned_labels(
 
     assert data.run_id == "r0"
     assert data.observed_frame["id"].tolist() == ["observed-a"]
-    assert context.data_paths["run_labels_used_parquet"] == labels_path.resolve()
+    assert data.observed_frame["batch_id"].tolist() == ["pre-round-0"]
+    assert data.observed_frame["display_label"].tolist() == ["Observed A"]
+    assert context.data_paths["run_observed_events_parquet"] == labels_path.resolve()
     assert not (outputs_dir / "ledger" / "labels.parquet").exists()
 
 
@@ -225,6 +240,55 @@ def test_channel_parser_fails_on_missing_and_duplicate_channels() -> None:
             [*valid, valid[0]],
             selection_view_id="ethanol",
         )
+
+
+def test_observed_rmf_frame_preserves_repeated_candidate_events_by_batch() -> None:
+    labels = pd.DataFrame(
+        {
+            "id": ["candidate-a", "candidate-a"],
+            "observed_round": [0, 1],
+            "batch_id": ["batch-0", "batch-1"],
+            "display_label": ["Candidate A", "Candidate A"],
+            "y_obs": [
+                [-1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0],
+                [-0.5, 1.5, -0.5, 1.5, -0.5, 1.5, -0.5, 1.5],
+            ],
+        }
+    )
+
+    observed = response_magnitude_feasibility_observed_frame(
+        labels,
+        target_mask=[0, 1, 0, 1],
+        calibration=_plot_data().calibration,
+    )
+
+    assert observed[["id", "observed_round", "batch_id"]].to_dict(orient="records") == [
+        {"id": "candidate-a", "observed_round": 0, "batch_id": "batch-0"},
+        {"id": "candidate-a", "observed_round": 1, "batch_id": "batch-1"},
+    ]
+    assert observed["batch_key"].tolist() == ["batch-0", "batch-1"]
+    assert observed["display_label"].tolist() == ["Candidate A", "Candidate A"]
+
+
+def test_observed_rmf_frame_derives_a_round_batch_key_without_fabricating_source_batch() -> None:
+    labels = pd.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "observed_round": [2],
+            "batch_id": [None],
+            "display_label": [None],
+            "y_obs": [[-1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0]],
+        }
+    )
+
+    observed = response_magnitude_feasibility_observed_frame(
+        labels,
+        target_mask=[0, 1, 0, 1],
+        calibration=_plot_data().calibration,
+    )
+
+    assert pd.isna(observed.loc[0, "batch_id"])
+    assert observed.loc[0, "batch_key"] == "round-2"
 
 
 def test_plot_frame_rejects_persisted_score_math_drift() -> None:
@@ -364,13 +428,17 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     plot_mod.render_frontier(context, params)
     frontier = captured.pop()
     frontier_axis = frontier.axes[0]
-    assert frontier_axis.get_title() == ("Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin")
+    assert frontier._suptitle is None
+    assert frontier_axis.get_title(loc="left") == (
+        "RMF candidate constraint landscape\nTarget ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin"
+    )
     assert frontier_axis.get_xlabel() == "ON-OFF response separation, $d_{response}$\nWindow mean log2(YFP / CFP)"
     assert frontier_axis.get_ylabel() == (
         "Minimum target-ON fluorescence relative to pDual-10\n$f_{on}$, log2(YFP / OD600)"
     )
     assert frontier.axes[-1].get_ylabel() == "Target-OFF clearance, $q_{off}$\n0 = boundary"
-    assert "Measured (n=1)" in frontier_axis.get_legend_handles_labels()[1]
+    assert "Observed · Batch 0 (n=1)" in frontier_axis.get_legend_handles_labels()[1]
+    assert frontier_axis.get_legend().get_bbox_to_anchor()._bbox.y0 < 0.0
     selected_collection = frontier_axis.collections[-1]
     assert selected_collection.get_array() is not None
     assert len(selected_collection.get_array()) == 2
@@ -378,20 +446,59 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     plot_mod.render_constraint_decomposition(context, params)
     decomposition = captured.pop()
     decomposition_axis = decomposition.axes[0]
-    assert "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin" in (decomposition_axis.get_title())
+    assert decomposition._suptitle is None
+    assert decomposition_axis.get_title(loc="left").startswith("Selected-candidate RMF constraints\n")
+    assert "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin" in (
+        decomposition_axis.get_title(loc="left")
+    )
     assert "$S_{\\mathrm{RMF}}=\\min" in decomposition_axis.get_xlabel()
     assert "0 marks each configured boundary" in decomposition_axis.get_xlabel()
     assert "higher is better" not in decomposition_axis.get_xlabel().lower()
     assert [tick.get_text() for tick in decomposition_axis.get_xticklabels()] == [
-        "$q_{\\mathrm{response}}$",
-        "$q_{\\mathrm{on}}$",
-        "$q_{\\mathrm{off}}$",
+        "$q_R$",
+        "$q_{\\mathrm{ON}}$",
+        "$q_{\\mathrm{OFF}}$",
         "$S_{\\mathrm{RMF}}$",
     ]
     assert len(decomposition_axis.patches) == 2
 
     plt.Figure.clear(frontier)
     plt.Figure.clear(decomposition)
+
+
+def test_rmf_frontier_color_extent_includes_observed_values_outside_prediction_range(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = _plot_data()
+    data.observed_frame.loc[:, "off_magnitude_constraint_margin"] = -2.5
+    captured: list[plt.Figure] = []
+    monkeypatch.setattr(plot_mod, "load_response_magnitude_feasibility_plot_data", lambda _context: data)
+    monkeypatch.setattr(plot_mod, "_save", lambda _context, figure: captured.append(figure))
+    monkeypatch.setattr(plt, "close", lambda _figure: None)
+    context = PlotContext(
+        campaign_dir=tmp_path,
+        workspace=_DummyWorkspace(tmp_path / "outputs"),
+        rounds=[0],
+        run_id="r0",
+        selection_view_id="ethanol",
+        data_paths={},
+        output_dir=tmp_path / "plots",
+        filename="review.png",
+        dpi=96,
+        format="png",
+        logger=logging.getLogger("opal.test.rmf-observed-color-extent"),
+        save_data=False,
+    )
+
+    plot_mod.render_frontier(context, {})
+
+    frontier = captured.pop()
+    assert context.artifact_metadata["notebook_view"]["color_extent"] == pytest.approx(2.5)
+    for collection in frontier.axes[0].collections[:3]:
+        assert collection.norm.vmin == pytest.approx(-2.5)
+        assert collection.norm.vmax == pytest.approx(2.5)
+    plt.Figure.clear(frontier)
 
 
 def test_rmf_plot_state_labels_must_match_objective_states() -> None:
@@ -420,17 +527,11 @@ def _write_alias_records(path: Path) -> None:
             ],
             "usr_label__primary": ["SpyP", None, None, None],
             "usr_label__aliases": [None, ["Candidate B"], None, None],
-            "densegen__plan": [
-                None,
-                "ethanol__sig35=b",
-                "ethanol_ciprofloxacin__sig35=e",
-                "unrecognized_plan_slug",
-            ],
         }
     ).write_parquet(path)
 
 
-def test_candidate_display_aliases_prefer_human_labels_and_never_emit_plan_slugs(tmp_path: Path) -> None:
+def test_candidate_display_aliases_use_only_projected_labels_then_short_ids(tmp_path: Path) -> None:
     records_path = tmp_path / "records.parquet"
     _write_alias_records(records_path)
 
@@ -447,17 +548,21 @@ def test_candidate_display_aliases_prefer_human_labels_and_never_emit_plan_slugs
     assert aliases == {
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "SpyP",
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "Candidate B",
-        "cccccccccccccccccccccccccccccccccccccccc": "EtOH + Cipro · σ35e · cccccc",
+        "cccccccccccccccccccccccccccccccccccccccc": "cccccc…ccccc",
         "dddddddddddddddddddddddddddddddddddddddd": "dddddd…ddddd",
     }
-    assert all("__" not in value and "_slug" not in value for value in aliases.values())
+    assert all("__" not in value for value in aliases.values())
 
 
-def test_candidate_display_aliases_reject_missing_contract_columns_and_ids(tmp_path: Path) -> None:
+def test_candidate_display_aliases_treat_alias_columns_as_optional_but_require_ids(tmp_path: Path) -> None:
     missing_columns = tmp_path / "missing-columns.parquet"
     pl.DataFrame({"id": ["candidate-a"]}).write_parquet(missing_columns)
-    with pytest.raises(OpalError, match="missing required alias columns"):
-        resolve_candidate_display_aliases(missing_columns, ["candidate-a"])
+    assert resolve_candidate_display_aliases(missing_columns, ["candidate-a"]) == {"candidate-a": "candidate-a"}
+
+    missing_id = tmp_path / "missing-id.parquet"
+    pl.DataFrame({"usr_label__primary": ["Candidate A"]}).write_parquet(missing_id)
+    with pytest.raises(OpalError, match="candidate ID column 'id'"):
+        resolve_candidate_display_aliases(missing_id, ["candidate-a"])
 
     records_path = tmp_path / "records.parquet"
     _write_alias_records(records_path)
@@ -465,62 +570,7 @@ def test_candidate_display_aliases_reject_missing_contract_columns_and_ids(tmp_p
         resolve_candidate_display_aliases(records_path, ["not-in-records"])
 
 
-def test_annotated_frontier_repels_aliases_and_keeps_them_inside_the_axes(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    data = _plot_data()
-    selected = data.frame["view__is_selected"]
-    data.frame.loc[selected, RESPONSE_REF] = [0.2, 0.201]
-    data.frame.loc[selected, ON_MAGNITUDE_REF] = [0.2, 0.201]
-    records_path = tmp_path / "records.parquet"
-    pl.DataFrame(
-        {
-            "id": ["selected-a", "selected-b"],
-            "usr_label__primary": ["Promoter A", "Promoter B"],
-            "usr_label__aliases": [None, None],
-            "densegen__plan": [None, None],
-        }
-    ).write_parquet(records_path)
-    captured: list[plt.Figure] = []
-    monkeypatch.setattr(plot_mod, "load_response_magnitude_feasibility_plot_data", lambda _context: data)
-    monkeypatch.setattr(plot_mod, "_save", lambda _context, figure: captured.append(figure))
-    monkeypatch.setattr(plt, "close", lambda _figure: None)
-    context = PlotContext(
-        campaign_dir=tmp_path,
-        workspace=_DummyWorkspace(tmp_path / "outputs"),
-        rounds=[0],
-        run_id="r0",
-        selection_view_id="ethanol",
-        data_paths={"records": records_path},
-        output_dir=tmp_path / "plots",
-        filename="review.png",
-        dpi=96,
-        format="png",
-        logger=logging.getLogger("opal.test.rmf-plot-alias-layout"),
-        save_data=False,
-    )
-
-    plot_mod.render_frontier(context, {"annotate_selected_aliases": True})
-
-    figure = captured.pop()
-    axis = figure.axes[0]
-    figure.canvas.draw()
-    annotations = [text for text in axis.texts if text.get_text() in {"Promoter A", "Promoter B"}]
-    assert len(annotations) == 2
-    renderer = figure.canvas.get_renderer()
-    axes_box = axis.get_window_extent(renderer=renderer)
-    annotation_boxes = [annotation.get_bbox_patch().get_window_extent(renderer=renderer) for annotation in annotations]
-    assert all(annotation.get_clip_on() for annotation in annotations)
-    assert all(
-        axes_box.x0 <= box.x0 <= box.x1 <= axes_box.x1 and axes_box.y0 <= box.y0 <= box.y1 <= axes_box.y1
-        for box in annotation_boxes
-    )
-    assert not annotation_boxes[0].overlaps(annotation_boxes[1])
-    plt.Figure.clear(figure)
-
-
-def test_unannotated_frontier_does_not_require_candidate_records(
+def test_static_frontier_does_not_require_candidate_records(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -543,14 +593,14 @@ def test_unannotated_frontier_does_not_require_candidate_records(
         save_data=False,
     )
 
-    plot_mod.render_frontier(context, {"annotate_selected_aliases": False})
+    plot_mod.render_frontier(context, {})
 
     figure = captured.pop()
     assert not figure.axes[0].texts
     plt.Figure.clear(figure)
 
 
-def test_secg_rmf_plot_config_declares_paired_alias_variants_and_symbolic_labels() -> None:
+def test_secg_rmf_plot_config_uses_one_interactive_frontier_and_rank_diagnostic() -> None:
     config_path = Path(__file__).parents[2] / "campaigns" / "secg_rmf_greedy" / "configs" / "plots.yaml"
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     presets = payload.get("plot_presets", {})
@@ -561,29 +611,15 @@ def test_secg_rmf_plot_config_declares_paired_alias_variants_and_symbolic_labels
         == "response_magnitude_feasibility_frontier"
     ]
 
-    assert [entry["name"] for entry in frontiers] == [
-        "rmf_candidate_frontier",
-        "rmf_candidate_frontier_with_aliases",
-    ]
+    assert [entry["name"] for entry in frontiers] == ["rmf_candidate_frontier"]
+    assert all("round_variants" not in entry for entry in payload["plots"])
     merged_params = [
         {**presets.get(entry.get("preset"), {}).get("params", {}), **entry.get("params", {})} for entry in frontiers
     ]
-    assert {params["surface_label"] for params in merged_params} == {"RMF candidate frontier"}
-    assert {
-        (
-            params["notebook_toggle"]["id"],
-            params["notebook_toggle"]["label"],
-            params["notebook_toggle"]["value"],
-        )
-        for params in merged_params
-    } == {
-        ("candidate_aliases", "Show candidate aliases", False),
-        ("candidate_aliases", "Show candidate aliases", True),
-    }
-    assert [params["annotate_selected_aliases"] for params in merged_params] == [False, True]
-    assert all(r"$d_{\mathrm{response}}$" in params["response_label"] for params in merged_params)
-    assert all(r"$f_{\mathrm{on}}$" in params["magnitude_label"] for params in merged_params)
-    assert all(r"$q_{\mathrm{off}}$" in params["off_constraint_label"] for params in merged_params)
+    assert merged_params[0]["surface_label"] == "RMF candidate frontier"
+    assert r"$d_R$" in merged_params[0]["response_label"]
+    assert r"$f_{\mathrm{ON}}$" in merged_params[0]["magnitude_label"]
+    assert r"$q_{\mathrm{OFF}}$" in merged_params[0]["off_constraint_label"]
 
     decomposition = next(
         entry
@@ -591,3 +627,16 @@ def test_secg_rmf_plot_config_declares_paired_alias_variants_and_symbolic_labels
         if entry.get("kind") == "response_magnitude_feasibility_constraint_decomposition"
     )
     assert decomposition["params"]["candidate_label_mode"] == "alias"
+    assert decomposition["params"]["caption"] == (
+        "Rows use active-view competition ranks after unique-batch allocation; "
+        "skipped ranks were assigned to another view."
+    )
+
+    rank = next(entry for entry in payload["plots"] if entry.get("name") == "rmf_score_vs_rank")
+    assert rank["kind"] == "scatter_score_vs_rank"
+    assert rank["params"]["score_field"] == "view__selection_score"
+    assert r"$S_{\mathrm{RMF}}$" in rank["params"]["score_label"]
+    assert rank["params"]["rank_scale"] == "log"
+    assert rank["params"]["show_selection_view"] is True
+    assert rank["params"]["legend_location"] == "upper_left"
+    assert rank["params"]["y_axis"]["reference_lines"] == [{"value": 0.0, "label": "Feasibility boundary"}]

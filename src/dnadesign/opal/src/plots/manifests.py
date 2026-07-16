@@ -17,7 +17,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from ..core.utils import OpalError, now_iso, read_json, write_json
+from ..core.utils import ExitCodes, OpalError, file_sha256, now_iso, read_json, write_json
 from ..registries.plots import describe_plot_kind
 
 PLOT_ARTIFACT_SCHEMA_VERSION = "opal.plot_artifact.v1"
@@ -56,6 +56,55 @@ def load_plot_manifest_index(path: str | Path) -> dict[str, Any]:
     return payload
 
 
+def verified_plot_tidy_csv(manifest: Mapping[str, Any], *, plot_root: str | Path) -> Path:
+    """Resolve one manifest-declared tidy table and verify its generation-time digest."""
+
+    tidy_outputs = [
+        entry
+        for entry in manifest.get("outputs") or []
+        if isinstance(entry, Mapping) and entry.get("role") == "tidy_csv"
+    ]
+    if len(tidy_outputs) != 1:
+        raise OpalError(
+            f"Plot manifest must declare exactly one tidy_csv output; found {len(tidy_outputs)}.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    declared_text = str(manifest.get("tidy_csv") or "").strip()
+    output_text = str(tidy_outputs[0].get("path") or "").strip()
+    if not declared_text or not output_text:
+        raise OpalError("Plot manifest has an empty tidy_csv path.", ExitCodes.CONTRACT_VIOLATION)
+    declared_path = Path(declared_text).expanduser().resolve()
+    output_path = Path(output_text).expanduser().resolve()
+    if declared_path != output_path:
+        raise OpalError(
+            "Plot manifest tidy_csv does not match its declared tidy output.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    root = Path(plot_root).expanduser().resolve()
+    try:
+        declared_path.relative_to(root)
+    except ValueError as exc:
+        raise OpalError(
+            f"Plot tidy CSV is outside the campaign plot root: {declared_path}",
+            ExitCodes.CONTRACT_VIOLATION,
+        ) from exc
+    expected_sha256 = str(tidy_outputs[0].get("sha256") or "").strip().lower()
+    if len(expected_sha256) != 64 or any(character not in "0123456789abcdef" for character in expected_sha256):
+        raise OpalError(
+            "Plot manifest tidy output has no valid SHA-256 digest.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    if not declared_path.is_file():
+        raise OpalError(f"Plot tidy CSV is missing: {declared_path}", ExitCodes.CONTRACT_VIOLATION)
+    actual_sha256 = file_sha256(declared_path)
+    if actual_sha256 != expected_sha256:
+        raise OpalError(
+            f"Plot tidy CSV SHA-256 does not match its manifest (expected={expected_sha256}, actual={actual_sha256}).",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    return declared_path
+
+
 def build_plot_manifest(
     *,
     name: str,
@@ -76,7 +125,7 @@ def build_plot_manifest(
     for data_path in getattr(context, "saved_data_paths", []):
         data_file = Path(data_path)
         if data_file.exists():
-            outputs.append(_file_entry(data_file, role="tidy_csv"))
+            outputs.append(_file_entry(data_file, role="tidy_csv", bind_digest=True))
     tidy_csv = next((entry["path"] for entry in outputs if entry.get("role") == "tidy_csv"), None)
     warnings: list[dict[str, Any]] = []
     quality = _quality_entry(tidy_csv=tidy_csv, tidy_schema=meta.get("tidy_schema") or [])
@@ -128,6 +177,7 @@ def build_plot_manifest(
         "selection_view_id": getattr(context, "selection_view_id", None),
         "rounds": _jsonable(getattr(context, "rounds", "unspecified")),
         "params": _jsonable(dict(params)),
+        "artifact_metadata": _jsonable(dict(getattr(context, "artifact_metadata", {}))),
         "inputs": freshness["inputs"],
         "outputs": outputs,
         "tidy_csv": tidy_csv,
@@ -162,7 +212,7 @@ def refresh_plot_manifest_freshness(manifest: Mapping[str, Any]) -> dict[str, An
         if isinstance(entry, Mapping) and entry.get("path")
     ]
     outputs = [
-        _file_entry(entry["path"], role=str(entry.get("role") or "output"))
+        _refreshed_file_entry(entry, default_role="output")
         for entry in manifest.get("outputs") or []
         if isinstance(entry, Mapping) and entry.get("path")
     ]
@@ -186,7 +236,7 @@ def write_plot_manifest_index(output_dir: Path, manifests: Iterable[Mapping[str,
     return path
 
 
-def _file_entry(path: str | Path, *, role: str) -> dict[str, Any]:
+def _file_entry(path: str | Path, *, role: str, bind_digest: bool = False) -> dict[str, Any]:
     file_path = Path(path)
     entry: dict[str, Any] = {
         "role": str(role),
@@ -201,7 +251,16 @@ def _file_entry(path: str | Path, *, role: str) -> dict[str, Any]:
                 "mtime_ns": int(stat.st_mtime_ns),
             }
         )
+        if bind_digest:
+            entry["sha256"] = file_sha256(file_path)
     return entry
+
+
+def _refreshed_file_entry(entry: Mapping[str, Any], *, default_role: str) -> dict[str, Any]:
+    refreshed = _file_entry(entry["path"], role=str(entry.get("role") or default_role))
+    if entry.get("sha256") is not None:
+        refreshed["sha256"] = str(entry["sha256"])
+    return refreshed
 
 
 def _error_entry(error: BaseException) -> dict[str, Any]:

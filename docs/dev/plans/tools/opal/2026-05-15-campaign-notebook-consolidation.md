@@ -88,13 +88,12 @@ The study route should include:
 - [ ] Dogfood generated notebooks against a demo campaign with plots present.
 - [ ] Add adversarial CLI tests for missing plots and plot-output metadata
   where coverage is still thin.
-- [ ] Decide whether the checked-in `campaign_progress.py` remains a fixture or
-  is replaced by generator-backed tests only.
+- [x] Replaced the checked-in `campaign_progress.py` fixture with generator-backed
+  tests so single-campaign and collection notebooks share one UI contract.
 
 ### Validation Checklist
 
 ```bash
-uv run marimo check src/dnadesign/opal/notebooks/campaign_progress.py
 DNADESIGN_HEADLESS=1 uv run pytest -q \
   src/dnadesign/opal/tests/notebooks \
   src/dnadesign/opal/tests/analysis \

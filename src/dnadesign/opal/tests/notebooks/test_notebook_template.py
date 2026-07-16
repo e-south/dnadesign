@@ -44,7 +44,6 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_collection_set_choices,
     build_notebook_collection_visual_choices,
     build_notebook_collection_visual_description,
-    build_notebook_display_variant_toggle,
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
     build_notebook_no_plot_scope_rows,
@@ -72,7 +71,6 @@ from dnadesign.opal.src.analysis.notebook_components import (
     render_visual_surface_cells,
     resolve_notebook_selection_view,
     select_notebook_baserender_default_record_id,
-    select_notebook_display_variant,
     select_notebook_plot_scope,
 )
 from dnadesign.opal.src.analysis.notebook_components.plot_text import plot_alt_text
@@ -100,6 +98,8 @@ def test_notebook_template_data_source_options() -> None:
 
 def test_notebook_template_uses_medium_width() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    assert text.startswith("import marimo\n\n__generated_with = ")
+    assert "\n# fmt: off\n# ruff: noqa\n" in text[:160]
     assert 'marimo.App(width="medium")' in text
     assert 'marimo.App(width="full")' not in text
 
@@ -116,7 +116,8 @@ def test_notebook_template_uses_one_compact_title_and_disclosed_campaign_context
     assert '"Campaign context": mo.md("\\n".join(_header_lines[2:]))' in text
     assert "selected_campaign_context_panel = mo.accordion(" in text
     assert "multiple=" not in context_cell
-    assert "_items = [selected_campaign_title_md]" in text
+    assert "selected_collection_set_title_md" in text
+    assert "else selected_campaign_title_md" in text
 
 
 def test_notebook_campaign_summary_exposes_rmf_target_partition() -> None:
@@ -156,7 +157,9 @@ def test_notebook_template_removes_extra_tables() -> None:
 
 def test_notebook_template_has_visual_surface() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
-    assert 'label="View"' in text
+    assert "campaign_ui = None if len(campaigns) == 1 else mo.ui.dropdown(" in text
+    assert "collection_set_choices = [] if len(campaigns) == 1 else" in text
+    assert 'label="Review scope"' in text
     assert "view_mode_ui = None" in text
     assert 'label="Review section"' in text
     assert 'label="Deliverable"' in text
@@ -194,7 +197,7 @@ def test_notebook_selection_view_controls_resolve_exact_ids() -> None:
 def test_notebook_template_has_opal_schema_sentinel() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v5"' in text
+    assert '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v6"' in text
 
 
 def test_notebook_template_does_not_read_widget_values_in_definition_cells() -> None:
@@ -204,15 +207,11 @@ def test_notebook_template_does_not_read_widget_values_in_definition_cells() -> 
             assert ".value" not in cell
 
 
-def test_notebook_template_exposes_memory_backed_alias_switch_in_control_row() -> None:
+def test_notebook_template_uses_direct_visual_choice_and_layered_controls() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
-    assert "display_variant_memory, set_display_variant_memory = mo.state({})" in text
-    assert "display_variant_ui = mo.ui.switch(" in text
-    assert 'label=_toggle["label"]' in text
-    assert "on_change=_remember_variant" in text
-    assert "display_variant_ui=display_variant_ui" in text
-    assert "selected_display_visual_choice" in text
+    assert "selected_visual_choice" in text
+    assert "layered_scatter_controls" in text
 
 
 def test_notebook_template_uses_visual_surface_component() -> None:
@@ -248,7 +247,6 @@ def test_notebook_template_centralizes_visual_control_surface() -> None:
     assert "review_control_surface = render_notebook_review_control_surface(" in text
     assert "if review_control_surface is not None:" in text
     assert "visual_group_ui=visual_group_ui" in text
-    assert "display_variant_ui=display_variant_ui" in text
     assert 'label="Review section"' in text
     assert "_review_control_rows = []" not in text
     assert "_primary_control_items" not in text
@@ -275,7 +273,6 @@ def test_notebook_review_control_surface_groups_plot_controls_by_semantics() -> 
         visual_group_ui="section",
         plot_ui="plot",
         plot_scope_ui="plot-scope",
-        display_variant_ui="display-variant",
         reader_evidence_artifact_ui="reader-artifact",
         reader_evidence_time_ui="reader-time",
         selected_visual_choice={"surface_kind": "plot"},
@@ -291,7 +288,6 @@ def test_notebook_review_control_surface_groups_plot_controls_by_semantics() -> 
             "section",
             "plot",
             "plot-scope",
-            "display-variant",
         ],
     }
 
@@ -314,66 +310,6 @@ def test_notebook_review_control_surface_groups_reader_controls_with_deliverable
         "kind": "hstack",
         "items": ["campaign", "view", "section", "deliverable", "reader-artifact", "reader-time"],
     }
-
-
-def test_notebook_display_variant_contract_selects_false_default_and_true_variant() -> None:
-    base = {
-        "label": "RMF frontier",
-        "kind": "response_magnitude_feasibility_frontier",
-        "selection_view_id": "ethanol",
-        "rounds": [0],
-        "run_id": "run-0",
-        "path": "frontier.png",
-        "notebook_toggle": {
-            "id": "candidate_aliases",
-            "label": "Show candidate aliases",
-            "value": False,
-        },
-    }
-    annotated = {
-        **base,
-        "path": "frontier_annotated.png",
-        "notebook_toggle": {**base["notebook_toggle"], "value": True},
-    }
-    choice = {**base, "display_variants": [annotated, base]}
-
-    assert build_notebook_display_variant_toggle(base) is None
-    assert select_notebook_display_variant(base, enabled=None) == base
-    assert build_notebook_display_variant_toggle(choice) == {
-        "id": "candidate_aliases",
-        "label": "Show candidate aliases",
-        "default": False,
-    }
-    assert select_notebook_display_variant(choice, enabled=None)["path"] == "frontier.png"
-    assert select_notebook_display_variant(choice, enabled=False)["path"] == "frontier.png"
-    assert select_notebook_display_variant(choice, enabled=True)["path"] == "frontier_annotated.png"
-
-
-def test_notebook_display_variant_contract_rejects_malformed_pairs() -> None:
-    base = {
-        "kind": "response_magnitude_feasibility_frontier",
-        "selection_view_id": "ethanol",
-        "rounds": [0],
-        "run_id": "run-0",
-        "notebook_toggle": {"id": "candidate_aliases", "label": "Show aliases", "value": False},
-    }
-    with pytest.raises(ValueError, match="exactly two"):
-        build_notebook_display_variant_toggle({"display_variants": []})
-    with pytest.raises(ValueError, match="exactly two"):
-        build_notebook_display_variant_toggle({"display_variants": [base]})
-    with pytest.raises(ValueError, match="matching plot kind, selection view, and scope"):
-        build_notebook_display_variant_toggle(
-            {
-                "display_variants": [
-                    base,
-                    {
-                        **base,
-                        "rounds": [1],
-                        "notebook_toggle": {**base["notebook_toggle"], "value": True},
-                    },
-                ]
-            }
-        )
 
 
 def test_notebook_review_control_surface_rejects_unknown_view_mode() -> None:
@@ -898,11 +834,15 @@ def test_campaign_set_template_keeps_view_and_set_selectors_at_top() -> None:
         collection_visual_index_path=Path("collection_visuals/collection_visual_manifest.json"),
     )
 
-    assert 'label="View"' in text
+    assert 'label="Review scope"' in text
     assert "view_mode_ui = mo.ui.dropdown(" in text
+    assert '"Cross-campaign comparison": "Campaign set"' in text
     assert 'value="Campaign"' in text
     assert 'active_view_mode = str(view_mode_ui.value) if view_mode_ui is not None else "Campaign"' in text
-    assert 'label="Campaign set"' in text
+    assert 'label="Comparison group"' in text
+    assert 'selected_collection_set_title_md = mo.md(f"# {_title}")' in text
+    assert 'if active_view_mode == "Campaign set"' in text
+    assert "else selected_campaign_title_md" in text
     assert 'label="Campaign"' in text
     assert 'label="Review section"' in text
     assert 'label="Deliverable"' in text
@@ -1265,40 +1205,6 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert labeled_surface["choices"][0]["label"] == "Specific objective expression"
     assert labeled_surface["choices"][0]["title"] == "Short plot title"
 
-    variant_manifests = []
-    for _name, _value, _path in (
-        ("rmf_frontier", False, "plots/rmf_frontier.png"),
-        ("rmf_frontier_aliases", True, "plots/rmf_frontier_aliases.png"),
-    ):
-        variant_manifests.append(
-            {
-                **view_model["plot_manifests"][0],
-                "name": _name,
-                "kind": "response_magnitude_feasibility_frontier",
-                "selection_view_id": "ethanol",
-                "params": {
-                    "surface_label": "RMF frontier",
-                    "notebook_toggle": {
-                        "id": "candidate_aliases",
-                        "label": "Show candidate aliases",
-                        "value": _value,
-                    },
-                },
-                "outputs": [{"role": "media", "path": _path, "exists": True}],
-            }
-        )
-    variant_surface = build_notebook_visual_surface_model(
-        {**view_model, "plot_manifests": variant_manifests},
-        selection_view_id="ethanol",
-        plot_entries=[
-            {"name": "rmf_frontier", "kind": "response_magnitude_feasibility_frontier"},
-            {"name": "rmf_frontier_aliases", "kind": "response_magnitude_feasibility_frontier"},
-        ],
-    )
-    assert [choice["label"] for choice in variant_surface["choices"]] == ["RMF frontier"]
-    assert len(variant_surface["choices"][0]["display_variants"]) == 2
-    assert variant_surface["choices"][0]["path_label"] == "plots/rmf_frontier.png"
-
     scope_view_model = {
         **view_model,
         "plot_manifests": [
@@ -1627,7 +1533,6 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert 'label="Deliverable"' in text
     assert "visual_group_label_memory, set_visual_group_label_memory = mo.state(None)" in text
     assert "visual_label_memory, set_visual_label_memory = mo.state(None)" in text
-    assert "display_variant_memory, set_display_variant_memory = mo.state({})" in text
     assert "plot_scope_label_memory, set_plot_scope_label_memory = mo.state({})" in text
     assert "on_change=set_visual_group_label_memory" in text
     assert "_preferred = visual_label_memory()" in text
@@ -1668,7 +1573,7 @@ def test_campaign_review_notebook_schema_matches_single_or_set_surface() -> None
         round_selector="latest",
     )
 
-    schema_line = '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v5"'
+    schema_line = '__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v6"'
     assert schema_line in single
     assert schema_line in campaign_set
     assert "opal.generated_campaign_notebook" not in single
@@ -1744,7 +1649,7 @@ def test_notebook_templates_stay_bounded_wiring_surfaces() -> None:
     assert "return mo.vstack(_items)" not in campaign_set
     assert "mo.vstack(_items)\n    return" not in campaign_set
     assert len(single.splitlines()) <= 1050
-    assert len(campaign_set.splitlines()) <= 980
+    assert len(campaign_set.splitlines()) <= 1_000
 
 
 def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surface() -> None:

@@ -43,6 +43,7 @@ class PlotMeta:
     round_scope: str = "single_or_round_history"
     label_requirement: str = "none"
     requires_model_artifact: bool = False
+    notebook_view: Dict[str, object] = field(default_factory=dict)
 
 
 def _dbg(msg: str) -> None:
@@ -154,6 +155,7 @@ def describe_plot_kind(name: str) -> Dict[str, object]:
             "data_shape": None,
             "tidy_schema": [],
             "failure_modes": [],
+            "notebook_view": {},
             "capability": _capability_entry(
                 objective_family="unknown",
                 data_layer="unspecified",
@@ -178,6 +180,7 @@ def describe_plot_kind(name: str) -> Dict[str, object]:
         "data_shape": meta.data_shape,
         "tidy_schema": list(meta.tidy_schema),
         "failure_modes": list(meta.failure_modes),
+        "notebook_view": dict(meta.notebook_view),
         "capability": _capability_entry(
             objective_family=meta.objective_family,
             data_layer=meta.data_layer,

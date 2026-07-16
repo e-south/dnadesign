@@ -56,7 +56,7 @@ def test_campaign_set_notebook_view_model_collects_campaigns(tmp_path: Path) -> 
     assert payload["campaigns"][0]["campaign"]["config_path"] == str(config_paths[0])
 
 
-def test_campaign_set_notebook_view_model_accepts_one_campaign(tmp_path: Path) -> None:
+def test_campaign_set_notebook_view_model_accepts_one_campaign(tmp_path: Path, monkeypatch) -> None:
     workdir = tmp_path / "campaign_a"
     workdir.mkdir(parents=True, exist_ok=True)
     records_path = workdir / "records.parquet"
@@ -69,10 +69,87 @@ def test_campaign_set_notebook_view_model_accepts_one_campaign(tmp_path: Path) -
         slug="campaign_a",
     )
 
+    monkeypatch.setattr(
+        notebook_set_mod,
+        "build_notebook_campaign_set_selection_overlap_choice",
+        lambda *_args, **_kwargs: {"visual_id": "must-not-be-built"},
+    )
+
     payload = build_campaign_set_notebook_view_model([config_path], round_selector="latest")
 
     assert payload["campaign_count"] == 1
     assert payload["campaigns"][0]["campaign"]["slug"] == "campaign_a"
+    assert payload["collection_visuals"] == []
+
+
+def test_campaign_set_notebook_view_model_rejects_collection_inputs_for_one_campaign(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign_a"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = workdir / "records.parquet"
+    write_records(records_path, slug="campaign_a")
+    config_path = workdir / "campaign.yaml"
+    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug="campaign_a")
+
+    with pytest.raises(OpalError, match="at least two distinct campaign configs"):
+        build_campaign_set_notebook_view_model(
+            [config_path],
+            collection_manifest_path=tmp_path / "collection.yaml",
+        )
+
+
+def test_campaign_set_notebook_view_model_does_not_treat_selection_views_as_campaigns(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_paths = []
+    for slug in ["campaign_a", "campaign_b"]:
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records_path = workdir / "records.parquet"
+        write_records(records_path, slug=slug)
+        config_path = workdir / "campaign.yaml"
+        write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug=slug)
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        config["selection_views"] = [
+            {**config["selection_views"][0], "id": view_id} for view_id in ["ethanol", "ciprofloxacin", "and"]
+        ]
+        config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        config_paths.append(config_path)
+
+    monkeypatch.setattr(
+        notebook_set_mod,
+        "build_notebook_campaign_set_selection_overlap_choice",
+        lambda *_args, **_kwargs: {"visual_id": "must-not-be-built"},
+    )
+
+    payload = build_campaign_set_notebook_view_model(config_paths, round_selector="latest")
+
+    assert payload["campaign_count"] == 2
+    assert payload["collection_visuals"] == []
+
+
+def test_campaign_set_notebook_view_model_retains_overlap_for_distinct_single_view_campaigns(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_paths = []
+    for slug in ["campaign_a", "campaign_b"]:
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records_path = workdir / "records.parquet"
+        write_records(records_path, slug=slug)
+        config_path = workdir / "campaign.yaml"
+        write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug=slug)
+        config_paths.append(config_path)
+
+    overlap = {"visual_id": "pooled_selection_overlap"}
+    monkeypatch.setattr(
+        notebook_set_mod,
+        "build_notebook_campaign_set_selection_overlap_choice",
+        lambda *_args, **_kwargs: overlap,
+    )
+
+    payload = build_campaign_set_notebook_view_model(config_paths, round_selector="latest")
+
+    assert payload["collection_visuals"] == [overlap]
 
 
 def test_campaign_set_notebook_view_model_loads_collection_relationships(tmp_path: Path) -> None:
@@ -377,12 +454,15 @@ def test_campaign_collection_manifest_fails_when_relationship_matches_no_pairs(t
 
 
 def test_campaign_collection_manifest_rejects_v1_schema(tmp_path: Path) -> None:
-    workdir = tmp_path / "campaign_a"
-    workdir.mkdir(parents=True, exist_ok=True)
-    records_path = workdir / "records.parquet"
-    write_records(records_path, slug="campaign_a")
-    config_path = workdir / "campaign.yaml"
-    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug="campaign_a")
+    config_paths = []
+    for slug in ["campaign_a", "campaign_b"]:
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records_path = workdir / "records.parquet"
+        write_records(records_path, slug=slug)
+        config_path = workdir / "campaign.yaml"
+        write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug=slug)
+        config_paths.append(config_path)
     collection_path = tmp_path / "campaign_collection.yaml"
     collection_path.write_text(
         yaml.safe_dump(
@@ -398,7 +478,7 @@ def test_campaign_collection_manifest_rejects_v1_schema(tmp_path: Path) -> None:
 
     with pytest.raises(OpalError, match="Unsupported campaign collection schema_version"):
         build_campaign_set_notebook_view_model(
-            [config_path],
+            config_paths,
             round_selector="latest",
             collection_manifest_path=collection_path,
         )
@@ -1106,12 +1186,15 @@ def test_collection_visual_manifest_index_validates_loaded_study_surfaces(tmp_pa
 
 
 def test_campaign_set_notebook_view_model_resolves_collection_visual_paths(tmp_path: Path) -> None:
-    workdir = tmp_path / "campaign_a"
-    workdir.mkdir(parents=True, exist_ok=True)
-    records_path = workdir / "records.parquet"
-    write_records(records_path, slug="campaign_a")
-    config_path = workdir / "campaign.yaml"
-    write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug="campaign_a")
+    config_paths = []
+    for slug in ["campaign_a", "campaign_b"]:
+        workdir = tmp_path / slug
+        workdir.mkdir(parents=True, exist_ok=True)
+        records_path = workdir / "records.parquet"
+        write_records(records_path, slug=slug)
+        config_path = workdir / "campaign.yaml"
+        write_campaign_yaml(config_path, workdir=workdir, records_path=records_path, slug=slug)
+        config_paths.append(config_path)
     collection_path = tmp_path / "campaign_collection.yaml"
     collection_path.write_text(
         yaml.safe_dump(
@@ -1137,7 +1220,7 @@ def test_campaign_set_notebook_view_model_resolves_collection_visual_paths(tmp_p
     )
 
     payload = build_campaign_set_notebook_view_model(
-        [config_path],
+        config_paths,
         collection_manifest_path=collection_path,
         collection_visual_index_path=index_path,
     )

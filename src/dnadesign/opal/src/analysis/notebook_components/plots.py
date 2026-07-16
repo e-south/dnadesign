@@ -23,7 +23,10 @@ from ._support import (
     plot_entries_from_manifests,
     sequence,
 )
-from .display_variants import group_notebook_display_variant_choices
+from .layered_scatter import (
+    build_notebook_layered_scatter_contract,
+    render_notebook_layered_scatter_image,
+)
 from .plot_scopes import (
     dedupe_scope_labels,
     plot_choice_from_manifest,
@@ -170,7 +173,6 @@ def build_notebook_visual_surface_model(
                 "tidy_available": artifact_path.endswith(".csv"),
             }
         )
-    choices = group_notebook_display_variant_choices(choices)
     return {
         "plots_dir": plots_dir,
         "choices": choices,
@@ -206,8 +208,16 @@ def build_notebook_plot_inventory_rows(visual_surface_model: Mapping[str, Any]) 
     return rows
 
 
-def render_notebook_plot_choice_image(plot_choice: Mapping[str, Any], *, mo: Any) -> Any:
+def render_notebook_plot_choice_image(
+    plot_choice: Mapping[str, Any],
+    *,
+    mo: Any,
+    view_state: Mapping[str, Any] | None = None,
+) -> Any:
     """Render one plot-choice media artifact at notebook-column width."""
+
+    if build_notebook_layered_scatter_contract(plot_choice) is not None:
+        return render_notebook_layered_scatter_image(plot_choice, state=view_state, mo=mo)
 
     path = Path(str(plot_choice.get("path") or ""))
     path_label = str(plot_choice.get("path_label") or plot_choice.get("path") or "not generated")

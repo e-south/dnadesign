@@ -36,6 +36,7 @@ COLORBLIND_PALETTE: tuple[str, ...] = (
     "#000000",  # black
 )
 CATEGORY_MARKERS: tuple[str, ...] = ("o", "s", "^", "D", "P", "X", "v", "*")
+OBSERVED_BATCH_MARKERS: tuple[str, ...] = ("o", "s", "^", "v", "<", ">", "P", "X", "h", "p", "8", "*")
 CATEGORY_LINESTYLES: tuple[str, ...] = ("-", "--", "-.", ":")
 DEFAULT_SQUARE_FIGSIZE: tuple[float, float] = (7.2, 7.2)
 DEFAULT_LANDSCAPE_FIGSIZE: tuple[float, float] = (11.0, 3.8)
@@ -258,6 +259,44 @@ def categorical_style(index: int) -> dict[str, str]:
     }
 
 
+def observed_batch_marker_map(
+    batch_ids: list[str] | tuple[str, ...],
+    *,
+    universe_batch_ids: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, str]:
+    """Assign stable, non-repeating markers to a bounded observed-batch set."""
+
+    canonical = [str(value).strip() for value in batch_ids]
+    if any(not value for value in canonical):
+        raise ValueError("Observed batch IDs must be non-empty strings.")
+    if len(canonical) != len(set(canonical)):
+        raise ValueError("Observed batch IDs must be unique before marker assignment.")
+    universe = canonical if universe_batch_ids is None else [str(value).strip() for value in universe_batch_ids]
+    if any(not value for value in universe) or len(universe) != len(set(universe)):
+        raise ValueError("The observed-batch marker universe must contain unique non-empty IDs.")
+    if universe_batch_ids is not None and len(universe) > len(OBSERVED_BATCH_MARKERS):
+        raise ValueError(
+            f"The observed-batch marker universe contains {len(universe)} batches; "
+            f"at most {len(OBSERVED_BATCH_MARKERS)} are supported."
+        )
+    if unknown := sorted(set(canonical) - set(universe)):
+        raise ValueError(f"Observed batches are absent from the marker universe: {unknown[:5]}.")
+    if len(canonical) > len(OBSERVED_BATCH_MARKERS):
+        raise ValueError(
+            f"Cannot distinguish {len(canonical)} observed batches in one scatter; "
+            f"filter to at most {len(OBSERVED_BATCH_MARKERS)} batches."
+        )
+    universe_positions = {value: index for index, value in enumerate(universe)}
+    assignments: dict[str, str] = {}
+    unused = list(OBSERVED_BATCH_MARKERS)
+    for batch_id in canonical:
+        preferred = OBSERVED_BATCH_MARKERS[universe_positions[batch_id] % len(OBSERVED_BATCH_MARKERS)]
+        marker = preferred if preferred in unused else unused[0]
+        assignments[batch_id] = marker
+        unused.remove(marker)
+    return assignments
+
+
 def categorical_colormap(name: str | None = None, *, n: int | None = None):
     """Return a categorical colormap, defaulting to the OPAL colorblind palette."""
 
@@ -352,6 +391,21 @@ def pretty_label(value: object, *, raw: bool = False) -> str:
     if raw and token and token != pretty:
         return f"{pretty} ({token})"
     return pretty
+
+
+def pretty_batch_label(value: object) -> str:
+    """Humanize an exact batch identifier without discarding its version or window."""
+
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"^pre[_-]?round[_-]?(\d+)", r"Pre-round \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?<![A-Za-z])batch[_-]?(\d+)", r"Batch \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?<!\d)(\d+)[_-](\d+)[_-]?h(?=$|[_-])", r"\1–\2 h", text, flags=re.IGNORECASE)
+    text = re.sub(r"[_-]v(\d+)$", r" · v\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"[_-]+", " ", text)
+    label = " ".join(text.split()).replace("Pre round", "Pre-round")
+    return f"{label[:1].upper()}{label[1:]}"
 
 
 def pretty_title(value: object) -> str:

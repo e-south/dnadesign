@@ -27,7 +27,7 @@ from dnadesign.opal.api.response_magnitude_feasibility import (
     score_response_magnitude_feasibility,
 )
 
-from ..analysis.ledger import read_run_labels_used, read_runs
+from ..analysis.ledger import read_run_observed_events, read_runs
 from ..core.utils import ExitCodes, OpalError
 from ._events_util import load_events, resolve_outputs_dir
 from .sfxi_diag_data import resolve_run_id, resolve_single_round
@@ -99,15 +99,15 @@ def load_response_magnitude_feasibility_plot_data(context: Any) -> ResponseMagni
         calibration=calibration,
         selection_view_id=context.selection_view_id,
     )
-    labels_snapshot = read_run_labels_used(
+    observed_snapshot = read_run_observed_events(
         runs,
         outputs_dir=outputs_dir,
         round_k=round_k,
         run_id=run_id,
     )
-    context.data_paths["run_labels_used_parquet"] = labels_snapshot.path
+    context.data_paths["run_observed_events_parquet"] = observed_snapshot.path
     observed_frame = response_magnitude_feasibility_observed_frame(
-        labels_snapshot.frame.to_pandas(),
+        observed_snapshot.frame.to_pandas(),
         target_mask=target_mask,
         calibration=calibration,
     )
@@ -130,20 +130,25 @@ def response_magnitude_feasibility_observed_frame(
 ) -> pd.DataFrame:
     """Reduce observed RMF labels to the same component space as predictions."""
 
-    required = {"id", "observed_round", "y_obs"}
+    required = {"id", "observed_round", "batch_id", "display_label", "y_obs"}
     missing = sorted(required - set(labels.columns))
     if missing:
         raise OpalError(f"RMF label ledger is missing columns: {missing}.", ExitCodes.CONTRACT_VIOLATION)
     if labels.empty:
         raise OpalError("RMF label ledger contains no rows for the selected round.", ExitCodes.CONTRACT_VIOLATION)
-    duplicate_events = labels.duplicated(subset=["id", "observed_round"], keep=False)
+    duplicate_events = labels.duplicated(subset=["id", "observed_round", "batch_id"], keep=False)
     if duplicate_events.any():
         sample = labels.loc[duplicate_events, "id"].astype(str).tolist()[:5]
         raise OpalError(
-            f"RMF label ledger contains duplicate id/round events (sample_ids={sample}).",
+            f"RMF label ledger contains duplicate candidate/round/batch events (sample_ids={sample}).",
             ExitCodes.CONTRACT_VIOLATION,
         )
-    current = labels.sort_values(["id", "observed_round"], kind="mergesort").drop_duplicates("id", keep="last")
+    current = labels.copy()
+    current["batch_key"] = [
+        str(batch_id) if not pd.isna(batch_id) else f"round-{int(observed_round)}"
+        for observed_round, batch_id in current[["observed_round", "batch_id"]].itertuples(index=False, name=None)
+    ]
+    current = current.sort_values(["observed_round", "batch_key", "id"], kind="mergesort").reset_index(drop=True)
     try:
         values = np.asarray([list(value) for value in current["y_obs"]], dtype=float)
         scored = score_response_magnitude_feasibility(
@@ -158,6 +163,10 @@ def response_magnitude_feasibility_observed_frame(
     return pd.DataFrame(
         {
             "id": current["id"].astype(str).to_numpy(),
+            "observed_round": current["observed_round"].astype(int).to_numpy(),
+            "batch_id": current["batch_id"].astype("string").to_numpy(),
+            "batch_key": current["batch_key"].astype(str).to_numpy(),
+            "display_label": current["display_label"].astype("string").to_numpy(),
             RESPONSE_REF: scored.components.response_separation,
             ON_MAGNITUDE_REF: scored.components.on_magnitude_floor,
             OFF_MAGNITUDE_REF: scored.components.off_magnitude_ceiling,
@@ -167,7 +176,7 @@ def response_magnitude_feasibility_observed_frame(
             FEASIBILITY_REF: scored.feasibility_margin,
             "feasible": scored.feasibility_margin >= 0.0,
         }
-    ).sort_values("id", kind="mergesort", ignore_index=True)
+    ).sort_values(["observed_round", "batch_key", "id"], kind="mergesort", ignore_index=True)
 
 
 def response_magnitude_feasibility_plot_frame(

@@ -24,6 +24,7 @@ def render_collection_cells() -> str:
             _active_view_mode_cell(),
             _collection_set_selector_cell(),
             _selected_collection_set_cell(),
+            _selected_collection_heading_cell(),
         )
     )
 
@@ -32,8 +33,10 @@ def _collection_visual_model_cell() -> str:
     return block(
         """
         @app.cell
-        def _(build_notebook_collection_set_choices, collection_visuals):
-            collection_set_choices = build_notebook_collection_set_choices(collection_visuals)
+        def _(build_notebook_collection_set_choices, campaigns, collection_visuals):
+            collection_set_choices = [] if len(campaigns) == 1 else build_notebook_collection_set_choices(
+                collection_visuals
+            )
             return collection_set_choices
         """
     )
@@ -45,7 +48,14 @@ def _view_mode_cell() -> str:
         @app.cell
         def _(collection_set_choices, mo):
             if collection_set_choices:
-                view_mode_ui = mo.ui.dropdown(["Campaign", "Campaign set"], value="Campaign", label="View")
+                view_mode_ui = mo.ui.dropdown(
+                    {
+                        "Campaign": "Campaign",
+                        "Cross-campaign comparison": "Campaign set",
+                    },
+                    value="Campaign",
+                    label="Review scope",
+                )
             else:
                 view_mode_ui = None
             return view_mode_ui
@@ -73,7 +83,7 @@ def _collection_set_selector_cell() -> str:
                 collection_set_ui = mo.ui.dropdown(
                     [choice["label"] for choice in collection_set_choices],
                     value=collection_set_choices[0]["label"],
-                    label="Campaign set",
+                    label="Comparison group",
                 )
             else:
                 collection_set_ui = None
@@ -95,6 +105,22 @@ def _selected_collection_set_cell() -> str:
                     choice for choice in collection_set_choices if choice["label"] == _selected
                 )
             return selected_collection_set_choice
+        """
+    )
+
+
+def _selected_collection_heading_cell() -> str:
+    return block(
+        """
+        @app.cell
+        def _(mo, selected_collection_set_choice):
+            _label = (
+                str(selected_collection_set_choice.get("label") or "").strip()
+                if selected_collection_set_choice is not None else ""
+            )
+            _title = "Cross-campaign comparison" + (f" · {_label}" if _label else "")
+            selected_collection_set_title_md = mo.md(f"# {_title}")
+            return selected_collection_set_title_md
         """
     )
 

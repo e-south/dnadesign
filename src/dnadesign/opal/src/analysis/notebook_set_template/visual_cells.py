@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from ._support import block
+from .layered_scatter_cells import render_layered_scatter_cells
 from .visual_panel_cells import render_visual_panel_cell
 from .visual_selector_cells import render_visual_selector_cells
 
@@ -25,6 +26,7 @@ def render_visual_cells() -> str:
             _visual_choices_cell(),
             render_visual_selector_cells(),
             _visual_scope_cell(),
+            render_layered_scatter_cells(),
             render_visual_panel_cell(),
         )
     )
@@ -122,23 +124,23 @@ def _visual_scope_cell() -> str:
             build_notebook_plot_scope_options,
             mo,
             plot_scope_label_memory,
-            selected_display_visual_choice,
+            selected_visual_choice,
             set_plot_scope_label_memory,
         ):
             if (
                 active_view_mode == "Campaign set"
-                or selected_display_visual_choice is None
-                or selected_display_visual_choice.get("surface_kind")
+                or selected_visual_choice is None
+                or selected_visual_choice.get("surface_kind")
                 in {"baserender", "campaign_set_baserender", "reader_evidence", "selection_batch"}
             ):
                 plot_scope_options = []
                 plot_scope_ui = None
             else:
-                plot_scope_options = build_notebook_plot_scope_options(selected_display_visual_choice)
+                plot_scope_options = build_notebook_plot_scope_options(selected_visual_choice)
                 if len(plot_scope_options) > 1:
                     _scope_labels = [option["label"] for option in plot_scope_options]
                     _scope_control_label = str(plot_scope_options[0].get("control_label") or "Plot scope")
-                    _scope_key = str(selected_display_visual_choice.get("label") or "plot")
+                    _scope_key = str(selected_visual_choice.get("label") or "plot")
                     _remembered = dict(plot_scope_label_memory()).get(_scope_key)
                     _preferred = _remembered if _remembered in _scope_labels else _scope_labels[0]
 

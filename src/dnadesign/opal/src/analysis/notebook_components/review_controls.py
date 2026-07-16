@@ -29,7 +29,7 @@ def render_notebook_review_control_surface(
     visual_group_ui: Any = None,
     plot_ui: Any = None,
     plot_scope_ui: Any = None,
-    display_variant_ui: Any = None,
+    layered_scatter_controls: Mapping[str, Any] | None = None,
     baserender_role_ui: Any = None,
     baserender_round_ui: Any = None,
     baserender_run_ui: Any = None,
@@ -59,7 +59,7 @@ def render_notebook_review_control_surface(
             visual_group_ui=visual_group_ui,
             plot_scope_ui=plot_scope_ui,
             plot_ui=plot_ui,
-            display_variant_ui=display_variant_ui,
+            layered_scatter_controls=layered_scatter_controls,
             reader_evidence_artifact_ui=reader_evidence_artifact_ui,
             reader_evidence_time_ui=reader_evidence_time_ui,
             selected_visual_choice=selected_visual_choice,
@@ -89,7 +89,7 @@ def _visual_controls(
     baserender_run_ui: Any,
     plot_scope_ui: Any,
     plot_ui: Any,
-    display_variant_ui: Any,
+    layered_scatter_controls: Mapping[str, Any] | None,
     reader_evidence_artifact_ui: Any,
     reader_evidence_time_ui: Any,
     visual_group_ui: Any,
@@ -108,7 +108,12 @@ def _visual_controls(
     elif _is_reader_evidence_visual(selected_visual_choice):
         controls.extend(_present(reader_evidence_artifact_ui, reader_evidence_time_ui))
     else:
-        controls.extend(_present(plot_scope_ui, display_variant_ui))
+        controls.extend(
+            _present(
+                plot_scope_ui,
+                *dict(layered_scatter_controls or {}).values(),
+            )
+        )
     return controls
 
 

@@ -37,6 +37,7 @@ class PlotContext:
     logger: logging.Logger
     save_data: bool  # if true, plugins should save tidy data
     saved_data_paths: list[Path] = field(default_factory=list)
+    artifact_metadata: dict[str, object] = field(default_factory=dict)
 
     def save_df(self, df: "pd.DataFrame", filename: str | None = None) -> Path:
         """

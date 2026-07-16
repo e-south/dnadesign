@@ -438,7 +438,7 @@ def test_notebook_generate_campaign_set_accepts_collection_manifest(tmp_path: Pa
     assert res.exit_code == 0, res.output
     text = out_path.read_text()
     assert _literal_assignment_value(text, "collection_manifest_path") == str(collection_path)
-    assert 'label="View"' in text
+    assert 'label="Review scope"' in text
     assert "view_mode_ui = mo.ui.dropdown(" in text
     assert "collection_visual_index_path" in text
     collection_visual_index = out_path.parent / "collection_visuals" / "collection_visual_manifest.json"

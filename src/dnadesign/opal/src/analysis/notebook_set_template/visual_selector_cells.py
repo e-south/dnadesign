@@ -22,8 +22,6 @@ def render_visual_selector_cells() -> str:
             _filtered_visual_choices_cell(),
             _visual_selector_cell(),
             _selected_visual_cell(),
-            _display_variant_selector_cell(),
-            _selected_display_visual_cell(),
         )
     )
 
@@ -33,14 +31,11 @@ def _visual_memory_cell() -> str:
         """
         @app.cell
         def _(mo):
-            display_variant_memory, set_display_variant_memory = mo.state({})
             plot_scope_label_memory, set_plot_scope_label_memory = mo.state({})
             visual_group_label_memory, set_visual_group_label_memory = mo.state(None)
             visual_label_memory, set_visual_label_memory = mo.state(None)
             return (
-                display_variant_memory,
                 plot_scope_label_memory,
-                set_display_variant_memory,
                 set_plot_scope_label_memory,
                 set_visual_group_label_memory,
                 set_visual_label_memory,
@@ -123,61 +118,6 @@ def _selected_visual_cell() -> str:
                 else next(choice for choice in visual_choices_in_group if choice["label"] == str(plot_ui.value))
             )
             return selected_visual_choice
-        """
-    )
-
-
-def _display_variant_selector_cell() -> str:
-    return block(
-        """
-        @app.cell
-        def _(
-            build_notebook_display_variant_toggle,
-            display_variant_memory,
-            mo,
-            selected_visual_choice,
-            set_display_variant_memory,
-        ):
-            _toggle = (
-                build_notebook_display_variant_toggle(selected_visual_choice)
-                if selected_visual_choice is not None
-                else None
-            )
-            if _toggle is None:
-                display_variant_ui = None
-            else:
-                _remembered = dict(display_variant_memory())
-                _enabled = bool(_remembered.get(_toggle["id"], _toggle["default"]))
-
-                def _remember_variant(value):
-                    set_display_variant_memory(
-                        {**dict(display_variant_memory()), _toggle["id"]: bool(value)}
-                    )
-
-                display_variant_ui = mo.ui.switch(
-                    value=_enabled,
-                    label=_toggle["label"],
-                    on_change=_remember_variant,
-                )
-            return display_variant_ui
-        """
-    )
-
-
-def _selected_display_visual_cell() -> str:
-    return block(
-        """
-        @app.cell
-        def _(display_variant_ui, select_notebook_display_variant, selected_visual_choice):
-            selected_display_visual_choice = (
-                None
-                if selected_visual_choice is None
-                else select_notebook_display_variant(
-                    selected_visual_choice,
-                    enabled=bool(display_variant_ui.value) if display_variant_ui is not None else None,
-                )
-            )
-            return selected_display_visual_choice
         """
     )
 

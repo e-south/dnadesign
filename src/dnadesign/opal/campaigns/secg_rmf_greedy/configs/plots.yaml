@@ -8,13 +8,12 @@ plot_presets:
   rmf_candidate_frontier:
     kind: response_magnitude_feasibility_frontier
     round_selector: latest
-    round_variants: each
     tags: [decision, rmf]
     params:
       title: "RMF candidate constraint landscape"
-      response_label: 'Response separation, $d_{\mathrm{response}}$ · $\log_2(\mathrm{YFP}/\mathrm{CFP})$'
-      magnitude_label: 'ON fluorescence floor, $f_{\mathrm{on}}$ · $\log_2(\mathrm{YFP}/\mathrm{OD}_{600})$ relative to pDual-10'
-      off_constraint_label: 'OFF fluorescence clearance, $q_{\mathrm{off}}$'
+      response_label: 'Response separation, $d_R$ · $\log_2(\mathrm{YFP}/\mathrm{CFP})$'
+      magnitude_label: 'ON fluorescence floor, $f_{\mathrm{ON}}$ · $\log_2(\mathrm{YFP}/\mathrm{OD}_{600})$ relative to pDual-10'
+      off_constraint_label: 'OFF fluorescence clearance, $q_{\mathrm{OFF}}$'
       state_labels:
         "00": "No stress"
         "10": "EtOH"
@@ -25,30 +24,34 @@ plot_presets:
 plots:
   - name: rmf_candidate_frontier
     preset: rmf_candidate_frontier
-    params:
-      annotate_selected_aliases: false
-      notebook_toggle:
-        id: candidate_aliases
-        label: "Show candidate aliases"
-        value: false
 
-  - name: rmf_candidate_frontier_with_aliases
-    preset: rmf_candidate_frontier
+  - name: rmf_score_vs_rank
+    kind: scatter_score_vs_rank
+    round_selector: latest
+    tags: [diagnostic, rmf, selection]
     params:
-      annotate_selected_aliases: true
-      notebook_toggle:
-        id: candidate_aliases
-        label: "Show candidate aliases"
-        value: true
+      title: "RMF score by active-view rank"
+      score_field: view__selection_score
+      score_label: 'Predicted feasibility margin, $S_{\mathrm{RMF}}$'
+      rank_mode: competition
+      rank_scale: log
+      rank_label: 'Active-view competition rank, $k$ (rank 1 at right; log scale)'
+      show_selection_view: true
+      legend_location: upper_left
+      rasterize_at: 10000
+      y_axis:
+        reference_lines:
+          - value: 0.0
+            label: "Feasibility boundary"
 
   - name: rmf_selected_constraints
     kind: response_magnitude_feasibility_constraint_decomposition
     round_selector: latest
-    round_variants: each
     tags: [decision, rmf, selection]
     params:
       title: "Selected-candidate RMF constraints"
       candidate_label_mode: alias
+      caption: "Rows use active-view competition ranks after unique-batch allocation; skipped ranks were assigned to another view."
       state_labels:
         "00": "No stress"
         "10": "EtOH"

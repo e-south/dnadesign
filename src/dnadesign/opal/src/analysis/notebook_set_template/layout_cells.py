@@ -38,13 +38,13 @@ def _layout_cell() -> str:
             campaign_ui,
             changes_panel,
             collection_visuals,
-            display_variant_ui,
             evidence_panel,
             label_staging_panel,
             metric_definitions_panel,
             mo,
             opal_table,
             plot_panel,
+            layered_scatter_controls,
             plot_scope_ui,
             plot_ui,
             reader_evidence_artifact_ui,
@@ -53,14 +53,19 @@ def _layout_cell() -> str:
             render_notebook_review_control_surface,
             selected_campaign_context_panel,
             selected_campaign_title_md,
-            selected_display_visual_choice,
+            selected_collection_set_title_md,
+            selected_visual_choice,
             selected_overview_panel,
             selection_view_ui,
             selected_validity_md,
             visual_group_ui,
             view_mode_ui,
         ):
-            _items = [selected_campaign_title_md]
+            _items = [
+                selected_collection_set_title_md
+                if active_view_mode == "Campaign set"
+                else selected_campaign_title_md
+            ]
             review_control_surface = render_notebook_review_control_surface(
                 active_view_mode=active_view_mode,
                 baserender_record_selector=baserender_record_selector,
@@ -68,7 +73,7 @@ def _layout_cell() -> str:
                 baserender_round_ui=baserender_round_ui,
                 baserender_run_ui=baserender_run_ui,
                 campaign_ui=campaign_ui,
-                display_variant_ui=display_variant_ui,
+                layered_scatter_controls=layered_scatter_controls,
                 selection_view_ui=selection_view_ui,
                 collection_set_ui=collection_set_ui,
                 mo=mo,
@@ -76,7 +81,7 @@ def _layout_cell() -> str:
                 plot_ui=plot_ui,
                 reader_evidence_artifact_ui=reader_evidence_artifact_ui,
                 reader_evidence_time_ui=reader_evidence_time_ui,
-                selected_visual_choice=selected_display_visual_choice,
+                selected_visual_choice=selected_visual_choice,
                 visual_group_ui=visual_group_ui,
                 view_mode_ui=view_mode_ui,
             )

@@ -27,6 +27,9 @@ def _preamble() -> str:
 
         __generated_with = "__GENERATED_WITH__"
 
+        # fmt: off
+        # ruff: noqa
+
         app = marimo.App(width="medium")
         """
     )
@@ -57,11 +60,12 @@ def _import_cell() -> str:
                 build_notebook_baserender_record_choices, build_notebook_baserender_record_choices_with_counts,
                 build_notebook_baserender_record_options, build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row, build_notebook_change_rows, build_notebook_change_summary_rows,
-                build_notebook_display_variant_toggle,
                 build_notebook_collection_baserender_role_choices, build_notebook_collection_set_choices,
                 build_notebook_campaign_set_selection_overlap_card_rows, build_notebook_collection_visual_card_rows,
                 build_notebook_collection_visual_choices, build_notebook_evidence_rows,
                 build_notebook_label_staging_rows, build_notebook_metric_definition_rows, build_notebook_plot_card_rows,
+                build_notebook_layered_scatter_contract,
+                build_notebook_layered_scatter_controls,
                 build_notebook_plot_method_sections, build_notebook_plot_scope_options,
                 build_notebook_reader_evidence_visual_choices, build_notebook_run_options,
                 build_notebook_selection_batch_choice,
@@ -75,8 +79,9 @@ def _import_cell() -> str:
                 render_notebook_plot_choice_image, render_notebook_reader_evidence_artifact_control,
                 render_notebook_reader_evidence_artifact_visual, render_notebook_reader_evidence_panel,
                 render_notebook_reader_evidence_time_control, render_notebook_review_control_surface,
-                render_notebook_visual_panel, resolve_notebook_round_default, resolve_notebook_selection_view,
-                select_notebook_baserender_default_record_id, select_notebook_display_variant,
+                render_notebook_visual_panel, read_notebook_layered_scatter_state,
+                resolve_notebook_round_default, resolve_notebook_selection_view,
+                select_notebook_baserender_default_record_id,
                 select_notebook_plot_scope,
             )
             from dnadesign.opal.notebooks.api.generated import (
@@ -92,11 +97,12 @@ def _import_cell() -> str:
                 build_notebook_baserender_record_choices, build_notebook_baserender_record_choices_with_counts,
                 build_notebook_baserender_record_options, build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row, build_notebook_change_rows, build_notebook_change_summary_rows,
-                build_notebook_display_variant_toggle,
                 build_notebook_collection_baserender_role_choices, build_notebook_collection_set_choices,
                 build_notebook_campaign_set_selection_overlap_card_rows, build_notebook_collection_visual_card_rows,
                 build_notebook_collection_visual_choices, collection_visual_description, build_notebook_evidence_rows,
                 build_notebook_label_staging_rows, build_notebook_metric_definition_rows, build_notebook_plot_card_rows,
+                build_notebook_layered_scatter_contract,
+                build_notebook_layered_scatter_controls,
                 build_notebook_plot_method_sections, build_notebook_plot_scope_options,
                 build_notebook_reader_evidence_visual_choices, build_notebook_run_options,
                 build_notebook_selection_batch_choice,
@@ -109,9 +115,9 @@ def _import_cell() -> str:
                 render_notebook_campaign_set_selection_overlap_image, render_notebook_plot_choice_image,
                 render_notebook_reader_evidence_artifact_control, render_notebook_reader_evidence_artifact_visual,
                 render_notebook_reader_evidence_panel, render_notebook_reader_evidence_time_control,
-                render_notebook_review_control_surface, render_notebook_visual_panel, resolve_notebook_round_default,
-                resolve_notebook_selection_view,
-                select_notebook_baserender_default_record_id, select_notebook_display_variant,
+                render_notebook_review_control_surface, render_notebook_visual_panel,
+                read_notebook_layered_scatter_state, resolve_notebook_round_default, resolve_notebook_selection_view,
+                select_notebook_baserender_default_record_id,
                 select_notebook_plot_scope,
             )
         """

@@ -64,11 +64,8 @@ def _campaign_selector_cell() -> str:
             campaign_labels = [f"{index + 1}. {row['label']}" for index, row in enumerate(_rows)]
             _preferred = campaign_label_memory()
             _preferred = _preferred if _preferred in campaign_labels else campaign_labels[0]
-            campaign_ui = mo.ui.dropdown(
-                campaign_labels,
-                value=_preferred,
-                label="Campaign",
-                on_change=set_campaign_label_memory,
+            campaign_ui = None if len(campaigns) == 1 else mo.ui.dropdown(
+                campaign_labels, value=_preferred, label="Campaign", on_change=set_campaign_label_memory
             )
             campaign_summary_df = pl.DataFrame(_rows)
             return campaign_labels, campaign_summary_df, campaign_ui
@@ -81,7 +78,7 @@ def _selected_campaign_cell() -> str:
         """
         @app.cell
         def _(campaign_labels, campaign_ui, campaigns):
-            selected_label = str(campaign_ui.value)
+            selected_label = str(campaign_ui.value) if campaign_ui is not None else campaign_labels[0]
             selected_index = campaign_labels.index(selected_label)
             selected_campaign_model = campaigns[selected_index]
             return selected_campaign_model, selected_label

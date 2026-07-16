@@ -520,7 +520,7 @@ def test_stress_rmf_campaign_declares_concise_plot_policy() -> None:
     config_path = Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml")
     expected = {
         "rmf_candidate_frontier": "response_magnitude_feasibility_frontier",
-        "rmf_candidate_frontier_with_aliases": "response_magnitude_feasibility_frontier",
+        "rmf_score_vs_rank": "scatter_score_vs_rank",
         "rmf_selected_constraints": "response_magnitude_feasibility_constraint_decomposition",
     }
 
@@ -536,7 +536,7 @@ def test_stress_rmf_campaign_declares_concise_plot_policy() -> None:
     )
     assert {spec["name"]: spec["kind"] for spec in specs} == expected
     assert all(spec["round_selector"] == "latest" for spec in specs)
-    assert all(spec["round_variants"] == "each" for spec in specs)
+    assert all(spec.get("round_variants") is None for spec in specs)
 
 
 def test_plot_cli_accepts_directory(tmp_path):

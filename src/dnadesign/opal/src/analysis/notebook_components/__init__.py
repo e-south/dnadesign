@@ -55,11 +55,6 @@ from .campaign_set_visuals import (
     build_notebook_collection_visual_choices,
     build_notebook_collection_visual_description,
 )
-from .display_variants import (
-    build_notebook_display_variant_toggle,
-    group_notebook_display_variant_choices,
-    select_notebook_display_variant,
-)
 from .evidence import (
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
@@ -67,6 +62,13 @@ from .evidence import (
 from .label_staging import (
     build_notebook_label_staging_rows,
     discover_label_staging_inputs,
+)
+from .layered_scatter import (
+    build_notebook_layered_scatter_contract,
+    build_notebook_layered_scatter_controls,
+    filter_notebook_layered_scatter_rows,
+    read_notebook_layered_scatter_state,
+    render_notebook_layered_scatter_image,
 )
 from .no_plot_scope import build_notebook_no_plot_scope_rows
 from .overview import (
@@ -182,9 +184,10 @@ __all__ = [
     "build_notebook_campaign_set_selection_overlap_rows",
     "build_notebook_distrust_lines",
     "build_notebook_distrust_rows",
-    "build_notebook_display_variant_toggle",
     "build_notebook_evidence_rows",
     "build_notebook_label_staging_rows",
+    "build_notebook_layered_scatter_contract",
+    "build_notebook_layered_scatter_controls",
     "build_notebook_metric_definition_rows",
     "build_notebook_no_run_lines",
     "build_notebook_no_plot_scope_rows",
@@ -215,7 +218,7 @@ __all__ = [
     "render_notebook_reader_evidence_artifact_control",
     "find_notebook_repo_root",
     "filter_notebook_visual_choices_by_group",
-    "group_notebook_display_variant_choices",
+    "filter_notebook_layered_scatter_rows",
     "load_notebook_baserender_record_row",
     "list_notebook_campaign_paths",
     "render_notebook_baserender_record",
@@ -227,6 +230,8 @@ __all__ = [
     "render_notebook_reader_evidence_panel",
     "render_notebook_reader_evidence_plot_type_control",
     "render_notebook_reader_evidence_time_control",
+    "render_notebook_layered_scatter_image",
+    "read_notebook_layered_scatter_state",
     "render_notebook_review_control_surface",
     "render_notebook_campaign_set_selection_overlap_image",
     "render_notebook_visual_panel",
@@ -234,6 +239,5 @@ __all__ = [
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "select_notebook_baserender_default_record_id",
-    "select_notebook_display_variant",
     "select_notebook_plot_scope",
 ]

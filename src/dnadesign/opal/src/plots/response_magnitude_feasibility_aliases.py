@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -22,19 +21,11 @@ import pandas as pd
 
 from ..core.utils import ExitCodes, OpalError
 
-_ALIAS_COLUMNS = (
-    "id",
+_ID_COLUMN = "id"
+_OPTIONAL_ALIAS_COLUMNS = (
     "usr_label__primary",
     "usr_label__aliases",
-    "densegen__plan",
 )
-_PLAN_PATTERN = re.compile(r"^(background_only|ethanol|ciprofloxacin|ethanol_ciprofloxacin)__sig35=([A-Za-z0-9.-]+)$")
-_PLAN_FAMILY_LABELS = {
-    "background_only": "Background",
-    "ethanol": "EtOH",
-    "ciprofloxacin": "Cipro",
-    "ethanol_ciprofloxacin": "EtOH + Cipro",
-}
 
 
 def resolve_candidate_display_aliases(
@@ -52,19 +43,21 @@ def resolve_candidate_display_aliases(
     if not path.is_file():
         raise OpalError(f"Candidate alias records.parquet not found: {path}", ExitCodes.CONTRACT_VIOLATION)
     try:
-        frame = pd.read_parquet(path, columns=list(_ALIAS_COLUMNS))
+        import pyarrow.parquet as pq
+
+        available = set(pq.read_schema(path).names)
     except Exception as exc:
-        try:
-            available = set(pd.read_parquet(path, columns=[]).columns)
-        except Exception:
-            available = set()
-        missing = sorted(set(_ALIAS_COLUMNS) - available)
-        if missing:
-            raise OpalError(
-                f"records.parquet is missing required alias columns: {missing}.",
-                ExitCodes.CONTRACT_VIOLATION,
-            ) from exc
+        raise OpalError(f"Failed to read candidate-table schema from records.parquet: {exc}") from exc
+    if _ID_COLUMN not in available:
+        raise OpalError("records.parquet is missing required candidate ID column 'id'.", ExitCodes.CONTRACT_VIOLATION)
+    projected_columns = [_ID_COLUMN, *(column for column in _OPTIONAL_ALIAS_COLUMNS if column in available)]
+    try:
+        frame = pd.read_parquet(path, columns=projected_columns)
+    except Exception as exc:
         raise OpalError(f"Failed to read candidate aliases from records.parquet: {exc}") from exc
+    for column in _OPTIONAL_ALIAS_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = None
 
     frame["id"] = frame["id"].map(_required_id)
     frame = frame.loc[frame["id"].isin(ids)].copy()
@@ -89,13 +82,10 @@ def resolve_candidate_display_aliases(
         row = by_id.loc[candidate_id]
         primary = _clean_text(row["usr_label__primary"])
         safe_alias = next((alias for alias in alias_lists[candidate_id] if alias_owners[alias] == 1), None)
-        plan_label = _plan_label(row["densegen__plan"])
         if primary:
             label = primary
         elif safe_alias:
             label = safe_alias
-        elif plan_label:
-            label = f"{plan_label} · {candidate_id[:6]}"
         else:
             label = short_candidate_id(candidate_id)
         labels[candidate_id] = label
@@ -237,17 +227,6 @@ def _aliases(value: object) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
         raise OpalError("usr_label__aliases values must be lists or null.", ExitCodes.CONTRACT_VIOLATION)
     return tuple(dict.fromkeys(label for item in value if (label := _clean_text(item))))
-
-
-def _plan_label(value: object) -> str | None:
-    plan = _clean_text(value)
-    if not plan:
-        return None
-    match = _PLAN_PATTERN.fullmatch(plan)
-    if match is None:
-        return None
-    family, signature = match.groups()
-    return f"{_PLAN_FAMILY_LABELS[family]} · σ35{signature}"
 
 
 def _clean_text(value: object) -> str | None:

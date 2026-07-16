@@ -34,6 +34,11 @@ def build_campaign_set_notebook_view_model(
     """Build a manifest-backed view model for one or more OPAL campaigns."""
 
     paths = _validated_campaign_set_paths(config_paths)
+    if len(paths) == 1 and (collection_manifest_path is not None or collection_visual_index_path is not None):
+        raise OpalError(
+            "Campaign collection inputs require at least two distinct campaign configs.",
+            ExitCodes.BAD_ARGS,
+        )
     if run_id is not None and len(paths) != 1:
         raise OpalError(
             "Campaign-set notebooks only support run_id pinning for a single campaign.",
@@ -72,9 +77,13 @@ def build_campaign_set_notebook_view_model(
         if collection_visual_index is not None and collection_visual_index_path is not None
         else []
     )
-    selection_overlap = build_notebook_campaign_set_selection_overlap_choice(
-        campaigns,
-        round_selector=round_selector or "latest",
+    selection_overlap = (
+        build_notebook_campaign_set_selection_overlap_choice(
+            campaigns,
+            round_selector=round_selector or "latest",
+        )
+        if _supports_campaign_selection_overlap(campaigns)
+        else None
     )
     if selection_overlap is not None:
         collection_visuals.append(selection_overlap)
@@ -135,6 +144,14 @@ def _validated_campaign_set_paths(config_paths: Iterable[str | Path]) -> list[Pa
             ExitCodes.BAD_ARGS,
         )
     return paths
+
+
+def _supports_campaign_selection_overlap(campaigns: list[dict[str, Any]]) -> bool:
+    """Return whether pooled overlap compares distinct campaigns, not target views."""
+
+    if len(campaigns) < 2:
+        return False
+    return all(len((campaign.get("campaign") or {}).get("selection_views") or []) <= 1 for campaign in campaigns)
 
 
 def _notebook_collection_visuals(index: dict[str, Any], *, index_path: Path) -> list[dict[str, Any]]:

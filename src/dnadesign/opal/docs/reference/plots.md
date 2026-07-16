@@ -1,7 +1,7 @@
 ## OPAL Plots
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-16
 
 
 Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
@@ -149,7 +149,7 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | `params` | merged plot parameters after defaults and presets |
 | `inputs` | resolved built-in and custom data paths with file size and mtime |
 | `outputs.media` | rendered image/SVG/PDF files |
-| `outputs.tidy_csv` | tidy CSV files saved by the plugin |
+| `outputs.tidy_csv` | tidy CSV saved by the plugin, including its generation-time SHA-256 digest |
 | `metadata` | `PlotMeta` summary, capability, data shape, tidy schema, and failure modes |
 | `quality` | tidy CSV schema validation status when a plot declares `metadata.tidy_schema` |
 | `freshness` | mtime-based freshness summary for resolved inputs and outputs |
@@ -161,6 +161,12 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 Review and generated notebook surfaces should read manifests first. Extra files
 on disk are advisory only; they can trigger stale-file warnings, but they are
 not current evidence unless referenced by the active manifest.
+
+Interactive notebook adapters verify their declared tidy output before parsing
+it. The table must be the manifest's single `tidy_csv` output, remain inside the
+campaign `outputs/plots` root after path resolution, and match the recorded
+SHA-256. Regenerate older or changed plot artifacts instead of rebinding them at
+notebook load time.
 
 When `round_variants` expands one configured plot into multiple artifacts, the
 aggregate index contains multiple `opal.plot_artifact.v1` manifests with the
@@ -189,11 +195,11 @@ or redefine assay semantics.
 
 - **`response_magnitude_feasibility_frontier`**: plots raw response separation against
   minimum target-ON reference-relative magnitude. Color is the signed
-  target-OFF constraint `z_off = (tau_off - b_off) / s_off`, dashed lines are the configured response and ON
+  target-OFF decision margin `q_off = (tau_off - b_off) / s_off`, dashed lines are the configured response and ON
   boundaries, and outlined diamonds are selected candidates. This is the
   primary candidate-universe view.
 - **`response_magnitude_feasibility_constraint_decomposition`**: shows selected
-  candidates by `z_response`, `z_on`, `z_off`, and `min(z)`. Zero is the pass
+  candidates by `q_response`, `q_on`, `q_off`, and `min(q)`. Zero is the pass
   boundary for each requirement, and the feasibility column must equal the
   row-wise minimum of the first three columns. This is the primary
   handoff-review view.
@@ -203,7 +209,11 @@ be `feasibility_margin`. Their default labels remain
 assay-neutral; study plot configs should provide exact response and
 reference-relative fluorescence labels when the Reader handoff declares those
 quantities. Predicted feasibility is decision support, not measured promoter
-behavior.
+behavior. Candidate-table `usr_label__primary` and `usr_label__aliases` fields
+are optional presentation metadata: the frontier falls back to a compact
+candidate ID when they are absent. Observed-event `display_label` values remain
+source-projected metadata and never participate in identity, training, or
+ranking.
 
 ---
 

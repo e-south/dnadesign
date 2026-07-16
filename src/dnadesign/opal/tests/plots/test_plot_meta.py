@@ -13,6 +13,7 @@ from dnadesign.opal.src.plots._mpl_utils import (
     COLORBLIND_PALETTE,
     categorical_style,
     math_label,
+    observed_batch_marker_map,
     pretty_label,
     pretty_title,
 )
@@ -69,6 +70,26 @@ def test_plot_style_helpers_prettify_labels_and_cycle_accessible_categories() ->
     )
 
 
+def test_observed_batch_markers_never_silently_repeat() -> None:
+    batch_ids = tuple(f"batch_{index}" for index in range(12))
+    marker_map = observed_batch_marker_map(batch_ids)
+
+    assert tuple(marker_map) == batch_ids
+    assert len(set(marker_map.values())) == len(batch_ids)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="filter to at most 12 batches"):
+        observed_batch_marker_map((*batch_ids, "batch_12"))
+
+    extended_universe = (*batch_ids, "batch_12")
+    with pytest.raises(ValueError, match="marker universe contains 13 batches; at most 12 are supported"):
+        observed_batch_marker_map(
+            ("batch_0", "batch_12"),
+            universe_batch_ids=extended_universe,
+        )
+
+
 def test_score_rank_plot_accepts_an_explicit_directional_rank_label() -> None:
     assert (
         _rank_axis_label(
@@ -84,3 +105,4 @@ def test_score_rank_plot_accepts_an_explicit_directional_rank_label() -> None:
     assert metadata["rationale"]
     assert "rank one appears at the right" in metadata["alt_text"]
     assert metadata["non_claim_boundary"]
+    assert "y_axis" in metadata["params"]
