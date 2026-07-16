@@ -15,6 +15,8 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from ...plots._mpl_utils import NOTEBOOK_ANNOTATION_FONTSIZE
+
 
 def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, Any]):
     """Render already-filtered prediction, selection, and observation layers."""
@@ -25,6 +27,12 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     from matplotlib.colors import TwoSlopeNorm
 
     from ...plots._mpl_utils import (
+        NOTEBOOK_AXIS_LABEL_FONTSIZE,
+        NOTEBOOK_COLORBAR_LABEL_FONTSIZE,
+        NOTEBOOK_LEGEND_FONTSIZE,
+        NOTEBOOK_TICK_FONTSIZE,
+        NOTEBOOK_TITLE_FONTSIZE,
+        SIGNED_MARGIN_CMAP,
         add_flush_colorbar,
         apply_notebook_axes_style,
         apply_plot_style,
@@ -53,7 +61,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     if not np.isfinite(color_extent) or color_extent <= 0.0:
         raise ValueError("Layered-scatter color_extent must be finite and positive.")
     norm = TwoSlopeNorm(vmin=-color_extent, vcenter=0.0, vmax=color_extent)
-    cmap = "RdBu"
+    cmap = SIGNED_MARGIN_CMAP
     fig, ax = plt.subplots(figsize=(7.2, 7.2), layout="constrained")
     apply_notebook_axes_style(ax, square=True)
     kinds = rows[record_column].astype(str)
@@ -119,22 +127,22 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     ax.axhline(float(runtime["y_boundary"]), color="#555555", linestyle="--", linewidth=1.0, zorder=1)
     ax.set_xlim(_limits(runtime["x_limits"], field="x_limits"))
     ax.set_ylim(_limits(runtime["y_limits"], field="y_limits"))
-    ax.set_xlabel(str(runtime["x_label"]), fontsize=9.5, labelpad=7)
-    ax.set_ylabel(str(runtime["y_label"]), fontsize=9.5, labelpad=7)
+    ax.set_xlabel(str(runtime["x_label"]), fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
+    ax.set_ylabel(str(runtime["y_label"]), fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     ax.set_title(
         f"{runtime['title']}\n{runtime['context']}",
-        loc="left",
+        loc="center",
         fontweight="semibold",
-        fontsize=10.5,
-        pad=8,
-        linespacing=1.35,
+        fontsize=NOTEBOOK_TITLE_FONTSIZE,
+        pad=10,
+        linespacing=1.25,
     )
-    ax.tick_params(axis="both", labelsize=8.5)
+    ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
     handles, _ = ax.get_legend_handles_labels()
     ax.legend(
         loc="upper center",
         bbox_to_anchor=(0.5, -0.14),
-        fontsize=7.3,
+        fontsize=NOTEBOOK_LEGEND_FONTSIZE,
         ncol=min(3, max(1, len(handles))),
         frameon=False,
         handletextpad=0.4,
@@ -146,11 +154,11 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         fig,
         ax,
         mappable,
-        label=f"{runtime['color_label']}\n0 = boundary",
+        label=f"{runtime['color_label']}\nred = greater clearance; 0 = boundary",
         pad=0.065,
-        ticklabelsize=8.5,
+        ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )
-    colorbar.ax.yaxis.label.set_size(9)
+    colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
     _annotate_visible_rows(
         ax,
         rows,
@@ -199,7 +207,7 @@ def _annotate_visible_rows(
         synthetic_aliases,
         x_column=x_column,
         y_column=y_column,
-        font_size=6.8,
+        font_size=NOTEBOOK_ANNOTATION_FONTSIZE,
     )
 
 

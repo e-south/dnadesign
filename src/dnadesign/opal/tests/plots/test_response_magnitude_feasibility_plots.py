@@ -390,6 +390,10 @@ def test_response_separation_plot_metadata_is_manuscript_explicit() -> None:
         assert meta["tier"] == "decision"
         assert meta["capability"]["objective_family"] == "response_magnitude_feasibility"
 
+    frontier_alt_text = describe_plot_kind("response_magnitude_feasibility_frontier")["alt_text"]
+    assert "red is greater clearance" in frontier_alt_text
+    assert "move right, up, and red" in frontier_alt_text
+
 
 def test_rmf_frontier_metadata_names_run_pinned_observed_events() -> None:
     requirements = describe_plot_kind("response_magnitude_feasibility_frontier")["requires"]
@@ -436,34 +440,51 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     frontier = captured.pop()
     frontier_axis = frontier.axes[0]
     assert frontier._suptitle is None
-    assert frontier_axis.get_title(loc="left") == (
+    assert frontier_axis.get_title(loc="center") == (
         "RMF candidate constraint landscape · Ethanol view\n"
         "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin"
     )
+    assert frontier_axis.get_title(loc="left") == ""
+    assert frontier_axis.title.get_fontsize() >= 14
     assert frontier_axis.get_xlabel() == "ON-OFF response separation, $d_{response}$\nWindow mean log2(YFP / CFP)"
     assert frontier_axis.get_ylabel() == (
         "Minimum target-ON fluorescence relative to pDual-10\n$f_{on}$, log2(YFP / OD600)"
     )
-    assert frontier.axes[-1].get_ylabel() == "Target-OFF clearance, $q_{off}$\n0 = boundary"
+    assert frontier_axis.xaxis.label.get_fontsize() >= 11.5
+    assert frontier_axis.yaxis.label.get_fontsize() >= 11.5
+    assert min(tick.get_fontsize() for tick in frontier_axis.get_xticklabels()) >= 10
+    assert min(tick.get_fontsize() for tick in frontier_axis.get_yticklabels()) >= 10
+    assert not frontier_axis.spines["top"].get_visible()
+    assert not frontier_axis.spines["right"].get_visible()
+    assert frontier.axes[-1].get_ylabel() == ("Target-OFF clearance, $q_{off}$\nred = greater clearance; 0 = boundary")
+    assert frontier.axes[-1].yaxis.label.get_fontsize() >= 10.5
     assert "Observed · Batch 0 (n=1)" in frontier_axis.get_legend_handles_labels()[1]
     assert frontier_axis.get_legend().get_bbox_to_anchor()._bbox.y0 < 0.0
+    assert min(text.get_fontsize() for text in frontier_axis.get_legend().get_texts()) >= 9.5
     selected_collection = frontier_axis.collections[-1]
     assert selected_collection.get_array() is not None
     assert len(selected_collection.get_array()) == 2
+    assert selected_collection.cmap.name == "RdBu_r"
 
     plot_mod.render_constraint_decomposition(context, params)
     decomposition = captured.pop()
     decomposition_axis = decomposition.axes[0]
     assert decomposition._suptitle is None
-    assert decomposition_axis.get_title(loc="left").startswith(
+    assert decomposition_axis.get_title(loc="center").startswith(
         "Predicted RMF margins for selected candidates · Ethanol view\n"
     )
     assert "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin" in (
-        decomposition_axis.get_title(loc="left")
+        decomposition_axis.get_title(loc="center")
     )
+    assert decomposition_axis.get_title(loc="left") == ""
+    assert decomposition_axis.title.get_fontsize() >= 14
     assert "$S_{\\mathrm{RMF}}=\\min" in decomposition_axis.get_xlabel()
     assert "0 marks each configured boundary" in decomposition_axis.get_xlabel()
     assert "higher is better" not in decomposition_axis.get_xlabel().lower()
+    assert decomposition_axis.xaxis.label.get_fontsize() >= 11.5
+    assert decomposition_axis.yaxis.label.get_fontsize() >= 11.5
+    assert min(tick.get_fontsize() for tick in decomposition_axis.get_xticklabels()) >= 10
+    assert min(tick.get_fontsize() for tick in decomposition_axis.get_yticklabels()) >= 10
     assert [tick.get_text() for tick in decomposition_axis.get_xticklabels()] == [
         "$q_R$",
         "$q_{\\mathrm{ON}}$",
@@ -471,6 +492,7 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
         "$S_{\\mathrm{RMF}}$",
     ]
     assert len(decomposition_axis.patches) == 2
+    assert decomposition_axis.images[0].cmap.name == "RdBu_r"
 
     plt.Figure.clear(frontier)
     plt.Figure.clear(decomposition)
@@ -628,8 +650,11 @@ def test_secg_rmf_plot_config_uses_one_interactive_frontier_and_rank_diagnostic(
     ]
     assert merged_params[0]["surface_label"] == "RMF candidate frontier"
     assert r"$d_R$" in merged_params[0]["response_label"]
-    assert r"$f_{\mathrm{ON}}$" in merged_params[0]["magnitude_label"]
+    assert merged_params[0]["magnitude_label"] == r"ON fluorescence floor, $f_{\mathrm{ON}}$"
     assert r"$q_{\mathrm{OFF}}$" in merged_params[0]["off_constraint_label"]
+    assert "pDual-10-relative log2(YFP/OD600)" in merged_params[0]["caption"]
+    assert "rightward" in merged_params[0]["caption"].lower()
+    assert "red" in merged_params[0]["caption"].lower()
 
     decomposition = next(
         entry
@@ -637,6 +662,7 @@ def test_secg_rmf_plot_config_uses_one_interactive_frontier_and_rank_diagnostic(
         if entry.get("kind") == "response_magnitude_feasibility_constraint_decomposition"
     )
     assert decomposition["params"]["candidate_label_mode"] == "alias"
+    assert decomposition["params"]["title"] == "Allocated RMF requirement margins"
     assert decomposition["params"]["caption"] == (
         "Each row is a model prediction for a candidate allocated to this selection view. "
         "Columns show the three standardized requirement margins and their maximin RMF score; "
@@ -650,5 +676,6 @@ def test_secg_rmf_plot_config_uses_one_interactive_frontier_and_rank_diagnostic(
     assert r"$S_{\mathrm{RMF}}$" in rank["params"]["score_label"]
     assert rank["params"]["rank_scale"] == "log"
     assert rank["params"]["show_selection_view"] is True
-    assert rank["params"]["legend_location"] == "upper_left"
+    assert rank["params"]["title_location"] == "center"
+    assert rank["params"]["legend_location"] == "below"
     assert rank["params"]["y_axis"]["reference_lines"] == [{"value": 0.0, "label": "Feasibility boundary"}]

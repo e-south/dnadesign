@@ -439,6 +439,19 @@ def test_layered_scatter_legend_stays_outside_the_annotation_field(tmp_path: Pat
     legend = figure.axes[0].get_legend()
     assert legend is not None
     assert legend.get_bbox_to_anchor()._bbox.y0 < 0.0
+    axis = figure.axes[0]
+    assert axis.get_title(loc="center") == (
+        "RMF candidate constraint landscape\nEthanol target · ON: 10, 11 · OFF: 00, 01"
+    )
+    assert axis.get_title(loc="left") == ""
+    assert axis.title.get_fontsize() >= 14
+    assert axis.xaxis.label.get_fontsize() >= 11.5
+    assert axis.yaxis.label.get_fontsize() >= 11.5
+    assert min(tick.get_fontsize() for tick in axis.get_xticklabels()) >= 10
+    assert min(text.get_fontsize() for text in legend.get_texts()) >= 9.5
+    assert not axis.spines["top"].get_visible()
+    assert not axis.spines["right"].get_visible()
+    assert axis.collections[0].cmap.name == "RdBu_r"
     plt.close(figure)
 
 

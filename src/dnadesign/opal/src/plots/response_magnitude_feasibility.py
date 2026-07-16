@@ -20,6 +20,13 @@ from ..analysis.ledger import OBSERVED_EVENTS_ARTIFACT_KEY
 from ..registries.plots import PlotMeta, register_plot
 from ._mpl_utils import (
     DEFAULT_SQUARE_FIGSIZE,
+    NOTEBOOK_ANNOTATION_FONTSIZE,
+    NOTEBOOK_AXIS_LABEL_FONTSIZE,
+    NOTEBOOK_COLORBAR_LABEL_FONTSIZE,
+    NOTEBOOK_LEGEND_FONTSIZE,
+    NOTEBOOK_TICK_FONTSIZE,
+    NOTEBOOK_TITLE_FONTSIZE,
+    SIGNED_MARGIN_CMAP,
     add_flush_colorbar,
     apply_notebook_axes_style,
     apply_plot_style,
@@ -58,9 +65,10 @@ _DECOMPOSITION_KIND = "response_magnitude_feasibility_constraint_decomposition"
         rationale="The three requirements remain visible instead of being hidden inside one scalar score.",
         alt_text=(
             "Scatter plot of predicted target-ON/OFF response separation against the target-ON fluorescence floor. "
-            "Color encodes the signed target-OFF constraint; all three directions improve upward, and zero marks "
-            "each configured boundary. Distinct marker shapes identify observed batches, and filled diamonds "
-            "identify selected candidates without hiding their target-OFF values."
+            "Color encodes the signed target-OFF constraint: blue is below the boundary, white is zero, and red is "
+            "greater clearance. Favorable candidates therefore move right, up, and red. Zero marks each configured "
+            "boundary. Distinct marker shapes identify observed batches, and filled diamonds identify selected "
+            "candidates without hiding their target-OFF values."
         ),
         non_claim_boundary="Predicted feasibility does not establish measured response or fluorescence.",
         tier="decision",
@@ -172,7 +180,7 @@ def render_frontier(context: Any, params: dict) -> None:
         frame[RESPONSE_REF],
         frame[ON_MAGNITUDE_REF],
         c=off_constraint,
-        cmap="RdBu",
+        cmap=SIGNED_MARGIN_CMAP,
         norm=norm,
         s=point_size,
         alpha=point_alpha,
@@ -192,7 +200,7 @@ def render_frontier(context: Any, params: dict) -> None:
             batch[RESPONSE_REF],
             batch[ON_MAGNITUDE_REF],
             c=batch["off_magnitude_constraint_margin"],
-            cmap="RdBu",
+            cmap=SIGNED_MARGIN_CMAP,
             norm=norm,
             edgecolors="#111111",
             marker=observed_markers[batch_key],
@@ -205,7 +213,7 @@ def render_frontier(context: Any, params: dict) -> None:
         frame.loc[selected, RESPONSE_REF],
         frame.loc[selected, ON_MAGNITUDE_REF],
         c=off_constraint[selected],
-        cmap="RdBu",
+        cmap=SIGNED_MARGIN_CMAP,
         norm=norm,
         marker="D",
         s=max(36.0, point_size * 2.5),
@@ -216,25 +224,25 @@ def render_frontier(context: Any, params: dict) -> None:
     )
     ax.axvline(data.calibration["response_separation_min"], color="#555555", linestyle="--", linewidth=1.1, zorder=1)
     ax.axhline(data.calibration["on_magnitude_min"], color="#555555", linestyle="--", linewidth=1.1, zorder=1)
-    ax.set_xlabel(response_label, fontsize=9.5, labelpad=7)
-    ax.set_ylabel(magnitude_label, fontsize=9.5, labelpad=7)
+    ax.set_xlabel(response_label, fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
+    ax.set_ylabel(magnitude_label, fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     title = _selection_view_title(
         params.get("title", "RMF candidate constraint landscape"),
         context=context,
     )
-    ax.tick_params(axis="both", labelsize=8.5)
+    ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
     ax.set_title(
         f"{wrap_plot_title(title, width=62)}\n{_target_context(data, params)}",
-        loc="left",
+        loc="center",
         fontweight="semibold",
-        fontsize=10.5,
-        pad=8,
-        linespacing=1.35,
+        fontsize=NOTEBOOK_TITLE_FONTSIZE,
+        pad=10,
+        linespacing=1.25,
     )
     ax.legend(
         loc="upper center",
         bbox_to_anchor=(0.5, -0.14),
-        fontsize=7.6,
+        fontsize=NOTEBOOK_LEGEND_FONTSIZE,
         ncol=3,
         frameon=False,
         handletextpad=0.45,
@@ -244,11 +252,11 @@ def render_frontier(context: Any, params: dict) -> None:
         fig,
         ax,
         points,
-        label=f"{off_label}\n0 = boundary",
+        label=f"{off_label}\nred = greater clearance; 0 = boundary",
         pad=0.065,
-        ticklabelsize=8.5,
+        ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )
-    colorbar.ax.yaxis.label.set_size(9)
+    colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
     records_path = context.data_paths.get("records")
     alias_ids = list(
         dict.fromkeys([*frame.loc[selected, "id"].astype(str).tolist(), *observed["id"].astype(str).tolist()])
@@ -350,7 +358,7 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
     default_height = max(4.8, min(10.0, 2.5 + 0.55 * len(selected)))
     figsize = _figsize(params.get("figsize_in", (7.4, default_height)))
     fig, ax = plt.subplots(figsize=figsize, layout="constrained")
-    image = ax.imshow(matrix, cmap="RdBu", norm=norm, aspect="equal")
+    image = ax.imshow(matrix, cmap=SIGNED_MARGIN_CMAP, norm=norm, aspect="equal")
     apply_notebook_axes_style(ax, grid=False, square=False)
     ax.set_xticks(
         np.arange(4),
@@ -375,26 +383,26 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
         np.arange(len(selected)),
         [f"#{int(row.view__rank_competition)}  {row_labels[str(row.id)]}" for row in selected.itertuples(index=False)],
     )
-    ax.tick_params(axis="x", labelsize=9)
-    ax.tick_params(axis="y", labelsize=9)
+    ax.tick_params(axis="x", labelsize=NOTEBOOK_TICK_FONTSIZE)
+    ax.tick_params(axis="y", labelsize=NOTEBOOK_TICK_FONTSIZE)
     ax.set_xlabel(
         r"$S_{\mathrm{RMF}}=\min(q_R,q_{\mathrm{ON}},q_{\mathrm{OFF}})$"
         "\n0 marks each configured boundary",
-        fontsize=9,
-        labelpad=7,
+        fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE,
+        labelpad=8,
     )
-    ax.set_ylabel("Competition rank · candidate", fontsize=9.5, labelpad=7)
+    ax.set_ylabel("Competition rank · candidate", fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     title = _selection_view_title(
         params.get("title", "Predicted RMF margins for selected candidates"),
         context=context,
     )
     ax.set_title(
         f"{wrap_plot_title(title, width=62)}\n{_target_context(data, params)}",
-        loc="left",
+        loc="center",
         fontweight="semibold",
-        fontsize=10.5,
-        pad=8,
-        linespacing=1.35,
+        fontsize=NOTEBOOK_TITLE_FONTSIZE,
+        pad=10,
+        linespacing=1.25,
     )
     for row in range(matrix.shape[0]):
         limiting_column = int(np.argmin(matrix[row, :3]))
@@ -417,18 +425,18 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
                 f"{value:.2f}",
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=NOTEBOOK_ANNOTATION_FONTSIZE,
                 color="white" if abs(value) > 0.55 * extent else "#111111",
             )
     colorbar = add_flush_colorbar(
         fig,
         ax,
         image,
-        label="Standardized margin\n0 = boundary; outline = limiting",
+        label="Standardized margin\nred = favorable; 0 = boundary\noutline = limiting",
         pad=0.06,
-        ticklabelsize=8.5,
+        ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )
-    colorbar.ax.yaxis.label.set_size(9)
+    colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
     _save(context, fig)
     if context.save_data:
         context.save_df(_decomposition_tidy(selected))

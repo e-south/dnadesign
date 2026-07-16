@@ -12,8 +12,9 @@ plot_presets:
     params:
       title: "RMF candidate constraint landscape"
       response_label: 'Response separation, $d_R$ · $\log_2(\mathrm{YFP}/\mathrm{CFP})$'
-      magnitude_label: 'ON fluorescence floor, $f_{\mathrm{ON}}$ · $\log_2(\mathrm{YFP}/\mathrm{OD}_{600})$ relative to pDual-10'
+      magnitude_label: 'ON fluorescence floor, $f_{\mathrm{ON}}$'
       off_constraint_label: 'OFF fluorescence clearance, $q_{\mathrm{OFF}}$'
+      caption: "Each point is one campaign candidate. Rightward response separation, upward ON fluorescence, and red OFF-state clearance are favorable; dashed lines mark the configured boundaries. The ON fluorescence floor is the minimum same-state pDual-10-relative log2(YFP/OD600) value across target-ON states. Diamonds are allocated candidates; outlined symbols are observed batches."
       state_labels:
         "00": "No stress"
         "10": "EtOH"
@@ -37,7 +38,8 @@ plots:
       rank_scale: log
       rank_label: 'Active-view competition rank, $k$ (rank 1 at right; log scale)'
       show_selection_view: true
-      legend_location: upper_left
+      title_location: center
+      legend_location: below
       rasterize_at: 10000
       caption: "Predicted RMF score versus active-view competition rank. Open diamonds mark candidates allocated to this view; zero is the configured feasibility boundary. Rank 1 is at the right on a reversed logarithmic axis."
       y_axis:
@@ -50,7 +52,7 @@ plots:
     round_selector: latest
     tags: [decision, rmf, selection]
     params:
-      title: "Predicted RMF margins for allocated candidates"
+      title: "Allocated RMF requirement margins"
       candidate_label_mode: alias
       caption: "Each row is a model prediction for a candidate allocated to this selection view. Columns show the three standardized requirement margins and their maximin RMF score; zero is the configured feasibility boundary. Ranks are active-view competition ranks, so skipped ranks were allocated to another view."
       state_labels:

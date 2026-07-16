@@ -73,6 +73,9 @@ def test_score_rank_reference_boundary_is_annotated_and_included_without_loose_s
             "score_field": "view__selection_score",
             "rank_mode": "competition",
             "legend_location": "upper_left",
+            "title": "RMF score by active-view rank",
+            "title_location": "center",
+            "show_selection_view": True,
             "y_axis": {
                 "reference_lines": [
                     {"value": 0.0, "label": "Feasibility boundary"},
@@ -92,6 +95,10 @@ def test_score_rank_reference_boundary_is_annotated_and_included_without_loose_s
     assert upper <= 0.30
     legend = ax.get_legend()
     assert legend is not None
+    assert ax.get_title(loc="center") == "RMF score by active view rank\nSelection view: Ethanol"
+    assert ax.get_title(loc="left") == ""
+    assert ax.title.get_fontsize() >= 14
+    assert min(text.get_fontsize() for text in legend.get_texts()) >= 9.5
     captured[0].canvas.draw()
     legend_bounds = legend.get_window_extent(captured[0].canvas.get_renderer())
     reference_y = ax.transData.transform((1.0, 0.0))[1]

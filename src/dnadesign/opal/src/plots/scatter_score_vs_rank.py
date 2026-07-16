@@ -17,6 +17,8 @@ from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events, resolve_outputs_dir
 from ._mpl_utils import (
     DEFAULT_SQUARE_FIGSIZE,
+    NOTEBOOK_LEGEND_FONTSIZE,
+    NOTEBOOK_TITLE_FONTSIZE,
     add_flush_colorbar,
     annotate_plot_meta,
     apply_notebook_axes_style,
@@ -61,6 +63,7 @@ from ._param_utils import (
             "rank_scale": "linear|log (default linear). Log scale resolves the top-ranked tail in large pools.",
             "rank_label": "Optional explicit x-axis label, including favorable direction.",
             "show_selection_view": "Append the active selection-view label to the title (default false).",
+            "title_location": "Title alignment: left|center|right (default left).",
             "legend_location": "below|upper_left (default below).",
             "y_axis": "Optional mapping with limits, reference_lines, and include_zero_tick.",
             "y_limits": "Optional explicit two-item y-axis limits; overrides y_axis.limits.",
@@ -110,6 +113,7 @@ def render(context, params: dict) -> None:
     rank_label = get_str(params, ["rank_label"], None)
     show_selection_view = get_bool(params, ["show_selection_view"], False)
     legend_location = (get_str(params, ["legend_location"], "below") or "below").lower()
+    title_location = (get_str(params, ["title_location"], "left") or "left").lower()
     # "sequential" | "competition"
     alpha = get_float(params, ["alpha"], 0.45)
     hue_field = normalize_metric_field(get_str(params, ["hue_field", "hue", "color", "color_by", "colour_by"], None))
@@ -140,6 +144,8 @@ def render(context, params: dict) -> None:
         raise ValueError("rank_scale must be 'linear' or 'log'.")
     if legend_location not in {"below", "upper_left"}:
         raise ValueError("legend_location must be 'below' or 'upper_left'.")
+    if title_location not in {"left", "center", "right"}:
+        raise ValueError("title_location must be 'left', 'center', or 'right'.")
 
     # Pull from predictions (full schema) and always join setpoint
     need = {
@@ -266,11 +272,11 @@ def render(context, params: dict) -> None:
                 context=context,
                 show_selection_view=show_selection_view,
             ),
-            loc="left",
+            loc=title_location,
             fontweight="semibold",
-            fontsize=10.5,
-            pad=8,
-            linespacing=1.35,
+            fontsize=NOTEBOOK_TITLE_FONTSIZE,
+            pad=10,
+            linespacing=1.25,
         )
         _set_rank_axis(ax, float(sub[x_field].max()), scale=rank_scale)
         if rank_scale == "linear":
@@ -364,11 +370,11 @@ def render(context, params: dict) -> None:
                 context=context,
                 show_selection_view=show_selection_view,
             ),
-            loc="left",
+            loc=title_location,
             fontweight="semibold",
-            fontsize=10.5,
-            pad=8,
-            linespacing=1.35,
+            fontsize=NOTEBOOK_TITLE_FONTSIZE,
+            pad=10,
+            linespacing=1.25,
         )
         _set_rank_axis(ax, float(df[x_field].max()), scale=rank_scale)
         if rank_scale == "linear":
@@ -424,7 +430,7 @@ def render(context, params: dict) -> None:
                 labels,
                 loc="upper left",
                 bbox_to_anchor=(0.0, 0.94 if has_y_reference_lines else 1.0),
-                fontsize=8,
+                fontsize=NOTEBOOK_LEGEND_FONTSIZE,
                 ncol=min(2, len(handles)),
                 frameon=False,
                 handletextpad=0.45,

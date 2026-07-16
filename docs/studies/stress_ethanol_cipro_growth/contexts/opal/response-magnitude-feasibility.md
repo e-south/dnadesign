@@ -157,11 +157,12 @@ The config `src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml`
 accepts labels only through the manifest-pinned study publication. Do not run it
 against an ad hoc or reconstructed label table.
 
-Run `r0-2026-07-16T01:32:16+00:00` used 27 exact labels and one 100-tree RF
-lineage. It produced six allocations per view and 18 sequence-unique
-candidates; one preferred overlap required one AND next-best-unallocated
-replacement. `model_support_ready` remains false. The run is a frozen learning
-probe, and synthesis authorization is a separate study decision.
+The verified round-0 run pinned in the campaign README used 27 exact labels
+and one 100-tree RF lineage. It produced six allocations per view and 18
+sequence-unique candidates; one preferred overlap required one AND
+next-best-unallocated replacement. `model_support_ready` remains false. The
+run is a frozen learning probe, and synthesis authorization is a separate study
+decision.
 
 ### Prospective evidence
 
