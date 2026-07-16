@@ -21,6 +21,10 @@ from typing import Any
 import pyarrow.parquet as pq
 
 from ..core.utils import OpalError, file_sha256
+from .candidate_exclusion_projection import (
+    CandidateExclusionSetBinding,
+    verify_candidate_exclusion_projection,
+)
 from .candidate_snapshot import verify_candidate_snapshot
 
 OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION = "opal.observed_label_promotion.v1"
@@ -30,6 +34,7 @@ _MANIFEST_FIELDS = {
     "study_id",
     "y_space",
     "study_provenance",
+    "candidate_exclusion_projection",
     "candidate_artifact",
     "label_artifact",
 }
@@ -55,6 +60,7 @@ class ObservedLabelPromotionBinding:
     candidate_id_column: str = "id"
     candidate_x_column: str | None = None
     candidate_root: Path | None = None
+    candidate_exclusion_sets: tuple[CandidateExclusionSetBinding, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +78,9 @@ class VerifiedObservedLabelPromotion:
     study_provenance_schema_id: str
     study_provenance_path: Path
     study_provenance_sha256: str
+    candidate_exclusion_set_id: str
+    candidate_exclusion_entries_sha256: str
+    candidate_exclusion_entry_count: int
     candidate_path: Path
     candidate_sha256: str
     candidate_row_count: int
@@ -196,6 +205,11 @@ def verify_observed_label_promotion(
             f"expected {provenance_expected_sha256}, found {provenance_actual_sha256}."
         )
 
+    candidate_exclusions = verify_candidate_exclusion_projection(
+        payload.get("candidate_exclusion_projection"),
+        configured_sets=binding.candidate_exclusion_sets,
+    )
+
     candidate = verify_candidate_snapshot(
         payload.get("candidate_artifact"),
         root=binding.dataset_root if binding.candidate_root is None else binding.candidate_root,
@@ -263,6 +277,9 @@ def verify_observed_label_promotion(
         study_provenance_schema_id=provenance_schema_id,
         study_provenance_path=provenance_path,
         study_provenance_sha256=provenance_actual_sha256,
+        candidate_exclusion_set_id=candidate_exclusions.exclusion_set_id,
+        candidate_exclusion_entries_sha256=candidate_exclusions.entries_sha256,
+        candidate_exclusion_entry_count=candidate_exclusions.entry_count,
         candidate_path=candidate.path,
         candidate_sha256=candidate.sha256,
         candidate_row_count=candidate.row_count,

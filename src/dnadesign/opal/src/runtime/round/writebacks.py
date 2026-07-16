@@ -81,6 +81,7 @@ def write_round_artifacts(
         model_meta_json=rdir / "model" / "model_meta.json",
         selections_parquet=rdir / "selection" / "selections.parquet",
         selection_batch_parquet=rdir / "selection" / "selection_batch.parquet",
+        selection_allocation_trace_parquet=rdir / "selection" / "allocation_trace.parquet",
         round_log_jsonl=rdir / "logs" / "round.log.jsonl",
         round_ctx_json=rdir / "metadata" / "round_ctx.json",
         objective_meta_json=rdir / "metadata" / "objective_meta.json",
@@ -120,6 +121,7 @@ def write_round_artifacts(
     for view_id, selection in score.selections.items():
         for idx in np.flatnonzero(selection.selected_bool):
             candidate_id = pool_ids[int(idx)]
+            allocation_slot = int(selection.allocation_slots[int(idx)])
             selected_rows.append(
                 {
                     "run_id": run_id,
@@ -132,21 +134,39 @@ def write_round_artifacts(
                     "tie_handling": selection.tie_handling,
                     "id": candidate_id,
                     "sequence": seq_map.get(candidate_id),
+                    "selection_order": (
+                        allocation_slot if allocation_slot > 0 else int(selection.ranks_ordinal[int(idx)])
+                    ),
+                    "rank_ordinal": int(selection.ranks_ordinal[int(idx)]),
                     "rank_competition": int(selection.ranks_competition[int(idx)]),
                     "score": float(selection.y_obj_scalar[int(idx)]),
                     "selection_score": float(selection.scores[int(idx)]),
                     "score_ref": selection.score_ref,
+                    "allocation_slot": allocation_slot if allocation_slot > 0 else None,
+                    "selection_origin": (
+                        "next_best_unallocated"
+                        if allocation_slot > 0 and not bool(selection.preferred_bool[int(idx)])
+                        else "preferred_top_k"
+                    ),
                 }
             )
-    selected_df = pd.DataFrame(selected_rows).sort_values(
-        ["selection_view_id", "rank_competition", "id"], kind="stable"
-    )
+    selected_df = pd.DataFrame(selected_rows).sort_values(["selection_view_id", "selection_order", "id"], kind="stable")
     batch_df = score.selection_batch.rows.copy()
     batch_df.insert(0, "campaign_slug", cfg.campaign.slug)
     batch_df.insert(0, "as_of_round", int(req.as_of_round))
     batch_df.insert(0, "run_id", run_id)
     selections_sha = write_selection_parquet(apaths.selections_parquet, selected_df)
     selection_batch_sha = write_selection_parquet(apaths.selection_batch_parquet, batch_df)
+    allocation_trace_sha = None
+    if score.selection_batch.allocation_summary.get("strategy") != "logical_union":
+        allocation_trace_df = score.selection_batch.allocation_trace.copy()
+        allocation_trace_df.insert(0, "campaign_slug", cfg.campaign.slug)
+        allocation_trace_df.insert(0, "as_of_round", int(req.as_of_round))
+        allocation_trace_df.insert(0, "run_id", run_id)
+        allocation_trace_sha = write_selection_parquet(
+            apaths.selection_allocation_trace_parquet,
+            allocation_trace_df,
+        )
 
     ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
     labels_used_sha = write_labels_used_parquet(apaths.labels_used_parquet, labels_used_df)
@@ -222,6 +242,11 @@ def write_round_artifacts(
             ),
         }
     )
+    if allocation_trace_sha is not None:
+        artifacts_paths_and_hashes["selection/allocation_trace.parquet"] = (
+            allocation_trace_sha,
+            str(apaths.selection_allocation_trace_parquet.resolve()),
+        )
 
     return ArtifactBundle(
         apaths=apaths,
@@ -407,6 +432,7 @@ def update_campaign_state(
                 "deduplicate_by": selection_batch.deduplicate_by,
                 "unique_count": int(selection_batch.unique_count),
                 "expected_unique_count": selection_batch.expected_unique_count,
+                "allocation": dict(selection_batch.allocation_summary),
             },
             model={
                 "type": cfg.model.name,
@@ -423,6 +449,11 @@ def update_campaign_state(
             artifacts={
                 "selections_parquet": str(apaths.selections_parquet.resolve()),
                 "selection_batch_parquet": str(apaths.selection_batch_parquet.resolve()),
+                **(
+                    {"selection_allocation_trace_parquet": str(apaths.selection_allocation_trace_parquet.resolve())}
+                    if apaths.selection_allocation_trace_parquet.exists()
+                    else {}
+                ),
                 "ledger_predictions_dir": str(ws.ledger_predictions_dir.resolve()),
                 "ledger_runs_parquet": str(ws.ledger_runs_path.resolve()),
                 "ledger_labels_parquet": str(ws.ledger_labels_path.resolve()),

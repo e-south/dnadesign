@@ -103,17 +103,12 @@ def _selected_campaign_baserender_contract_cell() -> str:
                 metadata_schema_columns=_metadata_schema_columns,
             )
             try:
-                selected_campaign_labels_df = selected_campaign_analysis.read_labels()
-            except Exception:
-                selected_campaign_labels_df = pl.DataFrame()
-            try:
                 selected_campaign_runs_df = selected_campaign_analysis.read_runs()
             except Exception:
                 selected_campaign_runs_df = pl.DataFrame()
             return (
                 selected_campaign_analysis,
                 selected_campaign_baserender_contract,
-                selected_campaign_labels_df,
                 selected_campaign_runs_df,
                 selected_campaign_store,
             )

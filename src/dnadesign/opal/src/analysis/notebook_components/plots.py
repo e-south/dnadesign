@@ -23,6 +23,7 @@ from ._support import (
     plot_entries_from_manifests,
     sequence,
 )
+from .display_variants import group_notebook_display_variant_choices
 from .plot_scopes import (
     dedupe_scope_labels,
     plot_choice_from_manifest,
@@ -169,6 +170,7 @@ def build_notebook_visual_surface_model(
                 "tidy_available": artifact_path.endswith(".csv"),
             }
         )
+    choices = group_notebook_display_variant_choices(choices)
     return {
         "plots_dir": plots_dir,
         "choices": choices,

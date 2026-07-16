@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +33,39 @@ from dnadesign.opal.src.storage.writebacks import (
     build_run_meta_event,
     build_run_pred_events,
 )
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_ledger, write_records
+
+
+def _write_cli_fixture(tmp_path: Path, *, selection_score: float) -> tuple[Path, str]:
+    workdir = tmp_path / "workdir"
+    workdir.mkdir(parents=True)
+    records_path = tmp_path / "records.parquet"
+    campaign_path = tmp_path / "campaign.yaml"
+    write_records(records_path)
+    write_campaign_yaml(campaign_path, workdir=workdir, records_path=records_path)
+
+    run_id = "run-1"
+    selection_path = workdir / "outputs" / "rounds" / "round_1" / "selection" / "selections.parquet"
+    write_selection_parquet(
+        selection_path,
+        pd.DataFrame(
+            {
+                "selection_view_id": ["primary"],
+                "id": ["a"],
+                "score": [0.1],
+                "selection_score": [selection_score],
+            }
+        ),
+    )
+    write_ledger(
+        workdir,
+        run_id=run_id,
+        round_index=1,
+        artifact_paths_and_hashes={
+            "selection/selections.parquet": ("sha", str(selection_path)),
+        },
+    )
+    return campaign_path, run_id
 
 
 def test_compare_selection_to_view_ledger_matches() -> None:
@@ -127,6 +161,78 @@ def test_verify_outputs_integration_uses_named_view(tmp_path: Path) -> None:
 
     assert summary["mismatch_count"] == 0
     assert mismatches.empty
+
+
+def test_verify_outputs_cli_reads_view_selection_score(tmp_path: Path) -> None:
+    campaign_path, run_id = _write_cli_fixture(tmp_path, selection_score=0.1)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "verify-outputs",
+            "-c",
+            str(campaign_path),
+            "--view",
+            "primary",
+            "--run-id",
+            run_id,
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["summary"]["rows_compared"] == 1
+    assert payload["summary"]["mismatch_count"] == 0
+
+
+def test_verify_outputs_cli_json_mismatch_is_contract_violation(tmp_path: Path) -> None:
+    campaign_path, run_id = _write_cli_fixture(tmp_path, selection_score=0.9)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "verify-outputs",
+            "-c",
+            str(campaign_path),
+            "--view",
+            "primary",
+            "--run-id",
+            run_id,
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 4, result.output
+    payload = json.loads(result.output)
+    assert payload["summary"]["mismatch_count"] == 1
+    assert payload["mismatches"][0]["id"] == "a"
+
+
+def test_verify_outputs_cli_text_mismatch_is_contract_violation(tmp_path: Path) -> None:
+    campaign_path, run_id = _write_cli_fixture(tmp_path, selection_score=0.9)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "verify-outputs",
+            "-c",
+            str(campaign_path),
+            "--view",
+            "primary",
+            "--run-id",
+            run_id,
+            "--no-hints",
+        ],
+    )
+
+    assert result.exit_code == 4, result.output
+    output = unstyle(result.output)
+    assert "mismatches: 1" in output
+    assert "top mismatches:" in output
 
 
 def test_verify_outputs_requires_selection_view_argument() -> None:

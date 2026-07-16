@@ -27,10 +27,10 @@ from dnadesign.opal.api.response_magnitude_feasibility import (
     score_response_magnitude_feasibility,
 )
 
-from ..analysis.ledger import read_labels, read_runs
+from ..analysis.ledger import read_run_labels_used, read_runs
 from ..core.utils import ExitCodes, OpalError
 from ._events_util import load_events, resolve_outputs_dir
-from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_round
+from .sfxi_diag_data import resolve_run_id, resolve_single_round
 
 OBJECTIVE_NAME = "response_magnitude_feasibility_v1"
 FEASIBILITY_REF = "feasibility_margin"
@@ -99,9 +99,15 @@ def load_response_magnitude_feasibility_plot_data(context: Any) -> ResponseMagni
         calibration=calibration,
         selection_view_id=context.selection_view_id,
     )
-    labels = labels_asof_round(read_labels(outputs_dir / "ledger" / "labels.parquet"), round_k=round_k)
+    labels_snapshot = read_run_labels_used(
+        runs,
+        outputs_dir=outputs_dir,
+        round_k=round_k,
+        run_id=run_id,
+    )
+    context.data_paths["run_labels_used_parquet"] = labels_snapshot.path
     observed_frame = response_magnitude_feasibility_observed_frame(
-        labels.to_pandas(),
+        labels_snapshot.frame.to_pandas(),
         target_mask=target_mask,
         calibration=calibration,
     )

@@ -71,6 +71,41 @@ def resolve_run_round(runs_df: pl.DataFrame, run_id: str) -> int:
     return rounds[0]
 
 
+def _unique_run_id_for_scope(
+    runs_df: pl.DataFrame | None,
+    *,
+    rounds_sel: RoundSelector,
+    explicit_run_id: str | None,
+) -> str | None:
+    """Resolve a singular run only when the concrete plot scope is unambiguous."""
+
+    if explicit_run_id is not None:
+        return str(explicit_run_id)
+    if runs_df is None or runs_df.is_empty() or not {"as_of_round", "run_id"} <= set(runs_df.columns):
+        return None
+    available = available_rounds(runs_df)
+    if not available:
+        return None
+    if isinstance(rounds_sel, str) and rounds_sel in {"latest", "unspecified"}:
+        scoped_rounds = [available[-1]]
+    elif rounds_sel == "all":
+        scoped_rounds = available
+    elif isinstance(rounds_sel, list):
+        scoped_rounds = sorted({int(value) for value in rounds_sel})
+    else:
+        return None
+    if len(scoped_rounds) != 1:
+        return None
+    run_ids = (
+        runs_df.filter(pl.col("as_of_round") == scoped_rounds[0])
+        .select(pl.col("run_id").drop_nulls().cast(pl.Utf8).unique())
+        .to_series()
+        .to_list()
+    )
+    unique = sorted({str(value) for value in run_ids if str(value).strip()})
+    return unique[0] if len(unique) == 1 else None
+
+
 def _resolve_output_dir(
     out_cfg: dict,
     *,
@@ -240,6 +275,10 @@ def _available_variant_rounds(*, req: PlotRequest, plot_name: str) -> list[int]:
 def run_plots(req: PlotRequest) -> bool:
     ensure_mpl_config_dir(workdir=req.workspace.workdir)
 
+    runs_df = None
+    if req.workspace.ledger_runs_path.exists():
+        runs_df = pl.read_parquet(req.workspace.ledger_runs_path)
+
     builtins = {
         "records": Path(req.store.records_path),
         "outputs": req.workspace.outputs_dir,
@@ -386,7 +425,11 @@ def run_plots(req: PlotRequest) -> bool:
                 campaign_dir=req.campaign_dir,
                 workspace=req.workspace,
                 rounds=entry_rounds_sel,
-                run_id=req.run_id,
+                run_id=_unique_run_id_for_scope(
+                    runs_df,
+                    rounds_sel=entry_rounds_sel,
+                    explicit_run_id=req.run_id,
+                ),
                 selection_view_id=req.selection_view_id,
                 data_paths=data_paths,
                 output_dir=Path(out_dir),

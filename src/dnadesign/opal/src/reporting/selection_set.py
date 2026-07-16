@@ -28,7 +28,7 @@ from .summary import select_run_meta
 from .verify_outputs import compare_selection_to_ledger, read_selection_artifact, read_selection_table
 
 SELECTION_SET_SCHEMA_VERSION = "opal.selection_set.v2"
-SELECTION_BATCH_SCHEMA_VERSION = "opal.selection_batch.v1"
+SELECTION_BATCH_SCHEMA_VERSION = "opal.selection_batch.v2"
 
 
 def _campaign_json(cfg_path: Path, cfg: Any, ws: CampaignWorkspace) -> dict[str, str]:
@@ -226,7 +226,7 @@ def load_selection_batch(
     run_id: str | None = None,
     selection_batch_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Load the deduplicated logical union of all selection sets for one run."""
+    """Load the final deduplicated selection batch for one run."""
 
     cfg_path = Path(config_path).resolve()
     cfg = load_config(cfg_path)

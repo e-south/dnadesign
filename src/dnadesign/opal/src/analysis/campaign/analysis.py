@@ -18,6 +18,8 @@ from typing import Iterable, Sequence
 import polars as pl
 
 from ...config.types import RootConfig
+from ...core.rounds import resolve_round_index_from_runs
+from ...core.utils import ExitCodes, OpalError
 from ...storage.workspace import CampaignWorkspace
 from ..ledger import (
     RoundSelector,
@@ -29,6 +31,9 @@ from ..ledger import (
     scan_labels,
     scan_predictions,
     scan_runs,
+)
+from ..ledger import (
+    read_run_labels_used as _read_run_labels_used,
 )
 from .data import CampaignData, CampaignPaths
 from .loading import load_campaign_data
@@ -70,6 +75,42 @@ class CampaignAnalysis:
 
     def read_labels(self) -> pl.DataFrame:
         return read_labels(self.workspace.ledger_labels_path)
+
+    def read_run_labels_used(
+        self,
+        *,
+        round_selector: str | int | None = None,
+        run_id: str | None = None,
+        runs_df: pl.DataFrame | None = None,
+    ) -> pl.DataFrame:
+        """Read the verified observed-label snapshot consumed by one run."""
+
+        if runs_df is None:
+            runs_df = self.read_runs()
+        round_k = resolve_round_index_from_runs(
+            runs_df,
+            None if round_selector is None else str(round_selector),
+            allow_none=False,
+        )
+        if round_k is None:  # pragma: no cover - guarded by allow_none=False
+            raise OpalError("Could not resolve a run-label round.", ExitCodes.BAD_ARGS)
+        scoped = runs_df.filter(pl.col("as_of_round") == int(round_k))
+        if run_id is None:
+            run_ids = sorted(
+                {str(value) for value in scoped.get_column("run_id").drop_nulls().to_list() if str(value).strip()}
+            )
+            if len(run_ids) != 1:
+                raise OpalError(
+                    f"Round {int(round_k)} has {len(run_ids)} run IDs; select one run to read its labels.",
+                    ExitCodes.BAD_ARGS,
+                )
+            run_id = run_ids[0]
+        return _read_run_labels_used(
+            runs_df,
+            outputs_dir=self.workspace.outputs_dir,
+            round_k=int(round_k),
+            run_id=str(run_id),
+        ).frame
 
     def scan_runs(self) -> pl.LazyFrame:
         return scan_runs(self.workspace.ledger_runs_path)

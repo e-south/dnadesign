@@ -29,6 +29,7 @@ from dnadesign.opal.src.config.types import (
     RootConfig,
     SafetyBlock,
     ScoringBlock,
+    SelectionBatchAllocationBlock,
     SelectionBatchBlock,
     SelectionView,
     TrainingBlock,
@@ -699,6 +700,78 @@ def test_run_round_preserves_null_sequence_in_selection_artifacts(tmp_path: Path
     assert sel_parquet_path.exists()
     sel_df = pd.read_parquet(sel_parquet_path)
     assert pd.isna(sel_df.loc[0, "sequence"])
+
+
+def test_run_round_persists_unique_multi_view_allocation_trace(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    records_path = tmp_path / "records.parquet"
+    _write_records_scalar_multibatch(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+        selection_params={
+            "top_k": 2,
+            "score_ref": "scalar",
+            "tie_handling": "ordinal",
+            "objective_mode": "maximize",
+            "require_exact_top_k": True,
+        },
+    )
+    selection = cfg.selection_views[0].selection
+    objective = cfg.selection_views[0].objective
+    cfg.selection_views = [
+        SelectionView(id="target_a", objective=objective, selection=selection),
+        SelectionView(id="target_b", objective=objective, selection=selection),
+    ]
+    cfg.selection_batch = SelectionBatchBlock(
+        deduplicate_by="sequence",
+        expected_unique_count=4,
+        allocation=SelectionBatchAllocationBlock(
+            strategy="round_robin_next_best_unallocated",
+            view_priority=["target_a", "target_b"],
+        ),
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+    result = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+
+    assert result.selection_batch_count == 4
+    assert {view["top_k_effective"] for view in result.selection_views.values()} == {2}
+    selection_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
+    selections = pd.read_parquet(selection_dir / "selections.parquet")
+    batch = pd.read_parquet(selection_dir / "selection_batch.parquet")
+    trace = pd.read_parquet(selection_dir / "allocation_trace.parquet")
+    assert selections.groupby("selection_view_id").size().to_dict() == {"target_a": 2, "target_b": 2}
+    assert len(batch) == 4
+    assert batch["selection_batch_key"].nunique() == 4
+    assert "skipped_already_allocated" in set(trace["decision"])
+    state = CampaignState.load(workdir / "state.json")
+    allocation_summary = state.rounds[0].selection_batch["allocation"]
+    assert allocation_summary["initial_unique_count"] == 2
+    assert allocation_summary["final_unique_count"] == 4
+    assert allocation_summary["replacement_count"] == 2
 
 
 def test_run_round_bubbles_runtime_error_from_model_artifacts(tmp_path: Path) -> None:

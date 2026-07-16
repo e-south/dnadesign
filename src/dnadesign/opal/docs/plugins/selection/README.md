@@ -3,13 +3,13 @@ id: opal-selection-plugins
 title: OPAL selection plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 ---
 
 ## OPAL Selection Strategies
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-15
 
 
 Selection plugins consume named objective channels and emit ranked candidate
@@ -71,6 +71,12 @@ candidates. A boundary tie under `competition_rank` or `dense_rank` then stops
 the round with an explicit cardinality error. OPAL does not silently truncate a
 tie or fill a short selection. The default is `false` because some campaigns
 intentionally preserve all tied candidates.
+
+An explicit `selection_batch.allocation` contract requires
+`tie_handling: ordinal` and `require_exact_top_k: true`. The allocator consumes
+the plugin's complete `order_idx` and advances within that order when another
+view already owns the deduplication key; it does not sort objective scores
+again.
 
 `expected_improvement` additionally requires:
 

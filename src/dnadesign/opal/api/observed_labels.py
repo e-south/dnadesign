@@ -18,6 +18,11 @@ from pathlib import Path
 import pandas as pd
 
 from ..src.core.utils import OpalError
+from ..src.storage.candidate_exclusion_projection import (
+    CandidateExclusionSetBinding,
+    build_candidate_exclusion_projection,
+    candidate_exclusion_sets_from_config,
+)
 from ..src.storage.candidate_snapshot import candidate_snapshot_record
 from ..src.storage.label_sources import ObservedLabelStore
 from ..src.storage.observed_label_promotion import (
@@ -98,10 +103,13 @@ def verify_observed_label_snapshot(
 __all__ = [
     "OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION",
     "OBSERVED_LABELS_API_VERSION",
+    "CandidateExclusionSetBinding",
     "ObservedLabelPromotionBinding",
     "ObservedLabelVerificationError",
     "VerifiedObservedLabelPromotion",
     "VerifiedObservedLabelSnapshot",
+    "build_candidate_exclusion_projection",
     "candidate_snapshot_record",
+    "candidate_exclusion_sets_from_config",
     "verify_observed_label_snapshot",
 ]

@@ -22,7 +22,8 @@ from dnadesign.opal.src.config.types import PluginRef, SelectionView
 from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.runtime.round.stages.objectives import evaluate_objectives
-from dnadesign.opal.src.runtime.round.stages.selection import build_selection_batch, select_candidates
+from dnadesign.opal.src.runtime.round.stages.selection import select_candidates
+from dnadesign.opal.src.runtime.round.stages.selection_batch import build_selection_batch
 
 
 def _round_ctx() -> RoundCtx:

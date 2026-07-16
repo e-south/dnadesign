@@ -29,6 +29,7 @@ def render_notebook_review_control_surface(
     visual_group_ui: Any = None,
     plot_ui: Any = None,
     plot_scope_ui: Any = None,
+    display_variant_ui: Any = None,
     baserender_role_ui: Any = None,
     baserender_round_ui: Any = None,
     baserender_run_ui: Any = None,
@@ -42,14 +43,14 @@ def render_notebook_review_control_surface(
     if active_view_mode not in _VIEW_MODES:
         raise ValueError("active_view_mode must be 'Campaign' or 'Campaign set'.")
 
-    control_groups = [
-        _primary_controls(
-            active_view_mode=active_view_mode,
-            campaign_ui=campaign_ui,
-            selection_view_ui=selection_view_ui,
-            view_mode_ui=view_mode_ui,
-            collection_set_ui=collection_set_ui,
-        ),
+    controls = _primary_controls(
+        active_view_mode=active_view_mode,
+        campaign_ui=campaign_ui,
+        selection_view_ui=selection_view_ui,
+        view_mode_ui=view_mode_ui,
+        collection_set_ui=collection_set_ui,
+    )
+    controls.extend(
         _visual_controls(
             baserender_record_selector=baserender_record_selector,
             baserender_role_ui=baserender_role_ui,
@@ -58,17 +59,13 @@ def render_notebook_review_control_surface(
             visual_group_ui=visual_group_ui,
             plot_scope_ui=plot_scope_ui,
             plot_ui=plot_ui,
+            display_variant_ui=display_variant_ui,
             reader_evidence_artifact_ui=reader_evidence_artifact_ui,
             reader_evidence_time_ui=reader_evidence_time_ui,
             selected_visual_choice=selected_visual_choice,
-        ),
-    ]
-    rows = [
-        mo.hstack(controls, justify="start", align="end", wrap=True, gap=0.35)
-        for controls in control_groups
-        if controls
-    ]
-    return mo.vstack(rows, gap=0.35) if rows else None
+        )
+    )
+    return mo.hstack(controls, justify="start", align="end", wrap=True, gap=0.35) if controls else None
 
 
 def _primary_controls(
@@ -92,6 +89,7 @@ def _visual_controls(
     baserender_run_ui: Any,
     plot_scope_ui: Any,
     plot_ui: Any,
+    display_variant_ui: Any,
     reader_evidence_artifact_ui: Any,
     reader_evidence_time_ui: Any,
     visual_group_ui: Any,
@@ -109,8 +107,8 @@ def _visual_controls(
         )
     elif _is_reader_evidence_visual(selected_visual_choice):
         controls.extend(_present(reader_evidence_artifact_ui, reader_evidence_time_ui))
-    elif plot_scope_ui is not None:
-        controls.append(plot_scope_ui)
+    else:
+        controls.extend(_present(plot_scope_ui, display_variant_ui))
     return controls
 
 

@@ -3,19 +3,19 @@ id: opal-objective-response-magnitude-feasibility-v1
 title: Response-Magnitude Feasibility objective
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 ---
 
 ## Response-Magnitude Feasibility `response_magnitude_feasibility_v1`
 
 **Short name:** RMF
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-15
 
 `response_magnitude_feasibility_v1` is a built-in objective plugin, not a
-selector or label contract. The plugin is available. The stress-study campaign
-remains inactive because the study has not promoted repeat-aggregated
-response-window observed Y through its typed label manifest.
+selector or label contract. The plugin does not declare whether a particular
+study has labels, a completed round, model support, or synthesis authority;
+those states belong to the owning study and campaign records.
 
 These equations are the source of truth for the objective mathematics. Reader or
 another assay service owns the measurements that enter the objective. A study
@@ -248,14 +248,22 @@ selection_views:
         top_k: 6
         score_ref: feasibility_margin
         objective_mode: maximize
-        tie_handling: competition_rank
+        tie_handling: ordinal
         require_exact_top_k: true
+
+selection_batch:
+  deduplicate_by: sequence
+  expected_unique_count: 6
+  allocation:
+    strategy: round_robin_next_best_unallocated
+    view_priority: [factor_a]
 ```
 
 The placeholders are intentional. Missing calibration or state identity is a
-configuration error. The exact-cardinality guard is part of the stress-study
-batch contract: a score tie at the sixth-candidate boundary stops selection
-instead of silently changing the requested batch size.
+configuration error. Coordinated unique allocation requires exact quotas and
+an ordinal selector order. `top_n` resolves an exact score tie deterministically
+by candidate ID; the allocation trace retains the score, rank, and any skipped
+cross-view overlap instead of silently changing the requested batch size.
 
 ### Uncertainty and fail-fast behavior
 

@@ -22,6 +22,7 @@ def render_baserender_scope_cells() -> str:
             _selection_round_cell(),
             _selection_run_cell(),
             _selected_round_value_cell(),
+            _selected_run_labels_cell(),
         )
     )
 
@@ -95,6 +96,23 @@ def _selected_round_value_cell() -> str:
                     label="Selection run",
                 )
             return baserender_run_options, baserender_run_ui
+        """
+    )
+
+
+def _selected_run_labels_cell() -> str:
+    return block(
+        """
+        @app.cell
+        def _(baserender_run_ui, pl, selected_baserender_round, selected_campaign_analysis):
+            if baserender_run_ui is None or selected_baserender_round is None:
+                selected_campaign_labels_df = pl.DataFrame()
+            else:
+                selected_campaign_labels_df = selected_campaign_analysis.read_run_labels_used(
+                    round_selector=selected_baserender_round,
+                    run_id=str(baserender_run_ui.value),
+                )
+            return selected_campaign_labels_df
         """
     )
 

@@ -55,6 +55,11 @@ from .campaign_set_visuals import (
     build_notebook_collection_visual_choices,
     build_notebook_collection_visual_description,
 )
+from .display_variants import (
+    build_notebook_display_variant_toggle,
+    group_notebook_display_variant_choices,
+    select_notebook_display_variant,
+)
 from .evidence import (
     build_notebook_evidence_rows,
     build_notebook_metric_definition_rows,
@@ -177,6 +182,7 @@ __all__ = [
     "build_notebook_campaign_set_selection_overlap_rows",
     "build_notebook_distrust_lines",
     "build_notebook_distrust_rows",
+    "build_notebook_display_variant_toggle",
     "build_notebook_evidence_rows",
     "build_notebook_label_staging_rows",
     "build_notebook_metric_definition_rows",
@@ -209,6 +215,7 @@ __all__ = [
     "render_notebook_reader_evidence_artifact_control",
     "find_notebook_repo_root",
     "filter_notebook_visual_choices_by_group",
+    "group_notebook_display_variant_choices",
     "load_notebook_baserender_record_row",
     "list_notebook_campaign_paths",
     "render_notebook_baserender_record",
@@ -227,5 +234,6 @@ __all__ = [
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "select_notebook_baserender_default_record_id",
+    "select_notebook_display_variant",
     "select_notebook_plot_scope",
 ]

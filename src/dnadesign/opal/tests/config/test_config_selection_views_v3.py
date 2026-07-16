@@ -74,6 +74,16 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
     return path
 
 
+def _enable_unique_allocation(payload: dict) -> None:
+    for view in payload["selection_views"]:
+        view["selection"]["params"]["tie_handling"] = "ordinal"
+        view["selection"]["params"]["require_exact_top_k"] = True
+    payload["selection_batch"]["allocation"] = {
+        "strategy": "round_robin_next_best_unallocated",
+        "view_priority": ["target_a", "target_b"],
+    }
+
+
 def test_v3_allows_repeated_objective_plugins_with_distinct_view_ids(tmp_path: Path) -> None:
     cfg = load_config(_write_config(tmp_path, _base_config(tmp_path)))
 
@@ -85,6 +95,72 @@ def test_v3_allows_repeated_objective_plugins_with_distinct_view_ids(tmp_path: P
     ]
     assert cfg.selection_batch.deduplicate_by == "sequence"
     assert cfg.selection_batch.expected_unique_count == 2
+
+
+def test_v3_accepts_explicit_round_robin_unique_allocation(tmp_path: Path) -> None:
+    payload = _base_config(tmp_path)
+    _enable_unique_allocation(payload)
+
+    cfg = load_config(_write_config(tmp_path, payload))
+
+    assert cfg.selection_batch.allocation is not None
+    assert cfg.selection_batch.allocation.strategy == "round_robin_next_best_unallocated"
+    assert cfg.selection_batch.allocation.view_priority == ["target_a", "target_b"]
+
+
+@pytest.mark.parametrize(
+    "view_priority",
+    [
+        ["target_a"],
+        ["target_a", "unknown"],
+    ],
+)
+def test_v3_rejects_incomplete_or_unknown_allocation_priority(
+    tmp_path: Path,
+    view_priority: list[str],
+) -> None:
+    payload = _base_config(tmp_path)
+    _enable_unique_allocation(payload)
+    payload["selection_batch"]["allocation"]["view_priority"] = view_priority
+
+    with pytest.raises(ConfigError, match="view_priority must be an exact permutation"):
+        load_config(_write_config(tmp_path, payload))
+
+
+def test_v3_rejects_duplicate_allocation_priority(tmp_path: Path) -> None:
+    payload = _base_config(tmp_path)
+    _enable_unique_allocation(payload)
+    payload["selection_batch"]["allocation"]["view_priority"] = ["target_a", "target_a"]
+
+    with pytest.raises(ConfigError, match="view_priority must not contain duplicates"):
+        load_config(_write_config(tmp_path, payload))
+
+
+def test_v3_requires_ordinal_ties_for_unique_allocation(tmp_path: Path) -> None:
+    payload = _base_config(tmp_path)
+    _enable_unique_allocation(payload)
+    payload["selection_views"][1]["selection"]["params"]["tie_handling"] = "competition_rank"
+
+    with pytest.raises(ConfigError, match="target_b.*tie_handling='ordinal'"):
+        load_config(_write_config(tmp_path, payload))
+
+
+def test_v3_requires_exact_view_quotas_for_unique_allocation(tmp_path: Path) -> None:
+    payload = _base_config(tmp_path)
+    _enable_unique_allocation(payload)
+    payload["selection_views"][1]["selection"]["params"]["require_exact_top_k"] = False
+
+    with pytest.raises(ConfigError, match="target_b.*require_exact_top_k=true"):
+        load_config(_write_config(tmp_path, payload))
+
+
+def test_v3_requires_batch_count_to_equal_allocation_quotas(tmp_path: Path) -> None:
+    payload = _base_config(tmp_path)
+    _enable_unique_allocation(payload)
+    payload["selection_batch"]["expected_unique_count"] = 3
+
+    with pytest.raises(ConfigError, match=r"must equal the sum.*\(2\)"):
+        load_config(_write_config(tmp_path, payload))
 
 
 def test_v3_requires_explicit_campaign_ownership(tmp_path: Path) -> None:

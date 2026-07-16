@@ -241,7 +241,9 @@ def test_plot_cli_round_variants_write_manifested_scope_artifacts(tmp_path):
     }
     assert manifests["mini_rall.manifest.json"]["rounds"] == "all"
     assert manifests["mini_r0.manifest.json"]["rounds"] == [0]
+    assert manifests["mini_r0.manifest.json"]["run_id"] == "r0"
     assert manifests["mini_r1.manifest.json"]["rounds"] == [1]
+    assert manifests["mini_r1.manifest.json"]["run_id"] == "r1"
 
 
 def test_plot_cli_rejects_each_variant_for_inherent_round_history_plots(tmp_path):
@@ -518,6 +520,7 @@ def test_stress_rmf_campaign_declares_concise_plot_policy() -> None:
     config_path = Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml")
     expected = {
         "rmf_candidate_frontier": "response_magnitude_feasibility_frontier",
+        "rmf_candidate_frontier_with_aliases": "response_magnitude_feasibility_frontier",
         "rmf_selected_constraints": "response_magnitude_feasibility_constraint_decomposition",
     }
 

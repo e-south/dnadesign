@@ -30,7 +30,7 @@ def build_notebook_selection_batch_choice(payload: Mapping[str, Any] | None) -> 
         raise ValueError(f"Selection batch unique_count={unique_count} does not match rows={len(rows)}.")
     return {
         "label": "Selection batch",
-        "title": "The selection batch is the deduplicated union of named selection views",
+        "title": "The selection batch is the final deduplicated proposal",
         "surface_kind": SELECTION_BATCH_SURFACE_KIND,
         "review_group": "handoff",
         "review_rank": 0,

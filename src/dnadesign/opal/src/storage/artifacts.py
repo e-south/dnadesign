@@ -34,6 +34,7 @@ class ArtifactPaths:
     model_meta_json: Path
     selections_parquet: Path
     selection_batch_parquet: Path
+    selection_allocation_trace_parquet: Path
     round_log_jsonl: Path
     round_ctx_json: Path
     objective_meta_json: Path

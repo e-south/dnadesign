@@ -117,24 +117,41 @@ def _visual_scope_cell() -> str:
     return block(
         """
         @app.cell
-        def _(active_view_mode, build_notebook_plot_scope_options, mo, selected_visual_choice):
+        def _(
+            active_view_mode,
+            build_notebook_plot_scope_options,
+            mo,
+            plot_scope_label_memory,
+            selected_display_visual_choice,
+            set_plot_scope_label_memory,
+        ):
             if (
                 active_view_mode == "Campaign set"
-                or selected_visual_choice is None
-                or selected_visual_choice.get("surface_kind")
+                or selected_display_visual_choice is None
+                or selected_display_visual_choice.get("surface_kind")
                 in {"baserender", "campaign_set_baserender", "reader_evidence", "selection_batch"}
             ):
                 plot_scope_options = []
                 plot_scope_ui = None
             else:
-                plot_scope_options = build_notebook_plot_scope_options(selected_visual_choice)
+                plot_scope_options = build_notebook_plot_scope_options(selected_display_visual_choice)
                 if len(plot_scope_options) > 1:
                     _scope_labels = [option["label"] for option in plot_scope_options]
                     _scope_control_label = str(plot_scope_options[0].get("control_label") or "Plot scope")
+                    _scope_key = str(selected_display_visual_choice.get("label") or "plot")
+                    _remembered = dict(plot_scope_label_memory()).get(_scope_key)
+                    _preferred = _remembered if _remembered in _scope_labels else _scope_labels[0]
+
+                    def _remember_scope(value):
+                        set_plot_scope_label_memory(
+                            {**dict(plot_scope_label_memory()), _scope_key: str(value)}
+                        )
+
                     plot_scope_ui = mo.ui.dropdown(
                         _scope_labels,
-                        value=_scope_labels[0],
+                        value=_preferred,
                         label=_scope_control_label,
+                        on_change=_remember_scope,
                     )
                 else:
                     plot_scope_ui = None

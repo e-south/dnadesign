@@ -53,6 +53,43 @@ def validate_params(category: str, name: str, params: Dict[str, Any]) -> Dict[st
 # ---------------------------
 
 
+class _CandidateIdExclusionEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    candidate_id: str
+    reason: str
+
+    @field_validator("candidate_id", "reason")
+    @classmethod
+    def _text_non_empty(cls, v: str) -> str:
+        value = str(v).strip()
+        if not value:
+            raise ValueError("candidate exclusion entry fields must be non-empty")
+        return value
+
+
+@register_param_schema("candidate_eligibility", "candidate_id_exclusion")
+class _CandidateIdExclusionParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    exclusion_set_id: str
+    entries: List[_CandidateIdExclusionEntry] = Field(min_length=1)
+    min_remaining_candidates: int = Field(ge=1)
+
+    @field_validator("exclusion_set_id")
+    @classmethod
+    def _set_id_non_empty(cls, v: str) -> str:
+        value = str(v).strip()
+        if not value:
+            raise ValueError("exclusion_set_id must be non-empty")
+        return value
+
+    @model_validator(mode="after")
+    def _candidate_ids_unique(self):
+        ids = [entry.candidate_id for entry in self.entries]
+        if len(ids) != len(set(ids)):
+            raise ValueError("candidate exclusion entries contain duplicate candidate IDs")
+        return self
+
+
 # transform_x schemas
 @register_param_schema("transform_x", "identity")
 class _IdentityParams(BaseModel):

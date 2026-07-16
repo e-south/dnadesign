@@ -37,7 +37,7 @@ def test_checked_in_campaigns_are_explicit_modern_surfaces() -> None:
         "demo_gp_ei": ("opal_demo", "demo", "runnable"),
         "demo_gp_topn": ("opal_demo", "demo", "runnable"),
         "demo_rf_sfxi_topn": ("opal_demo", "demo", "runnable"),
-        "secg_rmf_greedy": ("study_campaign", "study", "blocked_on_label_promotion"),
+        "secg_rmf_greedy": ("study_campaign", "study", "round0_complete"),
     }
 
     actual: dict[str, tuple[str, str, str]] = {}

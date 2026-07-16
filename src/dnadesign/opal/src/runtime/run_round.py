@@ -87,8 +87,23 @@ def _round_dir_has_blocking_entries(rdir: Path) -> bool:
     return not stages or not stages.issubset(allowed)
 
 
+def _validate_allocated_batch_k_override(req: RunRoundRequest) -> None:
+    cfg = req.cfg
+    if cfg.selection_batch.allocation is None or req.k_override is None:
+        return
+    quota_total = int(req.k_override) * len(cfg.selection_views)
+    expected = cfg.selection_batch.expected_unique_count
+    if expected is None or int(expected) != quota_total:
+        raise OpalError(
+            "The CLI top-k override is incompatible with the configured selection_batch allocation: "
+            f"expected_unique_count={expected}, override_quota_sum={quota_total}. "
+            "Update the campaign contract instead of changing an allocated batch implicitly."
+        )
+
+
 def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> RunRoundResult:
     cfg = req.cfg
+    _validate_allocated_batch_k_override(req)
     cfg_path = req.config_path or (Path(cfg.campaign.workdir) / "campaign.yaml")
     ws = CampaignWorkspace.from_config(cfg, cfg_path)
     if not ws.state_path.exists():

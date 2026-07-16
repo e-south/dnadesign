@@ -12,10 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import numpy as np
-import pandas as pd
 
 from ....core.round_context import RoundCtx
 from ....core.selection_contracts import (
@@ -30,7 +29,7 @@ from ....registries.selection import get_selection, normalize_selection_result, 
 from ....storage.artifacts import append_round_log_event, write_objective_meta
 from ..contracts import RoundInputs
 from .objectives import ObjectiveEvaluation
-from .selection_types import SelectionBatchEvaluation, SelectionEvaluation
+from .selection_types import SelectionEvaluation
 from .telemetry import log
 
 
@@ -118,6 +117,9 @@ def select_candidates(
             tie_handling=tie_handling,
             objective=mode,
         )
+        order_idx = np.asarray(sel_norm["order_idx"]).astype(int)
+        ranks_ordinal = np.empty(len(id_order_pool), dtype=int)
+        ranks_ordinal[order_idx] = np.arange(1, len(id_order_pool) + 1, dtype=int)
         ranks_competition = np.asarray(sel_norm["rank_competition"]).astype(int)
         selected_bool = np.asarray(sel_norm["selected_bool"]).astype(bool)
         n = len(id_order_pool)
@@ -148,8 +150,12 @@ def select_candidates(
             sel_params=sel_params,
             tie_handling=tie_handling,
             mode=mode,
+            order_idx=order_idx,
+            ranks_ordinal=ranks_ordinal,
             ranks_competition=ranks_competition,
+            preferred_bool=selected_bool.copy(),
             selected_bool=selected_bool,
+            allocation_slots=np.zeros(n, dtype=int),
             selected_effective=selected_effective,
             top_k=top_k,
             obj_sha="",
@@ -192,77 +198,3 @@ def select_candidates(
     obj_meta = {"objectives": objectives.objective_defs, "selection_views": selection_defs}
     obj_sha = write_objective_meta(rdir / "metadata" / "objective_meta.json", obj_meta)
     return {view_id: replace(result, obj_sha=obj_sha) for view_id, result in results.items()}
-
-
-def build_selection_batch(
-    *,
-    candidate_df: pd.DataFrame,
-    id_order_pool: List[str],
-    selections: Dict[str, SelectionEvaluation],
-    deduplicate_by: Optional[str],
-    expected_unique_count: Optional[int],
-) -> SelectionBatchEvaluation:
-    key_column = str(deduplicate_by or "id").strip()
-    required = {"id", key_column}
-    missing = sorted(required - set(candidate_df.columns))
-    if missing:
-        raise OpalError(f"selection_batch candidate data is missing column(s): {missing}")
-    candidates = candidate_df.loc[:, sorted(required)].copy()
-    candidates["id"] = candidates["id"].astype(str)
-    if candidates["id"].duplicated().any():
-        raise OpalError("selection_batch candidate ids must be unique.")
-    if candidates[key_column].isna().any():
-        raise OpalError(f"selection_batch deduplicate column {key_column!r} contains null values.")
-    by_id = candidates.set_index("id", drop=False)
-
-    batch: dict[str, dict[str, Any]] = {}
-    for view_id, selection in selections.items():
-        if len(selection.selected_bool) != len(id_order_pool):
-            raise OpalError(f"Selection view {view_id!r} does not align with the candidate pool.")
-        for idx in np.flatnonzero(selection.selected_bool):
-            candidate_id = str(id_order_pool[int(idx)])
-            if candidate_id not in by_id.index:
-                raise OpalError(f"Selection view {view_id!r} references unknown candidate id {candidate_id!r}.")
-            key_value = by_id.at[candidate_id, key_column]
-            key = str(key_value)
-            entry = batch.setdefault(
-                key,
-                {
-                    "id": candidate_id,
-                    "selection_batch_key": key,
-                    "deduplicate_by": key_column,
-                    "selection_view_ids": [],
-                    "selection_memberships": [],
-                },
-            )
-            if entry["id"] != candidate_id:
-                raise OpalError(
-                    f"selection_batch {key_column} value {key!r} maps to multiple candidate ids: "
-                    f"{entry['id']!r}, {candidate_id!r}."
-                )
-            entry["selection_view_ids"].append(view_id)
-            entry["selection_memberships"].append(
-                {
-                    "selection_view_id": view_id,
-                    "rank": int(selection.ranks_competition[int(idx)]),
-                    "score": float(selection.y_obj_scalar[int(idx)]),
-                    "selection_score": float(selection.scores[int(idx)]),
-                    "score_ref": selection.score_ref,
-                }
-            )
-
-    rows = pd.DataFrame(list(batch.values()))
-    if not rows.empty:
-        rows = rows.sort_values(["selection_batch_key", "id"], kind="stable").reset_index(drop=True)
-    unique_count = int(len(rows))
-    if expected_unique_count is not None and unique_count != int(expected_unique_count):
-        raise OpalError(
-            f"selection_batch expected {int(expected_unique_count)} unique candidates, observed {unique_count}. "
-            "OPAL does not fill or discard selection slots implicitly."
-        )
-    return SelectionBatchEvaluation(
-        rows=rows,
-        deduplicate_by=key_column,
-        unique_count=unique_count,
-        expected_unique_count=(None if expected_unique_count is None else int(expected_unique_count)),
-    )

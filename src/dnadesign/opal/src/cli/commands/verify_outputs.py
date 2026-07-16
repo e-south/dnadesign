@@ -88,7 +88,7 @@ def verify_outputs(
         ledger_df = read_selection_view_predictions(
             ws.ledger_predictions_dir,
             selection_view_id=view,
-            columns=["id"],
+            columns=["id", "view__selection_score"],
             round_selector=as_of_round,
             run_id=run_id,
             runs_df=pl.from_pandas(runs_df),
@@ -132,6 +132,10 @@ def verify_outputs(
                 no_hints=no_hints,
                 json_output=json,
             )
+        if summary["mismatch_count"] > 0:
+            raise typer.Exit(code=ExitCodes.CONTRACT_VIOLATION)
+    except typer.Exit:
+        raise
     except OpalError as e:
         opal_error("verify-outputs", e)
         raise typer.Exit(code=e.exit_code)

@@ -28,7 +28,8 @@ campaign slug, study ID, Y-space ID, a digest-pinned study-provenance manifest,
 the exact `records.parquet` candidate/X snapshot, and the relative sidecar path,
 SHA-256 digest, schema, columns, and Parquet row count. OPAL verifies the
 candidate snapshot, provenance, and labels before every read. The study-provenance manifest owns assay,
-identity, reduction, and aggregation semantics; OPAL records its schema and
+identity, reduction, and candidate-observation formation semantics; OPAL
+records its schema and
 digest without importing study logic. A
 manifest-pinned sidecar is immutable through generic OPAL ingest; its owning
 study publishes the label table, provenance manifest, and promotion manifest
@@ -79,20 +80,25 @@ Each `outputs/rounds/round_<k>/` contains:
 - `selection/selections.parquet`: long-form selected rows keyed by
   `selection_view_id`; `score` is the objective channel value and
   `selection_score` is the selector's ranking value
-- `selection/selection_batch.parquet`: deduplicated logical union with
-  `selection_view_ids` and `selection_memberships`; each membership retains
-  both scores
+- `selection/selection_batch.parquet`: final deduplicated batch with
+  `selection_view_ids`, `preferred_view_ids`, allocation ownership, and
+  `selection_memberships`; each membership retains both scores
+- `selection/allocation_trace.parquet`: when coordinated allocation is
+  configured, the ordered allocated and skipped-overlap decisions with view,
+  slot, ranks, scores, batch key, and conflict owner
 - `labels/labels_used.parquet`: immutable training-label snapshot
 - logs and context snapshots
 
 `selections.parquet` is the verification artifact for one view.
-`selection_batch.parquet` is the logical union for downstream study review.
-Neither artifact authorizes synthesis.
+`selection_batch.parquet` is the final physical-batch proposal for downstream
+study review. Under the default policy it is the logical union; under explicit
+allocation it contains the exact unique-slot result. Neither artifact
+authorizes synthesis.
 
 ### Public inspection contracts
 
 - `opal selection-set show/export --view <id>` projects and verifies one view.
-- `opal selection-batch show/export` reads the logical union.
+- `opal selection-batch show/export` reads the final deduplicated batch.
 - `opal verify-outputs --view <id>` compares one selection artifact to the
   shared prediction ledger.
 - `opal record-show --view <id>` reports view-specific rank and score.

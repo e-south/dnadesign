@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 audience:
   - operator
   - maintainer
@@ -13,7 +13,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-15
 
 ## OPAL Command Line Interface
 
@@ -212,8 +212,11 @@ opal run --config <yaml> --round <r> \
   * If a view sets `selection.params.exclude_already_labeled: true` (default), designs already labeled are **excluded**;
     scope is controlled by `training.policy.allow_resuggesting_candidates_until_labeled`.
 * Builds `selection_batch` as the declared deduplicated union of all selection
-  sets. A declared `expected_unique_count` is exact; OPAL never fills or drops
-  candidates silently.
+  sets. A declared `expected_unique_count` is exact. OPAL fails on overlap
+  under the default union contract; an explicit
+  `round_robin_next_best_unallocated` allocation may instead advance each view
+  through its deterministic ranking. Every skipped overlap and replacement is
+  recorded; OPAL never fills or drops candidates silently.
 
 **Artifacts written** (`outputs/rounds/round_<r>/`)
 
@@ -223,7 +226,8 @@ opal run --config <yaml> --round <r> \
   * `feature_importance.csv` (optional)
 * `selection/`
   * `selections.parquet` (long form, keyed by `selection_view_id`)
-  * `selection_batch.parquet` (deduplicated logical union)
+  * `selection_batch.parquet` (final deduplicated batch)
+  * `allocation_trace.parquet` (configured unique-slot allocation only)
 * `labels/`
   * `labels_used.parquet` (training snapshot for this run)
 * `metadata/`
@@ -437,7 +441,7 @@ opal selection-set export --config <yaml> --view <selection-view-id> \
 
 ### `selection-batch`
 
-Inspect or export the deduplicated logical union of all selection sets in a
+Inspect or export the final deduplicated selection batch in a
 run. This is an OPAL decision artifact, not a physical synthesis authorization.
 
 ```bash

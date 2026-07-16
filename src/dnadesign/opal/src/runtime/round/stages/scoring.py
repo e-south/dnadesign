@@ -16,10 +16,14 @@ from typing import Any, List
 import numpy as np
 
 from ....core.round_context import RoundCtx
+from ....core.utils import now_iso
+from ....storage.artifacts import append_round_log_event
 from ..contracts import RoundInputs, ScoreBundle
 from .objectives import evaluate_objectives
 from .prediction import fit_and_predict
-from .selection import build_selection_batch, select_candidates
+from .selection import select_candidates
+from .selection_allocation import allocate_unique_selection_slots
+from .selection_batch import build_selection_batch
 
 
 def stage_scoring(
@@ -60,13 +64,41 @@ def stage_scoring(
         id_order_pool=id_order_pool,
         objectives=objectives,
     )
+    allocation_trace = None
+    allocation_summary = None
+    if inputs.cfg.selection_batch.allocation is not None:
+        allocation_result = allocate_unique_selection_slots(
+            candidate_df=candidate_df,
+            id_order_pool=id_order_pool,
+            selections=selection,
+            deduplicate_by=inputs.cfg.selection_batch.deduplicate_by,
+            expected_unique_count=inputs.cfg.selection_batch.expected_unique_count,
+            allocation=inputs.cfg.selection_batch.allocation,
+        )
+        selection = allocation_result.selections
+        allocation_trace = allocation_result.trace
+        allocation_summary = allocation_result.summary
     batch = build_selection_batch(
         candidate_df=candidate_df,
         id_order_pool=id_order_pool,
         selections=selection,
         deduplicate_by=inputs.cfg.selection_batch.deduplicate_by,
         expected_unique_count=inputs.cfg.selection_batch.expected_unique_count,
+        allocation_trace=allocation_trace,
+        allocation_summary=allocation_summary,
     )
+    if inputs.cfg.selection_batch.allocation is not None:
+        append_round_log_event(
+            inputs.rdir / "logs" / "round.log.jsonl",
+            {
+                "ts": now_iso(),
+                "round": int(inputs.req.as_of_round),
+                "run_id": str(rctx.get("core/run_id", default="")),
+                "stage": "selection_batch_allocation_done",
+                **batch.allocation_summary,
+            },
+        )
+        rctx.set_core("core/selection_batch/allocation", batch.allocation_summary)
     objective_meta_sha = next(iter(selection.values())).obj_sha
 
     return ScoreBundle(

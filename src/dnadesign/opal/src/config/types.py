@@ -88,9 +88,16 @@ class SelectionView:
 
 
 @dataclass(frozen=True)
+class SelectionBatchAllocationBlock:
+    strategy: str
+    view_priority: List[str]
+
+
+@dataclass(frozen=True)
 class SelectionBatchBlock:
     deduplicate_by: Optional[str] = None
     expected_unique_count: Optional[int] = None
+    allocation: Optional[SelectionBatchAllocationBlock] = None
 
 
 @dataclass

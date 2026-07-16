@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/opal/src/runtime/round/stages/selection_types.py
 
-Typed results for selection views and logical selection batches.
+Typed results for selection views and final deduplicated selection batches.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -33,8 +33,12 @@ class SelectionEvaluation:
     sel_params: Dict[str, Any]
     tie_handling: str
     mode: str
+    order_idx: np.ndarray
+    ranks_ordinal: np.ndarray
     ranks_competition: np.ndarray
+    preferred_bool: np.ndarray
     selected_bool: np.ndarray
+    allocation_slots: np.ndarray
     selected_effective: int
     top_k: int
     obj_sha: str
@@ -48,6 +52,15 @@ class SelectionBatchEvaluation:
     deduplicate_by: str
     unique_count: int
     expected_unique_count: Optional[int]
+    allocation_trace: pd.DataFrame
+    allocation_summary: Dict[str, Any]
 
 
-__all__ = ["SelectionBatchEvaluation", "SelectionEvaluation"]
+@dataclass(frozen=True)
+class SelectionAllocationEvaluation:
+    selections: Dict[str, SelectionEvaluation]
+    trace: pd.DataFrame
+    summary: Dict[str, Any]
+
+
+__all__ = ["SelectionAllocationEvaluation", "SelectionBatchEvaluation", "SelectionEvaluation"]

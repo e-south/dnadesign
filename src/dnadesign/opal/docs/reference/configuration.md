@@ -8,7 +8,7 @@ keys. There is no compatibility parser.
 
 The central invariant is:
 
-> A campaign owns learning; a selection view owns a target; a selection batch owns the logical union.
+> A campaign owns learning; a selection view owns a target; a selection batch owns the final deduplicated proposal.
 
 ### Ontology
 
@@ -19,8 +19,9 @@ The central invariant is:
 - **Round:** one immutable label snapshot, one model fit, one prediction pass,
   and all declared selection views.
 - **Selection set:** rows selected by one view.
-- **Selection batch:** deterministic union of all selection sets, deduplicated
-  by the configured candidate field.
+- **Selection batch:** final proposal deduplicated by the configured candidate
+  field. It is the logical union by default or an explicitly coordinated set of
+  unique view allocations.
 
 Use separate campaigns only when X, Y, labels, transforms, model, candidate
 universe, or round lifecycle differ. Different target masks or setpoints over
@@ -51,8 +52,8 @@ read `state.json` and the run ledger instead.
 
 `selection_batch` is optional. If omitted, OPAL deduplicates by `id` and does
 not enforce a cardinality. Declare `expected_unique_count` only when exact
-logical-batch cardinality is part of the method; mismatch is fatal and OPAL
-never fills or discards rows implicitly.
+logical-batch cardinality is part of the method. Without an `allocation` block,
+a mismatch is fatal and OPAL does not fill or discard rows.
 
 ### Selection-view contract
 
@@ -86,6 +87,34 @@ or fill the result.
 `expected_improvement` also requires `uncertainty_ref`. The referenced model
 and objective path must emit predictive standard deviation; missing or invalid
 uncertainty is fatal.
+
+### Coordinated unique allocation
+
+Use the generic allocator only when every view must contribute an exact quota
+to one deduplicated physical batch:
+
+```yaml
+selection_batch:
+  deduplicate_by: sequence
+  expected_unique_count: 12
+  allocation:
+    strategy: round_robin_next_best_unallocated
+    view_priority: [factor_a, factor_b]
+```
+
+The allocator visits one slot at a time and scans each view's complete selector
+order until it finds an unallocated key. `view_priority` is an exact permutation
+of the configured view IDs and is the declared conflict tie-break; it is not an
+objective weighting. The strategy requires every view to set
+`tie_handling: ordinal` and `require_exact_top_k: true`, and
+`expected_unique_count` must equal the sum of the view quotas. OPAL records the
+skipped overlaps and replacements in `selection/allocation_trace.parquet` and
+the allocation summary in round state and context.
+
+Allocation never compares objective or selector score magnitudes across views.
+Missing priority entries, ambiguous deduplication keys, exhausted unique pools,
+and incoherent CLI top-k overrides fail before selection artifacts or ledgers
+are published.
 
 ### Multi-view example
 
@@ -151,7 +180,7 @@ selection_views:
           off_magnitude_scale: 1.0
     selection:
       name: top_n
-      params: {top_k: 6, score_ref: feasibility_margin, objective_mode: maximize, tie_handling: competition_rank}
+      params: {top_k: 6, score_ref: feasibility_margin, objective_mode: maximize, tie_handling: ordinal, require_exact_top_k: true}
 
   - id: factor_b
     objective:
@@ -162,11 +191,14 @@ selection_views:
         calibration: *calibration
     selection:
       name: top_n
-      params: {top_k: 6, score_ref: feasibility_margin, objective_mode: maximize, tie_handling: competition_rank}
+      params: {top_k: 6, score_ref: feasibility_margin, objective_mode: maximize, tie_handling: ordinal, require_exact_top_k: true}
 
 selection_batch:
   deduplicate_by: sequence
   expected_unique_count: 12
+  allocation:
+    strategy: round_robin_next_best_unallocated
+    view_priority: [factor_a, factor_b]
 ```
 
 ### Shared execution
@@ -178,7 +210,9 @@ For each round OPAL:
 3. fits one multi-output model once;
 4. predicts the candidate universe once;
 5. evaluates every selection view from those shared predictions;
-6. writes one selection set per view and one deduplicated selection batch.
+6. optionally coordinates unique slots from the complete view rankings;
+7. writes one final selection set per view, one deduplicated selection batch,
+   and an allocation trace when coordination is enabled.
 
 Validation rejects duplicate view IDs, qualified or unresolved channel refs,
 plugin-output collisions, unsupported selectors, and view-specific drift in
@@ -223,6 +257,11 @@ The pinned manifest uses this objective-agnostic observed-label contract:
     "path": "_opal/response_window_labels_v1/study_provenance.json",
     "sha256": "<lowercase 64-character SHA-256>"
   },
+  "candidate_exclusion_projection": {
+    "exclusion_set_id": "example_observation_dispositions_v1",
+    "entries_sha256": "<SHA-256 of canonical candidate_id and reason entries>",
+    "entry_count": 3
+  },
   "candidate_artifact": {
     "path": "records.parquet",
     "sha256": "<lowercase 64-character SHA-256>",
@@ -238,11 +277,18 @@ The pinned manifest uses this objective-agnostic observed-label contract:
 }
 ```
 
+`candidate_exclusion_projection` binds study-owned measured-but-unlabeled
+dispositions to one configured `candidate_id_exclusion` eligibility set. OPAL
+recomputes the entry digest from the campaign on every label verification and
+fails validation and execution if the set is missing or has drifted. An empty
+projection permits the named campaign rule to be absent.
+
 The campaign slug, study ID, Y-space ID, study-provenance artifact, candidate
 snapshot, label path, digests, schemas, columns, and Parquet row counts must
 match exactly. The candidate snapshot must contain the configured candidate-ID
 and X columns. Paths cannot escape the dataset root. The study-owned provenance artifact records the assay bundle,
-identity binding, reduction, and aggregation contracts needed to interpret Y;
+identity binding, reduction, and candidate-observation formation contracts
+needed to interpret Y;
 OPAL verifies its digest without interpreting study fields. The study publisher
 stages the label, provenance, and promotion records as one publication. OPAL reads and verifies that
 promotion but does not publish or revise it.
@@ -252,6 +298,7 @@ promotion but does not publish or revise it.
 - `ingest.duplicate_policy`: `error`
 - `scoring.score_batch_size`: `10000`
 - `selection_batch.deduplicate_by`: `id`
+- `selection_batch.allocation`: omitted; the batch is the exact logical union
 - `training.y_ops`: empty
 - safety guards: mixed type/alphabet rejection, duplicate-ID rejection,
   canonical X validation, and an 8 GiB X-matrix budget

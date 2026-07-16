@@ -3,7 +3,7 @@
 OPAL runs active-learning campaigns over labeled sequence datasets with
 explicit feature, objective, selection, and ledger contracts. OPAL v3 fits one
 shared phenotype model per campaign, applies named target views to the shared
-predictions, and records their logical union as one selection batch. Start at
+predictions, and records one final deduplicated selection batch. Start at
 the [OPAL docs index](docs/index.md).
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-07-13

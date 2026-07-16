@@ -9,6 +9,7 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+from .candidate_ids import candidate_id_exclusion
 from .contracts import (
     CandidateEligibilityResult,
     CandidateEligibilityRuleResult,
@@ -26,5 +27,6 @@ __all__ = [
     "RestrictionSiteScanReport",
     "RestrictionSiteSpec",
     "apply_candidate_eligibility",
+    "candidate_id_exclusion",
     "scan_restriction_sites",
 ]

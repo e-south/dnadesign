@@ -17,9 +17,13 @@ OPAL executes each round through the stages below.
 6. Apply `training.y_ops` inversion to both mean and std-dev when configured.
 7. Evaluate every `selection_views[].objective` against the shared phenotype
    prediction. View IDs namespace score and uncertainty channels.
-8. Run each view's selector independently and persist long-form selection sets.
-9. Build one deterministic `selection_batch` union without implicit fill or
-   discard behavior.
+8. Run each view's selector independently to produce a complete deterministic
+   ranking and its preferred top-k set.
+9. Build one deterministic `selection_batch`. The default is the exact logical
+   union. A declared round-robin allocator may instead assign each view its
+   next-best unallocated candidates until every exact quota is full.
+10. Persist final per-view allocations, the sequence-unique batch, and the
+    allocation trace before appending the run ledger.
 
 ### Runtime surfaces
 
@@ -46,8 +50,9 @@ OPAL executes each round through the stages below.
 - `model`: fit/predict implementation.
 - `selection_views`: named objective instances and ranking policies over
   explicit, view-local channel refs.
-- `selection_batch`: deduplication and optional exact-cardinality contract for
-  the logical union.
+- `selection_batch`: deduplication, optional exact-cardinality, and optional
+  cross-view unique-slot allocation. Allocation uses only selector order and
+  never compares score magnitudes between views.
 - `scoring`: prediction batch size.
 - `safety`: preflight guards before writes.
 
@@ -60,8 +65,8 @@ OPAL executes each round through the stages below.
 - `objective_mode` and `tie_handling` are explicit required controls.
 
 A campaign owns learning, a selection view owns a target, and a selection
-batch owns the logical union. Different setpoints over the same X, Y, labels,
-and model are selection views, not separate campaigns.
+batch owns the final deduplicated proposal. Different setpoints over the same
+X, Y, labels, and model are selection views, not separate campaigns.
 
 ### Failure model
 
@@ -73,6 +78,9 @@ OPAL is fail-fast by design:
 - duplicate view IDs and objective channel collisions fail at config load
 - non-finite/invalid model/objective/selection outputs fail before writeback
 - declared selection-batch cardinality mismatch fails without filling slots
+  unless the campaign explicitly declares the unique-slot allocator
+- unique-slot allocation fails on non-ordinal ties, non-exact view quotas,
+  incomplete view priority, ambiguous deduplication keys, or pool exhaustion
 - ledger schema violations fail at write time
 - a configured shared label sidecar fails rather than falling back to
   campaign-local label history when it is missing, malformed, or points at

@@ -290,7 +290,9 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, m
     assert out_path.exists()
     assert smoke_checked == [out_path]
     text = out_path.read_text()
-    assert "# OPAL Review Notebook" in text
+    assert "# OPAL Review Notebook" not in text
+    assert "selected_campaign_title_md = mo.md(_header_lines[0])" in text
+    assert "selected_campaign_context_panel = mo.accordion(" in text
     assert "build_campaign_set_notebook_view_model" in text
     assert 'label="Campaign"' in text
     assert 'label="Deliverable"' in text

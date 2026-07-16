@@ -4,17 +4,42 @@ plot_defaults:
     dpi: 300
     save_data: true
 
-plots:
-  - name: rmf_candidate_frontier
+plot_presets:
+  rmf_candidate_frontier:
     kind: response_magnitude_feasibility_frontier
     round_selector: latest
     round_variants: each
     tags: [decision, rmf]
     params:
-      title: "Predicted candidates occupy distinct response and fluorescence constraint regions"
-      response_label: "Target-ON minus target-OFF response, log2(YFP/CFP)"
-      magnitude_label: "Minimum target-ON fluorescence relative to pDual-10, log2(YFP/OD600)"
-      off_constraint_label: "Target-OFF fluorescence clearance, standardized margin"
+      title: "RMF candidate constraint landscape"
+      response_label: 'Response separation, $d_{\mathrm{response}}$ · $\log_2(\mathrm{YFP}/\mathrm{CFP})$'
+      magnitude_label: 'ON fluorescence floor, $f_{\mathrm{on}}$ · $\log_2(\mathrm{YFP}/\mathrm{OD}_{600})$ relative to pDual-10'
+      off_constraint_label: 'OFF fluorescence clearance, $q_{\mathrm{off}}$'
+      state_labels:
+        "00": "No stress"
+        "10": "EtOH"
+        "01": "Cipro"
+        "11": "EtOH + Cipro"
+      surface_label: "RMF candidate frontier"
+
+plots:
+  - name: rmf_candidate_frontier
+    preset: rmf_candidate_frontier
+    params:
+      annotate_selected_aliases: false
+      notebook_toggle:
+        id: candidate_aliases
+        label: "Show candidate aliases"
+        value: false
+
+  - name: rmf_candidate_frontier_with_aliases
+    preset: rmf_candidate_frontier
+    params:
+      annotate_selected_aliases: true
+      notebook_toggle:
+        id: candidate_aliases
+        label: "Show candidate aliases"
+        value: true
 
   - name: rmf_selected_constraints
     kind: response_magnitude_feasibility_constraint_decomposition
@@ -22,4 +47,10 @@ plots:
     round_variants: each
     tags: [decision, rmf, selection]
     params:
-      title: "Each selected candidate is limited by one explicit RMF requirement"
+      title: "Selected-candidate RMF constraints"
+      candidate_label_mode: alias
+      state_labels:
+        "00": "No stress"
+        "10": "EtOH"
+        "01": "Cipro"
+        "11": "EtOH + Cipro"

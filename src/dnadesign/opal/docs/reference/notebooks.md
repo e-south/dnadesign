@@ -3,7 +3,7 @@ id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-15
 audience:
   - operator
   - maintainer
@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-15
 
 ## OPAL Notebooks
 
@@ -84,7 +84,7 @@ Generated notebooks import public helpers from
 `dnadesign.opal.notebooks.api.generated`. The canonical generated surface is the
 campaign-set template, and a single-campaign notebook is the same template with
 one campaign config. Generated notebooks embed
-`__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v4"` so
+`__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v5"` so
 non-current local notebooks can be distinguished from current templates during review.
 `opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
 written notebook path, config paths, resolved round selector, optional pinned
@@ -104,7 +104,7 @@ Each campaign entry is a manifest-backed `NotebookViewModel` with schema
 | `review_manifest_paths` | map of selection-view ID to canonical manifest path |
 | `plot_manifests` | per-plot manifests referenced by the index |
 | `artifact_garden` | local artifact-root inventory, stale sibling list, byte counts, and dry-run prune plan |
-| `selection_batch` | deduplicated logical union for the resolved run |
+| `selection_batch` | final deduplicated proposal for the resolved run |
 | `stale_artifacts` | stale review or plot files not referenced by active manifests |
 | `warnings` | missing manifests, stale files, or other nonfatal states |
 
@@ -126,23 +126,28 @@ The generated notebook renders the view model as an app-mode review surface:
 - selection-view selector for the selected campaign; the chosen view controls
   objective parameters, target mask, ranks, selected rows, and plot manifests;
 - round selector for progress and manifest-backed plot scope;
-- an `OPAL Campaign Review` header that names the number of OPAL campaigns,
-  the review scope, and any materialized campaign-set visual count;
+- one human-readable campaign title. The campaign description, observed-label
+  evidence status and claim boundary, and active objective target stay in a
+  closed `Campaign context` accordion immediately below the navigation surface;
 - a top-level `Review scope` control only when there is a real campaign versus
   campaign-set choice: `Campaign` for one selected campaign's plot deliverables,
   and `Campaign set` for manifest-backed comparisons between genuinely
   independent campaigns;
 - a campaign-set selector for explicit matched sets, such as one positive/null
   control pair for a target/family/split;
-- a consolidated top control surface that groups review scope, review section,
-  and deliverable scope before any selected media. `Review section` is the
+- a consolidated, wrapped `mo.hstack` that keeps campaign, selection view,
+  review section, deliverable, and any scoped follow-on control together before
+  the selected media. `Review section` is the
   stable progressive-disclosure layer: `Decision review`, `Assay evidence`,
   `EDA comparisons`, `Model diagnostics`, `Method diagnostics`, and `Handoff`.
   The deliverable selector owns OPAL plot artifacts, selected-sequence renders,
   collection comparison visuals, and Reader evidence plot types within the
   active section. Follow-on controls are scoped to the selected deliverable:
-  plot scope for OPAL plots, selection round/run/sequence for selected-sequence
-  renders, and Reader plot instance or time controls for Reader deliverables;
+  plot scope or display variant for OPAL plots, selection round/run/sequence for
+  selected-sequence renders, and Reader plot instance or time controls for
+  Reader deliverables. Campaign, selection-view, review-section, deliverable,
+  plot-scope, and display-variant choices preserve valid state when another
+  control changes;
 - one selected media viewport above secondary tables, so app-mode review can
   iterate OPAL and Reader deliverables through one selector without opening
   detail sections. When a campaign has Reader evidence but no OPAL plot
@@ -213,7 +218,8 @@ Reusable generated-cell builders and public component primitives live in
 campaign summary rows, at-a-glance rows, validity lines, change summary lines
 and rows, distrust/limitations lines, warning and stale-artifact evidence rows,
 metric definition rows, artifact garden rows, manifest-backed visual-surface
-models, centralized review control surfaces, compact path labels, plot detail
+models, validated plot display-variant pairs, centralized review control
+surfaces, compact path labels, plot detail
 rows, plot method rows, and optional BaseRender record-render contracts. Keep
 the generated source renderer in `src/analysis/notebook_template/` as thin
 composition over small semantic cell fragment modules. The reusable component
@@ -224,11 +230,21 @@ Define marimo UI controls in one cell and read their `.value` in a downstream
 cell; generated notebooks include a regression guard for this rule.
 
 For a multi-view campaign, the top hierarchy is `Campaign | Selection view |
-Review section | Deliverable`. View-specific plots live under
+Review section | Deliverable | optional scope or display variant`. View-specific plots live under
 `outputs/plots/selection_views/<view_id>/`; shared model diagnostics appear
-once. A selection-batch deliverable reports the deduplicated logical union and
+once. A selection-batch deliverable reports the final deduplicated proposal and
 view memberships. Do not create a campaign-set notebook merely to compare
 setpoints that share one learning lifecycle.
+
+A plot may expose one optional notebook switch by publishing exactly two
+written manifests with the same `params.surface_label` and matching
+`params.notebook_toggle.id` and `.label`. The pair must contain one
+`value: false` manifest and one `value: true` manifest with the same plot kind,
+selection view, round scope, and run scope. The false variant is the default.
+One toggle ID must retain one accessible label across the notebook because the
+ID keys remembered display state.
+Malformed or incomplete pairs fail notebook model construction instead of
+silently choosing an artifact.
 
 Campaign surfaces are intentionally overview-first: they provide campaign and
 visual controls, manifest-backed plot-scope controls, status and provenance

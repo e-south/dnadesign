@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/opal/src/cli/commands/selection_batch.py
 
-CLI for the deduplicated logical union of OPAL selection views.
+CLI for the final deduplicated OPAL selection batch.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,8 +22,8 @@ from ...reporting.selection_set import load_selection_batch
 from ..registry import cli_group
 from ._common import internal_error, json_error, json_out, opal_error, resolve_config_path
 
-selection_batch_app = typer.Typer(no_args_is_help=True, help="Inspect and export a logical selection batch.")
-cli_group("selection-batch", help="Inspect and export a logical selection batch.")(selection_batch_app)
+selection_batch_app = typer.Typer(no_args_is_help=True, help="Inspect and export a final selection batch.")
+cli_group("selection-batch", help="Inspect and export a final selection batch.")(selection_batch_app)
 
 
 @selection_batch_app.command("show", help="Show the deduplicated selection union for one OPAL run.")

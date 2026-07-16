@@ -33,11 +33,11 @@ def render_visual_panel_cell() -> str:
             render_notebook_plot_choice_image,
             render_notebook_visual_panel,
             selected_baserender_round, selected_baserender_status_rows, selected_campaign_baserender_contract,
-            selected_campaign_labels_df, selected_visual_choice, select_notebook_plot_scope,
+            selected_campaign_labels_df, selected_display_visual_choice, select_notebook_plot_scope,
         ):
             if (
-                selected_visual_choice is not None
-                and selected_visual_choice.get("surface_kind") == "reader_evidence"
+                selected_display_visual_choice is not None
+                and selected_display_visual_choice.get("surface_kind") == "reader_evidence"
             ):
                 plot_panel = reader_evidence_visual
             else:
@@ -74,7 +74,7 @@ def render_visual_panel_cell() -> str:
                     selected_baserender_status_rows=selected_baserender_status_rows,
                     selected_campaign_baserender_contract=selected_campaign_baserender_contract,
                     selected_campaign_labels_df=selected_campaign_labels_df,
-                    selected_visual_choice=selected_visual_choice,
+                    selected_visual_choice=selected_display_visual_choice,
                     select_notebook_plot_scope=select_notebook_plot_scope,
                 )
             return plot_panel

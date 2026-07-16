@@ -39,6 +39,7 @@ from .types import (
     RootConfig,
     SafetyBlock,
     ScoringBlock,
+    SelectionBatchAllocationBlock,
     SelectionBatchBlock,
     SelectionView,
     TrainingBlock,
@@ -117,10 +118,27 @@ class PSelectionView(BaseModel):
         return out
 
 
+class PSelectionBatchAllocation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    strategy: Literal["round_robin_next_best_unallocated"]
+    view_priority: List[str] = Field(min_length=1)
+
+    @field_validator("view_priority")
+    @classmethod
+    def _view_priority_valid(cls, value: List[str]) -> List[str]:
+        out = [str(item).strip() for item in value]
+        if any(not item for item in out):
+            raise ValueError("selection_batch.allocation.view_priority entries must be non-empty")
+        if len(out) != len(set(out)):
+            raise ValueError("selection_batch.allocation.view_priority must not contain duplicates")
+        return out
+
+
 class PSelectionBatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
     deduplicate_by: Optional[str] = None
     expected_unique_count: Optional[int] = None
+    allocation: Optional[PSelectionBatchAllocation] = None
 
     @field_validator("deduplicate_by")
     @classmethod
@@ -468,6 +486,52 @@ def load_config(path: Path | str) -> RootConfig:
             "Invalid campaign.yaml: all selection views must use the same "
             "selection.params.exclude_already_labeled policy."
         )
+    allocation_dc: SelectionBatchAllocationBlock | None = None
+    if pyd.selection_batch.allocation is not None:
+        allocation = pyd.selection_batch.allocation
+        priority = list(allocation.view_priority)
+        missing_priority = sorted(set(view_ids) - set(priority))
+        unknown_priority = sorted(set(priority) - set(view_ids))
+        if missing_priority or unknown_priority or len(priority) != len(view_ids):
+            raise ConfigError(
+                "Invalid campaign.yaml: selection_batch.allocation.view_priority must be an exact "
+                f"permutation of selection view ids; missing={missing_priority}, unknown={unknown_priority}."
+            )
+        quota_total = 0
+        for view in selection_views:
+            params = dict(view.selection.params)
+            if str(params.get("tie_handling", "")).strip() != "ordinal":
+                raise ConfigError(
+                    "Invalid campaign.yaml: selection_batch allocation requires "
+                    f"selection_views[{view.id}].selection.params.tie_handling='ordinal'."
+                )
+            if not bool(params.get("require_exact_top_k", False)):
+                raise ConfigError(
+                    "Invalid campaign.yaml: selection_batch allocation requires "
+                    f"selection_views[{view.id}].selection.params.require_exact_top_k=true."
+                )
+            try:
+                top_k = int(params["top_k"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ConfigError(
+                    "Invalid campaign.yaml: selection_batch allocation requires a positive integer "
+                    f"selection_views[{view.id}].selection.params.top_k."
+                ) from exc
+            if top_k <= 0:
+                raise ConfigError("Invalid campaign.yaml: selection_batch allocation requires positive top_k values.")
+            quota_total += top_k
+        expected_unique_count = pyd.selection_batch.expected_unique_count
+        if expected_unique_count is None:
+            raise ConfigError("Invalid campaign.yaml: selection_batch allocation requires expected_unique_count.")
+        if int(expected_unique_count) != quota_total:
+            raise ConfigError(
+                "Invalid campaign.yaml: selection_batch.expected_unique_count must equal the sum of "
+                f"selection view top_k quotas ({quota_total}) when allocation is configured."
+            )
+        allocation_dc = SelectionBatchAllocationBlock(
+            strategy=str(allocation.strategy),
+            view_priority=priority,
+        )
     try:
         eligibility_rules = [
             PluginRef(rule.name, validate_params("candidate_eligibility", rule.name, rule.params))
@@ -598,6 +662,7 @@ def load_config(path: Path | str) -> RootConfig:
         selection_batch=SelectionBatchBlock(
             deduplicate_by=pyd.selection_batch.deduplicate_by,
             expected_unique_count=pyd.selection_batch.expected_unique_count,
+            allocation=allocation_dc,
         ),
         candidate_eligibility=candidate_eligibility_dc,
         training=training_dc,

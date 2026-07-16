@@ -25,6 +25,7 @@ from ..core.leakage import (
     build_shared_label_source_contamination_report,
 )
 from ..core.utils import OpalError
+from .candidate_exclusion_projection import candidate_exclusion_sets_from_config
 from .data_access import RecordsStore
 from .locks import PathLock
 from .observed_label_promotion import (
@@ -427,6 +428,7 @@ def label_source_from_config(cfg: RootConfig, store: RecordsStore) -> TrainingLa
                 candidate_path="records.parquet",
                 candidate_id_column=cfg.labels.id_column,
                 candidate_x_column=cfg.data.x_column_name,
+                candidate_exclusion_sets=candidate_exclusion_sets_from_config(cfg),
             )
         return SharedObservedLabelSource(
             store=ObservedLabelStore(
@@ -597,6 +599,9 @@ def label_source_status(
                     "study_provenance_schema_id": verified.study_provenance_schema_id,
                     "study_provenance_path": str(verified.study_provenance_path),
                     "study_provenance_sha256": verified.study_provenance_sha256,
+                    "candidate_exclusion_set_id": verified.candidate_exclusion_set_id,
+                    "candidate_exclusion_entries_sha256": verified.candidate_exclusion_entries_sha256,
+                    "candidate_exclusion_entry_count": verified.candidate_exclusion_entry_count,
                 }
             )
         return out

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from dnadesign.opal.src.core.utils import OpalError, file_sha256
 from dnadesign.opal.src.storage.label_sources import ObservedLabelStore
 from dnadesign.opal.src.storage.observed_label_promotion import (
     OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION,
+    CandidateExclusionSetBinding,
     ObservedLabelPromotionBinding,
     verify_observed_label_promotion,
 )
@@ -72,6 +74,7 @@ def _write_promotion(dataset_root: Path) -> tuple[Path, Path, dict]:
             "path": PROVENANCE_RELATIVE_PATH,
             "sha256": file_sha256(provenance_path),
         },
+        "candidate_exclusion_projection": _candidate_exclusion_projection([]),
         "candidate_artifact": _candidate_artifact(candidate_path),
         "label_artifact": {
             "path": LABEL_RELATIVE_PATH,
@@ -108,6 +111,19 @@ def _candidate_artifact(path: Path) -> dict[str, object]:
     }
 
 
+def _candidate_exclusion_projection(entries: list[dict[str, str]]) -> dict[str, object]:
+    canonical = json.dumps(
+        sorted(entries, key=lambda entry: entry["candidate_id"]),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return {
+        "exclusion_set_id": "study_observation_dispositions_v1",
+        "entries_sha256": sha256(canonical.encode("utf-8")).hexdigest(),
+        "entry_count": len(entries),
+    }
+
+
 def _store_with_label_frame(dataset_root: Path, frame: pd.DataFrame) -> ObservedLabelStore:
     label_path, manifest_path, payload = _write_promotion(dataset_root)
     frame.to_parquet(label_path, index=False)
@@ -135,6 +151,56 @@ def test_verify_observed_label_promotion_accepts_exact_artifact(tmp_path: Path) 
     assert verified.candidate_path == (tmp_path / CANDIDATE_RELATIVE_PATH).resolve()
     assert verified.candidate_row_count == 3
     assert verified.candidate_columns == ("id", "sequence", "x_feature")
+
+
+def test_verify_observed_label_promotion_binds_campaign_candidate_exclusions(tmp_path: Path) -> None:
+    _, manifest_path, payload = _write_promotion(tmp_path)
+    entries = [{"candidate_id": "candidate_unmeasured", "reason": "study_excluded"}]
+    payload["candidate_exclusion_projection"] = _candidate_exclusion_projection(entries)
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    matching = replace(
+        _binding(tmp_path),
+        candidate_exclusion_sets=(
+            CandidateExclusionSetBinding(
+                exclusion_set_id="study_observation_dispositions_v1",
+                entries=entries,
+            ),
+        ),
+    )
+
+    verified = verify_observed_label_promotion(matching)
+
+    assert verified.candidate_exclusion_set_id == "study_observation_dispositions_v1"
+    assert verified.candidate_exclusion_entry_count == 1
+
+
+@pytest.mark.parametrize(
+    ("sets", "message"),
+    [
+        ((), "missing candidate exclusion set"),
+        (
+            (
+                CandidateExclusionSetBinding(
+                    exclusion_set_id="study_observation_dispositions_v1",
+                    entries=[{"candidate_id": "candidate_unmeasured", "reason": "different_reason"}],
+                ),
+            ),
+            "digest mismatch",
+        ),
+    ],
+)
+def test_verify_observed_label_promotion_rejects_campaign_candidate_exclusion_drift(
+    tmp_path: Path,
+    sets: tuple[CandidateExclusionSetBinding, ...],
+    message: str,
+) -> None:
+    _, manifest_path, payload = _write_promotion(tmp_path)
+    entries = [{"candidate_id": "candidate_unmeasured", "reason": "study_excluded"}]
+    payload["candidate_exclusion_projection"] = _candidate_exclusion_projection(entries)
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    with pytest.raises(OpalError, match=message):
+        verify_observed_label_promotion(replace(_binding(tmp_path), candidate_exclusion_sets=sets))
 
 
 @pytest.mark.parametrize(

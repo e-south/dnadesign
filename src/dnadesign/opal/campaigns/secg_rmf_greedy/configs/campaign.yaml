@@ -7,7 +7,15 @@ campaign:
   workdir: "."
   metadata:
     study_id: stress_ethanol_cipro_growth
-    response_reduction: event_logmean_6_12h_post
+    response_reduction: event_logmean_4_8h_post
+    rmf_calibration:
+      cohort_id: exact_primary_reader_candidate_experiments_v1
+      unit: reader_candidate_experiment
+      scale_quantile: 0.9
+      reader_bundle_manifest_sha256: e0065183fe010fe40e88e75da998cff5ed1399e56ff1d2bc1268f9331b573a67  # pragma: allowlist secret
+      candidate_bindings_manifest_sha256: 273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8  # pragma: allowlist secret
+      unit_count: 41
+      excluded_nonexact_unit_count: 6
 
 plot_config: "plots.yaml"
 
@@ -28,6 +36,27 @@ data:
 
 candidate_eligibility:
   rules:
+    - name: candidate_id_exclusion
+      params:
+        exclusion_set_id: stress_response_window_observation_dispositions_v1
+        min_remaining_candidates: 1000
+        entries:
+          - candidate_id: 09b59d2365b6a6cb71fd44e155a40d92ae2a88f0  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: 4038eae023686f1abb6226022acd7daf18cd6e19  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: 435c9049d7a0b9df2aedb3724cff0c7f8486992d  # pragma: allowlist secret
+            reason: repeat_source_disagreement
+          - candidate_id: 7871958259f60506b8ffedfeff6683b53c5c688b  # pragma: allowlist secret
+            reason: repeat_source_disagreement
+          - candidate_id: 7d19c4330b78ea3eebeaaaaede6a7f4be72f3412  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: b59c5a320c7a1eb3c9e9e85d2e18a4f2d3f69470  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: c33e022ac822d1ca608940a561e4fb76802faa74  # pragma: allowlist secret
+            reason: repeat_source_disagreement
+          - candidate_id: e0cdedf311d28b733f95ccd8fe0a10b0280f8978  # pragma: allowlist secret
+            reason: repeat_source_disagreement
     - name: restriction_site_exclusion
       params:
         sequence_column: sequence
@@ -103,15 +132,15 @@ selection_views:
           response_separation_min: 0.0
           on_magnitude_min: 0.0
           off_magnitude_max: 0.0
-          response_separation_scale: 0.509942
-          on_magnitude_scale: 0.626884
-          off_magnitude_scale: 0.420417
+          response_separation_scale: 0.352901
+          on_magnitude_scale: 0.266036
+          off_magnitude_scale: 0.329133
     selection:
       name: top_n
       params:
         top_k: 6
         score_ref: feasibility_margin
-        tie_handling: competition_rank
+        tie_handling: ordinal
         objective_mode: maximize
         require_exact_top_k: true
 
@@ -125,15 +154,15 @@ selection_views:
           response_separation_min: 0.0
           on_magnitude_min: 0.0
           off_magnitude_max: 0.0
-          response_separation_scale: 0.390950
-          on_magnitude_scale: 0.337726
-          off_magnitude_scale: 0.504853
+          response_separation_scale: 0.309548
+          on_magnitude_scale: 0.244112
+          off_magnitude_scale: 0.259455
     selection:
       name: top_n
       params:
         top_k: 6
         score_ref: feasibility_margin
-        tie_handling: competition_rank
+        tie_handling: ordinal
         objective_mode: maximize
         require_exact_top_k: true
 
@@ -147,21 +176,24 @@ selection_views:
           response_separation_min: 0.0
           on_magnitude_min: 0.0
           off_magnitude_max: 0.0
-          response_separation_scale: 0.491582
-          on_magnitude_scale: 0.371687
-          off_magnitude_scale: 0.424486
+          response_separation_scale: 0.391062
+          on_magnitude_scale: 0.264730
+          off_magnitude_scale: 0.329133
     selection:
       name: top_n
       params:
         top_k: 6
         score_ref: feasibility_margin
-        tie_handling: competition_rank
+        tie_handling: ordinal
         objective_mode: maximize
         require_exact_top_k: true
 
 selection_batch:
   deduplicate_by: sequence
   expected_unique_count: 18
+  allocation:
+    strategy: round_robin_next_best_unallocated
+    view_priority: [ethanol, ciprofloxacin, and]
 
 scoring:
   score_batch_size: 1000

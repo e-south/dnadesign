@@ -114,7 +114,7 @@ def test_load_selection_batch_returns_logical_union(tmp_path: Path) -> None:
 
     payload = load_selection_batch(campaign, round_selector="latest")
 
-    assert payload["schema_version"] == "opal.selection_batch.v1"
+    assert payload["schema_version"] == "opal.selection_batch.v2"
     assert payload["selection_batch_path"] == str(batch_path)
     assert payload["unique_count"] == 1
     assert payload["rows"][0]["selection_view_ids"] == ["primary"]

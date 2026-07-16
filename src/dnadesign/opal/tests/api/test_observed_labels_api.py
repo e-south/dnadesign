@@ -127,6 +127,11 @@ def _write_promotion(dataset_root: Path, labels: pd.DataFrame) -> None:
             "path": PROVENANCE_RELATIVE_PATH,
             "sha256": _sha256(provenance_path),
         },
+        "candidate_exclusion_projection": {
+            "exclusion_set_id": "test_observed_label_dispositions_v1",
+            "entries_sha256": hashlib.sha256(b"[]").hexdigest(),
+            "entry_count": 0,
+        },
         "candidate_artifact": _candidate_artifact(candidate_path),
         "label_artifact": {
             "path": LABEL_RELATIVE_PATH,

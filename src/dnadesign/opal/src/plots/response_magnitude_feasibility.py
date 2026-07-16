@@ -26,6 +26,11 @@ from ._mpl_utils import (
     scatter_smart,
     wrap_plot_title,
 )
+from .response_magnitude_feasibility_aliases import (
+    annotate_candidate_aliases,
+    resolve_candidate_display_aliases,
+    short_candidate_id,
+)
 from .response_magnitude_feasibility_data import (
     FEASIBILITY_REF,
     OFF_MAGNITUDE_REF,
@@ -67,6 +72,10 @@ _DECOMPOSITION_KIND = "response_magnitude_feasibility_constraint_decomposition"
             "point_size": "Candidate point size (default 10).",
             "point_alpha": "Candidate point alpha (default 0.35).",
             "rasterize_at": "Rasterize points at or above this count (default 10000).",
+            "annotate_selected_aliases": "Annotate selected points with candidate display aliases (default false).",
+            "alias_font_size": "Selected-candidate annotation size in points (default 7).",
+            "surface_label": "Optional notebook-facing label shared by display variants.",
+            "notebook_toggle": "Optional notebook display-variant metadata; ignored by the renderer.",
         },
         requires=[
             "as_of_round",
@@ -115,17 +124,17 @@ def render_frontier(context: Any, params: dict) -> None:
     apply_plot_style()
     data = load_response_magnitude_feasibility_plot_data(context)
     frame = data.frame
-    response_label = str(params.get("response_label", "Target response separation, $d_{response}$")).strip()
+    response_label = str(params.get("response_label", r"Response separation, $d_{\mathrm{response}}$")).strip()
     magnitude_label = str(
         params.get(
             "magnitude_label",
-            "Target-ON magnitude floor, $f_{on}$",
+            r"ON fluorescence floor, $f_{\mathrm{on}}$",
         )
     ).strip()
     off_label = str(
         params.get(
             "off_constraint_label",
-            "Target-OFF constraint margin, $q_{off}$",
+            r"OFF fluorescence clearance, $q_{\mathrm{off}}$",
         )
     ).strip()
     if not response_label or not magnitude_label or not off_label:
@@ -134,6 +143,11 @@ def render_frontier(context: Any, params: dict) -> None:
     point_size = _positive_float(params.get("point_size", 10.0), name="point_size")
     point_alpha = _unit_float(params.get("point_alpha", 0.35), name="point_alpha")
     rasterize_at = _nonnegative_int(params.get("rasterize_at", 10_000), name="rasterize_at")
+    annotate_aliases = _strict_bool(
+        params.get("annotate_selected_aliases", False),
+        name="annotate_selected_aliases",
+    )
+    alias_font_size = _positive_float(params.get("alias_font_size", 7.0), name="alias_font_size")
 
     off_constraint = frame["off_magnitude_constraint_margin"].to_numpy(dtype=float)
     color_extent = max(float(np.max(np.abs(off_constraint))), 1.0e-9)
@@ -164,7 +178,7 @@ def render_frontier(context: Any, params: dict) -> None:
         marker="o",
         s=max(30.0, point_size * 2.0),
         linewidths=0.9,
-        label=f"Observed labels (n={len(observed)})",
+        label=f"Measured (n={len(observed)})",
         zorder=3,
     )
     ax.scatter(
@@ -177,41 +191,55 @@ def render_frontier(context: Any, params: dict) -> None:
         s=max(36.0, point_size * 2.5),
         edgecolors="#111111",
         linewidths=1.2,
-        label="Selected",
+        label=f"Selected (n={int(selected.sum())})",
         zorder=4,
     )
     ax.axvline(data.calibration["response_separation_min"], color="#555555", linestyle="--", linewidth=1.1, zorder=1)
     ax.axhline(data.calibration["on_magnitude_min"], color="#555555", linestyle="--", linewidth=1.1, zorder=1)
-    ax.set_xlabel(response_label, fontsize=11, labelpad=8)
-    ax.set_ylabel(magnitude_label, fontsize=11, labelpad=8)
-    ax.tick_params(axis="both", labelsize=9)
+    ax.set_xlabel(response_label, fontsize=9.5, labelpad=7)
+    ax.set_ylabel(magnitude_label, fontsize=9.5, labelpad=7)
+    ax.tick_params(axis="both", labelsize=8.5)
     fig.suptitle(
         wrap_plot_title(
-            params.get("title", "Predicted RMF components locate selections relative to campaign thresholds"),
-            width=50,
+            params.get("title", "RMF candidate constraint landscape"),
+            width=62,
         ),
         x=0.5,
         y=0.98,
         ha="center",
         fontweight="semibold",
-        fontsize=14,
+        fontsize=12,
     )
     ax.set_title(
         _target_context(data, params),
-        fontsize=8.5,
-        pad=10,
+        fontsize=8.2,
+        pad=7,
     )
-    ax.legend(loc="best", fontsize=9)
+    ax.legend(loc="upper left", fontsize=8, ncol=2, frameon=False, handletextpad=0.5, columnspacing=1.0)
     colorbar = add_flush_colorbar(
         fig,
         ax,
         points,
-        label=f"{off_label}\n0 = configured boundary",
-        pad=0.09,
-        ticklabelsize=9,
+        label=f"{off_label}\n0 = boundary",
+        pad=0.065,
+        ticklabelsize=8.5,
     )
-    colorbar.ax.yaxis.label.set_size(10)
-    fig.subplots_adjust(left=0.20, right=0.76, bottom=0.19, top=0.78)
+    colorbar.ax.yaxis.label.set_size(9)
+    fig.subplots_adjust(left=0.17, right=0.79, bottom=0.16, top=0.86)
+    if annotate_aliases:
+        records_path = context.data_paths.get("records")
+        if records_path is None:
+            raise ValueError("annotate_selected_aliases requires the built-in records.parquet input.")
+        selected_frame = frame.loc[selected].copy()
+        aliases = resolve_candidate_display_aliases(records_path, selected_frame["id"].astype(str).tolist())
+        annotate_candidate_aliases(
+            ax,
+            selected_frame,
+            aliases,
+            x_column=RESPONSE_REF,
+            y_column=ON_MAGNITUDE_REF,
+            font_size=alias_font_size,
+        )
     _save(context, fig)
     if context.save_data:
         context.save_df(_frontier_tidy(frame, observed))
@@ -239,6 +267,7 @@ def render_frontier(context: Any, params: dict) -> None:
             "state_labels": "Optional exact state-id to display-label mapping.",
             "figsize_in": "Optional two-item figure size in inches.",
             "max_selected": "Maximum selected rows permitted in one readable heatmap (default 24).",
+            "candidate_label_mode": "Candidate row labels: short_id (default) or alias.",
         },
         requires=[
             "as_of_round",
@@ -295,36 +324,51 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
     apply_notebook_axes_style(ax, grid=False, square=False)
     ax.set_xticks(
         np.arange(4),
-        [r"$q_{response}$", r"$q_{on}$", r"$q_{off}$", r"$S_{RMF}$"],
+        [
+            r"$q_{\mathrm{response}}$",
+            r"$q_{\mathrm{on}}$",
+            r"$q_{\mathrm{off}}$",
+            r"$S_{\mathrm{RMF}}$",
+        ],
     )
+    candidate_label_mode = str(params.get("candidate_label_mode", "short_id")).strip().lower()
+    if candidate_label_mode not in {"short_id", "alias"}:
+        raise ValueError("candidate_label_mode must be 'short_id' or 'alias'.")
+    if candidate_label_mode == "alias":
+        records_path = context.data_paths.get("records")
+        if records_path is None:
+            raise ValueError("candidate_label_mode='alias' requires the built-in records.parquet input.")
+        row_labels = resolve_candidate_display_aliases(records_path, selected["id"].astype(str).tolist())
+    else:
+        row_labels = {str(value): short_candidate_id(str(value)) for value in selected["id"]}
     ax.set_yticks(
         np.arange(len(selected)),
-        [f"#{int(row.view__rank_competition)}  {_short_id(row.id)}" for row in selected.itertuples(index=False)],
+        [f"#{int(row.view__rank_competition)}  {row_labels[str(row.id)]}" for row in selected.itertuples(index=False)],
     )
     ax.tick_params(axis="x", labelsize=9)
     ax.tick_params(axis="y", labelsize=9)
     ax.set_xlabel(
-        "$q_{response}$: separation | $q_{on}$: ON fluorescence | $q_{off}$: OFF control\n"
-        "Positive values satisfy the configured requirement; $S_{RMF}$ is the minimum margin",
-        fontsize=9.5,
-        labelpad=8,
+        r"$S_{\mathrm{RMF}}=\min(q_{\mathrm{response}},q_{\mathrm{on}},q_{\mathrm{off}})$"
+        "\n0 marks each configured boundary",
+        fontsize=9,
+        labelpad=7,
     )
-    ax.set_ylabel("Rank and candidate ID", fontsize=11, labelpad=8)
+    ax.set_ylabel("Selection rank · candidate", fontsize=9.5, labelpad=7)
     fig.suptitle(
         wrap_plot_title(
-            params.get("title", "The weakest requirement determines each selected feasibility score"),
-            width=50,
+            params.get("title", "Selected-candidate RMF constraints"),
+            width=62,
         ),
         x=0.5,
         y=0.98,
         ha="center",
         fontweight="semibold",
-        fontsize=14,
+        fontsize=12,
     )
     ax.set_title(
         f"{_target_context(data, params)}\nOutlined cell limits the RMF score",
-        fontsize=8.5,
-        pad=10,
+        fontsize=8.2,
+        pad=7,
     )
     for row in range(matrix.shape[0]):
         limiting_column = int(np.argmin(matrix[row, :3]))
@@ -354,12 +398,12 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
         fig,
         ax,
         image,
-        label="Standardized signed margin\n0 = configured boundary",
-        pad=0.08,
-        ticklabelsize=9,
+        label="Standardized margin\n0 = boundary",
+        pad=0.06,
+        ticklabelsize=8.5,
     )
-    colorbar.ax.yaxis.label.set_size(10)
-    fig.subplots_adjust(left=0.22, right=0.77, bottom=0.19, top=0.76)
+    colorbar.ax.yaxis.label.set_size(9)
+    fig.subplots_adjust(left=0.30, right=0.80, bottom=0.16, top=0.86)
     _save(context, fig)
     if context.save_data:
         context.save_df(_decomposition_tidy(selected))
@@ -496,9 +540,10 @@ def _nonnegative_int(value: object, *, name: str) -> int:
     return parsed
 
 
-def _short_id(value: object) -> str:
-    text = str(value)
-    return text if len(text) <= 15 else f"{text[:6]}...{text[-5:]}"
+def _strict_bool(value: object, *, name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be a boolean.")
+    return value
 
 
 __all__ = ["render_constraint_decomposition", "render_frontier"]

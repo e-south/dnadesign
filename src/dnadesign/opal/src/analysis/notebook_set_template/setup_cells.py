@@ -57,6 +57,7 @@ def _import_cell() -> str:
                 build_notebook_baserender_record_choices, build_notebook_baserender_record_choices_with_counts,
                 build_notebook_baserender_record_options, build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row, build_notebook_change_rows, build_notebook_change_summary_rows,
+                build_notebook_display_variant_toggle,
                 build_notebook_collection_baserender_role_choices, build_notebook_collection_set_choices,
                 build_notebook_campaign_set_selection_overlap_card_rows, build_notebook_collection_visual_card_rows,
                 build_notebook_collection_visual_choices, build_notebook_evidence_rows,
@@ -75,7 +76,8 @@ def _import_cell() -> str:
                 render_notebook_reader_evidence_artifact_visual, render_notebook_reader_evidence_panel,
                 render_notebook_reader_evidence_time_control, render_notebook_review_control_surface,
                 render_notebook_visual_panel, resolve_notebook_round_default, resolve_notebook_selection_view,
-                select_notebook_baserender_default_record_id, select_notebook_plot_scope,
+                select_notebook_baserender_default_record_id, select_notebook_display_variant,
+                select_notebook_plot_scope,
             )
             from dnadesign.opal.notebooks.api.generated import (
                 build_notebook_collection_visual_description as collection_visual_description,
@@ -90,6 +92,7 @@ def _import_cell() -> str:
                 build_notebook_baserender_record_choices, build_notebook_baserender_record_choices_with_counts,
                 build_notebook_baserender_record_options, build_notebook_campaign_header_lines,
                 build_notebook_campaign_summary_row, build_notebook_change_rows, build_notebook_change_summary_rows,
+                build_notebook_display_variant_toggle,
                 build_notebook_collection_baserender_role_choices, build_notebook_collection_set_choices,
                 build_notebook_campaign_set_selection_overlap_card_rows, build_notebook_collection_visual_card_rows,
                 build_notebook_collection_visual_choices, collection_visual_description, build_notebook_evidence_rows,
@@ -108,7 +111,8 @@ def _import_cell() -> str:
                 render_notebook_reader_evidence_panel, render_notebook_reader_evidence_time_control,
                 render_notebook_review_control_surface, render_notebook_visual_panel, resolve_notebook_round_default,
                 resolve_notebook_selection_view,
-                select_notebook_baserender_default_record_id, select_notebook_plot_scope,
+                select_notebook_baserender_default_record_id, select_notebook_display_variant,
+                select_notebook_plot_scope,
             )
         """
     )

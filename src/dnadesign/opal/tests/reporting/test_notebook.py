@@ -95,7 +95,7 @@ def test_notebook_view_model_loads_run_scoped_selection_batch(tmp_path: Path, mo
         calls.append((round_selector, run_id))
         assert config == config_path.resolve()
         return {
-            "schema_version": "opal.selection_batch.v1",
+            "schema_version": "opal.selection_batch.v2",
             "as_of_round": 0,
             "run_id": "run-1",
             "unique_count": 1,
@@ -130,7 +130,7 @@ def test_notebook_view_model_loads_latest_selection_batch_without_run_pin(
         calls.append((round_selector, run_id))
         assert config == config_path.resolve()
         return {
-            "schema_version": "opal.selection_batch.v1",
+            "schema_version": "opal.selection_batch.v2",
             "as_of_round": 0,
             "run_id": "run-1",
             "unique_count": 1,
