@@ -23,6 +23,7 @@ from .multistate_behavior_bundle_verification import (
     verify_multistate_behavior_shadow,
 )
 from .multistate_behavior_decision import build_multistate_behavior_decision
+from .multistate_behavior_decision_verification import verify_behavior_adversarial_audit_record
 from .multistate_behavior_json import load_strict_behavior_json
 from .multistate_behavior_shadow import VerifiedMultistateBehaviorShadow
 from .multistate_behavior_source_equivalence import build_source_equivalence_receipt
@@ -69,6 +70,7 @@ def publish_multistate_behavior_shadow(
         )
         artifacts.update(plot_artifacts)
         audit = load_strict_behavior_json(_AUDIT_PATH)
+        verify_behavior_adversarial_audit_record(audit)
         audit_path = stage / "independent_adversarial_audit.json"
         audit_path.write_text(
             json.dumps(audit, allow_nan=False, indent=2, sort_keys=True) + "\n",

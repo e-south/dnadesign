@@ -284,6 +284,13 @@ The completion gate adds the smallest evidence set needed for adjudication:
   three minimal plots for normalization robustness, grouped validation, and
   allocation-preview family decomposition.
 
+The audit record names the stable Codex subagent auditor, UTC completion time,
+full reviewed source commit, and SHA-256 digest of the preliminary bundle that
+the independent pass inspected. Publication and verification reject any drift
+in those four fields. This provenance identifies the exact automated review
+snapshot; it is not a human or external peer review, a cryptographic signature,
+or evidence of prospective hill-climb efficacy.
+
 The verifier rejects unregistered files, path escape, duplicate JSON keys,
 non-finite required values, row or schema drift, duplicate semantic keys,
 prediction-run mismatch, evidence-digest drift, non-replayable fold parameters

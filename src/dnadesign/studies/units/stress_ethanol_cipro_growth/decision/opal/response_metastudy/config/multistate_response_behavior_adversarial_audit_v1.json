@@ -1,5 +1,7 @@
 {
+  "auditor_id": "codex_subagent.metric_adversarial_audit.v1",
   "blockers": [],
+  "completed_at": "2026-07-17T22:49:20Z",
   "findings": [
     "Docs distinguish response, ON signal, and OFF suppression and limit pDual-10 claims to same-state signal.",
     "Tests cover monotonicity, Pareto order, permutation, finite arithmetic, view scope, and cardinality compensation.",
@@ -7,9 +9,11 @@
     "Grouped validation exposes undefined ranks and separates objective disagreement from predictive evidence.",
     "Hard minima, families, coordinates, assay uncertainty, controls, and allocation changes remain observable.",
     "Growth, feasibility, absolute OFF, cross-view scores, better prediction, and hill climbing are non-claims.",
-    "Reader, study, OPAL, and bridge ownership remain separate; no campaign consumes the shadow objective."
+    "Within the Multistate Response Behavior shadow path, Reader evidence, study normalization and publication, OPAL scoring and allocation, and bridge routing remain separate; no campaign consumes the shadow objective."
   ],
   "method": "independent_read_only_adversarial_implementation_and_scientific_contract_review",
+  "reviewed_preliminary_manifest_sha256": "sha256:dbf9e651a467df76f12ffa22c6b15f8515264a8d515731a601fc26274c66869f",
+  "reviewed_source_commit": "ee83c807d88f2f58958dc8cff78290dd90dbb826",
   "schema_id": "stress_ethanol_cipro_growth.multistate_response_behavior_adversarial_audit.v1",
   "schema_version": "1",
   "scope": [

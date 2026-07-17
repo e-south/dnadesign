@@ -64,6 +64,9 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     multistate_behavior_completion as behavior_completion,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
+    multistate_behavior_decision_verification as behavior_decision_verification,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
     multistate_behavior_labels as behavior_labels,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
@@ -81,6 +84,30 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 
 PACKAGE = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy")
 PROTOCOL_PATH = PACKAGE / "config/multistate_response_behavior_shadow_v1.yaml"
+AUDIT_PATH = PACKAGE / "config/multistate_response_behavior_adversarial_audit_v1.json"
+
+
+def test_adversarial_audit_pins_reviewed_snapshot_and_rejects_provenance_drift() -> None:
+    audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+
+    assert audit["auditor_id"] == "codex_subagent.metric_adversarial_audit.v1"
+    assert audit["completed_at"] == "2026-07-17T22:49:20Z"
+    assert audit["reviewed_source_commit"] == "ee83c807d88f2f58958dc8cff78290dd90dbb826"  # pragma: allowlist secret
+    assert audit["reviewed_preliminary_manifest_sha256"] == (
+        "sha256:dbf9e651a467df76f12ffa22c6b15f8515264a8d515731a601fc26274c66869f"
+    )
+    behavior_decision_verification.verify_behavior_adversarial_audit_record(audit)
+
+    for field in (
+        "auditor_id",
+        "completed_at",
+        "reviewed_source_commit",
+        "reviewed_preliminary_manifest_sha256",
+    ):
+        drifted = dict(audit)
+        drifted[field] = "drifted"
+        with pytest.raises(ValueError, match="independent audit"):
+            behavior_decision_verification.verify_behavior_adversarial_audit_record(drifted)
 
 
 def test_checked_in_behavior_protocol_is_shadow_only_and_complete() -> None:
@@ -804,6 +831,26 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
     assert "| Reader experiment | Candidate-experiment rank |" in report
     assert "| experiment-1 |" in report
     assert behavior_publication.verify_multistate_behavior_shadow(bundle) == manifest
+
+    audit_tamper = tmp_path / "audit-tamper"
+    shutil.copytree(bundle, audit_tamper)
+    audit_manifest = json.loads((audit_tamper / "manifest.json").read_text(encoding="utf-8"))
+    audit_path = audit_tamper / audit_manifest["artifacts"]["independent_adversarial_audit"]["path"]
+    audit_payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    audit_payload["reviewed_source_commit"] = "f" * 40
+    audit_path.write_text(json.dumps(audit_payload), encoding="utf-8")
+    _refresh_artifact_receipt(audit_tamper, audit_manifest, artifact_id="independent_adversarial_audit")
+    decision_path = audit_tamper / audit_manifest["artifacts"]["decision"]["path"]
+    decision_payload = json.loads(decision_path.read_text(encoding="utf-8"))
+    decision_payload["independent_adversarial_implementation_audit"]["reviewed_source_commit"] = "f" * 40
+    decision_payload["independent_adversarial_implementation_audit"]["evidence_sha256"] = (
+        "sha256:" + audit_manifest["artifacts"]["independent_adversarial_audit"]["sha256"]
+    )
+    decision_path.write_text(json.dumps(decision_payload), encoding="utf-8")
+    _refresh_artifact_receipt(audit_tamper, audit_manifest, artifact_id="decision")
+    (audit_tamper / "manifest.json").write_text(json.dumps(audit_manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="reviewed snapshot"):
+        behavior_publication.verify_multistate_behavior_shadow(audit_tamper)
 
     claim_tamper = tmp_path / "claim-tamper"
     shutil.copytree(bundle, claim_tamper)
