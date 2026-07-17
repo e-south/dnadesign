@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-magnitude-feasibility
 title: Response-Magnitude Feasibility study decision
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-16
 audience: [scientist, operator, agent]
 ---
 
@@ -31,11 +31,14 @@ intended OFF states, every intended ON state retains reference-relative
 fluorescence, and every intended OFF state stays below the declared
 reference-relative fluorescence boundary.
 
-This is the study's operational form of high dynamic range without allowing a
-single favorable contrast to hide leak. Response separation rewards the target
-state contrast, the OFF ceiling directly penalizes leaky fluorescence, and the
-ON floor prevents a uniformly dark promoter from looking selective. The
-maximin score is controlled by the weakest requirement.
+This is the study's operational direction toward high dynamic range without
+allowing a single favorable contrast to hide leak. Response separation rewards
+the target-state contrast, the OFF ceiling directly penalizes leaky
+fluorescence, and the ON floor prevents a uniformly dark promoter from looking
+selective. The maximin score is controlled by the weakest requirement. A
+high-dynamic-range feasibility claim additionally requires biologically
+meaningful nonzero separation and tight-OFF thresholds; the frozen round-0 zero
+boundaries do not establish those effect sizes by themselves.
 
 ### Why this study selects RMF rather than SFXI
 
@@ -81,6 +84,74 @@ The ordered response-window Y is:
 
 Here `b_i` is reference-relative fluorescence, not luminance or a general
 fluorophore brightness property.
+
+### What the pDual-10 boundary means
+
+The reference subtraction is experiment-local and state-matched:
+
+```text
+b_i = log2[(YFP/OD600)_design,i / (YFP/OD600)_pDual-10,i]
+```
+
+Therefore `b_i = 0` means that the design and pDual-10 have equal YFP/OD600 in
+the same assay condition. It does not mean zero fluorescence, background-like
+fluorescence, or absence of expression. State matching remains necessary
+because a nominally constitutive reference can change under stress; it prevents
+a stressed design from being compared with the reference measured in a
+different condition.
+
+The frozen round-0 campaign sets `off_magnitude_max: 0.0`. Its exact OFF claim
+is consequently **no brighter than same-state pDual-10**. Lower OFF output
+improves `q_off`, but the maximin score stops rewarding that improvement while
+response separation or ON fluorescence is the weaker requirement. The current
+boundary must not be described as a no-expression or tight-OFF gate.
+
+The selector ranks every candidate by the minimum margin and requires six
+allocations per view; it does not filter selections to `S_RMF >= 0`. When a view
+has no feasible prediction, OPAL still returns the six least-negative scores.
+Therefore `selected` means nominated by the declared policy, not feasible or
+biologically ON/OFF.
+
+The generic RMF objective already accepts a stricter study-declared ceiling.
+If the allowed OFF output is a fraction `f` of same-state pDual-10, the ceiling
+is:
+
+```text
+off_magnitude_max = log2(f)
+```
+
+For example, `-1`, `-2`, and approximately `-3.322` mean at most one-half,
+one-quarter, and one-tenth of same-state pDual-10, respectively. These remain
+reference-relative requirements; they do not establish biological background.
+The verified round-0 Reader bundle has no annotated promoterless or
+reporter-negative cellular control, so it cannot calibrate a background-like
+OFF boundary. A media blank is not equivalent to that control.
+
+A future tight-OFF policy must be study-owned and prespecified from the desired
+biological claim plus same-host, same-backbone negative-control evidence. Keep
+one scalar ceiling only if that boundary is stable across the relevant states;
+otherwise use a separately versioned per-state contract instead of collapsing
+different boundaries into one number. Changing the ceiling changes RMF scores
+and candidate rankings. It therefore requires a new frozen selection contract
+and a new model-evidence protocol series; it must not reinterpret the existing
+round-0 predictions after measurement.
+
+The same decision discipline applies to response separation. The round-0
+`response_separation_min: 0.0` boundary requires no prespecified minimum effect
+size. Top-K ranking rewards larger values, but feasibility at the boundary does
+not mean high dynamic range. A future requirements policy can state the intended
+phenotype in interpretable ratios and compile it into the existing RMF fields:
+
+```text
+response_separation_min = log2(minimum ON/OFF YFP/CFP ratio)
+on_magnitude_min        = log2(minimum ON output / same-state pDual-10)
+off_magnitude_max       = log2(maximum OFF output / same-state pDual-10)
+```
+
+Biological thresholds and assay-resolution scales are separate decisions.
+Thresholds state what phenotype is acceptable; Reader bootstrap and event-time
+evidence estimate how finely the assay resolves each requirement. Do not choose
+thresholds by searching for values that preserve the current candidate list.
 
 For a binary target mask `p`, RMF computes:
 
@@ -138,8 +209,10 @@ fixed sequence X -> shared eight-output model -> view-specific RMF -> coordinate
 
 No numerical probability of success is supported. The credible outcome is a
 directional test: whether selected constructs improve measured RMF relative to
-the 35-row source corpus and whether each view's nominations outperform the
-constructs nominated by the other views under that same mask.
+the 27-row promoted pre-round corpus and whether each view's nominations
+outperform the constructs nominated by the other views under that same mask.
+The 35-row retrospective screen remains diagnostic context, not the campaign's
+prospective baseline.
 
 ### Frozen round-0 contract
 
@@ -167,15 +240,41 @@ decision.
 ### Prospective evidence
 
 Every selected construct is measured in all four assay states, so all 18
-constructs update every view. Report:
+constructs update every view. For round 0, and after every eligible measured
+batch that retains the same six-per-view, 18-unique-candidate contract, report:
 
-- predicted versus measured RMF across all 18 constructs for each mask;
-- the 27-row promoted source distribution versus the prospective measured round;
-- response separation, ON fluorescence floor, OFF fluorescence ceiling, and
-  the limiting requirement for each construct;
+- frozen predicted versus measured response separation, ON fluorescence floor,
+  OFF fluorescence ceiling, `q_response`, `q_on`, `q_off`, scalar RMF, and the
+  limiting requirement for all 18 constructs under every mask;
+- feasibility counts (`S_RMF >= 0`) for the view's nominated six, the other
+  twelve, the complete 18, and the promoted pre-round corpus;
+- the promoted pre-round distribution versus the prospective measured round;
 - whether each view's six outperform the other twelve under that view's mask;
 - rank changes and model performance after the prospective response-window Y
   is ingested.
+
+The other twelve are contemporaneous constructs nominated for different views,
+not untreated or randomly sampled controls. Their comparison with the nominated
+six tests prospective view-specific enrichment within the coordinated batch;
+it does not by itself estimate causal treatment effects or population-wide hit
+rates.
+
+Before the first measured-batch checkpoint is recorded, the study needs one
+digest-bound `stress_ethanol_cipro_growth.prospective_round_evidence.v1`
+publication built from the frozen OPAL prediction and allocation records plus
+subsequently promoted observations. For the current contract its
+candidate-by-view table has 54 rows: 18 measured candidates evaluated under
+three masks. Preserve final allocation view and rank, predicted and measured
+components and margins, feasibility, limiting requirement, Reader and
+label-publication provenance, and campaign prediction and selection digests.
+The immutable model-evidence checkpoint references this publication; mutable
+OPAL runtime state is not the scientific record.
+
+Across batches, compare checkpoints only within one protocol series. Candidate
+membership and measured-corpus size are checkpoint evidence and may grow.
+State order, masks, RMF thresholds and scales, inclusion rules, evaluation
+methods, and model roles belong to the frozen protocol. Changing any of those
+starts a new series rather than silently extending the prior trajectory.
 
 TFBS composition is a provenance and diagnostic surface, not a campaign-specific
 eligibility constraint. Predicted RMF alone is not evidence of a responsive
