@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
 import importlib
 import tomllib
 from pathlib import Path
@@ -230,6 +231,32 @@ def test_generated_notebook_templates_do_not_import_dashboard_internals() -> Non
             assert "dnadesign.opal.src.analysis.dashboard" not in text
             assert "dnadesign.opal.notebooks.api.generated" in text or "notebooks.api" not in text
             assert "from dnadesign.opal.notebooks.api import" not in text
+
+
+def test_opal_source_does_not_import_reader_or_mutate_python_import_paths() -> None:
+    violations: list[str] = []
+    for path in sorted(OPAL_SOURCE_ROOT.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "reader" or alias.name.startswith("reader."):
+                        violations.append(f"{path}:{node.lineno}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if module == "reader" or module.startswith("reader."):
+                    violations.append(f"{path}:{node.lineno}: from {module} import ...")
+            elif (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Attribute)
+                and isinstance(node.func.value.value, ast.Name)
+                and node.func.value.value.id == "sys"
+                and node.func.value.attr == "path"
+            ):
+                violations.append(f"{path}:{node.lineno}: sys.path.{node.func.attr}(...)")
+
+    assert violations == []
 
 
 def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:

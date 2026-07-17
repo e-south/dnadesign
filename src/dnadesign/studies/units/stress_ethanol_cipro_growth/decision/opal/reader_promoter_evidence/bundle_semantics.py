@@ -64,7 +64,7 @@ def _verify_sources(value: object, *, selection: dict[str, str]) -> None:
         or any(not _nonempty(response[field]) for field in ("request_id", "experiment_id", "reduction_id"))
         or not _is_sha256(response["manifest_sha256"])
     ):
-        raise ReaderPromoterEvidenceError("Reader response-window source is not a verified bundle v4 record.")
+        raise ReaderPromoterEvidenceError("Reader response-window source is not a verified bundle v5 record.")
     for field in ("experiment_id", "reduction_id"):
         if response[field] != selection[field]:
             raise ReaderPromoterEvidenceError(

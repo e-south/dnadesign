@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 PROMOTER_RESPONSE_EVIDENCE_SEMANTIC_KIND = "promoter_response_evidence"
-PROMOTER_EVIDENCE_BUNDLE_RECORD_ID = "reader.response_window.promoter_evidence_bundle.v2"
+PROMOTER_EVIDENCE_BUNDLE_RECORD_ID = "reader.response_window.promoter_evidence_bundle.v3"
 READER_PROMOTER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
 READER_PROMOTER_EVIDENCE_MAX_BYTES = 32 * 1024 * 1024
 

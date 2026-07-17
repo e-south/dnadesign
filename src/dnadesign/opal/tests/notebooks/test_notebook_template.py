@@ -289,7 +289,6 @@ def test_notebook_review_control_surface_groups_plot_controls_by_semantics() -> 
         plot_ui="plot",
         plot_scope_ui="plot-scope",
         reader_evidence_artifact_ui="reader-artifact",
-        reader_evidence_time_ui="reader-time",
         selected_visual_choice={"surface_kind": "plot"},
         mo=mo,
     )
@@ -334,14 +333,13 @@ def test_notebook_review_control_surface_groups_reader_controls_with_deliverable
         visual_group_ui="section",
         plot_ui="deliverable",
         reader_evidence_artifact_ui="reader-artifact",
-        reader_evidence_time_ui="reader-time",
         selected_visual_choice={"surface_kind": "reader_evidence"},
         mo=mo,
     )
 
     assert rendered == {
         "kind": "hstack",
-        "items": ["campaign", "view", "section", "deliverable", "reader-artifact", "reader-time"],
+        "items": ["campaign", "view", "section", "deliverable", "reader-artifact"],
     }
 
 
@@ -764,7 +762,7 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "build_notebook_reader_evidence_visual_choices" in text
     assert "render_notebook_reader_evidence_plot_type_control" not in text
     assert "render_notebook_reader_evidence_artifact_control" in text
-    assert "render_notebook_reader_evidence_time_control" in text
+    assert "render_notebook_reader_evidence_time_control" not in text
     assert "render_notebook_review_control_surface" in text
     assert "build_notebook_visual_surface_model" in text
     assert "build_notebook_collection_set_choices" in text
@@ -786,10 +784,10 @@ def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
     assert 'selected_visual_choice.get("surface_kind") == "reader_evidence"' in text
     assert "render_notebook_reader_evidence_plot_type_control(" not in text
     assert "render_notebook_reader_evidence_artifact_control(" in text
-    assert "render_notebook_reader_evidence_time_control(" in text
+    assert "render_notebook_reader_evidence_time_control(" not in text
     assert "render_notebook_reader_evidence_artifact_visual(" in text
     assert "render_notebook_reader_evidence_panel(" in text
-    assert "reader_evidence_time_ui" in text
+    assert "reader_evidence_time_ui" not in text
     assert 'label="Reader plot type"' not in text
     assert 'label="Reader plot instance"' not in text
     helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/reader_evidence.py").read_text()
@@ -1778,7 +1776,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "build_notebook_reader_evidence_visual_choices" in text
     assert "render_notebook_reader_evidence_plot_type_control" not in text
     assert "render_notebook_reader_evidence_artifact_control" in text
-    assert "render_notebook_reader_evidence_time_control" in text
+    assert "render_notebook_reader_evidence_time_control" not in text
     assert "render_notebook_review_control_surface" in text
     assert "render_notebook_visual_panel" in text
     assert "Current campaign and plot evidence" not in text

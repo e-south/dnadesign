@@ -53,12 +53,12 @@ def write_reader_bundle(
     pdf.write_bytes(b"%PDF-1.7\nreader evidence\n")
     png.write_bytes(b"\x89PNG\r\n\x1a\nreader evidence\n")
     manifest = {
-        "schema_version": "reader.response_window.promoter_evidence_bundle.v2",
+        "schema_version": "reader.response_window.promoter_evidence_bundle.v3",
         "created_at": "2026-07-13T12:00:00+00:00",
         "claim_status": claim_status,
         "non_claim_boundary": (
-            "Reader presents response-window evidence and sequence context; it does not calculate, calibrate, "
-            "or promote an RMF objective."
+            "Reader presents response-window evidence and sequence context; downstream objective scoring, "
+            "normalization or calibration, and promotion remain outside Reader."
         ),
         "selection": {
             "experiment_id": experiment_id,

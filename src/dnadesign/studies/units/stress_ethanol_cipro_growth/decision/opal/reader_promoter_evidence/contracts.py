@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v2"
+READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v3"
 READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
 READER_PROMOTER_EVIDENCE_FILENAME = "reader_evidence_promoter_response.json"
 READER_PROMOTER_EVIDENCE_MEDIA_DIR = "reader_evidence_media"
@@ -23,8 +23,8 @@ TARGET_CAMPAIGN_SLUG = "secg_rmf_greedy"
 PROMOTER_RESPONSE_SEMANTIC_KIND = "promoter_response_evidence"
 PROMOTER_EVIDENCE_ARTIFACT_IDS = ("promoter_evidence.png", "promoter_evidence.pdf")
 PROMOTER_EVIDENCE_NON_CLAIM = (
-    "Reader presents response-window evidence and sequence context; it does not calculate, calibrate, "
-    "or promote an RMF objective."
+    "Reader presents response-window evidence and sequence context; downstream objective scoring, "
+    "normalization or calibration, and promotion remain outside Reader."
 )
 
 

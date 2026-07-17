@@ -21,7 +21,6 @@ def render_reader_evidence_cells() -> str:
         (
             _reader_evidence_plot_type_cell(),
             _reader_evidence_artifact_cell(),
-            _reader_evidence_time_cell(),
             _reader_evidence_visual_cell(),
         )
     )
@@ -68,31 +67,6 @@ def _reader_evidence_artifact_cell() -> str:
     )
 
 
-def _reader_evidence_time_cell() -> str:
-    return block(
-        """
-        @app.cell
-        def _(
-            mo,
-            reader_evidence_artifact_ui,
-            reader_evidence_surface,
-            render_notebook_reader_evidence_time_control,
-            selected_reader_evidence_plot_type_label,
-        ):
-            _selected_artifact_label = (
-                None if reader_evidence_artifact_ui is None else str(reader_evidence_artifact_ui.value)
-            )
-            reader_evidence_time_ui = render_notebook_reader_evidence_time_control(
-                reader_evidence_surface,
-                selected_plot_type_label=selected_reader_evidence_plot_type_label,
-                selected_artifact_label=_selected_artifact_label,
-                mo=mo,
-            )
-            return reader_evidence_time_ui
-        """
-    )
-
-
 def _reader_evidence_visual_cell() -> str:
     return block(
         """
@@ -101,7 +75,6 @@ def _reader_evidence_visual_cell() -> str:
             mo,
             reader_evidence_artifact_ui,
             reader_evidence_surface,
-            reader_evidence_time_ui,
             render_notebook_reader_evidence_artifact_visual,
             selected_reader_evidence_plot_type_label,
         ):
@@ -111,15 +84,11 @@ def _reader_evidence_visual_cell() -> str:
                 _selected_artifact_label = (
                     None if reader_evidence_artifact_ui is None else str(reader_evidence_artifact_ui.value)
                 )
-                _selected_time_h = None
-                if reader_evidence_time_ui is not None and hasattr(reader_evidence_time_ui, "value"):
-                    _selected_time_h = float(reader_evidence_time_ui.value)
                 reader_evidence_visual = render_notebook_reader_evidence_artifact_visual(
                     reader_evidence_surface,
                     selected_plot_type_label=selected_reader_evidence_plot_type_label,
                     selected_artifact_label=_selected_artifact_label,
                     mo=mo,
-                    selected_time_h=_selected_time_h,
                 )
             return reader_evidence_visual
         """

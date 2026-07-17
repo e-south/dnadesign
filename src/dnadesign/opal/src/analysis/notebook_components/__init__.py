@@ -120,7 +120,6 @@ from .reader_evidence import (
     render_notebook_reader_evidence_panel,
     render_notebook_reader_evidence_plot_type_control,
 )
-from .reader_evidence_triptych import render_notebook_reader_evidence_time_control
 from .review_controls import render_notebook_review_control_surface
 from .runs import (
     build_notebook_change_lines,
@@ -256,7 +255,6 @@ __all__ = [
     "render_notebook_reader_evidence_artifact_visual",
     "render_notebook_reader_evidence_panel",
     "render_notebook_reader_evidence_plot_type_control",
-    "render_notebook_reader_evidence_time_control",
     "render_notebook_layered_scatter_image",
     "read_notebook_layered_scatter_state",
     "render_notebook_review_control_surface",

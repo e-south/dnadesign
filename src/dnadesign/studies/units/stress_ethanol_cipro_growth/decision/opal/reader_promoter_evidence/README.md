@@ -9,7 +9,7 @@ last_verified: 2026-07-14
 # Reader promoter evidence
 
 The study-owned adapter validates published Reader
-`reader.response_window.promoter_evidence_bundle.v2` directories against an
+`reader.response_window.promoter_evidence_bundle.v3` directories against an
 explicit `dnadesign.study.promoter_candidate_bindings.v1` bundle. It stages
 their static PNG/PDF artifacts for OPAL display. It writes the
 `stress_ethanol_cipro_growth.reader_promoter_evidence.v1` schema with semantic

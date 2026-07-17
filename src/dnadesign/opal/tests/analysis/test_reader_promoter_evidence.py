@@ -18,21 +18,12 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.opal.src.analysis.notebook_components import (
-    reader_evidence_preview,
-    reader_evidence_triptych,
-)
-from dnadesign.opal.src.analysis.notebook_components import (
-    reader_evidence_visual as reader_evidence_visual_module,
-)
+from dnadesign.opal.src.analysis.notebook_components import reader_evidence_preview
 from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     build_notebook_reader_evidence_surface,
     discover_reader_evidence_artifacts,
     discover_reader_evidence_manifests,
     render_notebook_reader_evidence_artifact_visual,
-)
-from dnadesign.opal.src.analysis.notebook_components.reader_evidence_triptych import (
-    render_notebook_reader_evidence_time_control,
 )
 from dnadesign.opal.src.analysis.notebook_components.reader_promoter_evidence import (
     READER_PROMOTER_EVIDENCE_MAX_BYTES,
@@ -100,7 +91,7 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
                             {
                                 "semantic_kind": "promoter_response_evidence",
                                 "kind": "reader_publication",
-                                "record_id": "reader.response_window.promoter_evidence_bundle.v2",
+                                "record_id": "reader.response_window.promoter_evidence_bundle.v3",
                                 "scope": "design_reduction",
                                 "path": relative_media.as_posix(),
                                 "path_label": "20260713_sfxi/pDual-10-1/event_logmean_6_12h_post/promoter_evidence.png",
@@ -154,7 +145,7 @@ def test_promoter_evidence_verifies_staged_relative_media_without_reader_source(
     row = {
         "semantic_kind": "promoter_response_evidence",
         "kind": "reader_publication",
-        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v2",
+        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v3",
         "scope": "design_reduction",
         "id": "candidate-1",
         "candidate_id": "candidate-1",
@@ -194,7 +185,6 @@ def test_promoter_evidence_render_rejects_artifact_changed_after_discovery(tmp_p
         surface,
         selected_plot_type_label="Promoter response evidence",
         selected_artifact_label=label,
-        selected_time_h=12.0,
         mo=_FakeMo(),
     )
 
@@ -234,30 +224,15 @@ def test_promoter_evidence_render_rejects_tilde_artifact_path(tmp_path: Path, mo
     assert "confined content-addressed" in rendered["text"]
 
 
-def test_promoter_evidence_does_not_invoke_sfxi_reconstruction(tmp_path: Path, monkeypatch) -> None:
+def test_promoter_evidence_renders_verified_static_media(tmp_path: Path) -> None:
     surface, label = _valid_promoter_surface(tmp_path)
-
-    def fail_sfxi(*args, **kwargs):
-        raise AssertionError("SFXI reconstruction must not run for promoter-response evidence")
-
-    monkeypatch.setattr(reader_evidence_triptych, "reader_sfxi_triptych_time_metadata", fail_sfxi)
-    monkeypatch.setattr(reader_evidence_visual_module, "render_reader_sfxi_triptych_visual", fail_sfxi)
-
-    time_control = render_notebook_reader_evidence_time_control(
-        surface,
-        selected_plot_type_label="Promoter response evidence",
-        selected_artifact_label=label,
-        mo=_FakeMo(),
-    )
     rendered = render_notebook_reader_evidence_artifact_visual(
         surface,
         selected_plot_type_label="Promoter response evidence",
         selected_artifact_label=label,
-        selected_time_h=12.0,
         mo=_FakeMo(),
     )
 
-    assert time_control is None
     assert rendered["kind"] == "vstack"
 
 
@@ -331,7 +306,7 @@ def _valid_promoter_surface(tmp_path: Path) -> tuple[dict[str, list[dict[str, ob
         "plot_type_label": "Promoter response evidence",
         "semantic_kind": "promoter_response_evidence",
         "kind": "reader_publication",
-        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v2",
+        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v3",
         "scope": "design_reduction",
         "id": candidate_id,
         "candidate_id": candidate_id,

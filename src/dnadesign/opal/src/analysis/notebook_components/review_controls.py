@@ -36,7 +36,6 @@ def render_notebook_review_control_surface(
     baserender_run_ui: Any = None,
     baserender_record_selector: Any = None,
     reader_evidence_artifact_ui: Any = None,
-    reader_evidence_time_ui: Any = None,
     selected_visual_choice: Mapping[str, Any] | None = None,
 ) -> Any | None:
     """Render the consolidated top control surface for an OPAL review notebook."""
@@ -64,7 +63,6 @@ def render_notebook_review_control_surface(
             plot_ui=plot_ui,
             layered_scatter_controls=layered_scatter_controls,
             reader_evidence_artifact_ui=reader_evidence_artifact_ui,
-            reader_evidence_time_ui=reader_evidence_time_ui,
             selected_visual_choice=selected_visual_choice,
         )
     )
@@ -101,7 +99,6 @@ def _visual_controls(
     plot_ui: Any,
     layered_scatter_controls: Mapping[str, Any] | None,
     reader_evidence_artifact_ui: Any,
-    reader_evidence_time_ui: Any,
     visual_group_ui: Any,
     selected_visual_choice: Mapping[str, Any] | None,
 ) -> list[Any]:
@@ -117,7 +114,7 @@ def _visual_controls(
             )
         )
     elif _is_reader_evidence_visual(selected_visual_choice):
-        controls.extend(_present(reader_evidence_artifact_ui, reader_evidence_time_ui))
+        controls.extend(_present(reader_evidence_artifact_ui))
     else:
         controls.extend(
             _present(

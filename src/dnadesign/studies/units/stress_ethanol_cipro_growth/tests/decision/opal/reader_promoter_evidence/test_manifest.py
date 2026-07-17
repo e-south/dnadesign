@@ -105,7 +105,7 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
         source_artifact = densegen / Path(artifact["path"]).name
         assert artifact["semantic_kind"] == "promoter_response_evidence"
         assert artifact["kind"] == "reader_publication"
-        assert artifact["record_id"] == "reader.response_window.promoter_evidence_bundle.v2"
+        assert artifact["record_id"] == "reader.response_window.promoter_evidence_bundle.v3"
         assert artifact["scope"] == "design_reduction"
         assert artifact["exists"] is True
         assert artifact["bytes"] == source_artifact.stat().st_size

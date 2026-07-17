@@ -16,7 +16,6 @@ from typing import Any, Mapping
 
 from .reader_evidence_media import select_reader_media_artifact
 from .reader_evidence_preview import reader_pdf_preview_path
-from .reader_evidence_triptych import is_reader_sfxi_triptych_artifact, render_reader_sfxi_triptych_visual
 from .reader_promoter_evidence import (
     ReaderPromoterEvidenceIntegrityError,
     is_reader_promoter_evidence_artifact,
@@ -31,9 +30,8 @@ def render_notebook_reader_evidence_artifact_visual(
     selected_plot_type_label: str | None,
     selected_artifact_label: str | None,
     mo: Any,
-    selected_time_h: float | None = None,
 ) -> Any:
-    """Render the selected plot artifact or live Reader triptych."""
+    """Render one completed Reader plot artifact."""
 
     if not selected_plot_type_label:
         return mo.md("No plot type selected.")
@@ -46,8 +44,6 @@ def render_notebook_reader_evidence_artifact_visual(
     )
     if selected is None:
         return mo.md("Selected plot artifact is no longer available.")
-    if selected_time_h is not None and is_reader_sfxi_triptych_artifact(selected):
-        return render_reader_sfxi_triptych_visual(selected, selected_time_h=selected_time_h, mo=mo)
     return _render_static_reader_artifact(selected, mo=mo)
 
 

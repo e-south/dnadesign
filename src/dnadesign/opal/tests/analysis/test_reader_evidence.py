@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 import json
 from pathlib import Path
 
-from dnadesign.opal.src.analysis.notebook_components import reader_evidence_triptych
 from dnadesign.opal.src.analysis.notebook_components import reader_evidence_visual as reader_evidence_visual_module
 from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     build_notebook_reader_evidence_artifact_options,
@@ -24,9 +23,6 @@ from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     render_notebook_reader_evidence_artifact_control,
     render_notebook_reader_evidence_artifact_visual,
     render_notebook_reader_evidence_plot_type_control,
-)
-from dnadesign.opal.src.analysis.notebook_components.reader_evidence_triptych import (
-    render_notebook_reader_evidence_time_control,
 )
 
 
@@ -151,38 +147,7 @@ def test_reader_evidence_controls_use_reader_scoped_plot_labels() -> None:
     assert artifact_ui["label"] == "Reader plot instance"
 
 
-def test_reader_evidence_time_control_uses_triptych_metadata(monkeypatch) -> None:
-    monkeypatch.setattr(
-        reader_evidence_triptych,
-        "reader_sfxi_triptych_time_metadata",
-        lambda row: {"start": 0.0, "stop": 20.0, "value": 12.0, "step": 0.25, "ground_truth_time_h": 12.0},
-    )
-    surface = {
-        "media_rows": [
-            {
-                "label": "r0 | exp | design | 12.00 h",
-                "plot_type_label": "Time series + snapshot",
-                "semantic_kind": "intensity_overview",
-                "exists": True,
-                "media_type": "application/pdf",
-                "path": "/tmp/plot.pdf",
-            }
-        ]
-    }
-
-    rendered = render_notebook_reader_evidence_time_control(
-        surface,
-        selected_plot_type_label="Time series + snapshot",
-        selected_artifact_label="r0 | exp | design | 12.00 h",
-        mo=_FakeMo(),
-    )
-
-    assert rendered["kind"] == "slider"
-    assert rendered["label"] == "Reader time (h)"
-    assert rendered["value"] == 12.0
-
-
-def test_reader_evidence_pdf_renders_zoomable_image_preview(tmp_path: Path, monkeypatch) -> None:
+def test_reader_sfxi_triptych_pdf_renders_as_completed_static_artifact(tmp_path: Path, monkeypatch) -> None:
     pdf_path = tmp_path / "reader.pdf"
     preview_path = tmp_path / "reader-preview.png"
     pdf_path.write_bytes(b"%PDF-1.4\n")
@@ -192,7 +157,8 @@ def test_reader_evidence_pdf_renders_zoomable_image_preview(tmp_path: Path, monk
         "media_rows": [
             {
                 "label": "r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h",
-                "plot_type_label": "Plate-reader time series",
+                "plot_type_label": "Time series + snapshot",
+                "semantic_kind": "intensity_overview",
                 "path": str(pdf_path),
                 "exists": True,
                 "media_type": "application/pdf",
@@ -202,7 +168,7 @@ def test_reader_evidence_pdf_renders_zoomable_image_preview(tmp_path: Path, monk
 
     rendered = render_notebook_reader_evidence_artifact_visual(
         surface,
-        selected_plot_type_label="Plate-reader time series",
+        selected_plot_type_label="Time series + snapshot",
         selected_artifact_label="r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h",
         mo=_FakeMo(),
     )
