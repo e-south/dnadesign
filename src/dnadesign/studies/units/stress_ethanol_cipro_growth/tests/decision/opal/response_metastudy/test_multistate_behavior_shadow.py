@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import tomllib
 from dataclasses import replace
 from pathlib import Path
 
@@ -85,6 +86,13 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 PACKAGE = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy")
 PROTOCOL_PATH = PACKAGE / "config/multistate_response_behavior_shadow_v1.yaml"
 AUDIT_PATH = PACKAGE / "config/multistate_response_behavior_adversarial_audit_v1.json"
+
+
+def test_adversarial_audit_is_declared_as_package_data() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    studies_package_data = pyproject["tool"]["setuptools"]["package-data"]["dnadesign.studies"]
+
+    assert "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.json" in studies_package_data
 
 
 def test_adversarial_audit_pins_reviewed_snapshot_and_rejects_provenance_drift() -> None:
