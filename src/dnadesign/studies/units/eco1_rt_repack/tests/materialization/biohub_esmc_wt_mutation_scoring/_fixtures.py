@@ -63,6 +63,19 @@ class TimeoutOnceSequenceLogitsClient(FakeSequenceLogitsClient):
         return super().sequence_logits_for_sequence(sequence, model=model)
 
 
+class MalformedSecondSequenceLogitsClient(FakeSequenceLogitsClient):
+    def sequence_logits_for_sequence(
+        self,
+        sequence: str,
+        *,
+        model: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], list[int]]:
+        response = super().sequence_logits_for_sequence(sequence, model=model)
+        if len(self.requested_sequences) == 2:
+            return response[0], {"logits": {}}, response[2]
+        return response
+
+
 def write_mask_set(path: Path, *, length: int) -> None:
     residues = [
         {

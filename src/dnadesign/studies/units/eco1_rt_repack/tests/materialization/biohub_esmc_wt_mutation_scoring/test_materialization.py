@@ -25,6 +25,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests.materialization.atlas_semantic
 )
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.biohub_esmc_wt_mutation_scoring._fixtures import (
     FakeSequenceLogitsClient,
+    MalformedSecondSequenceLogitsClient,
     TimeoutOnceSequenceLogitsClient,
     write_mask_set,
 )
@@ -146,6 +147,31 @@ def test_wt_mutation_scoring_max_new_requests_writes_resumable_error(tmp_path: P
     assert statuses == {1: "accepted", 2: "errored"}
     assert failure_reasons[2] == "biohub_request_not_attempted_due_to_max_new_requests"
     assert len(substitution_rows) == 19
+
+
+def test_wt_mutation_scoring_records_malformed_logits_after_accepted_rows(tmp_path: Path) -> None:
+    write_foldcheck_report_fixture(tmp_path, accepted_candidate_ids={"wild_type"})
+    write_mask_set(tmp_path / "mask_set.yaml", length=4)
+
+    result = materialize_biohub_esmc_wt_mutation_scoring(
+        repo_root=Path.cwd(),
+        output_root=tmp_path,
+        positions="1-2",
+        max_new_requests=2,
+        biohub_client=MalformedSecondSequenceLogitsClient(),
+        retrieved_at="2026-06-27T00:00:00Z",
+    )
+
+    position_rows = pq.read_table(result.position_entropy_path).to_pylist()
+    substitution_rows = pq.read_table(result.substitution_llr_path).to_pylist()
+    by_position = {int(row["canonical_position"]): row for row in position_rows}
+    assert by_position[1]["status"] == "accepted"
+    assert by_position[2]["status"] == "errored"
+    assert by_position[2]["failure_reason"] == "Biohub logits response did not include JSON sequence logits"
+    assert len(substitution_rows) == 19
+    manifest = yaml.safe_load(result.request_manifest_path.read_text(encoding="utf-8"))
+    assert manifest["accepted_position_count"] == 1
+    assert manifest["errored_position_count"] == 1
 
 
 def test_wt_mutation_scoring_final_run_rejects_timeout_error_row(tmp_path: Path) -> None:

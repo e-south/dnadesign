@@ -105,7 +105,7 @@ def materialize_biohub_esmc_sequence_pseudolikelihood(
     thread_root = resolve_output_root(root, output_root or DEFAULT_OUTPUT_ROOT)
     scoring_root = thread_root / scoring_relative_root_for_model(model)
     selection = select_fold_accepted_biohub_esmc_sequences(output_root=thread_root, sequence_limit=sequence_limit)
-    records = _dedupe_records_by_sequence_hash(_select_records(selection.records, candidate_ids=tuple(candidate_ids)))
+    records = _select_records(selection.records, candidate_ids=tuple(candidate_ids))
     if not records or records[0].sequence_id != WT_SEQUENCE_ID:
         raise ValueError("Eco1 sequence pseudo-likelihood requires WT as the first selected sequence")
     selected_positions = parse_position_selection(positions, sequence_length=len(records[0].sequence))
@@ -134,6 +134,7 @@ def materialize_biohub_esmc_sequence_pseudolikelihood(
     )
     token_map: dict[str, int] | None = None
     position_rows: list[dict[str, object]] = []
+    logits_by_sequence_and_masked_sequence_hash: dict[tuple[str, str], dict[str, Any]] = {}
     new_request_count = 0
     for record in records:
         jobs = build_pseudolikelihood_jobs(
@@ -155,25 +156,46 @@ def materialize_biohub_esmc_sequence_pseudolikelihood(
             if cached_position is not None:
                 position_rows.append(cached_position)
                 continue
-            if max_new_requests is not None and new_request_count >= max_new_requests:
-                position_rows.append(
-                    build_error_pseudolikelihood_position_row(
-                        job=job,
-                        model=model,
-                        biohub_request_hash=request_hash,
-                        biohub_query_hash=query_hash,
-                        retrieved_at=timestamp,
-                        failure_reason="biohub_request_not_attempted_due_to_max_new_requests",
+            response_cache_key = (job.sequence_hash, job.masked_sequence_hash)
+            logits_response = logits_by_sequence_and_masked_sequence_hash.get(response_cache_key)
+            if logits_response is None:
+                if max_new_requests is not None and new_request_count >= max_new_requests:
+                    position_rows.append(
+                        build_error_pseudolikelihood_position_row(
+                            job=job,
+                            model=model,
+                            biohub_request_hash=request_hash,
+                            biohub_query_hash=query_hash,
+                            retrieved_at=timestamp,
+                            failure_reason="biohub_request_not_attempted_due_to_max_new_requests",
+                        )
                     )
-                )
-                continue
+                    continue
+                try:
+                    if token_map is None:
+                        token_map = dict(client.amino_acid_token_indices(model=model))
+                    _encode_response, logits_response, _tokens = client.sequence_logits_for_sequence(
+                        job.masked_sequence,
+                        model=model,
+                    )
+                except (BiohubEsmcRequestError, OSError, ValueError) as error:
+                    position_rows.append(
+                        build_error_pseudolikelihood_position_row(
+                            job=job,
+                            model=model,
+                            biohub_request_hash=request_hash,
+                            biohub_query_hash=query_hash,
+                            retrieved_at=timestamp,
+                            failure_reason=str(error),
+                        )
+                    )
+                    continue
+                finally:
+                    new_request_count += 1
+                    if request_sleep_seconds:
+                        sleep(request_sleep_seconds)
+                logits_by_sequence_and_masked_sequence_hash[response_cache_key] = logits_response
             try:
-                if token_map is None:
-                    token_map = dict(client.amino_acid_token_indices(model=model))
-                _encode_response, logits_response, _tokens = client.sequence_logits_for_sequence(
-                    job.masked_sequence,
-                    model=model,
-                )
                 normalized = normalize_pseudolikelihood_response(
                     job=job,
                     logits_response=logits_response,
@@ -184,7 +206,7 @@ def materialize_biohub_esmc_sequence_pseudolikelihood(
                     retrieved_at=timestamp,
                 )
                 position_rows.append(normalized.position_row)
-            except (BiohubEsmcRequestError, OSError, ValueError) as error:
+            except ValueError as error:
                 position_rows.append(
                     build_error_pseudolikelihood_position_row(
                         job=job,
@@ -195,10 +217,6 @@ def materialize_biohub_esmc_sequence_pseudolikelihood(
                         failure_reason=str(error),
                     )
                 )
-            finally:
-                new_request_count += 1
-            if request_sleep_seconds:
-                sleep(request_sleep_seconds)
 
     expected_lengths = {record.sequence_id: len(record.sequence) for record in records}
     sequence_rows = build_sequence_pseudolikelihood_rows(
@@ -269,19 +287,6 @@ def _select_records(
     if missing:
         raise ValueError(f"candidate_id(s) are not present in selected fold-check sequences: {missing}")
     return tuple(record for record in records if record.sequence_id in requested)
-
-
-def _dedupe_records_by_sequence_hash(
-    records: tuple[BiohubEsmcSequenceRecord, ...],
-) -> tuple[BiohubEsmcSequenceRecord, ...]:
-    seen_hashes: set[str] = set()
-    deduped: list[BiohubEsmcSequenceRecord] = []
-    for record in records:
-        if record.sequence_hash in seen_hashes:
-            continue
-        seen_hashes.add(record.sequence_hash)
-        deduped.append(record)
-    return tuple(deduped)
 
 
 def _require_uniform_sequence_lengths(records: tuple[BiohubEsmcSequenceRecord, ...]) -> None:

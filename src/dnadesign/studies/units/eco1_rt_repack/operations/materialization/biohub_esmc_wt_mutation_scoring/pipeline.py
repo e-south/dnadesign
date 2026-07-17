@@ -166,17 +166,6 @@ def materialize_biohub_esmc_wt_mutation_scoring(
                 job.masked_sequence,
                 model=model,
             )
-            normalized = normalize_masked_marginal_response(
-                job=job,
-                logits_response=logits_response,
-                aa_token_indices=token_map,
-                model=model,
-                biohub_request_hash=request_hash,
-                biohub_query_hash=query_hash,
-                retrieved_at=timestamp,
-            )
-            position_rows.append(normalized.position_row)
-            substitution_rows.extend(normalized.substitution_rows)
         except (BiohubEsmcRequestError, OSError) as error:
             position_rows.append(
                 build_error_position_row(
@@ -188,6 +177,31 @@ def materialize_biohub_esmc_wt_mutation_scoring(
                     failure_reason=str(error),
                 )
             )
+        else:
+            try:
+                normalized = normalize_masked_marginal_response(
+                    job=job,
+                    logits_response=logits_response,
+                    aa_token_indices=token_map,
+                    model=model,
+                    biohub_request_hash=request_hash,
+                    biohub_query_hash=query_hash,
+                    retrieved_at=timestamp,
+                )
+            except ValueError as error:
+                position_rows.append(
+                    build_error_position_row(
+                        job=job,
+                        model=model,
+                        biohub_request_hash=request_hash,
+                        biohub_query_hash=query_hash,
+                        retrieved_at=timestamp,
+                        failure_reason=str(error),
+                    )
+                )
+            else:
+                position_rows.append(normalized.position_row)
+                substitution_rows.extend(normalized.substitution_rows)
         finally:
             new_request_count += 1
         if request_sleep_seconds:
