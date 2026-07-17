@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-response-metastudy
 title: Response metric metastudy
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-17
 audience:
   - scientist
   - maintainer
@@ -133,6 +133,12 @@ Response-Magnitude Feasibility (RMF) mathematics:
 - `src/dnadesign/opal/docs/plugins/objectives/response-magnitude-feasibility.md`
 - `src/dnadesign/opal/src/objectives/response_magnitude_feasibility_math.py`
 - `src/dnadesign/opal/src/objectives/response_magnitude_feasibility_v1.py`
+
+Multistate Response Behavior shadow evaluation:
+
+- `src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/multistate_response_behavior_shadow_v1.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md`
 
 Reader response-window contract:
 

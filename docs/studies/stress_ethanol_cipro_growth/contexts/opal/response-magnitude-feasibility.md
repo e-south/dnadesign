@@ -237,6 +237,19 @@ next-best-unallocated replacement. `model_support_ready` remains false. The
 run is a frozen learning probe, and synthesis authorization is a separate study
 decision.
 
+### Separate threshold-free behavior evaluation
+
+The study is evaluating
+[`multistate_response_behavior_v1`](multistate-response-behavior.md) as a
+separately named shadow objective. It rewards every desired directional change
+and treats the hard bottleneck as a diagnostic rather than the selector. That
+contract is not a feasibility margin: a positive behavior score has no
+acceptance meaning.
+
+The shadow evaluation does not mutate this RMF contract, activate a second
+campaign, or authorize synthesis. Promotion requires a digest-bound comparison
+and an explicit decision that leaves one executable study campaign.
+
 ### Prospective evidence
 
 Every selected construct is measured in all four assay states, so all 18

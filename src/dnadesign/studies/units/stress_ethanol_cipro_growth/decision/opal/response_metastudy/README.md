@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-metastudy-package
 title: Response metric metastudy package
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-17
 ---
 
 # Response Metric Metastudy
@@ -48,6 +48,22 @@ Reader-owned response-window Y.
   pairs used only by the retrospective response model screen. It contains no
   candidate IDs, accounts explicitly for Reader designs that have no study
   candidate binding, and has no label-truth role.
+- `config/multistate_response_behavior_shadow_v1.yaml`: persisted, shadow-only
+  binding for target masks, assay-resolution normalization, evidence roles,
+  and activation gates. It does not configure a campaign.
+
+The shadow behavior modules expose a bounded builder for observed rows, Reader
+joint-bootstrap draws, and fixed prediction matrices. They use OPAL's public
+scorer and emit digest-bearing scores, coordinates, event envelopes, repeat
+agreement, observed candidate-experiment-unit rank sensitivity, and
+hard-versus-smooth candidate rank evidence on the fixed prediction surface.
+They do not alter the normal metastudy publication or allocate campaign slots
+until the study explicitly promotes the protocol.
+
+Use `multistate_behavior_cli.py preview` for a read-only summary, `publish` for
+the atomic shadow bundle, and `verify` for a fail-closed artifact check. The
+publisher preserves normalization rows and bootstrap scores rather than
+retaining only derived summaries.
 
 The objective-neutral response-window Reader request and candidate-observation
 policy live in the study-level `response_window_observations/` package. The metastudy consumes
@@ -203,3 +219,8 @@ Canonical objective sources:
 
 - `src/dnadesign/opal/docs/plugins/objectives/sfxi.md`
 - `src/dnadesign/opal/docs/plugins/objectives/response-magnitude-feasibility.md`
+- `src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md`
+
+Stress-study binding and claim boundary:
+
+- `docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md`

@@ -1,0 +1,60 @@
+schema_id: stress_ethanol_cipro_growth.multistate_response_behavior_shadow.v1
+schema_version: "1"
+protocol_id: secg_multistate_response_behavior_shadow_v1
+study_id: stress_ethanol_cipro_growth
+status: shadow_only
+
+objective:
+  name: multistate_response_behavior_v1
+  family_weighting: equal_one_third
+  normalized_temperature: 1.0
+  selector_output: behavior_score
+  hard_bottleneck_role: diagnostic_only
+
+assay:
+  state_ids: ["00", "10", "01", "11"]
+  primary_reduction_id: event_logmean_4_8h_post
+  response_semantics: reduced_log2_yfp_over_cfp
+  fluorescence_semantics: same_state_reference_relative_log2_yfp_over_od600
+  fluorescence_reference: pDual-10
+  off_claim_boundary: suppression_relative_to_same_state_pDual-10_not_absolute_off
+
+target_views:
+  - id: ethanol
+    target_mask: [0, 1, 0, 1]
+  - id: ciprofloxacin
+    target_mask: [0, 0, 1, 1]
+  - id: and
+    target_mask: [0, 0, 0, 1]
+
+normalization:
+  cohort_id: exact_primary_reader_candidate_experiments_v1
+  unit: reader_candidate_experiment
+  response_scale_basis: reader_joint_bootstrap_sd_of_declared_on_off_response_pairs
+  fluorescence_scale_basis: reader_joint_bootstrap_sd_of_each_reference_relative_state
+  pair_deduplication: unique_unordered_state_pair_union
+  scale_quantile: 0.90
+  quantile_method: linear
+  minimum_bootstrap_draws: 100
+
+evidence_roles:
+  bootstrap: normalization_and_candidate_experiment_unit_rank_sensitivity_no_top_k
+  event_time: separate_sensitivity_evidence
+  repeat: separate_disagreement_evidence
+  censor: exact_only_normalization_cohort
+
+ranking:
+  prediction_raw_top_k: 6
+  method: descending_score_then_ascending_candidate_id
+  tie_semantics: ordinal_rank_with_id_tiebreak
+  comparison_role: fixed_prediction_raw_candidate_ranking_no_sequence_allocation
+
+comparator:
+  objective_name: response_magnitude_feasibility_v1
+  score_channel: feasibility_margin
+  direction: maximize
+
+activation:
+  campaign: prohibited
+  synthesis: prohibited
+  promotion_gate: explicit_study_adjudication_after_shadow_evidence

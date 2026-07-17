@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-context-index
 title: Stress OPAL context
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-17
 audience:
   - operator
   - agent
@@ -26,6 +26,9 @@ Use `../../routes/decision/opal/README.md` for first-hop OPAL routing and
   induction-aware assay binding, three active masks, coordinated prospective
   allocation, and promotion boundary. Round 0 is complete as a frozen learning
   probe; model support and synthesis authorization remain separate.
+- [Multistate Response Behavior](multistate-response-behavior.md): threshold-free,
+  strictly directional shadow objective; study-owned normalization protocol,
+  uncertainty roles, and explicit campaign-promotion gate.
 - [DenseGen TFBS learnability probe v1](densegen-tfbs-learnability-probe-v1.md):
   study-owned v1 contract for scalar TF family content and slot-position
   synthetic-control campaigns. Realized profile boundaries live in the
