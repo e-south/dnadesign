@@ -154,6 +154,7 @@ where = ["src"]
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.studies" = [
+  "units/eco1_rt_repack/operations/materialization/review_deliverables/notebook_template.py.txt",
   "units/retron_hairpin_design/status/ops/status.registry.yaml",
   "units/stress_ethanol_cipro_growth/operations/status/ops/status.registry.yaml",
   "units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml",
