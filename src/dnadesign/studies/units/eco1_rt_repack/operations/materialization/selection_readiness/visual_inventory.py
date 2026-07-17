@@ -111,6 +111,18 @@ CURRENT_SELECTION_PLOTS = (
         ),
     ),
     SelectionPlot(
+        plot_id="selection_pairwise_sequence_differences",
+        file_name="selection_pairwise_sequence_differences.svg",
+        plain_title="Pairwise amino-acid differences among selected RT sequences",
+        selection_role="selected_panel_sequence_distance_audit",
+        funnel_stage_id="selected_panel",
+        notebook_group="core_funnel",
+        not_a_selector_reason=(
+            "Reports final amino-acid differences; selection used within-group mutation-position and exact-"
+            "substitution Jaccard distances."
+        ),
+    ),
+    SelectionPlot(
         plot_id="selection_local_structure_threshold_sensitivity",
         file_name="selection_local_structure_threshold_sensitivity.svg",
         plain_title="Local RMSD threshold sensitivity",

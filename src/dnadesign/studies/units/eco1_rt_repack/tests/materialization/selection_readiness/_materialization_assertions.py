@@ -80,6 +80,10 @@ def assert_selection_plot_contract(
     for label in ("Distal", "Peripheral", "Combined"):
         assert label in mutation_distance_text
     assert "d_J" in mutation_distance_text
+    sequence_distance_text = plot_text_by_id["selection_pairwise_sequence_differences"]
+    assert "Pairwise amino-acid differences among selected RT sequences" in sequence_distance_text
+    assert "Differing amino-acid positions" in sequence_distance_text
+    assert "Each unique pair is shown once" in sequence_distance_text
     assert "selection_local_structure_stratification" in plot_text_by_id
     local_structure_stratification_text = plot_text_by_id["selection_local_structure_stratification"]
     assert "review cutoff" in local_structure_stratification_text

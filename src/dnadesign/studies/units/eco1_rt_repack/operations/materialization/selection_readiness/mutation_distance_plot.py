@@ -45,28 +45,6 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
 
-def build_selected_sequence_distance_matrix(
-    *,
-    panel_rows: list[dict[str, object]],
-    candidate_rows: list[dict[str, object]],
-) -> tuple[list[str], list[list[int]]]:
-    """Return selected candidate ids and pairwise protein-sequence distances."""
-
-    ordered_panel = ordered_panel_rows(panel_rows)
-    candidate_by_id = {str(row["candidate_id"]): row for row in candidate_rows if row.get("candidate_id")}
-    labels: list[str] = []
-    sequences: list[str] = []
-    for panel_row in ordered_panel:
-        candidate_id = str(panel_row["candidate_id"])
-        candidate = candidate_by_id.get(candidate_id)
-        if candidate is None:
-            raise ValueError(f"Selection panel references missing candidate row: {candidate_id}")
-        labels.append(candidate_id)
-        sequences.append(str(candidate.get("sequence") or ""))
-    matrix = [[_hamming_distance(left, right) for right in sequences] for left in sequences]
-    return labels, matrix
-
-
 def build_selected_mutation_dissimilarity_matrices(
     *,
     panel_rows: list[dict[str, object]],
@@ -313,10 +291,6 @@ def _pairwise_distances(rows: list[frozenset[int]]) -> list[float]:
     ]
 
 
-def _hamming_distance(left: str, right: str) -> int:
-    return sum(a != b for a, b in zip(left, right, strict=False)) + abs(len(left) - len(right))
-
-
 def _selected_label(row: dict[str, object]) -> str:
     return short_selected_variant(row)
 
@@ -324,6 +298,5 @@ def _selected_label(row: dict[str, object]) -> str:
 __all__ = [
     "build_within_policy_position_distance_context",
     "build_selected_mutation_dissimilarity_matrices",
-    "build_selected_sequence_distance_matrix",
     "write_selected_mutation_dissimilarity_plot",
 ]

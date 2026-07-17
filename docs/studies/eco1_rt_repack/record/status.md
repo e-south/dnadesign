@@ -165,9 +165,12 @@ policy outputs.
 
 ProteinMPNN requests use the public `--omit_AA_jsonl` sidecar for
 residue-specific peripheral alphabets and `--omit_AAs C` for the global
-no-cysteine rule. Peripheral alternatives are MSA-observed; new D/E and new
-P/G substitutions are excluded. WT acidic, proline, or glycine residues may be
-retained.
+no-cysteine rule. Peripheral alternatives are MSA-observed; at a given Eco1
+position, this means the alternate amino acid appears at least once among
+non-gap clade-9 homolog residues aligned to that position. It does not mean
+that the alternate is common or that the complete mutation set occurs
+naturally. New D/E and new P/G substitutions are excluded. WT acidic, proline,
+or glycine residues may be retained.
 
 Open-site WT retention is calculated over the `25`, `59`, or `84` designable
 positions in each policy. Its vertical bands are the expected one-residue
@@ -197,8 +200,9 @@ The visible flow separates eligibility from experimental design:
 
 Protected-position, direct-contact, Wang-track, acidic-gain, and proximal MSA
 checks remove no active rows because those constraints were enforced during
-generation. They remain audited invariants rather than decorative funnel
-stages.
+generation. The MSA rule is therefore active upstream even though its
+downstream validation removes zero v3 rows. These checks remain audited
+invariants rather than row-reducing funnel stages.
 
 Within each group, the first pair has the greatest mutated-position Jaccard
 distance, with exact-substitution distance second. The third peripheral or
@@ -218,6 +222,14 @@ positions are shared and position-set distance is `0.500`. The peripheral trio
 shares `22` positions and has a minimum position-set distance of `0.366`. The
 combined trio shares `35` positions and has a minimum position-set distance of
 `0.305`. The panel is mutation-set-diverse, not orthogonal.
+
+The `selection_pairwise_sequence_differences` panel shows that the selected
+full-length RT sequences differ from one another at `16-52` amino-acid
+positions. Within groups, the distal pair differs at `16` positions, the
+peripheral pairs differ at `28-32`, and the combined pairs differ at `39-48`.
+The notebook reports these raw amino-acid counts separately from the Jaccard
+selection score. Cross-group counts are descriptive because each group exposes
+a different designable-position set.
 
 ### Evidence Limits
 
@@ -275,7 +287,12 @@ other inputs.
 The bundle contains one upload CSV, one FASTA, and one annotated GenBank file
 per candidate. FASTA records and GenBank filenames use the stable
 `Eco1RT-G3-*` aliases; the handoff manifest retains candidate ids and hashes.
-GenBank variation features use compact amino-acid labels such as `A47K`. The
+Each GenBank record presents a mutation summary before its policy annotations,
+then one codon-level variation feature per substitution using compact labels
+such as `A47K` (reference residue, Eco1 position, designed residue). Seven
+human-named features summarize the protected policy categories, using joined
+locations instead of splitting discontinuous categories into dozens of viewer
+rows. The
 manifest reports global and 50-bp-window GC measurements, maximum
 homopolymer length, repeated 20-mer count, internal BsaI/BsmBI checks, exact
 F10/R13 states, the Wang R13A evidence match, and the unresolved RT-msDNA

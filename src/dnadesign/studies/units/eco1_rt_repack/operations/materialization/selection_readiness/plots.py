@@ -32,6 +32,7 @@ from .regional_plots import (
     write_selected_substitutions_across_rt_plot,
 )
 from .sankey_plot import write_hypothesis_panel_flow_plot
+from .sequence_distance_plot import write_selected_sequence_distance_plot
 
 matplotlib.use("Agg")
 
@@ -104,6 +105,12 @@ def write_selection_readiness_plots(
             panel_rows=panel_rows,
             candidate_rows=candidate_rows,
             triage_rows=triage_rows,
+            input_hashes=input_hashes,
+        ),
+        write_selected_sequence_distance_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            candidate_rows=candidate_rows,
             input_hashes=input_hashes,
         ),
         write_local_structure_threshold_sensitivity_plot(

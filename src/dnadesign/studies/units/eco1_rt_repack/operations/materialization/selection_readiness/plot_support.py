@@ -44,6 +44,7 @@ def plot_row(
     interpretation_limit: str,
     render_mode: str,
     role: str = "manuscript_facing",
+    data_sources: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
         "plot_id": plot_id,
@@ -51,7 +52,8 @@ def plot_row(
         "artifact_kind": "svg",
         "status": "rendered",
         "path": str(path),
-        "data_sources": [
+        "data_sources": data_sources
+        or [
             "selection/candidate_triage_table.parquet",
             "selection/candidate_selection_panel.parquet",
         ],

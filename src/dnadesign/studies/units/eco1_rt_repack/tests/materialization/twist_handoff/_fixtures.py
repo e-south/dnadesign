@@ -90,16 +90,27 @@ def write_twist_handoff_inputs(root: Path) -> dict[str, Path]:
             }
         )
         fasta_records.append(f">{candidate_id}\n{protein}\n")
+    protected_reason_by_position = {
+        50: "direct_retained_dna_rna_contact_le5a",
+        80: "conserved_core_clade9_25pct_plurality",
+        100: "motif_context_naxxh",
+        190: "motif_context_yadd",
+        240: "motif_context_vtg",
+        249: "wang_thumb_contact_track",
+        255: "c_terminal_thumb_context_255_311",
+    }
     policy_rows = [
         {
             "policy_id": policy_id,
             "eco1_position": position,
-            "protected_reason_codes": ["motif_context"] if position == 100 else [],
-            "is_direct_contact_le_5a": False,
+            "protected_reason_codes": (
+                [protected_reason_by_position[position]] if position in protected_reason_by_position else []
+            ),
+            "is_direct_contact_le_5a": position == 50,
             "is_near_region_gt5_le10a": False,
-            "is_wang_thumb_track": False,
-            "is_c_terminal_thumb_context": False,
-            "is_conserved_core": position == 100,
+            "is_wang_thumb_track": position == 249,
+            "is_c_terminal_thumb_context": position == 255,
+            "is_conserved_core": position == 80,
         }
         for policy_id in sorted(set(policy_ids))
         for position in range(1, 321)

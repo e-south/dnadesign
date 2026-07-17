@@ -24,6 +24,9 @@ from dnadesign.permuter import default_codon_table_path
 from dnadesign.studies.units.eco1_rt_repack.operations.materialization.twist_handoff import (
     materialize_twist_handoff,
 )
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.twist_handoff._assertions import (
+    assert_reviewable_genbank_records,
+)
 from dnadesign.studies.units.eco1_rt_repack.tests.materialization.twist_handoff._fixtures import (
     REPO_ROOT,
     WT_GENBANK,
@@ -145,26 +148,11 @@ def test_materializes_quote_ready_full_cds_handoff(tmp_path: Path) -> None:
                 assert codon == best_codons[candidate_aa][1]
         assert dna[-3:] == str(wt_record.seq[-3:]).upper()
 
-    assert len(result.genbank_paths) == 8
     assert not stale_path.exists()
-    for path in result.genbank_paths:
-        record = SeqIO.read(path, "genbank")
-        assert len(record.seq) == 963
-        assert len([feature for feature in record.features if feature.type == "CDS"]) == 1
-        mutation_features = [feature for feature in record.features if feature.type == "variation"]
-        manifest_row = next(row for row in manifest["sequences"] if row["sequence_id"] == record.id)
-        assert len(mutation_features) == len(manifest_row["mutation_tokens"])
-        assert all(len(feature.location) == 3 for feature in mutation_features)
-        assert any(feature.type == "misc_feature" for feature in record.features)
-        feature_labels = {
-            str(feature.qualifiers.get("label", [""])[0])
-            for feature in record.features
-            if feature.type == "misc_feature"
-        }
-        assert "wang_alpha1_interface_review" in feature_labels
-        assert "wang_alpha1_R13_review" in feature_labels
-        feature_notes = [str(note) for feature in record.features for note in feature.qualifiers.get("note", [])]
-        assert any("rt_msdna_oligomeric_state=not_established" in note for note in feature_notes)
+    assert_reviewable_genbank_records(
+        genbank_paths=result.genbank_paths,
+        manifest_rows=manifest["sequences"],
+    )
 
 
 def test_fails_fast_when_panel_hash_does_not_match_foldcheck(tmp_path: Path) -> None:

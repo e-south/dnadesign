@@ -122,10 +122,12 @@ def render_intro(mo: Any) -> Any:
         "one RT chain and do not establish the RT-msDNA oligomeric state."
     )
     claim_limit = (
-        "Charge shifts, MSA support, fold metrics, and local RMSD are review evidence, not activity scores. ESMC and "
-        "SAE are optional model checks and do not select candidates. The sequence instances are not biological "
-        "replicates, and the panel does not establish improved activity, affinity, processivity, strand displacement, "
-        "safety, or RT-msDNA oligomeric state."
+        "MSA conservation and residue-specific peripheral alphabets constrain sequence generation; downstream MSA "
+        "checks verify that contract. ColabFold confidence and local RMSD constrain selection eligibility. These "
+        "measurements and the reported charge shifts are not activity scores. ESMC and SAE are optional model checks "
+        "and do not select candidates. The sequence instances are not biological replicates, and the panel does not "
+        "establish improved activity, affinity, processivity, strand displacement, safety, or RT-msDNA oligomeric "
+        "state."
     )
     paragraph_style = (
         "margin:0; width:100%; max-width:none; color:inherit; opacity:0.86; "

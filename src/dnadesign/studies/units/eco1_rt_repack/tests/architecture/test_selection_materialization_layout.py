@@ -20,6 +20,7 @@ from dnadesign.studies.units.eco1_rt_repack.tests._helpers import repo_root
 _PACKAGE_ROOT = "src/dnadesign/studies/units/eco1_rt_repack"
 _SHARED_MATERIALIZATION_ROOT_FILES = {
     "__init__.py",
+    "policy_visuals.py",
     "rendering.py",
     "rt_annotation_context.py",
     "rt_plot_annotations.py",
@@ -65,6 +66,7 @@ _SELECTION_READINESS_ROOT_FILES = {
     "review_axes.py",
     "regional_plots.py",
     "sankey_plot.py",
+    "sequence_distance_plot.py",
     "sequence_export.py",
     "selection_policy_context.py",
     "selection_summary.py",
