@@ -102,11 +102,11 @@ def _verify_observed_scores_from_coordinates(
         values = indexed["clearance"].to_numpy(dtype=float)
         family_counts = (
             sum(label.startswith("response:") for label in labels),
-            sum(label.startswith("on_expression:") for label in labels),
-            sum(label.startswith("off_suppression:") for label in labels),
+            sum(label.startswith("on_signal:") for label in labels),
+            sum(label.startswith("off_signal_suppression:") for label in labels),
         )
-        response, on_expression, off_suppression = np.split(values, np.cumsum(family_counts)[:-1])
-        family_scores = tuple(_smooth_bottleneck(family) for family in (response, on_expression, off_suppression))
+        response, on_signal, off_signal_suppression = np.split(values, np.cumsum(family_counts)[:-1])
+        family_scores = tuple(_smooth_bottleneck(family) for family in (response, on_signal, off_signal_suppression))
         prior = np.concatenate([np.full(count, 1.0 / (3.0 * count)) for count in family_counts])
         log_terms = -values + np.log(prior)
         behavior_score = float(-logsumexp(log_terms))
@@ -116,8 +116,8 @@ def _verify_observed_scores_from_coordinates(
             "behavior_score": behavior_score,
             "hard_bottleneck_clearance": float(np.min(values)),
             "response_family_score": family_scores[0],
-            "on_expression_family_score": family_scores[1],
-            "off_suppression_family_score": family_scores[2],
+            "on_signal_family_score": family_scores[1],
+            "off_signal_suppression_family_score": family_scores[2],
         }
         score_row = indexed_scores.loc[(unit_id, view_id)]
         for field, value in expected.items():
@@ -144,8 +144,8 @@ def _ordered_coordinate_labels(state_ids: tuple[str, ...], mask: tuple[int, ...]
     off = [state_ids[index] for index, value in enumerate(mask) if value == 0]
     return (
         *(f"response:{left}>{right}" for left in on for right in off),
-        *(f"on_expression:{state}" for state in on),
-        *(f"off_suppression:{state}" for state in off),
+        *(f"on_signal:{state}" for state in on),
+        *(f"off_signal_suppression:{state}" for state in off),
     )
 
 

@@ -154,8 +154,8 @@ def _score_rows(
         frame["behavior_score"] = score.behavior_score
         frame["hard_bottleneck_clearance"] = score.hard_bottleneck_clearance
         frame["response_family_score"] = score.response_family_score
-        frame["on_expression_family_score"] = score.on_expression_family_score
-        frame["off_suppression_family_score"] = score.off_suppression_family_score
+        frame["on_signal_family_score"] = score.on_signal_family_score
+        frame["off_signal_suppression_family_score"] = score.off_signal_suppression_family_score
         frame["limiting_coordinate"] = list(score.limiting_coordinate_label)
         frame["all_reference_directions_met"] = score.all_reference_directions_met
         _add_provenance(frame, protocol=protocol, normalization=normalization)
@@ -215,7 +215,7 @@ def _add_provenance(
     frame["protocol_source_sha256"] = f"sha256:{protocol.source_sha256}"
     frame["normalization_source_rows_sha256"] = f"sha256:{normalization.source_rows_sha256}"
     frame["response_scale"] = normalization.response_scale
-    frame["fluorescence_scale"] = normalization.fluorescence_scale
+    frame["signal_scale"] = normalization.signal_scale
     frame["status"] = protocol.status
     frame["campaign_activation"] = protocol.campaign_activation
     frame["synthesis_authorization"] = protocol.synthesis_authorization

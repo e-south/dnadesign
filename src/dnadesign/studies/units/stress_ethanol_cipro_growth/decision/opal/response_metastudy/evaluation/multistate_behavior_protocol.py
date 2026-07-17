@@ -20,6 +20,10 @@ import yaml
 from yaml.constructor import ConstructorError
 
 from ..core.contracts import StressTargetView
+from .multistate_behavior_gate_protocol import (
+    BehaviorCompletionGateProtocol,
+    parse_behavior_completion_gate,
+)
 from .multistate_behavior_normalization_protocol import (
     BehaviorNormalizationProtocol,
     parse_behavior_normalization_protocol,
@@ -48,6 +52,10 @@ from .multistate_behavior_protocol_fields import (
 )
 from .multistate_behavior_protocol_fields import (
     require_mapping as _mapping,
+)
+from .multistate_behavior_source_protocol import (
+    BehaviorSourceEquivalenceProtocol,
+    parse_behavior_source_equivalence,
 )
 
 SCHEMA_ID = "stress_ethanol_cipro_growth.multistate_response_behavior_shadow.v1"
@@ -91,6 +99,7 @@ class MultistateBehaviorShadowProtocol:
     protocol_id: str
     study_id: str
     status: Literal["shadow_only"]
+    source_equivalence: BehaviorSourceEquivalenceProtocol
     objective_name: str
     family_weighting: Literal["equal_one_third"]
     selector_output: Literal["behavior_score"]
@@ -113,6 +122,7 @@ class MultistateBehaviorShadowProtocol:
     comparator_objective_name: str
     comparator_score_channel: str
     comparator_direction: str
+    completion_gate: BehaviorCompletionGateProtocol
     source_path: Path
     source_sha256: str
 
@@ -150,6 +160,7 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
             "protocol_id",
             "study_id",
             "status",
+            "source_equivalence",
             "objective",
             "assay",
             "target_views",
@@ -157,6 +168,7 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
             "evidence_roles",
             "ranking",
             "comparator",
+            "completion_gate",
             "activation",
         },
         context="protocol",
@@ -165,6 +177,7 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
     _require_literal(payload, "schema_version", SCHEMA_VERSION, context="protocol")
     _require_literal(payload, "study_id", "stress_ethanol_cipro_growth", context="protocol")
     _require_literal(payload, "status", "shadow_only", context="protocol")
+    source_equivalence = parse_behavior_source_equivalence(payload["source_equivalence"])
     protocol_id = _nonempty_string(payload["protocol_id"], field="protocol.protocol_id")
     if protocol_id != "secg_multistate_response_behavior_shadow_v1":
         raise BehaviorProtocolError("protocol.protocol_id must be 'secg_multistate_response_behavior_shadow_v1'.")
@@ -282,12 +295,14 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
     _require_literal(comparator, "score_channel", "feasibility_margin", context="comparator")
     _require_literal(comparator, "direction", "maximize", context="comparator")
 
+    completion_gate = parse_behavior_completion_gate(payload["completion_gate"])
     return MultistateBehaviorShadowProtocol(
         schema_id=SCHEMA_ID,
         schema_version=SCHEMA_VERSION,
         protocol_id=protocol_id,
         study_id="stress_ethanol_cipro_growth",
         status="shadow_only",
+        source_equivalence=source_equivalence,
         objective_name="multistate_response_behavior_v1",
         family_weighting="equal_one_third",
         selector_output="behavior_score",
@@ -310,6 +325,7 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
         comparator_objective_name="response_magnitude_feasibility_v1",
         comparator_score_channel="feasibility_margin",
         comparator_direction="maximize",
+        completion_gate=completion_gate,
         source_path=source_path,
         source_sha256=hashlib.sha256(source_path.read_bytes()).hexdigest(),
     )

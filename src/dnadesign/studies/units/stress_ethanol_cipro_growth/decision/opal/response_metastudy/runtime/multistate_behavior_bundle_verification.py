@@ -17,8 +17,11 @@ import pandas as pd
 
 from ..evaluation.multistate_behavior_protocol import load_multistate_behavior_protocol
 from .multistate_behavior_bundle_contract import SCHEMA_ID, TABLE_COLUMNS, TABLE_IDS
+from .multistate_behavior_completion_verification import verify_behavior_completion_tables
+from .multistate_behavior_decision_verification import verify_behavior_decision_artifacts
 from .multistate_behavior_json import load_strict_behavior_json
 from .multistate_behavior_semantic_verification import verify_behavior_record_semantics
+from .multistate_behavior_source_equivalence import verify_source_equivalence_receipt
 from .multistate_behavior_source_receipt import verify_behavior_prediction_source_receipt
 from .multistate_behavior_table_coverage import verify_behavior_table_coverage
 from .multistate_behavior_table_derivations import verify_behavior_table_derivations
@@ -36,6 +39,9 @@ def verify_multistate_behavior_shadow(bundle_root: Path) -> dict[str, object]:
     manifest = load_strict_behavior_json(manifest_path)
     artifacts = _verify_artifacts(root, manifest_path=manifest_path, manifest=manifest)
     normalization = load_strict_behavior_json(root / str(artifacts["normalization"]["path"]))
+    decision = load_strict_behavior_json(root / str(artifacts["decision"]["path"]))
+    audit = load_strict_behavior_json(root / str(artifacts["independent_adversarial_audit"]["path"]))
+    source_equivalence = load_strict_behavior_json(root / str(artifacts["source_equivalence"]["path"]))
     protocol = load_multistate_behavior_protocol(_PROTOCOL_PATH)
     semantics = verify_behavior_record_semantics(
         manifest,
@@ -68,6 +74,30 @@ def verify_multistate_behavior_shadow(bundle_root: Path) -> dict[str, object]:
         semantics=semantics,
         comparator_semantics=comparator_semantics,
     )
+    verify_behavior_completion_tables(
+        tables,
+        semantics=semantics,
+        protocol=protocol,
+        reader_bundle_manifest_sha256=str(manifest["source"]["reader_bundle_manifest_sha256"]),
+    )
+    verify_behavior_decision_artifacts(
+        root,
+        manifest=manifest,
+        artifacts=artifacts,
+        decision=decision,
+        audit=audit,
+        tables=tables,
+        protocol=protocol,
+    )
+    verify_source_equivalence_receipt(
+        source_equivalence,
+        decision_source=decision["source_equivalence"],
+        study_id=protocol.study_id,
+        protocol_id=protocol.protocol_id,
+        corrected_reader_bundle_manifest_sha256=str(manifest["source"]["reader_bundle_manifest_sha256"]),
+        promoted_candidate_count=int(tables["grouped_objective_validation"]["candidate_id"].nunique()),
+        grouped_validation=tables["grouped_objective_validation"],
+    )
     return manifest
 
 
@@ -80,7 +110,17 @@ def _verify_artifacts(
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         raise ValueError("multistate behavior bundle lacks an artifact inventory.")
-    expected_ids = {"normalization", *(f"table__{table_id}" for table_id in TABLE_IDS)}
+    expected_ids = {
+        "normalization",
+        "decision",
+        "report",
+        "independent_adversarial_audit",
+        "source_equivalence",
+        "plot__normalization_robustness",
+        "plot__grouped_objective_validation",
+        "plot__allocation_family_decomposition",
+        *(f"table__{table_id}" for table_id in TABLE_IDS),
+    }
     if set(artifacts) != expected_ids:
         raise ValueError("multistate behavior artifact identities are incomplete or unexpected.")
     expected_paths = {manifest_path}

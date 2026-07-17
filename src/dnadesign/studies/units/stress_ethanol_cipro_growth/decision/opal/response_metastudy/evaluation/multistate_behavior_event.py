@@ -121,7 +121,7 @@ def _add_provenance(
     frame["protocol_source_sha256"] = f"sha256:{protocol.source_sha256}"
     frame["normalization_source_rows_sha256"] = f"sha256:{normalization.source_rows_sha256}"
     frame["response_scale"] = normalization.response_scale
-    frame["fluorescence_scale"] = normalization.fluorescence_scale
+    frame["signal_scale"] = normalization.signal_scale
     frame["status"] = protocol.status
     frame["campaign_activation"] = protocol.campaign_activation
     frame["synthesis_authorization"] = protocol.synthesis_authorization

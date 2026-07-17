@@ -16,28 +16,27 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.sources import (
-    preview_response_window_observation_evidence,
-)
-
 from ..core.contracts import MetastudyPaths
 from ..evaluation import (
     VerifiedBehaviorCohortReceipt,
     behavior_cohort_unit_ids_sha256,
     behavior_normalization_source_rows_sha256,
     build_multistate_behavior_normalization_record,
-    build_multistate_behavior_shadow_evidence,
-    compare_hard_and_behavior_scores,
     derive_multistate_behavior_normalization,
     load_multistate_behavior_protocol,
 )
 from ..evaluation.multistate_behavior_comparison import HardBehaviorComparison
 from ..evaluation.multistate_behavior_normalization import MultistateBehaviorNormalizationEvidence
+from ..evaluation.multistate_behavior_protocol import MultistateBehaviorShadowProtocol
 from ..evaluation.multistate_behavior_shadow import MultistateBehaviorShadowEvidence
 from .calibration_preview import build_calibration_cohort
 from .loading import assert_campaign_response_reduction, load_stress_campaign_contract
 from .multistate_behavior_censor import build_behavior_censor_exclusions
+from .multistate_behavior_completion import MultistateBehaviorCompletionEvidence
 from .multistate_behavior_prediction import load_verified_behavior_prediction_run
+from .multistate_behavior_reference import ReferenceSignalIdentityReceipt
+from .multistate_behavior_shadow_scoring import build_behavior_shadow_scoring_assembly
+from .multistate_behavior_sources import load_verified_behavior_sources
 from .publication import sha256_file
 
 
@@ -48,6 +47,8 @@ class VerifiedMultistateBehaviorShadow:
     evidence: MultistateBehaviorShadowEvidence
     hard_comparison: HardBehaviorComparison
     censor_exclusions: pd.DataFrame
+    completion: MultistateBehaviorCompletionEvidence
+    reference_identity: ReferenceSignalIdentityReceipt
     source: dict[str, object]
 
 
@@ -83,26 +84,27 @@ def load_verified_multistate_behavior_shadow(
         / "response_window_observations/config/reader_response_window.yaml"
     )
     policy_path = request_path.with_name("observation_policy.yaml")
-    resolved = preview_response_window_observation_evidence(
+    sources = load_verified_behavior_sources(
         reader_bundle_root=paths.reader_bundle_root,
         reader_request_path=request_path,
         candidate_bindings_root=Path(candidate_bindings_root).resolve(),
-        policy_path=policy_path,
+        prior_observation_policy_path=policy_path,
+        protocol=protocol,
     )
-    primary_reduction_id = resolved.policy.aggregation.primary_reduction_id
+    primary_reduction_id = sources.prior_observation_policy.aggregation.primary_reduction_id
     assert_campaign_response_reduction(campaign, primary_reduction_id=primary_reduction_id)
     if primary_reduction_id != protocol.primary_reduction_id:
         raise ValueError("verified Reader primary reduction disagrees with the behavior protocol.")
     cohort = build_calibration_cohort(
-        resolved.resolved.measurements,
-        resolved.resolved.bootstrap_draws,
+        sources.resolved.measurements,
+        sources.resolved.bootstrap_draws,
         primary_reduction_id=primary_reduction_id,
     )
     source_digests = {
-        "reader_bundle_manifest_sha256": resolved.reader_manifest_sha256,
+        "reader_bundle_manifest_sha256": sources.reader_manifest_sha256,
         "reader_request_sha256": sha256_file(request_path),
-        "candidate_bindings_manifest_sha256": resolved.candidate_bindings_manifest_sha256,
-        "observation_policy_sha256": resolved.policy.config_sha256,
+        "candidate_bindings_manifest_sha256": sources.candidate_bindings_manifest_sha256,
+        "observation_policy_sha256": sources.prior_observation_policy.config_sha256,
     }
     receipt = VerifiedBehaviorCohortReceipt(
         cohort_id=protocol.normalization.cohort_id,
@@ -111,8 +113,8 @@ def load_verified_multistate_behavior_shadow(
         candidate_count=cohort.candidate_count,
         reader_experiment_count=cohort.reader_experiment_count,
         excluded_nonexact_unit_count=cohort.excluded_nonexact_unit_count,
-        reader_bundle_manifest_sha256=resolved.reader_manifest_sha256,
-        candidate_bindings_manifest_sha256=resolved.candidate_bindings_manifest_sha256,
+        reader_bundle_manifest_sha256=sources.reader_manifest_sha256,
+        candidate_bindings_manifest_sha256=sources.candidate_bindings_manifest_sha256,
         unit_ids_sha256=behavior_cohort_unit_ids_sha256(cohort.labels),
         source_rows_sha256=behavior_normalization_source_rows_sha256(
             cohort.labels,
@@ -145,24 +147,19 @@ def load_verified_multistate_behavior_shadow(
         model_params=campaign.model_params,
         raw_top_k=protocol.prediction_raw_top_k,
     )
-    evidence = build_multistate_behavior_shadow_evidence(
-        observed=cohort.labels,
-        bootstrap_draws=cohort.draws,
-        predictions=prediction_run.predictions,
-        protocol=protocol,
+    scoring = build_behavior_shadow_scoring_assembly(
+        cohort=cohort,
         normalization=normalization,
-        target_views=campaign.target_views,
-    )
-    comparison = compare_hard_and_behavior_scores(
-        prediction_run.comparator_scores,
-        evidence.prediction_scores,
-        top_k=protocol.prediction_raw_top_k,
-        hard_score_semantics=(
-            f"{protocol.comparator_objective_name}.{protocol.comparator_score_channel}.{protocol.comparator_direction}"
-        ),
+        prediction_run=prediction_run,
+        campaign=campaign,
+        protocol=protocol,
+        candidate_records_path=campaign.candidate_records_path,
+        current_measurements=sources.resolved.measurements,
+        reader_bundle_manifest_sha256=sources.reader_manifest_sha256,
+        source_observation_bundle_root=_source_observation_bundle_root(root, protocol=protocol),
     )
     exclusions = build_behavior_censor_exclusions(
-        resolved.resolved.measurements,
+        sources.resolved.measurements,
         primary_reduction_id=primary_reduction_id,
         state_ids=protocol.state_ids,
     )
@@ -175,15 +172,17 @@ def load_verified_multistate_behavior_shadow(
     return VerifiedMultistateBehaviorShadow(
         normalization=normalization,
         normalization_record=normalization_record,
-        evidence=evidence,
-        hard_comparison=comparison,
+        evidence=scoring.evidence,
+        hard_comparison=scoring.comparison,
         censor_exclusions=exclusions,
+        completion=scoring.completion,
+        reference_identity=sources.reference_identity,
         source={
             "prediction": prediction_run.source,
-            "reader_bundle_manifest_sha256": _canonical_digest(resolved.reader_manifest_sha256),
-            "candidate_bindings_manifest_sha256": _canonical_digest(resolved.candidate_bindings_manifest_sha256),
+            "reader_bundle_manifest_sha256": _canonical_digest(sources.reader_manifest_sha256),
+            "candidate_bindings_manifest_sha256": _canonical_digest(sources.candidate_bindings_manifest_sha256),
             "reader_request_sha256": _canonical_digest(sha256_file(request_path)),
-            "observation_policy_sha256": _canonical_digest(resolved.policy.config_sha256),
+            "observation_policy_sha256": _canonical_digest(sources.prior_observation_policy.config_sha256),
         },
     )
 
@@ -193,6 +192,18 @@ def _canonical_digest(value: str) -> str:
     if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
         raise ValueError("source digest must be a lowercase SHA-256 value.")
     return f"sha256:{digest}"
+
+
+def _source_observation_bundle_root(
+    repo_root: Path,
+    *,
+    protocol: MultistateBehaviorShadowProtocol,
+) -> Path:
+    relative = Path(protocol.source_equivalence.prior_observation_bundle_repo_path)
+    resolved = (repo_root / relative).resolve()
+    if not resolved.is_relative_to(repo_root) or not resolved.is_dir():
+        raise ValueError("protocol-declared source observation bundle is missing or escapes the repository.")
+    return resolved
 
 
 __all__ = [

@@ -81,6 +81,10 @@ def _preview_summary(preview: VerifiedMultistateBehaviorShadow) -> dict[str, obj
     receipt = preview.normalization.verified_cohort_receipt
     if receipt is None:
         raise ValueError("behavior shadow preview lacks a verified cohort receipt.")
+    sensitivity = preview.completion.normalization_sensitivity
+    grouped = preview.completion.grouped_objective_validation
+    allocation = preview.completion.allocation_comparison
+    objective_sets = [set(rows["id"].astype(str)) for _, rows in allocation.groupby("objective_name", sort=False)]
     return {
         "schema_id": "stress_ethanol_cipro_growth.multistate_response_behavior_shadow_preview.v1",
         "status": "shadow_only",
@@ -95,6 +99,24 @@ def _preview_summary(preview: VerifiedMultistateBehaviorShadow) -> dict[str, obj
         },
         "prediction": preview.source["prediction"],
         "hard_behavior_comparison": preview.hard_comparison.summary.to_dict(orient="records"),
+        "completion_gate": {
+            "normalization_scenario_count": int(sensitivity["scenario_id"].nunique()),
+            "minimum_normalization_rank_spearman": float(sensitivity["score_spearman_vs_primary"].min()),
+            "minimum_normalization_top6_overlap": int(sensitivity["raw_top_k_overlap"].min()),
+            "promoted_candidate_count": preview.completion.validation_labels.promoted_candidate_count,
+            "label_source_experiment_count": int(grouped["label_source_reader_experiment_id"].nunique()),
+            "minimum_rank_defined_group_count": int(grouped["rank_defined_group_count"].min()),
+            "weakest_grouped_median_spearman": float(grouped["median_within_group_spearman"].min()),
+            "weakest_grouped_pooled_spearman": float(grouped["pooled_oof_spearman"].min()),
+            "allocation_preview_overlap": len(objective_sets[0] & objective_sets[1]),
+            "prospective_hill_climb_efficacy": "unproven",
+        },
+        "source_equivalence": {
+            "reader_manifest_sha256": preview.source["reader_bundle_manifest_sha256"],
+            "central_label_equivalence_sha256": (preview.completion.validation_labels.central_label_equivalence_sha256),
+            "reference_bootstrap_row_count": preview.reference_identity.bootstrap_row_count,
+        },
+        "promotion_decision": "no_go",
         "claim_boundary": "shadow_evidence_only_no_campaign_activation_or_synthesis_authorization",
     }
 

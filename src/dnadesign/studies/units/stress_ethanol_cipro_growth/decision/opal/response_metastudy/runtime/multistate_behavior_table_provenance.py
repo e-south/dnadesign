@@ -52,8 +52,8 @@ def verify_behavior_table_provenance(
         _require_single(frame, "response_scale", semantics.response_scale, table_id=table_id, numeric=True)
         _require_single(
             frame,
-            "fluorescence_scale",
-            semantics.fluorescence_scale,
+            "signal_scale",
+            semantics.signal_scale,
             table_id=table_id,
             numeric=True,
         )
@@ -155,16 +155,16 @@ def _verify_required_numerics(tables: dict[str, pd.DataFrame]) -> None:
             "behavior_score",
             "hard_bottleneck_clearance",
             "response_family_score",
-            "on_expression_family_score",
-            "off_suppression_family_score",
+            "on_signal_family_score",
+            "off_signal_suppression_family_score",
         ],
         "observed_coordinates": ["clearance", "bottleneck_weight"],
         "bootstrap_scores": [
             "behavior_score",
             "hard_bottleneck_clearance",
             "response_family_score",
-            "on_expression_family_score",
-            "off_suppression_family_score",
+            "on_signal_family_score",
+            "off_signal_suppression_family_score",
         ],
         "event_sensitivity": [
             "behavior_score_central",
@@ -186,8 +186,8 @@ def _verify_required_numerics(tables: dict[str, pd.DataFrame]) -> None:
             "behavior_score",
             "hard_bottleneck_clearance",
             "response_family_score",
-            "on_expression_family_score",
-            "off_suppression_family_score",
+            "on_signal_family_score",
+            "off_signal_suppression_family_score",
         ],
         "hard_behavior_detail": ["hard_score", "behavior_score", "hard_rank", "behavior_rank"],
     }

@@ -27,18 +27,18 @@ def verify_behavior_table_coverage(
     """Require every table to cover the exact semantic product it claims."""
 
     response = tables["normalization_response_resolution"]
-    fluorescence = tables["normalization_fluorescence_resolution"]
+    signal = tables["normalization_signal_resolution"]
     observed = tables["observed_scores"]
     unit_ids = set(observed["id"].astype(str))
     if len(unit_ids) != semantics.unit_count:
         raise ValueError("observed score unit identities disagree with the cohort receipt.")
     _require_identity_map(response, observed, context="response normalization")
-    _require_identity_map(fluorescence, observed, context="fluorescence normalization")
-    if set(response["id"].astype(str)) != unit_ids or set(fluorescence["id"].astype(str)) != unit_ids:
+    _require_identity_map(signal, observed, context="signal normalization")
+    if set(response["id"].astype(str)) != unit_ids or set(signal["id"].astype(str)) != unit_ids:
         raise ValueError("normalization table units disagree with observed score units.")
     _verify_normalization_coverage(
         response,
-        fluorescence,
+        signal,
         semantics=semantics,
         scale_quantile=scale_quantile,
         quantile_method=quantile_method,
@@ -83,7 +83,7 @@ def verify_behavior_table_coverage(
 
 def _verify_normalization_coverage(
     response: pd.DataFrame,
-    fluorescence: pd.DataFrame,
+    signal: pd.DataFrame,
     *,
     semantics: BehaviorBundleSemantics,
     scale_quantile: float,
@@ -99,13 +99,13 @@ def _verify_normalization_coverage(
         for row in rows.itertuples(index=False):
             if str(row.declared_by_selection_views) != ",".join(declared_by_pair[(str(row.state_a), str(row.state_b))]):
                 raise ValueError("response normalization declaring-view provenance drifted.")
-    for unit_id, rows in fluorescence.groupby("id", sort=False):
+    for unit_id, rows in signal.groupby("id", sort=False):
         states = set(rows["state_id"].astype(str))
         if states != expected_states or rows["state_id"].astype(str).duplicated().any():
-            raise ValueError(f"fluorescence normalization state coverage drifted for unit {unit_id!r}.")
+            raise ValueError(f"signal normalization state coverage drifted for unit {unit_id!r}.")
     for table_id, frame in (
         ("response", response),
-        ("fluorescence", fluorescence),
+        ("signal", signal),
     ):
         values = frame["bootstrap_sd"].to_numpy(dtype=float)
         if not np.isfinite(values).all() or (values < 0.0).any():
@@ -115,13 +115,13 @@ def _verify_normalization_coverage(
     observed_response = float(
         np.quantile(response["bootstrap_sd"].to_numpy(dtype=float), scale_quantile, method=quantile_method)
     )
-    observed_fluorescence = float(
-        np.quantile(fluorescence["bootstrap_sd"].to_numpy(dtype=float), scale_quantile, method=quantile_method)
+    observed_signal = float(
+        np.quantile(signal["bootstrap_sd"].to_numpy(dtype=float), scale_quantile, method=quantile_method)
     )
     if not np.isclose(observed_response, semantics.response_scale, rtol=1e-12, atol=0.0):
         raise ValueError("response scale does not derive from persisted normalization rows.")
-    if not np.isclose(observed_fluorescence, semantics.fluorescence_scale, rtol=1e-12, atol=0.0):
-        raise ValueError("fluorescence scale does not derive from persisted normalization rows.")
+    if not np.isclose(observed_signal, semantics.signal_scale, rtol=1e-12, atol=0.0):
+        raise ValueError("signal scale does not derive from persisted pDual-10-relative fluorescence rows.")
 
 
 def _require_view_product(
@@ -244,8 +244,8 @@ def _coordinate_labels(state_ids: tuple[str, ...], mask: tuple[int, ...]) -> set
     off = [state_ids[index] for index, value in enumerate(mask) if value == 0]
     return {
         *(f"response:{left}>{right}" for left in on for right in off),
-        *(f"on_expression:{state}" for state in on),
-        *(f"off_suppression:{state}" for state in off),
+        *(f"on_signal:{state}" for state in on),
+        *(f"off_signal_suppression:{state}" for state in off),
     }
 
 

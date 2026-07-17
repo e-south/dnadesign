@@ -42,12 +42,12 @@ class MultistateBehaviorNormalizationEvidence:
 
     protocol: MultistateBehaviorShadowProtocol
     response_scale: float
-    fluorescence_scale: float
+    signal_scale: float
     bootstrap_samples: int
     unit_count: int
     response_pair_count: int
     response_resolution_rows: pd.DataFrame
-    fluorescence_resolution_rows: pd.DataFrame
+    signal_resolution_rows: pd.DataFrame
     source_rows_sha256: str
     verified_cohort_receipt: VerifiedBehaviorCohortReceipt | None = None
 
@@ -71,7 +71,7 @@ class MultistateBehaviorNormalizationEvidence:
     def normalization(self) -> dict[str, float]:
         return {
             "response_scale": self.response_scale,
-            "fluorescence_scale": self.fluorescence_scale,
+            "signal_scale": self.signal_scale,
         }
 
 
@@ -83,14 +83,14 @@ def derive_multistate_behavior_normalization(
     target_views: tuple[StressTargetView, ...],
     verified_cohort_receipt: VerifiedBehaviorCohortReceipt | None = None,
 ) -> MultistateBehaviorNormalizationEvidence:
-    """Derive one response and one fluorescence resolution from joint draws."""
+    """Derive one response and one reference-relative signal resolution."""
 
     protocol.assert_target_views(target_views)
     label_rows, draw_rows = validated_behavior_evidence(labels, draws, protocol=protocol)
     pairs = _declared_pair_union(protocol, target_views=target_views)
     pair_views = _declaring_views(protocol, target_views=target_views)
     response_records: list[dict[str, object]] = []
-    fluorescence_records: list[dict[str, object]] = []
+    signal_records: list[dict[str, object]] = []
     draw_count = int(draw_rows.groupby("id", sort=False)["draw_index"].nunique().iloc[0])
 
     for label in label_rows.itertuples(index=False):
@@ -114,7 +114,7 @@ def derive_multistate_behavior_normalization(
                 }
             )
         for state_id in protocol.state_ids:
-            fluorescence_records.append(
+            signal_records.append(
                 {
                     **identity,
                     "state_id": state_id,
@@ -126,17 +126,13 @@ def derive_multistate_behavior_normalization(
     response_rows = pd.DataFrame.from_records(response_records).sort_values(
         ["id", "state_a", "state_b"], kind="mergesort"
     )
-    fluorescence_rows = pd.DataFrame.from_records(fluorescence_records).sort_values(
-        ["id", "state_id"], kind="mergesort"
-    )
+    signal_rows = pd.DataFrame.from_records(signal_records).sort_values(["id", "state_id"], kind="mergesort")
     quantile = protocol.normalization.scale_quantile
     method = protocol.normalization.quantile_method
     response_scale = float(np.quantile(response_rows["bootstrap_sd"].to_numpy(dtype=float), quantile, method=method))
-    fluorescence_scale = float(
-        np.quantile(fluorescence_rows["bootstrap_sd"].to_numpy(dtype=float), quantile, method=method)
-    )
+    signal_scale = float(np.quantile(signal_rows["bootstrap_sd"].to_numpy(dtype=float), quantile, method=method))
     _assert_positive_scale(response_scale, family="response")
-    _assert_positive_scale(fluorescence_scale, family="fluorescence")
+    _assert_positive_scale(signal_scale, family="reference-relative signal")
     source_rows_sha256 = behavior_normalization_source_rows_sha256(
         label_rows,
         draw_rows,
@@ -153,12 +149,12 @@ def derive_multistate_behavior_normalization(
     return MultistateBehaviorNormalizationEvidence(
         protocol=protocol,
         response_scale=response_scale,
-        fluorescence_scale=fluorescence_scale,
+        signal_scale=signal_scale,
         bootstrap_samples=draw_count,
         unit_count=len(label_rows),
         response_pair_count=len(pairs),
         response_resolution_rows=response_rows.reset_index(drop=True),
-        fluorescence_resolution_rows=fluorescence_rows.reset_index(drop=True),
+        signal_resolution_rows=signal_rows.reset_index(drop=True),
         source_rows_sha256=source_rows_sha256,
         verified_cohort_receipt=verified_cohort_receipt,
     )
@@ -220,11 +216,11 @@ def build_multistate_behavior_normalization_record(
         ],
         "normalization": {
             "response_scale": evidence.response_scale,
-            "fluorescence_scale": evidence.fluorescence_scale,
+            "signal_scale": evidence.signal_scale,
             "scale_quantile": protocol.normalization.scale_quantile,
             "quantile_method": protocol.normalization.quantile_method,
             "response_scale_basis": protocol.normalization.response_scale_basis,
-            "fluorescence_scale_basis": protocol.normalization.fluorescence_scale_basis,
+            "signal_scale_basis": protocol.normalization.signal_scale_basis,
             "pair_deduplication": protocol.normalization.pair_deduplication,
             "cohort_id": protocol.normalization.cohort_id,
             "unit": protocol.normalization.unit,

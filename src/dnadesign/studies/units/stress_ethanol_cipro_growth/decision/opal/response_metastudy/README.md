@@ -57,20 +57,28 @@ joint-bootstrap draws, and fixed prediction matrices. They use OPAL's public
 scorer and emit digest-bearing scores, coordinates, event envelopes, repeat
 agreement, observed candidate-experiment-unit rank sensitivity, and
 hard-versus-smooth candidate rank evidence on the fixed prediction surface.
-They do not alter the normal metastudy publication or allocate campaign slots
-until the study explicitly promotes the protocol.
+They do not alter the normal metastudy publication or campaign state. Their
+allocation comparison is a read-only call to OPAL's public
+sequence-deduplicated runtime.
 
 Use `multistate_behavior_cli.py preview` for a read-only summary, `publish` for
 the atomic shadow bundle, and `verify` for a fail-closed artifact check. The
 publisher preserves normalization rows and bootstrap scores rather than
-retaining only derived summaries.
+retaining only derived summaries. It also emits normalization sensitivity,
+grouped behavior-versus-RMF prediction-to-truth validation, corrected-Reader
+RMF replay scales, fixed raw prediction vectors, sequence-unique allocation
+previews, a digest-bound split decision, an independent adversarial audit,
+`report.md`, and three minimal review plots.
 
 The objective-neutral response-window Reader request and candidate-observation
 policy live in the study-level `response_window_observations/` package. The metastudy consumes
 their verified output; it does not own assay reduction or label truth.
 
-Generated evidence belongs under
-`workbench/outputs/response_metastudy/`; it is never hand-edited.
+The main response metastudy bundle belongs under
+`workbench/outputs/response_metastudy/`. The separate multistate-behavior
+shadow bundle belongs under
+`workbench/outputs/multistate_response_behavior_shadow/`. Neither publication
+is hand-edited.
 
 ## Run
 

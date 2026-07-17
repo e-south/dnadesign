@@ -36,7 +36,7 @@ class BehaviorBundleSemantics:
     state_ids: tuple[str, ...]
     view_masks: dict[str, tuple[int, ...]]
     response_scale: float
-    fluorescence_scale: float
+    signal_scale: float
     bootstrap_samples: int
     unit_count: int
     prediction_count: int
@@ -88,6 +88,7 @@ def verify_behavior_record_semantics(
             "normalization_source",
             "cohort",
             "excluded_nonexact_unit_count",
+            "decision",
             "tables",
             "artifacts",
             "claim_boundary",
@@ -118,6 +119,16 @@ def verify_behavior_record_semantics(
             "comparison_role": protocol.comparison_role,
         },
         context="manifest.comparator",
+        exact=True,
+    )
+    require_literals(
+        mapping(manifest["decision"], context="manifest.decision"),
+        {
+            "promotion_decision": "no_go",
+            "campaign_activation": "prohibited",
+            "synthesis": "prohibited",
+        },
+        context="manifest.decision",
         exact=True,
     )
 
@@ -169,7 +180,7 @@ def verify_behavior_record_semantics(
             str(row["id"]): tuple(int(value) for value in row["target_mask"]) for row in normalization["target_views"]
         },
         response_scale=positive_float(normalization_values["response_scale"], field="response_scale"),
-        fluorescence_scale=positive_float(normalization_values["fluorescence_scale"], field="fluorescence_scale"),
+        signal_scale=positive_float(normalization_values["signal_scale"], field="signal_scale"),
         bootstrap_samples=positive_int(normalization_values["bootstrap_samples"], field="bootstrap_samples"),
         unit_count=positive_int(normalization_values["unit_count"], field="unit_count"),
         prediction_count=positive_int(prediction.get("candidate_count"), field="prediction.candidate_count"),

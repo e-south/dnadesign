@@ -1,0 +1,23 @@
+{
+  "blockers": [],
+  "findings": [
+    "Docs distinguish response, ON signal, and OFF suppression and limit pDual-10 claims to same-state signal.",
+    "Tests cover monotonicity, Pareto order, permutation, finite arithmetic, view scope, and cardinality compensation.",
+    "Verification replays scales, scores, grouped folds, RMF calibration, allocation, provenance, and reports.",
+    "Grouped validation exposes undefined ranks and separates objective disagreement from predictive evidence.",
+    "Hard minima, families, coordinates, assay uncertainty, controls, and allocation changes remain observable.",
+    "Growth, feasibility, absolute OFF, cross-view scores, better prediction, and hill climbing are non-claims.",
+    "Reader, study, OPAL, and bridge ownership remain separate; no campaign consumes the shadow objective."
+  ],
+  "method": "independent_read_only_adversarial_implementation_and_scientific_contract_review",
+  "schema_id": "stress_ethanol_cipro_growth.multistate_response_behavior_adversarial_audit.v1",
+  "schema_version": "1",
+  "scope": [
+    "objective mathematics and property claims",
+    "study normalization and grouped validation",
+    "fixed-prediction RMF comparison and allocation preview",
+    "artifact publication and fail-closed verification",
+    "source-of-truth documentation and biological claim boundaries"
+  ],
+  "status": "pass"
+}

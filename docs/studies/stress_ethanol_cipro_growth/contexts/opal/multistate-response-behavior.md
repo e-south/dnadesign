@@ -46,15 +46,16 @@ intended OFF states. The behavior objective has three requirement families:
 1. **Response ordering:** `(r_i - r_j) / s_R` for every `i` in `O` and `j` in
    `F`. Higher values mean that an intended ON response exceeds an intended
    OFF response.
-2. **ON expression:** `b_i / s_B` for every `i` in `O`. Higher values mean
-   stronger fluorescence relative to pDual-10 measured in that same state.
-3. **OFF suppression:** `-b_j / s_B` for every `j` in `F`. Higher values mean
-   lower OFF-state fluorescence relative to pDual-10 measured in that same
-   state.
+2. **ON signal:** `b_i / s_signal` for every `i` in `O`. Higher values mean
+   stronger YFP/OD600 fluorescence signal relative to pDual-10 measured in that
+   same state.
+3. **OFF signal suppression:** `-b_j / s_signal` for every `j` in `F`. Higher
+   values mean lower OFF-state YFP/OD600 fluorescence signal relative to
+   pDual-10 measured in that same state.
 
 Every desired directional change improves one of these coordinates. The
-objective does not add a scored `b_ON - b_OFF` term because ON expression and
-OFF suppression already contain that information. A displayed ON-to-OFF
+objective does not add a scored `b_ON - b_OFF` term because ON signal and OFF
+signal suppression already contain that information. A displayed ON-to-OFF
 fluorescence contrast may help interpretation, but scoring it again would
 double-count both fluorescence requirements.
 
@@ -79,8 +80,8 @@ families equal one-third prior weight:
 ```text
 behavior_score = -log[
     (mean(exp(-response_clearance))
-     + mean(exp(-on_expression_clearance))
-     + mean(exp(-off_suppression_clearance))) / 3
+     + mean(exp(-on_signal_clearance))
+     + mean(exp(-off_signal_suppression_clearance))) / 3
 ]
 ```
 
@@ -94,13 +95,19 @@ other measurements stay fixed. Poor coordinates receive exponentially larger
 bottleneck weights, so one weak behavior still matters more than an already
 strong behavior.
 
+Strict monotonicity is a real-arithmetic property. At finite-precision
+extremes, already favorable coordinates can saturate or receive a numerically
+zero bottleneck weight. Runtime pressure tests therefore require a finite,
+nondecreasing score at extremes rather than a distinguishable increase after
+every arbitrarily large separation.
+
 The score permits bounded compensation. A large improvement in one coordinate
 can partly offset a smaller deficit elsewhere. No continuous scalar can be
 both strictly increasing in every desired coordinate and completely
 noncompensatory. The evidence surface therefore also reports:
 
 - the hard minimum across all coordinates;
-- response, ON-expression, and OFF-suppression family scores;
+- response, ON-signal, and OFF-signal-suppression family scores;
 - every state-level clearance and its bottleneck weight;
 - the limiting state or state pair; and
 - whether every reference direction is nonnegative.
@@ -119,7 +126,8 @@ assay state:
 b_i = log2[(YFP/OD600)_design,i / (YFP/OD600)_pDual-10,i]
 ```
 
-Thus `b_i = -3` means eightfold lower fluorescence than pDual-10 in that state.
+Thus `b_i = -3` means eightfold lower YFP/OD600 fluorescence signal than
+pDual-10 in that state.
 The behavior score continues to reward `-4`, `-5`, and lower OFF values without
 introducing an acceptance threshold.
 
@@ -136,11 +144,14 @@ draws over the existing exact primary candidate-experiment cohort:
 - `response_scale` is the declared 0.90 quantile of bootstrap standard
   deviations for the union of state pairs that appear as ON-versus-OFF pairs
   in any declared view;
-- `fluorescence_scale` is the same quantile of bootstrap standard deviations
-  for each state-level `b_i` value.
+- `signal_scale` is the same quantile of bootstrap standard deviations for
+  each state-level reference-relative `b_i` value.
 
-The 0.90 quantile is a prespecified conservative resolution convention. The
-median would describe a typical, relatively clean component and can make
+The 0.90 quantile is a conservative resolution convention frozen in the
+protocol before shadow ranking and prospective use. It was formulated after
+the existing assay corpus was available, so it is not described as prospective
+preregistration. The median would describe a typical, relatively clean
+component and can make
 noisier but valid assay states look artificially far apart after scaling. The
 maximum would let one unstable component or experiment set the scale for the
 entire study. The 0.90 quantile represents the noisier part of the verified
@@ -196,8 +207,41 @@ state-level coordinate tables where requested, event envelopes, repeat
 agreement, observed candidate-experiment-unit rank sensitivity, and aligned
 rank/Top-K comparisons against an explicitly named hard score on the fixed
 prediction surface. Prediction ranking uses descending score followed by
-ascending candidate ID, with an ordinal ID tie-break. The builder does not
-allocate a campaign batch or duplicate OPAL's sequence allocator.
+ascending candidate ID, with an ordinal ID tie-break. A read-only allocation
+preview calls OPAL's public round-robin next-best-unallocated runtime and
+deduplicates by exact sequence. The study does not duplicate the allocator and
+does not mutate a campaign.
+
+The registered random forest is trained against raw eight-component
+response-window Y. Both RMF and the behavior objective score the same predicted
+Y afterward. Changing the scalar objective can change ranking and allocation;
+it cannot, by itself, make the sequence-to-Y relationship easier to predict.
+Any claim that the behavior objective hill-climbs better therefore requires
+predictions frozen before new measurements over prospective rounds.
+
+Family means prevent a target mask with more response pairs from receiving
+more prior weight solely because it has more coordinates. They also create a
+cardinality boundary. Numeric behavior scores are view-local: comparison
+requires the same ordered state IDs, target mask, normalization record, and
+protocol. A shared state count or state list is insufficient because different
+masks create different coordinate families and priors. As the number of
+otherwise strong coordinates grows, one fixed weak coordinate can receive less
+total soft-bottleneck weight. The persisted pressure table reports balanced
+`K=2,4,8,16` analytic maximum soft-over-hard gaps of 1.10, 2.48, 3.87, and 5.26
+assay-resolution units. In this study, ethanol and ciprofloxacin response
+coordinates have prior `1/12`, giving `log(12)=2.485`; AND response and OFF
+coordinates have prior `1/9`, giving `log(9)=2.197`. The hard bottleneck,
+limiting coordinate, family scores, and coordinate weights disclose this
+compensation but do not constrain selection. A materially negative coordinate
+can coexist with a positive selector score. The semantic GO is limited to
+within-view ranking under the fixed four-state protocol; it is a NO-GO for
+conformance, feasibility, cross-view scalar comparison, or cross-state-space
+comparison.
+
+The objective does not encode growth, viability, or expression burden.
+YFP/OD600 denominator safeguards do not turn a high behavior score into growth
+compatibility evidence. Reader trajectories and study QC retain that evidence;
+growth is not added as a fourth score family.
 
 ### Persisted evidence bundle
 
@@ -215,10 +259,61 @@ contains:
 - fixed-prediction scores; and
 - aligned RMF-versus-behavior raw rank evidence.
 
+The completion gate adds the smallest evidence set needed for adjudication:
+
+- `normalization_sensitivity.parquet`: q50, q75, q90, q95, q99 and
+  leave-one-source-experiment-out scale sensitivity on one fixed prediction
+  matrix;
+- `grouped_objective_validation.parquet`: five-seed,
+  leave-one-label-source-experiment-out raw-Y random-forest predictions, with
+  fold-local behavior and RMF parameters and explicit rank-undefined groups;
+- `rmf_replay_calibration.parquet`: zero-threshold RMF scales replayed from the
+  corrected Reader uncertainty evidence rather than stale campaign scales;
+- `allocation_comparison.parquet`: sequence-unique public-runtime allocation
+  previews for both objectives;
+- `observed_control_face_validity.parquet`: SpyP ethanol and sulAp
+  ciprofloxacin score/rank diagnostics, with no positive AND control claim;
+- `family_cardinality_pressure.parquet`: analytic and realizable family
+  dilution pressure at `K=2,4,8,16`;
+- `grouped_rmf_resolution.parquet` and `source_equivalence.json`: portable
+  corrected-Reader calibration and exact point-label reuse receipts;
+- `decision.json`: a typed split verdict for semantic fit, implementation,
+  normalization robustness, predictive support, prospective efficacy,
+  technical readiness, campaign disposition, and synthesis;
+- `report.md`, one independent adversarial implementation-audit record, and
+  three minimal plots for normalization robustness, grouped validation, and
+  allocation-preview family decomposition.
+
 The verifier rejects unregistered files, path escape, duplicate JSON keys,
 non-finite required values, row or schema drift, duplicate semantic keys,
-prediction-run mismatch, and any change from the shadow-only activation
-boundary.
+prediction-run mismatch, evidence-digest drift, non-replayable fold parameters
+or scores, allocator divergence, report drift, and any change from the
+shadow-only activation boundary.
+
+### Source correction and label reuse
+
+The shadow protocol binds Reader manifest
+`bdc6f7afc8b00a7960eac7bf402be2632f9815c7fedc88cae4c27d47e9d09418`.
+It requires pDual-10 compared with the same resample to have exactly zero
+central `b_i`, bootstrap standard deviation, and every joint-bootstrap `b_i`
+draw. The immutable observation and label artifacts remain bound to their
+prior Reader manifest and remain independently verifiable.
+
+The shadow loader does not overwrite or reinterpret those artifacts. It selects
+the same candidate and Reader-experiment identities from the corrected bundle
+and requires bit-exact equality of all eight central values before reusing a
+promoted label. The bundle records a central-equivalence digest. Because the
+correction changes reference-bootstrap uncertainty but not central labels, a
+new observation version is not required for point-label reuse. The shadow
+evidence is a new source-bound publication because its uncertainty scales and
+source digests changed.
+
+The immutable label directory retains a digest-identical copy of the source
+observation manifest as a provenance receipt; it does not duplicate the source
+Parquet records. The shadow protocol therefore declares the study-owned source
+observation bundle path explicitly. The loader requires that bundle's manifest
+digest to equal the immutable receipt before it reads any record, then confines
+every record path and verifies its digest within the declared study bundle.
 
 Preview without writing:
 
@@ -242,10 +337,18 @@ shadow evidence is materialized. Review must cover:
 1. strict directional monotonicity, Pareto dominance, state-permutation
    equivariance, extreme finite inputs, and family-cardinality pressure tests;
 2. observed, bootstrap, event-bound, repeated-candidate, and censor evidence;
-3. fixed-prediction rank sensitivity and current-versus-proposed Top-K changes;
+3. fixed-prediction objective disagreement and current-versus-proposed Top-K
+   changes, kept distinct from grouped prediction-to-truth evidence;
 4. normalization sensitivity as a robustness test, without tuning scales to
    preserve current nominations; and
-5. one deliberate campaign disposition that leaves a single executable route.
+5. an independent adversarial implementation audit with no unresolved blockers;
+6. one deliberate campaign disposition that leaves a single executable route.
+
+The persisted decision is deliberately split. Semantic fit and shadow
+implementation may be `go` while predictive support remains insufficient,
+prospective hill-climb efficacy remains unproven, campaign activation remains
+`no_go`, and synthesis remains prohibited. A better-behaved scalar is not, by
+itself, evidence for a better predictor or a better prospective campaign.
 
 While the protocol remains `shadow_only`, an architecture test rejects any
 checked-in campaign config that names `multistate_response_behavior_v1`.

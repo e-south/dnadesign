@@ -28,7 +28,7 @@ class BehaviorNormalizationProtocol:
     cohort_id: str
     unit: str
     response_scale_basis: str
-    fluorescence_scale_basis: str
+    signal_scale_basis: str
     pair_deduplication: Literal["unique_unordered_state_pair_union"]
     scale_quantile: float
     quantile_method: Literal["linear"]
@@ -54,7 +54,7 @@ def parse_behavior_normalization_protocol(
             "cohort_id",
             "unit",
             "response_scale_basis",
-            "fluorescence_scale_basis",
+            "signal_scale_basis",
             "pair_deduplication",
             "scale_quantile",
             "quantile_method",
@@ -80,7 +80,7 @@ def parse_behavior_normalization_protocol(
         ),
         (
             payload,
-            "fluorescence_scale_basis",
+            "signal_scale_basis",
             "reader_joint_bootstrap_sd_of_each_reference_relative_state",
             "normalization",
         ),
@@ -109,9 +109,9 @@ def parse_behavior_normalization_protocol(
             payload["response_scale_basis"],
             field="response_scale_basis",
         ),
-        fluorescence_scale_basis=nonempty_string(
-            payload["fluorescence_scale_basis"],
-            field="fluorescence_scale_basis",
+        signal_scale_basis=nonempty_string(
+            payload["signal_scale_basis"],
+            field="signal_scale_basis",
         ),
         pair_deduplication="unique_unordered_state_pair_union",
         scale_quantile=scale_quantile,

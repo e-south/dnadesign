@@ -125,11 +125,11 @@ def _verify_normalization_values(
         values,
         {
             "response_scale",
-            "fluorescence_scale",
+            "signal_scale",
             "scale_quantile",
             "quantile_method",
             "response_scale_basis",
-            "fluorescence_scale_basis",
+            "signal_scale_basis",
             "pair_deduplication",
             "cohort_id",
             "unit",
@@ -148,14 +148,14 @@ def _verify_normalization_values(
             "scale_quantile": protocol.normalization.scale_quantile,
             "quantile_method": protocol.normalization.quantile_method,
             "response_scale_basis": protocol.normalization.response_scale_basis,
-            "fluorescence_scale_basis": protocol.normalization.fluorescence_scale_basis,
+            "signal_scale_basis": protocol.normalization.signal_scale_basis,
             "pair_deduplication": protocol.normalization.pair_deduplication,
             "cohort_id": protocol.normalization.cohort_id,
             "unit": protocol.normalization.unit,
         },
         context="normalization.normalization",
     )
-    for field in ("response_scale", "fluorescence_scale"):
+    for field in ("response_scale", "signal_scale"):
         positive_float(values[field], field=field)
     for field in (
         "unit_count",
