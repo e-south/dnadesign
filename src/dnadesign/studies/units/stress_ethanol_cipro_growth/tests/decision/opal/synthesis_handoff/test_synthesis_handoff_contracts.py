@@ -916,6 +916,68 @@ def test_measured_round_synthesis_output_dir_is_campaign_local() -> None:
     )
 
 
+def _selection_artifact_row(
+    *,
+    as_of_round: int,
+    campaign_slug: str,
+    selection_view_id: str,
+    candidate_id: str,
+    sequence: str,
+    rank: int,
+    score: float,
+) -> dict[str, Any]:
+    return {
+        "as_of_round": as_of_round,
+        "campaign_slug": campaign_slug,
+        "selection_view_id": selection_view_id,
+        "id": candidate_id,
+        "sequence": sequence,
+        "selection_batch_key": candidate_id,
+        "deduplicate_by": "id",
+        "rank_competition": rank,
+        "rank_ordinal": rank,
+        "score": score,
+        "selection_score": score,
+        "score_ref": f"{selection_view_id}/sfxi",
+        "allocation_slot": None,
+        "selection_origin": "preferred_top_k",
+    }
+
+
+def _selection_batch_row(
+    *,
+    as_of_round: int,
+    campaign_slug: str,
+    candidate_id: str,
+    memberships: list[tuple[str, int, float]],
+) -> dict[str, Any]:
+    view_ids = [view_id for view_id, _, _ in memberships]
+    return {
+        "as_of_round": as_of_round,
+        "campaign_slug": campaign_slug,
+        "id": candidate_id,
+        "selection_batch_key": candidate_id,
+        "deduplicate_by": "id",
+        "selection_view_ids": view_ids,
+        "selection_memberships": [
+            {
+                "selection_view_id": view_id,
+                "rank": rank,
+                "rank_ordinal": rank,
+                "score": score,
+                "selection_score": score,
+                "score_ref": f"{view_id}/sfxi",
+                "allocation_slot": None,
+                "selection_origin": "preferred_top_k",
+            }
+            for view_id, rank, score in memberships
+        ],
+        "preferred_view_ids": view_ids,
+        "allocation_view_id": None,
+        "allocation_slot": None,
+    }
+
+
 def _write_opal_round_fixture(
     tmp_path: Path,
     *,
@@ -1020,23 +1082,6 @@ def _write_opal_round_fixture(
     predictions_dir.mkdir(parents=True)
     runs_dir = ledger_root / "runs.parquet"
     runs_dir.mkdir(parents=True)
-    selection_dir = campaign_root / "outputs" / "rounds" / f"round_{as_of_round}" / "selection"
-    selection_path = selection_dir / "selections.parquet"
-    selection_batch_path = selection_dir / "selection_batch.parquet"
-
-    run_rows = [
-        {
-            "event": "run_meta",
-            "run_id": run_id,
-            "as_of_round": as_of_round,
-            "artifacts": {
-                "selection/selections.parquet": ["test-selection-sha", str(selection_path)],
-                "selection/selection_batch.parquet": ["test-batch-sha", str(selection_batch_path)],
-            },
-        }
-        for run_id in run_ids
-    ]
-    pd.DataFrame(run_rows).to_parquet(runs_dir / "part-runs.parquet", index=False)
 
     prediction_rows = []
     for run_id in run_ids:
@@ -1156,81 +1201,93 @@ def _write_opal_round_fixture(
             ]
         )
     pd.DataFrame(prediction_rows).to_parquet(predictions_dir / "part-predictions.parquet", index=False)
-    selection_dir.mkdir(parents=True)
-    pd.DataFrame(
-        [
-            {"selection_view_id": "ethanol", "id": candidate_b, "score": 0.9, "selection_score": 0.9},
-            {"selection_view_id": "ethanol", "id": candidate_a, "score": 0.8, "selection_score": 0.8},
+    selection_rows = [
+        _selection_artifact_row(
+            as_of_round=as_of_round,
+            campaign_slug=slug,
+            selection_view_id="ethanol",
+            candidate_id=candidate_b,
+            sequence=ledger_sequences[candidate_b],
+            rank=1,
+            score=0.9,
+        ),
+        _selection_artifact_row(
+            as_of_round=as_of_round,
+            campaign_slug=slug,
+            selection_view_id="ethanol",
+            candidate_id=candidate_a,
+            sequence=ledger_sequences[candidate_a],
+            rank=2,
+            score=0.8,
+        ),
+        _selection_artifact_row(
+            as_of_round=as_of_round,
+            campaign_slug=slug,
+            selection_view_id="ciprofloxacin",
+            candidate_id=candidate_c,
+            sequence=ledger_sequences[candidate_c],
+            rank=1,
+            score=0.95,
+        ),
+        _selection_artifact_row(
+            as_of_round=as_of_round,
+            campaign_slug=slug,
+            selection_view_id="ciprofloxacin",
+            candidate_id=candidate_b,
+            sequence=ledger_sequences[candidate_b],
+            rank=2,
+            score=0.85,
+        ),
+    ]
+    batch_rows = [
+        _selection_batch_row(
+            as_of_round=as_of_round,
+            campaign_slug=slug,
+            candidate_id=candidate_a,
+            memberships=[("ethanol", 2, 0.8)],
+        ),
+        _selection_batch_row(
+            as_of_round=as_of_round,
+            campaign_slug=slug,
+            candidate_id=candidate_b,
+            memberships=[("ethanol", 1, 0.9), ("ciprofloxacin", 2, 0.85)],
+        ),
+        _selection_batch_row(
+            as_of_round=as_of_round,
+            campaign_slug=slug,
+            candidate_id=candidate_c,
+            memberships=[("ciprofloxacin", 1, 0.95)],
+        ),
+    ]
+    run_rows = []
+    for run_id in run_ids:
+        selection_dir = campaign_root / "outputs" / "runs" / run_id / "selection"
+        selection_dir.mkdir(parents=True)
+        selection_path = selection_dir / "selections.parquet"
+        selection_batch_path = selection_dir / "selection_batch.parquet"
+        pd.DataFrame([{**row, "run_id": run_id} for row in selection_rows]).to_parquet(selection_path, index=False)
+        pd.DataFrame([{**row, "run_id": run_id} for row in batch_rows]).to_parquet(
+            selection_batch_path,
+            index=False,
+        )
+        run_rows.append(
             {
-                "selection_view_id": "ciprofloxacin",
-                "id": candidate_c,
-                "score": 0.95,
-                "selection_score": 0.95,
-            },
-            {
-                "selection_view_id": "ciprofloxacin",
-                "id": candidate_b,
-                "score": 0.85,
-                "selection_score": 0.85,
-            },
-        ]
-    ).to_parquet(selection_path, index=False)
-    pd.DataFrame(
-        [
-            {
-                "id": candidate_a,
-                "selection_batch_key": candidate_a,
-                "deduplicate_by": "id",
-                "selection_view_ids": ["ethanol"],
-                "selection_memberships": [
-                    {
-                        "selection_view_id": "ethanol",
-                        "rank": 2,
-                        "score": 0.8,
-                        "selection_score": 0.8,
-                        "score_ref": "ethanol/sfxi",
-                    }
-                ],
-            },
-            {
-                "id": candidate_b,
-                "selection_batch_key": candidate_b,
-                "deduplicate_by": "id",
-                "selection_view_ids": ["ethanol", "ciprofloxacin"],
-                "selection_memberships": [
-                    {
-                        "selection_view_id": "ethanol",
-                        "rank": 1,
-                        "score": 0.9,
-                        "selection_score": 0.9,
-                        "score_ref": "ethanol/sfxi",
-                    },
-                    {
-                        "selection_view_id": "ciprofloxacin",
-                        "rank": 2,
-                        "score": 0.85,
-                        "selection_score": 0.85,
-                        "score_ref": "ciprofloxacin/sfxi",
-                    },
-                ],
-            },
-            {
-                "id": candidate_c,
-                "selection_batch_key": candidate_c,
-                "deduplicate_by": "id",
-                "selection_view_ids": ["ciprofloxacin"],
-                "selection_memberships": [
-                    {
-                        "selection_view_id": "ciprofloxacin",
-                        "rank": 1,
-                        "score": 0.95,
-                        "selection_score": 0.95,
-                        "score_ref": "ciprofloxacin/sfxi",
-                    }
-                ],
-            },
-        ]
-    ).to_parquet(selection_batch_path, index=False)
+                "event": "run_meta",
+                "run_id": run_id,
+                "as_of_round": as_of_round,
+                "artifacts": {
+                    "selection/selections.parquet": [
+                        hashlib.sha256(selection_path.read_bytes()).hexdigest(),
+                        str(selection_path),
+                    ],
+                    "selection/selection_batch.parquet": [
+                        hashlib.sha256(selection_batch_path.read_bytes()).hexdigest(),
+                        str(selection_batch_path),
+                    ],
+                },
+            }
+        )
+    pd.DataFrame(run_rows).to_parquet(runs_dir / "part-runs.parquet", index=False)
     return config_path
 
 
