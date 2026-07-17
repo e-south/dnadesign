@@ -58,13 +58,13 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     multistate_behavior_rmf_replay as behavior_rmf,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
+    multistate_behavior_audit_verification as behavior_audit_verification,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
     multistate_behavior_censor as behavior_censor,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
     multistate_behavior_completion as behavior_completion,
-)
-from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
-    multistate_behavior_decision_verification as behavior_decision_verification,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
     multistate_behavior_labels as behavior_labels,
@@ -96,7 +96,7 @@ def test_adversarial_audit_pins_reviewed_snapshot_and_rejects_provenance_drift()
     assert audit["reviewed_preliminary_manifest_sha256"] == (
         "sha256:dbf9e651a467df76f12ffa22c6b15f8515264a8d515731a601fc26274c66869f"
     )
-    behavior_decision_verification.verify_behavior_adversarial_audit_record(audit)
+    behavior_audit_verification.verify_behavior_adversarial_audit_record(audit)
 
     for field in (
         "auditor_id",
@@ -107,7 +107,7 @@ def test_adversarial_audit_pins_reviewed_snapshot_and_rejects_provenance_drift()
         drifted = dict(audit)
         drifted[field] = "drifted"
         with pytest.raises(ValueError, match="independent audit"):
-            behavior_decision_verification.verify_behavior_adversarial_audit_record(drifted)
+            behavior_audit_verification.verify_behavior_adversarial_audit_record(drifted)
 
 
 def test_checked_in_behavior_protocol_is_shadow_only_and_complete() -> None:

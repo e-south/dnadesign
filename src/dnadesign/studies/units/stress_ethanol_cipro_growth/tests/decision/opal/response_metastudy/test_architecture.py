@@ -90,6 +90,7 @@ def test_response_model_modules_stay_semantically_bounded() -> None:
         "runtime/campaign_calibration.py": 120,
         "runtime/model_evidence_manifest.py": 200,
         "runtime/multistate_behavior_bundle_contract.py": 110,
+        "runtime/multistate_behavior_audit_verification.py": 100,
         "runtime/multistate_behavior_bundle_verification.py": 250,
         "runtime/multistate_behavior_completion.py": 220,
         "runtime/multistate_behavior_completion_verification.py": 310,

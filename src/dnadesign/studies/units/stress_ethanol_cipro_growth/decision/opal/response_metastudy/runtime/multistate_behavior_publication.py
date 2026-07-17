@@ -18,12 +18,12 @@ import pandas as pd
 
 from ..reporting.multistate_behavior_plots import render_multistate_behavior_plots
 from ..reporting.multistate_behavior_report import render_multistate_behavior_report
+from .multistate_behavior_audit_verification import verify_behavior_adversarial_audit_record
 from .multistate_behavior_bundle_verification import (
     SCHEMA_ID,
     verify_multistate_behavior_shadow,
 )
 from .multistate_behavior_decision import build_multistate_behavior_decision
-from .multistate_behavior_decision_verification import verify_behavior_adversarial_audit_record
 from .multistate_behavior_json import load_strict_behavior_json
 from .multistate_behavior_shadow import VerifiedMultistateBehaviorShadow
 from .multistate_behavior_source_equivalence import build_source_equivalence_receipt
