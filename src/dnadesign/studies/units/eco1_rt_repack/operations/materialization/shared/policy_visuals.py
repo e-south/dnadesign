@@ -1,4 +1,13 @@
-"""Shared labels and colors for Eco1 generation-policy visuals."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/shared/policy_visuals.py
+
+Shared labels and colors for Eco1 generation-policy visuals.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

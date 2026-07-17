@@ -52,6 +52,7 @@ _MATERIALIZATION_PRIMITIVES = {
 _MATERIALIZATION_SUPPORT_PACKAGES = {"shared"}
 _MATERIALIZATION_SHARED_FILES = {
     "__init__.py",
+    "policy_visuals.py",
     "rendering.py",
     "rt_annotation_context.py",
     "rt_plot_annotations.py",
