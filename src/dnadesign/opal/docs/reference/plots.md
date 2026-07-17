@@ -1,7 +1,7 @@
 ## OPAL Plots
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-16
+**Last verified:** 2026-07-17
 
 
 Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
@@ -214,6 +214,40 @@ are optional presentation metadata: the frontier falls back to a compact
 candidate ID when they are absent. Observed-event `display_label` values remain
 source-projected metadata and never participate in identity, training, or
 ranking.
+
+---
+
+### Multistate Response Behavior decision plots
+
+These plots are operative review surfaces for campaigns using
+`multistate_response_behavior_v1`. They resolve one exact selection view and
+run, replay `pred__y_hat_model` through the public behavior mathematics, and
+fail if the replayed `behavior_score` differs from the persisted score. Measured
+points are replayed from the run-pinned `labels/observed_events.parquet`
+artifact. They do not read the mutable labels ledger or infer assay semantics.
+
+- **`multistate_response_behavior_frontier`**: plots the response-family score
+  against the target-ON signal-family score. Color encodes the target-OFF
+  signal-suppression family score. Diamonds identify candidates actually
+  allocated to the active view; they are not reconstructed raw top-k rows.
+  The manifest-backed layered-scatter adapter provides independent prediction,
+  allocation, observed-batch, and label controls.
+- **`multistate_response_behavior_selected_decomposition`**: shows every
+  K-state response, ON-signal, and OFF-signal-suppression coordinate for the
+  allocated candidates, followed by the three family scores, hard bottleneck,
+  and smooth behavior score. An outline marks the lowest state-level
+  coordinate.
+
+Neither plot draws or implies a feasibility boundary. Zero is a
+reference-direction value, not a pass threshold, and a positive score does not
+mean that every coordinate is positive. The generic objective knows only a
+reference-relative signal; a study-owned plot configuration may name that
+signal more specifically when its assay contract supports the claim.
+
+The built-in `scatter_score_vs_rank`, `observed_objective_over_rounds`,
+`metric_over_rounds`, `vector_summary_heatmap`, feature-importance surfaces,
+selection-batch review, and BaseRender panel remain reusable. They should not
+be copied under behavior-specific names.
 
 ---
 

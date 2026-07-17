@@ -196,7 +196,7 @@ def _multistate_response_behavior_payload() -> dict:
         objective_params={
             "state_ids": ["00", "10", "01", "11"],
             "target_mask": [0, 1, 0, 1],
-            "normalization": {"response_scale": 0.25, "fluorescence_scale": 0.5},
+            "normalization": {"response_scale": 0.25, "signal_scale": 0.5},
         },
         score_ref="behavior_score",
     )
@@ -216,7 +216,7 @@ def test_load_config_accepts_multistate_response_behavior_view(tmp_path: Path) -
     assert objective.params == {
         "state_ids": ["00", "10", "01", "11"],
         "target_mask": [0, 1, 0, 1],
-        "normalization": {"response_scale": 0.25, "fluorescence_scale": 0.5},
+        "normalization": {"response_scale": 0.25, "signal_scale": 0.5},
     }
 
 
@@ -225,6 +225,23 @@ def test_load_config_rejects_multistate_response_behavior_temperature(tmp_path: 
     payload["selection_views"][0]["objective"]["params"]["temperature"] = 2.0
 
     with pytest.raises(ConfigError, match="temperature"):
+        load_config(_write(tmp_path / "campaign.yaml", payload))
+
+
+def test_load_config_rejects_boolean_behavior_target_mask_aliases(tmp_path: Path) -> None:
+    payload = _multistate_response_behavior_payload()
+    payload["selection_views"][0]["objective"]["params"]["target_mask"] = [False, True, False, True]
+
+    with pytest.raises(ConfigError, match="boolean aliases"):
+        load_config(_write(tmp_path / "campaign.yaml", payload))
+
+
+@pytest.mark.parametrize("state_ids", [["00", " 10", "01", "11"], ["00", "10", "01", "   "]])
+def test_load_config_rejects_behavior_state_identity_whitespace(tmp_path: Path, state_ids: list[str]) -> None:
+    payload = _multistate_response_behavior_payload()
+    payload["selection_views"][0]["objective"]["params"]["state_ids"] = state_ids
+
+    with pytest.raises(ConfigError, match="leading or trailing whitespace"):
         load_config(_write(tmp_path / "campaign.yaml", payload))
 
 

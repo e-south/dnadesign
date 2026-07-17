@@ -34,6 +34,7 @@ from ._mpl_utils import (
     scale_to_sizes,
     scatter_smart,
     sequential_colormap,
+    wrap_plot_title,
 )
 from ._param_utils import (
     event_columns_for,
@@ -476,11 +477,11 @@ def _set_rank_axis(ax, max_rank: float, *, scale: str) -> None:
 def _score_rank_title(value: object, *, context: object, show_selection_view: bool) -> str:
     title = pretty_title(value)
     if not show_selection_view:
-        return title
+        return wrap_plot_title(title, width=54)
     selection_view_id = str(getattr(context, "selection_view_id", "") or "").strip()
     if not selection_view_id:
         raise ValueError("show_selection_view requires an active selection_view_id.")
-    return f"{title}\nSelection view: {pretty_label(selection_view_id)}"
+    return wrap_plot_title(f"{title} · {pretty_label(selection_view_id)} view", width=54)
 
 
 def _rank_axis_label(*, x_field: str, rank_mode: str, rank_label: str | None) -> str:

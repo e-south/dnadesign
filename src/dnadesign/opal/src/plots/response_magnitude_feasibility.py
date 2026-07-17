@@ -37,7 +37,8 @@ from ._mpl_utils import (
     scatter_smart,
     wrap_plot_title,
 )
-from .response_magnitude_feasibility_aliases import (
+from .candidate_annotations import (
+    observed_candidate_display_labels,
     resolve_candidate_display_aliases,
     short_candidate_id,
 )
@@ -232,7 +233,7 @@ def render_frontier(context: Any, params: dict) -> None:
     )
     ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
     ax.set_title(
-        f"{wrap_plot_title(title, width=62)}\n{_target_context(data, params)}",
+        f"{wrap_plot_title(title, width=50)}\n{wrap_plot_title(_target_context(data, params), width=56)}",
         loc="center",
         fontweight="semibold",
         fontsize=NOTEBOOK_TITLE_FONTSIZE,
@@ -272,9 +273,25 @@ def render_frontier(context: Any, params: dict) -> None:
         "x_label": response_label,
         "y_label": magnitude_label,
         "color_label": off_label,
-        "x_boundary": float(data.calibration["response_separation_min"]),
-        "y_boundary": float(data.calibration["on_magnitude_min"]),
-        "color_extent": color_extent,
+        "reference_lines": {
+            "x": [
+                {
+                    "value": float(data.calibration["response_separation_min"]),
+                    "label": "Configured response boundary",
+                }
+            ],
+            "y": [
+                {
+                    "value": float(data.calibration["on_magnitude_min"]),
+                    "label": "Configured ON-fluorescence boundary",
+                }
+            ],
+        },
+        "color_scale": {
+            "center": 0.0,
+            "extent": color_extent,
+            "context": "red = greater clearance; 0 = configured boundary",
+        },
         "x_limits": [float(value) for value in ax.get_xlim()],
         "y_limits": [float(value) for value in ax.get_ylim()],
     }
@@ -397,7 +414,7 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
         context=context,
     )
     ax.set_title(
-        f"{wrap_plot_title(title, width=62)}\n{_target_context(data, params)}",
+        f"{wrap_plot_title(title, width=50)}\n{wrap_plot_title(_target_context(data, params), width=56)}",
         loc="center",
         fontweight="semibold",
         fontsize=NOTEBOOK_TITLE_FONTSIZE,
@@ -482,29 +499,10 @@ def _frontier_tidy(
             "observed_round": observed["observed_round"].astype("Int64"),
             "batch_id": observed["batch_id"].astype("string"),
             "batch_key": observed["batch_key"].astype("string"),
-            "display_label": _observed_display_labels(observed, fallbacks=aliases),
+            "display_label": observed_candidate_display_labels(observed, fallbacks=aliases),
         }
     )
     return pd.concat([predictions, labels], ignore_index=True)
-
-
-def _observed_display_labels(observed: pd.DataFrame, *, fallbacks: Mapping[str, str]) -> pd.Series:
-    labels = observed["display_label"].astype("string")
-    missing = labels.isna() | labels.str.strip().eq("")
-    if missing.any():
-        labels = labels.where(~missing, observed["id"].astype(str).map(fallbacks).astype("string"))
-    candidate_labels = pd.DataFrame({"id": observed["id"].astype(str), "label": labels}).drop_duplicates()
-    ambiguous = set(candidate_labels.loc[candidate_labels["label"].duplicated(keep=False), "label"].astype(str))
-    if ambiguous:
-        labels = pd.Series(
-            [
-                f"{label} · {candidate_id[:6]}" if str(label) in ambiguous else str(label)
-                for candidate_id, label in zip(observed["id"].astype(str), labels, strict=True)
-            ],
-            index=observed.index,
-            dtype="string",
-        )
-    return labels.astype("string")
 
 
 def _decomposition_tidy(selected: pd.DataFrame) -> pd.DataFrame:

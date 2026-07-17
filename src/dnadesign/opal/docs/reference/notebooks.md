@@ -3,7 +3,7 @@ id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-16
+last_verified: 2026-07-17
 audience:
   - operator
   - maintainer
@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-16
+**Last verified:** 2026-07-17
 
 ## OPAL Notebooks
 
@@ -162,6 +162,11 @@ The generated notebook renders the view model as an app-mode review surface:
   memory is scoped by campaign and plot identity, annotation scope is limited
   to visible layers, and hiding every layer produces a compact empty state
   rather than a notebook error;
+- layered-scatter plot manifests declare their own x/y reference lines and
+  color-center interpretation. The notebook renders only those declared lines
+  and uses the declared color text. It does not assume that zero means a
+  feasibility boundary; threshold-free objectives may declare no reference
+  lines and describe zero only as a reference direction;
 - one selected media viewport above secondary tables, so app-mode review can
   iterate OPAL and Reader deliverables through one selector without opening
   detail sections. When a campaign has Reader evidence but no OPAL plot

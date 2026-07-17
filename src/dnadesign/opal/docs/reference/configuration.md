@@ -1,7 +1,7 @@
 ## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-16
+**Last verified:** 2026-07-17
 
 `campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
 keys. There is no compatibility parser.
@@ -115,6 +115,15 @@ Allocation never compares objective or selector score magnitudes across views.
 Missing priority entries, ambiguous deduplication keys, exhausted unique pools,
 and incoherent CLI top-k overrides fail before selection artifacts or ledgers
 are published.
+
+Study-owned shadow evidence can preview the same decision without activating or
+mutating a campaign through
+`dnadesign.opal.api.preview_round_robin_next_best_unallocated`. The read-only
+API accepts one candidate table with exact `id` and `dedup_key` columns, one
+complete per-view table with `selection_view_id`, `id`, `score`, ordinal `rank`,
+and `top_k`, plus the exact `view_priority`. It delegates to the production
+allocator and returns the allocated rows, complete trace, and summary. IDs and
+deduplication keys are identity fields: whitespace is rejected, not normalized.
 
 ### Multi-view example
 

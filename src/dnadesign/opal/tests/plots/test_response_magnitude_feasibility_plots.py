@@ -16,6 +16,7 @@ import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -24,7 +25,10 @@ import yaml
 from dnadesign.opal.src.core.utils import OpalError, file_sha256
 from dnadesign.opal.src.plots import response_magnitude_feasibility as plot_mod
 from dnadesign.opal.src.plots._context import PlotContext
-from dnadesign.opal.src.plots.response_magnitude_feasibility_aliases import (
+from dnadesign.opal.src.plots._mpl_utils import NOTEBOOK_ANNOTATION_FONTSIZE
+from dnadesign.opal.src.plots.candidate_annotations import (
+    annotate_candidate_aliases,
+    observed_candidate_display_labels,
     resolve_candidate_display_aliases,
 )
 from dnadesign.opal.src.plots.response_magnitude_feasibility_data import (
@@ -57,16 +61,8 @@ def _channels(*, feasibility: float, response: float, on: float, off: float) -> 
     ]
 
 
-def _plot_data() -> ResponseMagnitudeFeasibilityPlotData:
-    calibration = {
-        "response_separation_min": 0.0,
-        "on_magnitude_min": 0.0,
-        "off_magnitude_max": 0.0,
-        "response_separation_scale": 1.0,
-        "on_magnitude_scale": 1.0,
-        "off_magnitude_scale": 1.0,
-    }
-    events = pd.DataFrame(
+def _prediction_events() -> pd.DataFrame:
+    return pd.DataFrame(
         {
             "as_of_round": [0, 0, 0],
             "run_id": ["r0", "r0", "r0"],
@@ -80,6 +76,18 @@ def _plot_data() -> ResponseMagnitudeFeasibilityPlotData:
             "view__is_selected": [True, True, False],
         }
     )
+
+
+def _plot_data() -> ResponseMagnitudeFeasibilityPlotData:
+    calibration = {
+        "response_separation_min": 0.0,
+        "on_magnitude_min": 0.0,
+        "off_magnitude_max": 0.0,
+        "response_separation_scale": 1.0,
+        "on_magnitude_scale": 1.0,
+        "off_magnitude_scale": 1.0,
+    }
+    events = _prediction_events()
     observed = pd.DataFrame(
         {
             "id": ["observed-a"],
@@ -238,6 +246,29 @@ def test_channel_parser_fails_on_missing_and_duplicate_channels() -> None:
     with pytest.raises(OpalError, match="Duplicate score channel"):
         parse_response_magnitude_feasibility_channels(
             [*valid, valid[0]],
+            selection_view_id="ethanol",
+        )
+
+
+@pytest.mark.parametrize(
+    ("column", "values", "message"),
+    [
+        ("view__is_selected", ["False", "True", "False"], "selected flags must be exact booleans"),
+        ("view__rank_competition", [1.5, 2.0, 3.0], "selection ranks must be positive integers"),
+    ],
+)
+def test_rmf_plot_frame_rejects_truthy_strings_and_fractional_ranks(
+    column: str,
+    values: list[object],
+    message: str,
+) -> None:
+    events = _prediction_events()
+    events[column] = values
+
+    with pytest.raises(OpalError, match=message):
+        response_magnitude_feasibility_plot_frame(
+            events,
+            calibration=_plot_data().calibration,
             selection_view_id="ethanol",
         )
 
@@ -442,7 +473,7 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     assert frontier._suptitle is None
     assert frontier_axis.get_title(loc="center") == (
         "RMF candidate constraint landscape · Ethanol view\n"
-        "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin"
+        "Target ON: Ethanol, Both stresses | OFF: No stress,\nCiprofloxacin"
     )
     assert frontier_axis.get_title(loc="left") == ""
     assert frontier_axis.title.get_fontsize() >= 14
@@ -470,12 +501,9 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     decomposition = captured.pop()
     decomposition_axis = decomposition.axes[0]
     assert decomposition._suptitle is None
-    assert decomposition_axis.get_title(loc="center").startswith(
-        "Predicted RMF margins for selected candidates · Ethanol view\n"
-    )
-    assert "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin" in (
-        decomposition_axis.get_title(loc="center")
-    )
+    decomposition_title = decomposition_axis.get_title(loc="center").replace("\n", " ")
+    assert decomposition_title.startswith("Predicted RMF margins for selected candidates · Ethanol view ")
+    assert "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin" in decomposition_title
     assert decomposition_axis.get_title(loc="left") == ""
     assert decomposition_axis.title.get_fontsize() >= 14
     assert "$S_{\\mathrm{RMF}}=\\min" in decomposition_axis.get_xlabel()
@@ -526,7 +554,11 @@ def test_rmf_frontier_color_extent_includes_observed_values_outside_prediction_r
     plot_mod.render_frontier(context, {})
 
     frontier = captured.pop()
-    assert context.artifact_metadata["notebook_view"]["color_extent"] == pytest.approx(2.5)
+    assert context.artifact_metadata["notebook_view"]["color_scale"] == {
+        "center": 0.0,
+        "extent": pytest.approx(2.5),
+        "context": "red = greater clearance; 0 = configured boundary",
+    }
     for collection in frontier.axes[0].collections[:3]:
         assert collection.norm.vmin == pytest.approx(-2.5)
         assert collection.norm.vmax == pytest.approx(2.5)
@@ -586,6 +618,92 @@ def test_candidate_display_aliases_use_only_projected_labels_then_short_ids(tmp_
     assert all("__" not in value for value in aliases.values())
 
 
+def test_candidate_display_aliases_disambiguate_shared_id_prefixes(tmp_path: Path) -> None:
+    records_path = tmp_path / "records.parquet"
+    pl.DataFrame(
+        {
+            "id": ["abcdef111111", "abcdef222222"],
+            "usr_label__primary": ["Same", "Same"],
+        }
+    ).write_parquet(records_path)
+
+    aliases = resolve_candidate_display_aliases(records_path, ["abcdef111111", "abcdef222222"])
+
+    assert aliases == {
+        "abcdef111111": "Same · abcdef111111",
+        "abcdef222222": "Same · abcdef222222",
+    }
+    assert len(set(aliases.values())) == 2
+
+
+def test_observed_display_labels_disambiguate_shared_id_prefixes() -> None:
+    observed = pd.DataFrame(
+        {
+            "id": ["abcdef111111", "abcdef222222", "abcdef111111"],
+            "display_label": ["Same", "Same", "Same"],
+        }
+    )
+
+    labels = observed_candidate_display_labels(observed, fallbacks={})
+
+    assert labels.tolist() == ["Same · abcdef111111", "Same · abcdef222222", "Same · abcdef111111"]
+
+
+def test_candidate_annotations_do_not_distort_constrained_layout() -> None:
+    figure, axis = plt.subplots(figsize=(7.2, 7.2), layout="constrained")
+    axis.set_xlim(-1.0, 1.0)
+    axis.set_ylim(-1.0, 1.0)
+
+    annotations = annotate_candidate_aliases(
+        axis,
+        pd.DataFrame({"id": ["a", "b"], "x": [-0.4, 0.4], "y": [-0.2, 0.2]}),
+        {"a": "Candidate A", "b": "Candidate B"},
+        x_column="x",
+        y_column="y",
+    )
+
+    assert annotations
+    assert all(not annotation.get_in_layout() for annotation in annotations)
+    plt.close(figure)
+
+
+def test_candidate_annotations_use_two_nonoverlapping_lanes_for_dense_labels() -> None:
+    figure, axis = plt.subplots(figsize=(4.0, 4.0), layout="constrained")
+    axis.set_xlim(-1.0, 1.0)
+    axis.set_ylim(-1.0, 1.0)
+    count = 33
+    frame = pd.DataFrame(
+        {
+            "id": [f"candidate-{index:02d}" for index in range(count)],
+            "x": np.linspace(-0.6, 0.6, count),
+            "y": np.zeros(count),
+        }
+    )
+    aliases = {candidate_id: f"C{index:02d}" for index, candidate_id in enumerate(frame["id"])}
+
+    annotations = annotate_candidate_aliases(
+        axis,
+        frame,
+        aliases,
+        x_column="x",
+        y_column="y",
+        font_size=NOTEBOOK_ANNOTATION_FONTSIZE,
+        max_lanes=2,
+    )
+
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    axes_box = axis.get_window_extent(renderer=renderer)
+    boxes = [annotation.get_bbox_patch().get_window_extent(renderer=renderer) for annotation in annotations]
+    assert {annotation.get_ha() for annotation in annotations} == {"left", "right"}
+    assert all(box.x0 >= axes_box.x0 and box.x1 <= axes_box.x1 for box in boxes)
+    assert all(box.y0 >= axes_box.y0 and box.y1 <= axes_box.y1 for box in boxes)
+    for left_index, left_box in enumerate(boxes):
+        for right_box in boxes[left_index + 1 :]:
+            assert not left_box.overlaps(right_box)
+    plt.close(figure)
+
+
 def test_candidate_display_aliases_treat_alias_columns_as_optional_but_require_ids(tmp_path: Path) -> None:
     missing_columns = tmp_path / "missing-columns.parquet"
     pl.DataFrame({"id": ["candidate-a"]}).write_parquet(missing_columns)
@@ -600,6 +718,24 @@ def test_candidate_display_aliases_treat_alias_columns_as_optional_but_require_i
     _write_alias_records(records_path)
     with pytest.raises(OpalError, match="missing requested candidate IDs"):
         resolve_candidate_display_aliases(records_path, ["not-in-records"])
+
+
+@pytest.mark.parametrize("candidate_id", [" candidate-a", "candidate-a "])
+def test_candidate_display_aliases_reject_identity_whitespace(tmp_path: Path, candidate_id: str) -> None:
+    records_path = tmp_path / "records.parquet"
+    pl.DataFrame({"id": ["candidate-a"]}).write_parquet(records_path)
+
+    with pytest.raises(OpalError, match="leading or trailing whitespace"):
+        resolve_candidate_display_aliases(records_path, [candidate_id])
+
+
+@pytest.mark.parametrize("candidate_id", [None, 7])
+def test_candidate_display_aliases_reject_non_string_identity(tmp_path: Path, candidate_id: object) -> None:
+    records_path = tmp_path / "records.parquet"
+    pl.DataFrame({"id": ["candidate-a"]}).write_parquet(records_path)
+
+    with pytest.raises(OpalError, match="exact strings"):
+        resolve_candidate_display_aliases(records_path, [candidate_id])
 
 
 def test_static_frontier_does_not_require_candidate_records(

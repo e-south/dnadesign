@@ -413,9 +413,9 @@ class _ResponseMagnitudeFeasibilityParams(BaseModel):
 class _MultistateResponseBehaviorNormalization(BaseModel):
     model_config = ConfigDict(extra="forbid")
     response_scale: float
-    fluorescence_scale: float
+    signal_scale: float
 
-    @field_validator("response_scale", "fluorescence_scale", mode="before")
+    @field_validator("response_scale", "signal_scale", mode="before")
     @classmethod
     def _positive_finite_scale(cls, v: object) -> float:
         if isinstance(v, (bool, np.bool_)):
@@ -433,17 +433,25 @@ class _MultistateResponseBehaviorParams(BaseModel):
     target_mask: List[Literal[0, 1]]
     normalization: _MultistateResponseBehaviorNormalization
 
+    @field_validator("target_mask", mode="before")
+    @classmethod
+    def _target_mask_rejects_boolean_aliases(cls, value: object) -> object:
+        if isinstance(value, (list, tuple, np.ndarray)) and any(isinstance(item, (bool, np.bool_)) for item in value):
+            raise ValueError("objective.params.target_mask must use numeric zero or one, not boolean aliases")
+        return value
+
     @model_validator(mode="after")
     def _state_contract_is_aligned(self):
-        normalized = [str(value).strip() for value in self.state_ids]
-        if len(normalized) < 2 or any(not value for value in normalized) or len(set(normalized)) != len(normalized):
+        values = list(self.state_ids)
+        if any(value != value.strip() for value in values):
+            raise ValueError("objective.params.state_ids must not contain leading or trailing whitespace")
+        if len(values) < 2 or any(not value for value in values) or len(set(values)) != len(values):
             raise ValueError("objective.params.state_ids must contain at least two unique, non-empty values")
-        if len(self.target_mask) != len(normalized):
+        if len(self.target_mask) != len(values):
             raise ValueError("objective.params.target_mask must align one-to-one with state_ids")
         on_count = int(sum(self.target_mask))
         if on_count <= 0 or on_count >= len(self.target_mask):
             raise ValueError("objective.params.target_mask must contain at least one ON and one OFF state")
-        self.state_ids = normalized
         return self
 
 

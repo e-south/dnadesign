@@ -30,8 +30,8 @@ selector.
 Use this objective when the desired behavior is:
 
 - every intended ON response should exceed every intended OFF response;
-- every intended ON state should have greater reference-relative expression;
-- every intended OFF state should have lower reference-relative expression;
+- every intended ON state should have greater reference-relative signal;
+- every intended OFF state should have lower reference-relative signal;
 - every improvement in any one of those directions should improve the scalar;
 - no biological acceptance threshold should be embedded in the score.
 
@@ -49,14 +49,14 @@ For `K >= 2` explicitly named states, the input has exactly `2K` columns:
 ```
 
 - `r_i` is a finite reduced response value.
-- `b_i` is a finite, same-state reference-relative expression value.
+- `b_i` is the finite, same-state reference-relative signal coordinate.
 - `state_ids` declares the column order with unique, non-empty identifiers.
 - `target_mask` has one binary value per state and contains at least one ON and
   one OFF state.
 
 The objective does not require two factors or a complete factorial design. It
 uses only the ordered states and their ON/OFF membership. Jointly permuting the
-state IDs, response columns, expression columns, and mask leaves every score
+state IDs, response columns, signal columns, and mask leaves every score
 unchanged.
 
 The objective does not choose an assay window, combine experimental repeats,
@@ -74,11 +74,12 @@ $$
 The study supplies two strictly positive assay-resolution scales:
 
 $$
-s_R > 0, \qquad s_B > 0.
+s_R > 0, \qquad s_S > 0.
 $$
 
-They put response and expression changes into comparable resolution units. They
-are not biological pass/fail thresholds and are not fitted by the objective.
+They put response and reference-relative signal changes into comparable
+resolution units. They are not biological pass/fail thresholds and are not
+fitted by the objective.
 
 #### 1. Response ordering
 
@@ -93,32 +94,32 @@ A positive value means that one ON response exceeds one OFF response. The full
 family contains `|O| x |F|` pairwise clearances, so no response state is dropped
 by an early minimum or maximum.
 
-#### 2. ON expression
+#### 2. ON signal
 
 Every intended ON state contributes:
 
 $$
-x^{ON}_i = \frac{b_i}{s_B},
+x^{ON}_i = \frac{b_i}{s_S},
 \qquad i \in O.
 $$
 
-A positive value means that the candidate is brighter than its declared
+A positive value means that the candidate has greater signal than its declared
 same-state reference.
 
-#### 3. OFF suppression
+#### 3. OFF signal suppression
 
 Every intended OFF state contributes:
 
 $$
-x^{OFF}_j = \frac{-b_j}{s_B},
+x^{OFF}_j = \frac{-b_j}{s_S},
 \qquad j \in F.
 $$
 
-A positive value means that the candidate is dimmer than its declared
+A positive value means that the candidate has lower signal than its declared
 same-state reference. More negative `b_j` always improves the score.
 
 An additional scored `b_ON - b_OFF` family is intentionally absent. It would
-mostly count the ON-expression and OFF-suppression evidence twice. Such a
+mostly count the ON-signal and OFF-signal-suppression evidence twice. Such a
 contrast can be displayed as a diagnostic without changing the selector.
 
 ### Family-balanced smooth bottleneck
@@ -129,7 +130,7 @@ $$
 S_G = -\log\left(\frac{1}{|G|}\sum_{c \in G}e^{-x_c}\right).
 $$
 
-The selection scalar gives the response, ON-expression, and OFF-suppression
+The selection scalar gives the response, ON-signal, and OFF-signal-suppression
 families equal prior standing:
 
 $$
@@ -151,6 +152,23 @@ pairs or the larger mask partition more influence merely because they contain
 more coordinates. Repeating an identical coordinate within one family leaves
 that family's mean and the overall score unchanged.
 
+#### State-space cardinality boundary
+
+The objective accepts any fixed `K >= 2`, but scores are comparable only when
+the objective version, ordered state space, target mask, and normalization
+protocol are identical.
+Family balancing does not make one weak coordinate equally influential across
+different state-space sizes. A coordinate in family `G` has prior weight
+`1/(3|G|)`, so its maximum compensation gap is `log(3|G|)` resolution units.
+That bound grows as a family gains distinct coordinates.
+
+Consequently, a study must not compare scores from different state spaces or
+interpret this objective as an all-state conformance guarantee. For a larger
+fixed state space, promotion evidence must pressure-test weak-coordinate
+influence and retain the hard bottleneck, limiting coordinate, and coordinate
+weights as mandatory review diagnostics. Those diagnostics expose the tradeoff;
+they do not constrain the selector.
+
 ### Why every improvement matters
 
 Each coordinate has positive derivative:
@@ -167,13 +185,22 @@ where `w_c = 1/(3|G|)` for a coordinate in family `G`. Therefore:
 
 - increasing any ON response strictly raises the score;
 - decreasing any OFF response strictly raises the score;
-- increasing expression in any ON state strictly raises the score;
-- decreasing expression in any OFF state strictly raises the score.
+- increasing the reference-relative signal in any ON state strictly raises the
+  score;
+- decreasing the reference-relative signal in any OFF state strictly raises
+  the score.
 
 The returned `coordinate_weights` are these derivatives in normalized units.
 They sum to one for each candidate. A poor coordinate receives exponentially
 more influence, so the score remains bottleneck-oriented without the plateaus
 of a hard minimum.
+
+This strictness is a property of the real-valued equation. In finite-precision
+arithmetic, an extremely favorable, nonlimiting coordinate can have an
+exponential weight that underflows to zero, so a further change may leave the
+returned float unchanged. Assay-scale property tests require strict directional
+improvement; arithmetic-extreme tests require finite, nondecreasing behavior
+rather than a bytewise strict-increase guarantee.
 
 ### Compensation is limited, not absent
 
@@ -199,8 +226,8 @@ The optional diagnostic `all_reference_directions_met` is true when every
 normalized clearance is non-negative:
 
 - every ON response is at least every OFF response;
-- every ON expression value is at least its same-state reference;
-- every OFF expression value is at most its same-state reference.
+- every ON signal value is at least its same-state reference;
+- every OFF signal value is at most its same-state reference.
 
 This is a reference-direction diagnostic, not a biological acceptance test. A
 positive `behavior_score` can occur while one coordinate remains negative.
@@ -236,8 +263,8 @@ advertise them as selectable score channels:
 
 - `hard_bottleneck_clearance`: worst individual normalized clearance;
 - `response_family_score`: smooth response-ordering bottleneck;
-- `on_expression_family_score`: smooth ON-expression bottleneck;
-- `off_suppression_family_score`: smooth OFF-suppression bottleneck.
+- `on_signal_family_score`: smooth ON-signal bottleneck;
+- `off_signal_suppression_family_score`: smooth OFF-signal-suppression bottleneck.
 
 The public mathematics API additionally returns:
 
@@ -268,7 +295,7 @@ selection_views:
         target_mask: [0, 1, 0, 1]
         normalization:
           response_scale: <positive study-issued assay-resolution scale>
-          fluorescence_scale: <positive study-issued assay-resolution scale>
+          signal_scale: <positive study-issued assay-resolution scale>
     selection:
       name: top_n
       params:

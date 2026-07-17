@@ -17,7 +17,7 @@ from typing import Mapping, Sequence
 import numpy as np
 
 OBJECTIVE_NAME = "multistate_response_behavior_v1"
-NORMALIZATION_FIELDS = ("response_scale", "fluorescence_scale")
+NORMALIZATION_FIELDS = ("response_scale", "signal_scale")
 NORMALIZED_TEMPERATURE = 1.0
 _CLEARANCE_LIMIT = np.finfo(float).max / 64.0
 
@@ -28,10 +28,10 @@ class MultistateResponseBehaviorClearances:
 
     response: np.ndarray
     response_labels: tuple[str, ...]
-    on_expression: np.ndarray
-    on_expression_labels: tuple[str, ...]
-    off_suppression: np.ndarray
-    off_suppression_labels: tuple[str, ...]
+    on_signal: np.ndarray
+    on_signal_labels: tuple[str, ...]
+    off_signal_suppression: np.ndarray
+    off_signal_suppression_labels: tuple[str, ...]
     state_ids: tuple[str, ...]
     target_mask: tuple[int, ...]
     normalization: dict[str, float]
@@ -40,13 +40,13 @@ class MultistateResponseBehaviorClearances:
     def coordinate_clearances(self) -> np.ndarray:
         """Return all clearances in response, ON, then OFF family order."""
 
-        return np.concatenate((self.response, self.on_expression, self.off_suppression), axis=1)
+        return np.concatenate((self.response, self.on_signal, self.off_signal_suppression), axis=1)
 
     @property
     def coordinate_labels(self) -> tuple[str, ...]:
         """Return stable labels aligned with ``coordinate_clearances``."""
 
-        return self.response_labels + self.on_expression_labels + self.off_suppression_labels
+        return self.response_labels + self.on_signal_labels + self.off_signal_suppression_labels
 
 
 @dataclass(frozen=True)
@@ -57,8 +57,8 @@ class MultistateResponseBehaviorScore:
     behavior_score: np.ndarray
     hard_bottleneck_clearance: np.ndarray
     response_family_score: np.ndarray
-    on_expression_family_score: np.ndarray
-    off_suppression_family_score: np.ndarray
+    on_signal_family_score: np.ndarray
+    off_signal_suppression_family_score: np.ndarray
     coordinate_weights: np.ndarray
     limiting_coordinate_index: np.ndarray
     limiting_coordinate_label: tuple[str, ...]
@@ -79,13 +79,13 @@ class MultistateResponseBehaviorScore:
 
 
 def multistate_response_behavior_clearances(
-    response_fluorescence: np.ndarray,
+    response_signal: np.ndarray,
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
     normalization: Mapping[str, object],
 ) -> MultistateResponseBehaviorClearances:
-    """Build every normalized response, ON-expression, and OFF-suppression clearance."""
+    """Build every normalized response, ON-signal, and OFF-signal-suppression clearance."""
 
     states = validated_state_ids(state_ids)
     target_on = binary_target_mask(target_mask)
@@ -94,40 +94,40 @@ def multistate_response_behavior_clearances(
             f"{OBJECTIVE_NAME}: state_ids and target_mask must have equal length; "
             f"got {len(states)} and {target_on.size}."
         )
-    values = validated_response_fluorescence(response_fluorescence, state_count=len(states))
+    values = validated_response_signal(response_signal, state_count=len(states))
     scales = parse_normalization(normalization)
     target_off = ~target_on
     on_indices = np.flatnonzero(target_on)
     off_indices = np.flatnonzero(target_off)
     response = values[:, : len(states)]
-    fluorescence = values[:, len(states) :]
+    signal = values[:, len(states) :]
 
     response_pairs = _safe_scaled_difference(
         response[:, on_indices, None],
         response[:, None, off_indices],
         scale=scales["response_scale"],
     ).reshape(len(values), -1)
-    on_expression = _safe_scaled(
-        fluorescence[:, on_indices],
-        scale=scales["fluorescence_scale"],
+    on_signal = _safe_scaled(
+        signal[:, on_indices],
+        scale=scales["signal_scale"],
     )
-    off_suppression = _safe_scaled(
-        -fluorescence[:, off_indices],
-        scale=scales["fluorescence_scale"],
+    off_signal_suppression = _safe_scaled(
+        -signal[:, off_indices],
+        scale=scales["signal_scale"],
     )
 
     response_labels = tuple(
         f"response:{states[on_index]}>{states[off_index]}" for on_index in on_indices for off_index in off_indices
     )
-    on_labels = tuple(f"on_expression:{states[index]}" for index in on_indices)
-    off_labels = tuple(f"off_suppression:{states[index]}" for index in off_indices)
+    on_labels = tuple(f"on_signal:{states[index]}" for index in on_indices)
+    off_labels = tuple(f"off_signal_suppression:{states[index]}" for index in off_indices)
     return MultistateResponseBehaviorClearances(
         response=response_pairs,
         response_labels=response_labels,
-        on_expression=on_expression,
-        on_expression_labels=on_labels,
-        off_suppression=off_suppression,
-        off_suppression_labels=off_labels,
+        on_signal=on_signal,
+        on_signal_labels=on_labels,
+        off_signal_suppression=off_signal_suppression,
+        off_signal_suppression_labels=off_labels,
         state_ids=states,
         target_mask=tuple(int(value) for value in target_on),
         normalization=scales,
@@ -135,7 +135,7 @@ def multistate_response_behavior_clearances(
 
 
 def score_multistate_response_behavior(
-    response_fluorescence: np.ndarray,
+    response_signal: np.ndarray,
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
@@ -144,20 +144,23 @@ def score_multistate_response_behavior(
     """Score a finite ``[r(state...), b(state...)]`` matrix without thresholds."""
 
     clearances = multistate_response_behavior_clearances(
-        response_fluorescence,
+        response_signal,
         state_ids=state_ids,
         target_mask=target_mask,
         normalization=normalization,
     )
     response_score = _smooth_bottleneck(clearances.response)
-    on_score = _smooth_bottleneck(clearances.on_expression)
-    off_score = _smooth_bottleneck(clearances.off_suppression)
+    on_score = _smooth_bottleneck(clearances.on_signal)
+    off_score = _smooth_bottleneck(clearances.off_signal_suppression)
     coordinate_clearances = clearances.coordinate_clearances
     coordinate_prior = np.concatenate(
         (
             np.full(clearances.response.shape[1], 1.0 / (3.0 * clearances.response.shape[1])),
-            np.full(clearances.on_expression.shape[1], 1.0 / (3.0 * clearances.on_expression.shape[1])),
-            np.full(clearances.off_suppression.shape[1], 1.0 / (3.0 * clearances.off_suppression.shape[1])),
+            np.full(clearances.on_signal.shape[1], 1.0 / (3.0 * clearances.on_signal.shape[1])),
+            np.full(
+                clearances.off_signal_suppression.shape[1],
+                1.0 / (3.0 * clearances.off_signal_suppression.shape[1]),
+            ),
         )
     )
     behavior_score, coordinate_weights = _weighted_smooth_bottleneck(
@@ -171,8 +174,8 @@ def score_multistate_response_behavior(
         behavior_score=behavior_score,
         hard_bottleneck_clearance=np.min(coordinate_clearances, axis=1),
         response_family_score=response_score,
-        on_expression_family_score=on_score,
-        off_suppression_family_score=off_score,
+        on_signal_family_score=on_score,
+        off_signal_suppression_family_score=off_score,
         coordinate_weights=coordinate_weights,
         limiting_coordinate_index=limiting_index,
         limiting_coordinate_label=tuple(labels[index] for index in limiting_index),
@@ -188,7 +191,9 @@ def validated_state_ids(raw: Sequence[str]) -> tuple[str, ...]:
         raise ValueError(f"{OBJECTIVE_NAME}: state_ids must contain at least two ordered strings.")
     if any(not isinstance(value, str) for value in raw):
         raise ValueError(f"{OBJECTIVE_NAME}: state_ids must contain strings, not coerced identifiers.")
-    values = tuple(value.strip() for value in raw)
+    values = tuple(raw)
+    if any(value != value.strip() for value in values):
+        raise ValueError(f"{OBJECTIVE_NAME}: state_ids must not contain leading or trailing whitespace.")
     if any(not value for value in values) or len(set(values)) != len(values):
         raise ValueError(f"{OBJECTIVE_NAME}: state_ids must be non-empty and unique; got {list(values)}.")
     return values
@@ -219,8 +224,8 @@ def binary_target_mask(target_mask: Sequence[int | float]) -> np.ndarray:
     return values.astype(bool)
 
 
-def validated_response_fluorescence(values: np.ndarray, *, state_count: int) -> np.ndarray:
-    """Validate ordered response values followed by aligned fluorescence values."""
+def validated_response_signal(values: np.ndarray, *, state_count: int) -> np.ndarray:
+    """Validate ordered response values followed by aligned signal values."""
 
     if not isinstance(state_count, int) or isinstance(state_count, bool) or state_count < 2:
         raise ValueError(f"{OBJECTIVE_NAME}: state_count must be an integer >= 2.")
@@ -229,7 +234,7 @@ def validated_response_fluorescence(values: np.ndarray, *, state_count: int) -> 
     if matrix.ndim != 2 or matrix.shape[1] != expected_columns:
         raise ValueError(
             f"{OBJECTIVE_NAME}: input must have exact shape (n, {expected_columns}) with "
-            f"{state_count} response columns followed by {state_count} aligned fluorescence columns; "
+            f"{state_count} response columns followed by {state_count} aligned signal columns; "
             f"got {getattr(matrix, 'shape', None)}."
         )
     if matrix.shape[0] == 0:
@@ -321,6 +326,6 @@ __all__ = [
     "multistate_response_behavior_clearances",
     "parse_normalization",
     "score_multistate_response_behavior",
-    "validated_response_fluorescence",
+    "validated_response_signal",
     "validated_state_ids",
 ]

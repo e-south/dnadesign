@@ -20,7 +20,7 @@ from ..src.objectives.multistate_response_behavior_math import (
     multistate_response_behavior_clearances,
     parse_normalization,
     score_multistate_response_behavior,
-    validated_response_fluorescence,
+    validated_response_signal,
     validated_state_ids,
 )
 
@@ -36,6 +36,6 @@ __all__ = [
     "multistate_response_behavior_clearances",
     "parse_normalization",
     "score_multistate_response_behavior",
-    "validated_response_fluorescence",
+    "validated_response_signal",
     "validated_state_ids",
 ]

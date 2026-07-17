@@ -63,9 +63,15 @@ def _choice(workdir: Path, *, tidy_path: Path | None = None) -> dict[str, object
                     "x_label": "Response separation",
                     "y_label": "ON fluorescence",
                     "color_label": "OFF clearance",
-                    "x_boundary": 0.0,
-                    "y_boundary": 0.0,
-                    "color_extent": 1.0,
+                    "reference_lines": {
+                        "x": [{"value": 0.0, "label": "Configured response boundary"}],
+                        "y": [{"value": 0.0, "label": "Configured ON-expression boundary"}],
+                    },
+                    "color_scale": {
+                        "center": 0.0,
+                        "extent": 1.0,
+                        "context": "red = greater clearance; 0 = configured boundary",
+                    },
                     "x_limits": [-0.5, 0.8],
                     "y_limits": [-0.5, 1.8],
                 }

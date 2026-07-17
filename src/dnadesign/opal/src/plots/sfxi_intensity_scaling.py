@@ -23,12 +23,11 @@ from ..objectives import sfxi_math
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_bool, get_float, get_int, get_str
+from ._run_resolution import resolve_run_id, resolve_single_round
 from .sfxi_diag_data import (
     labels_current_round,
     parse_exponents_from_runs,
     parse_setpoint_from_runs,
-    resolve_run_id,
-    resolve_single_round,
 )
 
 

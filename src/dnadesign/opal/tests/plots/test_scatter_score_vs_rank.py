@@ -95,7 +95,7 @@ def test_score_rank_reference_boundary_is_annotated_and_included_without_loose_s
     assert upper <= 0.30
     legend = ax.get_legend()
     assert legend is not None
-    assert ax.get_title(loc="center") == "RMF score by active view rank\nSelection view: Ethanol"
+    assert ax.get_title(loc="center") == "RMF score by active view rank · Ethanol view"
     assert ax.get_title(loc="left") == ""
     assert ax.title.get_fontsize() >= 14
     assert min(text.get_fontsize() for text in legend.get_texts()) >= 9.5

@@ -30,8 +30,8 @@ SCORE_CHANNELS = ("behavior_score",)
 DIAGNOSTIC_CHANNELS = (
     "hard_bottleneck_clearance",
     "response_family_score",
-    "on_expression_family_score",
-    "off_suppression_family_score",
+    "on_signal_family_score",
+    "off_signal_suppression_family_score",
 )
 
 
@@ -45,7 +45,7 @@ def multistate_response_behavior_v1(
     train_view=None,
     y_pred_std=None,
 ) -> ObjectiveResultV2:
-    """Score aligned response/fluorescence states with a smooth bottleneck."""
+    """Score aligned response and reference-relative signal states with a smooth bottleneck."""
 
     del ctx, train_view, y_pred_std
     if not isinstance(params, Mapping):

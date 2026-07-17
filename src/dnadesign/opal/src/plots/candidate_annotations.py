@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/opal/src/plots/response_magnitude_feasibility_aliases.py
+src/dnadesign/opal/src/plots/candidate_annotations.py
 
-Candidate display aliases and collision-safe labels for RMF plots.
+Candidate display aliases and collision-safe labels for OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -90,11 +90,8 @@ def resolve_candidate_display_aliases(
             label = short_candidate_id(candidate_id)
         labels[candidate_id] = label
 
-    duplicate_labels = {label for label, count in Counter(labels.values()).items() if count > 1}
-    return {
-        candidate_id: (f"{label} · {candidate_id[:6]}" if label in duplicate_labels else label)
-        for candidate_id, label in labels.items()
-    }
+    resolved = _collision_safe_labels(list(labels), list(labels.values()))
+    return dict(zip(labels, resolved, strict=True))
 
 
 def annotate_candidate_aliases(
@@ -105,33 +102,34 @@ def annotate_candidate_aliases(
     x_column: str,
     y_column: str,
     font_size: float = 7.0,
+    max_lanes: int = 1,
 ) -> list[Any]:
-    """Place selected aliases in one collision-free lane inside the plot axes."""
+    """Place candidate aliases in one or two collision-free lanes inside the plot axes."""
 
     required = {"id", x_column, y_column}
     missing = sorted(required - set(frame.columns))
     if missing:
-        raise OpalError(f"RMF annotation frame is missing columns: {missing}.", ExitCodes.CONTRACT_VIOLATION)
+        raise OpalError(f"Candidate annotation frame is missing columns: {missing}.", ExitCodes.CONTRACT_VIOLATION)
     if frame.empty:
-        raise OpalError("RMF alias annotation requires selected candidates.", ExitCodes.CONTRACT_VIOLATION)
+        raise OpalError("Candidate annotation requires at least one row.", ExitCodes.CONTRACT_VIOLATION)
+    if isinstance(max_lanes, bool) or max_lanes not in {1, 2}:
+        raise OpalError("Candidate annotations support max_lanes of 1 or 2.", ExitCodes.CONTRACT_VIOLATION)
     ids = frame["id"].astype(str).tolist()
     missing_aliases = sorted(set(ids) - set(aliases))
     if missing_aliases:
         raise OpalError(
-            f"RMF alias annotation is missing candidate labels: {missing_aliases[:5]}.",
+            f"Candidate annotation is missing display labels: {missing_aliases[:5]}.",
             ExitCodes.CONTRACT_VIOLATION,
         )
     coordinates = frame[[x_column, y_column]].to_numpy(dtype=float)
     if not np.isfinite(coordinates).all():
-        raise OpalError("RMF alias annotation coordinates must be finite.", ExitCodes.CONTRACT_VIOLATION)
+        raise OpalError("Candidate annotation coordinates must be finite.", ExitCodes.CONTRACT_VIOLATION)
 
     figure = ax.figure
     figure.canvas.draw()
     renderer = figure.canvas.get_renderer()
     axes_box = ax.get_window_extent(renderer=renderer)
     point_pixels = ax.transData.transform(coordinates)
-    use_right_lane = float(np.median(point_pixels[:, 0])) <= float(axes_box.x0 + axes_box.x1) / 2.0
-    horizontal_alignment = "left" if use_right_lane else "right"
     annotations: list[Any] = []
     for candidate_id, (x_value, y_value) in zip(ids, coordinates, strict=True):
         annotation = ax.annotate(
@@ -140,7 +138,7 @@ def annotate_candidate_aliases(
             xytext=(x_value, y_value),
             xycoords="data",
             textcoords="data",
-            ha=horizontal_alignment,
+            ha="left",
             va="center",
             fontsize=font_size,
             color="#252525",
@@ -151,6 +149,7 @@ def annotate_candidate_aliases(
         )
         annotation.set_clip_on(True)
         annotation.set_clip_path(ax.patch)
+        annotation.set_in_layout(False)
         if annotation.arrow_patch is not None:
             annotation.arrow_patch.set_clip_on(True)
             annotation.arrow_patch.set_clip_path(ax.patch)
@@ -162,24 +161,45 @@ def annotate_candidate_aliases(
     heights = [box.height for box in text_boxes]
     desired_y = point_pixels[:, 1].tolist()
     padding = 4.0
-    centers = _spread_centers(
-        desired_y,
-        heights,
-        lower=float(axes_box.y0 + padding),
-        upper=float(axes_box.y1 - padding),
-        gap=3.0,
-    )
+    lower = float(axes_box.y0 + padding)
+    upper = float(axes_box.y1 - padding)
+    try:
+        centers = _spread_centers(desired_y, heights, lower=lower, upper=upper, gap=3.0)
+    except OpalError:
+        if max_lanes == 1:
+            raise
+        ordered = sorted(range(len(annotations)), key=lambda index: (float(point_pixels[index, 0]), index))
+        split = (len(ordered) + 1) // 2
+        lane_specs = ((ordered[:split], False), (ordered[split:], True))
+    else:
+        use_right_lane = float(np.median(point_pixels[:, 0])) <= float(axes_box.x0 + axes_box.x1) / 2.0
+        lane_specs = ((list(range(len(annotations))), use_right_lane),)
+
     inverse = ax.transData.inverted()
-    for index, annotation in enumerate(annotations):
-        width = text_boxes[index].width
-        point_x = float(point_pixels[index, 0])
-        if use_right_lane:
-            anchor_x = min(point_x + 8.0, float(axes_box.x1 - padding - width))
-            anchor_x = max(anchor_x, float(axes_box.x0 + padding))
-        else:
-            anchor_x = max(point_x - 8.0, float(axes_box.x0 + padding + width))
-            anchor_x = min(anchor_x, float(axes_box.x1 - padding))
-        annotation.set_position(tuple(inverse.transform((anchor_x, centers[index]))))
+    for lane_indexes, use_right_lane in lane_specs:
+        lane_centers = (
+            [centers[index] for index in lane_indexes]
+            if len(lane_specs) == 1
+            else _spread_centers(
+                [desired_y[index] for index in lane_indexes],
+                [heights[index] for index in lane_indexes],
+                lower=lower,
+                upper=upper,
+                gap=3.0,
+            )
+        )
+        for index, center in zip(lane_indexes, lane_centers, strict=True):
+            annotation = annotations[index]
+            width = text_boxes[index].width
+            point_x = float(point_pixels[index, 0])
+            annotation.set_ha("left" if use_right_lane else "right")
+            if use_right_lane:
+                anchor_x = min(point_x + 8.0, float(axes_box.x1 - padding - width))
+                anchor_x = max(anchor_x, float(axes_box.x0 + padding))
+            else:
+                anchor_x = max(point_x - 8.0, float(axes_box.x0 + padding + width))
+                anchor_x = min(anchor_x, float(axes_box.x1 - padding))
+            annotation.set_position(tuple(inverse.transform((anchor_x, center))))
     figure.canvas.draw()
     return annotations
 
@@ -187,6 +207,64 @@ def annotate_candidate_aliases(
 def short_candidate_id(candidate_id: str) -> str:
     value = _required_id(candidate_id)
     return value if len(value) <= 14 else f"{value[:6]}…{value[-5:]}"
+
+
+def observed_candidate_display_labels(
+    observed: pd.DataFrame,
+    *,
+    fallbacks: Mapping[str, str],
+) -> pd.Series:
+    """Return source labels with deterministic identity fallbacks and disambiguation."""
+
+    required = {"id", "display_label"}
+    missing = sorted(required - set(observed.columns))
+    if missing:
+        raise OpalError(
+            f"Observed candidate labels are missing columns: {missing}.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    labels = observed["display_label"].astype("string")
+    missing_labels = labels.isna() | labels.str.strip().eq("")
+    if missing_labels.any():
+        labels = labels.where(
+            ~missing_labels,
+            observed["id"].astype(str).map(fallbacks).astype("string"),
+        )
+    unresolved = labels.isna() | labels.str.strip().eq("")
+    if unresolved.any():
+        ids = observed.loc[unresolved, "id"].astype(str).tolist()[:5]
+        raise OpalError(
+            f"Observed candidate labels lack display fallbacks: {ids}.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    resolved = _collision_safe_labels(observed["id"].astype(str).tolist(), labels.astype(str).tolist())
+    return pd.Series(resolved, index=observed.index, dtype="string")
+
+
+def _collision_safe_labels(candidate_ids: Sequence[str], base_labels: Sequence[str]) -> list[str]:
+    """Disambiguate distinct identity/label pairs without relying on fixed ID prefixes."""
+
+    pairs = list(zip(candidate_ids, base_labels, strict=True))
+    unique_pairs = list(dict.fromkeys(pairs))
+    resolved = {pair: pair[1] for pair in unique_pairs}
+    duplicate_bases = {label for label, count in Counter(resolved.values()).items() if count > 1}
+    if duplicate_bases:
+        for pair in unique_pairs:
+            candidate_id, label = pair
+            if label in duplicate_bases:
+                resolved[pair] = f"{label} · {short_candidate_id(candidate_id)}"
+    duplicate_short = {label for label, count in Counter(resolved.values()).items() if count > 1}
+    if duplicate_short:
+        for pair in unique_pairs:
+            candidate_id, _label = pair
+            if resolved[pair] in duplicate_short:
+                resolved[pair] = f"{pair[1]} · {candidate_id}"
+    if len(set(resolved.values())) != len(resolved):
+        raise OpalError(
+            "Candidate display labels could not be made unique from exact candidate IDs.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    return [resolved[pair] for pair in pairs]
 
 
 def _spread_centers(
@@ -201,7 +279,7 @@ def _spread_centers(
     required_height = sum(float(heights[index]) for index in order) + gap * max(0, len(order) - 1)
     if required_height > upper - lower:
         raise OpalError(
-            "RMF selected-candidate aliases cannot fit inside the plot axes.",
+            "Candidate annotations cannot fit inside the plot axes.",
             ExitCodes.CONTRACT_VIOLATION,
         )
     centers_by_index: dict[int, float] = {}
@@ -239,10 +317,22 @@ def _clean_text(value: object) -> str | None:
 
 
 def _required_id(value: object) -> str:
-    candidate_id = str(value).strip()
+    if not isinstance(value, str):
+        raise OpalError("Candidate IDs must be exact strings, without coercion.", ExitCodes.CONTRACT_VIOLATION)
+    candidate_id = value
+    if candidate_id != candidate_id.strip():
+        raise OpalError(
+            "Candidate IDs must not contain leading or trailing whitespace.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
     if not candidate_id or candidate_id.lower() in {"nan", "none"}:
         raise OpalError("Candidate IDs must be non-empty strings.", ExitCodes.CONTRACT_VIOLATION)
     return candidate_id
 
 
-__all__ = ["annotate_candidate_aliases", "resolve_candidate_display_aliases", "short_candidate_id"]
+__all__ = [
+    "annotate_candidate_aliases",
+    "observed_candidate_display_labels",
+    "resolve_candidate_display_aliases",
+    "short_candidate_id",
+]

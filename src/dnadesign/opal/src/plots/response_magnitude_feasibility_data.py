@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -30,7 +29,8 @@ from dnadesign.opal.api.response_magnitude_feasibility import (
 from ..analysis.ledger import read_run_observed_events, read_runs
 from ..core.utils import ExitCodes, OpalError
 from ._events_util import load_events, resolve_outputs_dir
-from .sfxi_diag_data import resolve_run_id, resolve_single_round
+from ._ledger_contracts import validated_competition_ranks, validated_selected_flags
+from ._run_resolution import parse_run_view_definitions, resolve_run_id, resolve_single_round
 
 OBJECTIVE_NAME = "response_magnitude_feasibility_v1"
 FEASIBILITY_REF = "feasibility_margin"
@@ -215,16 +215,18 @@ def response_magnitude_feasibility_plot_frame(
     ]
     channels = pd.DataFrame.from_records(channel_rows, index=events.index)
     frame = pd.concat([events.drop(columns=["pred__score_channels"]).copy(), channels], axis=1)
-    for column in ("view__rank_competition", *REQUIRED_SCORE_REFS):
+    frame["view__rank_competition"] = validated_competition_ranks(
+        frame["view__rank_competition"],
+        objective_label="RMF",
+    )
+    for column in REQUIRED_SCORE_REFS:
         frame[column] = pd.to_numeric(frame[column], errors="raise")
-    numeric = frame[["view__rank_competition", *REQUIRED_SCORE_REFS]].to_numpy(dtype=float)
-    if not np.isfinite(numeric).all():
+    if not np.isfinite(frame[list(REQUIRED_SCORE_REFS)].to_numpy(dtype=float)).all():
         raise OpalError("RMF prediction ledger contains non-finite values.", ExitCodes.CONTRACT_VIOLATION)
-    if (frame["view__rank_competition"] < 1).any():
-        raise OpalError("RMF selection ranks must be positive.", ExitCodes.CONTRACT_VIOLATION)
-    if frame["view__is_selected"].isna().any():
-        raise OpalError("RMF selected flags must be present.", ExitCodes.CONTRACT_VIOLATION)
-    frame["view__is_selected"] = frame["view__is_selected"].astype(bool)
+    frame["view__is_selected"] = validated_selected_flags(
+        frame["view__is_selected"],
+        objective_label="RMF",
+    )
 
     components = ResponseMagnitudeFeasibilityComponents(
         response_separation=frame[RESPONSE_REF].to_numpy(dtype=float),
@@ -307,11 +309,14 @@ def _single_run_row(
             ExitCodes.CONTRACT_VIOLATION,
         )
     row = rows.to_dicts()[0]
-    try:
-        objective_defs = json.loads(str(row["objective__defs_json"]))
-        selection_defs = json.loads(str(row["selection_views__defs_json"]))
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise OpalError(f"RMF run metadata is invalid JSON: {exc}", ExitCodes.CONTRACT_VIOLATION) from exc
+    objective_defs = parse_run_view_definitions(
+        row["objective__defs_json"],
+        field_label="RMF run objective definitions",
+    )
+    selection_defs = parse_run_view_definitions(
+        row["selection_views__defs_json"],
+        field_label="RMF run selection-view definitions",
+    )
     objective_matches = [item for item in objective_defs if item.get("selection_view_id") == selection_view_id]
     selection_matches = [item for item in selection_defs if item.get("selection_view_id") == selection_view_id]
     if len(objective_matches) != 1 or len(selection_matches) != 1:

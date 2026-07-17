@@ -36,7 +36,7 @@ def _state_ids(state_count: int) -> list[str]:
 
 
 def _normalization() -> dict[str, float]:
-    return {"response_scale": 2.0, "fluorescence_scale": 4.0}
+    return {"response_scale": 2.0, "signal_scale": 4.0}
 
 
 def _params(target_mask: list[int]) -> dict[str, object]:
@@ -66,21 +66,21 @@ def test_documented_clearances_and_family_balanced_score() -> None:
     result = _score(values, [0, 1, 0])
 
     np.testing.assert_allclose(result.clearances.response, [[2.0, 1.0]])
-    np.testing.assert_allclose(result.clearances.on_expression, [[1.0]])
-    np.testing.assert_allclose(result.clearances.off_suppression, [[1.0, 2.0]])
+    np.testing.assert_allclose(result.clearances.on_signal, [[1.0]])
+    np.testing.assert_allclose(result.clearances.off_signal_suppression, [[1.0, 2.0]])
     assert result.coordinate_labels == (
         "response:s1>s0",
         "response:s1>s2",
-        "on_expression:s1",
-        "off_suppression:s0",
-        "off_suppression:s2",
+        "on_signal:s1",
+        "off_signal_suppression:s0",
+        "off_signal_suppression:s2",
     )
     expected_response = -np.log(np.mean(np.exp(-np.asarray([2.0, 1.0]))))
     expected_off = -np.log(np.mean(np.exp(-np.asarray([1.0, 2.0]))))
     expected = -np.log(np.mean(np.exp(-np.asarray([expected_response, 1.0, expected_off]))))
     assert result.response_family_score.tolist() == pytest.approx([expected_response])
-    assert result.on_expression_family_score.tolist() == pytest.approx([1.0])
-    assert result.off_suppression_family_score.tolist() == pytest.approx([expected_off])
+    assert result.on_signal_family_score.tolist() == pytest.approx([1.0])
+    assert result.off_signal_suppression_family_score.tolist() == pytest.approx([expected_off])
     assert result.behavior_score.tolist() == pytest.approx([expected])
     assert result.hard_bottleneck_clearance.tolist() == pytest.approx([1.0])
     assert result.limiting_coordinate_label == ("response:s1>s2",)
@@ -102,9 +102,9 @@ def test_every_desired_coordinate_improvement_strictly_increases_score(state_cou
         response_improved[:, state_index] += 0.125 if state_is_on else -0.125
         assert np.all(_score(response_improved, target_mask).behavior_score > baseline)
 
-        fluorescence_improved = values.copy()
-        fluorescence_improved[:, state_count + state_index] += 0.125 if state_is_on else -0.125
-        assert np.all(_score(fluorescence_improved, target_mask).behavior_score > baseline)
+        signal_improved = values.copy()
+        signal_improved[:, state_count + state_index] += 0.125 if state_is_on else -0.125
+        assert np.all(_score(signal_improved, target_mask).behavior_score > baseline)
 
 
 def test_pareto_dominance_is_preserved() -> None:
@@ -145,8 +145,11 @@ def test_joint_state_permutation_is_equivariant() -> None:
     np.testing.assert_allclose(reordered.behavior_score, direct.behavior_score)
     np.testing.assert_allclose(reordered.hard_bottleneck_clearance, direct.hard_bottleneck_clearance)
     np.testing.assert_allclose(reordered.response_family_score, direct.response_family_score)
-    np.testing.assert_allclose(reordered.on_expression_family_score, direct.on_expression_family_score)
-    np.testing.assert_allclose(reordered.off_suppression_family_score, direct.off_suppression_family_score)
+    np.testing.assert_allclose(reordered.on_signal_family_score, direct.on_signal_family_score)
+    np.testing.assert_allclose(
+        reordered.off_signal_suppression_family_score,
+        direct.off_signal_suppression_family_score,
+    )
 
 
 def test_family_means_prevent_coordinate_cardinality_from_reweighting_a_family() -> None:
@@ -157,19 +160,19 @@ def test_family_means_prevent_coordinate_cardinality_from_reweighting_a_family()
         two_state,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0, "fluorescence_scale": 1.0},
+        normalization={"response_scale": 1.0, "signal_scale": 1.0},
     )
     expanded = score_multistate_response_behavior(
         repeated_off_state,
         state_ids=["off-a", "off-b", "off-c", "on"],
         target_mask=[0, 0, 0, 1],
-        normalization={"response_scale": 1.0, "fluorescence_scale": 1.0},
+        normalization={"response_scale": 1.0, "signal_scale": 1.0},
     )
 
     assert expanded.behavior_score.tolist() == pytest.approx(baseline.behavior_score.tolist())
     assert expanded.response_family_score.tolist() == pytest.approx(baseline.response_family_score.tolist())
-    assert expanded.off_suppression_family_score.tolist() == pytest.approx(
-        baseline.off_suppression_family_score.tolist()
+    assert expanded.off_signal_suppression_family_score.tolist() == pytest.approx(
+        baseline.off_signal_suppression_family_score.tolist()
     )
 
 
@@ -178,10 +181,10 @@ def test_equal_clearances_give_each_family_one_third_total_weight() -> None:
         np.zeros((1, 8), dtype=float),
         state_ids=["off-a", "on", "off-b", "off-c"],
         target_mask=[0, 1, 0, 0],
-        normalization={"response_scale": 1.0, "fluorescence_scale": 1.0},
+        normalization={"response_scale": 1.0, "signal_scale": 1.0},
     )
     response_count = result.clearances.response.shape[1]
-    on_count = result.clearances.on_expression.shape[1]
+    on_count = result.clearances.on_signal.shape[1]
 
     assert np.sum(result.coordinate_weights[:, :response_count], axis=1).tolist() == pytest.approx([1.0 / 3.0])
     assert np.sum(
@@ -205,7 +208,7 @@ def test_extreme_finite_values_remain_finite_and_weighted() -> None:
         values,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0e-100, "fluorescence_scale": 1.0e-100},
+        normalization={"response_scale": 1.0e-100, "signal_scale": 1.0e-100},
     )
 
     for array in (
@@ -214,8 +217,8 @@ def test_extreme_finite_values_remain_finite_and_weighted() -> None:
         result.behavior_score,
         result.hard_bottleneck_clearance,
         result.response_family_score,
-        result.on_expression_family_score,
-        result.off_suppression_family_score,
+        result.on_signal_family_score,
+        result.off_signal_suppression_family_score,
     ):
         assert np.all(np.isfinite(array))
     np.testing.assert_allclose(np.sum(result.coordinate_weights, axis=1), np.ones(2))
@@ -227,7 +230,7 @@ def test_smooth_compensation_above_hard_bottleneck_is_bounded() -> None:
         values,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0, "fluorescence_scale": 1.0},
+        normalization={"response_scale": 1.0, "signal_scale": 1.0},
     )
     minimum_prior_weight = 1.0 / 3.0
 
@@ -243,7 +246,7 @@ def test_positive_behavior_score_is_not_a_feasibility_claim() -> None:
         values,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0, "fluorescence_scale": 1.0},
+        normalization={"response_scale": 1.0, "signal_scale": 1.0},
     )
 
     assert result.behavior_score[0] > 0.0
@@ -284,10 +287,10 @@ def test_target_mask_must_be_one_dimensional() -> None:
     "normalization",
     [
         {},
-        {"response_scale": 1.0, "fluorescence_scale": 1.0, "threshold": 0.0},
-        {"response_scale": True, "fluorescence_scale": 1.0},
-        {"response_scale": 0.0, "fluorescence_scale": 1.0},
-        {"response_scale": 1.0, "fluorescence_scale": np.inf},
+        {"response_scale": 1.0, "signal_scale": 1.0, "threshold": 0.0},
+        {"response_scale": True, "signal_scale": 1.0},
+        {"response_scale": 0.0, "signal_scale": 1.0},
+        {"response_scale": 1.0, "signal_scale": np.inf},
     ],
 )
 def test_normalization_requires_exact_positive_finite_scales(normalization: dict[str, float]) -> None:
@@ -306,6 +309,17 @@ def test_normalization_requires_exact_positive_finite_scales(normalization: dict
 )
 def test_state_ids_are_aligned_unique_and_nonempty(state_ids: list[object]) -> None:
     with pytest.raises(ValueError, match="state_ids"):
+        score_multistate_response_behavior(
+            np.zeros((1, 4), dtype=float),
+            state_ids=state_ids,
+            target_mask=[0, 1],
+            normalization=_normalization(),
+        )
+
+
+@pytest.mark.parametrize("state_ids", [["a", " a"], ["a", "b "], ["a", "   "]])
+def test_state_ids_reject_whitespace_normalization(state_ids: list[str]) -> None:
+    with pytest.raises(ValueError, match="leading or trailing whitespace"):
         score_multistate_response_behavior(
             np.zeros((1, 4), dtype=float),
             state_ids=state_ids,
@@ -353,8 +367,8 @@ def test_plugin_exposes_only_ledger_safe_scalar_channels_and_diagnostics() -> No
     for name in (
         "hard_bottleneck_clearance",
         "response_family_score",
-        "on_expression_family_score",
-        "off_suppression_family_score",
+        "on_signal_family_score",
+        "off_signal_suppression_family_score",
         "all_reference_directions_met",
         "limiting_coordinate_index",
         "limiting_coordinate_weight",
@@ -388,7 +402,7 @@ def test_plugin_registry_contract_and_config_schema_are_explicit() -> None:
             "multistate_response_behavior_v1",
             {
                 **_params([0, 1]),
-                "normalization": {"response_scale": True, "fluorescence_scale": 1.0},
+                "normalization": {"response_scale": True, "signal_scale": 1.0},
             },
         )
 

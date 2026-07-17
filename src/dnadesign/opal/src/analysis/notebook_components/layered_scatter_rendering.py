@@ -11,8 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import textwrap
 from typing import Any, Mapping
 
+import numpy as np
 import pandas as pd
 
 from ...plots._mpl_utils import NOTEBOOK_ANNOTATION_FONTSIZE
@@ -22,7 +24,6 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     """Render already-filtered prediction, selection, and observation layers."""
 
     import matplotlib.pyplot as plt
-    import numpy as np
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import TwoSlopeNorm
 
@@ -38,8 +39,9 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         apply_plot_style,
         observed_batch_marker_map,
         scatter_smart,
+        wrap_plot_title,
     )
-    from ...plots.response_magnitude_feasibility_aliases import annotate_candidate_aliases
+    from ...plots.candidate_annotations import annotate_candidate_aliases
 
     apply_plot_style()
     view = _mapping(contract["view"])
@@ -57,10 +59,18 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     if not np.isfinite(numeric).all():
         raise ValueError("Layered-scatter visible coordinates and colors must be finite.")
 
-    color_extent = float(runtime["color_extent"])
+    color_scale = _mapping(runtime["color_scale"])
+    color_center = float(color_scale["center"])
+    color_extent = float(color_scale["extent"])
     if not np.isfinite(color_extent) or color_extent <= 0.0:
         raise ValueError("Layered-scatter color_extent must be finite and positive.")
-    norm = TwoSlopeNorm(vmin=-color_extent, vcenter=0.0, vmax=color_extent)
+    if not np.isfinite(color_center):
+        raise ValueError("Layered-scatter color center must be finite.")
+    norm = TwoSlopeNorm(
+        vmin=color_center - color_extent,
+        vcenter=color_center,
+        vmax=color_center + color_extent,
+    )
     cmap = SIGNED_MARGIN_CMAP
     fig, ax = plt.subplots(figsize=(7.2, 7.2), layout="constrained")
     apply_notebook_axes_style(ax, square=True)
@@ -82,7 +92,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             s=10,
             alpha=0.32,
             rasterize_at=10_000,
-            label=f"Predicted pool (n={len(pool):,})",
+            label=_legend_label(f"Predicted pool (n={len(pool):,})"),
             zorder=2,
         )
     if not selected.empty:
@@ -96,7 +106,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             s=42,
             edgecolors="#111111",
             linewidths=1.1,
-            label=f"Selected (n={len(selected)})",
+            label=_legend_label(f"Selected (n={len(selected)})"),
             zorder=4,
         )
     batch_labels = {str(item["id"]): str(item["label"]) for item in contract["observed_batches"]}
@@ -120,17 +130,18 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             s=34,
             edgecolors="#111111",
             linewidths=0.8,
-            label=f"Observed · {batch_labels[batch_id]} (n={len(batch)})",
+            label=_legend_label(f"Observed · {batch_labels[batch_id]} (n={len(batch)})"),
             zorder=3,
         )
-    ax.axvline(float(runtime["x_boundary"]), color="#555555", linestyle="--", linewidth=1.0, zorder=1)
-    ax.axhline(float(runtime["y_boundary"]), color="#555555", linestyle="--", linewidth=1.0, zorder=1)
+    reference_lines = _mapping(runtime["reference_lines"])
+    _draw_reference_lines(ax, reference_lines.get("x"), axis="x")
+    _draw_reference_lines(ax, reference_lines.get("y"), axis="y")
     ax.set_xlim(_limits(runtime["x_limits"], field="x_limits"))
     ax.set_ylim(_limits(runtime["y_limits"], field="y_limits"))
     ax.set_xlabel(str(runtime["x_label"]), fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     ax.set_ylabel(str(runtime["y_label"]), fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     ax.set_title(
-        f"{runtime['title']}\n{runtime['context']}",
+        f"{wrap_plot_title(runtime['title'], width=50)}\n{wrap_plot_title(runtime['context'], width=56)}",
         loc="center",
         fontweight="semibold",
         fontsize=NOTEBOOK_TITLE_FONTSIZE,
@@ -143,10 +154,11 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         loc="upper center",
         bbox_to_anchor=(0.5, -0.14),
         fontsize=NOTEBOOK_LEGEND_FONTSIZE,
-        ncol=min(3, max(1, len(handles))),
+        ncol=min(2, max(1, len(handles))),
         frameon=False,
         handletextpad=0.4,
         columnspacing=0.7,
+        alignment="left",
     )
     mappable = ScalarMappable(norm=norm, cmap=cmap)
     mappable.set_array([])
@@ -154,11 +166,13 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         fig,
         ax,
         mappable,
-        label=f"{runtime['color_label']}\nred = greater clearance; 0 = boundary",
+        label=f"{runtime['color_label']}\n{color_scale['context']}",
         pad=0.065,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )
     colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
+    colorbar.ax.yaxis.set_label_position("left")
+    colorbar.ax.yaxis.labelpad = 0
     _annotate_visible_rows(
         ax,
         rows,
@@ -208,6 +222,7 @@ def _annotate_visible_rows(
         x_column=x_column,
         y_column=y_column,
         font_size=NOTEBOOK_ANNOTATION_FONTSIZE,
+        max_lanes=2,
     )
 
 
@@ -220,8 +235,32 @@ def _limits(value: object, *, field: str) -> tuple[float, float]:
     return parsed
 
 
+def _draw_reference_lines(ax: Any, raw: object, *, axis: str) -> None:
+    if not isinstance(raw, list):
+        raise ValueError(f"Layered-scatter {axis} reference lines must be a list.")
+    for item in raw:
+        if not isinstance(item, Mapping) or set(item) != {"value", "label"}:
+            raise ValueError(f"Layered-scatter {axis} reference lines require exactly value and label.")
+        value = float(item["value"])
+        label = str(item["label"]).strip()
+        if not np.isfinite(value) or not label:
+            raise ValueError(f"Layered-scatter {axis} reference-line values must be finite and labels non-empty.")
+        draw = ax.axvline if axis == "x" else ax.axhline
+        line = draw(value, color="#555555", linestyle="--", linewidth=1.0, zorder=1)
+        line.set_gid(f"reference-line:{axis}:{label}")
+
+
 def _mapping(value: object) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
+
+
+def _legend_label(value: str) -> str:
+    return textwrap.fill(
+        value,
+        width=32,
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
 
 
 __all__ = ["render_layered_scatter_figure"]

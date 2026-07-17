@@ -19,7 +19,8 @@ from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_bool, get_str, reject_params
-from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_round
+from ._run_resolution import resolve_run_id, resolve_single_round
+from .sfxi_diag_data import labels_asof_round
 
 
 @register_plot(

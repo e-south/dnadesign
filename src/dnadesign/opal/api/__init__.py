@@ -43,6 +43,11 @@ from .response_magnitude_feasibility import (
     score_response_magnitude_feasibility,
     validated_response_magnitude,
 )
+from .selection_allocation import (
+    SELECTION_ALLOCATION_PREVIEW_API_VERSION,
+    SelectionAllocationPreview,
+    preview_round_robin_next_best_unallocated,
+)
 from .sfxi import (
     SFXI_API_VERSION,
     SFXI_REFERENCE_OVERLAY_FIELDS,
@@ -71,6 +76,7 @@ __all__ = [
     "ResponseMagnitudeFeasibilityComponents",
     "ResponseMagnitudeFeasibilityScore",
     "RUN_SERIES_SCHEMA_VERSION",
+    "SELECTION_ALLOCATION_PREVIEW_API_VERSION",
     "SFXI_API_VERSION",
     "SFXI_REFERENCE_OVERLAY_FIELDS",
     "SFXI_REFERENCE_OVERLAY_NAMESPACE",
@@ -79,12 +85,14 @@ __all__ = [
     "SFXI_STATE_ORDER",
     "SFXIScoringConfig",
     "SFXIScoringResult",
+    "SelectionAllocationPreview",
     "VerifiedObservedLabelPromotion",
     "VerifiedObservedLabelSnapshot",
     "binary_target_mask",
     "candidate_snapshot_record",
     "calibrate_response_magnitude_feasibility",
     "observed_objective_run_contract_sha256",
+    "preview_round_robin_next_best_unallocated",
     "multistate_response_behavior_clearances",
     "response_magnitude_feasibility_components",
     "score_response_magnitude_feasibility",

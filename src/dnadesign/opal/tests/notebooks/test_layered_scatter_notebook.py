@@ -12,6 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import inspect
+import io
+import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -34,7 +36,7 @@ from dnadesign.opal.src.analysis.notebook_set_template.layered_scatter_cells imp
     render_layered_scatter_cells,
 )
 from dnadesign.opal.src.core.utils import file_sha256
-from dnadesign.opal.src.plots import response_magnitude_feasibility_aliases
+from dnadesign.opal.src.plots import candidate_annotations
 from dnadesign.opal.src.registries.plots import describe_plot_kind
 
 
@@ -85,15 +87,58 @@ def _choice(
                     "x_label": r"Response separation, $d_R$",
                     "y_label": r"ON fluorescence, $f_{\mathrm{ON}}$",
                     "color_label": r"OFF clearance, $q_{\mathrm{OFF}}$",
-                    "x_boundary": 0.0,
-                    "y_boundary": 0.0,
-                    "color_extent": 1.0,
+                    "reference_lines": {
+                        "x": [{"value": 0.0, "label": "Configured response boundary"}],
+                        "y": [{"value": 0.0, "label": "Configured ON-expression boundary"}],
+                    },
+                    "color_scale": {
+                        "center": 0.0,
+                        "extent": 1.0,
+                        "context": "red = greater clearance; 0 = configured boundary",
+                    },
                     "x_limits": [-0.5, 0.8],
                     "y_limits": [-0.5, 1.8],
                 }
             },
         },
     }
+
+
+def _behavior_choice(tmp_path: Path, *, filename: str, selection_view_id: str) -> dict[str, object]:
+    choice = _choice(tmp_path, filename=filename)
+    manifest = choice["manifest"]
+    assert isinstance(manifest, dict)
+    tidy_path = Path(str(manifest["tidy_csv"]))
+    tidy = pd.read_csv(tidy_path).rename(
+        columns={
+            "response_separation": "response_family_score",
+            "on_magnitude_floor": "on_signal_family_score",
+            "off_constraint_margin": "off_signal_suppression_family_score",
+        }
+    )
+    tidy.to_csv(tidy_path, index=False)
+    manifest["kind"] = "multistate_response_behavior_frontier"
+    manifest["selection_view_id"] = selection_view_id
+    manifest["metadata"] = describe_plot_kind("multistate_response_behavior_frontier")
+    outputs = manifest["outputs"]
+    assert isinstance(outputs, list) and isinstance(outputs[0], dict)
+    outputs[0]["sha256"] = file_sha256(tidy_path)
+    runtime = manifest["artifact_metadata"]["notebook_view"]
+    runtime.update(
+        {
+            "title": "Multistate behavior family landscape",
+            "x_label": "Response family score",
+            "y_label": "ON-signal family score",
+            "color_label": "OFF-signal-suppression family score",
+            "reference_lines": {"x": [], "y": []},
+            "color_scale": {
+                "center": 0.0,
+                "extent": 1.0,
+                "context": "red = stronger suppression; 0 = reference direction; not feasibility",
+            },
+        }
+    )
+    return choice
 
 
 def test_layered_scatter_contract_discovers_exact_observed_batches(tmp_path: Path) -> None:
@@ -158,6 +203,55 @@ def test_layered_scatter_memory_persists_across_selection_views(tmp_path: Path) 
 
     assert ethanol is not None and ciprofloxacin is not None
     assert ethanol["key"] == ciprofloxacin["key"]
+
+
+def test_behavior_layered_scatter_memory_and_reference_semantics_are_view_neutral(tmp_path: Path) -> None:
+    first_choice = _behavior_choice(tmp_path, filename="behavior_a.csv", selection_view_id="factor-a")
+    second_choice = _behavior_choice(tmp_path, filename="behavior_b.csv", selection_view_id="factor-b")
+    first = build_notebook_layered_scatter_contract(first_choice)
+    second = build_notebook_layered_scatter_contract(second_choice)
+
+    assert first is not None and second is not None
+    assert first["key"] == second["key"]
+    filtered = filter_notebook_layered_scatter_rows(
+        pd.read_csv(first["tidy_path"]),
+        contract=first,
+        state={"observed_batches": ["batch_1"]},
+    )
+    figure = render_layered_scatter_figure(filtered, contract=first)
+    assert not figure.axes[0].lines
+    assert figure.axes[-1].get_ylabel().endswith("0 = reference direction; not feasibility")
+    plt.close(figure)
+
+
+def test_layered_scatter_wraps_long_title_and_target_context_inside_square_viewport(tmp_path: Path) -> None:
+    choice = _behavior_choice(tmp_path, filename="behavior_long.csv", selection_view_id="factor-a")
+    runtime = choice["manifest"]["artifact_metadata"]["notebook_view"]
+    runtime["title"] = (
+        "Multistate behavior family landscape for a deliberately long publication-facing active-learning view"
+    )
+    runtime["context"] = (
+        "Target ON: stress condition alpha, stress condition beta, recovery condition gamma | "
+        "OFF: baseline condition, vehicle condition, unrelated stress condition delta"
+    )
+    contract = build_notebook_layered_scatter_contract(choice)
+    assert contract is not None
+    filtered = filter_notebook_layered_scatter_rows(
+        pd.read_csv(contract["tidy_path"]),
+        contract=contract,
+        state={"observed_batches": ["batch_1"]},
+    )
+
+    figure = render_layered_scatter_figure(filtered, contract=contract)
+    try:
+        figure.canvas.draw()
+        title = figure.axes[0].title
+        title_box = title.get_window_extent(renderer=figure.canvas.get_renderer())
+        assert len(title.get_text().splitlines()) >= 3
+        assert title_box.x0 >= figure.bbox.x0
+        assert title_box.x1 <= figure.bbox.x1
+    finally:
+        plt.close(figure)
 
 
 def test_layered_scatter_memory_stays_isolated_by_run_round_and_plot(tmp_path: Path) -> None:
@@ -250,19 +344,25 @@ def test_layered_scatter_annotation_scope_is_row_stable_for_overlapping_ids(
             "label_scope": label_scope,
         },
     )
-    captured: list[tuple[list[str], list[str]]] = []
+    captured: list[tuple[list[str], list[str], int]] = []
 
     def _capture_annotations(_ax, frame, aliases, **_kwargs) -> None:
-        captured.append((frame["record_kind"].astype(str).tolist(), list(aliases.values())))
+        captured.append(
+            (
+                frame["record_kind"].astype(str).tolist(),
+                list(aliases.values()),
+                int(_kwargs["max_lanes"]),
+            )
+        )
 
     monkeypatch.setattr(
-        response_magnitude_feasibility_aliases,
+        candidate_annotations,
         "annotate_candidate_aliases",
         _capture_annotations,
     )
     figure = layered_scatter_rendering.render_layered_scatter_figure(filtered, contract=contract)
     try:
-        assert captured == [([expected_kind], [expected_label])]
+        assert captured == [([expected_kind], [expected_label], 2)]
     finally:
         import matplotlib.pyplot as plt
 
@@ -453,6 +553,51 @@ def test_layered_scatter_legend_stays_outside_the_annotation_field(tmp_path: Pat
     assert not axis.spines["right"].get_visible()
     assert axis.collections[0].cmap.name == "RdBu_r"
     plt.close(figure)
+
+
+def test_layered_scatter_all_visible_layers_keep_a_usable_square_panel(tmp_path: Path) -> None:
+    choice = _behavior_choice(tmp_path, filename="behavior_all_layers.csv", selection_view_id="ethanol")
+    contract = build_notebook_layered_scatter_contract(choice)
+    assert contract is not None
+    batch_ids = [item["id"] for item in contract["observed_batches"]]
+    filtered = filter_notebook_layered_scatter_rows(
+        pd.read_csv(contract["tidy_path"]),
+        contract=contract,
+        state={
+            "show_prediction_pool": True,
+            "show_selected": True,
+            "observed_batches": batch_ids,
+            "label_scope": "both",
+        },
+    )
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        figure = render_layered_scatter_figure(filtered, contract=contract)
+        figure.savefig(io.BytesIO(), format="png", facecolor="white")
+    try:
+        assert not any("constrained_layout not applied" in str(item.message) for item in captured)
+        figure.canvas.draw()
+        renderer = figure.canvas.get_renderer()
+        axis_box = figure.axes[0].get_window_extent(renderer=renderer)
+        legend = figure.axes[0].get_legend()
+        assert legend is not None
+        legend_box = legend.get_window_extent(renderer=renderer)
+        colorbar_axis = figure.axes[-1]
+        colorbar_label_box = colorbar_axis.yaxis.label.get_window_extent(renderer=renderer)
+        assert axis_box.width / figure.bbox.width >= 0.35
+        assert axis_box.height / figure.bbox.height >= 0.35
+        assert legend_box.x0 >= figure.bbox.x0
+        assert legend_box.x1 <= figure.bbox.x1
+        assert legend_box.y0 >= figure.bbox.y0
+        assert colorbar_label_box.x0 >= axis_box.x1
+        assert colorbar_label_box.x1 <= figure.bbox.x1
+        assert colorbar_label_box.y0 >= figure.bbox.y0
+        assert colorbar_label_box.y1 <= figure.bbox.y1
+        assert len(legend.get_texts()) == 4
+        assert any("\n" in text.get_text() for text in legend.get_texts())
+    finally:
+        plt.close(figure)
 
 
 def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:

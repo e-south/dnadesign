@@ -137,6 +137,9 @@ def notebook_visual_group(choice: Mapping[str, Any]) -> tuple[NotebookVisualGrou
         return _GROUPS_BY_KEY["decision"], _DECISION_NAMES[name]
     if kind in _DECISION_KINDS:
         return _GROUPS_BY_KEY["decision"], _DECISION_KINDS[kind]
+    declared_tier = _manifest_tier_group(choice)
+    if declared_tier is not None:
+        return declared_tier, 100
     if name in _EDA_NAMES:
         return _GROUPS_BY_KEY["eda"], _EDA_NAMES[name]
     if kind in _MODEL_KINDS:
@@ -144,6 +147,18 @@ def notebook_visual_group(choice: Mapping[str, Any]) -> tuple[NotebookVisualGrou
     if kind in _METHOD_KINDS:
         return _GROUPS_BY_KEY["method"], 0
     return _GROUPS_BY_KEY["eda"], 100
+
+
+def _manifest_tier_group(choice: Mapping[str, Any]) -> NotebookVisualGroup | None:
+    """Route a registered visual by a generic review-group tier when declared."""
+
+    manifest = mapping(choice.get("manifest"))
+    metadata = mapping(manifest.get("metadata"))
+    for value in (choice.get("tier"), manifest.get("tier"), metadata.get("tier")):
+        key = str(value or "").strip().lower()
+        if key in _GROUPS_BY_KEY:
+            return _GROUPS_BY_KEY[key]
+    return None
 
 
 def _choice_group(choice: Mapping[str, Any]) -> NotebookVisualGroup | None:

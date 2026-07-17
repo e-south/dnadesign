@@ -16,7 +16,7 @@ uncertainty channels. Objective-specific pages define the equations.
 
 `sfxi_v1`, `response_magnitude_feasibility_v1`, and
 `multistate_response_behavior_v1` are independent objective plugins. The two
-multistate objectives accept the same ordered response/expression shape but
+multistate objectives accept the same ordered response/reference-signal shape but
 answer different questions: RMF measures clearance from explicit feasibility
 boundaries; the behavior objective ranks threshold-free desired behavior.
 `top_n` and `expected_improvement` are selection plugins. A selection view binds
@@ -74,8 +74,8 @@ and scales.
 
 ### `multistate_response_behavior_v1`
 
-Use for `K` ordered response states plus `K` aligned reference-relative
-expression states when every desired state-level improvement should affect a
+Use for `K` ordered response states plus `K` aligned reference-relative signal
+states when every desired state-level improvement should affect a
 threshold-free, family-balanced smooth bottleneck.
 
 - Score channels:
@@ -83,8 +83,8 @@ threshold-free, family-balanced smooth bottleneck.
 - Candidate-aligned diagnostics:
   - `hard_bottleneck_clearance`
   - `response_family_score`
-  - `on_expression_family_score`
-  - `off_suppression_family_score`
+  - `on_signal_family_score`
+  - `off_signal_suppression_family_score`
 - Uncertainty channels:
   - none
 

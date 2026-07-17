@@ -68,15 +68,15 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
         "x_label",
         "y_label",
         "color_label",
-        "x_boundary",
-        "y_boundary",
-        "color_extent",
+        "reference_lines",
+        "color_scale",
         "x_limits",
         "y_limits",
     }
     missing_runtime = sorted(required_runtime - set(runtime))
     if missing_runtime:
         raise ValueError(f"Layered-scatter runtime metadata is missing fields: {missing_runtime}.")
+    _validate_runtime_semantics(runtime)
 
     columns = [str(view[key]) for key in required_spec if key.endswith("_column")]
     tidy = pd.read_csv(tidy_path, low_memory=False)
@@ -306,6 +306,33 @@ def _validate_tidy_semantics(rows: pd.DataFrame, *, view: Mapping[str, Any]) -> 
     observed_batches = batches.loc[observed_mask]
     if observed_batches.isna().any() or observed_batches.astype(str).str.strip().eq("").any():
         raise ValueError("Layered-scatter observed rows require non-empty batch IDs.")
+
+
+def _validate_runtime_semantics(runtime: Mapping[str, Any]) -> None:
+    reference_lines = _mapping(runtime.get("reference_lines"))
+    if set(reference_lines) != {"x", "y"}:
+        raise ValueError("Layered-scatter reference_lines must contain exactly x and y lists.")
+    for axis in ("x", "y"):
+        lines = reference_lines[axis]
+        if not isinstance(lines, list):
+            raise ValueError(f"Layered-scatter reference_lines.{axis} must be a list.")
+        for item in lines:
+            if not isinstance(item, Mapping) or set(item) != {"value", "label"}:
+                raise ValueError(f"Layered-scatter reference_lines.{axis} entries require exactly value and label.")
+            value = float(item["value"])
+            label = str(item["label"]).strip()
+            if not np.isfinite(value) or not label:
+                raise ValueError(f"Layered-scatter reference_lines.{axis} values must be finite and labels non-empty.")
+    color_scale = _mapping(runtime.get("color_scale"))
+    if set(color_scale) != {"center", "extent", "context"}:
+        raise ValueError("Layered-scatter color_scale must contain exactly center, extent, and context.")
+    center = float(color_scale["center"])
+    extent = float(color_scale["extent"])
+    context = str(color_scale["context"]).strip()
+    if not np.isfinite(center) or not np.isfinite(extent) or extent <= 0.0 or not context:
+        raise ValueError(
+            "Layered-scatter color_scale requires a finite center, positive finite extent, and non-empty context."
+        )
 
 
 def _effective_label_scope(label_scope: str, *, show_selected: bool, show_observed: bool) -> str:

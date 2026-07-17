@@ -144,6 +144,20 @@ def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) ->
             "(off_max - off_magnitude) / off_scale. Feasibility is their row-wise minimum; "
             "zero is the configured boundary."
         ),
+        "multistate_response_behavior_frontier": (
+            "OPAL replays each ordered [r(state...), b(state...)] vector under the run-pinned target mask and "
+            "normalization. Response coordinates are (r_on - r_off) / response_scale, ON-signal coordinates "
+            "are b_on / signal_scale, and OFF-signal-suppression coordinates are -b_off / signal_scale. Each "
+            "family score is -log(mean(exp(-x))). The selectable behavior score applies the same smooth "
+            "bottleneck to the three equally weighted family means; the frontier keeps those families separate "
+            "and draws no feasibility boundary."
+        ),
+        "multistate_response_behavior_selected_decomposition": (
+            "For each ledger-allocated candidate, OPAL replays every normalized response, ON-signal, and "
+            "OFF-signal-suppression coordinate. It appends the three family smooth-bottleneck scores, the hard "
+            "minimum coordinate, and the family-balanced behavior score. The outlined state-level cell is the "
+            "hard bottleneck; zero denotes the reference direction, not feasibility."
+        ),
         "observed_objective_over_rounds": (
             "OPAL replays the configured pointwise objective once for each immutable observed candidate vector. "
             "Within each observed batch, the horizontal line is the candidate median and the vertical whisker "
@@ -293,6 +307,16 @@ def plot_encoding_text(*, kind: str, params: Mapping[str, Any]) -> str:
         )
     if kind == "response_magnitude_feasibility_constraint_decomposition":
         return "x=standardized requirement; y=selected candidate; color=signed margin with zero as the pass boundary"
+    if kind == "multistate_response_behavior_frontier":
+        return (
+            "x=response-family score; y=target-ON signal-family score; "
+            "color=target-OFF signal-suppression family score; allocated candidates=diamonds"
+        )
+    if kind == "multistate_response_behavior_selected_decomposition":
+        return (
+            "x=state-level coordinate and family summary; y=allocated candidate; "
+            "color=normalized behavior value; outline=hard bottleneck coordinate"
+        )
     if kind == "observed_objective_over_rounds":
         return (
             "x=observed batch; y=pointwise observed objective value; point=candidate; "
