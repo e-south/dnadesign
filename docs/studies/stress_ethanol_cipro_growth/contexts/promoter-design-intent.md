@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-promoter-design-intent
 surface: study-context
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-05-28
+last_verified: 2026-07-17
 entrypoint: ../routes/README.md
 ---
 
@@ -24,8 +24,9 @@ is:
 > program in a chosen cellular context.
 
 Everything else in this study - DenseGen arrays, TFBS curation, Evo2/LatentDNA
-representations, SFXI, OPAL, ethanol stress, SOS-like ciprofloxacin response,
-and the pDual10 context - serves that problem.
+representations, Reader assay evidence, study-issued objectives, OPAL, ethanol
+stress, SOS-like ciprofloxacin response, and the pDual10 context - serves that
+problem.
 
 The strongest one-sentence premise is:
 
@@ -283,8 +284,9 @@ The stress-study active-learning framing is stronger when the goal is a
 specified promoter behavior, especially across multiple conditions. A promoter
 can be bright in the wrong state, responsive but too weak, specific but
 unusable, or correct in shape but too low in dynamic range. Multi-state
-promoter behavior therefore needs a setpoint-conditioned objective. SFXI should
-be treated as a selection objective, not a mechanism score.
+promoter behavior therefore needs an explicit multistate objective contract.
+The study may evaluate more than one independently versioned objective, but
+each remains a selection rule rather than a mechanism score.
 
 #### Foot Guns To Avoid
 
@@ -313,8 +315,10 @@ Active-learning foot guns:
   broadly reusable promoter grammar.
 - Hiding negative evidence. A convincing study still needs controls, diversity
   samples, and interpretable failure modes.
-- Collapsing biology into a scalar. SFXI and related objectives must keep
-  shape, amplitude, noise, burden, and condition-specific behavior visible.
+- Collapsing biology into a scalar. SFXI, RMF, and Multistate Response Behavior
+  must retain their objective-specific diagnostics while Reader keeps assay
+  trajectories, uncertainty, censoring, burden, and condition-specific
+  behavior visible.
 - Treating embeddings as function. Evo2/LatentDNA features can structure the
   search before labels close the loop; they are not promoter-function evidence.
 
@@ -405,7 +409,7 @@ desired expression program
   -> controlled promoter candidate universe
   -> learned sequence representation
   -> multi-condition assay
-  -> setpoint-conditioned objective
+  -> explicit versioned multistate objective
   -> active-learning selection
   -> refined promoter designs
 ```
@@ -413,9 +417,10 @@ desired expression program
 Dense-array design matters because it creates a structured, auditable candidate
 universe rather than an opaque random library. Evo2/LatentDNA representations
 matter because they provide candidate feature spaces, but they are priors or
-features, not proof of function. SFXI matters because multi-condition promoter
-design needs a setpoint-conditioned objective. OPAL matters because the space is
-too large and the labels too costly for exhaustive measurement.
+features, not proof of function. A study-issued objective matters because a
+multi-condition response vector does not choose its own ranking semantics.
+OPAL matters because the space is too large and the labels too costly for
+exhaustive measurement.
 
 The study-specific design loop has this responsibility split:
 
@@ -423,10 +428,21 @@ The study-specific design loop has this responsibility split:
 | --- | --- | --- |
 | Regulatory priors | Choose TFBS families and promoter constraints that plausibly connect to the ethanol/ciprofloxacin testbed. | TFBS presence is not a mechanism claim by itself. |
 | DenseGen candidate universe | Generate controlled promoter architectures with traceable part and design-family metadata. | Dense-array generation does not guarantee regulatory logic. |
-| Evo2/LatentDNA features | Provide a fixed-length candidate representation for pre-assay selection. | Embeddings are not phenotype labels or proof of condition-dependent activity. |
-| SFXI objective | Score measured or predicted four-state response vectors against a setpoint while preserving logic/effect diagnostics. | SFXI is a selection objective, not a biological mechanism score. |
+| Evo2/LatentDNA features | Provide a fixed-length candidate representation for model fitting and selection. | Embeddings are not phenotype labels or proof of condition-dependent activity. |
+| Study-issued objective | Apply one explicit, versioned interpretation to measured or predicted multistate response vectors. | SFXI, RMF, and Multistate Response Behavior have distinct mathematics and claims; none is a biological mechanism score. |
 | OPAL campaign loop | Train on observed labels, rank/select next candidates, and preserve campaign-local ledgers. | OPAL owns the generic active-learning loop, not DenseGen-specific biological interpretation. |
-| Assay labels | Close the loop with measured multi-condition promoter responses. | Pre-assay analyses prepare the search; they do not establish promoter function. |
+| Assay labels | Close the loop with measured multi-condition promoter responses. | Prediction and selection do not establish promoter function before prospective measurement. |
+
+The objective sources of truth remain separate:
+
+- [SFXI source evidence](opal/sfxi-round0-source-evidence.md) covers the SFXI
+  vector and immutable SFXI evidence records.
+- [Response Magnitude Feasibility](opal/response-magnitude-feasibility.md)
+  defines the thresholded RMF requirements used by the completed round-0 audit
+  and selection record.
+- [Multistate Response Behavior](opal/multistate-response-behavior.md) defines a
+  threshold-free monotonic behavior objective that remains shadow-only pending
+  prospective evidence and explicit study promotion.
 
 ### Case-Study Semantics
 
@@ -462,7 +478,8 @@ Study instance:
 11 = combined ethanol/ciprofloxacin state
 ```
 
-Current OPAL campaign setpoints follow the same state order:
+The active RMF views and the behavior shadow masks use this shared assay state
+order:
 
 | Campaign intent | Setpoint vector |
 | --- | --- |
@@ -486,7 +503,7 @@ Those questions map to the study components:
 
 | Question | Study component | Reader-value wording |
 | --- | --- | --- |
-| What should the promoter do? | Four-state setpoints and SFXI | A useful promoter objective is a desired expression profile across states, not a single scalar brightness value. |
+| What should the promoter do? | Four-state specification and an explicit objective contract | A useful promoter objective is a desired expression profile across states, not a single scalar brightness value. |
 | What sequence space might contain promoters that do it? | TFBS curation and DenseGen dense arrays | Regulatory priors define a controlled candidate universe whose motif composition, spacing, and promoter constraints remain auditable. |
 | How do we choose what to build? | Evo2/LatentDNA features and OPAL | Learned sequence representations and active learning help prioritize candidates before exhaustive measurement is possible. |
 
@@ -504,21 +521,18 @@ These premises should guide talks, manuscripts, and study-facing summaries:
 | Candidate-space construction | Regulatory priors can be converted into an interpretable candidate universe whose parts and constraints are explicit. | TF evidence -> motif pools -> promoter grammar -> candidate population. |
 | Dense-array generation | Dense-array design systematically explores compact regulatory syntax while preserving architecture constraints. | Example promoter architectures and design-family distributions. |
 | Representation choice | Learned sequence representations are useful only if they preserve design-relevant structure before guiding experiments. | Feature health, family separation, sigma-core gradients, and context robustness. |
-| Multi-condition objective | Multi-state promoter design requires an objective that rewards both the right response shape and enough usable expression. | SFXI decomposition: response vector, target vector, logic fidelity, effect scaling. |
-| Active learning | Once labels exist, promoter design becomes iterative search rather than exhaustive screening. | Candidate universe -> assay -> response vector -> SFXI -> model -> next batch. |
+| Multi-condition objective | Multi-state promoter design requires an explicit objective whose behavior and claim boundary match the study intent. | Assay response vector plus the configured objective's response, signal, bottleneck, or feasibility diagnostics. |
+| Active learning | Once labels exist, promoter design becomes iterative search rather than exhaustive screening. | Candidate universe -> assay -> response vector -> configured objective -> model -> next batch. |
 | Experimental results | Measured promoter responses determine whether the designed grammar yields the requested expression programs. | Hit rate versus baseline, response-profile clusters, example promoters, and failure modes. |
 | Interpretation | The biological value comes from learning which regulatory architectures produce which expression programs, not merely from identifying top-ranked sequences. | Feature enrichment among successful and failed promoters; architecture-to-response examples. |
 | Conclusion | The contribution is a general design discipline for moving from regulatory priors to specified promoter behavior under context dependence. | Return to the opening specification loop. |
 
-For the current pre-assay posture, soften experimental-result language to:
-
-> The current study prepares the experimental search by generating,
-> representing, auditing, and scoring a candidate universe before measured
-> round-0 labels are available.
-
-After measured labels exist, the result section should foreground response
-profiles, hit enrichment, architecture-to-function interpretation, and failure
-modes.
+The study now has 27 verified round-0 labels and one digest-pinned RMF round-0
+selection record. Those artifacts establish a reproducible learning probe, not
+validated model support or promoter performance for the nominated batch. The
+next result-bearing step is prospective measurement of that batch. The
+threshold-free behavior objective remains a verified shadow evaluation, and
+neither objective evaluation authorizes synthesis.
 
 ### Minimal Figure Logic
 
@@ -531,8 +545,8 @@ artifact:
 | 2 | Prior work solves pieces of the problem but leaves specification-driven multi-state design unresolved. | Literature landscape: sequence scale versus behavioral richness. |
 | 3 | Regulatory priors define an interpretable candidate universe. | TF evidence -> motif pools -> promoter grammar -> candidate population. |
 | 4 | Dense-array design samples regulatory syntax under promoter constraints. | Example promoter architectures and design-family summaries. |
-| 5 | Representation learning is a pre-assay decision problem. | Representation audits, not a lone UMAP. |
-| 6 | Multi-state promoter behavior needs a setpoint-conditioned objective. | SFXI decomposition across `[00, 10, 01, 11]`. |
+| 5 | Representation choice is a model-input decision that must remain auditable across rounds. | Representation audits, not a lone UMAP. |
+| 6 | Multi-state promoter behavior needs an explicit, versioned objective contract. | Objective-specific decomposition across the shared `[00, 10, 01, 11]` assay state order. |
 | 7 | Active learning makes specification-driven promoter search experimentally tractable. | Round-based selection loop. |
 | 8 | Measured rounds reveal both design successes and grammar failures. | Hit enrichment, response clusters, architecture interpretation. |
 
@@ -546,18 +560,18 @@ pieces of the field that do not fully solve specified multi-state promoter
 behavior.
 
 Figures 3 and 4 should say "we know what we varied." Figure 5 should say "we
-audited the representation before trusting it." Figure 6 should say "the scalar
-score decomposes into visible response-shape and effect terms." Figure 8 should
-eventually say "the measured rounds reveal both useful designs and grammar
-failures."
+audited the representation before trusting it." Figure 6 should say "the
+configured scalar remains interpretable through objective-specific families,
+requirements, and bottleneck diagnostics." Figure 8 should eventually say
+"the measured rounds reveal both useful designs and grammar failures."
 
 ### Planned Response-Shape And Metadata Analyses
 
-Flag this as a future OPAL/study-analysis deliverable after measured
-multi-condition labels exist. The direct CLASSIC-like analog is not a UMAP of
-sequence embeddings and not a plot computed from SFXI alone. It is a
-response-space map computed from the underlying four-condition expression
-vector:
+Flag this as a future OPAL/study-analysis deliverable once multiple prospective
+rounds provide enough measured multi-condition labels. The direct CLASSIC-like
+analog is not a UMAP of sequence embeddings and not a plot computed from one
+objective scalar. It is a response-space map computed from the underlying
+four-condition expression vector:
 
 ```text
 y_i = [baseline, ethanol, ciprofloxacin, ethanol + ciprofloxacin]
@@ -582,7 +596,7 @@ map:
 ```text
 x-axis: KL divergence from AND-like combined-stress target
 y-axis: KL divergence from OR-like general-stress target
-point size: SFXI score or effect-scaled utility
+point size: configured objective score or one explicitly named diagnostic
 point color: OPAL round
 optional encodings: replicate uncertainty, campaign target, or validation set
 ```
@@ -592,9 +606,11 @@ scale are useful. Low divergence is interpretable as closeness to an archetype;
 high divergence can mean many different failure modes and should not be
 overinterpreted.
 
-SFXI remains an overlay and selection objective:
+The configured objective remains an overlay rather than the response-space
+definition:
 
-> KL divergence maps response shape; SFXI ranks design utility.
+> Response-space divergence maps shape; the configured objective ranks one
+> declared notion of design utility.
 
 This distinction matters because KL over normalized expression discards
 magnitude. A weak promoter can look shape-compatible but be useless; a bright
@@ -623,7 +639,8 @@ The intended questions are:
 Guardrails:
 
 - Define behavior classes in measured response space using KL, Jensen-Shannon,
-  SFXI decomposition, or explicit response-vector thresholds.
+  an explicitly named objective decomposition, or explicit response-vector
+  thresholds.
 - Use UMAP only as a visualization layer for architecture clusters after
   behavior classes are defined.
 - Account for OPAL sampling bias. Actively selected records are the campaign's
@@ -644,7 +661,7 @@ regulatory context
 promoter grammar
 controlled candidate universe
 multi-state response
-setpoint-conditioned selection
+explicit multistate selection objective
 data-efficient search
 measured feedback
 architecture-to-function interpretation
@@ -672,7 +689,7 @@ Preferred wording:
 | We used DenseGen to create 157,160 promoters. | We generated a controlled candidate universe large enough to search but structured enough to interpret. |
 | We embedded promoters with Evo2. | We used a learned genomic representation as a candidate feature space, then audited whether it preserved design-relevant structure. |
 | We used OPAL for active learning. | We used measured promoter responses to decide which candidates should be built next. |
-| We introduce SFXI. | We needed a selection objective that rewards the right response shape and sufficient output across multiple states. |
+| We configured SFXI, RMF, or Multistate Response Behavior. | We used one explicit, versioned interpretation of the same multistate assay evidence and retained the diagnostics needed to understand its ranking. |
 
 ### Claim Boundaries
 
@@ -686,8 +703,8 @@ Use these claims:
   expression is still required to establish function.
 - Learned sequence representations are useful as design priors only after they
   are audited against known structure.
-- A multi-condition promoter assay needs a setpoint-conditioned objective
-  because brightness alone is not the design goal.
+- A multi-condition promoter assay needs an explicit, versioned objective
+  contract because brightness alone is not the design goal.
 - The stress-response case study demonstrates a tractable version of a broader
   promoter-design problem.
 
@@ -698,14 +715,14 @@ Avoid these claims:
 - Evo2 predicts condition-dependent promoter activity.
 - Dense arrays guarantee regulatory logic.
 - TFBS presence implies functional regulation.
-- SFXI is a biological mechanism score.
+- Any selection objective is a biological mechanism score.
 - The E. coli stress system is the entire contribution.
 
 Safest boundary sentence:
 
 > This work does not claim that sequence priors or embeddings are sufficient to
-> predict promoter function; it claims that they can structure the search before
-> measured labels close the loop.
+> predict promoter function; it claims that they can structure a search whose
+> conclusions still require measured, prospectively evaluated labels.
 
 ### Current And Future Claim State
 
@@ -713,8 +730,9 @@ Keep the claim state tied to the available evidence.
 
 | Evidence state | Safe claim |
 | --- | --- |
-| Pre-assay candidate table materialized, X selected, no measured round-0 labels | The study has prepared a controlled candidate universe, selected a representation, and defined setpoint-conditioned objectives for the first measured search round. |
-| Round-0 assay labels ingested | The study can evaluate whether measured four-state promoter responses match the declared SFXI setpoints better than baseline or diversity-only choices. |
+| Candidate table materialized and X selected | The study has prepared a controlled candidate universe and an auditable model representation. This is input readiness, not phenotype evidence. |
+| Twenty-seven round-0 labels verified and one RMF selection record completed | The study has a reproducible prospective learning probe. Weak grouped prediction-to-truth support, unmeasured nominations, and the study-owned synthesis gate prevent a policy-efficacy or synthesis claim. |
+| First prospectively frozen batch measured | The study can compare nominated candidates with the same-round alternatives under each declared view and test enrichment without claiming that one batch establishes learning. |
 | Multiple active-learning rounds completed | The study can ask whether iterative selection improves hit recovery, exposes architecture-response relationships, and identifies failure modes. |
 | Strong hits validated across repeats or secondary contexts | The study can claim specific useful promoter designs within the tested host, construct, assay, and stress conditions. |
 

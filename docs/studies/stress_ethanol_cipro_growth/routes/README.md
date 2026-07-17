@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-routes
 surface: study-route-map
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-15
+last_verified: 2026-07-17
 entrypoint: self
 status_surface: studies.stress-ethanol-cipro-growth.status
 preflight_surface: studies.stress-ethanol-cipro-growth.preflight
@@ -42,6 +42,7 @@ Use this page after the checked-in study status tells you where the record stand
 | Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
 | Reader observations and candidate identity | `stress study` | `label_truth_ready` | `src/dnadesign/studies/units/stress_ethanol_cipro_growth/{response_window_observations,promoter_candidate_bindings}/` |
 | OPAL campaigns | `opal` | `round0_selection_review` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
+| Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | RMF active record; behavior shadow no-go | [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), [RMF](../contexts/opal/response-magnitude-feasibility.md), and [Multistate Response Behavior](../contexts/opal/multistate-response-behavior.md) |
 
 ### Terminology Guardrails
 
@@ -51,7 +52,8 @@ Use this page after the checked-in study status tells you where the record stand
 - DenseGen generation plans are biological generation conditions such as `background_only`, `ethanol`, `ciprofloxacin`, and `ethanol_ciprofloxacin`.
 - OPAL campaigns are downstream objectives: ethanol factor, ciprofloxacin factor, and AND. AND is not a synonym for every `ethanol_ciprofloxacin` DenseGen row.
 - OPAL reads an `opal_candidate_feature_table`, not just a matrix. The materialized table is the dense generated promoter subset plus measured pDual-10 Reader round-0 rows in `usr_prom_eth_cip_opal_candidates` with X column `latentdna__evo2_7b__context_anchor_mean_bidir_concat`.
-- SFXI state order for these campaigns is `[00, 10, 01, 11]`.
+- The shared assay state order is `[00, 10, 01, 11]`; each objective owns its
+  own vector interpretation, masks, diagnostics, and claim boundary.
 - Repeat-label truth and model decision quality are independent gates. The
   approved observation policy publishes 27 exact labels and eight exclusions.
   Round-0 completion does not promote the model or authorize synthesis.
