@@ -3,27 +3,31 @@ id: opal-objective-plugins
 title: OPAL objective plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-07-17
 ---
 
 ## OPAL Objective Plugins
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-17
 
 Objective plugins convert shared model predictions into named score and
 uncertainty channels. Objective-specific pages define the equations.
 
-`sfxi_v1` and `response_magnitude_feasibility_v1` are independent objective
-plugins with different Y contracts. `top_n` and `expected_improvement` are
-selection plugins. A selection view binds one objective to one selector; an
-objective does not choose candidates, and a selector does not infer objective
-identity from Y.
+`sfxi_v1`, `response_magnitude_feasibility_v1`, and
+`multistate_response_behavior_v1` are independent objective plugins. The two
+multistate objectives accept the same ordered response/expression shape but
+answer different questions: RMF measures clearance from explicit feasibility
+boundaries; the behavior objective ranks threshold-free desired behavior.
+`top_n` and `expected_improvement` are selection plugins. A selection view binds
+one objective to one selector; an objective does not choose candidates, and a
+selector does not infer objective identity from Y.
 
 Source modules:
 
 - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
 - `src/dnadesign/opal/src/objectives/response_magnitude_feasibility_v1.py`
+- `src/dnadesign/opal/src/objectives/multistate_response_behavior_v1.py`
 - `src/dnadesign/opal/src/objectives/spop_v1.py`
 - `src/dnadesign/opal/src/objectives/scalar_identity_v1.py`
 - `src/dnadesign/opal/src/objectives/vector_channel_v1.py`
@@ -68,6 +72,22 @@ and scales.
 - Uncertainty channels:
   - none
 
+### `multistate_response_behavior_v1`
+
+Use for `K` ordered response states plus `K` aligned reference-relative
+expression states when every desired state-level improvement should affect a
+threshold-free, family-balanced smooth bottleneck.
+
+- Score channels:
+  - `behavior_score` (maximize)
+- Candidate-aligned diagnostics:
+  - `hard_bottleneck_clearance`
+  - `response_family_score`
+  - `on_expression_family_score`
+  - `off_suppression_family_score`
+- Uncertainty channels:
+  - none
+
 ### `scalar_identity_v1`
 
 Use when the model output is already a single scalar objective.
@@ -108,6 +128,7 @@ Use when a vector target should select by closeness to a declared target vector.
 
 - [SFXI behavior and math](sfxi.md)
 - [Response-Magnitude Feasibility (RMF) behavior and math](response-magnitude-feasibility.md)
+- [Multistate Response Behavior math and contract](multistate-response-behavior.md)
 - [SPOP scalar objective](spop.md)
 
 ### Common selection wiring examples

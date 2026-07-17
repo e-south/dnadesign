@@ -190,6 +190,44 @@ def test_load_config_rejects_degenerate_response_target_mask(tmp_path: Path, tar
         load_config(_write(tmp_path / "campaign.yaml", _rmf_payload(target_mask)))
 
 
+def _multistate_response_behavior_payload() -> dict:
+    payload = _base_config(
+        objective_name="multistate_response_behavior_v1",
+        objective_params={
+            "state_ids": ["00", "10", "01", "11"],
+            "target_mask": [0, 1, 0, 1],
+            "normalization": {"response_scale": 0.25, "fluorescence_scale": 0.5},
+        },
+        score_ref="behavior_score",
+    )
+    payload["data"].update({"y_column_name": "response_window_vector", "y_expected_length": 8})
+    payload["transforms_y"] = {
+        "name": "vector_from_table_v1",
+        "params": {"value_columns": ["r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11"]},
+    }
+    return payload
+
+
+def test_load_config_accepts_multistate_response_behavior_view(tmp_path: Path) -> None:
+    cfg = load_config(_write(tmp_path / "campaign.yaml", _multistate_response_behavior_payload()))
+
+    objective = cfg.selection_views[0].objective
+    assert objective.name == "multistate_response_behavior_v1"
+    assert objective.params == {
+        "state_ids": ["00", "10", "01", "11"],
+        "target_mask": [0, 1, 0, 1],
+        "normalization": {"response_scale": 0.25, "fluorescence_scale": 0.5},
+    }
+
+
+def test_load_config_rejects_multistate_response_behavior_temperature(tmp_path: Path) -> None:
+    payload = _multistate_response_behavior_payload()
+    payload["selection_views"][0]["objective"]["params"]["temperature"] = 2.0
+
+    with pytest.raises(ConfigError, match="temperature"):
+        load_config(_write(tmp_path / "campaign.yaml", payload))
+
+
 def _usr_sidecar_payload() -> dict:
     payload = _base_config()
     payload["data"].update(

@@ -11,6 +11,13 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from .multistate_response_behavior import (
+    MULTISTATE_RESPONSE_BEHAVIOR_API_VERSION,
+    MultistateResponseBehaviorClearances,
+    MultistateResponseBehaviorScore,
+    multistate_response_behavior_clearances,
+    score_multistate_response_behavior,
+)
 from .observed_labels import (
     OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION,
     OBSERVED_LABELS_API_VERSION,
@@ -52,11 +59,14 @@ from .sfxi import (
 )
 
 __all__ = [
+    "MULTISTATE_RESPONSE_BEHAVIOR_API_VERSION",
     "OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION",
     "OBSERVED_LABELS_API_VERSION",
     "OBSERVED_OBJECTIVE_HISTORY_API_VERSION",
     "ObservedLabelPromotionBinding",
     "ObservedLabelVerificationError",
+    "MultistateResponseBehaviorClearances",
+    "MultistateResponseBehaviorScore",
     "RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION",
     "ResponseMagnitudeFeasibilityComponents",
     "ResponseMagnitudeFeasibilityScore",
@@ -75,8 +85,10 @@ __all__ = [
     "candidate_snapshot_record",
     "calibrate_response_magnitude_feasibility",
     "observed_objective_run_contract_sha256",
+    "multistate_response_behavior_clearances",
     "response_magnitude_feasibility_components",
     "score_response_magnitude_feasibility",
+    "score_multistate_response_behavior",
     "score_vec8",
     "score_vec8_with_denom",
     "to_sfxi_reference_overlay_records",

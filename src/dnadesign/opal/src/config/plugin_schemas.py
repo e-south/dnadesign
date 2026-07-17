@@ -410,6 +410,43 @@ class _ResponseMagnitudeFeasibilityParams(BaseModel):
         return self
 
 
+class _MultistateResponseBehaviorNormalization(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    response_scale: float
+    fluorescence_scale: float
+
+    @field_validator("response_scale", "fluorescence_scale", mode="before")
+    @classmethod
+    def _positive_finite_scale(cls, v: object) -> float:
+        if isinstance(v, (bool, np.bool_)):
+            raise ValueError("multistate response behavior normalization scales cannot be boolean")
+        value = float(v)
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("multistate response behavior normalization scales must be positive and finite")
+        return value
+
+
+@register_param_schema("objective", "multistate_response_behavior_v1")
+class _MultistateResponseBehaviorParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    state_ids: List[str]
+    target_mask: List[Literal[0, 1]]
+    normalization: _MultistateResponseBehaviorNormalization
+
+    @model_validator(mode="after")
+    def _state_contract_is_aligned(self):
+        normalized = [str(value).strip() for value in self.state_ids]
+        if len(normalized) < 2 or any(not value for value in normalized) or len(set(normalized)) != len(normalized):
+            raise ValueError("objective.params.state_ids must contain at least two unique, non-empty values")
+        if len(self.target_mask) != len(normalized):
+            raise ValueError("objective.params.target_mask must align one-to-one with state_ids")
+        on_count = int(sum(self.target_mask))
+        if on_count <= 0 or on_count >= len(self.target_mask):
+            raise ValueError("objective.params.target_mask must contain at least one ON and one OFF state")
+        self.state_ids = normalized
+        return self
+
+
 @register_param_schema("objective", "scalar_identity_v1")
 class _ScalarIdentityParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
