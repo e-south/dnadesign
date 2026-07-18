@@ -21,7 +21,7 @@ from ._mmcif import (
 )
 
 StructureFormat = Literal["pdb", "mmcif"]
-_BACKBONE_ATOM_NAMES = frozenset({"N", "CA", "C", "O", "OXT"})
+PROTEIN_BACKBONE_ATOM_NAMES = ("N", "CA", "C", "O", "OXT")
 DNA_RESIDUE_NAMES = frozenset({"DA", "DC", "DG", "DT"})
 RNA_RESIDUE_NAMES = frozenset({"A", "C", "G", "I", "U"})
 STANDARD_AMINO_ACID_RESIDUE_NAMES = frozenset(
@@ -204,7 +204,7 @@ def _summarize_pdb_atom_content(structure_text: str) -> StructureAtomContent:
         residue_key = (line[21:22], line[22:26].strip(), line[26:27].strip(), residue_name)
         atom_count += 1
         residue_keys.add(residue_key)
-        if atom_name.upper() not in _BACKBONE_ATOM_NAMES:
+        if atom_name.upper() not in PROTEIN_BACKBONE_ATOM_NAMES:
             sidechain_atom_count += 1
             sidechain_residue_keys.add(residue_key)
     return StructureAtomContent(
@@ -231,7 +231,7 @@ def _summarize_mmcif_atom_content(structure_text: str) -> StructureAtomContent:
         )
         atom_count += 1
         residue_keys.add(residue_key)
-        if record.atom_name not in _BACKBONE_ATOM_NAMES:
+        if record.atom_name not in PROTEIN_BACKBONE_ATOM_NAMES:
             sidechain_atom_count += 1
             sidechain_residue_keys.add(residue_key)
     return StructureAtomContent(

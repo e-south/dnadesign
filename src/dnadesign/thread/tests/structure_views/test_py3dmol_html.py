@@ -192,7 +192,7 @@ def test_py3dmol_backend_can_show_sidechains_and_persist_camera() -> None:
     assert "const pan = translateScene || translate" in html
     assert "const panScale = 0.22" in html
     assert "pan(-event.deltaX * panScale, -event.deltaY * panScale)" in html
-    assert '"not":{"atom":["N","C","O","OXT"]}' in unescaped_html
+    assert '"not":{"atom":["N","CA","C","O","OXT"]}' in unescaped_html
     expected_residue_selection = (
         '"resn":["ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","ILE",'
         '"LEU","LYS","MET","PHE","PRO","SER","THR","TRP","TYR","VAL"]'
@@ -539,7 +539,7 @@ def test_py3dmol_backend_colors_visible_protein_sidechains_with_molecule_class()
     )
 
     unescaped_html = html_lib.unescape(html).replace(" ", "")
-    assert '"not":{"atom":["N","C","O","OXT"]}' in unescaped_html
+    assert '"not":{"atom":["N","CA","C","O","OXT"]}' in unescaped_html
     assert '"cartoon":{"color":"#0072B2"}' in unescaped_html
     assert '"stick":{"color":"#0072B2","radius":0.16}' in unescaped_html
     assert '"stick":{"color":"#8c959f","radius":0.16}' not in unescaped_html

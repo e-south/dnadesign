@@ -17,6 +17,7 @@ import json
 
 from dnadesign.thread.structure_views.models import (
     DNA_RESIDUE_NAMES,
+    PROTEIN_BACKBONE_ATOM_NAMES,
     RNA_RESIDUE_NAMES,
     STANDARD_AMINO_ACID_RESIDUE_NAMES,
     MoleculeClass,
@@ -217,7 +218,7 @@ def _py3dmol_background_color(color: str) -> str:
 
 def _sidechain_selection(model_index: int) -> dict[str, object]:
     selection = _molecule_selection(model_index, "protein")
-    selection["not"] = {"atom": ["N", "C", "O", "OXT"]}
+    selection["not"] = {"atom": list(PROTEIN_BACKBONE_ATOM_NAMES)}
     return selection
 
 
