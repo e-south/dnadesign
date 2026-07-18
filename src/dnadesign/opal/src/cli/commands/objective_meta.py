@@ -51,10 +51,17 @@ def _view_definition(run_row: pd.Series, *, view_id: str) -> tuple[dict[str, Any
     return objective_matches[0], selection_matches[0]
 
 
+def _diagnostic_items(value: Any) -> list[Any] | tuple[Any, ...]:
+    items = value.tolist() if isinstance(value, np.ndarray) else value
+    if isinstance(items, (list, tuple)):
+        return items
+    return []
+
+
 def _diagnostic_keys(frame: pd.DataFrame) -> list[str]:
     keys: set[str] = set()
     for diagnostics in frame["view__diagnostics"].tolist():
-        for item in diagnostics or []:
+        for item in _diagnostic_items(diagnostics):
             if isinstance(item, dict) and item.get("name"):
                 keys.add(str(item["name"]))
     return sorted(keys)
@@ -65,7 +72,11 @@ def _profile(frame: pd.DataFrame, diagnostic_keys: list[str]) -> dict[str, Any]:
     for key in diagnostic_keys:
         expanded[f"diagnostic/{key}"] = [
             next(
-                (float(item["value"]) for item in (items or []) if item.get("name") == key),
+                (
+                    float(item["value"])
+                    for item in _diagnostic_items(items)
+                    if isinstance(item, dict) and item.get("name") == key
+                ),
                 np.nan,
             )
             for items in expanded["view__diagnostics"]
