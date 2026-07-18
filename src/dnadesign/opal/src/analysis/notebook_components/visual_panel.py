@@ -34,6 +34,7 @@ def render_notebook_visual_panel(
     plot_ui: Any = None,
     plot_scope_ui: Any = None,
     plot_view_state: Mapping[str, Any] | None = None,
+    layered_scatter_contract: Mapping[str, Any] | None = None,
     build_notebook_collection_visual_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None = None,
     build_notebook_campaign_set_selection_overlap_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]]
     | None = None,
@@ -150,6 +151,7 @@ def render_notebook_visual_panel(
         pl=pl,
         plot_scope_ui=plot_scope_ui,
         plot_view_state=plot_view_state,
+        layered_scatter_contract=layered_scatter_contract,
         render_notebook_plot_choice_image=render_notebook_plot_choice_image,
         selected_visual_choice=selected_visual_choice,
         select_notebook_plot_scope=select_notebook_plot_scope,
@@ -315,6 +317,7 @@ def _render_campaign_plot_panel(
     pl: Any,
     plot_scope_ui: Any,
     plot_view_state: Mapping[str, Any] | None,
+    layered_scatter_contract: Mapping[str, Any] | None,
     render_notebook_plot_choice_image: Callable[..., Any],
     selected_visual_choice: Mapping[str, Any],
     select_notebook_plot_scope: Callable[..., Mapping[str, Any]],
@@ -330,7 +333,12 @@ def _render_campaign_plot_panel(
         mo=mo,
         items=[
             controls,
-            render_notebook_plot_choice_image(choice, mo=mo, view_state=plot_view_state),
+            render_notebook_plot_choice_image(
+                choice,
+                mo=mo,
+                view_state=plot_view_state,
+                layered_scatter_contract=layered_scatter_contract,
+            ),
             mo.accordion({"Plot evidence": mo.vstack(detail_items, gap=0.35)}, multiple=True),
         ],
     )

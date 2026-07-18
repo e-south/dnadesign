@@ -23,9 +23,15 @@ from .baserender import (
 )
 from .baserender_campaign_context import load_notebook_baserender_campaign_context
 from .baserender_diagnostics import render_notebook_baserender_diagnostic_panel
+from .baserender_record_memory import (
+    build_notebook_baserender_record_memory_key,
+    resolve_notebook_baserender_preferred_record_id,
+)
 from .baserender_record_selection import (
+    build_notebook_selected_baserender_record_sets,
     build_notebook_selected_baserender_records,
     resolve_notebook_baserender_record_selection,
+    resolve_notebook_baserender_selection_batch_scope,
 )
 from .baserender_records import (
     build_notebook_baserender_label_rows,
@@ -40,6 +46,10 @@ from .baserender_records import (
 from .baserender_render import (
     render_notebook_baserender_record,
 )
+from .baserender_review_bundle import (
+    build_notebook_baserender_evidence_bundle,
+    build_notebook_baserender_record_controls,
+)
 from .baserender_selection_scope import (
     build_notebook_baserender_role_control,
     build_notebook_baserender_selection_view_control,
@@ -47,7 +57,6 @@ from .baserender_selection_scope import (
     resolve_notebook_baserender_selection_view_id,
 )
 from .baserender_selector import (
-    build_notebook_baserender_review_state,
     build_notebook_baserender_selector_model,
     render_notebook_baserender_selector,
 )
@@ -176,10 +185,13 @@ __all__ = [
     "build_notebook_baserender_record_choices",
     "build_notebook_baserender_record_choices_with_counts",
     "build_notebook_baserender_record_options",
-    "build_notebook_baserender_review_state",
+    "build_notebook_baserender_record_memory_key",
+    "build_notebook_baserender_evidence_bundle",
+    "build_notebook_baserender_record_controls",
     "build_notebook_baserender_selector_model",
     "build_notebook_baserender_role_control",
     "build_notebook_baserender_selection_view_control",
+    "build_notebook_selected_baserender_record_sets",
     "build_notebook_selected_baserender_records",
     "has_notebook_baserender_record_options",
     "build_notebook_selection_batch_choice",
@@ -265,6 +277,8 @@ __all__ = [
     "resolve_notebook_round_default",
     "resolve_notebook_baserender_selection_view_id",
     "resolve_notebook_baserender_record_selection",
+    "resolve_notebook_baserender_selection_batch_scope",
+    "resolve_notebook_baserender_preferred_record_id",
     "resolve_notebook_baserender_campaign_model",
     "select_notebook_baserender_default_record_id",
     "select_notebook_plot_scope",

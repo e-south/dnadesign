@@ -17,7 +17,7 @@ from ._support import block
 def render_layered_scatter_cells() -> str:
     """Render persistent controls and view state for generic layered scatters."""
 
-    return "\n".join((_memory_cell(), _control_cell(), _state_cell()))
+    return "\n".join((_memory_cell(), _contract_cell(), _control_cell(), _state_cell()))
 
 
 def _memory_cell() -> str:
@@ -31,19 +31,29 @@ def _memory_cell() -> str:
     )
 
 
-def _control_cell() -> str:
+def _contract_cell() -> str:
     return block(
         """
         @app.cell
-        def _(build_notebook_layered_scatter_contract, build_notebook_layered_scatter_controls,
-              layered_scatter_memory, mo, plot_scope_ui, selected_visual_choice,
-              select_notebook_plot_scope, set_layered_scatter_memory):
+        def _(build_notebook_layered_scatter_contract, plot_scope_ui,
+              selected_visual_choice, select_notebook_plot_scope):
             _scope_label = str(plot_scope_ui.value) if plot_scope_ui is not None else None
             _s = (
                 select_notebook_plot_scope(selected_visual_choice, _scope_label)
                 if selected_visual_choice is not None else None
             )
             layered_scatter_contract = build_notebook_layered_scatter_contract(_s) if _s is not None else None
+            return layered_scatter_contract
+        """
+    )
+
+
+def _control_cell() -> str:
+    return block(
+        """
+        @app.cell
+        def _(build_notebook_layered_scatter_controls, layered_scatter_contract,
+              layered_scatter_memory, mo, set_layered_scatter_memory):
             layered_scatter_controls = build_notebook_layered_scatter_controls(
                 layered_scatter_contract, memory=layered_scatter_memory,
                 set_memory=set_layered_scatter_memory, mo=mo,
@@ -52,8 +62,8 @@ def _control_cell() -> str:
             scatter_selected_ui = layered_scatter_controls["selected"]
             scatter_observed_batches_ui = layered_scatter_controls["observed_batches"]
             scatter_labels_ui = layered_scatter_controls["labels"]
-            return (layered_scatter_contract, layered_scatter_controls, scatter_labels_ui,
-                    scatter_observed_batches_ui, scatter_prediction_pool_ui, scatter_selected_ui)
+            return (layered_scatter_controls, scatter_labels_ui, scatter_observed_batches_ui,
+                    scatter_prediction_pool_ui, scatter_selected_ui)
         """
     )
 

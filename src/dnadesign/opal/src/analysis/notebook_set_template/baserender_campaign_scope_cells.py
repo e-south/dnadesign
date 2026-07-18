@@ -117,12 +117,12 @@ def _selected_campaign_baserender_contract_cell() -> str:
             (
                 selected_campaign_analysis,
                 selected_campaign_baserender_contract,
-                selected_campaign_runs_df,
+                _selected_campaign_runs_df,
                 selected_campaign_store,
             ) = load_notebook_baserender_campaign_context(baserender_campaign_model)
             return (
                 selected_campaign_analysis, selected_campaign_baserender_contract,
-                selected_campaign_runs_df, selected_campaign_store,
+                selected_campaign_store,
             )
         """
     )

@@ -213,11 +213,20 @@ def render_notebook_plot_choice_image(
     *,
     mo: Any,
     view_state: Mapping[str, Any] | None = None,
+    layered_scatter_contract: Mapping[str, Any] | None = None,
 ) -> Any:
     """Render one plot-choice media artifact at notebook-column width."""
 
-    if build_notebook_layered_scatter_contract(plot_choice) is not None:
-        return render_notebook_layered_scatter_image(plot_choice, state=view_state, mo=mo)
+    contract = layered_scatter_contract
+    if contract is None:
+        contract = build_notebook_layered_scatter_contract(plot_choice)
+    if contract is not None:
+        return render_notebook_layered_scatter_image(
+            plot_choice,
+            contract=contract,
+            state=view_state,
+            mo=mo,
+        )
 
     path = Path(str(plot_choice.get("path") or ""))
     path_label = str(plot_choice.get("path_label") or plot_choice.get("path") or "not generated")

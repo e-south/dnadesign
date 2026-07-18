@@ -32,6 +32,7 @@ from dnadesign.opal.src.analysis.notebook_components.layered_scatter_rendering i
     render_layered_scatter_figure,
 )
 from dnadesign.opal.src.analysis.notebook_components.plot_scopes import select_notebook_plot_scope
+from dnadesign.opal.src.analysis.notebook_set_template import layered_scatter_cells as layered_scatter_cell_template
 from dnadesign.opal.src.analysis.notebook_set_template.layered_scatter_cells import (
     render_layered_scatter_cells,
 )
@@ -154,6 +155,46 @@ def test_layered_scatter_contract_discovers_exact_observed_batches(tmp_path: Pat
         "Batch 1",
         "Pre-round 0 response corpus 4–8 h · v1",
     ]
+    assert isinstance(contract["rows"], pd.DataFrame)
+    assert list(contract["rows"].columns) == [
+        "id",
+        "record_kind",
+        "selected",
+        "batch_key",
+        "display_label",
+        "response_separation",
+        "on_magnitude_floor",
+        "off_constraint_margin",
+    ]
+
+
+def test_layered_scatter_render_reuses_the_verified_contract_rows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Mo:
+        @staticmethod
+        def image(data: bytes, **kwargs):
+            return {"data": data, **kwargs}
+
+    choice = _choice(tmp_path)
+    contract = build_notebook_layered_scatter_contract(choice)
+    assert contract is not None
+
+    monkeypatch.setattr(pd, "read_csv", lambda *_args, **_kwargs: pytest.fail("unexpected CSV reread"))
+    rendered = render_notebook_layered_scatter_image(
+        choice,
+        contract=contract,
+        state={
+            "show_prediction_pool": True,
+            "show_selected": True,
+            "observed_batches": ["batch_1"],
+            "label_scope": "both",
+        },
+        mo=_Mo(),
+    )
+
+    assert rendered["data"].startswith(b"\x89PNG")
 
 
 def test_layered_scatter_contract_rejects_more_batches_than_the_marker_vocabulary(tmp_path: Path) -> None:
@@ -609,6 +650,8 @@ def test_layered_scatter_all_visible_layers_keep_a_usable_square_panel(tmp_path:
 
 def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:
     text = render_layered_scatter_cells()
+    contract_cell = layered_scatter_cell_template._contract_cell()
+    control_cell = layered_scatter_cell_template._control_cell()
     helper_text = inspect.getsource(build_notebook_layered_scatter_controls)
 
     assert 'label="Prediction pool"' in helper_text
@@ -629,6 +672,10 @@ def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:
     assert "build_notebook_layered_scatter_contract(_s)" in text
     assert "select_notebook_plot_scope(" in text
     assert "plot_scope_ui.value" in text
+    assert "layered_scatter_memory" not in contract_cell
+    assert "set_layered_scatter_memory" not in contract_cell
+    assert "build_notebook_layered_scatter_contract" in contract_cell
+    assert "layered_scatter_memory" in control_cell
 
 
 def test_layered_scatter_controls_follow_the_selected_manifest_scope(tmp_path: Path) -> None:

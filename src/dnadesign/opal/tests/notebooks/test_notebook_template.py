@@ -32,6 +32,8 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_baserender_record_annotation_counts,
     build_notebook_baserender_record_choices,
     build_notebook_baserender_record_choices_with_counts,
+    build_notebook_baserender_record_controls,
+    build_notebook_baserender_record_memory_key,
     build_notebook_baserender_record_options,
     build_notebook_campaign_header_lines,
     build_notebook_campaign_set_metric_comparison_rows,
@@ -54,6 +56,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_plot_scope_options,
     build_notebook_reader_evidence_artifact_rows,
     build_notebook_run_summary_lines,
+    build_notebook_selected_baserender_record_sets,
     build_notebook_selected_baserender_records,
     build_notebook_selection_batch_choice,
     build_notebook_selection_batch_rows,
@@ -71,6 +74,8 @@ from dnadesign.opal.src.analysis.notebook_components import (
     render_notebook_review_control_surface,
     render_notebook_visual_panel,
     render_visual_surface_cells,
+    resolve_notebook_baserender_preferred_record_id,
+    resolve_notebook_baserender_selection_batch_scope,
     resolve_notebook_selection_view,
     select_notebook_baserender_default_record_id,
     select_notebook_plot_scope,
@@ -1886,21 +1891,28 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     assert "build_notebook_collection_baserender_role_choices" in text
     assert '"surface_kind": "baserender"' in text
     assert '"surface_kind": CAMPAIGN_SET_BASERENDER_SURFACE_KIND' in text
-    assert "build_notebook_baserender_review_state" in text
+    assert "build_notebook_baserender_evidence_bundle" in text
+    assert "build_notebook_baserender_record_controls" in text
+    assert "baserender_record_memory, set_baserender_record_memory = mo.state({})" in text
+    evidence_cell = text[
+        text.index("baserender_record_evidence_bundle =") : text.index("return baserender_record_evidence_bundle,")
+    ]
+    assert "selected_campaign_analysis" not in evidence_cell
+    assert "baserender_record_memory" not in evidence_cell
     assert "resolve_notebook_baserender_record_selection" in text
     assert "load_notebook_baserender_campaign_context" in text
     assert "baserender_record_id" in text
-    assert 'label="Selection round"' in text
-    assert 'label="Selection run"' in text
+    assert 'label="Selection round"' not in text
+    assert 'label="Selection run"' not in text
     assert "build_notebook_collection_baserender_role_control" in text
-    assert 'str(selected_round_selector).strip().lower() == "all"' in text
+    assert 'str(selected_round_selector).strip().lower() == "all"' not in text
     assert "baserender_campaign_model" in text
     assert "selected_baserender_round" in text
     assert "baserender_selected_round" not in text
     assert "selected_baserender_records" in text
     assert "selected_baserender_selection_view_id" in text
     assert "baserender_selection_view_ui" in text
-    assert "selection_view_id=selected_baserender_selection_view_id" in text
+    assert "_view_id = str(selected_baserender_selection_view_id)" in text
     assert "baserender_selection_record" in text
     assert "baserender_has_renderable_records" in text
     assert "baserender_diagnostic_panel" in text
@@ -1921,16 +1933,16 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     ast.parse(text)
 
 
-def test_campaign_set_notebook_hides_singleton_baserender_scope_controls_without_losing_scope() -> None:
+def test_campaign_set_notebook_pins_baserender_scope_to_verified_selection_batch() -> None:
     text = render_campaign_set_notebook(
         [Path("campaign_a.yaml"), Path("campaign_b.yaml")],
         round_selector="latest",
     )
 
-    assert "if len(baserender_rounds) > 1:" in text
-    assert "else baserender_rounds[0]" in text
-    assert "if len(baserender_run_options) > 1 else None" in text
-    assert "else baserender_run_options[0]" in text
+    assert "resolve_notebook_baserender_selection_batch_scope(" in text
+    assert 'baserender_campaign_model.get("selection_batch")' in text
+    assert "baserender_round_ui = None" in text
+    assert "baserender_run_ui = None" in text
     assert "run_id=selected_baserender_run_id" in text
     assert "run_id=str(baserender_run_ui.value)" not in text
     assert "build_notebook_baserender_selection_view_control" in text
@@ -2163,6 +2175,206 @@ def test_selected_baserender_records_preserve_view_and_competition_rank() -> Non
     assert build_notebook_selected_baserender_records(
         _CampaignAnalysis(), selection_view_id="ethanol", round_value=3, run_id=None
     )[1] == [{"field": "selection scope", "value": "no run available"}]
+
+
+def test_selected_baserender_record_sets_cover_each_view_exactly_once() -> None:
+    selection_batch = {
+        "schema_version": "opal.selection_batch.v3",
+        "campaign": {"slug": "campaign"},
+        "as_of_round": 0,
+        "run_id": "run-0",
+        "verification": {"status": "pass"},
+        "rows": [
+            {
+                "id": "ethanol-first",
+                "campaign_slug": "campaign",
+                "as_of_round": 0,
+                "run_id": "run-0",
+                "selection_view_ids": ["ethanol"],
+                "selection_memberships": [{"selection_view_id": "ethanol", "rank": 1}],
+            },
+            {
+                "id": "ciprofloxacin-first",
+                "campaign_slug": "campaign",
+                "as_of_round": 0,
+                "run_id": "run-0",
+                "selection_view_ids": ["ciprofloxacin"],
+                "selection_memberships": [{"selection_view_id": "ciprofloxacin", "rank": 1}],
+            },
+        ],
+    }
+    records, status = build_notebook_selected_baserender_record_sets(
+        selection_batch,
+        campaign_slug="campaign",
+        selection_view_ids=["ethanol", "ciprofloxacin"],
+        round_value=0,
+        run_id="run-0",
+    )
+
+    assert list(records) == ["ethanol", "ciprofloxacin"]
+    assert records["ethanol"][0]["record_id"] == "ethanol-first"
+    assert records["ciprofloxacin"][0]["record_id"] == "ciprofloxacin-first"
+    assert status["ethanol"][0] == {"field": "selection view", "value": "Ethanol"}
+    with pytest.raises(ValueError, match="unique"):
+        build_notebook_selected_baserender_record_sets(
+            selection_batch,
+            campaign_slug="campaign",
+            selection_view_ids=["ethanol", "ethanol"],
+            round_value=0,
+            run_id="run-0",
+        )
+    invalid_verification = {**selection_batch, "verification": {"status": "fail"}}
+    with pytest.raises(ValueError, match="verification must pass"):
+        build_notebook_selected_baserender_record_sets(
+            invalid_verification,
+            campaign_slug="campaign",
+            selection_view_ids=["ethanol"],
+            round_value=0,
+            run_id="run-0",
+        )
+    invalid_views = {
+        **selection_batch,
+        "rows": [{**selection_batch["rows"][0], "selection_view_ids": "ethanol"}],
+    }
+    with pytest.raises(ValueError, match="requires selection_view_ids"):
+        build_notebook_selected_baserender_record_sets(
+            invalid_views,
+            campaign_slug="campaign",
+            selection_view_ids=["ethanol"],
+            round_value=0,
+            run_id="run-0",
+        )
+
+
+def test_baserender_selection_batch_scope_is_exact_and_fail_fast() -> None:
+    assert resolve_notebook_baserender_selection_batch_scope(None) == (None, None)
+    assert resolve_notebook_baserender_selection_batch_scope({}) == (None, None)
+    assert resolve_notebook_baserender_selection_batch_scope({"as_of_round": 3, "run_id": "run-3"}) == (3, "run-3")
+    with pytest.raises(ValueError, match="both round and run id"):
+        resolve_notebook_baserender_selection_batch_scope({"as_of_round": 3})
+    with pytest.raises(ValueError, match="invalid value"):
+        resolve_notebook_baserender_selection_batch_scope({"as_of_round": 0.5, "run_id": "run"})
+
+
+def test_baserender_record_memory_round_trip_is_scoped_to_selection_view() -> None:
+    ethanol_key = build_notebook_baserender_record_memory_key(
+        campaign_slug="campaign",
+        run_id="run-0",
+        round_value=0,
+        selection_view_id="ethanol",
+    )
+    cipro_key = build_notebook_baserender_record_memory_key(
+        campaign_slug="campaign",
+        run_id="run-0",
+        round_value=0,
+        selection_view_id="ciprofloxacin",
+    )
+    memory = {ethanol_key: "ethanol-rank-2"}
+
+    assert (
+        resolve_notebook_baserender_preferred_record_id(
+            ["ethanol-rank-1", "ethanol-rank-2"],
+            {"ethanol-rank-1": 5, "ethanol-rank-2": 5},
+            preferred_record_id=memory.get(ethanol_key),
+        )
+        == "ethanol-rank-2"
+    )
+    assert (
+        resolve_notebook_baserender_preferred_record_id(
+            ["cipro-rank-1", "cipro-rank-2"],
+            {"cipro-rank-1": 5, "cipro-rank-2": 5},
+            preferred_record_id=memory.get(cipro_key),
+        )
+        == "cipro-rank-1"
+    )
+    assert (
+        resolve_notebook_baserender_preferred_record_id(
+            ["ethanol-rank-1", "ethanol-rank-2"],
+            {"ethanol-rank-1": 5, "ethanol-rank-2": 5},
+            preferred_record_id=memory.get(ethanol_key),
+        )
+        == "ethanol-rank-2"
+    )
+
+
+def test_baserender_record_controls_restore_each_selection_view_independently() -> None:
+    class _Dropdown:
+        def __init__(self, choices: dict[str, str], value: str, on_change: object) -> None:
+            self.value = choices[value]
+            self.on_change = on_change
+
+    class _UI:
+        def dropdown(
+            self,
+            choices: dict[str, str],
+            *,
+            value: str,
+            on_change: object,
+            **_: object,
+        ) -> _Dropdown:
+            return _Dropdown(choices, value, on_change)
+
+    evidence = {
+        view_id: {
+            "selector_model": {
+                "has_renderable_records": True,
+                "record_options": [f"{prefix}-rank-1", f"{prefix}-rank-2"],
+                "annotation_counts": {f"{prefix}-rank-1": 5, f"{prefix}-rank-2": 5},
+                "record_choices": {
+                    "Rank 1": f"{prefix}-rank-1",
+                    "Rank 2": f"{prefix}-rank-2",
+                },
+            }
+        }
+        for view_id, prefix in (("ethanol", "ethanol"), ("ciprofloxacin", "cipro"))
+    }
+    memory: dict[str, str] = {}
+
+    def _set_memory(value: dict[str, str]) -> None:
+        memory.clear()
+        memory.update(value)
+
+    kwargs = {
+        "campaign_slug": "campaign",
+        "run_id": "run-0",
+        "round_value": 0,
+        "memory": lambda: memory,
+        "set_memory": _set_memory,
+        "mo": SimpleNamespace(ui=_UI()),
+    }
+    controls = build_notebook_baserender_record_controls(evidence, **kwargs)
+    controls["ethanol"].on_change("ethanol-rank-2")
+    controls = build_notebook_baserender_record_controls(evidence, **kwargs)
+
+    assert controls["ethanol"].value == "ethanol-rank-2"
+    assert controls["ciprofloxacin"].value == "cipro-rank-1"
+    controls["ciprofloxacin"].on_change("cipro-rank-2")
+    controls = build_notebook_baserender_record_controls(evidence, **kwargs)
+    assert controls["ethanol"].value == "ethanol-rank-2"
+    assert controls["ciprofloxacin"].value == "cipro-rank-2"
+
+
+def test_baserender_record_memory_allows_pre_run_unavailable_state() -> None:
+    records, status = build_notebook_selected_baserender_record_sets(
+        None,
+        campaign_slug="campaign",
+        selection_view_ids=["ethanol"],
+        run_id=None,
+        round_value=None,
+    )
+    controls = build_notebook_baserender_record_controls(
+        {"ethanol": {"selector_model": {"has_renderable_records": False}}},
+        campaign_slug="campaign",
+        run_id=None,
+        round_value=None,
+        memory=lambda: {},
+        set_memory=lambda _value: None,
+        mo=object(),
+    )
+
+    assert records == {"ethanol": []}
+    assert status == {"ethanol": [{"field": "selection scope", "value": "no rounds available"}]}
+    assert controls == {"ethanol": None}
 
 
 def test_selected_baserender_records_do_not_expose_partial_invalid_evidence() -> None:

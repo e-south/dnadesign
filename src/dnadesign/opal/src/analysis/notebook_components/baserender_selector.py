@@ -15,8 +15,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .baserender import build_notebook_baserender_contract_rows
-from .baserender_diagnostics import render_notebook_baserender_diagnostic_panel
+from .baserender_record_memory import resolve_notebook_baserender_preferred_record_id
 from .baserender_records import (
     build_notebook_baserender_record_annotation_counts,
     build_notebook_baserender_record_choices_with_counts,
@@ -47,6 +46,7 @@ def build_notebook_baserender_selector_model(
             "annotation_counts": {},
             "record_choices": {},
             "default_label": None,
+            "selected_record_id": None,
         }
 
     counts = build_notebook_baserender_record_annotation_counts(
@@ -76,57 +76,41 @@ def build_notebook_baserender_selector_model(
         "annotation_counts": counts,
         "record_choices": choices,
         "default_label": default_labels[0],
+        "selected_record_id": default_record_id,
     }
 
 
-def render_notebook_baserender_selector(selector_model: Mapping[str, Any], *, mo: Any) -> Any | None:
+def render_notebook_baserender_selector(
+    selector_model: Mapping[str, Any],
+    *,
+    mo: Any,
+    preferred_record_id: Any | None = None,
+    on_change: Any | None = None,
+) -> Any | None:
     """Render the selected-sequence control only when its public adapter is usable."""
 
     if not bool(selector_model.get("has_renderable_records")):
         return None
     choices = dict(selector_model.get("record_choices") or {})
-    default_label = str(selector_model.get("default_label") or "").strip()
-    if not choices or default_label not in choices:
+    selected_record_id = resolve_notebook_baserender_preferred_record_id(
+        list(selector_model.get("record_options") or []),
+        dict(selector_model.get("annotation_counts") or {}),
+        preferred_record_id=preferred_record_id,
+    )
+    selected_labels = [label for label, record_id in choices.items() if str(record_id) == selected_record_id]
+    if not choices or len(selected_labels) != 1:
         raise ValueError("Renderable BaseRender selector state requires one valid default choice.")
     return mo.ui.dropdown(
         choices,
-        value=default_label,
+        value=selected_labels[0],
         label="Selected sequence",
         searchable=True,
         full_width=True,
+        on_change=on_change,
     )
-
-
-def build_notebook_baserender_review_state(
-    records_path: str | Path,
-    contract: Mapping[str, Any],
-    selected_records: Sequence[Mapping[str, Any]],
-    status_rows: Sequence[Mapping[str, Any]],
-    *,
-    mo: Any,
-    opal_table: Any,
-    pl: Any,
-) -> tuple[bool, Any | None, Any | None]:
-    """Build the selected-sequence control and its unavailable-evidence fallback."""
-
-    selector_model = build_notebook_baserender_selector_model(records_path, contract, selected_records)
-    has_renderable_records = bool(selector_model["has_renderable_records"])
-    selector = render_notebook_baserender_selector(selector_model, mo=mo)
-    diagnostic_panel = render_notebook_baserender_diagnostic_panel(
-        has_renderable_records=has_renderable_records,
-        selected_record_ids=[str(row["record_id"]) for row in selected_records],
-        status_rows=status_rows,
-        contract=contract,
-        build_contract_rows=build_notebook_baserender_contract_rows,
-        mo=mo,
-        opal_table=opal_table,
-        pl=pl,
-    )
-    return has_renderable_records, selector, diagnostic_panel
 
 
 __all__ = [
-    "build_notebook_baserender_review_state",
     "build_notebook_baserender_selector_model",
     "render_notebook_baserender_selector",
 ]
