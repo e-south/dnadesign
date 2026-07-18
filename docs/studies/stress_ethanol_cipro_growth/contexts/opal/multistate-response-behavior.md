@@ -575,3 +575,8 @@ Scientific and implementation sources are intentionally split by authority:
 These digest-bound metastudy results remain evidence, not an executable
 campaign route. The active protocol authorizes a prospective MSRB learning
 probe while preserving the stated nonclaims and synthesis prohibition.
+
+The shadow manifest and decision stay inside the generated workbench bundle.
+Its verifier checks the complete artifact inventory, bytes, schemas,
+derivations, and provenance as one unit. The activation receipt binds that
+bundle's path and digests without copying an incomplete subset into source.

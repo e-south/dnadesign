@@ -38,15 +38,27 @@
     "evidence": {
       "manifest": {
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/manifest.json",
-        "sha256": "76d07a05e341dd4ad4d5a43d721bcf0834de902662f85452f5ea57777c578c64"
+        "sha256": "76d07a05e341dd4ad4d5a43d721bcf0834de902662f85452f5ea57777c578c64",
+        "storage_class": "generated_workbench_bundle",
+        "verification_owner": "multistate_behavior_shadow_bundle_verifier"
       },
       "decision": {
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/decision.json",
-        "sha256": "f1e81a750ce99efae6c6cac4ed50423ae7db89b49a70662cfab6632971fa49ef"
+        "sha256": "f1e81a750ce99efae6c6cac4ed50423ae7db89b49a70662cfab6632971fa49ef",
+        "storage_class": "generated_workbench_bundle",
+        "verification_owner": "multistate_behavior_shadow_bundle_verifier"
+      },
+      "normalization": {
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/normalization.json",
+        "sha256": "2eeace704e3348b6ca3c21068646e5abe8f967f58cf2c57079302d7467bd79a3",
+        "storage_class": "generated_workbench_bundle",
+        "verification_owner": "multistate_behavior_shadow_bundle_verifier"
       },
       "independent_adversarial_audit": {
-        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/independent_adversarial_audit.json",
-        "sha256": "7f33bb0c18d84db1ddcccfea8cc0be74ec1a7b75a0f1982159db64747ebec169"
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/multistate_response_behavior_adversarial_audit_v1.json",
+        "sha256": "7f33bb0c18d84db1ddcccfea8cc0be74ec1a7b75a0f1982159db64747ebec169",
+        "storage_class": "packaged_source_evidence",
+        "verification_owner": "activation_receipt_source_tree_contract"
       }
     }
   },
@@ -170,7 +182,7 @@
       {
         "role": "study_source_of_truth",
         "path": "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md",
-        "sha256": "7acee2509293ea05937f70c61e1aeb95bbd2a6c60bdd1bc57bb81754c713b38e"
+        "sha256": "7eff9093e5f1f31965b8423b3bdc41c5e9f059ffab075e401ebdaf14c75063f4"
       },
       {
         "role": "active_study_protocol",
@@ -180,7 +192,7 @@
       {
         "role": "active_study_protocol_readme",
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/README.md",
-        "sha256": "ef9f11178722cc1ff62905ffe0023e44d11c32b3e6ff678c0e1e18724fd3580e"
+        "sha256": "cd352ba27b3d0e58454ee2ac25ee3cbe5b9b7c0089a6afd212cf74f475e013be"
       },
       {
         "role": "active_campaign_readme",
@@ -200,7 +212,17 @@
       {
         "role": "activation_receipt_verifier",
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/test_source_tree_contracts.py",
-        "sha256": "18fc46a0aa3410e55d3081b767d228f63b5a180bda6245db5a130fc7d7ea5b6a"
+        "sha256": "9b73e2c75c83191830c16a30e82fcf31480a4d161d998ad8828bc8d9dee22e88"
+      },
+      {
+        "role": "shadow_bundle_verifier",
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/multistate_behavior_bundle_verification.py",
+        "sha256": "d07ce7e6f9da25d981345f24c65040fec09fc38ab0ff75cde792fe60ff4e1763"
+      },
+      {
+        "role": "shadow_protocol",
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/multistate_response_behavior_shadow_v1.yaml",
+        "sha256": "b868112c86dfe62e9c81955e87a3cd9798eda5e6a34917014baa4cece7e6bd4c"
       }
     ]
   }

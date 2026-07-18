@@ -35,3 +35,10 @@ remains the evidence that retrospective results did not justify claiming
 superior hill-climbing or synthesis readiness. The active decision authorizes
 only a prospectively frozen learning probe under the separately declared study
 protocol.
+
+The shadow manifest and decision remain one generated workbench bundle. The
+bundle verifier owns their complete inventory, byte, schema, provenance, and
+derivation checks. The source-tree receipt records their paths and digests but
+does not duplicate a partial bundle. The adversarial audit is packaged source
+evidence and is checked byte-for-byte in a clean checkout. The active protocol
+and activation receipt are also declared package data.

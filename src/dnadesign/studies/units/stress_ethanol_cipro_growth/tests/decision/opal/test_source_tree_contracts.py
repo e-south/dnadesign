@@ -34,6 +34,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _require_sha256(value: object) -> str:
+    assert isinstance(value, str)
+    assert len(value) == 64
+    assert all(character in "0123456789abcdef" for character in value)
+    return value
+
+
 def test_candidate_identity_contract_is_owned_at_study_scope() -> None:
     assert SCHEMA_ID == "dnadesign.study.promoter_candidate_bindings.v1"
     assert STUDY_ID == "stress_ethanol_cipro_growth"
@@ -115,14 +122,39 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
         "The shadow no-go remains authoritative for claims of superior hill-climbing and synthesis. "
         "The separately approved active protocol authorizes only a prospectively frozen greedy learning probe."
     )
+    shadow_bundle_root = STUDY_ROOT / "workbench" / "outputs" / "multistate_response_behavior_shadow" / "latest"
+    packaged_audit_path = (
+        STUDY_ROOT
+        / "decision"
+        / "opal"
+        / "response_metastudy"
+        / "config"
+        / "multistate_response_behavior_adversarial_audit_v1.json"
+    )
+    expected_evidence_paths = {
+        "manifest": shadow_bundle_root / "manifest.json",
+        "decision": shadow_bundle_root / "decision.json",
+        "normalization": shadow_bundle_root / "normalization.json",
+        "independent_adversarial_audit": packaged_audit_path,
+    }
     for evidence_id, protocol_key in (
         ("manifest", "shadow_manifest_sha256"),
         ("decision", "shadow_decision_sha256"),
+        ("normalization", "shadow_normalization_sha256"),
         ("independent_adversarial_audit", "shadow_adversarial_audit_sha256"),
     ):
         item = shadow["evidence"][evidence_id]
-        assert item["sha256"] == protocol["evidence"][protocol_key]
-        assert _sha256(Path(item["path"])) == item["sha256"]
+        digest = _require_sha256(item["sha256"])
+        path = Path(item["path"])
+        assert digest == protocol["evidence"][protocol_key]
+        assert path == expected_evidence_paths[evidence_id]
+        if evidence_id in {"manifest", "decision", "normalization"}:
+            assert item["storage_class"] == "generated_workbench_bundle"
+            assert item["verification_owner"] == "multistate_behavior_shadow_bundle_verifier"
+        else:
+            assert item["storage_class"] == "packaged_source_evidence"
+            assert item["verification_owner"] == "activation_receipt_source_tree_contract"
+            assert _sha256(path) == digest
 
     review = receipt["independent_adversarial_review"]
     assert review["reviewer_type"] == "automated_codex_subagent"
@@ -156,6 +188,18 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
         "active_campaign_config": OPAL_CAMPAIGNS_ROOT / "secg_msrb_greedy" / "configs" / "campaign.yaml",
         "active_campaign_plot_config": OPAL_CAMPAIGNS_ROOT / "secg_msrb_greedy" / "configs" / "plots.yaml",
         "activation_receipt_verifier": STUDY_ROOT / "tests" / "decision" / "opal" / "test_source_tree_contracts.py",
+        "shadow_bundle_verifier": STUDY_ROOT
+        / "decision"
+        / "opal"
+        / "response_metastudy"
+        / "runtime"
+        / "multistate_behavior_bundle_verification.py",
+        "shadow_protocol": STUDY_ROOT
+        / "decision"
+        / "opal"
+        / "response_metastudy"
+        / "config"
+        / "multistate_response_behavior_shadow_v1.yaml",
     }
     assert {item["role"]: Path(item["path"]) for item in entries} == expected_sources
 
@@ -165,6 +209,7 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
     assert all(not path.is_absolute() and ".." not in path.parts for path in paths)
     assert protocol_path in paths
     assert all(path.is_file() for path in paths)
+    assert all(_require_sha256(item["sha256"]) for item in entries)
     mismatches = {
         path.as_posix(): {"expected": item["sha256"], "actual": _sha256(path)}
         for path, item in zip(paths, entries, strict=True)

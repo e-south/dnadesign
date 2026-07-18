@@ -93,6 +93,8 @@ def test_adversarial_audit_is_declared_as_package_data() -> None:
     studies_package_data = pyproject["tool"]["setuptools"]["package-data"]["dnadesign.studies"]
 
     assert "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.json" in studies_package_data
+    assert "units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/*.yaml" in studies_package_data
+    assert "units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/*.json" in studies_package_data
 
 
 def test_adversarial_audit_pins_reviewed_snapshot_and_rejects_provenance_drift() -> None:
