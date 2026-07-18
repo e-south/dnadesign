@@ -73,6 +73,14 @@ def test_msrb_has_one_study_protocol_and_one_matching_executable_campaign() -> N
         "score_channel": "behavior_score",
     }
     assert protocol["status"] == "active_learning_probe"
+    assert protocol["normalization"]["derivation"] == {
+        "response_scale_basis": "reader_joint_bootstrap_sd_of_declared_on_off_response_pairs",
+        "signal_scale_basis": "reader_joint_bootstrap_sd_of_each_reference_relative_state",
+        "pair_deduplication": "unique_unordered_state_pair_union",
+        "reader_joint_bootstrap_draws": 500,
+        "scale_quantile": 0.90,
+        "quantile_method": "linear",
+    }
     assert campaign["campaign"]["slug"] == "secg_msrb_greedy"
     assert campaign["data"]["y_column_name"] == "opal__reader_response_window_vector_v1__y"
 
@@ -232,6 +240,8 @@ def test_msrb_study_source_of_truth_covers_the_complete_evidence_path() -> None:
         "[r00, r10, r01, r11, b00, b10, b01, b11]",
         "### 5. Sequence-to-phenotype prediction",
         "### 6. MSRB scoring",
+        "unique unordered union",
+        "500 joint Reader bootstrap draws",
         "### 7. Greedy allocation and prospective measurement",
         "## Compensation boundary and anti-collapse evidence",
         "## Uncertainty and censoring",

@@ -291,6 +291,22 @@ candidate-experiment units. They put the two measurement types into comparable
 resolution units. They are not biological pass thresholds and were not tuned
 to preserve preferred candidates.
 
+The derivation is fixed rather than inferred from the two resulting numbers:
+
+- For $s_R$, take the unique unordered union of every intended-ON versus
+  intended-OFF state pair declared by the three target masks. For each pair and
+  each exact candidate-experiment unit, compute the sample standard deviation
+  of $r_i-r_j$ over the 500 joint Reader bootstrap draws. $s_R$ is the q90 of
+  those pair-level standard deviations using the linear quantile method.
+- For $s_B$, compute the sample standard deviation of each state-specific
+  reference-relative $b_i$ coordinate over the same 500 joint Reader bootstrap
+  draws for every exact candidate-experiment unit. $s_B$ is the q90 of those
+  state-level standard deviations using the same linear quantile method.
+
+The scales therefore describe assay resolution in the complete exact
+candidate-experiment cohort. They are not fitted from predictions, selected
+candidates, or the 27 promoted candidate labels.
+
 For a family $G$, define the smooth bottleneck
 
 $$

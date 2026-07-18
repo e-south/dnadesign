@@ -35,6 +35,13 @@ normalization:
   protocol: exact_primary_reader_candidate_experiments_q90_v1
   family_weighting: equal_one_third
   normalized_temperature: 1.0
+  derivation:
+    response_scale_basis: reader_joint_bootstrap_sd_of_declared_on_off_response_pairs
+    signal_scale_basis: reader_joint_bootstrap_sd_of_each_reference_relative_state
+    pair_deduplication: unique_unordered_state_pair_union
+    reader_joint_bootstrap_draws: 500
+    scale_quantile: 0.90
+    quantile_method: linear
   values:
     response_scale: 0.3080415202556689
     signal_scale: 0.3129336929825316
