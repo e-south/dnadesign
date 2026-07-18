@@ -19,6 +19,7 @@ import pytest
 
 from dnadesign.opal.src.config.types import SelectionBatchAllocationBlock
 from dnadesign.opal.src.core.utils import OpalError
+from dnadesign.opal.src.reporting.selection_batch_contract import validate_selection_batch_rows
 from dnadesign.opal.src.runtime.round.stages.selection_allocation import allocate_unique_selection_slots
 from dnadesign.opal.src.runtime.round.stages.selection_batch import build_selection_batch
 from dnadesign.opal.src.runtime.round.stages.selection_types import SelectionEvaluation
@@ -265,6 +266,53 @@ def test_allocation_deduplicates_shared_keys_across_distinct_candidate_ids() -> 
     assert allocated.summary["skipped_overlap_count"] == 1
     assert allocated.summary["replacement_count"] == 1
     assert allocated.summary["final_unique_count"] == 2
+
+
+def test_batch_deduplicates_one_view_preferences_for_a_shared_key() -> None:
+    ids = ["a", "b", "c", "d"]
+    candidates = pd.DataFrame({"id": ids, "sequence": ["AAA", "AAA", "CCC", "DDD"]})
+    selections = {
+        "target_a": _selection(
+            "target_a",
+            id_order_pool=ids,
+            ranked_ids=ids,
+            top_k=2,
+        )
+    }
+    allocated = allocate_unique_selection_slots(
+        candidate_df=candidates,
+        id_order_pool=ids,
+        selections=selections,
+        deduplicate_by="sequence",
+        expected_unique_count=2,
+        allocation=_allocation("target_a"),
+    )
+
+    batch = build_selection_batch(
+        candidate_df=candidates,
+        id_order_pool=ids,
+        selections=allocated.selections,
+        deduplicate_by="sequence",
+        expected_unique_count=2,
+        allocation_trace=allocated.trace,
+        allocation_summary=allocated.summary,
+    )
+
+    shared = batch.rows.loc[batch.rows["selection_batch_key"] == "AAA"].iloc[0]
+    assert shared["preferred_view_ids"] == ["target_a"]
+    persisted = batch.rows.assign(run_id="run-0", as_of_round=0, campaign_slug="campaign")
+    validated = validate_selection_batch_rows(
+        persisted,
+        campaign_slug="campaign",
+        run_id="run-0",
+        as_of_round=0,
+        configured_view_ids=["target_a"],
+        deduplicate_by="sequence",
+        allocation_strategy="round_robin_next_best_unallocated",
+        allocation_view_priority=["target_a"],
+        quota_by_view={"target_a": 2},
+    )
+    assert len(validated) == 2
 
 
 def test_cli_top_k_override_cannot_drift_an_allocated_batch_contract() -> None:

@@ -52,7 +52,9 @@ def build_selection_batch(
             if candidate_id not in by_id.index:
                 raise OpalError(f"Selection view {view_id!r} references unknown candidate id {candidate_id!r}.")
             key = str(by_id.at[candidate_id, key_column])
-            preferred_by_key.setdefault(key, []).append(view_id)
+            preferred_views = preferred_by_key.setdefault(key, [])
+            if view_id not in preferred_views:
+                preferred_views.append(view_id)
 
     batch: dict[str, dict[str, Any]] = {}
     for view_id, selection in selections.items():
