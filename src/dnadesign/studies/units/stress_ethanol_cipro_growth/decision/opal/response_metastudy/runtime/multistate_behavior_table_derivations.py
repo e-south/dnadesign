@@ -21,6 +21,7 @@ from ..evaluation.multistate_behavior_comparison import (
 )
 from ..evaluation.multistate_behavior_stability import build_bootstrap_rank_stability
 from .multistate_behavior_event_verification import verify_event_score_derivations
+from .multistate_behavior_frame_verification import assert_frame_equal_by_key
 from .multistate_behavior_semantic_verification import BehaviorBundleSemantics
 
 
@@ -156,17 +157,8 @@ def _assert_frame_equivalent(
     keys: list[str],
     context: str,
 ) -> None:
-    left = observed.sort_values(keys, kind="mergesort").reset_index(drop=True)
-    right = expected.sort_values(keys, kind="mergesort").reset_index(drop=True)
     try:
-        pd.testing.assert_frame_equal(
-            left,
-            right,
-            check_dtype=False,
-            check_exact=False,
-            rtol=1e-12,
-            atol=1e-12,
-        )
+        assert_frame_equal_by_key(observed, expected, keys=keys)
     except AssertionError as exc:
         raise ValueError(f"{context} does not derive from its persisted source table.") from exc
 

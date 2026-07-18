@@ -22,6 +22,7 @@ from ..evaluation.multistate_behavior_comparison import compare_hard_and_behavio
 from ..evaluation.multistate_behavior_protocol import MultistateBehaviorShadowProtocol
 from ..evaluation.multistate_behavior_rmf_replay import build_current_rmf_prediction_scores
 from .multistate_behavior_allocation_verification import verify_allocation_comparison
+from .multistate_behavior_frame_verification import assert_frame_equal_by_key
 from .multistate_behavior_grouped_verification import verify_grouped_objective_validation
 from .multistate_behavior_semantic_verification import BehaviorBundleSemantics
 from .multistate_behavior_sensitivity_verification import verify_normalization_sensitivity
@@ -281,14 +282,7 @@ def _components(protocol: MultistateBehaviorShadowProtocol) -> list[str]:
 
 def _assert_frame(observed: pd.DataFrame, expected: pd.DataFrame, keys: list[str]) -> None:
     try:
-        pd.testing.assert_frame_equal(
-            observed.sort_values(keys).reset_index(drop=True),
-            expected.sort_values(keys).reset_index(drop=True),
-            check_dtype=False,
-            check_exact=False,
-            rtol=1e-12,
-            atol=1e-12,
-        )
+        assert_frame_equal_by_key(observed, expected, keys=keys)
     except AssertionError as exc:
         raise ValueError("completion-gate table does not replay from persisted lower-level evidence.") from exc
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from ..evaluation.multistate_behavior_protocol import load_multistate_behavior_protocol
 from .multistate_behavior_bundle_contract import SCHEMA_ID, TABLE_COLUMNS, TABLE_IDS
@@ -154,7 +155,7 @@ def _load_tables(
     contracts = manifest.get("tables")
     if not isinstance(contracts, dict) or set(contracts) != TABLE_IDS:
         raise ValueError("multistate behavior table contracts are incomplete or unexpected.")
-    loaded: dict[str, pd.DataFrame] = {}
+    paths: dict[str, Path] = {}
     for table_id, expected_columns in TABLE_COLUMNS.items():
         contract = contracts[table_id]
         if not isinstance(contract, dict) or set(contract) != {"rows", "columns"}:
@@ -164,11 +165,14 @@ def _load_tables(
             raise ValueError(f"table {table_id!r} row count must be a nonnegative integer.")
         if contract["columns"] != list(expected_columns):
             raise ValueError(f"table {table_id!r} manifest columns disagree with the schema.")
-        frame = pd.read_parquet(root / str(artifacts[f"table__{table_id}"]["path"]))
-        if len(frame) != rows or tuple(frame.columns) != expected_columns:
+        path = root / str(artifacts[f"table__{table_id}"]["path"])
+        parquet = pq.ParquetFile(path)
+        if parquet.metadata is None or parquet.metadata.num_rows != rows:
             raise ValueError(f"table {table_id!r} row count or columns drifted.")
-        loaded[table_id] = frame
-    return loaded
+        if tuple(parquet.schema_arrow.names) != expected_columns:
+            raise ValueError(f"table {table_id!r} row count or columns drifted.")
+        paths[table_id] = path
+    return {table_id: pd.read_parquet(path) for table_id, path in paths.items()}
 
 
 __all__ = ["SCHEMA_ID", "TABLE_IDS", "verify_multistate_behavior_shadow"]

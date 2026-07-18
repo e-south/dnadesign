@@ -131,10 +131,11 @@ def _require_view_product(
     semantics: BehaviorBundleSemantics,
     context: str,
 ) -> None:
-    if frame.duplicated(subset=["id", "selection_view_id"]).any() or set(frame["id"].astype(str)) != ids:
-        raise ValueError(f"{context} contains duplicate or missing unit identities.")
+    keys = frame.loc[:, ["id", "selection_view_id"]]
     expected_views = set(semantics.view_ids)
-    if any(set(rows["selection_view_id"].astype(str)) != expected_views for _, rows in frame.groupby("id")):
+    if len(keys) != len(ids) * len(expected_views) or keys.duplicated().any() or set(keys["id"].astype(str)) != ids:
+        raise ValueError(f"{context} contains duplicate or missing unit identities.")
+    if set(keys["selection_view_id"].astype(str)) != expected_views:
         raise ValueError(f"{context} does not cover every declared selection view per id.")
 
 

@@ -17,6 +17,7 @@ import shutil
 import tomllib
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -82,10 +83,48 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
     multistate_behavior_source_equivalence as behavior_equivalence,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
+    multistate_behavior_table_coverage as behavior_table_coverage,
+)
 
 PACKAGE = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy")
 PROTOCOL_PATH = PACKAGE / "config/multistate_response_behavior_shadow_v1.yaml"
 AUDIT_PATH = PACKAGE / "config/multistate_response_behavior_adversarial_audit_v1.json"
+
+
+def test_view_product_coverage_is_vectorized_and_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view_ids = ("ethanol", "ciprofloxacin", "and")
+    unit_ids = tuple(f"candidate-{index:06d}" for index in range(2_000))
+    frame = pd.DataFrame(
+        {
+            "id": np.repeat(unit_ids, len(view_ids)),
+            "selection_view_id": np.tile(view_ids, len(unit_ids)),
+        }
+    )
+    semantics = SimpleNamespace(view_ids=view_ids)
+
+    def _reject_group_iteration(*args: object, **kwargs: object) -> None:
+        raise AssertionError("exact view-product verification must not iterate one group per candidate")
+
+    monkeypatch.setattr(pd.DataFrame, "groupby", _reject_group_iteration)
+    behavior_table_coverage._require_view_product(
+        frame,
+        ids=set(unit_ids),
+        semantics=semantics,
+        context="prediction scores",
+    )
+
+    drifted = frame.copy()
+    drifted.loc[0, "selection_view_id"] = "undeclared"
+    with pytest.raises(ValueError, match="declared selection view"):
+        behavior_table_coverage._require_view_product(
+            drifted,
+            ids=set(unit_ids),
+            semantics=semantics,
+            context="prediction scores",
+        )
 
 
 def test_adversarial_audit_is_declared_as_package_data() -> None:
