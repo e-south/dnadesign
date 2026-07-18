@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 import json
 from pathlib import Path
 
+from dnadesign.opal.api.reader_evidence import READER_EVIDENCE_MANIFEST_ADAPTER
 from dnadesign.opal.src.analysis.notebook_components import reader_evidence_visual as reader_evidence_visual_module
 from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     build_notebook_reader_evidence_artifact_options,
@@ -40,13 +41,14 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     manifest.write_text(
         json.dumps(
             {
-                "schema_version": "stress_ethanol_cipro_growth.reader_evidence.v1",
+                "schema_version": "example_study.reader_evidence.v1",
+                "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
                 "round": "r0",
                 "summary": {
                     "rows": 1,
                     "distinct_ids": 1,
                     "reader_experiments": 1,
-                    "artifact_count": 2,
+                    "artifact_count": 3,
                     "missing_artifact_rows": 0,
                 },
                 "rows": [
@@ -58,18 +60,27 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
                         "artifacts": [
                             {
                                 "semantic_kind": "raw_kinetics",
+                                "kind": "reader_plot",
+                                "record_id": "plot:raw_kinetics",
+                                "scope": "design",
                                 "path": str(raw_pdf),
                                 "exists": True,
                                 "media_type": "application/pdf",
                             },
                             {
                                 "semantic_kind": "intensity_overview",
+                                "kind": "reader_plot",
+                                "record_id": "plot:intensity_overview",
+                                "scope": "design",
                                 "path": str(triptych_pdf),
                                 "exists": True,
                                 "media_type": "application/pdf",
                             },
                             {
                                 "semantic_kind": "sfxi_vec8_heatmap",
+                                "kind": "reader_plot",
+                                "record_id": "plot:sfxi_vec8_heatmap",
+                                "scope": "design",
                                 "path": str(heatmap_png),
                                 "exists": True,
                                 "media_type": "image/png",
@@ -99,6 +110,99 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
         surface,
         selected_plot_type_label="SFXI vec8 heatmap",
     ) == ["r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h"]
+
+
+def test_reader_evidence_discovery_routes_by_public_adapter_not_study_schema(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    manifest = workdir / "inputs" / "r0" / "reader_evidence_manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "unrelated.study_specific_schema.v9",
+                "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
+                "round": "r0",
+                "summary": {
+                    "rows": 1,
+                    "distinct_ids": 1,
+                    "reader_experiments": 1,
+                    "artifact_count": 1,
+                    "missing_artifact_rows": 0,
+                },
+                "rows": [
+                    {
+                        "id": "candidate-1",
+                        "design_id": "design-1",
+                        "reader_experiment_id": "experiment-1",
+                        "artifacts": [
+                            {
+                                "semantic_kind": "example_evidence",
+                                "kind": "reader_plot",
+                                "record_id": "plot:example",
+                                "scope": "design",
+                                "path": "evidence/example.png",
+                                "exists": True,
+                                "media_type": "image/png",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rows = discover_reader_evidence_manifests(workdir)
+
+    assert rows[0]["status"] == "ready"
+    assert rows[0]["rows"] == 1
+
+
+def test_reader_evidence_discovery_rejects_adapter_summary_drift(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    manifest = workdir / "inputs" / "r0" / "reader_evidence_manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "example.reader_evidence.v1",
+                "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
+                "round": "r0",
+                "summary": {
+                    "rows": 1,
+                    "distinct_ids": 1,
+                    "reader_experiments": 1,
+                    "artifact_count": 0,
+                    "missing_artifact_rows": 0,
+                },
+                "rows": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert discover_reader_evidence_manifests(workdir)[0]["status"] == "schema_attention"
+    assert discover_reader_evidence_artifacts(workdir) == []
+
+
+def test_reader_evidence_discovery_rejects_manifest_without_public_adapter(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    manifest = workdir / "inputs" / "r0" / "reader_evidence_manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v1",
+                "round": "r0",
+                "summary": {"rows": 1},
+                "rows": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert discover_reader_evidence_manifests(workdir)[0]["status"] == "schema_attention"
+    assert discover_reader_evidence_artifacts(workdir) == []
 
 
 def test_reader_evidence_visual_choices_join_deliverable_universe() -> None:

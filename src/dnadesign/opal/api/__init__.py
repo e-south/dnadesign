@@ -33,6 +33,13 @@ from .observed_objective_history import (
     RUN_SERIES_SCHEMA_VERSION,
     observed_objective_run_contract_sha256,
 )
+from .reader_evidence import (
+    READER_EVIDENCE_API_VERSION,
+    READER_EVIDENCE_MANIFEST_ADAPTER,
+    ReaderEvidenceManifestAdapterError,
+    ReaderEvidenceManifestProjection,
+    parse_reader_evidence_manifest_adapter,
+)
 from .response_magnitude_feasibility import (
     RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION,
     ResponseMagnitudeFeasibilityComponents,
@@ -68,6 +75,10 @@ __all__ = [
     "OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION",
     "OBSERVED_LABELS_API_VERSION",
     "OBSERVED_OBJECTIVE_HISTORY_API_VERSION",
+    "READER_EVIDENCE_API_VERSION",
+    "READER_EVIDENCE_MANIFEST_ADAPTER",
+    "ReaderEvidenceManifestAdapterError",
+    "ReaderEvidenceManifestProjection",
     "ObservedLabelPromotionBinding",
     "ObservedLabelVerificationError",
     "MultistateResponseBehaviorClearances",
@@ -91,6 +102,7 @@ __all__ = [
     "binary_target_mask",
     "candidate_snapshot_record",
     "calibrate_response_magnitude_feasibility",
+    "parse_reader_evidence_manifest_adapter",
     "observed_objective_run_contract_sha256",
     "preview_round_robin_next_best_unallocated",
     "multistate_response_behavior_clearances",

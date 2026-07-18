@@ -16,6 +16,7 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.opal.api.reader_evidence import READER_EVIDENCE_MANIFEST_ADAPTER
 from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_at_a_glance_rows,
     build_notebook_campaign_header_lines,
@@ -321,7 +322,8 @@ def test_notebook_view_model_includes_reader_evidence_manifests(tmp_path: Path) 
     evidence_manifest.write_text(
         json.dumps(
             {
-                "schema_version": "stress_ethanol_cipro_growth.reader_evidence.v1",
+                "schema_version": "example_study.reader_evidence.v1",
+                "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
                 "campaign_slug": "secg_ethanol_rf_sfxi_topn",
                 "round": "r0",
                 "observed_round": 0,
@@ -341,6 +343,9 @@ def test_notebook_view_model_includes_reader_evidence_manifests(tmp_path: Path) 
                         "artifacts": [
                             {
                                 "semantic_kind": "raw_kinetics",
+                                "kind": "reader_plot",
+                                "record_id": "plot:raw_kinetics",
+                                "scope": "design",
                                 "path": str(reader_plot),
                                 "exists": True,
                                 "media_type": "application/pdf",

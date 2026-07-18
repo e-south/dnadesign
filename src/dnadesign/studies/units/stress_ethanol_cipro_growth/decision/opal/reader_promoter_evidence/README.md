@@ -9,12 +9,18 @@ last_verified: 2026-07-18
 # Reader promoter evidence
 
 The study-owned adapter validates published Reader
-`reader.response_window.promoter_evidence_bundle.v3` directories against an
+`reader.response_window.promoter_evidence_bundle.v4` directories against an
 explicit `dnadesign.study.promoter_candidate_bindings.v1` bundle. It stages
 their static PNG/PDF artifacts for OPAL display. It writes the
 `stress_ethanol_cipro_growth.reader_promoter_evidence.v1` schema with semantic
 kind `promoter_response_evidence`; the default filename is
 `reader_evidence_promoter_response.json`.
+
+The manifest also declares the public
+`opal.reader_evidence_manifest.v1` adapter. The study schema remains the
+authority for candidate and experiment provenance; the adapter identifies only
+the generic fields OPAL may render. OPAL therefore does not import or recognize
+the stress-study schema name.
 
 The handoff is display-only. Reader owns trajectories, reductions, figures,
 and source manifests. The stress study validates candidate, sequence-authority,

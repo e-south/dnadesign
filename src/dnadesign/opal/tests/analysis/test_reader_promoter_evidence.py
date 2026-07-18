@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.opal.api.reader_evidence import READER_EVIDENCE_MANIFEST_ADAPTER
 from dnadesign.opal.src.analysis.notebook_components import reader_evidence_preview
 from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     build_notebook_reader_evidence_surface,
@@ -43,7 +44,8 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
     evidence_manifest.write_text(
         json.dumps(
             {
-                "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v1",
+                "schema_version": "example_study.reader_promoter_evidence.v1",
+                "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
                 "created_at": "2026-07-13T12:00:00+00:00",
                 "campaign_slug": "secg_msrb_greedy",
                 "round": "r0",
@@ -91,7 +93,7 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
                             {
                                 "semantic_kind": "promoter_response_evidence",
                                 "kind": "reader_publication",
-                                "record_id": "reader.response_window.promoter_evidence_bundle.v3",
+                                "record_id": "reader.response_window.promoter_evidence_bundle.v4",
                                 "scope": "design_reduction",
                                 "path": relative_media.as_posix(),
                                 "path_label": "20260713_sfxi/pDual-10-1/event_logmean_6_12h_post/promoter_evidence.png",
@@ -145,7 +147,7 @@ def test_promoter_evidence_verifies_staged_relative_media_without_reader_source(
     row = {
         "semantic_kind": "promoter_response_evidence",
         "kind": "reader_publication",
-        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v3",
+        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v4",
         "scope": "design_reduction",
         "id": "candidate-1",
         "candidate_id": "candidate-1",
@@ -306,7 +308,7 @@ def _valid_promoter_surface(tmp_path: Path) -> tuple[dict[str, list[dict[str, ob
         "plot_type_label": "Promoter response evidence",
         "semantic_kind": "promoter_response_evidence",
         "kind": "reader_publication",
-        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v3",
+        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v4",
         "scope": "design_reduction",
         "id": candidate_id,
         "candidate_id": candidate_id,
@@ -378,7 +380,16 @@ def _write_publication_manifest(manifest_path: Path, row: dict[str, object]) -> 
     manifest_path.write_text(
         json.dumps(
             {
-                "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v1",
+                "schema_version": "example_study.reader_promoter_evidence.v1",
+                "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
+                "round": "r0",
+                "summary": {
+                    "rows": 1,
+                    "distinct_ids": 1,
+                    "reader_experiments": 1,
+                    "artifact_count": 1,
+                    "missing_artifact_rows": 0,
+                },
                 "rows": [publication_row],
             }
         )

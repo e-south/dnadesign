@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.opal.api.reader_evidence import READER_EVIDENCE_MANIFEST_ADAPTER
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence import (
     ReaderPromoterEvidenceError,
     materialize_reader_promoter_evidence_manifest,
@@ -70,6 +71,7 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
     )
 
     assert payload["schema_version"] == "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
+    assert payload["opal_adapter"] == READER_EVIDENCE_MANIFEST_ADAPTER
     assert payload["campaign_slug"] == "secg_msrb_greedy"
     assert payload["round"] == "r0"
     assert "observed_round" not in payload
@@ -105,7 +107,7 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
         source_artifact = densegen / Path(artifact["path"]).name
         assert artifact["semantic_kind"] == "promoter_response_evidence"
         assert artifact["kind"] == "reader_publication"
-        assert artifact["record_id"] == "reader.response_window.promoter_evidence_bundle.v3"
+        assert artifact["record_id"] == "reader.response_window.promoter_evidence_bundle.v4"
         assert artifact["scope"] == "design_reduction"
         assert artifact["exists"] is True
         assert artifact["bytes"] == source_artifact.stat().st_size
@@ -148,8 +150,9 @@ def test_preview_accepts_reader_screen_only_overlay_without_promoting_a_score(tm
     manifest_path = bundle / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["objective_overlay"] = {
-        "schema_version": "reader.response_window.objective_display_overlay.v1",
+        "schema_version": "reader.response_window.objective_display_overlay.v2",
         "objective_id": "response_magnitude_feasibility_v1",
+        "objective_display_label": "RMF",
         "claim_status": "screen_only",
         "experiment_id": "20260713_sfxi",
         "reader_design_id": "pDual-10-screen",
@@ -171,6 +174,41 @@ def test_preview_accepts_reader_screen_only_overlay_without_promoting_a_score(tm
     assert payload["rows"][0]["claim_status"] == "screen_only"
     assert "rmf" not in payload["rows"][0]
     assert "score" not in payload["rows"][0]
+
+
+@pytest.mark.parametrize("label", [" RMF", "RMF\nscore", "W" * 41])
+def test_preview_rejects_invalid_objective_display_labels(tmp_path: Path, label: str) -> None:
+    bundle, bindings = _write_reader_bundle(
+        tmp_path / "invalid-display-label",
+        candidate_id="candidate-screen",
+        design_id="pDual-10-screen",
+        experiment_id="20260713_sfxi",
+        claim_status="screen_only",
+    )
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["objective_overlay"] = {
+        "schema_version": "reader.response_window.objective_display_overlay.v2",
+        "objective_id": "response_magnitude_feasibility_v1",
+        "objective_display_label": label,
+        "claim_status": "screen_only",
+        "experiment_id": "20260713_sfxi",
+        "reader_design_id": "pDual-10-screen",
+        "reduction_id": "event_logmean_6_12h_post",
+        "manifest_sha256": "sha256:" + "5" * 64,
+        "components": [
+            {
+                "component_id": "on_fluorescence_floor",
+                "label": "ON fluorescence floor",
+                "value": 1.25,
+                "unit": "log2 ratio",
+            }
+        ],
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReaderPromoterEvidenceError, match="display label"):
+        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
 
 
 def test_materialize_atomically_writes_and_verifies_the_default_manifest(tmp_path: Path) -> None:
@@ -259,8 +297,9 @@ def test_preview_rejects_screen_overlay_with_more_than_six_components(tmp_path: 
     manifest_path = bundle / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["objective_overlay"] = {
-        "schema_version": "reader.response_window.objective_display_overlay.v1",
+        "schema_version": "reader.response_window.objective_display_overlay.v2",
         "objective_id": "response_magnitude_feasibility_v1",
+        "objective_display_label": "RMF",
         "claim_status": "screen_only",
         "experiment_id": "20260713_sfxi",
         "reader_design_id": "pDual-10-screen",
@@ -399,8 +438,9 @@ def test_preview_rejects_objective_overlay_identity_that_disagrees_with_selectio
     manifest_path = bundle / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["objective_overlay"] = {
-        "schema_version": "reader.response_window.objective_display_overlay.v1",
+        "schema_version": "reader.response_window.objective_display_overlay.v2",
         "objective_id": "response_magnitude_feasibility_v1",
+        "objective_display_label": "RMF",
         "claim_status": "screen_only",
         "experiment_id": "20260713_sfxi",
         "reader_design_id": "pDual-10-screen",

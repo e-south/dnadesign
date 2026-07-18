@@ -188,6 +188,7 @@ def _verify_overlay(value: object, *, claim_status: str, selection: dict[str, st
     fields = {
         "schema_version",
         "objective_id",
+        "objective_display_label",
         "claim_status",
         "experiment_id",
         "reader_design_id",
@@ -198,7 +199,7 @@ def _verify_overlay(value: object, *, claim_status: str, selection: dict[str, st
     if not isinstance(value, dict) or set(value) != fields:
         raise ReaderPromoterEvidenceError(f"Reader objective overlay fields must be exactly {sorted(fields)}.")
     if (
-        value["schema_version"] != "reader.response_window.objective_display_overlay.v1"
+        value["schema_version"] != "reader.response_window.objective_display_overlay.v2"
         or value["claim_status"] != claim_status
         or claim_status != "screen_only"
         or not _is_sha256(value["manifest_sha256"])
@@ -208,6 +209,18 @@ def _verify_overlay(value: object, *, claim_status: str, selection: dict[str, st
         )
     ):
         raise ReaderPromoterEvidenceError("Reader objective overlay identity or claim status is invalid.")
+    objective_display_label = value["objective_display_label"]
+    if (
+        not isinstance(objective_display_label, str)
+        or objective_display_label != objective_display_label.strip()
+        or not objective_display_label
+        or not objective_display_label.isprintable()
+        or len(objective_display_label) > 40
+    ):
+        raise ReaderPromoterEvidenceError(
+            "Reader objective overlay display label must be a trimmed, printable, single-line string of at most "
+            "40 characters."
+        )
     selection_fields = {
         "experiment_id": "experiment_id",
         "reader_design_id": "design_id",

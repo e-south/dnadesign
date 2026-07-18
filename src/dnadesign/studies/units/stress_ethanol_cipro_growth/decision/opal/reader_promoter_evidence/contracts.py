@@ -15,8 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v3"
+READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v4"
 READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
+# Wire identity declared by the OPAL consumer contract. The study publishes the
+# value without importing OPAL, preserving the study-to-campaign boundary.
+READER_EVIDENCE_MANIFEST_ADAPTER = "opal.reader_evidence_manifest.v1"
 READER_PROMOTER_EVIDENCE_FILENAME = "reader_evidence_promoter_response.json"
 READER_PROMOTER_EVIDENCE_MEDIA_DIR = "reader_evidence_media"
 TARGET_CAMPAIGN_SLUG = "secg_msrb_greedy"
@@ -67,6 +70,7 @@ __all__ = [
     "PROMOTER_RESPONSE_SEMANTIC_KIND",
     "READER_BUNDLE_SCHEMA_VERSION",
     "READER_EVIDENCE_SCHEMA_VERSION",
+    "READER_EVIDENCE_MANIFEST_ADAPTER",
     "READER_PROMOTER_EVIDENCE_FILENAME",
     "READER_PROMOTER_EVIDENCE_MEDIA_DIR",
     "ReaderPromoterEvidenceError",

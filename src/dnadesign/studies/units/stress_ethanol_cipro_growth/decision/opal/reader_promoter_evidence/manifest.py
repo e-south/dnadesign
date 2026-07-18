@@ -25,6 +25,7 @@ from .contracts import (
     PROMOTER_EVIDENCE_ARTIFACT_IDS,
     PROMOTER_RESPONSE_SEMANTIC_KIND,
     READER_BUNDLE_SCHEMA_VERSION,
+    READER_EVIDENCE_MANIFEST_ADAPTER,
     READER_EVIDENCE_SCHEMA_VERSION,
     READER_PROMOTER_EVIDENCE_FILENAME,
     READER_PROMOTER_EVIDENCE_MEDIA_DIR,
@@ -184,6 +185,7 @@ def _preview_from_bundles(
         raise ReaderPromoterEvidenceError("Reader promoter-evidence inputs contain a duplicate selection identity.")
     return {
         "schema_version": READER_EVIDENCE_SCHEMA_VERSION,
+        "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
         "created_at": datetime.now(UTC).isoformat(),
         "campaign_slug": TARGET_CAMPAIGN_SLUG,
         "round": round_label,

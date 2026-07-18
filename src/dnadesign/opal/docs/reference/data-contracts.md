@@ -1,7 +1,7 @@
 ## OPAL Data and Artifact Contracts v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-16
+**Last verified:** 2026-07-18
 
 ### Candidate records
 
@@ -147,6 +147,30 @@ campaigns, outputs are namespaced under
 `outputs/plots/selection_views/<view_id>/`. A generated notebook exposes one
 `Selection view` control and filters masks, scores, selections, and plot
 deliverables to that view. Shared model diagnostics are rendered once.
+
+### Reader evidence manifest adapter
+
+Reader evidence remains producer-owned. A study may keep its own
+`schema_version`, but it must opt into OPAL's notebook surface with
+`opal_adapter: opal.reader_evidence_manifest.v1`. The public adapter is a
+projection contract, not a study-schema alias.
+
+The adapter requires:
+
+- a trimmed producer `schema_version` and round label;
+- a `rows` list whose entries have a candidate or record ID, Reader design ID,
+  Reader experiment ID, and an `artifacts` list;
+- artifact entries with semantic kind, producer kind, record ID, scope, path,
+  existence flag, and media type; and
+- an exact five-field summary: row count, distinct ID count, Reader experiment
+  count, artifact count, and rows with missing artifact evidence.
+
+OPAL recomputes every summary count from the projected rows. Missing or
+duplicated artifact identities, malformed fields, non-boolean existence flags,
+and count drift reject the adapter before notebook discovery. Producer-specific
+assay semantics, candidate identity, artifact digests, and scientific claims
+remain in their owning contracts; the adapter only defines the common evidence
+shape OPAL is allowed to display.
 
 ### Validation
 

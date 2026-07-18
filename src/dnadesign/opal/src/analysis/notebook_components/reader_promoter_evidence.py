@@ -17,9 +17,13 @@ import re
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
+from dnadesign.opal.api.reader_evidence import (
+    ReaderEvidenceManifestAdapterError,
+    parse_reader_evidence_manifest_adapter,
+)
+
 PROMOTER_RESPONSE_EVIDENCE_SEMANTIC_KIND = "promoter_response_evidence"
-PROMOTER_EVIDENCE_BUNDLE_RECORD_ID = "reader.response_window.promoter_evidence_bundle.v3"
-READER_PROMOTER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
+PROMOTER_EVIDENCE_BUNDLE_RECORD_ID = "reader.response_window.promoter_evidence_bundle.v4"
 READER_PROMOTER_EVIDENCE_MAX_BYTES = 32 * 1024 * 1024
 
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
@@ -138,11 +142,13 @@ def _verify_publication_manifest_binding(row: Mapping[str, Any], *, manifest_pat
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise ReaderPromoterEvidenceIntegrityError(f"Promoter display manifest is not valid JSON: {exc}") from exc
-    if not isinstance(payload, dict) or payload.get("schema_version") != READER_PROMOTER_EVIDENCE_SCHEMA_VERSION:
-        raise ReaderPromoterEvidenceIntegrityError("Promoter display manifest schema is invalid.")
-    publication_rows = payload.get("rows")
-    if not isinstance(publication_rows, list):
-        raise ReaderPromoterEvidenceIntegrityError("Promoter display manifest rows are malformed.")
+    try:
+        projection = parse_reader_evidence_manifest_adapter(payload)
+    except ReaderEvidenceManifestAdapterError as exc:
+        raise ReaderPromoterEvidenceIntegrityError(
+            f"Promoter display manifest Reader adapter is invalid: {exc}"
+        ) from exc
+    publication_rows = projection.rows
     matches: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
     for publication_row in publication_rows:
         if not isinstance(publication_row, Mapping):
@@ -206,7 +212,6 @@ def _verify_digest(path: Path, *, expected: object, label: str) -> None:
 
 __all__ = [
     "PROMOTER_RESPONSE_EVIDENCE_SEMANTIC_KIND",
-    "READER_PROMOTER_EVIDENCE_SCHEMA_VERSION",
     "READER_PROMOTER_EVIDENCE_MAX_BYTES",
     "ReaderPromoterEvidenceIntegrityError",
     "is_reader_promoter_evidence_artifact",

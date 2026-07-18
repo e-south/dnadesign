@@ -15,6 +15,11 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from dnadesign.opal.api.reader_evidence import (
+    ReaderEvidenceManifestAdapterError,
+    parse_reader_evidence_manifest_adapter,
+)
+
 from ._support import compact_path, mapping, sequence
 from .reader_evidence_media import (
     dedupe_reader_media_labels,
@@ -25,13 +30,6 @@ from .reader_evidence_media import (
     time_selected_label,
 )
 from .reader_evidence_visual import render_notebook_reader_evidence_artifact_visual
-
-READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_evidence.v1"
-READER_PROMOTER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
-_READER_EVIDENCE_SCHEMA_VERSIONS = {
-    READER_EVIDENCE_SCHEMA_VERSION,
-    READER_PROMOTER_EVIDENCE_SCHEMA_VERSION,
-}
 
 
 def discover_reader_evidence_manifests(workdir: str | Path) -> list[dict[str, Any]]:
@@ -51,9 +49,13 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
     rows: list[dict[str, Any]] = []
     for manifest_path in sorted(root.glob("inputs/r*/reader_evidence*.json")):
         payload = _read_payload(manifest_path)
-        if payload is None or payload.get("schema_version") not in _READER_EVIDENCE_SCHEMA_VERSIONS:
+        if payload is None:
             continue
-        for evidence_row in sequence(payload.get("rows")):
+        try:
+            projection = parse_reader_evidence_manifest_adapter(payload)
+        except ReaderEvidenceManifestAdapterError:
+            continue
+        for evidence_row in projection.rows:
             item = mapping(evidence_row)
             for artifact in sequence(item.get("artifacts")):
                 artifact_item = mapping(artifact)
@@ -61,7 +63,7 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                 semantic_kind = str(artifact_item.get("semantic_kind") or "artifact")
                 design_id = str(item.get("design_id") or "")
                 reader_experiment_id = str(item.get("reader_experiment_id") or "")
-                round_label = str(payload.get("round") or _round_label(manifest_path))
+                round_label = projection.round_label
                 plot_type_label = semantic_kind_label(semantic_kind)
                 artifact_label = " | ".join(
                     part
@@ -297,12 +299,14 @@ def _reader_evidence_manifest_row(path: Path, *, workdir: Path) -> dict[str, Any
     payload = _read_payload(path)
     if payload is None:
         return {**row, "status": "read_error"}
-    if payload.get("schema_version") not in _READER_EVIDENCE_SCHEMA_VERSIONS:
+    try:
+        projection = parse_reader_evidence_manifest_adapter(payload)
+    except ReaderEvidenceManifestAdapterError:
         return {**row, "status": "schema_attention"}
-    summary = mapping(payload.get("summary"))
+    summary = projection.summary
     row.update(
         {
-            "round": str(payload.get("round") or round_label),
+            "round": projection.round_label,
             "rows": int(summary.get("rows") or 0),
             "distinct_ids": int(summary.get("distinct_ids") or 0),
             "reader_experiments": int(summary.get("reader_experiments") or 0),
@@ -328,8 +332,6 @@ def _round_label(path: Path) -> str:
 
 
 __all__ = [
-    "READER_EVIDENCE_SCHEMA_VERSION",
-    "READER_PROMOTER_EVIDENCE_SCHEMA_VERSION",
     "build_notebook_reader_evidence_artifact_rows",
     "build_notebook_reader_evidence_artifact_options",
     "build_notebook_reader_evidence_plot_type_options",

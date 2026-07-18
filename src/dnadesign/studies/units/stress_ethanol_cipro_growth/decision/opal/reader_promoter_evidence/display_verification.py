@@ -18,6 +18,7 @@ from typing import Any
 
 from .contracts import (
     PROMOTER_EVIDENCE_ARTIFACT_IDS,
+    READER_EVIDENCE_MANIFEST_ADAPTER,
     READER_EVIDENCE_SCHEMA_VERSION,
     TARGET_CAMPAIGN_SLUG,
     ReaderPromoterEvidenceError,
@@ -25,7 +26,15 @@ from .contracts import (
 )
 from .display_artifact_verification import is_sha256, verify_display_artifact
 
-_DISPLAY_MANIFEST_FIELDS = {"schema_version", "created_at", "campaign_slug", "round", "summary", "rows"}
+_DISPLAY_MANIFEST_FIELDS = {
+    "schema_version",
+    "opal_adapter",
+    "created_at",
+    "campaign_slug",
+    "round",
+    "summary",
+    "rows",
+}
 _DISPLAY_SUMMARY_FIELDS = {"rows", "distinct_ids", "reader_experiments", "artifact_count", "missing_artifact_rows"}
 _DISPLAY_ROW_FIELDS = {
     "id",
@@ -81,6 +90,8 @@ def verify_reader_promoter_evidence_manifest(path: Path) -> ReaderPromoterEviden
         )
     if payload["schema_version"] != READER_EVIDENCE_SCHEMA_VERSION:
         raise ReaderPromoterEvidenceError(f"Reader display manifest must use {READER_EVIDENCE_SCHEMA_VERSION!r}.")
+    if payload["opal_adapter"] != READER_EVIDENCE_MANIFEST_ADAPTER:
+        raise ReaderPromoterEvidenceError(f"Reader display opal_adapter must use {READER_EVIDENCE_MANIFEST_ADAPTER!r}.")
     _display_created_at(payload["created_at"])
     if payload["campaign_slug"] != TARGET_CAMPAIGN_SLUG:
         raise ReaderPromoterEvidenceError(f"Reader display campaign_slug must be {TARGET_CAMPAIGN_SLUG!r}.")
