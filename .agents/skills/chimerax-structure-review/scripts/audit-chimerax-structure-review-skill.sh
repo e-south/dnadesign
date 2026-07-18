@@ -143,7 +143,7 @@ else
   fail "ChimeraX source provenance is incomplete"
 fi
 
-if grep -q 'open -n -a "$CHIMERAX_APP"' "$SCRIPT_DIR/chimerax-session-start.sh" \
+if grep -q 'open -n -a "$CHIMERAX_APP" --stdin /dev/null --stdout "$CHIMERAX_LOG" --stderr "$CHIMERAX_LOG"' "$SCRIPT_DIR/chimerax-session-start.sh" \
   && grep -q 'nohup "$CHIMERAX_BIN_RESOLVED" --script "$START_SCRIPT" </dev/null' "$SCRIPT_DIR/chimerax-session-start.sh" \
   && grep -q 'lsof -tiTCP:"$PORT" -sTCP:LISTEN' "$SCRIPT_DIR/chimerax-session-start.sh"; then
   pass "graphical session launcher uses detached platform paths and resolves the REST owner"

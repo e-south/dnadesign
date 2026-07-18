@@ -132,7 +132,7 @@ fi
 CHIMERAX_PID=""
 if [[ "$(uname -s)" == "Darwin" && "$CHIMERAX_BIN_RESOLVED" == *.app/Contents/MacOS/* ]]; then
   CHIMERAX_APP="${CHIMERAX_BIN_RESOLVED%%.app/Contents/MacOS/*}.app"
-  open -n -a "$CHIMERAX_APP" -i /dev/null -o "$CHIMERAX_LOG" --stderr "$CHIMERAX_LOG" \
+  open -n -a "$CHIMERAX_APP" --stdin /dev/null --stdout "$CHIMERAX_LOG" --stderr "$CHIMERAX_LOG" \
     --args --script "$START_SCRIPT"
 else
   nohup "$CHIMERAX_BIN_RESOLVED" --script "$START_SCRIPT" </dev/null >"$CHIMERAX_LOG" 2>&1 &
