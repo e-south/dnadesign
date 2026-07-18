@@ -38,6 +38,7 @@ from .multistate_response_behavior_data import (
     OFF_SIGNAL_SUPPRESSION_FAMILY_REF,
     ON_SIGNAL_FAMILY_REF,
     RESPONSE_FAMILY_REF,
+    SELECTED_COORDINATE_DETAIL_SCOPE,
     load_multistate_response_behavior_plot_data,
 )
 from .multistate_response_behavior_support import (
@@ -118,8 +119,13 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
     from matplotlib.patches import Rectangle
 
     apply_plot_style()
-    data = load_multistate_response_behavior_plot_data(context)
-    selected = data.frame.loc[data.frame["view__is_selected"]].copy()
+    data = load_multistate_response_behavior_plot_data(
+        context,
+        detail_scope=SELECTED_COORDINATE_DETAIL_SCOPE,
+    )
+    selected = data.selected_coordinate_frame
+    if selected is None:
+        raise ValueError("Behavior decomposition requires selected-coordinate detail.")
     if selected.empty:
         raise ValueError("Behavior decomposition has no allocated candidates.")
     max_selected = nonnegative_int(params.get("max_selected", 24), name="max_selected")

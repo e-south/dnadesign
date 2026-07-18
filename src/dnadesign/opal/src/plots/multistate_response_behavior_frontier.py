@@ -47,6 +47,7 @@ from .multistate_response_behavior_data import (
     OFF_SIGNAL_SUPPRESSION_FAMILY_REF,
     ON_SIGNAL_FAMILY_REF,
     RESPONSE_FAMILY_REF,
+    SUMMARY_DETAIL_SCOPE,
     load_multistate_response_behavior_plot_data,
 )
 from .multistate_response_behavior_support import (
@@ -166,7 +167,7 @@ def render_family_frontier(context: Any, params: dict) -> None:
     from matplotlib.lines import Line2D
 
     apply_plot_style()
-    data = load_multistate_response_behavior_plot_data(context)
+    data = load_multistate_response_behavior_plot_data(context, detail_scope=SUMMARY_DETAIL_SCOPE)
     frame = data.frame
     observed = data.observed_frame
     response_label = nonempty(

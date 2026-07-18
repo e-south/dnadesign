@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -38,6 +38,9 @@ HARD_BOTTLENECK_REF = "hard_bottleneck_clearance"
 RESPONSE_FAMILY_REF = "response_family_score"
 ON_SIGNAL_FAMILY_REF = "on_signal_family_score"
 OFF_SIGNAL_SUPPRESSION_FAMILY_REF = "off_signal_suppression_family_score"
+SUMMARY_DETAIL_SCOPE = "summary"
+SELECTED_COORDINATE_DETAIL_SCOPE = "selected_coordinates"
+PlotDetailScope = Literal["summary", "selected_coordinates"]
 
 
 @dataclass(frozen=True)
@@ -52,10 +55,21 @@ class MultistateResponseBehaviorPlotData:
     coordinate_labels: tuple[str, ...]
     round_k: int
     run_id: str
+    selected_coordinate_frame: pd.DataFrame | None = None
 
 
-def load_multistate_response_behavior_plot_data(context: Any) -> MultistateResponseBehaviorPlotData:
-    """Load one behavior-objective run and replay its public mathematics."""
+def load_multistate_response_behavior_plot_data(
+    context: Any,
+    *,
+    detail_scope: PlotDetailScope = SUMMARY_DETAIL_SCOPE,
+) -> MultistateResponseBehaviorPlotData:
+    """Load one behavior-objective run with explicitly scoped coordinate detail."""
+
+    if detail_scope not in {SUMMARY_DETAIL_SCOPE, SELECTED_COORDINATE_DETAIL_SCOPE}:
+        raise OpalError(
+            "Behavior plot detail_scope must be 'summary' or 'selected_coordinates'.",
+            ExitCodes.BAD_ARGS,
+        )
 
     outputs_dir = resolve_outputs_dir(context)
     runs = read_runs(outputs_dir / "ledger" / "runs.parquet")
@@ -115,7 +129,21 @@ def load_multistate_response_behavior_plot_data(context: Any) -> MultistateRespo
         target_mask=target_mask,
         normalization=normalization,
     )
-    coordinate_labels = _single_coordinate_labels(frame, observed_frame)
+    coordinate_labels = _coordinate_labels(
+        state_ids=state_ids,
+        target_mask=target_mask,
+        normalization=normalization,
+    )
+    selected_coordinate_frame = None
+    if detail_scope == SELECTED_COORDINATE_DETAIL_SCOPE:
+        selected_coordinate_frame = _selected_coordinate_frame(
+            frame,
+            state_ids=state_ids,
+            target_mask=target_mask,
+            normalization=normalization,
+            coordinate_labels=coordinate_labels,
+        )
+    frame = frame.drop(columns=["pred__y_hat_model"])
     return MultistateResponseBehaviorPlotData(
         frame=frame,
         observed_frame=observed_frame,
@@ -125,6 +153,7 @@ def load_multistate_response_behavior_plot_data(context: Any) -> MultistateRespo
         coordinate_labels=coordinate_labels,
         round_k=round_k,
         run_id=run_id,
+        selected_coordinate_frame=selected_coordinate_frame,
     )
 
 
@@ -262,23 +291,33 @@ def _score(
         raise OpalError(f"{context} violate the objective contract: {exc}", ExitCodes.CONTRACT_VIOLATION) from exc
 
 
-def _attach_scored_columns(frame: pd.DataFrame, scored: Any) -> None:
+def _attach_scored_columns(
+    frame: pd.DataFrame,
+    scored: Any,
+    *,
+    include_coordinate_detail: bool = False,
+) -> None:
     frame[BEHAVIOR_SCORE_REF] = np.asarray(scored.behavior_score, dtype=float)
     frame[HARD_BOTTLENECK_REF] = np.asarray(scored.hard_bottleneck_clearance, dtype=float)
     frame[RESPONSE_FAMILY_REF] = np.asarray(scored.response_family_score, dtype=float)
     frame[ON_SIGNAL_FAMILY_REF] = np.asarray(scored.on_signal_family_score, dtype=float)
     frame[OFF_SIGNAL_SUPPRESSION_FAMILY_REF] = np.asarray(scored.off_signal_suppression_family_score, dtype=float)
-    frame["coordinate_clearances"] = [row.tolist() for row in scored.coordinate_clearances]
-    frame["coordinate_weights"] = [row.tolist() for row in scored.coordinate_weights]
-    frame["coordinate_labels"] = [list(scored.coordinate_labels) for _ in range(len(frame))]
-    frame["limiting_coordinate_index"] = np.asarray(scored.limiting_coordinate_index, dtype=int)
-    frame["limiting_coordinate_label"] = list(scored.limiting_coordinate_label)
+    if include_coordinate_detail:
+        frame["coordinate_clearances"] = [row.tolist() for row in scored.coordinate_clearances]
+        frame["coordinate_weights"] = [row.tolist() for row in scored.coordinate_weights]
+        frame["coordinate_labels"] = [list(scored.coordinate_labels) for _ in range(len(frame))]
+    limiting_indices = np.asarray(scored.limiting_coordinate_index, dtype=int)
+    frame["limiting_coordinate_index"] = limiting_indices
+    frame["limiting_coordinate_label"] = pd.Categorical.from_codes(
+        limiting_indices,
+        categories=list(scored.coordinate_labels),
+    )
     frame["all_reference_directions_met"] = np.asarray(scored.all_reference_directions_met, dtype=bool)
 
 
 def _vector_matrix(values: pd.Series, *, context: str) -> np.ndarray:
     try:
-        matrix = np.asarray([list(value) for value in values], dtype=float)
+        matrix = np.asarray(values.tolist(), dtype=float)
     except (TypeError, ValueError) as exc:
         raise OpalError(f"{context} must be finite numeric vectors.", ExitCodes.CONTRACT_VIOLATION) from exc
     return matrix
@@ -321,11 +360,46 @@ def _parse_behavior_score_channel(payload: object, *, selection_view_id: str) ->
     return parsed[BEHAVIOR_SCORE_REF]
 
 
-def _single_coordinate_labels(*frames: pd.DataFrame) -> tuple[str, ...]:
-    labels = {tuple(str(value) for value in raw) for frame in frames for raw in frame["coordinate_labels"].tolist()}
-    if len(labels) != 1:
+def _coordinate_labels(
+    *,
+    state_ids: Sequence[str],
+    target_mask: Sequence[int | float],
+    normalization: Mapping[str, object],
+) -> tuple[str, ...]:
+    state_count = len(state_ids)
+    scored = _score(
+        np.zeros((1, 2 * state_count), dtype=float),
+        state_ids=state_ids,
+        target_mask=target_mask,
+        normalization=normalization,
+        context="Behavior coordinate contract",
+    )
+    return tuple(str(value) for value in scored.coordinate_labels)
+
+
+def _selected_coordinate_frame(
+    frame: pd.DataFrame,
+    *,
+    state_ids: Sequence[str],
+    target_mask: Sequence[int | float],
+    normalization: Mapping[str, object],
+    coordinate_labels: Sequence[str],
+) -> pd.DataFrame:
+    selected = frame.loc[frame["view__is_selected"]].copy()
+    if selected.empty:
+        return selected
+    scored = _score(
+        _vector_matrix(selected["pred__y_hat_model"], context="selected behavior prediction vectors"),
+        state_ids=state_ids,
+        target_mask=target_mask,
+        normalization=normalization,
+        context="Selected behavior prediction vectors",
+    )
+    scored_labels = tuple(str(value) for value in scored.coordinate_labels)
+    if scored_labels != tuple(coordinate_labels):
         raise OpalError("Behavior coordinate labels drifted within one run.", ExitCodes.CONTRACT_VIOLATION)
-    return next(iter(labels))
+    _attach_scored_columns(selected, scored, include_coordinate_detail=True)
+    return selected.drop(columns=["pred__y_hat_model"]).reset_index(drop=True)
 
 
 def _single_run_row(
@@ -396,7 +470,10 @@ __all__ = [
     "OBJECTIVE_NAME",
     "OFF_SIGNAL_SUPPRESSION_FAMILY_REF",
     "ON_SIGNAL_FAMILY_REF",
+    "PlotDetailScope",
     "RESPONSE_FAMILY_REF",
+    "SELECTED_COORDINATE_DETAIL_SCOPE",
+    "SUMMARY_DETAIL_SCOPE",
     "MultistateResponseBehaviorPlotData",
     "load_multistate_response_behavior_plot_data",
     "multistate_response_behavior_observed_frame",

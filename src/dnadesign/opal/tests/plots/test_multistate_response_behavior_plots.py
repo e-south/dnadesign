@@ -33,7 +33,9 @@ from dnadesign.opal.src.plots.multistate_response_behavior_data import (
     OFF_SIGNAL_SUPPRESSION_FAMILY_REF,
     ON_SIGNAL_FAMILY_REF,
     RESPONSE_FAMILY_REF,
+    SELECTED_COORDINATE_DETAIL_SCOPE,
     MultistateResponseBehaviorPlotData,
+    _selected_coordinate_frame,
     load_multistate_response_behavior_plot_data,
     multistate_response_behavior_observed_frame,
     multistate_response_behavior_plot_frame,
@@ -105,27 +107,36 @@ def _plot_data() -> MultistateResponseBehaviorPlotData:
         target_mask=TARGET_MASK,
         normalization=NORMALIZATION,
     )
+    frame = multistate_response_behavior_plot_frame(
+        _prediction_events(),
+        state_ids=STATE_IDS,
+        target_mask=TARGET_MASK,
+        normalization=NORMALIZATION,
+        selection_view_id="stress-a",
+    )
+    coordinate_labels = (
+        "response:stress-a>baseline",
+        "response:stress-a>stress-b",
+        "on_signal:stress-a",
+        "off_signal_suppression:baseline",
+        "off_signal_suppression:stress-b",
+    )
     return MultistateResponseBehaviorPlotData(
-        frame=multistate_response_behavior_plot_frame(
-            _prediction_events(),
-            state_ids=STATE_IDS,
-            target_mask=TARGET_MASK,
-            normalization=NORMALIZATION,
-            selection_view_id="stress-a",
-        ),
+        frame=frame,
         observed_frame=observed,
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
         normalization=NORMALIZATION,
-        coordinate_labels=(
-            "response:stress-a>baseline",
-            "response:stress-a>stress-b",
-            "on_signal:stress-a",
-            "off_signal_suppression:baseline",
-            "off_signal_suppression:stress-b",
-        ),
+        coordinate_labels=coordinate_labels,
         round_k=0,
         run_id="r0",
+        selected_coordinate_frame=_selected_coordinate_frame(
+            frame,
+            state_ids=STATE_IDS,
+            target_mask=TARGET_MASK,
+            normalization=NORMALIZATION,
+            coordinate_labels=coordinate_labels,
+        ),
     )
 
 
@@ -221,13 +232,56 @@ def test_behavior_plot_loader_uses_run_pinned_observed_events(
     context = _context(tmp_path, filename="review.png", save_data=False)
     context.run_id = None
 
-    data = load_multistate_response_behavior_plot_data(context)
+    data = load_multistate_response_behavior_plot_data(context, detail_scope="summary")
 
     assert data.run_id == "r0"
     assert data.observed_frame["id"].tolist() == ["observed-a"]
     assert data.observed_frame["batch_id"].tolist() == ["pre-round-0"]
+    assert data.selected_coordinate_frame is None
+    coordinate_object_columns = {
+        "coordinate_clearances",
+        "coordinate_weights",
+        "coordinate_labels",
+    }
+    assert coordinate_object_columns.isdisjoint(data.frame.columns)
+    assert coordinate_object_columns.isdisjoint(data.observed_frame.columns)
+    assert "pred__y_hat_model" not in data.frame.columns
     assert context.data_paths["run_observed_events_parquet"] == labels_path.resolve()
     assert not (outputs_dir / "ledger" / "labels.parquet").exists()
+
+    detailed = load_multistate_response_behavior_plot_data(
+        context,
+        detail_scope=SELECTED_COORDINATE_DETAIL_SCOPE,
+    )
+    assert detailed.selected_coordinate_frame is not None
+    assert detailed.selected_coordinate_frame["id"].tolist() == ["selected-a", "selected-b"]
+    assert coordinate_object_columns <= set(detailed.selected_coordinate_frame.columns)
+    assert coordinate_object_columns.isdisjoint(detailed.frame.columns)
+    assert "pred__y_hat_model" not in detailed.frame.columns
+    assert "pred__y_hat_model" not in detailed.selected_coordinate_frame.columns
+    expected_selected = score_multistate_response_behavior(
+        VECTORS[:2],
+        state_ids=STATE_IDS,
+        target_mask=TARGET_MASK,
+        normalization=NORMALIZATION,
+    )
+    np.testing.assert_allclose(
+        np.asarray(detailed.selected_coordinate_frame["coordinate_clearances"].tolist()),
+        expected_selected.coordinate_clearances,
+    )
+    np.testing.assert_allclose(
+        np.asarray(detailed.selected_coordinate_frame["coordinate_weights"].tolist()),
+        expected_selected.coordinate_weights,
+    )
+    assert all(
+        tuple(labels) == expected_selected.coordinate_labels
+        for labels in detailed.selected_coordinate_frame["coordinate_labels"]
+    )
+
+
+def test_behavior_plot_loader_rejects_unknown_detail_scope_before_io() -> None:
+    with pytest.raises(OpalError, match="detail_scope"):
+        load_multistate_response_behavior_plot_data(object(), detail_scope="all_coordinates")  # type: ignore[arg-type]
 
 
 def test_behavior_plot_frame_replays_public_math_and_rejects_persisted_score_drift() -> None:
@@ -245,11 +299,21 @@ def test_behavior_plot_frame_replays_public_math_and_rejects_persisted_score_dri
         RESPONSE_FAMILY_REF,
         ON_SIGNAL_FAMILY_REF,
         OFF_SIGNAL_SUPPRESSION_FAMILY_REF,
-        "coordinate_clearances",
-        "coordinate_weights",
         "limiting_coordinate_label",
         "all_reference_directions_met",
     } <= set(frame)
+    assert {
+        "coordinate_clearances",
+        "coordinate_weights",
+        "coordinate_labels",
+    }.isdisjoint(frame.columns)
+    expected = score_multistate_response_behavior(
+        VECTORS,
+        state_ids=STATE_IDS,
+        target_mask=TARGET_MASK,
+        normalization=NORMALIZATION,
+    )
+    assert frame["limiting_coordinate_label"].astype(str).tolist() == list(expected.limiting_coordinate_label)
     with pytest.raises(OpalError, match="canonical objective math"):
         multistate_response_behavior_plot_frame(
             _prediction_events(drift=0.1),
@@ -350,7 +414,11 @@ def test_behavior_plot_renderers_write_media_and_tidy_data(
     filename: str,
     tidy_columns: set[str],
 ) -> None:
-    monkeypatch.setattr(renderer_module, "load_multistate_response_behavior_plot_data", lambda _context: _plot_data())
+    monkeypatch.setattr(
+        renderer_module,
+        "load_multistate_response_behavior_plot_data",
+        lambda _context, **_kwargs: _plot_data(),
+    )
     context = _context(tmp_path, filename=filename, save_data=True)
 
     renderer(context, {})
@@ -366,7 +434,11 @@ def test_behavior_frontier_declares_reference_semantics_without_feasibility_guid
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: list[plt.Figure] = []
-    monkeypatch.setattr(frontier_plot, "load_multistate_response_behavior_plot_data", lambda _context: _plot_data())
+    monkeypatch.setattr(
+        frontier_plot,
+        "load_multistate_response_behavior_plot_data",
+        lambda _context, **_kwargs: _plot_data(),
+    )
     monkeypatch.setattr(frontier_plot, "save_figure", lambda _context, figure: captured.append(figure))
     monkeypatch.setattr(plt, "close", lambda _figure: None)
     context = _context(tmp_path, filename="frontier.png", save_data=False)
@@ -401,7 +473,11 @@ def test_behavior_frontier_uses_compact_static_observed_batch_labels(
     captured: list[plt.Figure] = []
     data = _plot_data()
     data.observed_frame.loc[:, "batch_key"] = "pre_round0_response_corpus_4_8h_v1"
-    monkeypatch.setattr(frontier_plot, "load_multistate_response_behavior_plot_data", lambda _context: data)
+    monkeypatch.setattr(
+        frontier_plot,
+        "load_multistate_response_behavior_plot_data",
+        lambda _context, **_kwargs: data,
+    )
     monkeypatch.setattr(frontier_plot, "save_figure", lambda _context, figure: captured.append(figure))
     monkeypatch.setattr(plt, "close", lambda _figure: None)
     context = _context(tmp_path, filename="frontier.png", save_data=False)
@@ -420,7 +496,11 @@ def test_behavior_frontier_wraps_long_target_context_inside_figure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: list[plt.Figure] = []
-    monkeypatch.setattr(frontier_plot, "load_multistate_response_behavior_plot_data", lambda _context: _plot_data())
+    monkeypatch.setattr(
+        frontier_plot,
+        "load_multistate_response_behavior_plot_data",
+        lambda _context, **_kwargs: _plot_data(),
+    )
     monkeypatch.setattr(frontier_plot, "save_figure", lambda _context, figure: captured.append(figure))
     monkeypatch.setattr(plt, "close", lambda _figure: None)
     context = _context(tmp_path, filename="frontier.png", save_data=False)
@@ -452,8 +532,12 @@ def test_behavior_frontier_wraps_long_target_context_inside_figure(
 
 
 def test_behavior_decomposition_is_k_state_and_marks_only_coordinate_bottlenecks() -> None:
-    selected = _plot_data().frame.loc[lambda frame: frame["view__is_selected"]]
-    tidy = decomposition_plot.decomposition_tidy(selected, coordinate_labels=_plot_data().coordinate_labels)
+    data = _plot_data()
+    assert data.selected_coordinate_frame is not None
+    tidy = decomposition_plot.decomposition_tidy(
+        data.selected_coordinate_frame,
+        coordinate_labels=data.coordinate_labels,
+    )
 
     coordinates = tidy.loc[tidy["component_kind"].eq("coordinate")]
     assert coordinates.groupby("id").size().to_dict() == {"selected-a": 5, "selected-b": 5}
@@ -469,7 +553,7 @@ def test_behavior_decomposition_uses_msrb_symbols_and_compact_colorbar(
     monkeypatch.setattr(
         decomposition_plot,
         "load_multistate_response_behavior_plot_data",
-        lambda _context: _plot_data(),
+        lambda _context, **_kwargs: _plot_data(),
     )
     monkeypatch.setattr(decomposition_plot, "save_figure", lambda _context, figure: captured.append(figure))
     monkeypatch.setattr(plt, "close", lambda _figure: None)
