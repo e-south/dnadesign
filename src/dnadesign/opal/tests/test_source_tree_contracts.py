@@ -38,7 +38,7 @@ def test_checked_in_campaigns_are_explicit_modern_surfaces() -> None:
         "demo_gp_ei": ("opal_demo", "demo", "runnable"),
         "demo_gp_topn": ("opal_demo", "demo", "runnable"),
         "demo_rf_sfxi_topn": ("opal_demo", "demo", "runnable"),
-        "secg_rmf_greedy": ("study_campaign", "study", "round0_complete"),
+        "secg_msrb_greedy": ("study_campaign", "study", "round0_complete"),
     }
 
     actual: dict[str, tuple[str, str, str]] = {}
@@ -66,13 +66,16 @@ def test_campaign_index_declares_routing_frontmatter() -> None:
     assert frontmatter["status"] == "active"
 
 
-def test_current_stress_campaign_config_has_no_sfxi_metric_or_brightness_aliases() -> None:
-    config_path = OPAL_ROOT / "campaigns" / "secg_rmf_greedy" / "configs" / "campaign.yaml"
+def test_current_stress_campaign_config_has_one_msrb_objective_and_neutral_y_identity() -> None:
+    config_path = OPAL_ROOT / "campaigns" / "secg_msrb_greedy" / "configs" / "campaign.yaml"
     text = config_path.read_text(encoding="utf-8").lower()
 
     assert "sfxi" not in text
     assert "vec8" not in text
     assert "brightness" not in text
+    assert "rmf" not in text
+    assert text.count("name: multistate_response_behavior_v1") == 3
+    assert 'y_column_name: "opal__reader_response_window_vector_v1__y"' in text
     assert "stress_promoter_insert:v1" in text
 
 

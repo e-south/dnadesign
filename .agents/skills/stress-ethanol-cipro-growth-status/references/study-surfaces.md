@@ -53,10 +53,13 @@ Keep ownership boundaries clear.
   OPAL owns canonical SFXI math; the metastudy owns stress setpoints, policy
   comparisons, model validation, and generated review evidence. Do not
   reconstruct its verdict from loose plot files.
-- The successor-metric decision record is
-  `contexts/opal/response-magnitude-feasibility.md`. OPAL owns the generic
+- The active metric decision record is
+  `contexts/opal/multistate-response-behavior.md`. OPAL owns the generic MSRB
   objective; Reader owns event-relative assay reduction; the study owns masks,
-  calibration evidence, and activation posture.
+  normalization, the source protocol, activation audit, and synthesis posture.
+- `contexts/opal/response-magnitude-feasibility.md` documents the frozen RMF
+  comparator. Its config and run evidence stay under the study workbench and
+  are not an executable campaign route.
 
 ## Study-Owned Source Routing
 

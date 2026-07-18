@@ -1,0 +1,207 @@
+{
+  "schema_id": "stress_ethanol_cipro_growth.multistate_response_behavior_activation_audit.v1",
+  "schema_version": "1",
+  "audit_id": "secg_msrb_learning_probe_activation_20260718",
+  "completed_at": "2026-07-18T17:24:47Z",
+  "study_id": "stress_ethanol_cipro_growth",
+  "protocol_id": "secg_msrb_learning_probe_v1",
+  "objective_id": "multistate_response_behavior_v1",
+  "status": "pass_with_bounded_authorization",
+  "decision": {
+    "semantic_and_mathematical_alignment": {
+      "verdict": "go",
+      "scope": "MSRB is the primary ranking objective for the declared stress-promoter target masks.",
+      "basis": "The three equally weighted requirement families match response ordering, intended-ON signal, and intended-OFF suppression, and every improvement in a desired direction contributes to the score."
+    },
+    "active_learning_probe": {
+      "verdict": "go",
+      "authorization_basis": "explicit_study_signoff",
+      "scope": "One prospectively frozen greedy learning probe using the declared response-window Y contract, normalization, model, target masks, and allocation rule.",
+      "boundary": "Activation authorizes measurement of a frozen ranking policy; it is not evidence that the policy enriches or hill-climbs."
+    },
+    "prospective_hill_climb_efficacy": {
+      "verdict": "unknown",
+      "required_evidence": "Predictions frozen before measurements across prospective rounds, with raw-Y fidelity and within-view enrichment evaluated after each round."
+    },
+    "synthesis_authorization": {
+      "verdict": "no_go",
+      "owner": "stress_ethanol_cipro_growth",
+      "reason": "An OPAL allocation and this metric decision do not authorize ordering or synthesis."
+    }
+  },
+  "prior_shadow_decision": {
+    "protocol_id": "secg_multistate_response_behavior_shadow_v1",
+    "status": "shadow_only",
+    "campaign_disposition": "no_go",
+    "superseded_claims": [],
+    "reconciliation": "The shadow no-go remains authoritative for claims of superior hill-climbing and synthesis. The separately approved active protocol authorizes only a prospectively frozen greedy learning probe.",
+    "evidence": {
+      "manifest": {
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/manifest.json",
+        "sha256": "76d07a05e341dd4ad4d5a43d721bcf0834de902662f85452f5ea57777c578c64"
+      },
+      "decision": {
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/decision.json",
+        "sha256": "f1e81a750ce99efae6c6cac4ed50423ae7db89b49a70662cfab6632971fa49ef"
+      },
+      "independent_adversarial_audit": {
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/independent_adversarial_audit.json",
+        "sha256": "7f33bb0c18d84db1ddcccfea8cc0be74ec1a7b75a0f1982159db64747ebec169"
+      }
+    }
+  },
+  "independent_adversarial_review": {
+    "reviewer_type": "automated_codex_subagent",
+    "independence": "separately tasked read-only reimplementation and contract review",
+    "external_human_peer_review": false,
+    "cryptographic_signature": false,
+    "result": "pass_with_claim_boundaries",
+    "oracle_reimplementation": {
+      "random_case_count": 60000,
+      "discrepancy_count": 0,
+      "active_view_ids": [
+        "ethanol",
+        "ciprofloxacin",
+        "and"
+      ],
+      "exact_matches": [
+        "state_level_clearances",
+        "coordinate_prior_weights",
+        "behavior_score",
+        "bottleneck_weights"
+      ],
+      "normalization_covariance_max_abs_difference": 5.68e-14,
+      "compensation_bound_maximum_numerical_excess": 2.22e-15,
+      "scope": "independent score and diagnostic replay over random active-mask candidate-view inputs"
+    },
+    "property_suite": {
+      "path": "src/dnadesign/opal/tests/objectives/test_objective_multistate_response_behavior_v1.py",
+      "independent_reviewed_collection_count": 75,
+      "collected_test_count": 78,
+      "post_review_hardening": "Extreme-input nondecrease regression cases were added after the read-only audit and included in the final passing collection.",
+      "result": "pass",
+      "properties": [
+        "strict directional monotonicity in finite assay-relevant ranges",
+        "Pareto-dominance preservation",
+        "joint state-permutation equivariance",
+        "equal one-third family standing",
+        "active target-mask differentiation",
+        "finite extreme-input arithmetic",
+        "normalization covariance",
+        "analytic compensation bounds"
+      ]
+    },
+    "independent_extreme_input_probe": {
+      "case_count": 800,
+      "decrease_count": 0,
+      "result": "pass"
+    },
+    "active_mask_checks": {
+      "view_ids": [
+        "ethanol",
+        "ciprofloxacin",
+        "and"
+      ],
+      "prototype_winner_mismatch_count": 0,
+      "distinct_family_failure_detection": "pass",
+      "coordinate_prior_and_compensation_bound_checks": "pass"
+    },
+    "cardinality_pressure": {
+      "case_count": 30,
+      "state_counts": [
+        2,
+        4,
+        8,
+        16
+      ],
+      "mask_topologies": [
+        "one_on",
+        "balanced",
+        "one_off"
+      ],
+      "weak_families": [
+        "response_ordering",
+        "intended_on_signal",
+        "intended_off_suppression"
+      ],
+      "result": "pass_with_documented_within_family_dilution"
+    },
+    "limitations": [
+      "The reviewer is an automated Codex agent, not an external human peer reviewer.",
+      "The audit validates equations, contracts, properties, and replayed evidence; it cannot establish prospective biological enrichment.",
+      "Family means prevent family-count reweighting, but one weak coordinate can be diluted within a large family; the hard bottleneck and compensation diagnostics remain required."
+    ]
+  },
+  "claim_boundaries": {
+    "feasibility_or_conformance": "not_claimed",
+    "absolute_off_or_nonexpression": "not_claimed",
+    "prospective_metric_superiority": "not_claimed",
+    "prospective_predictor_quality": "not_claimed",
+    "growth_viability_or_burden": "separate_assay_evidence",
+    "calibrated_model_uncertainty": "unavailable",
+    "cross_view_score_comparison": "prohibited",
+    "cross_protocol_score_comparison": "prohibited"
+  },
+  "source_bindings": {
+    "algorithm": "sha256",
+    "digest_scope": "exact_file_bytes",
+    "receipt_self_digest": "excluded_to_avoid_self_reference",
+    "entries": [
+      {
+        "role": "objective_math",
+        "path": "src/dnadesign/opal/src/objectives/multistate_response_behavior_math.py",
+        "sha256": "9ded57183807d93d39c17ad9633c5f7d640ff8729fcf7c697cd3823b8931fca6"
+      },
+      {
+        "role": "objective_plugin",
+        "path": "src/dnadesign/opal/src/objectives/multistate_response_behavior_v1.py",
+        "sha256": "3599d09903d86b657cb017f1f1272d6818712daa93bb5d1ba0ad79f86819f657"
+      },
+      {
+        "role": "objective_property_tests",
+        "path": "src/dnadesign/opal/tests/objectives/test_objective_multistate_response_behavior_v1.py",
+        "sha256": "6e500dafe15a4ee630369143092e92a694002cc87c56b85fa8f24ec65901d50e"
+      },
+      {
+        "role": "generic_objective_source_of_truth",
+        "path": "src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md",
+        "sha256": "7d85a50dbacc1e0a234468534b109b30e161d5cce94ff8acd2d8325ed545c263"
+      },
+      {
+        "role": "study_source_of_truth",
+        "path": "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md",
+        "sha256": "7acee2509293ea05937f70c61e1aeb95bbd2a6c60bdd1bc57bb81754c713b38e"
+      },
+      {
+        "role": "active_study_protocol",
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml",
+        "sha256": "b5dee36c77f26074a56494816be009625b5ef03255f9e2d21517b4e59d6bb4f8"
+      },
+      {
+        "role": "active_study_protocol_readme",
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/README.md",
+        "sha256": "ef9f11178722cc1ff62905ffe0023e44d11c32b3e6ff678c0e1e18724fd3580e"
+      },
+      {
+        "role": "active_campaign_readme",
+        "path": "src/dnadesign/opal/campaigns/secg_msrb_greedy/README.md",
+        "sha256": "02472a8fe0312043df19c45df182ca1836b06576e1e545f9d38925d37e359d44"
+      },
+      {
+        "role": "active_campaign_config",
+        "path": "src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml",
+        "sha256": "9c638b9abc29d03c814778e97392926d3e94433161b7faa9ff65ca0fa3691b76"
+      },
+      {
+        "role": "active_campaign_plot_config",
+        "path": "src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/plots.yaml",
+        "sha256": "284239176f37a94c69e40bf74db98287419b72cc295c2e4e26a4b260adcd3e0b"
+      },
+      {
+        "role": "activation_receipt_verifier",
+        "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/test_source_tree_contracts.py",
+        "sha256": "18fc46a0aa3410e55d3081b767d228f63b5a180bda6245db5a130fc7d7ea5b6a"
+      }
+    ]
+  }
+}

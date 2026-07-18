@@ -52,8 +52,10 @@ maintain duplicate trajectory math.
 
 ### Campaign, target-view, and source boundaries
 
-`secg_rmf_greedy` is the configured executable stress campaign. The
-metastudy loads its campaign config and derives exactly three immutable
+The completed `secg_rmf_greedy` run is frozen under the study-owned
+`workbench/source_evidence/opal_rmf_round0/` shelf. It is comparator evidence,
+not an executable campaign. The metastudy loads that fixed source contract and
+derives exactly three immutable
 `StressTargetView` records in declared order: `ethanol`, `ciprofloxacin`, and
 `and`. Each view must use `response_magnitude_feasibility_v1`, state order
 `[00, 10, 01, 11]`, and a unique binary target mask. The loader rejects extra,
@@ -92,8 +94,8 @@ The response-metastudy publication schema is
 1. Verify the three immutable round-0 SFXI source ledgers, shared 35-row label pool,
    candidate IDs, and their equivalent predictor surfaces.
 2. Recompute persisted SFXI scores through the public OPAL API.
-3. Audit SFXI exponent, gate, lexicographic, and OFF-state-logic variants without
-   changing `secg_rmf_greedy` campaign state.
+3. Audit SFXI exponent, gate, lexicographic, and OFF-state-logic variants
+   without changing active campaign state.
 4. Verify `reader.response_window.bundle.v5`, all record contracts, source
    provenance, artifact digests, and row counts.
 5. Verify the response-owned 35-row screen selection against the Reader bundle,
@@ -169,7 +171,7 @@ Reader's response-window handoff is
 must not use `sfxi_vec8` names. The primary reduction is the 4-8-hour
 post-event geometric log mean. Reader owns that reduction and its uncertainty;
 the study owns repeated-candidate label sources and promotion of response-window
-observed Y; OPAL applies RMF and owns campaign scoring.
+observed Y; OPAL applies the configured objective and owns campaign scoring.
 
 ### Evidence Findings
 

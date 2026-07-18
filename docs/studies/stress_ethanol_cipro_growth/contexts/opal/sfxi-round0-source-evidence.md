@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-sfxi-round0-source-evidence
 title: SFXI round-0 source evidence
 owner: dnadesign-maintainers
 status: source_evidence
-last_verified: 2026-07-16
+last_verified: 2026-07-18
 audience:
   - operator
   - agent
@@ -47,18 +47,20 @@ The campaign-local staging command and the three SFXI executable configs are
 absent. These artifacts remain SFXI evidence in their declared y-space; they
 are not routes for label promotion or campaign execution.
 
-### RMF Boundary
+### Response-Window and MSRB Boundary
 
-`secg_rmf_greedy` does not consume SFXI vec8 labels. It requires the typed
-eight-component response-window sidecar at
-`usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v4/observed_labels.parquet`.
-The verified sidecar contains 27 exact response-window labels and remains
-separate from this SFXI source evidence. RMF round 0 completed from that typed
-source; no SFXI vec8 row entered its label table.
+`secg_msrb_greedy` does not consume SFXI vec8 labels. Its model target is the
+typed eight-component Reader response-window Y stored at
+`usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v5/observed_labels.parquet`.
+The verified sidecar contains 27 exact labels and remains separate from this
+SFXI source evidence. MSRB is applied only after the shared model predicts that
+Y. The completed RMF round is retained separately as frozen comparator
+evidence; no SFXI vec8 row entered either response-window label table.
 
 Reader response-window generation, study-owned metric review, and OPAL commands
 are routed through:
 
 - `contexts/opal/response-metastudy.md`
-- `contexts/opal/response-magnitude-feasibility.md`
+- `contexts/opal/multistate-response-behavior.md`
+- `contexts/opal/response-magnitude-feasibility.md` (frozen RMF comparator)
 - `routes/decision/opal/campaign-commands.md`

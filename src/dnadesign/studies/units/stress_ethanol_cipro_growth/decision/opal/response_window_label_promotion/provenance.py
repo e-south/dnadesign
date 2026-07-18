@@ -46,7 +46,7 @@ def build_study_provenance(
     ]
     return {
         "schema_id": PROVENANCE_SCHEMA_ID,
-        "schema_version": "4",
+        "schema_version": "5",
         "study_id": STUDY_ID,
         "created_at": datetime.now(UTC).isoformat(),
         "observation_bundle": {

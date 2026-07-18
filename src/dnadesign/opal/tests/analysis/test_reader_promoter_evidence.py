@@ -45,7 +45,7 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
             {
                 "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v1",
                 "created_at": "2026-07-13T12:00:00+00:00",
-                "campaign_slug": "secg_rmf_greedy",
+                "campaign_slug": "secg_msrb_greedy",
                 "round": "r0",
                 "summary": {
                     "rows": 1,

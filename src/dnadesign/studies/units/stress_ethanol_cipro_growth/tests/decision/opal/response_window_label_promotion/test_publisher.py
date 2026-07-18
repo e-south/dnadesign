@@ -90,7 +90,7 @@ def test_verified_observations_publish_exact_one_dimensional_opal_labels(tmp_pat
         dataset_root=dataset,
         manifest_path=f"{DEFAULT_OUTPUT_DIRECTORY}/promotion.manifest.json",
         label_path=f"{DEFAULT_OUTPUT_DIRECTORY}/observed_labels.parquet",
-        campaign_slug="secg_rmf_greedy",
+        campaign_slug="secg_msrb_greedy",
         study_id="stress_ethanol_cipro_growth",
         y_space="reader_response_window_vector_v1",
     )
@@ -99,7 +99,7 @@ def test_verified_observations_publish_exact_one_dimensional_opal_labels(tmp_pat
     assert verified.promotion.candidate_path == (dataset / "records.parquet").resolve()
     provenance = json.loads(result.study_provenance_path.read_text(encoding="utf-8"))
     assert provenance["observation_bundle"]["schema_id"].endswith("response_window_observations.v2")
-    assert provenance["schema_id"].endswith("response_window_label_promotion.v4")
+    assert provenance["schema_id"].endswith("response_window_label_promotion.v5")
     assert provenance["prior_promotion"] is None
 
 
@@ -213,10 +213,10 @@ def test_two_batch_publication_survives_opal_run_and_batch_toggle_contract(tmp_p
         "--view",
         "ethanol",
         "--name",
-        "rmf_candidate_frontier",
+        "msrb_family_frontier",
     )
     assert plot.returncode == 0, plot.stdout + plot.stderr
-    manifest_path = workdir / "outputs/plots/rmf_candidate_frontier_r1.manifest.json"
+    manifest_path = workdir / "outputs/plots/msrb_family_frontier_r1.manifest.json"
     manifest = load_plot_artifact_manifest(manifest_path)
     view = manifest["metadata"]["notebook_view"]
     assert view["adapter"] == "layered_scatter_v1"
@@ -623,7 +623,7 @@ def test_published_labels_fail_when_candidate_sequence_or_x_snapshot_changes(tmp
         dataset_root=dataset,
         manifest_path=result.promotion_manifest_path.relative_to(dataset).as_posix(),
         label_path=result.label_path.relative_to(dataset).as_posix(),
-        campaign_slug="secg_rmf_greedy",
+        campaign_slug="secg_msrb_greedy",
         study_id="stress_ethanol_cipro_growth",
         y_space="reader_response_window_vector_v1",
     )
@@ -989,7 +989,7 @@ def _campaign_config(
     entries: list[dict[str, str]],
     label_directory: str = DEFAULT_OUTPUT_DIRECTORY,
 ) -> Path:
-    source = Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml")
+    source = Path("src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml")
     payload = yaml.safe_load(source.read_text(encoding="utf-8"))
     payload["campaign"]["workdir"] = str(tmp_path / "campaign-workdir")
     payload["ownership"]["dataset_id"] = dataset.name
@@ -1033,7 +1033,7 @@ def _runnable_campaign_config(
         label_directory=label_directory,
     )
     payload = yaml.safe_load(campaign.read_text(encoding="utf-8"))
-    payload["plot_config"] = str(Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/plots.yaml").resolve())
+    payload["plot_config"] = str(Path("src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/plots.yaml").resolve())
     payload["model"]["params"].update(
         {
             "n_estimators": 5,

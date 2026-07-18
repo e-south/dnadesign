@@ -1,0 +1,96 @@
+schema_id: stress_ethanol_cipro_growth.multistate_response_behavior_protocol.v1
+schema_version: "1"
+protocol_id: secg_msrb_learning_probe_v1
+study_id: stress_ethanol_cipro_growth
+status: active_learning_probe
+
+activation_receipt:
+  schema_id: stress_ethanol_cipro_growth.multistate_response_behavior_activation_audit.v1
+  path: activation_audit.json
+  digest_ownership: receipt_binds_protocol
+
+metric:
+  id: multistate_response_behavior_v1
+  acronym: MSRB
+  score_channel: behavior_score
+
+assay:
+  y_space: reader_response_window_vector_v1
+  value_order: [r00, r10, r01, r11, b00, b10, b01, b11]
+  state_ids: ["00", "10", "01", "11"]
+  primary_reduction_id: event_logmean_4_8h_post
+  response_semantics: reduced_log2_yfp_over_cfp
+  signal_semantics: same_state_pDual10_relative_log2_yfp_over_od600
+  fluorescence_reference: pDual-10
+
+target_views:
+  - id: ethanol
+    target_mask: [0, 1, 0, 1]
+  - id: ciprofloxacin
+    target_mask: [0, 0, 1, 1]
+  - id: and
+    target_mask: [0, 0, 0, 1]
+
+normalization:
+  protocol: exact_primary_reader_candidate_experiments_q90_v1
+  family_weighting: equal_one_third
+  normalized_temperature: 1.0
+  values:
+    response_scale: 0.3080415202556689
+    signal_scale: 0.3129336929825316
+  cohort:
+    id: exact_primary_reader_candidate_experiments_v1
+    unit: reader_candidate_experiment
+    unit_count: 41
+    candidate_count: 32
+    reader_experiment_count: 8
+    excluded_nonexact_unit_count: 6
+    scale_quantile: 0.90
+    quantile_method: linear
+
+label_truth:
+  source: study_published_manifest_pinned_response_window_labels
+  repeated_experiment_policy: explicit_selected_reader_experiment_or_exclusion
+  cross_experiment_well_pooling: prohibited
+  exact_primary_components_required: true
+  candidate_count: 27
+
+model:
+  target: full_reader_response_window_vector
+  name: random_forest
+  n_estimators: 100
+  feature_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
+  feature_width: 8192
+  separate_scalar_model_per_view: false
+
+selection:
+  selector: top_n
+  top_k_per_view: 6
+  score_ref: behavior_score
+  sequence_deduplication: true
+  allocation: round_robin_next_best_unallocated
+  view_priority: [ethanol, ciprofloxacin, and]
+  expected_unique_count: 18
+
+evidence:
+  semantic_alignment: supported
+  implementation: verified
+  retrospective_predictive_ordering: insufficient
+  prospective_hill_climb_efficacy: unproven
+  campaign_role: prospectively_frozen_greedy_learning_probe
+  synthesis_authorization: prohibited
+  shadow_manifest_sha256: 76d07a05e341dd4ad4d5a43d721bcf0834de902662f85452f5ea57777c578c64  # pragma: allowlist secret
+  shadow_decision_sha256: f1e81a750ce99efae6c6cac4ed50423ae7db89b49a70662cfab6632971fa49ef  # pragma: allowlist secret
+  shadow_normalization_sha256: 2eeace704e3348b6ca3c21068646e5abe8f967f58cf2c57079302d7467bd79a3  # pragma: allowlist secret
+  shadow_adversarial_audit_sha256: 7f33bb0c18d84db1ddcccfea8cc0be74ec1a7b75a0f1982159db64747ebec169  # pragma: allowlist secret
+  reader_normalization_bundle_sha256: bdc6f7afc8b00a7960eac7bf402be2632f9815c7fedc88cae4c27d47e9d09418  # pragma: allowlist secret
+  reader_label_bundle_sha256: e0065183fe010fe40e88e75da998cff5ed1399e56ff1d2bc1268f9331b573a67  # pragma: allowlist secret
+  candidate_bindings_manifest_sha256: 273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8  # pragma: allowlist secret
+
+claim_boundaries:
+  feasibility: not_claimed
+  absolute_off_or_nonexpression: not_claimed
+  growth_viability_or_burden: separate_assay_evidence
+  calibrated_model_uncertainty: unavailable
+  cross_view_score_comparison: prohibited
+  cross_protocol_score_comparison: prohibited

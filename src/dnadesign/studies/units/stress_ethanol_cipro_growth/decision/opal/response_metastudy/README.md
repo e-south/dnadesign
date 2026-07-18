@@ -130,7 +130,8 @@ the campaign scale contract.
 
 ## Architecture
 
-- `secg_rmf_greedy` is the configured executable stress campaign.
+- `secg_rmf_greedy` is frozen non-executable comparator evidence under the
+  study workbench source-evidence shelf.
 - `StressTargetView` records are derived and validated directly from its three
   declared selection views: `ethanol`, `ciprofloxacin`, and `and`.
 - The three persisted round-0 SFXI runs are loaded only as immutable

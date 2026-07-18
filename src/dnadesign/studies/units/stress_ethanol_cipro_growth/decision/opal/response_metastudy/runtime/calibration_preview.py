@@ -25,6 +25,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
     preview_response_window_observation_evidence,
 )
 
+from ...source_evidence import rmf_round0_source_evidence_root
 from ..core.contracts import MetastudyPaths, StressCampaignContract
 from ..core.response_contracts import RESPONSE_REVIEW_SPEC
 from ..evaluation.response_uncertainty import estimate_response_calibration_from_reader_draws
@@ -64,7 +65,7 @@ def preview_response_calibration(
         repo_root=root,
         reader_bundle_root=Path(reader_bundle_root).resolve(),
         out_dir=root / ".unused-calibration-preview",
-        campaign_root=root / "src/dnadesign/opal/campaigns",
+        campaign_root=rmf_round0_source_evidence_root(root).resolve(),
     )
     campaign = load_stress_campaign_contract(paths)
     request_path = (

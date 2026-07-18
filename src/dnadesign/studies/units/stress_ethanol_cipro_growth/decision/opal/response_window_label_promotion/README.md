@@ -23,7 +23,7 @@ snapshot. Campaign binding is a separate check that verifies the configured X
 column. The publisher then atomically creates a versioned directory:
 
 ```text
-_opal/response_window_labels_v4/
+_opal/response_window_labels_v5/
   observed_labels.parquet
   source_observation.manifest.json
   study_provenance.json
@@ -88,20 +88,20 @@ uv run python -m \
   publish \
   --observation-bundle <approved-observation-bundle> \
   --dataset-root src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates \
-  --output-relative-directory _opal/response_window_labels_v4
+  --output-relative-directory _opal/response_window_labels_v5
 
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_window_label_promotion \
   verify \
   --dataset-root src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates \
-  --output-relative-directory _opal/response_window_labels_v4
+  --output-relative-directory _opal/response_window_labels_v5
 
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_window_label_promotion \
   verify-campaign-binding \
   --dataset-root src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates \
-  --output-relative-directory _opal/response_window_labels_v4 \
-  --campaign-config src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  --output-relative-directory _opal/response_window_labels_v5 \
+  --campaign-config src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
 ```
 
 The publisher has no overwrite flag. `verify` checks the study bundle without

@@ -679,7 +679,7 @@ def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -
 
     panel = render_notebook_visual_panel(
         active_view_mode="Campaign",
-        baserender_campaign_model={"campaign": {"slug": "secg_rmf_greedy"}},
+        baserender_campaign_model={"campaign": {"slug": "secg_msrb_greedy"}},
         baserender_record_id="candidate-record-alpha-with-long-id",
         baserender_record_row={"id": "candidate-record-alpha-with-long-id", "sequence": "ACGT"},
         baserender_selection_record={

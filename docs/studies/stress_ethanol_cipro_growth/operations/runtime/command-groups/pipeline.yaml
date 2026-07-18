@@ -290,39 +290,39 @@ study_pipeline:
       densegen_subset_exclude_non_null_columns:
         - sfxi_ref__collection_id
       manual_include_scope: measured_pdual10_reader_round0_rows_with_existing_x
-    config: src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+    config: src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
     observed_label_promotion:
       schema_version: opal.observed_label_promotion.v1
       y_space: reader_response_window_vector_v1
       reduction_id: event_logmean_4_8h_post
       label_rows: 27
-      manifest: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v4/promotion.manifest.json
+      manifest: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v5/promotion.manifest.json
       manifest_sha256: 12a6ae8c1f3720f9f72dc00bf556787e1a73953058cd8ab8d8030d516f023ef3  # pragma: allowlist secret
       label_artifact_sha256: 746196094ae181d8bb18336545beac2cce644fa916b193731b66cabd2d742f92  # pragma: allowlist secret
     selection_views:
       ethanol: [0, 1, 0, 1]
       ciprofloxacin: [0, 0, 1, 1]
       and: [0, 0, 0, 1]
-    validate_json_command: uv run opal validate -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --json
-    progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --round latest --json
-    review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view <selection_view_id> --round latest --json
+    validate_json_command: uv run opal validate -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --json
+    progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --round latest --json
+    review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view <selection_view_id> --round latest --json
     densegen_axis_probe_progress_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe progress --run-root <run-root> --json
-    selection_set_show_command: uv run opal selection-set show -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --json
-    selection_set_export_command: uv run opal selection-set export -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --out <selection-set.csv> --format csv --json
-    selection_batch_show_command: uv run opal selection-batch show -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --round 0 --json
+    selection_set_show_command: uv run opal selection-set show -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --json
+    selection_set_export_command: uv run opal selection-set export -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --out <selection-set.csv> --format csv --json
+    selection_batch_show_command: uv run opal selection-batch show -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --round 0 --json
     verify_outputs_round0_commands:
-      ethanol: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view ethanol --round 0 --json
-      ciprofloxacin: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view ciprofloxacin --round 0 --json
-      and: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --view and --round 0 --json
+      ethanol: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view ethanol --round 0 --json
+      ciprofloxacin: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view ciprofloxacin --round 0 --json
+      and: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view and --round 0 --json
     round0:
       run_id: r0-2026-07-16T01:32:16+00:00
       status: completed
       training_label_rows: 27
       selection_batch_rows: 18
       selection_batch_unique_sequences: 18
-      selection_batch: src/dnadesign/opal/campaigns/secg_rmf_greedy/outputs/rounds/round_0/selection/selection_batch.parquet
+      selection_batch: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/selection/selection_batch.parquet
       selection_batch_sha256: a71ac31555314ab9aa2f837e1e0c306a35397e41211a155dc34c4d256a6b2061  # pragma: allowlist secret
-      round_context: src/dnadesign/opal/campaigns/secg_rmf_greedy/outputs/rounds/round_0/metadata/round_ctx.json
+      round_context: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/metadata/round_ctx.json
       round_context_sha256: b56d6ffca6b29f8bcb589b1e5c1a4e4fc74f843a707b68203aa63e58e3f8eeae  # pragma: allowlist secret
       authorization_state: candidate_review_only
     synthesis_handoff_batch0_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --write --json
@@ -332,8 +332,8 @@ study_pipeline:
       role: campaign_specific_artifact_viewer
       pre_run_execution_safe: true
       mutates_notebook: true
-      generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml --round 0 --force
-      run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+      generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --round 0 --force
+      run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
     batch0_selector: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml
     state: round0_candidate_review
     synthesis_authorization: not_granted

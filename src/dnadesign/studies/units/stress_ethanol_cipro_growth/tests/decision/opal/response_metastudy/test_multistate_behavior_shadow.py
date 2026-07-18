@@ -254,16 +254,29 @@ def test_protocol_rejects_state_identity_duplicate_yaml_and_numeric_strings(tmp_
         load_multistate_behavior_protocol(string_number)
 
 
-def test_shadow_protocol_cannot_be_named_by_a_checked_in_campaign() -> None:
-    protocol = load_multistate_behavior_protocol(PROTOCOL_PATH)
-    assert protocol.status == "shadow_only"
-    assert protocol.campaign_activation == "prohibited"
-    offenders: list[str] = []
+def test_shadow_protocol_cannot_authorize_a_checked_in_campaign() -> None:
+    shadow = load_multistate_behavior_protocol(PROTOCOL_PATH)
+    assert shadow.status == "shadow_only"
+    assert shadow.campaign_activation == "prohibited"
+    active_path = Path(
+        "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/"
+        "multistate_response_behavior/protocol.yaml"
+    )
+    active = yaml.safe_load(active_path.read_text(encoding="utf-8"))
+    assert active["status"] == "active_learning_probe"
+    assert active["protocol_id"] != shadow.protocol_id
+
+    objective_users: list[str] = []
     for path in sorted(Path("src/dnadesign/opal/campaigns").glob("*/configs/campaign.yaml")):
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-        if protocol.objective_name in _nested_strings(payload):
-            offenders.append(str(path))
-    assert offenders == []
+        if shadow.objective_name not in _nested_strings(payload):
+            continue
+        objective_users.append(str(path))
+        metadata = payload["campaign"]["metadata"]
+        assert metadata["protocol_id"] == active["protocol_id"]
+        assert shadow.protocol_id not in _nested_strings(payload)
+
+    assert objective_users == ["src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml"]
 
 
 def test_behavior_normalization_uses_bootstrap_only_and_one_common_scale_per_family() -> None:

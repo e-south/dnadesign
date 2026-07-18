@@ -128,10 +128,10 @@ def test_synthesis_alias_source_accepts_one_selection_batch_artifact(tmp_path: P
     source_entry = handoff.pop("expected_campaigns")[0]
     handoff["source_authority"] = "opal_selection_batch"
     source_entry.pop("source_campaign_slug")
-    source_entry["campaign_slug"] = "secg_rmf_greedy"
+    source_entry["campaign_slug"] = "secg_msrb_greedy"
     manifest_path = repo_root / source_entry["manifest_path"]
     manifest = pd.read_csv(manifest_path)
-    manifest["campaign_slug"] = "secg_rmf_greedy"
+    manifest["campaign_slug"] = "secg_msrb_greedy"
     manifest.to_csv(manifest_path, index=False)
     source_entry["manifest_sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     handoff["expected_artifact"] = source_entry

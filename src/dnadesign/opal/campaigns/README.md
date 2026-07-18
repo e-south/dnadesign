@@ -3,14 +3,14 @@ id: opal-campaign-routes
 title: OPAL campaign routes
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-18
 surface: opal_campaign_index
 ---
 
 ## OPAL Campaign Routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-15
+**Last verified:** 2026-07-18
 
 An executable campaign has one `configs/campaign.yaml` using
 `opal.campaign.v3` and an explicit `ownership` block. Repository discovery
@@ -23,7 +23,7 @@ loads only that path shape and rejects invalid or unowned configs.
 | [`demo_rf_sfxi_topn`](demo_rf_sfxi_topn/README.md) | demo | Canonical local RF, SFXI, and greedy-selection example; owns the shared demo records fixture |
 | [`demo_gp_topn`](demo_gp_topn/README.md) | demo | Local Gaussian-process example with deterministic top-N selection |
 | [`demo_gp_ei`](demo_gp_ei/README.md) | demo | Local Gaussian-process example with expected-improvement selection |
-| [`secg_rmf_greedy`](secg_rmf_greedy/README.md) | study | Stress-study learning loop with ethanol, ciprofloxacin, and AND RMF selection views |
+| [`secg_msrb_greedy`](secg_msrb_greedy/README.md) | study | Stress-study learning loop with ethanol, ciprofloxacin, and AND MSRB selection views over one response-window phenotype |
 
 Run state is not declared in this index. `state.json` and the run ledger are
 the runtime sources of truth. The stress-study status and readiness routes are

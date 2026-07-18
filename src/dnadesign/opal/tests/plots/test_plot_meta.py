@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from dnadesign.opal.src.plots._mpl_utils import (
     COLORBLIND_PALETTE,
     categorical_style,
+    compact_batch_label,
     math_label,
     observed_batch_marker_map,
     pretty_label,
@@ -68,6 +69,9 @@ def test_plot_style_helpers_prettify_labels_and_cycle_accessible_categories() ->
     assert pretty_title("Higher RMF scores receive better round-0 ranks") == (
         "Higher RMF scores receive better round 0 ranks"
     )
+    assert pretty_title("MSRB score by active view rank") == "MSRB score by active view rank"
+    assert compact_batch_label("pre_round0_response_corpus_4_8h_v1") == "Pre-round 0"
+    assert compact_batch_label("batch_12_reader_replicate_v2") == "Batch 12"
 
 
 def test_observed_batch_markers_never_silently_repeat() -> None:

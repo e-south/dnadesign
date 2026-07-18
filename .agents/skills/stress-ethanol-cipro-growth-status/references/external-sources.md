@@ -11,3 +11,7 @@ not study-state evidence.
 | `docs/studies/README.md` | repo-local | Study record ownership, layout, and route-map placement. |
 | `docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md` | repo-local | Snapshot vs preflight routing contract. |
 | `docs/studies/stress_ethanol_cipro_growth/` | repo-local | Active study facts, route map, route-detail pages, and downstream posture. |
+| `docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md` | repo-local | Active MSRB scientific contract and claim boundaries. |
+| `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml` | repo-local | Study-owned MSRB protocol and exact campaign binding. |
+| `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/activation_audit.json` | repo-local | Digest-bound activation decision and evidence posture. |
+| `src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml` | repo-local | Sole executable stress-study OPAL campaign config. |

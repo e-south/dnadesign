@@ -12,7 +12,8 @@ surface but belongs somewhere else.
 | Which tool or doc should I open next? | `docs/studies/<study-id>/routes/README.md` | Study-owned one-hop handoff by owner surface. |
 | How do I check OPAL campaign status or open OPAL plots? | `docs/studies/<study-id>/routes/README.md`, then `docs/studies/<study-id>/routes/decision/opal/README.md` and `campaign-commands.md` | The one-hop route selects OPAL; command detail stays in the campaign command subpage instead of expanding this skill into an OPAL walkthrough. |
 | Does current SFXI scoring support distinct campaign selection or synthesis? | `routes/decision/opal/README.md`, then `contexts/opal/response-metastudy.md` and the manifest-backed generated report | The study-owned metastudy separates canonical metric checks, predictor validation, and policy-promotion posture. |
-| Is RMF ready for the stress campaign? | `routes/decision/opal/README.md`, then `contexts/opal/response-magnitude-feasibility.md` | The study decision record separates objective availability from Reader event/record readiness, typed labels, calibration, and unified campaign activation. |
+| Is MSRB ready for the stress campaign? | `routes/decision/opal/README.md`, then `contexts/opal/multistate-response-behavior.md` and the study-owned MSRB protocol plus activation audit | The study decision record separates Reader evidence, typed labels, objective activation, runtime completion, model support, and synthesis authorization. |
+| What happened to the RMF campaign? | `contexts/opal/response-magnitude-feasibility.md`, then the frozen workbench source-evidence path it names | RMF remains immutable comparator evidence and is not an executable OPAL route. |
 | What is blocking OPAL batch 0? | `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json --command-timeout-seconds 30`, then `docs/studies/<study-id>/routes/decision/opal/README.md` | The next-scope gate is the shared densegen-only candidate table and selected X contract; labels and campaign state remain assay-time state. |
 | Where did this OPAL candidate ID come from? | `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.opal_batch0.provenance --config src/dnadesign/studies/units/stress_ethanol_cipro_growth/opal_batch0/sampling.yaml --id <candidate_id>` | Per-ID lineage is study-owned because it joins OPAL records to DenseGen sidecars, Construct views, Infer aliases, and LatentDNA rows. |
 | Which study files are authoritative? | `record/campaign.yaml`, `record/datasets.yaml`, `record/status.md`, `operations/ops.study.yaml`, plus `routes/README.md`, `operations/runtime/command-groups/README.md`, and `operations/runtime/command-groups/pipeline.yaml` when present | The checked-in record stays authoritative; the command-group README is only the lane index, while `pipeline.yaml` stays the canonical machine payload. |
@@ -32,8 +33,10 @@ Status-first routing boundary:
   one-hop map selects that owner surface.
 - Use `contexts/opal/response-metastudy.md` only after the OPAL route is selected
   and the question concerns metric validity or synthesis posture.
-- Use `contexts/opal/response-magnitude-feasibility.md` after the OPAL route
-  when the question concerns successor math, event-relative labels, OR
-  support, or promotion readiness.
+- Use `contexts/opal/multistate-response-behavior.md` after the OPAL route for
+  the active MSRB scientific contract, then verify the source protocol and
+  activation audit before reporting campaign activation.
+- Use `contexts/opal/response-magnitude-feasibility.md` only for frozen RMF
+  comparator semantics and evidence.
 - Use `operations/runtime/command-groups/README.md` before the full pipeline
   when the question is command-group navigation rather than machine parsing.

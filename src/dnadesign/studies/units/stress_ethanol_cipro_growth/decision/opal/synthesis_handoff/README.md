@@ -1,8 +1,8 @@
 # Stress OPAL Synthesis Handoff
 
 **Owner:** stress_ethanol_cipro_growth study
-**Lifecycle:** round-0 source available; synthesis authorization pending
-**Last verified:** 2026-07-15
+**Lifecycle:** measured-round contract ready; synthesis authorization pending
+**Last verified:** 2026-07-18
 
 Study-owned conversion from an OPAL logical selection batch to physical
 synthesis artifacts.
@@ -55,30 +55,30 @@ by multiple views appears once with every membership.
 The authority is
 `docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml`.
 
-The first physical assay batch selected by the RMF campaign has assay index 1
-and was chosen by the model fitted at OPAL round 0. Those axes are related but
-not interchangeable: `assay_batch_index` counts physical assay batches, while
-`model_as_of_round` identifies the label snapshot and model that made the
-selection.
+The first physical assay batch selected by the MSRB campaign will have assay
+index 1 and will be chosen by the model fitted at OPAL round 0. Those axes are
+related but not interchangeable: `assay_batch_index` counts physical assay
+batches, while `model_as_of_round` identifies the label snapshot and model
+that made the selection.
 
 If synthesis is authorized, its reviewed handoff record uses this mapping:
 
 ```yaml
-- handoff_id: stress-opal-assay-b1-r0-rmf-v1
+- handoff_id: stress-opal-assay-b1-r0-msrb-v1
   lifecycle_status: generated_pending_acceptance
   source_authority: opal_selection_batch
   selection_epoch: opal_model_round
   assay_batch_index: 1
   model_as_of_round: 0
-  campaign_slug: secg_rmf_greedy
-  run_id: r0-2026-07-16T01:32:16+00:00
+  campaign_slug: secg_msrb_greedy
+  run_id: <msrb-round-0-run-id>
   strategy_id: stress_promoter_insert:v1
   expected_selection_views:
     - {selection_view_id: ethanol, expected_rows: 6}
     - {selection_view_id: ciprofloxacin, expected_rows: 6}
     - {selection_view_id: and, expected_rows: 6}
   expected_artifact:
-    campaign_slug: secg_rmf_greedy
+    campaign_slug: secg_msrb_greedy
     expected_rows: 18
     manifest_path: <generated-manifest-path>
     vendor_workbook_path: <generated-workbook-path>
@@ -95,11 +95,11 @@ Inspect the unified selections:
 
 ```bash
 uv run opal selection-set show \
-  -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml \
+  -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml \
   --view ethanol --round latest --json
 
 uv run opal selection-batch show \
-  -c src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml \
+  -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml \
   --round latest --json
 ```
 

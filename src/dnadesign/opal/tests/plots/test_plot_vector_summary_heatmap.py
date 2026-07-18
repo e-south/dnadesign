@@ -14,6 +14,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from dnadesign.opal.src.plots import vector_summary_heatmap as plot_mod
@@ -93,3 +95,26 @@ def test_vector_summary_heatmap_tick_size_adapts_to_channel_count() -> None:
 
     assert normal == 13
     assert 8.5 <= dense < normal
+
+
+def test_vector_summary_default_layout_is_compact_for_one_round() -> None:
+    width, height = plot_mod._default_heatmap_figsize(dim=8, row_count=1)
+
+    assert width > height
+    assert height <= 4.0
+
+
+def test_vector_summary_centered_norm_is_symmetric_and_annotations_are_bounded() -> None:
+    matrix = np.asarray([[-2.0, 0.5, 3.0]], dtype=float)
+    norm = plot_mod._heatmap_norm(matrix, center=0.0)
+
+    assert norm is not None
+    assert norm.vmin == -3.0
+    assert norm.vcenter == 0.0
+    assert norm.vmax == 3.0
+
+    figure, axis = plt.subplots()
+    annotations = plot_mod._annotate_heatmap_values(axis, matrix, enabled=True, max_cells=8)
+    assert [text.get_text() for text in annotations] == ["-2.00", "0.50", "3.00"]
+    assert plot_mod._annotate_heatmap_values(axis, matrix, enabled=True, max_cells=2) == []
+    plt.close(figure)

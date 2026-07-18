@@ -42,7 +42,7 @@ Use this page after the checked-in study status tells you where the record stand
 | Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
 | Reader observations and candidate identity | `stress study` | `label_truth_ready` | `src/dnadesign/studies/units/stress_ethanol_cipro_growth/{response_window_observations,promoter_candidate_bindings}/` |
 | OPAL campaigns | `opal` | `round0_selection_review` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
-| Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | RMF active record; behavior shadow no-go | [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), [RMF](../contexts/opal/response-magnitude-feasibility.md), and [Multistate Response Behavior](../contexts/opal/multistate-response-behavior.md) |
+| Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | MSRB active learning probe; SFXI and RMF comparison evidence | [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), [RMF](../contexts/opal/response-magnitude-feasibility.md), and [Multistate Response Behavior](../contexts/opal/multistate-response-behavior.md) |
 
 ### Terminology Guardrails
 

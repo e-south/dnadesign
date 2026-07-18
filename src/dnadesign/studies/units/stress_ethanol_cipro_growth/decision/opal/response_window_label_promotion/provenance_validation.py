@@ -89,7 +89,7 @@ def validate_study_provenance(
         raise ResponseWindowLabelPromotionError("published study provenance fields disagree.")
     if (
         provenance["schema_id"] != PROVENANCE_SCHEMA_ID
-        or provenance["schema_version"] != "4"
+        or provenance["schema_version"] != "5"
         or provenance["study_id"] != STUDY_ID
     ):
         raise ResponseWindowLabelPromotionError("published study provenance identity disagrees.")

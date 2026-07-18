@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-opal-synthesis-handoff
 surface: study-context
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-12
+last_verified: 2026-07-18
 type: contract
 plane: data-plane
 owner_boundary: stress_ethanol_cipro_growth
@@ -30,7 +30,7 @@ semantics into OPAL.
 - **Selection membership**: the view, rank, score, and score channel that
   nominated a candidate.
 
-For measured rounds, `secg_rmf_greedy` is the campaign. `ethanol`,
+For measured rounds, `secg_msrb_greedy` is the campaign. `ethanol`,
 `ciprofloxacin`, and `and` are selection views, not separate model histories.
 
 ### Source Contract
@@ -49,7 +49,7 @@ physical row with every nomination.
 The pre-assay batch-zero order is digest-pinned source evidence. Its SFXI source
 run slugs map explicitly to `ethanol`, `ciprofloxacin`, and `and` selection-view
 identities. It did not result from a fitted OPAL round and must not be described
-as RMF active selection.
+as active MSRB selection.
 
 ### Measured-Round Record
 
@@ -99,9 +99,9 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 ### Evidence Boundary
 
 The handoff proves identity, membership, cloning, and export integrity. It does
-not prove RMF prediction accuracy, biological feasibility, exact rank
-stability, or order authorization. Those require OPAL model evidence,
-prospective Reader measurements, and an explicit lifecycle decision.
+not prove response-window prediction accuracy, prospective MSRB enrichment,
+exact rank stability, or order authorization. Those require OPAL model
+evidence, prospective Reader measurements, and an explicit lifecycle decision.
 
 ### Validation
 

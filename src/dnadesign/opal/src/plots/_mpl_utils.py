@@ -80,6 +80,7 @@ _PRETTY_LABELS = {
     "E_raw": "Raw effect (E_raw)",
     "e_raw": "Raw effect (E_raw)",
     "mse": "MSE",
+    "msrb": "MSRB",
     "iqr": "IQR",
     "q25": "Q25",
     "q75": "Q75",
@@ -416,6 +417,19 @@ def pretty_batch_label(value: object) -> str:
     return f"{label[:1].upper()}{label[1:]}"
 
 
+def compact_batch_label(value: object) -> str:
+    """Project a standardized batch identifier into a compact static label."""
+
+    token = str(value or "").strip()
+    pre_round = re.match(r"^pre[_-]?round[_-]?(\d+)(?:$|[_-])", token, flags=re.IGNORECASE)
+    if pre_round:
+        return f"Pre-round {pre_round.group(1)}"
+    batch = re.match(r"^batch[_-]?(\d+)(?:$|[_-])", token, flags=re.IGNORECASE)
+    if batch:
+        return f"Batch {batch.group(1)}"
+    return pretty_batch_label(token)
+
+
 def pretty_title(value: object) -> str:
     text = str(value or "").strip()
     if not text:
@@ -423,10 +437,9 @@ def pretty_title(value: object) -> str:
     if _looks_like_expression_title(text):
         return text
     if "_" not in text and "__" not in text and "-" not in text:
-        lower = text.lower()
-        if lower in _ACRONYMS:
-            return _ACRONYMS[lower]
-        return text[:1].upper() + text[1:] if text.islower() else text
+        words = [_ACRONYMS.get(word.lower(), word) for word in text.split()]
+        label = " ".join(words)
+        return label[:1].upper() + label[1:] if text.islower() else label
     text = text.replace("__", " ").replace("_", " ").replace("-", " ")
     text = re.sub(r"\s+", " ", text).strip()
     words = []

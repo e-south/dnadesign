@@ -478,7 +478,7 @@ Study instance:
 11 = combined ethanol/ciprofloxacin state
 ```
 
-The active RMF views and the behavior shadow masks use this shared assay state
+The active MSRB views and the frozen RMF comparison use this shared assay state
 order:
 
 | Campaign intent | Setpoint vector |

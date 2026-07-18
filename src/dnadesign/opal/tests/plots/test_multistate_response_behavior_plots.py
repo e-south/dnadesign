@@ -388,7 +388,30 @@ def test_behavior_frontier_declares_reference_semantics_without_feasibility_guid
     assert not axis.spines["right"].get_visible()
     assert axis.get_legend().get_bbox_to_anchor()._bbox.y0 < 0.0
     assert min(text.get_fontsize() for text in axis.get_legend().get_texts()) >= 9.5
-    assert figure.axes[-1].get_ylabel().endswith("0 = reference-relative family score; not feasibility")
+    assert axis.get_legend().legend_handles[0].get_alpha() >= 0.7
+    assert figure.axes[-1].get_ylabel() == r"OFF-signal-suppression family score, $S_{\mathrm{OFF}}$"
+    assert runtime["color_scale"]["context"].endswith("not feasibility")
+    plt.Figure.clear(figure)
+
+
+def test_behavior_frontier_uses_compact_static_observed_batch_labels(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[plt.Figure] = []
+    data = _plot_data()
+    data.observed_frame.loc[:, "batch_key"] = "pre_round0_response_corpus_4_8h_v1"
+    monkeypatch.setattr(frontier_plot, "load_multistate_response_behavior_plot_data", lambda _context: data)
+    monkeypatch.setattr(frontier_plot, "save_figure", lambda _context, figure: captured.append(figure))
+    monkeypatch.setattr(plt, "close", lambda _figure: None)
+    context = _context(tmp_path, filename="frontier.png", save_data=False)
+
+    frontier_plot.render_family_frontier(context, {})
+
+    figure = captured.pop()
+    labels = [text.get_text() for text in figure.axes[0].get_legend().get_texts()]
+    assert "Observed · Pre-round 0 (n=1)" in labels
+    assert all("response corpus" not in label.lower() for label in labels)
     plt.Figure.clear(figure)
 
 
@@ -421,6 +444,10 @@ def test_behavior_frontier_wraps_long_target_context_inside_figure(
     assert len(title.get_text().splitlines()) >= 3
     assert title_box.x0 >= figure.bbox.x0
     assert title_box.x1 <= figure.bbox.x1
+    color_label_box = figure.axes[-1].yaxis.label.get_window_extent(renderer=figure.canvas.get_renderer())
+    legend_box = figure.axes[0].get_legend().get_window_extent(renderer=figure.canvas.get_renderer())
+    assert not title_box.overlaps(color_label_box)
+    assert not legend_box.overlaps(color_label_box)
     plt.Figure.clear(figure)
 
 
@@ -432,6 +459,30 @@ def test_behavior_decomposition_is_k_state_and_marks_only_coordinate_bottlenecks
     assert coordinates.groupby("id").size().to_dict() == {"selected-a": 5, "selected-b": 5}
     assert coordinates.groupby("id")["limiting"].sum().to_dict() == {"selected-a": 1, "selected-b": 1}
     assert not tidy.loc[~tidy["component_kind"].eq("coordinate"), "limiting"].any()
+
+
+def test_behavior_decomposition_uses_msrb_symbols_and_compact_colorbar(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[plt.Figure] = []
+    monkeypatch.setattr(
+        decomposition_plot,
+        "load_multistate_response_behavior_plot_data",
+        lambda _context: _plot_data(),
+    )
+    monkeypatch.setattr(decomposition_plot, "save_figure", lambda _context, figure: captured.append(figure))
+    monkeypatch.setattr(plt, "close", lambda _figure: None)
+    context = _context(tmp_path, filename="decomposition.png", save_data=False)
+
+    decomposition_plot.render_selected_decomposition(context, {})
+
+    figure = captured.pop()
+    labels = [tick.get_text() for tick in figure.axes[0].get_xticklabels()]
+    assert r"$x_{\min}$" in labels
+    assert r"$S_{\mathrm{MSRB}}$" in labels
+    assert figure.axes[-1].get_ylabel() == "Normalized behavior evidence"
+    plt.Figure.clear(figure)
 
 
 def test_behavior_plot_registry_and_objective_family_routing_are_explicit() -> None:

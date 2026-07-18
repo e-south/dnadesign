@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-07-15
+- Last verified: 2026-07-18
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
@@ -92,16 +92,21 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   `r0-2026-07-09T18:38:31+00:00` (AND). Each used 35 labels, scored 154785
   candidates, and selected 6 rows. No executable campaign configs exist for
   these source runs.
-- RMF campaign: `secg_rmf_greedy` is the sole executable stress-study OPAL
-  config. It declares one shared eight-output RF with ethanol,
-  ciprofloxacin, and AND selection views. Round 0 completed as run
-  `r0-2026-07-16T01:32:16+00:00` from 27 exact promoted response-window labels.
-  Each view received six sequence-unique slots through the declared
-  round-robin next-best-unallocated allocator. The preferred lists contained
-  one cross-view overlap; the AND view advanced once, producing the required
-  18-sequence batch. This is a prospectively frozen learning probe.
-  `model_support_ready` remains false, and the completed selection does not
-  authorize synthesis.
+- Frozen RMF comparator: the retired RMF round-0 run
+  `r0-2026-07-16T01:32:16+00:00` used 27 exact Reader response-window labels
+  and produced an 18-sequence allocation. Its config and ledgers are retained
+  only as digest-pinned metastudy evidence; they are not an executable route.
+- MSRB campaign: `secg_msrb_greedy` is the sole executable stress-study OPAL
+  config. It fits one shared eight-output RF to the neutral Reader
+  response-window Y, then evaluates ethanol, ciprofloxacin, and AND target
+  masks with `multistate_response_behavior_v1`. Each view requests six
+  candidates, and the declared round-robin allocator requires 18 unique
+  sequences. Round 0 completed on 2026-07-18 using 27 labels and scored
+  154785 candidates. The three views produced six allocations each; one
+  cross-view overlap was replaced by AND's next unallocated rank, yielding 18
+  sequence-unique candidates. Output replay found zero score or membership
+  mismatches. This is a prospectively frozen greedy learning probe.
+  `model_support_ready` remains false, and no selection authorizes synthesis.
 - Candidate TFBS metadata: `verified`; the 2026-07-12 rematerialization repaired
   79505 dropped `densegen__used_tfbs_detail` values by binding the authoritative
   DenseGen sidecar. The readiness contract now fails if any DenseGen-backed row
@@ -121,7 +126,8 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   declared windows, normalized linear AUC, and delta remain response sensitivity
   analyses. The strongest descriptive fixed challenger is PLS4 over the primary
   eight-component summary, with weakest selection-view response-separation and
-  feasibility Spearman values of 0.45. Retrospective grouped enrichment is strongest for
+  RMF-feasibility Spearman values of 0.45 in the frozen comparator analysis.
+  Retrospective grouped enrichment is strongest for
   ciprofloxacin and weakest for ethanol, but all exact 95% intervals include
   0.5 and do not establish calibrated success probabilities. Under the
   study's time and assay-capacity constraints, the prospective policy assigns
@@ -158,12 +164,13 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
   rows, with `latentdna__evo2_7b__context_anchor_mean_bidir_concat` as its
   fixed-length X. The SFXI labels remain separate from the promoted
   response-window Y. Do not synthesize response-window Y from an SFXI score.
-- Review round 0 through the pinned label snapshot, RF model artifact, three
-  six-row selection sets, allocation trace, and 18-row logical batch. Preserve
-  the frozen prediction and allocation evidence before the new constructs are
-  measured. Treat the result as a learning probe while `model_support_ready`
-  remains false. Physical synthesis still requires a separate study-owned
-  handoff and lifecycle decision.
+- Preserve and review the completed MSRB round 0 through the pinned Reader
+  response-window label snapshot, RF model artifact, three six-row selection
+  sets, allocation trace, and 18-row logical batch. Keep the frozen predictions
+  and allocation evidence with the future measurements. Treat the result as a
+  learning probe while
+  `model_support_ready` remains false. Physical synthesis still requires a
+  separate study-owned handoff and lifecycle decision.
 - Use the response metric metastudy `report.md`, generated `review.py`,
   `tables/pressure_tests.csv`, `tables/setpoint_support.csv`,
   `tables/reader_event_intervals.csv`,

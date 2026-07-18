@@ -20,7 +20,6 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
-import yaml
 
 from dnadesign.opal.src.core.utils import OpalError, file_sha256
 from dnadesign.opal.src.plots import response_magnitude_feasibility as plot_mod
@@ -766,52 +765,3 @@ def test_static_frontier_does_not_require_candidate_records(
     figure = captured.pop()
     assert not figure.axes[0].texts
     plt.Figure.clear(figure)
-
-
-def test_secg_rmf_plot_config_uses_one_interactive_frontier_and_rank_diagnostic() -> None:
-    config_path = Path(__file__).parents[2] / "campaigns" / "secg_rmf_greedy" / "configs" / "plots.yaml"
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    presets = payload.get("plot_presets", {})
-    frontiers = [
-        entry
-        for entry in payload["plots"]
-        if (entry.get("kind") or presets.get(entry.get("preset"), {}).get("kind"))
-        == "response_magnitude_feasibility_frontier"
-    ]
-
-    assert [entry["name"] for entry in frontiers] == ["rmf_candidate_frontier"]
-    assert all("round_variants" not in entry for entry in payload["plots"])
-    merged_params = [
-        {**presets.get(entry.get("preset"), {}).get("params", {}), **entry.get("params", {})} for entry in frontiers
-    ]
-    assert merged_params[0]["surface_label"] == "RMF candidate frontier"
-    assert r"$d_R$" in merged_params[0]["response_label"]
-    assert merged_params[0]["magnitude_label"] == r"ON fluorescence floor, $f_{\mathrm{ON}}$"
-    assert r"$q_{\mathrm{OFF}}$" in merged_params[0]["off_constraint_label"]
-    assert "pDual-10-relative log2(YFP/OD600)" in merged_params[0]["caption"]
-    assert "rightward" in merged_params[0]["caption"].lower()
-    assert "red" in merged_params[0]["caption"].lower()
-
-    decomposition = next(
-        entry
-        for entry in payload["plots"]
-        if entry.get("kind") == "response_magnitude_feasibility_constraint_decomposition"
-    )
-    assert decomposition["params"]["candidate_label_mode"] == "alias"
-    assert decomposition["params"]["title"] == "Allocated RMF requirement margins"
-    assert decomposition["params"]["caption"] == (
-        "Each row is a model prediction for a candidate allocated to this selection view. "
-        "Columns show the three standardized requirement margins and their maximin RMF score; "
-        "zero is the configured feasibility boundary. Ranks are active-view competition ranks, "
-        "so skipped ranks were allocated to another view."
-    )
-
-    rank = next(entry for entry in payload["plots"] if entry.get("name") == "rmf_score_vs_rank")
-    assert rank["kind"] == "scatter_score_vs_rank"
-    assert rank["params"]["score_field"] == "view__selection_score"
-    assert r"$S_{\mathrm{RMF}}$" in rank["params"]["score_label"]
-    assert rank["params"]["rank_scale"] == "log"
-    assert rank["params"]["show_selection_view"] is True
-    assert rank["params"]["title_location"] == "center"
-    assert rank["params"]["legend_location"] == "below"
-    assert rank["params"]["y_axis"]["reference_lines"] == [{"value": 0.0, "label": "Feasibility boundary"}]

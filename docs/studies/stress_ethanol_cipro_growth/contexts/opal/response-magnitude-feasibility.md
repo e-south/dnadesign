@@ -226,9 +226,10 @@ Round 0 froze and recorded:
 6. Six slots per view, sequence deduplication, round-robin
    next-best-unallocated allocation, and exact expected batch size 18.
 
-The config `src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml`
-accepts labels only through the manifest-pinned study publication. Do not run it
-against an ad hoc or reconstructed label table.
+The fixed comparator contract now lives at
+`src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_rmf_round0/secg_rmf_greedy/configs/campaign.yaml`.
+It is non-executable source evidence for the metastudy and must not be treated
+as an alternate campaign route.
 
 The verified round-0 run pinned in the campaign README used 27 exact labels
 and one 100-tree RF lineage. It produced six allocations per view and 18
@@ -237,18 +238,17 @@ next-best-unallocated replacement. `model_support_ready` remains false. The
 run is a frozen learning probe, and synthesis authorization is a separate study
 decision.
 
-### Separate threshold-free behavior evaluation
+### Threshold-free behavior promotion
 
-The study is evaluating
+The study evaluated
 [`multistate_response_behavior_v1`](multistate-response-behavior.md) as a
-separately named shadow objective. It rewards every desired directional change
-and treats the hard bottleneck as a diagnostic rather than the selector. That
-contract is not a feasibility margin: a positive behavior score has no
-acceptance meaning.
+separately named shadow objective, then promoted it for the sole executable
+stress campaign. It rewards every desired directional change and treats the
+hard bottleneck as a diagnostic rather than the selector. That contract is not
+a feasibility margin: a positive behavior score has no acceptance meaning.
 
-The shadow evaluation does not mutate this RMF contract, activate a second
-campaign, or authorize synthesis. Promotion requires a digest-bound comparison
-and an explicit decision that leaves one executable study campaign.
+The RMF equations and fixed comparator results remain valid. They are not a
+second production selector and do not authorize synthesis.
 
 ### Prospective evidence
 

@@ -30,9 +30,9 @@ from ._mpl_utils import (
     add_flush_colorbar,
     apply_notebook_axes_style,
     apply_plot_style,
+    compact_batch_label,
     ensure_mpl_config_dir,
     observed_batch_marker_map,
-    pretty_batch_label,
     scatter_smart,
     wrap_plot_title,
 )
@@ -163,6 +163,7 @@ def render_family_frontier(context: Any, params: dict) -> None:
     ensure_mpl_config_dir(workdir=getattr(context.workspace, "workdir", None))
     import matplotlib.pyplot as plt
     from matplotlib.colors import TwoSlopeNorm
+    from matplotlib.lines import Line2D
 
     apply_plot_style()
     data = load_multistate_response_behavior_plot_data(context)
@@ -223,7 +224,7 @@ def render_family_frontier(context: Any, params: dict) -> None:
             marker=observed_markers[batch_key],
             s=max(30.0, point_size * 2.0),
             linewidths=0.9,
-            label=f"Observed · {pretty_batch_label(batch_key)} (n={len(batch)})",
+            label=f"Observed · {compact_batch_label(batch_key)} (n={len(batch)})",
             zorder=3,
         )
     ax.scatter(
@@ -252,12 +253,27 @@ def render_family_frontier(context: Any, params: dict) -> None:
         linespacing=1.25,
     )
     ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
+    legend_handles, legend_labels = ax.get_legend_handles_labels()
+    if legend_handles and legend_labels[0].startswith("Predicted pool"):
+        legend_handles[0] = Line2D(
+            [],
+            [],
+            linestyle="none",
+            marker="o",
+            markersize=7,
+            markerfacecolor="#56B4E9",
+            markeredgecolor="none",
+            alpha=0.8,
+        )
     ax.legend(
+        legend_handles,
+        legend_labels,
         loc="upper center",
         bbox_to_anchor=(0.5, -0.14),
         fontsize=NOTEBOOK_LEGEND_FONTSIZE,
         ncol=3,
         frameon=False,
+        markerscale=1.8,
         handletextpad=0.45,
         columnspacing=0.8,
     )
@@ -265,7 +281,7 @@ def render_family_frontier(context: Any, params: dict) -> None:
         fig,
         ax,
         points,
-        label=f"{off_label}\n{COLOR_CONTEXT}",
+        label=off_label,
         pad=0.065,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )

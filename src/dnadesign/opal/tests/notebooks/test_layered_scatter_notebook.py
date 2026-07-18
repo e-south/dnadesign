@@ -220,7 +220,7 @@ def test_behavior_layered_scatter_memory_and_reference_semantics_are_view_neutra
     )
     figure = render_layered_scatter_figure(filtered, contract=first)
     assert not figure.axes[0].lines
-    assert figure.axes[-1].get_ylabel().endswith("0 = reference direction; not feasibility")
+    assert figure.axes[-1].get_ylabel() == "OFF-signal-suppression family score"
     plt.close(figure)
 
 
@@ -250,6 +250,10 @@ def test_layered_scatter_wraps_long_title_and_target_context_inside_square_viewp
         assert len(title.get_text().splitlines()) >= 3
         assert title_box.x0 >= figure.bbox.x0
         assert title_box.x1 <= figure.bbox.x1
+        color_label_box = figure.axes[-1].yaxis.label.get_window_extent(renderer=figure.canvas.get_renderer())
+        legend_box = figure.axes[0].get_legend().get_window_extent(renderer=figure.canvas.get_renderer())
+        assert not title_box.overlaps(color_label_box)
+        assert not legend_box.overlaps(color_label_box)
     finally:
         plt.close(figure)
 
@@ -516,6 +520,7 @@ def test_layered_scatter_renderer_returns_a_publication_image(tmp_path: Path) ->
 
     assert rendered["data"].startswith(b"\x89PNG")
     assert "Batch 1" in rendered["caption"]
+    assert "red = greater clearance; 0 = configured boundary" in rendered["caption"]
     assert rendered["style"]["max-height"] == "min(62vh, 720px)"
 
 
@@ -549,6 +554,7 @@ def test_layered_scatter_legend_stays_outside_the_annotation_field(tmp_path: Pat
     assert axis.yaxis.label.get_fontsize() >= 11.5
     assert min(tick.get_fontsize() for tick in axis.get_xticklabels()) >= 10
     assert min(text.get_fontsize() for text in legend.get_texts()) >= 9.5
+    assert legend.legend_handles[0].get_alpha() >= 0.7
     assert not axis.spines["top"].get_visible()
     assert not axis.spines["right"].get_visible()
     assert axis.collections[0].cmap.name == "RdBu_r"
@@ -595,7 +601,8 @@ def test_layered_scatter_all_visible_layers_keep_a_usable_square_panel(tmp_path:
         assert colorbar_label_box.y0 >= figure.bbox.y0
         assert colorbar_label_box.y1 <= figure.bbox.y1
         assert len(legend.get_texts()) == 4
-        assert any("\n" in text.get_text() for text in legend.get_texts())
+        assert any(text.get_text().startswith("Observed · Pre-round 0") for text in legend.get_texts())
+        assert all("response corpus" not in text.get_text().lower() for text in legend.get_texts())
     finally:
         plt.close(figure)
 

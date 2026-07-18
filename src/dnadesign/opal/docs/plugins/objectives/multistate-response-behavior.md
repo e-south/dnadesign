@@ -1,15 +1,17 @@
 ---
 id: opal-objective-multistate-response-behavior-v1
 title: Multistate Response Behavior objective
+short_name: MSRB
+objective_id: multistate_response_behavior_v1
 owner: dnadesign-maintainers
 status: available
-last_verified: 2026-07-17
+last_verified: 2026-07-18
 ---
 
-## Multistate Response Behavior `multistate_response_behavior_v1`
+## Multistate Response Behavior (MSRB) `multistate_response_behavior_v1`
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-17
+**Last verified:** 2026-07-18
 
 `multistate_response_behavior_v1` is a threshold-free OPAL objective. It ranks
 how consistently a candidate moves in the desired directions across a binary
@@ -24,6 +26,19 @@ semantics. An assay service owns the measurements. A study owns the state
 meanings, target mask, assay-resolution scales, and decision to activate the
 objective. OPAL owns the equations and exposes their result to a configured
 selector.
+
+### At a glance
+
+| Contract field | Value |
+| --- | --- |
+| Human short name | MSRB |
+| Objective identifier | `multistate_response_behavior_v1` |
+| Input | Ordered finite `[r(state...), b(state...)]` with width `2K` |
+| Selectable score | `behavior_score`, written $S_{\mathrm{MSRB}}$ |
+| Direction | Maximize |
+| Study inputs | Ordered state IDs, binary target mask, and two positive resolution scales |
+| Required diagnostics | Three family scores, hard bottleneck, limiting coordinate, compensation gap and bound, coordinate weights, and natural-zero status |
+| Uncertainty | None emitted; assay and model uncertainty remain separate evidence |
 
 ### When to use this objective
 
@@ -134,7 +149,7 @@ The selection scalar gives the response, ON-signal, and OFF-signal-suppression
 families equal prior standing:
 
 $$
-S_{behavior} = -\log\left[
+S_{\mathrm{MSRB}} = -\log\left[
 \frac{1}{3}\left(
 \frac{1}{|R|}\sum_{c \in R}e^{-x_c}
 + \frac{1}{|ON|}\sum_{c \in ON}e^{-x_c}
@@ -149,8 +164,10 @@ temperature to preserve preferred nominations.
 
 Family means matter. Weighting each coordinate equally would give response
 pairs or the larger mask partition more influence merely because they contain
-more coordinates. Repeating an identical coordinate within one family leaves
-that family's mean and the overall score unchanged.
+more coordinates. Uniformly replicating every coordinate in one family leaves
+that family's mean unchanged. Selectively duplicating one coordinate changes
+its within-family weight and can change the score; distinct assay states must
+therefore be declared once rather than expanded as implicit weighting knobs.
 
 #### State-space cardinality boundary
 
@@ -174,7 +191,7 @@ they do not constrain the selector.
 Each coordinate has positive derivative:
 
 $$
-\frac{\partial S_{behavior}}{\partial x_c}
+\frac{\partial S_{\mathrm{MSRB}}}{\partial x_c}
 =
 \frac{w_c e^{-x_c}}
      {\sum_d w_d e^{-x_d}}
@@ -190,10 +207,11 @@ where `w_c = 1/(3|G|)` for a coordinate in family `G`. Therefore:
 - decreasing the reference-relative signal in any OFF state strictly raises
   the score.
 
-The returned `coordinate_weights` are these derivatives in normalized units.
-They sum to one for each candidate. A poor coordinate receives exponentially
-more influence, so the score remains bottleneck-oriented without the plateaus
-of a hard minimum.
+The returned `coordinate_weights` are these candidate-specific derivatives in
+normalized units. They sum to one for each candidate and are distinct from the
+fixed prior weights `w_c`. A poor coordinate receives exponentially more
+influence, so the score remains bottleneck-oriented without the plateaus of a
+hard minimum.
 
 This strictness is a property of the real-valued equation. In finite-precision
 arithmetic, an extremely favorable, nonlimiting coordinate can have an
@@ -212,13 +230,32 @@ For the hard bottleneck `m = min_c x_c` and the prior weight `w_m` of one
 limiting coordinate:
 
 $$
-m \le S_{behavior} \le m - \log(w_m).
+m \le S_{\mathrm{MSRB}} \le m - \log(w_m).
 $$
 
 Making already strong coordinates arbitrarily better cannot lift the scalar
 more than this finite amount above the weakest clearance. The plugin reports
-`hard_bottleneck_clearance`, the limiting coordinate index, and its bottleneck
-weight so reviewers can see that tradeoff directly.
+`hard_bottleneck_clearance`, `compensation_gap`,
+`maximum_compensation_gap`, the limiting coordinate index, its fixed prior
+weight, and its candidate-specific bottleneck weight so reviewers can see that
+tradeoff directly.
+
+### Worked score examples
+
+These examples use unit resolution scales. They demonstrate the equation and
+are not biological acceptance criteria.
+
+- If every normalized clearance equals `+1`, every family score, the hard
+  bottleneck, and $S_{\mathrm{MSRB}}$ equal `+1`.
+- If the response family is `+1`, the ON-signal family is `+100`, and the
+  OFF-suppression family is `-1`, then $S_{\mathrm{MSRB}}\approx-0.028$.
+  Arbitrarily favorable ON signal does not erase the OFF leak or outrank the
+  balanced candidate.
+- Starting from all-zero coordinates, making one coordinate with prior weight
+  $w$ arbitrarily favorable raises the score only toward $-\log(1-w)$. The
+  favorable outlier has finite influence.
+- A positive `behavior_score` can coexist with a negative hard bottleneck.
+  This example prevents the scalar from being read as feasibility.
 
 ### Natural zero is not feasibility
 
@@ -237,21 +274,22 @@ synthesis readiness.
 
 ### Same-state reference claim boundary
 
-The generic objective receives `b_i`; it does not know the reference's biological
-identity. In the stress promoter study, Reader defines:
+The generic objective receives `b_i`; it does not know the reference's
+biological identity or how an assay aggregates replicates. Let
+$\bar{F}_{design,i}$ and $\bar{F}_{reference,i}$ denote the assay-owned reduced
+replicate aggregates for one state. The reference-relative coordinate is:
 
 $$
-b_i = \log_2\left[
-\frac{(YFP/OD600)_{design,i}}
-     {(YFP/OD600)_{pDual-10,i}}
-\right].
+b_i = \bar{F}_{design,i}-\bar{F}_{reference,i}.
 $$
 
-In that study, `b_i = -3` means eightfold lower fluorescence than pDual-10 in
-the same measured state. The defensible claim is therefore "OFF suppression
-relative to same-state pDual-10." pDual-10 does not measure reporter background
-or prove absolute non-expression. No objective can recover an unmeasured
-background reference.
+In the stress promoter study, each $\bar{F}$ is a replicate median of a
+well-level geometric log mean of $YFP/OD600$, and the declared reference is
+pDual-10. There, `b_i = -3` means that the design's reduced fluorescence is
+eightfold lower than pDual-10 in the same measured state. The defensible claim
+is therefore "OFF suppression relative to same-state pDual-10." pDual-10 does
+not measure reporter background or prove absolute non-expression. No objective
+can recover an unmeasured background reference.
 
 ### Output contract
 
@@ -262,6 +300,9 @@ The plugin records these candidate-aligned diagnostics, but OPAL does not
 advertise them as selectable score channels:
 
 - `hard_bottleneck_clearance`: worst individual normalized clearance;
+- `compensation_gap`: score minus the hard bottleneck;
+- `maximum_compensation_gap`: analytic ceiling from the limiting coordinate's
+  prior weight;
 - `response_family_score`: smooth response-ordering bottleneck;
 - `on_signal_family_score`: smooth ON-signal bottleneck;
 - `off_signal_suppression_family_score`: smooth OFF-signal-suppression bottleneck.
@@ -269,6 +310,7 @@ advertise them as selectable score channels:
 The public mathematics API additionally returns:
 
 - every state-level clearance and its stable label;
+- every coordinate's fixed family-balanced prior weight;
 - each coordinate's bottleneck weight;
 - the limiting coordinate index and label;
 - `all_reference_directions_met`;
@@ -329,6 +371,22 @@ Stable log-sum-exp evaluation prevents exponential overflow. Normalized
 clearances beyond floating-point range saturate at a finite numerical guard;
 this affects only arithmetic extremes far outside assay-resolution inputs.
 
+### Plot and review contract
+
+Generic OPAL review surfaces include:
+
+- `multistate_response_behavior_frontier` for the three family scores;
+- `multistate_response_behavior_selected_decomposition` for every coordinate,
+  family score, hard bottleneck, and selected score;
+- `scatter_score_vs_rank` for pool-wide rank context;
+- `vector_summary_heatmap` for the objective-neutral predicted phenotype; and
+- `observed_objective_over_rounds` once multiple measured rounds exist.
+
+The frontier's selected and observed annotation layers are campaign-scoped.
+Neither the plots nor the objective reconstruct Reader evidence or candidate
+identity. Study-issued Reader composites and BaseRender sequence annotations
+remain digest-verified evidence displayed through their public contracts.
+
 ### Source map
 
 - Public math API: `src/dnadesign/opal/api/multistate_response_behavior.py`
@@ -339,3 +397,5 @@ this affects only arithmetic extremes far outside assay-resolution inputs.
 - Parameter schema: `src/dnadesign/opal/src/config/plugin_schemas.py`
 - Objective tests:
   `src/dnadesign/opal/tests/objectives/test_objective_multistate_response_behavior_v1.py`
+- Stress-study end-to-end example:
+  `docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md`

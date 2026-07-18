@@ -70,7 +70,7 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
     )
 
     assert payload["schema_version"] == "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
-    assert payload["campaign_slug"] == "secg_rmf_greedy"
+    assert payload["campaign_slug"] == "secg_msrb_greedy"
     assert payload["round"] == "r0"
     assert "observed_round" not in payload
     assert "label_input" not in payload
@@ -565,5 +565,5 @@ def test_display_verifier_rejects_a_different_campaign_destination(tmp_path: Pat
     display["campaign_slug"] = "secg_cipro_rf_sfxi_topn"
     result.manifest_json.write_text(json.dumps(display, indent=2) + "\n", encoding="utf-8")
 
-    with pytest.raises(ReaderPromoterEvidenceError, match="secg_rmf_greedy"):
+    with pytest.raises(ReaderPromoterEvidenceError, match="secg_msrb_greedy"):
         verify_reader_promoter_evidence_manifest(result.manifest_json)

@@ -7,7 +7,7 @@ opal_selection_set_show_json:
   - selection-set
   - show
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --view
   - <selection_view_id>
   - --round
@@ -23,7 +23,7 @@ opal_selection_set_export_csv_json:
   - selection-set
   - export
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --view
   - <selection_view_id>
   - --round
@@ -42,7 +42,7 @@ opal_selection_batch_show_json:
   - selection-batch
   - show
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --round
   - <as_of_round>
   - --json
@@ -54,7 +54,7 @@ opal_campaign_progress_json:
   - opal
   - progress
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --round
   - latest
   - --json
@@ -67,7 +67,7 @@ opal_campaign_review_json:
   - opal
   - review
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --view
   - <selection_view_id>
   - --round

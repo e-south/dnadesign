@@ -21,7 +21,7 @@ checks:
   - kind: command
     check_id: opal.campaign.validate
     check_group: opal
-    summary: The RMF campaign validates its candidate table and typed observed-label source.
+    summary: The MSRB campaign validates its candidate table and typed observed-label source.
     required: true
     surface: opal_campaign_validate_json
   - kind: command

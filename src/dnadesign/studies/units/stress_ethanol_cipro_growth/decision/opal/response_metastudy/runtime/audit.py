@@ -20,6 +20,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
     build_all_primary_measurements,
 )
 
+from ...source_evidence import rmf_round0_source_evidence_root
 from ..core.contracts import (
     DEFAULT_RECOMMENDATION_THRESHOLDS,
     SFXI_SOURCE_PROVENANCE,
@@ -109,7 +110,7 @@ def _materialize_metastudy(
         repo_root=repo_root.resolve(),
         reader_bundle_root=reader_bundle_root.resolve(),
         out_dir=out_dir.resolve(),
-        campaign_root=(repo_root / "src/dnadesign/opal/campaigns").resolve(),
+        campaign_root=rmf_round0_source_evidence_root(repo_root).resolve(),
     )
     paths.out_dir.mkdir(parents=True, exist_ok=True)
     stress_campaign = load_stress_campaign_contract(paths)

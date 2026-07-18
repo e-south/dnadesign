@@ -595,12 +595,13 @@ def test_plot_cli_list_configured_json_error_when_config_missing():
     assert "Traceback" not in res.stderr
 
 
-def test_stress_rmf_campaign_declares_concise_plot_policy() -> None:
-    config_path = Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml")
+def test_stress_msrb_campaign_declares_concise_plot_policy() -> None:
+    config_path = Path("src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml")
     expected = {
-        "rmf_candidate_frontier": "response_magnitude_feasibility_frontier",
-        "rmf_score_vs_rank": "scatter_score_vs_rank",
-        "rmf_selected_constraints": "response_magnitude_feasibility_constraint_decomposition",
+        "msrb_family_frontier": "multistate_response_behavior_frontier",
+        "msrb_score_vs_rank": "scatter_score_vs_rank",
+        "msrb_allocated_evidence": "multistate_response_behavior_selected_decomposition",
+        "selected_response_window_summary": "vector_summary_heatmap",
     }
 
     campaign_cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -614,7 +615,12 @@ def test_stress_rmf_campaign_declares_concise_plot_policy() -> None:
         plot_presets=plot_cfg.plot_presets,
     )
     assert {spec["name"]: spec["kind"] for spec in specs} == expected
-    assert all(spec["round_selector"] == "latest" for spec in specs)
+    assert {spec["name"]: spec["round_selector"] for spec in specs} == {
+        "msrb_family_frontier": "latest",
+        "msrb_score_vs_rank": "latest",
+        "msrb_allocated_evidence": "latest",
+        "selected_response_window_summary": "all",
+    }
     assert all(spec.get("round_variants") is None for spec in specs)
 
 
@@ -833,7 +839,7 @@ def test_plot_cli_generic_primitives_write_manifested_data(tmp_path):
         assert manifest["status"] == "written"
         assert manifest["tidy_csv"].endswith(".csv")
         width, height = _png_dimensions(workdir / "outputs" / "plots" / f"{name}_r0.png")
-        if name == "feature_heat":
+        if name in {"feature_heat", "vector_heat"}:
             assert width > height
         else:
             assert width == height

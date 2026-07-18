@@ -1,0 +1,79 @@
+plot_defaults:
+  output:
+    format: png
+    dpi: 300
+    save_data: true
+
+plot_presets:
+  msrb_family_frontier:
+    kind: multistate_response_behavior_frontier
+    round_selector: latest
+    tags: [decision, msrb]
+    params:
+      title: "Predicted multistate response behavior"
+      response_family_label: 'Response-ordering family score, $S_R$'
+      on_signal_family_label: 'Intended-ON signal family score, $S_{\mathrm{ON}}$'
+      off_signal_suppression_family_label: 'Intended-OFF suppression family score, $S_{\mathrm{OFF}}$'
+      figsize_in: [8.8, 7.4]
+      caption: "Each point is one campaign candidate. Rightward response ordering, upward intended-ON signal, and redder intended-OFF suppression are favorable. Diamonds are allocated candidates; outlined symbols are observed batches. Zero is a reference direction, not feasibility."
+      state_labels:
+        "00": "No stress"
+        "10": "EtOH"
+        "01": "Cipro"
+        "11": "EtOH + Cipro"
+      surface_label: "MSRB family landscape"
+
+plots:
+  - name: msrb_family_frontier
+    preset: msrb_family_frontier
+
+  - name: msrb_score_vs_rank
+    kind: scatter_score_vs_rank
+    round_selector: latest
+    tags: [diagnostic, msrb, selection]
+    params:
+      title: "Predicted MSRB score by rank"
+      score_field: view__selection_score
+      score_label: 'Predicted Multistate Response Behavior, $S_{\mathrm{MSRB}}$'
+      rank_mode: competition
+      rank_scale: log
+      rank_label: 'Active-view competition rank, $k$ (rank 1 at right; log scale)'
+      show_selection_view: true
+      title_location: center
+      legend_location: below
+      rasterize_at: 10000
+      caption: "Predicted MSRB score versus competition rank. Open diamonds mark candidates allocated to the active view. The score has no pass boundary; rank 1 appears at the right on a reversed logarithmic axis."
+
+  - name: msrb_allocated_evidence
+    kind: multistate_response_behavior_selected_decomposition
+    round_selector: latest
+    tags: [decision, msrb, selection]
+    params:
+      title: "Allocated MSRB evidence"
+      candidate_label_mode: alias
+      caption: "Each row is one model prediction allocated to the active view. State-level response, intended-ON signal, and intended-OFF suppression coordinates are followed by family scores, the hard bottleneck, and the MSRB score. The outline marks the limiting coordinate; zero is a reference direction, not feasibility."
+      state_labels:
+        "00": "No stress"
+        "10": "EtOH"
+        "01": "Cipro"
+        "11": "EtOH + Cipro"
+
+  - name: selected_response_window_summary
+    kind: vector_summary_heatmap
+    round_selector: all
+    tags: [diagnostic, phenotype, round-history]
+    params:
+      title: "Predicted response-window phenotype of allocated candidates"
+      vector_field: pred__y_hat_model
+      cohort: selected
+      aggregation: mean
+      include_reference_vector: false
+      show_selection_view: true
+      figsize_in: [10.8, 3.6]
+      cmap: RdBu_r
+      center: 0.0
+      annotate_values: true
+      max_annotation_cells: 64
+      channel_labels: ['$r_{00}$', '$r_{10}$', '$r_{01}$', '$r_{11}$', '$b_{00}$', '$b_{10}$', '$b_{01}$', '$b_{11}$']
+      value_label: "Mean predicted coordinate"
+      caption: "The model predicts the complete eight-component Reader phenotype before MSRB is applied. Red denotes a larger coordinate and blue a smaller coordinate; color is not target-mask desirability. Rows summarize allocated candidates by round for the active view; no target mask is encoded in the vector itself."

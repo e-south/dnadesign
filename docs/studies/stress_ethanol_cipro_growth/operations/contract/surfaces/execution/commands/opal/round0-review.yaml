@@ -7,7 +7,7 @@ opal_campaign_validate_json:
   - opal
   - validate
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --json
 opal_selection_batch_round0_json:
   surface_type: command
@@ -19,7 +19,7 @@ opal_selection_batch_round0_json:
   - selection-batch
   - show
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --round
   - '0'
   - --json
@@ -32,7 +32,7 @@ opal_verify_outputs_round0_ethanol_json:
   - opal
   - verify-outputs
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --view
   - ethanol
   - --round
@@ -47,7 +47,7 @@ opal_verify_outputs_round0_ciprofloxacin_json:
   - opal
   - verify-outputs
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --view
   - ciprofloxacin
   - --round
@@ -62,7 +62,7 @@ opal_verify_outputs_round0_and_json:
   - opal
   - verify-outputs
   - -c
-  - src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml
+  - src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
   - --view
   - and
   - --round

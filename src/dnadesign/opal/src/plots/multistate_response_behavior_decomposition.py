@@ -157,8 +157,8 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         r"$S_R$",
         r"$S_{\mathrm{ON}}$",
         r"$S_{\mathrm{OFF}}$",
-        r"$q_{\min}$",
-        r"$S_{\mathrm{behavior}}$",
+        r"$x_{\min}$",
+        r"$S_{\mathrm{MSRB}}$",
     ]
     ax.set_xticks(np.arange(matrix.shape[1]), [*coordinate_tick_labels, *summary_tick_labels], rotation=45, ha="right")
     row_labels = _candidate_row_labels(context, selected=selected, mode=params.get("candidate_label_mode", "short_id"))
@@ -212,7 +212,7 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         fig,
         ax,
         image,
-        label="Normalized behavior value\nred = favorable; 0 = reference direction\nnot feasibility",
+        label="Normalized behavior evidence",
         pad=0.06,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )

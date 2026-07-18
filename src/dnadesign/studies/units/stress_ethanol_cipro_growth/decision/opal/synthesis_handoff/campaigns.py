@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG = Path("src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml")
+DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG = Path("src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml")
 
 STRESS_SELECTION_VIEW_ALIAS_CODES: dict[str, str] = {
     "ethanol": "ETH",

@@ -210,6 +210,8 @@ def render_notebook_layered_scatter_image(
         )
     }
     batch_labels = [str(item["label"]) for item in contract["observed_batches"] if str(item["id"]) in selected_batches]
+    runtime = _mapping(contract["runtime"])
+    color_context = str(_mapping(runtime.get("color_scale")).get("context") or "").strip()
     return mo.image(
         payload.getvalue(),
         alt=(
@@ -217,6 +219,7 @@ def render_notebook_layered_scatter_image(
             "observations selected by study batch."
         ),
         caption=(
+            f"Color: {color_context}. "
             "Observed vectors are measured evidence rescored under the active selection view. "
             f"Visible observed batches: {', '.join(batch_labels) if batch_labels else 'none'}."
         ),

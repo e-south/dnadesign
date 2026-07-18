@@ -21,7 +21,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 
 
 def test_publish_command_reports_exact_immutable_artifact_paths(monkeypatch, capsys, tmp_path: Path) -> None:
-    output = tmp_path / "dataset/_opal/response_window_labels_v4"
+    output = tmp_path / "dataset/_opal/response_window_labels_v5"
     monkeypatch.setattr(
         cli,
         "publish_response_window_labels",
@@ -110,4 +110,4 @@ def test_study_verify_has_no_implicit_campaign_config(tmp_path: Path) -> None:
     args = cli.build_parser().parse_args(["verify", "--dataset-root", str(tmp_path / "dataset")])
 
     assert not hasattr(args, "campaign_config")
-    assert args.output_relative_directory == "_opal/response_window_labels_v4"
+    assert args.output_relative_directory == "_opal/response_window_labels_v5"

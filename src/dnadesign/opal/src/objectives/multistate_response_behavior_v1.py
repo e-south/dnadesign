@@ -29,6 +29,8 @@ from .multistate_response_behavior_math import (
 SCORE_CHANNELS = ("behavior_score",)
 DIAGNOSTIC_CHANNELS = (
     "hard_bottleneck_clearance",
+    "compensation_gap",
+    "maximum_compensation_gap",
     "response_family_score",
     "on_signal_family_score",
     "off_signal_suppression_family_score",
@@ -63,15 +65,17 @@ def multistate_response_behavior_v1(
         normalization=params["normalization"],
     )
     scores = {"behavior_score": np.asarray(scored.behavior_score, dtype=float)}
-    limiting_weight = scored.coordinate_weights[
+    limiting_bottleneck_weight = scored.coordinate_weights[
         np.arange(len(scored.behavior_score)),
         scored.limiting_coordinate_index,
     ]
+    limiting_prior_weight = scored.coordinate_prior_weights[scored.limiting_coordinate_index]
     diagnostics = {
         **{channel: np.asarray(getattr(scored, channel), dtype=float) for channel in DIAGNOSTIC_CHANNELS},
         "all_reference_directions_met": scored.all_reference_directions_met.astype(np.int8),
         "limiting_coordinate_index": scored.limiting_coordinate_index,
-        "limiting_coordinate_weight": limiting_weight,
+        "limiting_coordinate_prior_weight": limiting_prior_weight,
+        "limiting_coordinate_bottleneck_weight": limiting_bottleneck_weight,
         "uncertainty_emitted": False,
         "summary_stats": {
             "candidate_count": int(scored.behavior_score.size),

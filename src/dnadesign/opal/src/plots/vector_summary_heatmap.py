@@ -20,7 +20,6 @@ from ..registries.plots import PlotMeta, register_plot
 from ._cohort_utils import positive_ranks, selected_mask
 from ._events_util import load_events, load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import (
-    DEFAULT_SQUARE_FIGSIZE,
     add_flush_colorbar,
     apply_notebook_axes_style,
     apply_plot_style,
@@ -49,6 +48,10 @@ from ._mpl_utils import (
             "aggregation": "Currently mean.",
             "reference_mse_panel": "When a reference vector is present, add a round-wise MSE panel (default false).",
             "cmap": "Matplotlib colormap (default opal_seafoam: low values white, high values dark seafoam).",
+            "center": "Optional numeric colormap center for signed vectors.",
+            "annotate_values": "Write values in cells when the table is small enough (default false).",
+            "max_annotation_cells": "Maximum cells eligible for value annotations (default 64).",
+            "show_selection_view": "Append the active selection-view label to the title (default false).",
             "value_label": "Colorbar label (default Mean predicted response for prediction vectors).",
         },
         requires=["as_of_round", "run_id", "pred__y_hat_model"],
@@ -224,8 +227,8 @@ def render(context, params: dict) -> None:
         spacer_ax.axis("off")
         ax_mse = fig.add_subplot(gs[0, 3])
     else:
-        figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
-        fig, ax = plt.subplots(figsize=figsize)
+        figsize = tuple(params.get("figsize_in", _default_heatmap_figsize(dim=dim, row_count=len(y_labels))))
+        fig, ax = plt.subplots(figsize=figsize, layout="constrained")
         cax = None
         ax_mse = None
     tick_font_size = _adaptive_heatmap_tick_font_size(
@@ -237,6 +240,9 @@ def render(context, params: dict) -> None:
     )
     cmap = sequential_colormap(params.get("cmap", "opal_seafoam"))
     masked_matrix = np.ma.masked_invalid(matrix)
+    center_raw = params.get("center")
+    center = None if center_raw is None else float(center_raw)
+    norm = _heatmap_norm(matrix, center=center)
     x_edges = np.arange(dim + 1)
     y_edges = np.arange(len(y_labels) + 1)
     im = ax.pcolormesh(
@@ -244,13 +250,17 @@ def render(context, params: dict) -> None:
         y_edges,
         masked_matrix,
         cmap=cmap,
+        norm=norm,
         edgecolors="white",
         linewidth=0.75,
         shading="flat",
     )
     ax.set_xlim(0, dim)
     ax.set_ylim(len(y_labels), 0)
-    ax.set_aspect("equal", adjustable="box")
+    try:
+        ax.set_box_aspect(max(0.22, min(0.8, 2.0 * len(y_labels) / max(dim, 1))))
+    except Exception:
+        ax.set_aspect("auto")
     apply_notebook_axes_style(ax, grid=False, square=False)
     ax.set_xticks(np.arange(dim) + 0.5)
     ax.set_xticklabels(
@@ -265,10 +275,17 @@ def render(context, params: dict) -> None:
     channel_axis_label = str(params.get("channel_axis_label", "Vector channel")).strip()
     if channel_axis_label:
         ax.set_xlabel(channel_axis_label, fontsize=font_size)
-    ax.set_title(pretty_title(params.get("title", "Vector summary heatmap")), fontsize=title_font_size)
+    title = pretty_title(params.get("title", "Vector summary heatmap"))
+    if bool(params.get("show_selection_view", False)):
+        view_id = str(getattr(context, "selection_view_id", "") or "").strip()
+        if not view_id:
+            raise ValueError("show_selection_view requires an active selection_view_id.")
+        title = f"{title} · {pretty_title(pretty_label(view_id))}"
+    ax.set_title(title, fontsize=title_font_size, fontweight="semibold", pad=10)
     value_label = str(params.get("value_label", f"{pretty_label(aggregation)} predicted response"))
     if cax is None:
-        add_flush_colorbar(fig, ax, im, label=value_label)
+        colorbar = add_flush_colorbar(fig, ax, im, label=value_label, ticklabelsize=tick_font_size)
+        colorbar.ax.yaxis.label.set_size(font_size)
     else:
         fig.subplots_adjust(left=0.11, right=0.965, bottom=0.24, top=0.84, wspace=0.08)
         fig.canvas.draw()
@@ -311,11 +328,18 @@ def render(context, params: dict) -> None:
             ax_mse.set_box_aspect(1.0)
         except Exception:
             pass
-    left_margin = 0.13 if ax_mse is not None else 0.18
-    if ax_mse is None:
-        fig.subplots_adjust(left=left_margin, right=0.96, bottom=0.22, top=0.86)
+    _annotate_heatmap_values(
+        ax,
+        matrix,
+        enabled=bool(params.get("annotate_values", False)),
+        max_cells=int(params.get("max_annotation_cells", 64)),
+        center=center,
+    )
     out = context.output_dir / context.filename
-    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
+    if ax_mse is None:
+        fig.savefig(out, dpi=context.dpi, facecolor="white", bbox_inches="tight", pad_inches=0.1)
+    else:
+        save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:
@@ -371,6 +395,62 @@ def _adaptive_heatmap_tick_font_size(
     y_pitch = height * heatmap_height_fraction * 72.0 / max(int(row_count), 1)
     fitted = min(float(requested), x_pitch * 0.82, y_pitch * 0.78)
     return max(8.5, min(13.0, fitted))
+
+
+def _default_heatmap_figsize(*, dim: int, row_count: int) -> tuple[float, float]:
+    """Choose a compact landscape canvas for a vector-by-round table."""
+
+    width = max(8.4, min(12.0, 4.8 + 0.75 * max(int(dim), 1)))
+    height = max(3.4, min(7.2, 2.8 + 0.55 * max(int(row_count), 1)))
+    return width, height
+
+
+def _heatmap_norm(matrix: np.ndarray, *, center: float | None):
+    """Return a symmetric diverging normalization when a center is declared."""
+
+    if center is None:
+        return None
+    if not math.isfinite(center):
+        raise ValueError("center must be finite when provided.")
+    finite = np.asarray(matrix, dtype=float)[np.isfinite(matrix)]
+    if finite.size == 0:
+        raise ValueError("centered heatmap requires at least one finite value.")
+    extent = max(float(np.max(np.abs(finite - center))), 1.0e-9)
+    from matplotlib.colors import TwoSlopeNorm
+
+    return TwoSlopeNorm(vmin=center - extent, vcenter=center, vmax=center + extent)
+
+
+def _annotate_heatmap_values(
+    ax,
+    matrix: np.ndarray,
+    *,
+    enabled: bool,
+    max_cells: int,
+    center: float | None = None,
+) -> list[object]:
+    """Annotate a small heatmap without turning dense vector tables into text walls."""
+
+    values = np.asarray(matrix, dtype=float)
+    if not enabled or max_cells < 1 or values.size > max_cells:
+        return []
+    midpoint = 0.0 if center is None else float(center)
+    extent = max(float(np.max(np.abs(values - midpoint))), 1.0e-9)
+    artists = []
+    for row_index, row in enumerate(values):
+        for column_index, value in enumerate(row):
+            artists.append(
+                ax.text(
+                    column_index + 0.5,
+                    row_index + 0.5,
+                    f"{value:.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=8.75,
+                    color="white" if abs(value - midpoint) > 0.58 * extent else "#111111",
+                )
+            )
+    return artists
 
 
 def _coerce_vector(value: object, *, field: str) -> list[float]:

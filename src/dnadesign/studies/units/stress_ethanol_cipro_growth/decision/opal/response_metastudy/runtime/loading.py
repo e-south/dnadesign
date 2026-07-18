@@ -121,7 +121,7 @@ def load_stress_campaign_contract(paths: MetastudyPaths) -> StressCampaignContra
     x_column_name = data.get("x_column_name")
     if not all(isinstance(value, str) and value for value in (dataset, relative_path, x_column_name)):
         raise ValueError("Stress campaign candidate-table identity is incomplete.")
-    records_path = (campaign_dir / relative_path / dataset / "records.parquet").resolve()
+    records_path = (paths.repo_root / "src/dnadesign/usr/datasets" / dataset / "records.parquet").resolve()
     if not records_path.is_file():
         raise FileNotFoundError(f"Stress campaign candidate records are missing: {records_path}")
     model = payload.get("model")

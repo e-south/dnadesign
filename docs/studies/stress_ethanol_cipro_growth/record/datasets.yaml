@@ -227,7 +227,7 @@ datasets:
     onboard_mode: create_new
     authority: shared
     notes: >-
-      Materialized shared OPAL candidate feature table for the unified RMF
+      Materialized shared OPAL candidate feature table for the response-window
       campaign. This is a USR `records.parquet` candidate universe
       with 157185 rows: 157160 generated promoter rows from the four declared
       DenseGen plans (`background_only`, `ethanol`, `ciprofloxacin`, and
@@ -241,8 +241,8 @@ datasets:
       `opal_candidate__design_family`, and `opal_candidate__sfxi_ref__collection_id`
       provenance columns plus one fixed-length vector-valued X column named
       `latentdna__evo2_7b__context_anchor_mean_bidir_concat`. SFXI source
-      labels remain at `_opal/observed_labels.parquet`; the unified RMF campaign
-      reads `_opal/response_window_labels_v4/observed_labels.parquet`. Shared
+      labels remain at `_opal/observed_labels.parquet`; the active MSRB campaign
+      reads `_opal/response_window_labels_v5/observed_labels.parquet`. Shared
       predictions, view-specific selections, and the logical selection batch
       remain OPAL runtime artifacts. The X value is the Fwd+RC 1 kb context-anchor Evo2 7B
       intermediate embedding vector; it is not UMAP, centroid distance, an

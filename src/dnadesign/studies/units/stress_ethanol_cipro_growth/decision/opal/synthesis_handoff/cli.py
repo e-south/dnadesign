@@ -135,7 +135,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--campaign-config",
         type=Path,
-        help=("Unified OPAL campaign config used when --source opal-round. Defaults to the stress RMF campaign."),
+        help=("Unified OPAL campaign config used when --source opal-round. Defaults to the active stress campaign."),
     )
     parser.add_argument(
         "--round",
@@ -279,7 +279,7 @@ def _batch_id_from_source(
     if source == "opal-round":
         if as_of_round is None:
             raise ValueError("--round is required when --source opal-round")
-        return args_batch_id or f"stress-opal-r{int(as_of_round)}-rmf-v1"
+        return args_batch_id or f"stress-opal-r{int(as_of_round)}-msrb-v1"
     return args_batch_id or "stress-opal-synthesis-batch"
 
 

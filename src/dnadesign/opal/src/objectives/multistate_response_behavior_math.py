@@ -59,9 +59,12 @@ class MultistateResponseBehaviorScore:
     response_family_score: np.ndarray
     on_signal_family_score: np.ndarray
     off_signal_suppression_family_score: np.ndarray
+    coordinate_prior_weights: np.ndarray
     coordinate_weights: np.ndarray
     limiting_coordinate_index: np.ndarray
     limiting_coordinate_label: tuple[str, ...]
+    compensation_gap: np.ndarray
+    maximum_compensation_gap: np.ndarray
     all_reference_directions_met: np.ndarray
     normalization: dict[str, float]
 
@@ -168,17 +171,23 @@ def score_multistate_response_behavior(
         prior_weights=coordinate_prior,
     )
     limiting_index = np.argmin(coordinate_clearances, axis=1).astype(int)
+    hard_bottleneck = np.min(coordinate_clearances, axis=1)
+    compensation_gap = behavior_score - hard_bottleneck
+    maximum_compensation_gap = -np.log(coordinate_prior[limiting_index])
     labels = clearances.coordinate_labels
     return MultistateResponseBehaviorScore(
         clearances=clearances,
         behavior_score=behavior_score,
-        hard_bottleneck_clearance=np.min(coordinate_clearances, axis=1),
+        hard_bottleneck_clearance=hard_bottleneck,
         response_family_score=response_score,
         on_signal_family_score=on_score,
         off_signal_suppression_family_score=off_score,
+        coordinate_prior_weights=coordinate_prior,
         coordinate_weights=coordinate_weights,
         limiting_coordinate_index=limiting_index,
         limiting_coordinate_label=tuple(labels[index] for index in limiting_index),
+        compensation_gap=compensation_gap,
+        maximum_compensation_gap=maximum_compensation_gap,
         all_reference_directions_met=np.all(coordinate_clearances >= 0.0, axis=1),
         normalization=dict(clearances.normalization),
     )

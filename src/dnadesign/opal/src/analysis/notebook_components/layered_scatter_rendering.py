@@ -26,6 +26,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     import matplotlib.pyplot as plt
     from matplotlib.cm import ScalarMappable
     from matplotlib.colors import TwoSlopeNorm
+    from matplotlib.lines import Line2D
 
     from ...plots._mpl_utils import (
         NOTEBOOK_AXIS_LABEL_FONTSIZE,
@@ -37,6 +38,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         add_flush_colorbar,
         apply_notebook_axes_style,
         apply_plot_style,
+        compact_batch_label,
         observed_batch_marker_map,
         scatter_smart,
         wrap_plot_title,
@@ -130,7 +132,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             s=34,
             edgecolors="#111111",
             linewidths=0.8,
-            label=_legend_label(f"Observed · {batch_labels[batch_id]} (n={len(batch)})"),
+            label=_legend_label(f"Observed · {compact_batch_label(batch_id)} (n={len(batch)})"),
             zorder=3,
         )
     reference_lines = _mapping(runtime["reference_lines"])
@@ -149,12 +151,25 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         linespacing=1.25,
     )
     ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
-    handles, _ = ax.get_legend_handles_labels()
+    handles, labels = ax.get_legend_handles_labels()
+    if handles and labels[0].startswith("Predicted pool"):
+        handles[0] = Line2D(
+            [],
+            [],
+            linestyle="none",
+            marker="o",
+            markersize=7,
+            markerfacecolor="#56B4E9",
+            markeredgecolor="none",
+            alpha=0.8,
+        )
     ax.legend(
+        handles,
+        labels,
         loc="upper center",
         bbox_to_anchor=(0.5, -0.14),
         fontsize=NOTEBOOK_LEGEND_FONTSIZE,
-        ncol=min(2, max(1, len(handles))),
+        ncol=3 if len(handles) == 3 else min(2, max(1, len(handles))),
         frameon=False,
         handletextpad=0.4,
         columnspacing=0.7,
@@ -166,13 +181,13 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         fig,
         ax,
         mappable,
-        label=f"{runtime['color_label']}\n{color_scale['context']}",
+        label=str(runtime["color_label"]),
         pad=0.065,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )
     colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
     colorbar.ax.yaxis.set_label_position("left")
-    colorbar.ax.yaxis.labelpad = 0
+    colorbar.ax.yaxis.labelpad = 8
     _annotate_visible_rows(
         ax,
         rows,

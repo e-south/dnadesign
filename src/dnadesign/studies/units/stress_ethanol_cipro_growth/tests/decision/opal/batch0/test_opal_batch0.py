@@ -1798,18 +1798,18 @@ def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
     }
     x_col = "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
 
-    cfg = load_config(CAMPAIGN_ROOT / "secg_rmf_greedy" / "configs/campaign.yaml")
-    assert cfg.campaign.slug == "secg_rmf_greedy"
+    cfg = load_config(CAMPAIGN_ROOT / "secg_msrb_greedy" / "configs/campaign.yaml")
+    assert cfg.campaign.slug == "secg_msrb_greedy"
     assert cfg.data.location.kind == "usr"
     assert cfg.data.location.dataset == "usr_prom_eth_cip_opal_candidates"
     assert cfg.data.location.path.endswith("src/dnadesign/usr/datasets")
     assert cfg.data.x_column_name == x_col
-    assert cfg.data.y_column_name == "opal__secg_rmf_greedy__response_window_y"
+    assert cfg.data.y_column_name == "opal__reader_response_window_vector_v1__y"
     assert cfg.data.y_expected_length == 8
     assert cfg.labels.source.kind == "usr_sidecar"
     assert cfg.labels.source.dataset == "usr_prom_eth_cip_opal_candidates"
-    assert cfg.labels.source.path == "_opal/response_window_labels_v4/observed_labels.parquet"
-    assert cfg.labels.source.manifest_path == "_opal/response_window_labels_v4/promotion.manifest.json"
+    assert cfg.labels.source.path == "_opal/response_window_labels_v5/observed_labels.parquet"
+    assert cfg.labels.source.manifest_path == "_opal/response_window_labels_v5/promotion.manifest.json"
     assert cfg.labels.y_space == "reader_response_window_vector_v1"
     assert cfg.labels.round_column == "observed_round"
     assert cfg.labels.dedup_policy == "error_on_duplicate"
@@ -1824,7 +1824,8 @@ def test_opal_campaign_configs_point_at_candidate_feature_table() -> None:
     assert all(view.selection.name == "top_n" for view in cfg.selection_views)
     assert all(view.selection.params["top_k"] == 6 for view in cfg.selection_views)
     assert all(view.selection.params["require_exact_top_k"] is True for view in cfg.selection_views)
-    assert all(view.selection.params["score_ref"] == "feasibility_margin" for view in cfg.selection_views)
+    assert all(view.objective.name == "multistate_response_behavior_v1" for view in cfg.selection_views)
+    assert all(view.selection.params["score_ref"] == "behavior_score" for view in cfg.selection_views)
     assert cfg.selection_batch.deduplicate_by == "sequence"
     assert cfg.selection_batch.expected_unique_count == 18
 
@@ -1859,7 +1860,7 @@ def test_study_docs_use_candidate_feature_table_name() -> None:
     assert "response-window label snapshot" in docs
     assert "digest-pinned study-provenance manifest" in docs
     assert "_opal/observed_labels.parquet" in docs
-    assert "_opal/response_window_labels_v4/observed_labels.parquet" in docs
+    assert "_opal/response_window_labels_v5/observed_labels.parquet" in docs
     assert "decision.opal.batch0.provenance" in docs
     assert "raw Infer vector concat" in docs
 
@@ -1922,7 +1923,7 @@ def test_opal_round0_ops_phase_routes_to_readonly_candidate_review() -> None:
     assert phase_by_id["opal_candidate_table_pre_assay"]["status"] == "complete"
     review_phase = phase_by_id["opal_round0_candidate_review"]
     assert review_phase["status"] == "in_progress"
-    assert review_phase["next_surface"].endswith("notebooks/opal_secg_rmf_greedy_analysis.py")
+    assert review_phase["next_surface"].endswith("notebooks/opal_secg_msrb_greedy_analysis.py")
     assert "does not authorize synthesis" in review_phase["notes"]
     assert bindings["group_phase_bindings"]["opal"] == "opal_round0_candidate_review"
 

@@ -74,7 +74,7 @@ panel = render_sequence_panel_image(candidate_row, config=config)
   campaign: 27 exact labels and eight measured-candidate exclusions.
 - OPAL run and explain read the unified response-window observed labels through
   `labels.source.kind: usr_sidecar` at
-  `_opal/response_window_labels_v4/observed_labels.parquet`.
+  `_opal/response_window_labels_v5/observed_labels.parquet`.
 - Generic `opal ingest-y` cannot modify the manifest-pinned response-window
   label source.
 - The stress config sets `writeback.prediction_records: ledger_only`, so runs keep
@@ -99,7 +99,7 @@ panel = render_sequence_panel_image(candidate_row, config=config)
   digest-pinned study-provenance manifest records the Reader artifact,
   candidate-binding artifact, reduction, and repeated-candidate label-source
   contracts. The published path is
-  `usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v4/observed_labels.parquet`.
+  `usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v5/observed_labels.parquet`.
 - Consumer contract: one campaign fits the shared eight-output phenotype model.
   Ethanol, ciprofloxacin, and AND masks are named selection views over the same
   predictions.

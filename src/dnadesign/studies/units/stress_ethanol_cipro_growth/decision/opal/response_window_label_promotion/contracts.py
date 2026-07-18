@@ -22,11 +22,11 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
     VALUE_COLUMNS,
 )
 
-CAMPAIGN_SLUG = "secg_rmf_greedy"
+CAMPAIGN_SLUG = "secg_msrb_greedy"
 STUDY_ID = "stress_ethanol_cipro_growth"
 Y_SPACE = "reader_response_window_vector_v1"
-PROVENANCE_SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_label_promotion.v4"
-DEFAULT_OUTPUT_DIRECTORY = "_opal/response_window_labels_v4"
+PROVENANCE_SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_label_promotion.v5"
+DEFAULT_OUTPUT_DIRECTORY = "_opal/response_window_labels_v5"
 LABEL_FILENAME = "observed_labels.parquet"
 PROVENANCE_FILENAME = "study_provenance.json"
 PROMOTION_FILENAME = "promotion.manifest.json"

@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-decision
 title: OPAL decision surfaces
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-18
 ---
 
 ## OPAL Decision Surfaces
@@ -11,22 +11,27 @@ last_verified: 2026-07-15
 Study-owned OPAL surfaces keep candidate universes, DenseGen-label probes, and
 biological guardrails outside generic OPAL core.
 
-OPAL registers SFXI and RMF as independent objective plugins. `top_n` and
-`expected_improvement` are selectors, not metric identities. The current stress
-campaign is configured to model the response-window eight-component Y and
-apply RMF inside its selection views. Its verified source contains 27 exact
-labels and eight measured-candidate exclusions. Round 0 completed as a frozen
-learning probe with one shared RF and 18 sequence-unique allocations.
+OPAL registers SFXI, Response Magnitude Feasibility (RMF), and Multistate
+Response Behavior (MSRB) as independent objective plugins. `top_n` and
+`expected_improvement` are selectors, not objective identities. The current
+stress campaign models the neutral Reader response-window eight-component Y
+and applies MSRB under each selection view's target mask. Its verified source
+contains 27 exact labels and eight measured-candidate exclusions. The campaign
+is a prospectively frozen greedy learning probe; predictive support and
+prospective enrichment remain unproven.
 
 - `batch0/`: pre-assay candidate-table materialization and provenance review.
 - `densegen_axis_probe/`: DenseGen construction-label OPAL probes, including
   the strict TFBS learnability workflow.
 - `reader_promoter_evidence/`: verifies Reader publication bundles and writes
-  display-only manifests for the `secg_rmf_greedy` campaign.
+  display-only manifests for the `secg_msrb_greedy` campaign.
+- `multistate_response_behavior/`: fixes the study-owned response-window
+  contract, normalization, target masks, evidence posture, and MSRB campaign
+  decision without redefining OPAL's generic objective mathematics.
 - `response_metastudy/`: read-only metric, label, and predictor review over the
-  digest-pinned SFXI source ledgers plus Reader's response-window bundle. It
-  records evidence and risk without changing campaign state or promoting a
-  model.
+  digest-pinned SFXI and RMF comparator evidence plus Reader's response-window
+  bundle. It records evidence and risk without changing campaign state or
+  promoting a model.
 - `synthesis_handoff/`: study-owned physical synthesis handoff for selected
   OPAL promoters, including cloning-strategy transforms, vendor-neutral
   manifests, and vendor export adapters. It wraps the checked-in batch0

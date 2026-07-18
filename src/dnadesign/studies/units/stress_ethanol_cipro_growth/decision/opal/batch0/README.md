@@ -2,14 +2,14 @@
 
 **Owner:** stress_ethanol_cipro_growth study
 **Lifecycle:** active candidate-table materialization; pre-assay seed recorded
-**Last verified:** 2026-07-16
+**Last verified:** 2026-07-18
 
 This directory materializes the shared OPAL candidate table and preserves the
 reviewed 18-row pre-assay seed. The seed combines DenseGen design metadata, the
 selected LatentDNA representation, and the declared synthesis rules. It is
 digest-pinned source provenance, not an executable OPAL model-selection campaign.
 
-Measured-round execution is routed through the unified `secg_rmf_greedy`
+Measured-round execution is routed through the unified `secg_msrb_greedy`
 campaign. Its canonical commands and activation gate are documented in
 `docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/campaign-commands.md`.
 
@@ -43,10 +43,11 @@ DenseGen-backed rows also carry `densegen__used_tfbs_detail` and
 columns are required candidate-table data: OPAL's selected-sequence surface
 passes them to BaseRender's configured `densegen_tfbs` adapter.
 
-The SFXI source runs used the `_opal/observed_labels.parquet`
-sidecar. The unified RMF campaign instead requires
-`_opal/response_window_labels_v4/observed_labels.parquet`, fits one shared eight-output
-model, and writes predictions, view-specific selections, and the logical
+The SFXI source runs used the `_opal/observed_labels.parquet` sidecar. The MSRB
+campaign instead fits one shared eight-output model to the neutral Reader
+response-window Y in
+`_opal/response_window_labels_v5/observed_labels.parquet`. It applies target
+masks after prediction and writes view-specific selections plus the logical
 selection batch to one campaign ledger. `records.parquet` remains the
 candidate/X table. Fork the USR candidate table only when a future campaign
 uses a different candidate universe or X contract.
