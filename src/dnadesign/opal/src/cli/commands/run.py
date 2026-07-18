@@ -25,7 +25,7 @@ from ...core.selection_contracts import (
 from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
 from ...runtime.memory_guard import enforce_x_matrix_memory_budget
 from ...runtime.round_plan import required_candidate_columns
-from ...runtime.run_round import RunRoundRequest, run_round
+from ...runtime.run_round import RunRoundRequest, assert_round_artifacts_writable, run_round
 from ...storage.artifacts import append_round_log_event
 from ...storage.candidate_scope import load_candidate_scope_ids
 from ...storage.locks import CampaignLock
@@ -136,10 +136,36 @@ def cmd_run(
     cfg_path: Path | None = None
     cfg = None
     attempt_id: str | None = None
+    round_log_opened = False
     try:
         attempt_id = uuid.uuid4().hex
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
+
+        # Reject an implicit rerun before opening the prior round's immutable log.
+        ws = CampaignWorkspace.from_config(cfg, cfg_path)
+        st_path = ws.state_path
+        if st_path.exists():
+            try:
+                st = CampaignState.load(st_path)
+            except Exception as e:
+                raise OpalError(f"Failed to load state.json at {st_path}: {e}", ExitCodes.BAD_ARGS) from e
+            exists = any(int(r.round_index) == int(round) for r in st.rounds)
+            if exists and not resume:
+                if not prompt_confirm(
+                    f"[guard] Round r={int(round)} already recorded in {st_path.name}. "
+                    "Overwrite this round entry and artifacts? (y/N): ",
+                    non_interactive_hint="No TTY available. Re-run with --resume to overwrite this round.",
+                ):
+                    print_stdout("Aborted.")
+                    raise typer.Exit(code=ExitCodes.BAD_ARGS)
+                resume = True
+        assert_round_artifacts_writable(
+            ws.round_dir(int(round)),
+            round_index=int(round),
+            allow_resume=bool(resume),
+        )
+
         _append_cli_round_event(
             cfg,
             cfg_path,
@@ -149,6 +175,7 @@ def cmd_run(
             command="run",
             status="started",
         )
+        round_log_opened = True
         store = store_from_cfg(cfg)
         _append_cli_round_event(
             cfg,
@@ -225,34 +252,6 @@ def cmd_run(
         )
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
-
-        # Guard: if this round already exists in state.json, prompt unless --resume
-        st_path = Path(cfg.campaign.workdir) / "state.json"
-        if st_path.exists():
-            try:
-                st = CampaignState.load(st_path)
-            except Exception as e:
-                raise OpalError(f"Failed to load state.json at {st_path}: {e}", ExitCodes.BAD_ARGS) from e
-            exists = any(int(r.round_index) == int(round) for r in st.rounds)
-            if exists and not resume:
-                if not prompt_confirm(
-                    f"[guard] Round r={int(round)} already recorded in {st_path.name}. "
-                    "Overwrite this round entry and artifacts? (y/N): ",
-                    non_interactive_hint="No TTY available. Re-run with --resume to overwrite this round.",
-                ):
-                    _append_cli_round_event(
-                        cfg,
-                        cfg_path,
-                        int(round),
-                        "abort",
-                        attempt_id=attempt_id,
-                        severity="warning",
-                        status="operator_cancelled",
-                        message="operator declined resume confirmation",
-                    )
-                    print_stdout("Aborted.")
-                    raise typer.Exit(code=ExitCodes.BAD_ARGS)
-                resume = True
 
         lockfile = Path(cfg.campaign.workdir) / ".opal.lock"
         _append_cli_round_event(
@@ -345,12 +344,12 @@ def cmd_run(
     except typer.Exit:
         raise
     except OpalError as e:
-        if cfg is not None and cfg_path is not None:
+        if round_log_opened and cfg is not None and cfg_path is not None:
             _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
-        if cfg is not None and cfg_path is not None:
+        if round_log_opened and cfg is not None and cfg_path is not None:
             _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
         internal_error("run", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)

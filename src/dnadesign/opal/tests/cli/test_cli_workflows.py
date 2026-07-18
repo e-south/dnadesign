@@ -28,6 +28,7 @@ from dnadesign.opal.tests._cli_helpers import (
     write_ledger,
     write_records,
     write_records_with_x_values,
+    write_state,
 )
 
 
@@ -355,6 +356,51 @@ def test_run_rejects_x_matrix_memory_budget_before_records_load(tmp_path: Path, 
     log_text = round_log.read_text(encoding="utf-8")
     assert '"stage":"x_validate_done"' in log_text
     assert '"stage":"records_load_start"' not in log_text
+
+
+@pytest.mark.parametrize("operator_declines", [False, True])
+def test_run_rejected_state_rerun_does_not_mutate_completed_round_log(
+    tmp_path: Path,
+    monkeypatch,
+    operator_declines: bool,
+) -> None:
+    workdir, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
+    write_state(workdir, records_path=records, run_id="completed-run", round_index=0)
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+    original_log = round_log.read_bytes()
+    if operator_declines:
+        monkeypatch.setattr(
+            "dnadesign.opal.src.cli.commands.run.prompt_confirm",
+            lambda *_args, **_kwargs: False,
+        )
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "run", "-c", str(campaign), "--round", "0", "--quiet"],
+    )
+
+    assert result.exit_code == 2
+    expected_message = "Aborted." if operator_declines else "Re-run with --resume"
+    assert expected_message in _plain_output(result.output)
+    assert round_log.read_bytes() == original_log
+
+
+def test_run_rejected_artifact_rerun_does_not_mutate_round_log(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    model_artifact = workdir / "outputs" / "rounds" / "round_0" / "model" / "model.joblib"
+    model_artifact.parent.mkdir(parents=True, exist_ok=True)
+    model_artifact.write_bytes(b"completed-model")
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "run", "-c", str(campaign), "--round", "0", "--quiet"],
+    )
+
+    assert result.exit_code == 2
+    assert "already contains artifacts" in _plain_output(result.output)
+    assert model_artifact.read_bytes() == b"completed-model"
+    assert not round_log.exists()
 
 
 def test_run_ledger_only_streams_candidate_x_without_full_records_load(tmp_path: Path, monkeypatch) -> None:
@@ -697,6 +743,7 @@ def test_run_rejects_corrupt_state_json(tmp_path: Path) -> None:
     assert res.exit_code != 0
     out = res.output.lower()
     assert "failed to load state.json" in out
+    assert not (workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl").exists()
 
 
 def test_run_surfaces_sfxi_round_label_requirements_as_opal_error(tmp_path: Path) -> None:

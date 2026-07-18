@@ -105,6 +105,17 @@ def _round_dir_has_blocking_entries(rdir: Path) -> bool:
     return not stages or not stages.issubset(allowed)
 
 
+def assert_round_artifacts_writable(
+    rdir: Path,
+    *,
+    round_index: int,
+    allow_resume: bool,
+) -> None:
+    """Reject writes to an existing round unless an explicit resume permits them."""
+    if not allow_resume and rdir.exists() and _round_dir_has_blocking_entries(rdir):
+        raise OpalError(f"Round {int(round_index)} already contains artifacts in {rdir}. Use --resume to overwrite.")
+
+
 def _validate_allocated_batch_k_override(req: RunRoundRequest) -> None:
     cfg = req.cfg
     if cfg.selection_batch.allocation is None or req.k_override is None:
@@ -130,10 +141,11 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     rdir = ws.round_dir(req.as_of_round)
     store.assert_unique_ids(df)
 
-    if not req.allow_resume and rdir.exists() and _round_dir_has_blocking_entries(rdir):
-        raise OpalError(
-            f"Round {int(req.as_of_round)} already contains artifacts in {rdir}. Use --resume to overwrite."
-        )
+    assert_round_artifacts_writable(
+        rdir,
+        round_index=int(req.as_of_round),
+        allow_resume=bool(req.allow_resume),
+    )
     if req.allow_resume:
         _clear_round_dir(rdir, preserve_logs=True, preserve_run_artifacts=True)
     round_log_path = rdir / "logs" / "round.log.jsonl"
