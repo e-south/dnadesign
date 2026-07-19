@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import torch
 
 from dnadesign.thread.adapters.biohub_esmc import (
@@ -80,6 +81,44 @@ def test_biohub_esmc_validator_rejects_stale_feature_row_sequence_hashes(tmp_pat
         "thread.biohub_esmc.protein_features_sequence_hash_mismatch",
         "thread.biohub_esmc.residue_features_sequence_hash_mismatch",
     } <= {issue.check_id for issue in issues}
+
+
+@pytest.mark.parametrize(
+    ("table_label", "mutated_rows_field"),
+    [
+        ("protein_features", "protein_feature_rows"),
+        ("residue_features", "residue_feature_rows"),
+    ],
+)
+def test_biohub_esmc_validator_rejects_cross_model_feature_rows(
+    tmp_path: Path,
+    table_label: str,
+    mutated_rows_field: str,
+) -> None:
+    normalized = _normalized_rows("candidate_a", "AC")
+    request_hash = _request_hash(("candidate_a",))
+    protein_rows = [dict(row) for row in normalized.protein_feature_rows]
+    residue_rows = [dict(row) for row in normalized.residue_feature_rows]
+    mutated_rows = protein_rows if mutated_rows_field == "protein_feature_rows" else residue_rows
+    for row in mutated_rows:
+        row["sae_model"] = "different-sae-k2-codebook8"
+    write_biohub_esmc_artifacts(
+        output_root=tmp_path,
+        profile_rows=[normalized.profile_row],
+        protein_feature_rows=protein_rows,
+        residue_feature_rows=residue_rows,
+        feature_catalog_rows=normalized.feature_catalog_rows,
+        request_manifest={"schema_id": "thread.biohub_esmc.request", "biohub_request_hash": request_hash},
+        request_hash=request_hash,
+    )
+
+    issues = validate_biohub_esmc_artifacts(
+        output_root=tmp_path,
+        expected_candidate_ids={"candidate_a"},
+        request_hash=request_hash,
+    )
+
+    assert {issue.check_id for issue in issues} == {f"thread.biohub_esmc.{table_label}_sae_model_mismatch"}
 
 
 def _normalized_rows(candidate_id: str, sequence: str):

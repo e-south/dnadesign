@@ -418,17 +418,19 @@ def _validate_feature_table_candidate_hashes(
     expected_count_field: str,
 ) -> list[BiohubEsmcIssue]:
     accepted_hashes: dict[str, str] = {}
+    accepted_sae_models: dict[str, str] = {}
     expected_counts: dict[str, int] = {}
     for row in profile_rows:
         if str(row.get("status") or "") != "accepted":
             continue
         candidate_id = str(row["candidate_id"])
         accepted_hashes[candidate_id] = str(row["sequence_hash"])
+        accepted_sae_models[candidate_id] = str(row["sae_model"])
         expected_counts[candidate_id] = int(row.get(expected_count_field) or 0)
     if not accepted_hashes:
         return []
-    table = pq.read_table(path, columns=["candidate_id", "sequence_hash"])
-    grouped = table.group_by(["candidate_id", "sequence_hash"]).aggregate([("sequence_hash", "count")])
+    table = pq.read_table(path, columns=["candidate_id", "sequence_hash", "sae_model"])
+    grouped = table.group_by(["candidate_id", "sequence_hash", "sae_model"]).aggregate([("sequence_hash", "count")])
     issues: list[BiohubEsmcIssue] = []
     observed_counts: dict[str, int] = {}
     for row in grouped.to_pylist():
@@ -450,6 +452,15 @@ def _validate_feature_table_candidate_hashes(
                 BiohubEsmcIssue(
                     check_id=f"thread.biohub_esmc.{table_label}_sequence_hash_mismatch",
                     message=f"{table_label} sequence_hash for {candidate_id!r} does not match the profile row",
+                    path=f"{path}:{candidate_id}",
+                )
+            )
+        observed_sae_model = str(row["sae_model"])
+        if observed_sae_model != accepted_sae_models[candidate_id]:
+            issues.append(
+                BiohubEsmcIssue(
+                    check_id=f"thread.biohub_esmc.{table_label}_sae_model_mismatch",
+                    message=f"{table_label} sae_model for {candidate_id!r} does not match the profile row",
                     path=f"{path}:{candidate_id}",
                 )
             )
