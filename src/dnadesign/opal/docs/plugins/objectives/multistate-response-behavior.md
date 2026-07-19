@@ -1,6 +1,6 @@
 ---
 id: opal-objective-multistate-response-behavior-v1
-title: Multistate Response Behavior objective
+title: Multistate Response Behavior
 short_name: MSRB
 objective_id: multistate_response_behavior_v1
 owner: dnadesign-maintainers
@@ -8,25 +8,25 @@ status: available
 last_verified: 2026-07-19
 ---
 
-## Multistate Response Behavior (MSRB) `multistate_response_behavior_v1`
+## Multistate Response Behavior (MSRB)
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-07-19
 
 Multistate Response Behavior (MSRB) ranks candidate expression programs across
-a fixed panel of measured states. A target specification marks each state as
-intended ON or intended OFF. The score then rewards three behaviors together:
+a fixed set of measured states. A target specification marks each state as
+intended ON or intended OFF. The score rewards three behaviors:
 
 - stronger response in every intended-ON state than in every intended-OFF
   state;
 - higher signal relative to the reference in intended-ON states; and
 - lower reference-relative signal in intended-OFF states.
 
-Under a fixed state panel, target mask, and scale protocol, every favorable
-change improves the score. The weakest state-level results have the greatest
-influence, but improvements elsewhere still count. There is a fixed ceiling on
-how much very strong performance in one family can compensate for weakness in
-another. No biological pass/fail threshold is built into the objective.
+For a fixed state panel, target mask, and normalization protocol, every
+favorable change improves the score. Weak state-level results have the greatest
+influence, while improvements elsewhere still count. A favorable outlier has a
+finite effect and cannot offset weak behavior without bound. The objective has
+no biological pass/fail threshold.
 
 `behavior_score` is a ranking quantity. It does not establish a biological
 acceptance boundary, measurement quality, or predictive accuracy.
@@ -35,12 +35,12 @@ acceptance boundary, measurement quality, or predictive accuracy.
 
 | Element | Value |
 | --- | --- |
-| Human short name | MSRB |
+| Short name | MSRB |
 | Objective identifier | `multistate_response_behavior_v1` |
 | Input | Two values per state: ordered finite `[r(state...), b(state...)]` |
 | Selectable score | `behavior_score`, written $S_{\mathrm{MSRB}}$ |
 | Direction | Maximize |
-| Required context | Ordered state IDs, ON/OFF membership over `K` states, and two positive normalization scales defined by the measurement protocol |
+| Required context | Ordered state IDs, ON/OFF membership over `K` states, and two positive normalization scales from the measurement protocol |
 | Interpretive diagnostics | Three family scores, hard bottleneck, limiting coordinate, compensation gap and bound, coordinate weights, and reference-direction status |
 | Uncertainty | The score uses a point estimate; assay and model uncertainty are reported separately |
 
@@ -53,12 +53,10 @@ MSRB begins with two phenotype coordinates for each measured state:
 - $b_i$ summarizes signal relative to a reference measured in that same state;
   positive means above the reference and negative means below it.
 
-These values may be observed assay reductions or model predictions in the same
-phenotype space. Wet-lab time series are first reduced into one response and
-one reference-relative signal value per state. The measurement protocol
-defines the response reduction and replicate handling; it also defines the
-reference used to form $b_i$. MSRB begins only after the phenotype has been
-formed.
+These values may be observed assay summaries or model predictions in the same
+coordinate system. The measurement protocol defines how raw measurements and
+replicates produce $r_i$ and $b_i$, including the reference used for $b_i$.
+MSRB starts with the completed phenotype.
 
 Let `K` mean the number of measured states. Because each state contributes one
 response value and one reference-relative signal value, the ordered phenotype
@@ -68,15 +66,15 @@ $$
 Y=[r_1,\ldots,r_K,b_1,\ldots,b_K].
 $$
 
-For four states, `2 × 4 = 8`, so this happens to be an eight-value phenotype:
+For four states, `2 × 4 = 8`, so the phenotype has eight values:
 
 ```text
 [r_A, r_B, r_C, r_D, b_A, b_B, b_C, b_D]
 ```
 
-The width comes from the measured state panel. It is not fixed by MSRB. MSRB
-accepts any fixed `K >= 2` when every state is assigned to a nonempty
-intended-ON or intended-OFF set.
+The measured state panel determines the width; MSRB does not. MSRB accepts any
+fixed `K >= 2` when the target contains at least one intended-ON and one
+intended-OFF state.
 
 MSRB computes the score as follows:
 
@@ -93,35 +91,31 @@ available beside the scalar.
 
 ### Worked assay mapping: dual-reporter promoter screen
 
-> **Concrete application.** This mapping shows how one four-state promoter
-> assay supplies MSRB inputs. It is an example, not part of the generic
-> definition. The [study application](../../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md)
-> gives the complete reduction, repeat, label, model, and campaign path.
+> This example maps one four-state promoter assay onto the generic inputs. The
+> assay choices are not part of the objective. See [MSRB in the stress-promoter
+> study](../../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md)
+> for reduction, replicate, label, model, and campaign details.
 
 | Generic element | Example study binding |
 | --- | --- |
 | State panel | `00`: no perturbation; `10`: ethanol; `01`: ciprofloxacin; `11`: both perturbations |
 | Raw measurements | OD600, YFP, and CFP time series from a 96-well plate |
-| Primary window | Each well is reduced over 4–8 hours after the perturbation event, before replicate wells are combined |
+| Primary window | Each well is reduced over 4–8 hours after perturbation, before replicate wells are combined |
 | Response $r_i$ | Median well-level reduction of $\log_2(\mathrm{YFP}/\mathrm{CFP})$ in state $i$ |
 | Signal $b_i$ | Median design $\log_2(\mathrm{YFP}/\mathrm{OD600})$ minus median same-state pDual-10 value |
 | Coordinate order | All response values first, followed by all signal values |
 
-The two coordinate types answer different questions. The response coordinate
-$r_i$ describes YFP relative to the second fluorescent reporter, CFP, within
-the candidate. The signal coordinate $b_i$ describes YFP per culture density
-relative to a reference construct measured in the same state. The same YFP
-channel contributes to both coordinates, but their denominators and
-interpretations are different.
+Here, $r_i$ measures YFP relative to CFP within the candidate, while $b_i$
+measures YFP per culture density relative to a reference construct in the same
+state. Both use YFP, but they answer different questions because their
+denominators differ.
 
-pDual-10 is the measured, condition-matched constitutive reference for this
-assay. Its plasmid contains two exact `BBa_J23105` sequences from the Anderson
-promoter collection; the [study dataset registry](../../../../../../docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml)
-records the source lineage. This documents the reference's promoter provenance;
-the measured same-state output, not nominal catalog strength, enters $b_i$.
-The calculation does not assume that pDual-10 output is constant across
-conditions. Each candidate is compared with pDual-10 from the same condition.
-The result supports only a relative signal claim, not absolute non-expression.
+pDual-10 is the condition-matched reference. The [study dataset
+registry](../../../../../../docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml)
+records its `BBa_J23105` Anderson-promoter provenance. Only measured pDual-10
+output from the same condition enters the calculation; nominal promoter
+strength and condition invariance are not assumed. The result supports a
+relative signal claim, not absolute non-expression.
 
 The resulting study phenotype is serialized as responses followed by signals:
 
@@ -135,23 +129,19 @@ use masks `[0,1,0,1]`, `[0,0,1,1]`, and `[0,0,0,1]`, respectively. Changing
 the mask changes which states are rewarded as ON or OFF; it does not change
 the assay reduction or the model prediction.
 
-This study uses the 90th percentile of eligible within-experiment bootstrap
-standard deviations as each normalization scale:
+The study sets each normalization scale to the 90th percentile of eligible
+within-experiment bootstrap standard deviations:
 
 | Scale | Rounded value | What one unit represents |
 | --- | ---: | --- |
 | $s_R$ | `0.308` log2 | One declared response-contrast uncertainty unit |
 | $s_B$ | `0.313` log2 | One declared reference-relative signal uncertainty unit |
 
-The values happen to be similar here, but they come from different uncertainty
-distributions and are fixed independently. Dividing by them expresses both
-coordinate types relative to their own bootstrap precision before aggregation.
-Without that conversion, one raw log2 unit would be treated as equally
-informative in both coordinate types even when their precision differs. These
-scales are normalization conventions, not limits of detection, biological
-goals, pass thresholds, or preference weights. Full-precision values and their
-derivation remain in the study protocol; rounded values are sufficient for
-interpretation.
+The two scales come from different uncertainty distributions and are fixed
+independently. They express response and signal in units of their own bootstrap
+precision before aggregation. They are not limits of detection, biological
+goals, pass thresholds, or preference weights. The study protocol records the
+full-precision values and derivation.
 
 ### When to use this objective
 

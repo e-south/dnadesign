@@ -1,6 +1,6 @@
 ---
 id: stress-ethanol-cipro-growth-multistate-response-behavior
-title: MSRB application for the stress-promoter study
+title: Multistate Response Behavior in the stress-promoter study
 short_name: MSRB
 objective_id: multistate_response_behavior_v1
 y_space: reader_response_window_vector_v1
@@ -15,72 +15,41 @@ audience:
   - agent
 ---
 
-## MSRB application for the stress-promoter study
+## Multistate Response Behavior in the stress-promoter study
 
-**Multistate Response Behavior (MSRB)** ranks promoters intended to
-implement condition-dependent expression programs by three biological
-preferences at once:
-
-1. intended-ON states should have greater reporter response than intended-OFF
-   states;
-2. intended-ON states should have greater same-state reference-relative signal;
-   and
-3. intended-OFF states should have lower same-state reference-relative signal.
-
-For this assay, the signal coordinate is reduced YFP/OD600 relative to
-same-state pDual-10. The pDual-10 plasmid contains two exact `BBa_J23105`
-sequences from the Anderson promoter collection; the
-[dataset registry](../../record/datasets.yaml) records the source lineage. MSRB
-uses the construct's measured output in each assay state, not its catalog
-strength, and does not assume that the reference is condition-invariant. This
-reference choice is a study binding, not part of the generic MSRB definition.
+Multistate Response Behavior (MSRB) is the ranking objective for this promoter
+campaign. It favors stronger intended-ON than intended-OFF response, higher
+intended-ON signal, and lower intended-OFF signal. The [objective
+definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+defines the reusable inputs, equations, diagnostics, and limits. The binding
+below specifies how the stress-promoter assay supplies those inputs and how the
+campaign uses the resulting score.
 
 The OPAL objective identifier is `multistate_response_behavior_v1`, its scalar
 is written $S_{\mathrm{MSRB}}$, and its selectable score channel is
 `behavior_score`.
 
-MSRB is the sole ranking objective for the active promoter campaign. The
-model, score, and allocation rule are fixed before the selected candidates are
-measured. Each resulting batch tests whether the sequence-to-phenotype model
-and measured MSRB enrichment improve as evidence accumulates. This is the
-study's prospectively frozen greedy learning probe. Existing retrospective
-evidence supports the objective's biological semantics and implementation, but
-it does not establish reliable predictive ordering or prospective hill-climb
-efficacy. Selection and physical synthesis authorization remain separate
-decisions.
+MSRB is the campaign's only ranking objective. The model, score, and allocation
+rule are fixed before each selected batch is measured. Each batch then tests
+whether predicted rankings enrich for measured MSRB and whether retraining
+improves later rounds. Retrospective evidence supports the objective's
+implementation and biological interpretation, but not reliable predictive
+ordering or prospective hill-climb efficacy. Selection does not authorize
+physical synthesis.
 
-The [generic MSRB definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
-defines the reusable phenotype, equations, diagnostics, and claim boundaries.
-Its [worked assay mapping](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#worked-assay-mapping-dual-reporter-promoter-screen)
-provides a compact symbol-to-measurement view. This document gives the full
-study-specific assay and campaign path. The
-[`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml)
-pins the assay, normalization, target masks, model target, selection policy,
-and claim boundaries for this study.
+The generic page includes a compact [assay
+mapping](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#worked-assay-mapping-dual-reporter-promoter-screen).
+The study's [`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml)
+records the exact assay, normalization, target masks, model target, selection
+policy, and claim boundaries.
 
-### Scope of this study application
+### Study binding
 
-Generic MSRB accepts a fixed panel of `K >= 2` named states with binary
-intended-ON/OFF membership and an ordered `2K` phenotype. The states need not
-represent stress, two perturbations, binary factor codes, or a complete
-factorial panel.
-
-This study supplies one concrete binding: four measured conditions, a
-condition-matched pDual-10 reference, a 4–8-hour response window, three target
-masks, and one active campaign. Those assay and campaign choices do not alter
-the generic objective.
-
-```text
-sequence representation X
-  -> predicted response-window phenotype Y_hat_RW
-  -> target mask plus MSRB
-  -> behavior score and diagnostics
-  -> greedy allocation
-```
-
-The model predicts the phenotype, not an MSRB scalar. One predicted phenotype
-can therefore be evaluated under several target masks without retraining the
-model or changing Reader's assay contract.
+This study binds MSRB to four measured conditions, a condition-matched
+pDual-10 reference, a 4–8-hour response window, three target masks, and one
+campaign. The model predicts the response-window phenotype, not an MSRB scalar.
+The same prediction can therefore be scored under each target mask without
+retraining the model or changing Reader's assay contract.
 
 ### Authority by stage
 
@@ -95,9 +64,9 @@ model or changing Reader's assay contract.
 | Cross-repository routing | Reader–study–OPAL bridge; routing only |
 
 Each stage consumes the prior stage's published artifact without recalculating
-its measurements or identities. OPAL does not import Reader, Reader does not
-resolve candidate authority, and the bridge does not invent formulas, aliases,
-repeat rules, or campaign policy.
+measurements or identities. OPAL does not import Reader. Reader does not
+resolve candidate authority. The bridge routes artifacts without defining
+formulas, aliases, repeat rules, or campaign policy.
 
 ### End-to-end evidence path
 
@@ -152,7 +121,7 @@ comparison. Alternative windows, event bounds, area-under-the-curve summaries,
 and delta summaries remain sensitivity evidence. They do not silently replace
 the primary reduction.
 
-Reader's canonical details live in
+Reader defines the reduction and its evidence contract in
 `reader/docs/lib/plate_reader/response_window.md` in the sibling Reader
 repository.
 
@@ -174,6 +143,11 @@ $$
 This creates one estimate per experiment, design, and state. The reference is
 both experiment-matched and state-matched. A stressed candidate is never
 compared with pDual-10 measured in another condition.
+
+The pDual-10 plasmid contains two exact `BBa_J23105` sequences from the
+Anderson promoter collection; the [dataset registry](../../record/datasets.yaml)
+records the source lineage. The calculation uses measured output, not nominal
+catalog strength, and does not assume that pDual-10 is condition-invariant.
 
 Reader preserves three evidence layers alongside the central estimates:
 
@@ -216,7 +190,7 @@ resolve to one candidate and a matching sequence digest. Missing, duplicated,
 fuzzy, prefix-based, or sequence-mismatched joins fail. Reader aliases never
 become candidate authority by themselves.
 
-The current immutable label publication contains 27 exact candidate vectors.
+The published label set contains 27 exact candidate vectors.
 OPAL verifies its `opal.observed_label_promotion.v1` receipt and artifact
 digests before reading any label. Across future campaign rounds, all label
 events remain in the ledger; the configured `latest_only` policy chooses the
@@ -224,7 +198,7 @@ latest exact event per candidate for cumulative training. That round-level
 policy is distinct from the study's adjudication of repeated Reader
 experiments within one published event.
 
-#### 4. The current four-state response-window phenotype
+#### 4. Four-state response-window phenotype
 
 Generic MSRB consumes `2K` ordered coordinates for any fixed `K >= 2`. This
 Reader assay has `K=4`, so its phenotype contains eight values.
@@ -290,10 +264,9 @@ it does not retrain the raw-Y model. This separation makes prediction errors
 observable component by component and avoids creating three disconnected
 scalar-model lineages.
 
-The current 100-tree random forest is a frozen prospective baseline, not a
-claim that random forests are optimal. Retrospective experiment-held-out rank
-support is weak. The first batches test whether the loop learns; they do not
-begin from an assumption that it already does.
+The 100-tree random forest is a fixed prospective baseline, not a claim that
+random forests are optimal. Retrospective experiment-held-out rank support is
+weak. The first batches test whether the loop learns.
 
 #### 6. MSRB scoring
 
@@ -312,9 +285,9 @@ type:
 | $s_R$ | `0.308` log2 | q90 within-experiment uncertainty of declared ON-versus-OFF response contrasts |
 | $s_B$ | `0.313` log2 | q90 within-experiment uncertainty of same-state pDual-10-relative signal |
 
-In plain language, a response contrast of about `0.31` log2 or a
-reference-relative signal change of about `0.31` log2 counts as one declared
-bootstrap-uncertainty unit for its coordinate type. For example:
+A response contrast of about `0.31` log2 or a reference-relative signal change
+of about `0.31` log2 counts as one bootstrap-uncertainty unit for its coordinate
+type. For example:
 
 - an ON-minus-OFF response difference of `0.616` log2 is about
   `0.616 / 0.308 = +2.0` response normalization units; and
@@ -358,8 +331,7 @@ are not measurements on one interchangeable scale.
 
 #### How to read the family landscape
 
-The campaign notebook makes the three scored families visible instead of
-asking the scalar to explain itself:
+The campaign notebook shows all three family scores:
 
 - farther right means stronger intended-ON versus intended-OFF response
   ordering, $S_R$;
@@ -451,8 +423,7 @@ primary response-window values do not become apparently exact labels.
 
 ### Required observability
 
-The OPAL notebook must keep the scalar subordinate to its evidence. For every
-selection view it provides:
+For every selection view, the OPAL notebook shows:
 
 1. a family landscape with response ordering on the x-axis, intended-ON signal
    on the y-axis, and intended-OFF suppression in color;
@@ -473,7 +444,7 @@ show learning.
 
 ### Prospective hill-climb evaluation
 
-The first batch is evidence about the complete loop, not merely the scalar:
+The first batch evaluates the complete loop:
 
 ```text
 sequence X -> predicted Y_RW -> MSRB -> greedy allocation -> measured Y_RW
@@ -514,16 +485,8 @@ alternate executable stress campaign.
 
 ### Claim boundaries
 
-MSRB supports the following claims:
-
-- every desired directional improvement contributes to ranking;
-- response ordering, intended-ON signal, and intended-OFF suppression have
-  equal family standing;
-- poor coordinates receive more influence than already favorable coordinates;
-- a favorable outlier has bounded influence; and
-- the same predicted phenotype can be interpreted under different fixed masks.
-
-MSRB does not establish:
+The [objective definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+states the mathematical claims. For this study, MSRB does not establish:
 
 - feasibility or conformance to a biological specification;
 - absolute OFF, reporter background, or absence of expression;
@@ -539,7 +502,7 @@ of $b_i$ can recover an unmeasured reporter-negative background.
 
 ### Verification and source map
 
-Scientific and implementation sources are intentionally split by authority:
+Scientific and implementation sources are split by authority:
 
 - Reader response-window contract:
   `reader/docs/lib/plate_reader/response_window.md`
@@ -560,11 +523,11 @@ Scientific and implementation sources are intentionally split by authority:
 - Pre-promotion pressure tests and RMF comparison:
   `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/`
 
-These digest-bound metastudy results remain evidence, not an executable
-campaign route. The active protocol authorizes a prospective MSRB learning
-probe while preserving the stated nonclaims and synthesis prohibition.
+The digest-bound metastudy results are evidence, not an executable campaign.
+The active protocol permits a prospective MSRB learning probe but does not
+authorize synthesis.
 
-The shadow manifest and decision stay inside the generated workbench bundle.
-Its verifier checks the complete artifact inventory, bytes, schemas,
-derivations, and provenance as one unit. The activation receipt binds that
-bundle's path and digests without copying an incomplete subset into source.
+The generated workbench bundle contains the shadow manifest and decision. Its
+verifier checks the artifact inventory, bytes, schemas, derivations, and
+provenance together. The activation receipt records the bundle path and
+digests.

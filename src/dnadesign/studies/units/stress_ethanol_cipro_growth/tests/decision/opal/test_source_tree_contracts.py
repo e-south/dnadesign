@@ -184,12 +184,10 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
         "objective_property_tests": Path(
             "src/dnadesign/opal/tests/objectives/test_objective_multistate_response_behavior_v1.py"
         ),
-        "generic_objective_source_of_truth": Path(
+        "generic_objective_definition": Path(
             "src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md"
         ),
-        "study_application_contract": Path(
-            "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md"
-        ),
+        "study_binding": Path("docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md"),
         "active_study_protocol": protocol_path,
         "active_study_protocol_readme": decision_root / "README.md",
         "active_campaign_readme": OPAL_CAMPAIGNS_ROOT / "secg_msrb_greedy" / "README.md",
@@ -226,36 +224,37 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
     assert mismatches == {}
 
 
-def test_msrb_study_application_covers_the_complete_evidence_path() -> None:
+def test_msrb_study_doc_covers_the_complete_evidence_path() -> None:
     path = Path("docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md")
     text = path.read_text(encoding="utf-8")
 
     for required in (
         "Multistate Response Behavior (MSRB)",
-        "### Scope of this study application",
-        "The model predicts the phenotype, not an MSRB scalar.",
-        "## End-to-end evidence path",
-        "### 1. Reader response-window reduction",
-        "### 2. Within-experiment replicate handling",
-        "### 3. Study-owned repeat adjudication and label promotion",
-        "### 4. The current four-state response-window phenotype",
+        "### Study binding",
+        "The model predicts the response-window phenotype, not an MSRB scalar.",
+        "### End-to-end evidence path",
+        "#### 1. Reader response-window reduction",
+        "#### 2. Within-experiment replicate handling",
+        "#### 3. Study-owned repeat adjudication and label promotion",
+        "#### 4. Four-state response-window phenotype",
         "[r00, r10, r01, r11, b00, b10, b01, b11]",
-        "### 5. Sequence-to-phenotype prediction",
-        "### 6. MSRB scoring",
+        "#### 5. Sequence-to-phenotype prediction",
+        "#### 6. MSRB scoring",
         "Rounded value",
         "500 joint bootstrap draws",
-        "### 7. Greedy allocation and prospective measurement",
+        "#### 7. Greedy allocation and prospective measurement",
         "### Applied controls and promotion evidence",
-        "## Uncertainty and censoring",
+        "### Uncertainty and censoring",
         "practical no-go outcome",
         "rectangular colorbar",
-        "## Claim boundaries",
+        "### Claim boundaries",
     ):
         assert required in text
     assert all(line.strip() != "-" for line in text.splitlines())
+    assert "source of truth" not in text.casefold()
 
 
-def test_generic_msrb_source_of_truth_is_k_state_with_bounded_assay_mapping() -> None:
+def test_generic_msrb_doc_is_k_state_with_bounded_assay_mapping() -> None:
     path = Path("src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md")
     text = path.read_text(encoding="utf-8")
     normalized = " ".join(text.split())
@@ -274,8 +273,8 @@ def test_generic_msrb_source_of_truth_is_k_state_with_bounded_assay_mapping() ->
     for required in (
         "### From a multistate phenotype to one score",
         mapping_heading,
-        "For four states, `2 × 4 = 8`, so this happens to be an eight-value phenotype",
-        "The width comes from the measured state panel. It is not fixed by MSRB.",
+        "For four states, `2 × 4 = 8`, so the phenotype has eight values",
+        "The measured state panel determines the width; MSRB does not.",
         "`K` counts states, not experimental factors",
         "### What the same-state reference means",
         "### Why normalization scales are needed",
@@ -289,7 +288,7 @@ def test_generic_msrb_source_of_truth_is_k_state_with_bounded_assay_mapping() ->
     ):
         assert required in normalized
     for required in (
-        "It is an example, not part of the generic definition.",
+        "The assay choices are not part of the objective.",
         "OD600, YFP, and CFP time series",
         "[r00, r10, r01, r11, b00, b10, b01, b11]",
         "pDual-10",
@@ -314,6 +313,7 @@ def test_generic_msrb_source_of_truth_is_k_state_with_bounded_assay_mapping() ->
         "Reader bootstrap",
     ):
         assert study_token.casefold() not in generic_core_without_study_path.casefold()
+    assert "source of truth" not in text.casefold()
 
 
 def test_response_window_observation_operator_docs_do_not_route_to_moving_reader_output() -> None:
