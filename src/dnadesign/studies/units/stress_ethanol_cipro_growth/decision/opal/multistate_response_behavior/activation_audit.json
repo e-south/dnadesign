@@ -2,7 +2,7 @@
   "schema_id": "stress_ethanol_cipro_growth.multistate_response_behavior_activation_audit.v1",
   "schema_version": "1",
   "audit_id": "secg_msrb_learning_probe_activation_20260718",
-  "completed_at": "2026-07-19T14:02:14Z",
+  "completed_at": "2026-07-19T16:56:36Z",
   "study_id": "stress_ethanol_cipro_growth",
   "protocol_id": "secg_msrb_learning_probe_v1",
   "objective_id": "multistate_response_behavior_v1",
@@ -177,7 +177,7 @@
       {
         "role": "generic_objective_definition",
         "path": "src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md",
-        "sha256": "3a2dcac42693d38b2d9522f6867044578e28b873797cf7c163e63ab3d28ffdd1"
+        "sha256": "e3c900e1cb42d513d9ae5eead9ec78992d83d6b0ba1907c14fca51b5ed1567a6"
       },
       {
         "role": "study_binding",
