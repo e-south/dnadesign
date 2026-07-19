@@ -473,6 +473,17 @@ observed points; a fourth continuous color scale would repeat the z-axis. The
 complete ledger is the numerical record, the 2D landscape is the publication
 summary, and the 3D view supports interactive inspection.
 
+The three axes are different behavioral requirements, not statistically
+independent latent variables. They are derived from the same phenotype vector,
+and some assays share measurement channels across response and signal
+coordinates. A shift that raises signal in every state also tends to improve
+the ON family while worsening OFF suppression. The point cloud can therefore
+form a thin sheet and look nearly collapsed from an edge-on camera angle. This
+geometry does not change the score or make the families duplicates. It becomes
+a model concern when predictions occupy a much thinner region than measured
+points, because the predictor may then miss combinations that the assay can
+produce.
+
 The selector maximizes the smooth bottleneck, not Euclidean distance toward a
 plot corner. A point may rank higher despite being less rightward or less high
 when its OFF-suppression score is materially better. The three family scores,
