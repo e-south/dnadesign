@@ -9,7 +9,7 @@ type: route
 plane: control-plane
 owner_boundary: opal
 surface_role: decision
-current_state: round0_selection_review
+current_state: opal_round0_candidate_review
 entry_artifact: usr_prom_eth_cip_opal_candidates
 exit_artifact: opal_campaign_records_and_ledgers
 ---
@@ -20,11 +20,11 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 ### Surface
 
-- Route state: `round0_selection_review`
+- Route state: `opal_round0_candidate_review`
 - Entry artifact: `usr_prom_eth_cip_opal_candidates` shared USR candidate table
 - Candidate table role: `opal_candidate_feature_table`
 - Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
-- Batch-0 selector: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/`
+- Pre-assay seed and candidate provenance: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/`
 - Primary doc: `src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md`
 
 ### Detail Surfaces

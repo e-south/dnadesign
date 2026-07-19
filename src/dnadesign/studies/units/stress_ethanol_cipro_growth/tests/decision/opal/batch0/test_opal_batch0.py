@@ -1978,7 +1978,7 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     assert "uv run opal notebook run" in opal_commands
     assert "uv run opal status" in opal_commands
     assert "unified notebook displays named selection views" in opal_route
-    assert "selection batch" in opal_commands
+    assert "opal selection-batch show" in opal_commands
     assert "decision.opal.batch0.provenance" in opal_route
     assert "studies.stress-ethanol-cipro-growth.status" in routes
     assert opal_notebook["role"] == "campaign_specific_artifact_viewer"
@@ -2008,6 +2008,6 @@ def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() ->
     assert len(routes.splitlines()) <= 140
     assert "routes/decision/opal/README.md" in routes
     assert "routes/analysis/latentdna.md" in routes
-    assert "round0_selection_review" in opal_route
+    assert "opal_round0_candidate_review" in opal_route
     assert "response-window label snapshot" in opal_context
     assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in latentdna_route

@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-routes
 surface: study-route-map
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-17
+last_verified: 2026-07-18
 entrypoint: self
 status_surface: studies.stress-ethanol-cipro-growth.status
 preflight_surface: studies.stress-ethanol-cipro-growth.preflight
@@ -13,11 +13,11 @@ preflight_surface: studies.stress-ethanol-cipro-growth.preflight
 
 **Owner:** dnadesign-maintainers
 
-**Last verified:** 2026-07-15
+**Last verified:** 2026-07-18
 
 Use this page after the checked-in study status tells you where the record stands. Keep this file as the one-hop handoff map; put downstream detail in focused files under this directory.
 
-- Status: `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
+- Status summary: `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json | jq '{state, summary, opal: .evidence.opal}'`
 - Preflight: `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json`
 - Snapshot route inventory: `evidence.analysis_surfaces.{densegen,latentdna,cluster}`
 
@@ -26,7 +26,7 @@ Use this page after the checked-in study status tells you where the record stand
 | Need | Surface |
 | --- | --- |
 | Primary route | this page |
-| Status | `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json` |
+| Status | `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json \| jq '{state, summary, opal: .evidence.opal}'` |
 | Preflight | `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json` |
 | Machine-readable contract | `../operations/ops.study.yaml` |
 | Study intent and semantic guardrails | [Promoter design intent](../contexts/promoter-design-intent.md) |
@@ -41,7 +41,7 @@ Use this page after the checked-in study status tells you where the record stand
 | LatentDNA comparison surface | `latentdna` | `x_selected_appendix_optional` | [LatentDNA](analysis/latentdna.md) (`routes/analysis/latentdna.md`) |
 | Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
 | Reader observations and candidate identity | `stress study` | `label_truth_ready` | `src/dnadesign/studies/units/stress_ethanol_cipro_growth/{response_window_observations,promoter_candidate_bindings}/` |
-| OPAL campaigns | `opal` | `round0_selection_review` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
+| OPAL campaigns | `opal` | `opal_round0_candidate_review` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
 | Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | MSRB active learning probe; SFXI and RMF comparison evidence | [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), [RMF](../contexts/opal/response-magnitude-feasibility.md), and [Multistate Response Behavior](../contexts/opal/multistate-response-behavior.md) |
 
 ### Terminology Guardrails
@@ -55,6 +55,6 @@ Use this page after the checked-in study status tells you where the record stand
 - The shared assay state order is `[00, 10, 01, 11]`; each objective owns its own vector interpretation, masks, diagnostics, and claim boundary.
 - Repeat-label truth and model decision quality are independent gates; the approved observation policy publishes 27 exact labels and eight exclusions.
   Round-0 completion does not promote the model or authorize synthesis.
-- Study lifecycle phases are record-plane state labels such as the current `opal_candidate_table_pre_assay`; they are not DenseGen generation plans.
+- Study lifecycle phases are record-plane state labels such as the current `opal_round0_candidate_review`; they are not DenseGen generation plans.
 - Infer lanes are model-family and dataset-target configs such as `anchor_only_20b` or `anchor_plus_template_7b`; they are not lifecycle phases.
 - Route `Plane` values use the repo-wide enum from `ARCHITECTURE.md`. If extra nuance is needed, use `Surface role` rather than inventing a new plane name.

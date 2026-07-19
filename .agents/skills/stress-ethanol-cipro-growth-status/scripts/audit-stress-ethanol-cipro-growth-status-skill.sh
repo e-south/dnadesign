@@ -185,6 +185,7 @@ require_file "$STATUS_SRC/ops/status.registry.yaml"
 require_file "$STATUS_SRC/service.py"
 require_file "$STATUS_SRC/snapshot.py"
 require_file "$STATUS_SRC/preflight.py"
+require_file "$STATUS_SRC/opal_run_receipt.py"
 require_file "$STATUS_SRC/probes/runtime_dependencies.py"
 require_file "$STATUS_SRC/probes/semantic_completeness.py"
 require_file "$STATUS_SRC/probes/sequence_view_contracts.py"
@@ -250,6 +251,8 @@ require_pattern 'latentdna\.readiness\.semantic' "preflight provider emits Laten
 require_pattern 'missing_source_datasets' "preflight provider emits LatentDNA missing-source details" "$STATUS_SRC/preflight.py"
 require_pattern 'LatentDNA primary readiness attention' "LatentDNA readiness summary reports primary attention" "$STATUS_SRC/latentdna_readiness.py"
 require_pattern 'missing_appendix_source_datasets' "LatentDNA readiness exposes appendix drift separately" "$STATUS_SRC/latentdna_readiness.py"
+require_pattern 'actual_sha256' "OPAL receipt verifies materialized artifact bytes" "$STATUS_SRC/opal_run_receipt.py"
+require_pattern 'OPAL round-0 run receipt integrity is not ok' "status fails closed on OPAL receipt drift" "$STATUS_SRC/snapshot.py"
 require_pattern 'densegen-axis-probe-v0\.md' "OPAL route links the DenseGen probe context" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md"
 require_pattern 'densegen-axis-probe-v0\.md' "OPAL context index links the DenseGen probe context" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/opal/README.md"
 require_pattern '__all__: list\[str\] = \[\]' "DenseGen probe package root exports no flat aggregate API" "$PROBE_SRC/__init__.py"
@@ -268,9 +271,9 @@ require_absent 'generic promoter' "skill avoids generic promoter routing languag
 require_absent 'unified RMF' "skill does not present RMF as the active campaign"
 
 if [[ -e "$REPO_ROOT/src/dnadesign/opal/campaigns/secg_rmf_greedy/configs/campaign.yaml" ]]; then
-  fail "retired RMF campaign is absent from executable OPAL campaigns"
+  fail "RMF comparator campaign is absent from executable OPAL campaigns"
 else
-  pass "retired RMF campaign is absent from executable OPAL campaigns"
+  pass "RMF comparator campaign is absent from executable OPAL campaigns"
 fi
 
 if [[ -e "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/surfaces/execution/commands/notify.yaml" ]]; then
@@ -298,6 +301,7 @@ else
 fi
 
 require_max_lines "$STATUS_SRC/service.py" 320 "status service stays orchestration-sized"
+require_max_lines "$STATUS_SRC/opal_run_receipt.py" 280 "OPAL run-receipt verifier stays bounded"
 require_max_lines "$STATUS_SRC/probes/runtime_dependencies.py" 140 "runtime probe module stays bounded"
 require_max_lines "$STATUS_SRC/probes/semantic_completeness.py" 200 "semantic-completeness probe module stays bounded"
 require_max_lines "$STATUS_SRC/probes/sequence_view_contracts.py" 240 "sequence-view probe module stays bounded"

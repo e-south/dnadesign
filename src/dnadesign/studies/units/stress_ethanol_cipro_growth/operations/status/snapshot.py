@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from .infer_runtime import (
@@ -128,6 +128,7 @@ def build_stress_ethanol_cipro_growth_status(
     infer_feature_completion_state = dependencies.inspect_infer_feature_completion(study_context=study_context)
     latentdna_state = dependencies.inspect_latentdna_readiness(study_context=study_context)
     additional_downstream_surfaces = dependencies.inspect_additional_downstream_surfaces(study_context=study_context)
+    opal_run_receipt = _attention_opal_run_receipt(additional_downstream_surfaces)
     exploratory_analysis = dependencies.inspect_exploratory_analysis(
         study_context=study_context,
         latentdna_state=latentdna_state,
@@ -181,6 +182,10 @@ def build_stress_ethanol_cipro_growth_status(
         summary_text = str(latentdna_state.get("summary") or "").strip()
         if summary_text:
             summary_parts.append(summary_text)
+    if opal_run_receipt is not None:
+        summary_text = str(opal_run_receipt.get("summary") or "").strip()
+        if summary_text:
+            summary_parts.append(summary_text)
     if planned_outputs_state is not None and bool(planned_outputs_state.get("include_in_summary")):
         summary_parts.append(str(planned_outputs_state["summary"]))
     if study_context.next_ready_phase is not None:
@@ -211,6 +216,8 @@ def build_stress_ethanol_cipro_growth_status(
         attention_reasons.append("Infer feature completion is incomplete")
     if latentdna_state is not None and _latentdna_readiness_drives_attention(latentdna_state):
         attention_reasons.append("LatentDNA readiness is not ok")
+    if opal_run_receipt is not None:
+        attention_reasons.append("OPAL round-0 run receipt integrity is not ok")
     if planned_outputs_state is not None and bool(planned_outputs_state.get("drives_top_level_attention")):
         attention_reasons.append("planned shared outputs remain pending")
     if status_context.infer_runtime.preferred_model_family is not None and any(
@@ -239,6 +246,22 @@ def _latentdna_readiness_drives_attention(latentdna_state: dict[str, object]) ->
         return False
     state = str(latentdna_state.get("state") or "").strip()
     return state not in {"", "ok"}
+
+
+def _attention_opal_run_receipt(
+    downstream_surfaces: Mapping[str, object],
+) -> Mapping[str, object] | None:
+    opal_surface = downstream_surfaces.get("opal")
+    if not isinstance(opal_surface, Mapping):
+        return None
+    run_receipt = opal_surface.get("run_receipt")
+    if not isinstance(run_receipt, Mapping):
+        return None
+    if not bool(run_receipt.get("configured")):
+        return None
+    if bool(run_receipt.get("drives_top_level_attention")):
+        return run_receipt
+    return None
 
 
 def _build_source_growth_state(

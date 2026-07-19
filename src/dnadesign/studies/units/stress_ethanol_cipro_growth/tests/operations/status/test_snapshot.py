@@ -475,6 +475,76 @@ def test_build_stress_ethanol_cipro_growth_status_preserves_summary_and_attentio
     assert "local_advisories" not in evidence
 
 
+def test_build_status_fails_closed_on_opal_round_receipt_drift(tmp_path: Path) -> None:
+    base_context = _make_study_context(tmp_path)
+    study_context = replace(
+        base_context,
+        densegen_row_target=8,
+        densegen_row_gap=0,
+    )
+    status_context = StressEthanolCiproGrowthStatusResolvedContext(
+        infer_runtime=StressEthanolCiproGrowthInferRuntimeResolvedContext(
+            preferred_model_family=None,
+            supported_model_families=(),
+            infer_config_paths={},
+            runtime_lane_contracts=(),
+            runtime_config_paths={},
+            phase_targets=(),
+            phase_targets_by_id={},
+            config_phase_ids={},
+            runtime_phase_ids={},
+            infer_notify_profile_paths={},
+            infer_notify_profile_errors={},
+            runtime_model_summaries=(),
+            gpu_required_runtime_labels=(),
+        )
+    )
+    receipt_summary = "OPAL round-0 run receipt has 1 integrity mismatch(es)"
+
+    state, summary, evidence = build_stress_ethanol_cipro_growth_status(
+        study_context=study_context,
+        status_context=status_context,
+        dependencies=StressEthanolCiproGrowthStatusDependencies(
+            infer_runtime=StressEthanolCiproGrowthInferRuntimeDependencies(
+                resolve_named_path_mapping=lambda *args, **kwargs: {},
+                resolve_infer_runtime_lane_contracts=lambda *args, **kwargs: (),
+                derive_infer_notify_profile_paths=lambda config_paths: ({}, {}),
+                load_infer_model_summary=lambda config_path: {"model_id": "demo", "device": "cpu"},
+                string_or_none=_string_or_none,
+                string_list_or_empty=_string_list_or_empty,
+            ),
+            phase_matches_infer_model_family=lambda **kwargs: False,
+            inspect_semantic_completeness=lambda **kwargs: None,
+            inspect_additional_downstream_surfaces=lambda **kwargs: {
+                "cluster": {"configured": False, "state": "planned"},
+                "opal": {
+                    "configured": True,
+                    "state": "round0_candidate_review",
+                    "integrity_state": "attention",
+                    "run_receipt": {
+                        "configured": True,
+                        "state": "attention",
+                        "drives_top_level_attention": True,
+                        "summary": receipt_summary,
+                        "mismatches": [
+                            {
+                                "field": "artifacts.selection_batch.actual_sha256",
+                                "expected": "expected",
+                                "actual": "actual",
+                            }
+                        ],
+                    },
+                },
+            },
+        ),
+        summary_scope="repo",
+    )
+
+    assert state == "attention"
+    assert receipt_summary in summary
+    assert "OPAL round-0 run receipt integrity is not ok" in evidence["attention_reasons"]
+
+
 def test_build_stress_ethanol_cipro_growth_status_demotes_source_gate_once_handoffs_exceed_target(
     tmp_path: Path,
 ) -> None:
