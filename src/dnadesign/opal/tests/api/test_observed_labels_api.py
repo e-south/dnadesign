@@ -19,16 +19,34 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+import dnadesign.opal.api as opal_api
 from dnadesign.opal import (
     OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION,
     ObservedLabelPromotionBinding,
     verify_observed_label_snapshot,
+)
+from dnadesign.opal.api import (
+    CandidateExclusionSetBinding,
+    build_candidate_exclusion_projection,
+    candidate_exclusion_sets_from_config,
+    observed_labels,
 )
 
 LABEL_RELATIVE_PATH = "_opal/observed_labels.parquet"
 MANIFEST_RELATIVE_PATH = "_opal/observed_labels.manifest.json"
 PROVENANCE_RELATIVE_PATH = "_opal/study_label_provenance.json"
 CANDIDATE_RELATIVE_PATH = "records.parquet"
+
+
+def test_candidate_exclusion_helpers_are_available_from_the_api_package() -> None:
+    assert CandidateExclusionSetBinding is observed_labels.CandidateExclusionSetBinding
+    assert build_candidate_exclusion_projection is observed_labels.build_candidate_exclusion_projection
+    assert candidate_exclusion_sets_from_config is observed_labels.candidate_exclusion_sets_from_config
+    assert {
+        "CandidateExclusionSetBinding",
+        "build_candidate_exclusion_projection",
+        "candidate_exclusion_sets_from_config",
+    }.issubset(opal_api.__all__)
 
 
 def test_public_snapshot_api_verifies_and_materializes_exact_vectors(tmp_path: Path) -> None:
