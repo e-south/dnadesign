@@ -703,6 +703,35 @@ def test_candidate_annotations_use_two_nonoverlapping_lanes_for_dense_labels() -
     plt.close(figure)
 
 
+def test_candidate_annotations_flip_at_axes_edges_without_covering_anchor_points() -> None:
+    figure, axis = plt.subplots(figsize=(4.0, 4.0), layout="constrained")
+    axis.set_xlim(-1.0, 1.0)
+    axis.set_ylim(-1.0, 1.0)
+    frame = pd.DataFrame(
+        {
+            "id": ["left", "right"],
+            "x": [-0.98, 0.98],
+            "y": [-0.4, 0.4],
+        }
+    )
+
+    annotations = annotate_candidate_aliases(
+        axis,
+        frame,
+        {"left": "Left boundary", "right": "Right boundary"},
+        x_column="x",
+        y_column="y",
+    )
+
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    anchor_pixels = axis.transData.transform(frame[["x", "y"]].to_numpy(dtype=float))
+    boxes = [annotation.get_bbox_patch().get_window_extent(renderer=renderer) for annotation in annotations]
+    assert [annotation.get_ha() for annotation in annotations] == ["left", "right"]
+    assert all(not box.contains(*anchor) for box, anchor in zip(boxes, anchor_pixels, strict=True))
+    plt.close(figure)
+
+
 def test_candidate_display_aliases_treat_alias_columns_as_optional_but_require_ids(tmp_path: Path) -> None:
     missing_columns = tmp_path / "missing-columns.parquet"
     pl.DataFrame({"id": ["candidate-a"]}).write_parquet(missing_columns)

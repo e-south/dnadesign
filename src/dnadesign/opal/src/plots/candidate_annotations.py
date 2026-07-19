@@ -176,6 +176,7 @@ def annotate_candidate_aliases(
         lane_specs = ((list(range(len(annotations))), use_right_lane),)
 
     inverse = ax.transData.inverted()
+    horizontal_gap = 12.0
     for lane_indexes, use_right_lane in lane_specs:
         lane_centers = (
             [centers[index] for index in lane_indexes]
@@ -192,16 +193,40 @@ def annotate_candidate_aliases(
             annotation = annotations[index]
             width = text_boxes[index].width
             point_x = float(point_pixels[index, 0])
-            annotation.set_ha("left" if use_right_lane else "right")
-            if use_right_lane:
-                anchor_x = min(point_x + 8.0, float(axes_box.x1 - padding - width))
-                anchor_x = max(anchor_x, float(axes_box.x0 + padding))
-            else:
-                anchor_x = max(point_x - 8.0, float(axes_box.x0 + padding + width))
-                anchor_x = min(anchor_x, float(axes_box.x1 - padding))
+            anchor_x, alignment = _horizontal_annotation_anchor(
+                point_x,
+                width,
+                left=float(axes_box.x0 + padding),
+                right=float(axes_box.x1 - padding),
+                gap=horizontal_gap,
+                prefer_right=use_right_lane,
+            )
+            annotation.set_ha(alignment)
             annotation.set_position(tuple(inverse.transform((anchor_x, center))))
     figure.canvas.draw()
     return annotations
+
+
+def _horizontal_annotation_anchor(
+    point_x: float,
+    width: float,
+    *,
+    left: float,
+    right: float,
+    gap: float,
+    prefer_right: bool,
+) -> tuple[float, str]:
+    """Place a label beside its point, flipping lanes before a boundary clamp can cover it."""
+
+    if width > right - left:
+        raise OpalError("Candidate annotation is wider than the plot axes.", ExitCodes.CONTRACT_VIOLATION)
+    right_anchor = point_x + gap
+    left_anchor = point_x - gap
+    right_fits = right_anchor + width <= right
+    left_fits = left_anchor - width >= left
+    if (prefer_right and right_fits) or not left_fits:
+        return min(max(right_anchor, left), right - width), "left"
+    return max(min(left_anchor, right), left + width), "right"
 
 
 def short_candidate_id(candidate_id: str) -> str:
