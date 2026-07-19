@@ -15,7 +15,7 @@ the docs-side study record for verified status, and use this source package
 when the task needs executable study surfaces or checked-in review artifacts.
 
 - Binding file: [contexts/latentdna/binding.yaml](../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml)
-- Workspace snapshot consumer doc: [stress-ethanol-cipro-representation-comparison.md](../../../../latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md)
+- Workspace snapshot consumer doc: [stress-ethanol-cipro-representation-comparison.md](../../../latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md)
 - Active deliverables: `dataset_overview`, `representation_health_summary`, `design_structure_summary`, `sigma35_ordinal_audit`, `context_robustness_summary`, `candidate_decision_frontier`, `candidate_x_selection_scorecard`
 - Companion visuals: `balanced_design_family_margin_gallery`, `sigma35_margin_ladder_gallery`, `sigma35_stress_margin_gallery`, `context_pair_summary`, `reference_to_plan_centroid_heatmap`, `reference_standard_strength_audit`
 - Appendix support: `sigma35_centroid_distance_gallery`, `design_centroid_margin_gallery`, `reference_alignment_summary`, `representation_scree_diagnostic`
