@@ -13,37 +13,52 @@ last_verified: 2026-07-19
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-07-19
 
-`multistate_response_behavior_v1` ranks candidates across any fixed set of
-named states partitioned into intended-ON and intended-OFF groups. It rewards
-stronger response ordering, intended-ON signal, and intended-OFF suppression
-without embedding biological pass/fail thresholds. `behavior_score` is a
-ranking score, not feasibility, a label, or synthesis authorization.
+Multistate Response Behavior (MSRB) ranks candidate expression programs across
+a fixed panel of measured states. A target specification marks each state as
+intended ON or intended OFF. The score then rewards three behaviors together:
 
-The upstream producer owns measurements. A study owns state meanings, target
-membership, resolution scales, and campaign activation. OPAL owns the equations
-and exposes `behavior_score` to a configured selector.
+- stronger response in every intended-ON state than in every intended-OFF
+  state;
+- higher signal relative to the reference in intended-ON states; and
+- lower reference-relative signal in intended-OFF states.
+
+Under a fixed state panel, target mask, and scale protocol, every favorable
+change improves the score. The weakest state-level results have the greatest
+influence, but improvements elsewhere still count. There is a fixed ceiling on
+how much very strong performance in one family can compensate for weakness in
+another. No biological pass/fail threshold is built into the objective.
+
+`behavior_score` is a ranking quantity. It does not establish a biological
+acceptance boundary, measurement quality, or predictive accuracy.
 
 ### At a glance
 
-| Contract field | Value |
+| Element | Value |
 | --- | --- |
 | Human short name | MSRB |
 | Objective identifier | `multistate_response_behavior_v1` |
 | Input | Two values per state: ordered finite `[r(state...), b(state...)]` |
 | Selectable score | `behavior_score`, written $S_{\mathrm{MSRB}}$ |
 | Direction | Maximize |
-| Study inputs | Ordered state IDs, ON/OFF membership over `K` states, and two positive resolution scales |
-| Required diagnostics | Three family scores, hard bottleneck, limiting coordinate, compensation gap and bound, coordinate weights, and natural-zero status |
-| Uncertainty | None emitted; assay and model uncertainty remain separate evidence |
+| Required context | Ordered state IDs, ON/OFF membership over `K` states, and two positive assay-resolution scales |
+| Interpretive diagnostics | Three family scores, hard bottleneck, limiting coordinate, compensation gap and bound, coordinate weights, and reference-direction status |
+| Uncertainty | The score uses a point estimate; assay and model uncertainty are reported separately |
 
 ### From a multistate phenotype to one score
 
-MSRB begins with two measured coordinates for each state:
+MSRB begins with two phenotype coordinates for each measured state:
 
-- $r_i$: the state-specific response coordinate; higher means a stronger
-  response; and
-- $b_i$: the state-specific signal relative to a same-state reference;
-  positive means above that reference and negative means below it.
+- $r_i$ summarizes the state-specific regulatory response; higher means a
+  stronger response.
+- $b_i$ summarizes signal relative to a reference measured in that same state;
+  positive means above the reference and negative means below it.
+
+These values may be observed assay reductions or model predictions in the same
+phenotype space. Wet-lab time series are first reduced into one response and
+one reference-relative signal value per state. The measurement protocol
+defines the response reduction and replicate handling; it also defines the
+reference used to form $b_i$. MSRB begins only after the phenotype has been
+formed.
 
 Let `K` mean the number of measured states. Because each state contributes one
 response value and one reference-relative signal value, the ordered phenotype
@@ -63,7 +78,7 @@ The width comes from the measured state panel. It is not fixed by MSRB. MSRB
 accepts any fixed `K >= 2` when every state is assigned to a nonempty
 intended-ON or intended-OFF set.
 
-The reduction to one score has four explicit stages:
+MSRB computes the score as follows:
 
 ```text
 ordered phenotype with two values per state
@@ -73,25 +88,25 @@ ordered phenotype with two values per state
   -> combine the three family scores into S_MSRB
 ```
 
-Each stage remains observable. The scalar never replaces the input phenotype,
-three family scores, or weakest state-level requirement.
+The phenotype, three family scores, and weakest state-level coordinate remain
+available beside the scalar.
 
 ### When to use this objective
 
-Use this objective when the desired behavior is:
+MSRB fits an experimental objective in which:
 
 - every intended ON response should exceed every intended OFF response;
-- every intended ON state should have greater reference-relative signal;
+- every intended ON state should have higher reference-relative signal;
 - every intended OFF state should have lower reference-relative signal;
 - every improvement in any one of those directions should improve the scalar;
 - no biological acceptance threshold should be embedded in the score.
 
-Use [Response-Magnitude Feasibility](response-magnitude-feasibility.md) when a
-study has explicit acceptance thresholds and needs a non-compensatory signed
-margin. MSRB ranks threshold-free directional behavior; RMF measures signed
-clearance from explicit acceptance boundaries.
+When explicit biological acceptance thresholds exist and every threshold must
+be met, [Response-Magnitude Feasibility](response-magnitude-feasibility.md) is
+the corresponding non-compensatory objective. MSRB instead ranks continuous,
+threshold-free directional improvement.
 
-### Ordered input contract
+### Input and target specification
 
 For `K >= 2` explicitly named states, the input has exactly two columns per
 state, or `2 × K` columns in total:
@@ -111,27 +126,44 @@ and one intended-OFF member. `K` counts states, not experimental factors, and
 the states need not form a factorial panel. Jointly permuting state IDs,
 response columns, signal columns, and mask leaves every score unchanged.
 
-The `2K` contract begins after assay-window selection, repeat handling,
+The `2K` phenotype begins after assay-window selection, repeat handling,
 reference resolution, state identification, and treatment annotation. MSRB v1
-uses binary ON/OFF membership over arbitrary fixed `K`. The measured values are
-continuous; only the target membership is binary.
+uses binary ON/OFF membership over arbitrary fixed `K`; the measured phenotype
+coordinates remain continuous.
 
-MSRB v1 does not represent partially ON targets, exact expression setpoints,
-ordinal preference graphs, or don't-care states. Those specifications require
-a separately named target contract and objective because they change what an
-improvement means. In particular, an exact setpoint objective must penalize
-overshoot and therefore cannot remain monotonic in every raw coordinate.
+Partially ON targets, exact setpoints, ordinal preferences, and don't-care
+states require a different objective because they change what counts as
+improvement. An exact setpoint, for example, must penalize overshoot and
+therefore cannot remain monotonic in every raw coordinate.
+
+### What the same-state reference means
+
+MSRB receives a signed same-state reference-relative coordinate $b_i$. When
+the coordinate is formed as a difference, let $F^{red}_{design,i}$ and
+$F^{red}_{reference,i}$ denote the reduced design and reference measurements
+for one state. Then:
+
+$$
+b_i = F^{red}_{design,i}-F^{red}_{reference,i}.
+$$
+
+`b_i = 0` denotes equality to the reference, positive values denote greater
+signal, and negative values denote lower signal. For a log2 coordinate,
+`b_i = -3` means eightfold lower signal than the reference in state $i$. This
+supports relative suppression only; it cannot establish background or absolute
+non-expression.
 
 ### Why assay-resolution scales are needed
 
 An ON-minus-OFF response contrast and a same-state reference-relative signal
-coordinate may have different repeat precision even when both are recorded in
-log units. A raw change of `0.3` therefore need not carry the same evidential
-resolution in the two evidence types. The response scale $s_R$ is the study's
-declared resolution of one ON-minus-OFF response contrast. The signal scale
-$s_B$ is the declared resolution of one same-state $b_i$ coordinate.
+may have different repeat precision, even when both use log units. A raw change
+of `0.3` therefore need not represent the same assay-resolvable change in both
+measurements. Two positive scales put them on a common resolution basis:
 
-The study supplies two positive scales:
+- $s_R$ is the declared resolution of one ON-minus-OFF response contrast.
+- $s_B$ is the declared resolution of one same-state $b_i$ value.
+
+Both must be positive:
 
 $$
 s_R>0,\qquad s_B>0.
@@ -140,17 +172,15 @@ $$
 Dividing by these scales expresses every desired change in assay-resolution
 units. The resulting signed value is called a normalized **clearance**. A
 clearance of `+1` means one declared resolution unit in a favorable direction;
-`-1` means one unit in an unfavorable direction. The scales balance
-measurement resolution, not biological importance.
+`-1` means one unit in an unfavorable direction. Here, clearance means signed
+displacement from a reference equality, not clearance from a biological
+acceptance boundary. The scales balance measurement resolution, not biological
+importance.
 
-MSRB does not estimate or tune the scales. The study declares an evidence-based
-derivation and holds the resulting values constant for a ranking comparison.
-They are not biological pass thresholds or free preference weights. Changing a
-scale changes the objective's relative sensitivity and can change scores and
-ranks, which is why the values must not be adjusted after predictions or
-preferred candidates are inspected. The machine-readable protocol stores full
-precision so a rerun produces the same scores; explanatory prose should use
-readable rounded values.
+The measurement protocol derives and fixes both scales before ranking. They are
+neither biological thresholds nor preference weights. Because either scale can
+change candidate ranks, record both at full precision for reproducibility and
+fix them before inspecting rankings; explanatory prose may use rounded values.
 
 For example, if a response difference is `0.62` and the declared response scale
 is `0.31`, the normalized response clearance is about `+2`. The division says
@@ -167,14 +197,14 @@ $$
 
 | Behavior being sought | Evidence used | Favorable change |
 | --- | --- | --- |
-| Correct state ordering | Every intended-ON response minus every intended-OFF response | ON response rises or OFF response falls |
-| Useful ON signal | Reference-relative signal in every intended-ON state | ON signal rises |
-| OFF signal suppression | Negative reference-relative signal in every intended-OFF state | OFF signal falls |
+| Correct state ordering | Every intended-ON response minus every intended-OFF response | ON value increases or OFF value decreases |
+| Higher ON signal | Reference-relative signal in every intended-ON state | ON signal increases |
+| OFF signal suppression | Negative reference-relative signal in every intended-OFF state | OFF signal decreases |
 
 #### 1. Response ordering
 
-Basic question: **Does the response rise in every state meant to be ON compared
-with every state meant to be OFF?**
+Basic question: **Does every intended-ON response value exceed every
+intended-OFF response value?**
 
 Every intended ON response is compared with every intended OFF response:
 
@@ -190,14 +220,13 @@ still be positive while one pair is reversed. The hard bottleneck and
 `all_reference_directions_met` diagnostic expose that case.
 
 Only between-state response differences matter. Adding the same constant to
-every $r_i$ leaves every response-ordering clearance and the final score
-unchanged. Absolute or reference-relative signal is represented by the aligned
-$b_i$ coordinates rather than by the common level of the $r_i$ values.
+every $r_i$ leaves the response-ordering family and final score unchanged. The
+aligned $b_i$ values carry the reference-relative signal information.
 
 #### 2. ON signal
 
-Basic question: **When the program should be ON, does it produce useful signal
-relative to the same-state reference?**
+Basic question: **When the program should be ON, is its signal higher relative
+to the same-state reference?**
 
 Every intended ON state contributes:
 
@@ -211,8 +240,8 @@ means lower signal. Every intended-ON state contributes independently.
 
 #### 3. OFF signal suppression
 
-Basic question: **When the program should be OFF, is unwanted signal suppressed
-relative to the same-state reference?**
+Basic question: **When the program should be OFF, is its signal lower than the
+same-state reference?**
 
 Every intended OFF state contributes:
 
@@ -225,9 +254,9 @@ The minus sign turns lower measured signal into a favorable positive clearance.
 More negative `b_j` therefore always improves the score. Every intended-OFF
 state contributes independently.
 
-An additional scored `b_ON - b_OFF` family is intentionally absent. It would
-mostly count the ON-signal and OFF-signal-suppression evidence twice. Such a
-contrast can be displayed as a diagnostic without changing the selector.
+An additional scored `b_ON - b_OFF` family would count much of the ON-signal
+and OFF-suppression evidence twice. That contrast may be shown as a diagnostic,
+but it is not a fourth scored family.
 
 ### Family-balanced smooth bottleneck
 
@@ -238,9 +267,11 @@ $$
 S_G = -\log\left(\frac{1}{|G|}\sum_{c \in G}e^{-x_c}\right).
 $$
 
-This is a smooth minimum. The weakest clearances exert the most influence, but
-improving any clearance still raises the family score. If every clearance in a
-family equals `+1`, its family score is exactly `+1`.
+This smooth minimum stays near the weakest clearance while remaining sensitive
+to every clearance. If every clearance in a family equals `+1`, its family
+score is exactly `+1`. Here and in the final aggregation, `log` is the natural
+logarithm paired with `exp`; this is separate from any log2 transform used in
+the assay coordinates.
 
 The three resulting family scores are:
 
@@ -259,9 +290,10 @@ e^{-S_R}+e^{-S_{ON}}+e^{-S_{OFF}}
 $$
 
 Higher $S_{\mathrm{MSRB}}$ is better. The score stays close to a weak family
-without discarding improvements in the other two. It is not an average that
-allows one arbitrarily strong family to dominate without bound, and it is not a
-hard minimum that ignores every nonlimiting improvement.
+without discarding improvements in the other two. It is not a linear average
+of the family scores that allows one arbitrarily strong family to dominate
+without bound, and it is not a hard minimum that ignores every nonlimiting
+improvement.
 
 ### One complete four-state example
 
@@ -298,34 +330,33 @@ The weakest individual clearance is `+1`. The final score is higher because
 the remaining coordinates are stronger, but their influence is bounded. These
 numbers are ranking evidence in resolution units; `1.491` is not a pass grade.
 
-One normalized resolution unit fixes the smoothness convention; there is no
-free temperature parameter. The study must declare its resolution scales and
-hold them constant during ranking rather than adjust them to preserve preferred
-candidates.
+One resolution unit also fixes the smoothness convention; the equation has no
+separate temperature parameter.
 
-Family means matter. Weighting each coordinate equally would give response
-pairs or the larger mask partition more influence merely because they contain
-more coordinates. Uniformly replicating every coordinate in one family leaves
-that family's mean unchanged. Selectively duplicating one coordinate changes
-its within-family weight and can change the score; distinct assay states must
-therefore be declared once rather than expanded as implicit weighting knobs.
+Family means prevent a family from gaining influence merely because it contains
+more coordinates. Repeating every coordinate within a family leaves its score
+unchanged; selectively duplicating states changes their weight and is not a
+valid way to encode preference.
 
 #### State-space cardinality boundary
 
 The objective accepts any fixed `K >= 2`, but scores are comparable only when
 the objective version, ordered state space, target mask, and normalization
-protocol are identical.
-Family balancing does not make one weak coordinate equally influential across
-different state-space sizes. A coordinate in family `G` has prior weight
-`1/(3|G|)`, so its maximum compensation gap is `log(3|G|)` resolution units.
-That bound grows as a family gains distinct coordinates.
+protocol are identical. Family balancing does not make one weak coordinate
+equally influential across different state-space sizes. A coordinate in family
+`G` has prior weight `1/(3|G|)`, so its maximum compensation gap is
+`log(3|G|)` resolution units. That bound grows as a family gains distinct
+coordinates.
 
-Consequently, a study must not compare scores from different state spaces or
-interpret this objective as an all-state conformance guarantee. For a larger
-fixed state space, promotion evidence must pressure-test weak-coordinate
-influence and retain the hard bottleneck, limiting coordinate, and coordinate
-weights as mandatory review diagnostics. Those diagnostics expose the tradeoff;
-they do not constrain the selector.
+Within the response family, each ON/OFF pair has equal prior weight. The ON and
+OFF partitions therefore have equal aggregate influence, but each state in the
+smaller partition has more individual leverage because it participates in more
+pairs.
+
+Scores from different state spaces should not be compared or interpreted as an
+all-state conformance guarantee. As the state panel grows, the hard bottleneck,
+limiting coordinate, and coordinate weights become increasingly important for
+showing how much influence one weak state retains.
 
 ### Why every improvement matters
 
@@ -354,22 +385,16 @@ fixed prior weights `w_c`. A poor coordinate receives exponentially more
 influence, so the score remains bottleneck-oriented without the plateaus of a
 hard minimum.
 
-This strictness is a property of the real-valued equation. In finite-precision
-arithmetic, an extremely favorable, nonlimiting coordinate can have an
-exponential weight that underflows to zero, so a further change may leave the
-returned float unchanged. Assay-scale property tests require strict directional
-improvement; arithmetic-extreme tests require finite, nondecreasing behavior
-rather than a bytewise strict-increase guarantee.
-
 ### Reading the three-family landscape
 
-The standard family landscape places the response-ordering family score on the x-axis,
-the intended-ON-signal family score on the y-axis, and the intended-OFF-signal-
-suppression family score in color. Under one fixed view and protocol:
+The standard family landscape places the response-ordering score on the
+x-axis, the intended-ON-signal score on the y-axis, and the intended-OFF-
+suppression score in color. Under one fixed target view and scale protocol:
 
 - farther right means better response ordering;
 - farther up means stronger intended-ON signal;
-- redder means stronger intended-OFF suppression; and
+- higher on the OFF-suppression color scale means stronger intended-OFF
+  suppression; and
 - a candidate that is strictly better in all three encodings must have a
   strictly higher behavior score.
 
@@ -380,37 +405,22 @@ family scores, so there is no hidden fourth preference; the selected-candidate
 decomposition exposes the state-level coordinates that produced each family
 score.
 
-The landscape may also contain measured observations. They provide assay
-context but are not members of the prediction pool ranked by a selector.
-Sequence-deduplicated campaign allocation is downstream of this objective and
-may advance a view to its next-best unallocated prediction. A plot must keep
-prediction, observation, selection, and allocation roles visually distinct.
-
-Zero on an axis or color scale is a reference direction. It is not a pass
-boundary, and the upper-right-red region does not by itself establish
-feasibility or measured performance.
+In the standard campaign review, measured observations may be overlaid for
+assay context but are not members of the prediction pool being ranked. If an
+allocation rule prevents the same sequence from occupying more than one view,
+a view may receive its next-best unallocated candidate. Prediction,
+observation, selection, and allocation therefore remain visually distinct.
 
 An optional interactive view places the same three family scores on the x, y,
-and z axes. It uses color and marker shape only to distinguish prediction,
-selection, and observed-evidence roles; a fourth continuous color scale would
-repeat information already carried by the z-axis. The 3D view is an inspection
-aid, not the publication artifact. It may deterministically sample the large
-background prediction pool for browser performance, but it must retain every
-selected and observed row and disclose the sample. The complete 2D figure and
-tidy ledger remain authoritative.
+and z axes. Color and marker shape distinguish predicted, selected, and
+observed points; a fourth continuous color scale would repeat the z-axis. The
+complete ledger is the numerical record, the 2D landscape is the publication
+summary, and the 3D view supports interactive inspection.
 
-The selector maximizes the smooth bottleneck of all three family scores, not
-Euclidean distance toward a plot corner. A selected point can therefore be
-slightly less rightward or less high than another point when it has materially
-better OFF suppression. Campaign-wide sequence deduplication can also move a
-view to its next-best unallocated candidate. Hover values and the selected
-candidate's three family scores are the accurate explanation of a rank; visual
-distance in one projection is not.
-
-If a campaign pins a robust color extent, values outside that display extent
-must remain in the plot and evidence table, the colorbar must mark its saturated
-end or ends, and the caption must state the policy. Color saturation is a
-rendering choice; it must never clip the scored coordinate or affect ranking.
+The selector maximizes the smooth bottleneck, not Euclidean distance toward a
+plot corner. A point may rank higher despite being less rightward or less high
+when its OFF-suppression score is materially better. The three family scores,
+rather than visual distance in one projection, explain the rank.
 
 ### Compensation is limited, not absent
 
@@ -426,11 +436,10 @@ m \le S_{\mathrm{MSRB}} \le m - \log(w_m).
 $$
 
 Making already strong coordinates arbitrarily better cannot lift the scalar
-more than this finite amount above the weakest clearance. The plugin reports
-`hard_bottleneck_clearance`, `compensation_gap`,
-`maximum_compensation_gap`, the limiting coordinate index, its fixed prior
-weight, and its candidate-specific bottleneck weight so reviewers can see that
-tradeoff directly.
+more than this finite amount above the weakest clearance. Interpret the score
+alongside `hard_bottleneck_clearance`, `compensation_gap`,
+`maximum_compensation_gap`, the limiting coordinate, and its weights to see the
+remaining tradeoff.
 
 ### Boundary examples
 
@@ -439,18 +448,16 @@ are not biological acceptance criteria.
 
 - If the response family is `+1`, the ON-signal family is `+100`, and the
   OFF-suppression family is `-1`, then $S_{\mathrm{MSRB}}\approx-0.028$.
-  Arbitrarily favorable ON signal does not erase the OFF leak. A balanced
-  candidate with family scores `[+1, +1, +1]` scores exactly `+1` and therefore
-  ranks higher than `[+1, +100, -1]`.
+  Arbitrarily favorable ON signal does not erase weak OFF suppression. A
+  balanced candidate with family scores `[+1, +1, +1]` scores exactly `+1` and
+  therefore ranks higher than `[+1, +100, -1]`.
 - Starting from all-zero coordinates, making one coordinate with prior weight
   $w$ arbitrarily favorable raises the score only toward $-\log(1-w)$. The
   favorable outlier has finite influence.
-- A positive `behavior_score` can coexist with a negative hard bottleneck.
-  Therefore, a positive score is not evidence of feasibility.
 
-### Natural zero is not feasibility
+### Reference direction is not feasibility
 
-The optional diagnostic `all_reference_directions_met` is true when every
+The non-selectable diagnostic `all_reference_directions_met` is true when every
 normalized clearance is non-negative:
 
 - every ON response is at least every OFF response;
@@ -459,34 +466,16 @@ normalized clearance is non-negative:
 
 This is a reference-direction diagnostic, not a biological acceptance test. A
 positive `behavior_score` can occur while one coordinate remains negative.
-Neither a positive score nor `all_reference_directions_met` means that a study
-has established feasibility, non-expression, safety, model support, or
-synthesis readiness.
+Neither quantity proves absolute non-expression, assay adequacy, or predictive
+accuracy.
 
-### Same-state reference claim boundary
-
-MSRB receives a signed same-state reference-relative coordinate $b_i$. The
-upstream data contract owns the reference identity and reduction. Let
-$\bar{F}_{design,i}$ and $\bar{F}_{reference,i}$ denote the upstream reduced
-values for one state. Then:
-
-$$
-b_i = \bar{F}_{design,i}-\bar{F}_{reference,i}.
-$$
-
-`b_i = 0` denotes equality to the reference, positive values denote greater
-signal, and negative values denote lower signal. For a log2 coordinate,
-`b_i = -3` means eightfold lower signal than the reference in state $i$. This
-supports relative suppression only; it cannot establish background or absolute
-non-expression.
-
-### Output contract
+### Reported quantities
 
 The only selectable score channel is `behavior_score`, the family-balanced
 selection scalar. It is maximized.
 
-The plugin records these candidate-aligned diagnostics, but OPAL does not
-advertise them as selectable score channels:
+The following candidate-aligned diagnostics explain the score but are not
+separate selection targets:
 
 - `hard_bottleneck_clearance`: worst individual normalized clearance;
 - `compensation_gap`: score minus the hard bottleneck;
@@ -496,7 +485,7 @@ advertise them as selectable score channels:
 - `on_signal_family_score`: smooth ON-signal bottleneck;
 - `off_signal_suppression_family_score`: smooth OFF-signal-suppression bottleneck.
 
-The public mathematics API additionally returns:
+The detailed mathematical result also returns:
 
 - every state-level clearance and its stable label;
 - every coordinate's fixed family-balanced prior weight;
@@ -505,11 +494,15 @@ The public mathematics API additionally returns:
 - `all_reference_directions_met`;
 - the exact normalization scales.
 
-The plugin persists only candidate-aligned scalar channels and numeric
-diagnostics in prediction ledgers. Full coordinate matrices remain available
-through the public mathematics API for study-owned evidence tables and plots.
+Prediction ledgers retain candidate-aligned scalar quantities. State-level
+coordinates remain available for evidence tables and decomposition plots.
 
-### Configuration
+### Implementation reference
+
+These details support reproducible configuration, validation, visualization,
+and source navigation without changing the scientific definition above.
+
+#### Configuration
 
 ```yaml
 transforms_y:
@@ -537,15 +530,15 @@ selection_views:
         require_exact_top_k: true
 ```
 
-The configuration binds one target mask to one selection view. Normalization
-and campaign activation remain study-owned.
+Each selection view binds one target mask and one fixed pair of resolution
+scales to the objective.
 
-### Uncertainty and fail-fast behavior
+#### Evidence and numerical boundaries
 
-The objective consumes point estimates and emits no uncertainty channel. Assay
-bootstrap draws, event-time bounds, repeated observations, censoring, and model
-refits remain separate evidence. They are neither appended to the `2K`
-point-estimate input nor treated as one probabilistic standard deviation.
+The score consumes a `2K` point estimate and emits no uncertainty channel.
+Bootstrap draws, event-time bounds, repeated observations, censoring, and model
+refits remain separate evidence; they are not appended to the `2K` phenotype as
+another component or collapsed into a single probabilistic standard deviation.
 
 The objective rejects:
 
@@ -555,11 +548,11 @@ The objective rejects:
 - missing, extra, non-finite, or non-positive normalization scales;
 - undeclared plugin parameters, including a temperature or threshold.
 
-Stable log-sum-exp evaluation prevents exponential overflow. Normalized
-clearances beyond floating-point range saturate at a finite numerical guard;
-this affects only arithmetic extremes far outside assay-resolution inputs.
+Stable log-sum-exp evaluation prevents exponential overflow. Clearances beyond
+floating-point range saturate at a finite numerical guard; this affects only
+arithmetic extremes far outside assay-resolution inputs.
 
-### Plot and review contract
+#### Review views
 
 OPAL review surfaces for MSRB include:
 
@@ -567,15 +560,28 @@ OPAL review surfaces for MSRB include:
 - `multistate_response_behavior_selected_decomposition` for every coordinate,
   family score, hard bottleneck, and selected score;
 - `scatter_score_vs_rank` for pool-wide rank context;
-- `vector_summary_heatmap` for the objective-neutral predicted phenotype; and
-- `observed_objective_over_rounds` once multiple measured rounds exist.
+- `vector_summary_heatmap` for the objective-neutral predicted phenotype;
+- `observed_objective_over_rounds` once multiple measured rounds exist; and
+- an interactive three-family inspector for rotating the same $S_R$, $S_{ON}$,
+  and $S_{OFF}$ coordinates shown in the 2D landscape.
 
-Annotation layers are scoped by campaign, run, round, and view. Neither the
-objective nor its plots infer upstream assay evidence, candidate identity, or
-sequence annotations. External evidence is displayed only through explicitly
-configured, verified contracts.
+Annotations are scoped to one campaign, run, round, and target view so that
+predicted, selected, and previously observed candidates are not mixed across
+analyses.
 
-### Source map
+#### Responsibility boundaries
+
+- The assay producer defines the measurements, reduction window, replicate
+  evidence, censoring, and the meaning of $r_i$ and $b_i$.
+- The biological study defines state identities, target membership, reference
+  choice, resolution scales, and whether an objective is suitable for a
+  campaign.
+- OPAL evaluates the published equations, predicts the complete phenotype,
+  applies the selected target view, and records ranking and allocation.
+- Sequence annotation and other external evidence enter review surfaces only
+  through explicit, verified sources; they do not alter the score.
+
+#### Source map
 
 - Public math API: `src/dnadesign/opal/api/multistate_response_behavior.py`
 - Objective implementation:

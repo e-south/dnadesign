@@ -265,17 +265,18 @@ def test_generic_msrb_source_of_truth_is_k_state_and_assay_neutral() -> None:
         "For four states, `2 × 4 = 8`, so this happens to be an eight-value phenotype",
         "The width comes from the measured state panel. It is not fixed by MSRB.",
         "`K` counts states, not experimental factors",
+        "### What the same-state reference means",
         "### Why assay-resolution scales are needed",
         "The scales balance measurement resolution, not biological importance.",
         "Basic question:",
         "The final scalar applies the same smooth bottleneck",
         "### One complete four-state example",
         "the summary can still be positive while one pair is reversed",
-        "point-estimate input",
+        "not appended to the `2K` phenotype as another component",
         "state_ids: [state_a, state_b, state_c]",
     ):
         assert required in normalized
-    assert "MSRB v1 does not represent partially ON targets, exact expression setpoints" in normalized
+    assert "Partially ON targets, exact setpoints, ordinal preferences, and don't-care states" in normalized
     assert 'state_ids: ["00", "10", "01", "11"]' not in text
     assert "pDual-10" not in text
     assert "Reader bootstrap" not in text
