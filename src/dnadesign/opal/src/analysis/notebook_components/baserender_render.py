@@ -21,7 +21,12 @@ _BASERENDER_CONTENT_PAD_PX = 32
 _BASERENDER_BLACK_MATTE_THRESHOLD = 24
 
 
-def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
+def render_notebook_baserender_record(
+    record_row: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    *,
+    title: str | None = None,
+) -> dict[str, Any]:
     """Render a single record through the public BaseRender API."""
 
     if not bool(contract.get("available")):
@@ -49,10 +54,11 @@ def render_notebook_baserender_record(record_row: Mapping[str, Any], contract: M
                 style_overrides=style_overrides,
                 target_width_px=int(contract.get("target_width_px") or 2600),
                 target_height_px=int(contract.get("target_height_px") or 430),
-                vertical_anchor=str(contract.get("vertical_anchor") or "top"),
-                canvas_top_pad_px=int(contract.get("canvas_top_pad_px") or 8),
+                vertical_anchor=str(contract.get("vertical_anchor") or "center"),
+                canvas_top_pad_px=int(contract.get("canvas_top_pad_px") or 0),
+                title=title,
             )
-            image_bytes = _encode_content_fit_white_png(Image.fromarray(panel.image))
+            image_bytes = _encode_horizontal_fit_white_png(Image.fromarray(panel.image))
             sequence_length = int(panel.diagnostics.sequence_length_bp)
             feature_count = int(panel.diagnostics.feature_count)
         else:
@@ -173,6 +179,30 @@ def _encode_content_fit_white_png(image: Any) -> bytes:
     top = max(0, int(ys.min()) - pad)
     bottom = min(white.height, int(ys.max()) + pad + 1)
     fitted = white.crop((left, top, right, bottom))
+    return _encode_opaque_white_png(fitted)
+
+
+def _encode_horizontal_fit_white_png(image: Any) -> bytes:
+    """Fit visible content horizontally while preserving BaseRender's vertical canvas."""
+
+    import numpy as np
+    from PIL import Image
+
+    rgba = image.convert("RGBA")
+    white = Image.new("RGBA", rgba.size, (*_BASERENDER_CANVAS_BACKGROUND_RGB, 255))
+    white.alpha_composite(rgba)
+    white = _normalize_black_border_matte_to_white(white)
+
+    arr = np.asarray(white.convert("RGB"))
+    content_mask = (arr < _BASERENDER_CONTENT_THRESHOLD).any(axis=2)
+    if not content_mask.any():
+        return _encode_opaque_white_png(white)
+
+    _, xs = np.where(content_mask)
+    pad = int(_BASERENDER_CONTENT_PAD_PX)
+    left = max(0, int(xs.min()) - pad)
+    right = min(white.width, int(xs.max()) + pad + 1)
+    fitted = white.crop((left, 0, right, white.height))
     return _encode_opaque_white_png(fitted)
 
 

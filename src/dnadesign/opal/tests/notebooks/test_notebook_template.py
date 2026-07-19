@@ -29,6 +29,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_at_a_glance_rows,
     build_notebook_baserender_contract,
     build_notebook_baserender_contract_rows,
+    build_notebook_baserender_panel_title,
     build_notebook_baserender_record_annotation_counts,
     build_notebook_baserender_record_choices,
     build_notebook_baserender_record_choices_with_counts,
@@ -723,6 +724,8 @@ def test_notebook_visual_panel_rejects_unknown_control_surface() -> None:
 
 
 def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -> None:
+    rendered: dict[str, object] = {}
+
     class _FakeMo:
         def md(self, text: str) -> dict[str, object]:
             return {"kind": "md", "text": text}
@@ -754,7 +757,8 @@ def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -
         mo=_FakeMo(),
         opal_table=lambda *_, **__: {"kind": "table"},
         pl=pl,
-        render_notebook_baserender_record=lambda *_: {
+        render_notebook_baserender_record=lambda *_, **kwargs: rendered.update(kwargs)
+        or {
             "record_id": "candidate-record-alpha-with-long-id",
             "image_bytes": b"png",
             "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
@@ -770,17 +774,73 @@ def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -
     )
 
     visual = panel["items"][0]
-    assert visual["gap"] == 0.1
-    assert visual["items"][0]["text"] == (
-        '<h4 style="text-align:center; margin:0 0 0.15rem 0;">'
-        "AND selection · competition rank 7 · candidate <code>candidate-re...-long-id</code></h4>"
-    )
-    assert visual["items"][1]["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
-    assert "candidate-record-alpha-with-long-id" not in visual["items"][0]["text"]
+    assert visual["kind"] == "image"
+    assert rendered["title"] == ("AND selection · competition rank 7 · candidate candidate-re...-long-id")
+    assert visual["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
+    assert "candidate-record-alpha-with-long-id" not in str(rendered["title"])
     assert "Sequence and selection evidence" in panel["items"][1]["items"]
 
 
+@pytest.mark.parametrize(
+    ("selection_record", "message"),
+    [
+        ({"record_id": "candidate-1", "selection_view_id": "", "view_rank": 1}, "selection_view_id"),
+        ({"record_id": "", "selection_view_id": "ethanol", "view_rank": 1}, "record_id"),
+        ({"record_id": "candidate-1", "selection_view_id": "ethanol", "view_rank": 0}, "view_rank"),
+        ({"record_id": "candidate-1", "selection_view_id": "ethanol", "view_rank": True}, "view_rank"),
+        ({"record_id": "candidate-1", "selection_view_id": "ethanol", "view_rank": 1.5}, "view_rank"),
+    ],
+)
+def test_notebook_baserender_panel_title_rejects_incomplete_selection_identity(
+    selection_record: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        build_notebook_baserender_panel_title(selection_record)
+
+
+def test_notebook_baserender_panel_rejects_record_identity_drift() -> None:
+    class _FakeMo:
+        def md(self, text: str) -> dict[str, object]:
+            return {"kind": "md", "text": text}
+
+        def vstack(self, items: list[object], *, gap: float) -> dict[str, object]:
+            return {"kind": "vstack", "items": items, "gap": gap}
+
+        def accordion(self, items: dict[str, object], **kwargs: object) -> dict[str, object]:
+            return {"kind": "accordion", "items": items, **kwargs}
+
+    with pytest.raises(ValueError, match="authoritative selection record"):
+        render_notebook_visual_panel(
+            active_view_mode="Campaign",
+            baserender_record_id="candidate-expected",
+            baserender_record_row={"id": "candidate-other", "sequence": "ACGT"},
+            baserender_selection_record={
+                "record_id": "candidate-expected",
+                "selection_view_id": "ethanol",
+                "view_rank": 1,
+            },
+            build_notebook_baserender_contract_rows=lambda _: [],
+            build_notebook_baserender_label_rows=lambda *_, **__: [],
+            build_notebook_plot_card_rows=lambda _: [],
+            build_notebook_plot_method_sections=lambda _: {},
+            control_surface="external",
+            mo=_FakeMo(),
+            opal_table=lambda *_, **__: {"kind": "table"},
+            pl=pl,
+            render_notebook_baserender_record=lambda *_, **__: pytest.fail("mismatched record was rendered"),
+            render_notebook_plot_choice_image=lambda *_, **__: None,
+            selected_baserender_status_rows=(),
+            selected_campaign_baserender_contract={"available": True},
+            selected_campaign_labels_df=None,
+            selected_visual_choice={"surface_kind": "baserender"},
+            select_notebook_plot_scope=lambda *_, **__: {},
+        )
+
+
 def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> None:
+    rendered: dict[str, object] = {}
+
     class _FakeMo:
         def md(self, text: str) -> dict[str, object]:
             return {"kind": "md", "text": text}
@@ -806,6 +866,11 @@ def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> N
         baserender_record_id="candidate-record-alpha-with-long-id",
         baserender_record_row={"id": "candidate-record-alpha-with-long-id", "sequence": "ACGT"},
         baserender_record_selector=selector,
+        baserender_selection_record={
+            "record_id": "candidate-record-alpha-with-long-id",
+            "selection_view_id": "ciprofloxacin",
+            "view_rank": 3,
+        },
         build_notebook_plot_card_rows=lambda _: [],
         build_notebook_plot_method_sections=lambda _: {},
         control_surface="external",
@@ -814,7 +879,8 @@ def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> N
         opal_table=lambda *_, **__: {"kind": "table"},
         pl=pl,
         plot_view_state={"figure": "interactive_3d"},
-        render_notebook_baserender_record=lambda *_: {
+        render_notebook_baserender_record=lambda *_, **kwargs: rendered.update(kwargs)
+        or {
             "record_id": "candidate-record-alpha-with-long-id",
             "image_bytes": b"png",
             "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
@@ -830,9 +896,9 @@ def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> N
     companion = panel["items"][1]
     assert companion["items"][0]["items"] == [selector]
     sequence = companion["items"][2]
-    assert "candidate-re...-long-id" in sequence["items"][0]["text"]
-    assert "competition rank" not in sequence["items"][0]["text"]
-    assert sequence["items"][1]["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
+    assert sequence["kind"] == "image"
+    assert rendered["title"] == ("Ciprofloxacin selection · competition rank 3 · candidate candidate-re...-long-id")
+    assert sequence["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -3024,7 +3090,7 @@ def test_notebook_baserender_record_options_filter_to_selected_ids(tmp_path: Pat
     ]
 
 
-def test_notebook_baserender_render_keeps_campaign_context_outside_sequence_canvas(
+def test_notebook_baserender_render_passes_selection_context_to_public_sequence_canvas(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import dnadesign.opal.src.analysis.notebook_components.baserender_render as baserender_render
@@ -3051,6 +3117,7 @@ def test_notebook_baserender_render_keeps_campaign_context_outside_sequence_canv
             "adapter_policies": {"require_non_empty": False},
             "render_route": "sequence_panel",
         },
+        title="Ethanol selection · competition rank 2 · candidate record-abc",
     )
 
     row = captured["row"]
@@ -3059,11 +3126,14 @@ def test_notebook_baserender_render_keeps_campaign_context_outside_sequence_canv
     assert "__opal_baserender_record_title" not in row
     assert isinstance(kwargs, dict)
     assert "overlay_text" not in kwargs["adapter_columns"]
+    assert kwargs["title"] == "Ethanol selection · competition rank 2 · candidate record-abc"
+    assert kwargs["vertical_anchor"] == "center"
+    assert kwargs["canvas_top_pad_px"] == 0
     assert payload["record_id"] == "record-abc"
     assert payload["caption"] == "DenseGen TFBS annotation · 4 bp · 0 annotated elements"
 
 
-def test_notebook_baserender_render_uses_high_resolution_content_fit_canvas(tmp_path: Path) -> None:
+def test_notebook_baserender_render_preserves_vertical_canvas_while_fitting_width(tmp_path: Path) -> None:
     from PIL import Image
 
     feature_type = pa.list_(
@@ -3108,12 +3178,13 @@ def test_notebook_baserender_render_uses_high_resolution_content_fit_canvas(tmp_
     near_black_fraction = float((rgb.max(axis=2) <= 24).mean())
     assert near_black_fraction < 0.01
     assert image.width >= 900
+    assert image.height == int(contract["target_height_px"])
     content_mask = (rgb < 245).any(axis=2)
     ys, xs = np.where(content_mask)
     assert int(xs.min()) <= 40
     assert int(image.width - 1 - xs.max()) <= 40
-    assert int(ys.min()) <= 40
-    assert int(image.height - 1 - ys.max()) <= 40
+    assert int(ys.min()) > 0
+    assert int(ys.max()) < image.height - 1
 
 
 def test_notebook_baserender_content_fit_normalizes_black_matte_to_white() -> None:

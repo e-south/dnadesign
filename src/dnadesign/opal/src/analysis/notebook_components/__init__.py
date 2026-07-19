@@ -175,6 +175,7 @@ from .visual_hierarchy import (
     filter_notebook_visual_choices_by_group,
 )
 from .visual_panel import render_notebook_visual_panel
+from .visual_panel_baserender import build_notebook_baserender_panel_title
 from .visual_surface import render_visual_surface_cells
 from .zoomable_visual import render_notebook_zoomable_image
 
@@ -198,6 +199,7 @@ __all__ = [
     "build_notebook_baserender_record_choices_with_counts",
     "build_notebook_baserender_record_options",
     "build_notebook_baserender_record_memory_key",
+    "build_notebook_baserender_panel_title",
     "build_notebook_baserender_evidence_bundle",
     "build_notebook_baserender_record_controls",
     "build_notebook_baserender_selector_model",
