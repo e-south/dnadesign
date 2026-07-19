@@ -110,3 +110,15 @@ def test_score_rank_plot_accepts_an_explicit_directional_rank_label() -> None:
     assert "rank one appears at the right" in metadata["alt_text"]
     assert metadata["non_claim_boundary"]
     assert "y_axis" in metadata["params"]
+    assert "selection_marker_label" in metadata["params"]
+
+
+def test_vector_summary_heatmap_declares_interpretation_boundaries() -> None:
+    metadata = describe_plot_kind("vector_summary_heatmap")
+
+    assert metadata["premise"]
+    assert metadata["decision_value"]
+    assert metadata["rationale"]
+    assert metadata["alt_text"]
+    assert metadata["non_claim_boundary"]
+    assert metadata["tier"] == "diagnostic"

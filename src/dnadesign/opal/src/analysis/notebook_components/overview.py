@@ -63,7 +63,7 @@ def build_notebook_campaign_header_lines(
     level = max(1, min(6, int(heading_level)))
     marker = "#" * level
     description = _campaign_description(campaign)
-    target = _objective_target_summary(selection_view)
+    target = _objective_target_summary(selection_view, campaign=campaign)
     lines = [f"{marker} {title}", "", description]
     evidence_lines = campaign_evidence_status_lines(view_model)
     if evidence_lines:
@@ -164,7 +164,10 @@ def build_notebook_at_a_glance_rows(
         {"field": "X column", "value": row["x_column"]},
         {"field": "Y column", "value": row["y_column"]},
         {"field": "selection view", "value": selection_view.get("id")},
-        {"field": "objective target", "value": _objective_target_summary(selection_view)},
+        {
+            "field": "objective target",
+            "value": _objective_target_summary(selection_view, campaign=campaign),
+        },
         {"field": "label source", "value": row["label_source"]},
         {"field": "label readiness", "value": label_source_readiness_label(label_status)},
         {"field": "label context", "value": row["label_context"] or "not recorded"},
@@ -189,7 +192,11 @@ def build_notebook_at_a_glance_rows(
     return rows
 
 
-def _objective_target_summary(selection_view: Mapping[str, Any]) -> str:
+def _objective_target_summary(
+    selection_view: Mapping[str, Any],
+    *,
+    campaign: Mapping[str, Any] | None = None,
+) -> str:
     view_id = str(selection_view.get("id") or "").strip()
     if not view_id:
         raise ValueError("Notebook selection view requires a non-empty id.")
@@ -198,23 +205,53 @@ def _objective_target_summary(selection_view: Mapping[str, Any]) -> str:
     if not name:
         raise ValueError(f"Notebook selection view {view_id!r} requires an objective name.")
     params = mapping(objective.get("params"))
-    if name == "response_magnitude_feasibility_v1":
+    if "state_ids" in params or "target_mask" in params:
         state_ids = [str(value) for value in sequence(params.get("state_ids"))]
         target_mask = sequence(params.get("target_mask"))
         if not state_ids or len(state_ids) != len(target_mask):
-            raise ValueError("RMF notebook target requires aligned state_ids and target_mask values.")
-        if any(value not in (0, 1, False, True) for value in target_mask):
-            raise ValueError("RMF notebook target_mask values must be binary.")
+            raise ValueError("Masked notebook objectives require aligned state_ids and target_mask values.")
+        if any(isinstance(value, bool) or value not in (0, 1) for value in target_mask):
+            raise ValueError("Masked notebook objective target_mask values must be numeric zero or one.")
         on_states = [state for state, value in zip(state_ids, target_mask, strict=True) if int(value) == 1]
         off_states = [state for state, value in zip(state_ids, target_mask, strict=True) if int(value) == 0]
         if not on_states or not off_states:
-            raise ValueError("RMF notebook target_mask must contain at least one ON and one OFF state.")
-        return f"RMF mask={list(map(int, target_mask))}; ON={', '.join(on_states)}; OFF={', '.join(off_states)}"
+            raise ValueError("Masked notebook objective target_mask must contain at least one ON and one OFF state.")
+        objective_label = display_name(name.removesuffix("_v1"))
+        acronym = _campaign_objective_acronym(campaign, objective_name=name)
+        if acronym:
+            objective_label = f"{objective_label} ({acronym})"
+        selection = mapping(selection_view.get("selection"))
+        selection_params = mapping(selection.get("params"))
+        score_ref = str(selection_params.get("score_ref") or "").strip()
+        objective_mode = str(selection_params.get("objective_mode") or "").strip().lower()
+        score_clause = (
+            f"; {objective_mode} {display_name(score_ref).lower()}"
+            if score_ref and objective_mode in {"maximize", "minimize"}
+            else ""
+        )
+        return f"{objective_label}{score_clause}; ON={', '.join(on_states)}; OFF={', '.join(off_states)}"
     if "setpoint_vector" in params:
         return f"{name} setpoint_vector={params['setpoint_vector']}"
     if params:
         return f"{name} params={sorted(params)}"
     return f"{name} params=none"
+
+
+def _campaign_objective_acronym(
+    campaign: Mapping[str, Any] | None,
+    *,
+    objective_name: str,
+) -> str:
+    campaign_record = mapping(campaign)
+    acronym = str(mapping(campaign_record.get("metadata")).get("metric_acronym") or "").strip()
+    if not acronym:
+        return ""
+    objective_names = {
+        str(mapping(mapping(view).get("objective")).get("name") or "").strip()
+        for view in sequence(campaign_record.get("selection_views"))
+    }
+    objective_names.discard("")
+    return acronym if objective_names == {objective_name} else ""
 
 
 def _campaign_label_context(campaign: Mapping[str, Any]) -> str:

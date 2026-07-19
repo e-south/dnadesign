@@ -109,7 +109,79 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     assert build_notebook_reader_evidence_artifact_options(
         surface,
         selected_plot_type_label="SFXI vec8 heatmap",
-    ) == ["r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h"]
+    ) == ["Round 0 · 2026-07-06 · SFXI · pDual-10-SECG-B0-ETH-01 · 12.04 h · PNG"]
+
+
+def test_reader_evidence_labels_disambiguate_media_without_exposing_paths(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    png = tmp_path / "reader" / "promoter_evidence.png"
+    pdf = tmp_path / "reader" / "promoter_evidence.pdf"
+    png.parent.mkdir(parents=True)
+    png.write_bytes(b"png")
+    pdf.write_bytes(b"pdf")
+    manifest = workdir / "inputs" / "r0" / "reader_evidence_manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "example_study.reader_evidence.v1",
+                "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
+                "round": "r0",
+                "summary": {
+                    "rows": 1,
+                    "distinct_ids": 1,
+                    "reader_experiments": 1,
+                    "artifact_count": 2,
+                    "missing_artifact_rows": 0,
+                },
+                "rows": [
+                    {
+                        "id": "candidate-1",
+                        "design_id": "design-1",
+                        "reader_experiment_id": "20260706_response-window-opal-20-28",
+                        "reduction_id": "event_logmean_4_8h_post",
+                        "artifacts": [
+                            {
+                                "semantic_kind": "promoter_response_evidence",
+                                "kind": "reader_publication",
+                                "record_id": "plot:png",
+                                "scope": "design_reduction",
+                                "path": str(png),
+                                "exists": True,
+                                "media_type": "image/png",
+                            },
+                            {
+                                "semantic_kind": "promoter_response_evidence",
+                                "kind": "reader_publication",
+                                "record_id": "plot:pdf",
+                                "scope": "design_reduction",
+                                "path": str(pdf),
+                                "exists": True,
+                                "media_type": "application/pdf",
+                            },
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    surface = build_notebook_reader_evidence_surface(
+        {
+            "campaign": {"workdir": str(workdir)},
+            "reader_evidence": discover_reader_evidence_manifests(workdir),
+            "reader_evidence_artifacts": discover_reader_evidence_artifacts(workdir),
+        }
+    )
+
+    assert build_notebook_reader_evidence_artifact_options(
+        surface,
+        selected_plot_type_label="Promoter response evidence",
+    ) == [
+        "Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event · PNG",
+        "Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event · PDF",
+    ]
+    assert all("/reader/" not in label for label in surface["media_labels"])
 
 
 def test_reader_evidence_discovery_routes_by_public_adapter_not_study_schema(tmp_path: Path) -> None:

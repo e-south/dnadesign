@@ -64,6 +64,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     color_scale = _mapping(runtime["color_scale"])
     color_center = float(color_scale["center"])
     color_extent = float(color_scale["extent"])
+    colorbar_extend = str(color_scale.get("extend") or "neither")
     if not np.isfinite(color_extent) or color_extent <= 0.0:
         raise ValueError("Layered-scatter color_extent must be finite and positive.")
     if not np.isfinite(color_center):
@@ -184,6 +185,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         label=str(runtime["color_label"]),
         pad=0.065,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
+        extend=colorbar_extend,
     )
     colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
     colorbar.ax.yaxis.set_label_position("left")

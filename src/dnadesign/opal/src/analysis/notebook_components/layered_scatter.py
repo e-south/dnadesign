@@ -136,6 +136,8 @@ def render_notebook_layered_scatter_image(
     batch_labels = [str(item["label"]) for item in prepared["observed_batches"] if str(item["id"]) in selected_batches]
     runtime = _mapping(prepared["runtime"])
     color_context = str(_mapping(runtime.get("color_scale")).get("context") or "").strip()
+    x_context = str(runtime.get("x_label") or "").strip()
+    y_context = str(runtime.get("y_label") or "").strip()
     return mo.image(
         payload.getvalue(),
         alt=(
@@ -143,14 +145,15 @@ def render_notebook_layered_scatter_image(
             "observations selected by study batch."
         ),
         caption=(
-            f"Color: {color_context}. "
+            f"Horizontal: {x_context}. Vertical: {y_context}. Color: {color_context}. "
+            "Interpret all three encodings together; no single axis determines selection. "
             "Observed vectors are measured evidence rescored under the active selection view. "
             f"Visible observed batches: {', '.join(batch_labels) if batch_labels else 'none'}."
         ),
         rounded=True,
         style={
             "width": "auto",
-            "max-height": "min(62vh, 720px)",
+            "max-height": "min(76vh, 860px)",
             "max-width": "100%",
             "height": "auto",
             "object-fit": "contain",

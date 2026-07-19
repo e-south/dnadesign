@@ -190,7 +190,7 @@ def render_visual_surface_cells() -> str:
                         rounded=True,
                         style={
                             "width": "auto",
-                            "max-height": "min(68vh, 760px)",
+                            "max-height": "min(76vh, 860px)",
                             "max-width": "100%",
                             "height": "auto",
                             "object-fit": "contain",

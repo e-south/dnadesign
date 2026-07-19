@@ -115,6 +115,7 @@ _ACRONYMS = {
     "logic4": "logic4",
     "sigma35": "sigma35",
     "mse": "MSE",
+    "opal": "OPAL",
     "rf": "RF",
     "rmf": "RMF",
     "sfxi": "SFXI",
@@ -613,6 +614,7 @@ def add_flush_colorbar(
     size: str = "4%",
     pad: float = 0.08,
     ticklabelsize: float | None = None,
+    extend: str = "neither",
 ):
     """Add a vertical colorbar whose top and bottom align with the target axes."""
 
@@ -628,7 +630,9 @@ def add_flush_colorbar(
         borderpad=0.0,
     )
     cax.set_in_layout(False)
-    cbar = fig.colorbar(mappable, cax=cax)
+    if extend not in {"neither", "both", "min", "max"}:
+        raise ValueError(f"Unsupported colorbar extension: {extend!r}.")
+    cbar = fig.colorbar(mappable, cax=cax, extend=extend)
     if label:
         cbar.set_label(label)
     if ticklabelsize is not None:

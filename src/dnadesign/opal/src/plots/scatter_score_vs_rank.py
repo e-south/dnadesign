@@ -64,6 +64,7 @@ from ._param_utils import (
             "rank_scale": "linear|log (default linear). Log scale resolves the top-ranked tail in large pools.",
             "rank_label": "Optional explicit x-axis label, including favorable direction.",
             "show_selection_view": "Append the active selection-view label to the title (default false).",
+            "selection_marker_label": "Legend label for outlined allocated/selected candidates (default Selected).",
             "title_location": "Title alignment: left|center|right (default left).",
             "legend_location": "below|upper_left (default below).",
             "y_axis": "Optional mapping with limits, reference_lines, and include_zero_tick.",
@@ -113,6 +114,7 @@ def render(context, params: dict) -> None:
     rank_scale = (get_str(params, ["rank_scale"], "linear") or "linear").lower()
     rank_label = get_str(params, ["rank_label"], None)
     show_selection_view = get_bool(params, ["show_selection_view"], False)
+    selection_marker_label = get_str(params, ["selection_marker_label"], "Selected") or "Selected"
     legend_location = (get_str(params, ["legend_location"], "below") or "below").lower()
     title_location = (get_str(params, ["title_location"], "left") or "left").lower()
     # "sequential" | "competition"
@@ -263,7 +265,7 @@ def render(context, params: dict) -> None:
                     edgecolors="black",
                     linewidths=1.0,
                     rasterize_at=rasterize_at,
-                    label="Selected",
+                    label=selection_marker_label,
                 )
         ax.set_xlabel(_rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label))
         ax.set_ylabel(score_label)

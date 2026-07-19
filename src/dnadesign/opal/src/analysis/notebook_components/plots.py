@@ -239,7 +239,7 @@ def render_notebook_plot_choice_image(
         rounded=True,
         style={
             "width": "auto",
-            "max-height": "min(62vh, 720px)",
+            "max-height": "min(76vh, 860px)",
             "max-width": "100%",
             "height": "auto",
             "object-fit": "contain",

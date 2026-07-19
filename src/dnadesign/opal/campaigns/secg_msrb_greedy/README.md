@@ -24,6 +24,18 @@ The model predicts
 The same predicted phenotype is interpreted under each study-issued target
 mask. MSRB is the objective and `top_n` is the selector.
 
+In the family landscape, farther right means better response ordering, farther
+up means stronger intended-ON signal, and redder means stronger intended-OFF
+suppression. All three directions matter. Measured controls provide context but
+are not members of the unmeasured prediction pool, and sequence deduplication
+can advance a later view to its next-best unallocated candidate. The
+selected-candidate decomposition, not either scatter axis alone, explains a
+rank.
+
+The OFF-suppression color scale is a campaign-pinned symmetric linear display
+at the prediction-pool absolute 99th percentile. Pointed colorbar ends identify
+saturated tail colors; all candidates and exact values remain available.
+
 The campaign is a prospectively frozen greedy learning probe. Retrospective
 ordering is weak, prospective hill-climb efficacy is unknown, and campaign
 selection does not authorize synthesis. The

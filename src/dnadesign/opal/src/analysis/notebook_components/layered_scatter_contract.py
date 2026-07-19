@@ -191,8 +191,12 @@ def _validate_runtime_semantics(runtime: Mapping[str, Any]) -> None:
             if not np.isfinite(value) or not label:
                 raise ValueError(f"Layered-scatter reference_lines.{axis} values must be finite and labels non-empty.")
     color_scale = _mapping(runtime.get("color_scale"))
-    if set(color_scale) != {"center", "extent", "context"}:
-        raise ValueError("Layered-scatter color_scale must contain exactly center, extent, and context.")
+    required_color_scale = {"center", "extent", "context"}
+    allowed_color_scale = {*required_color_scale, "extend"}
+    if missing := sorted(required_color_scale - set(color_scale)):
+        raise ValueError(f"Layered-scatter color_scale is missing fields: {missing}.")
+    if extra := sorted(set(color_scale) - allowed_color_scale):
+        raise ValueError(f"Layered-scatter color_scale contains unsupported fields: {extra}.")
     center = float(color_scale["center"])
     extent = float(color_scale["extent"])
     context = str(color_scale["context"]).strip()
@@ -200,6 +204,9 @@ def _validate_runtime_semantics(runtime: Mapping[str, Any]) -> None:
         raise ValueError(
             "Layered-scatter color_scale requires a finite center, positive finite extent, and non-empty context."
         )
+    extend = str(color_scale.get("extend") or "neither")
+    if extend not in {"neither", "both", "min", "max"}:
+        raise ValueError("Layered-scatter color_scale.extend must be neither, both, min, or max.")
 
 
 def _mapping(value: object) -> Mapping[str, Any]:

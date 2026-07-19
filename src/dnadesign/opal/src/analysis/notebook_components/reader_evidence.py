@@ -25,7 +25,11 @@ from .reader_evidence_media import (
     dedupe_reader_media_labels,
     filter_reader_media_rows,
     is_reader_media_artifact,
+    reader_experiment_display_label,
+    reader_media_format_label,
     reader_media_plot_type_labels,
+    reader_reduction_display_label,
+    reader_round_display_label,
     semantic_kind_label,
     time_selected_label,
 )
@@ -65,13 +69,18 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                 reader_experiment_id = str(item.get("reader_experiment_id") or "")
                 round_label = projection.round_label
                 plot_type_label = semantic_kind_label(semantic_kind)
-                artifact_label = " | ".join(
+                artifact_label = " · ".join(
                     part
                     for part in (
-                        round_label,
-                        reader_experiment_id,
+                        reader_round_display_label(round_label),
+                        reader_experiment_display_label(reader_experiment_id),
                         design_id,
+                        reader_reduction_display_label(item.get("reduction_id")),
                         time_selected_label(item.get("time_selected_h")),
+                        reader_media_format_label(
+                            path=path,
+                            media_type=artifact_item.get("media_type"),
+                        ),
                     )
                     if part
                 )

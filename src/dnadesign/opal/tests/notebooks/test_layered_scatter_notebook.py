@@ -561,8 +561,11 @@ def test_layered_scatter_renderer_returns_a_publication_image(tmp_path: Path) ->
 
     assert rendered["data"].startswith(b"\x89PNG")
     assert "Batch 1" in rendered["caption"]
+    assert "Horizontal: Response separation" in rendered["caption"]
+    assert "Vertical: ON fluorescence" in rendered["caption"]
     assert "red = greater clearance; 0 = configured boundary" in rendered["caption"]
-    assert rendered["style"]["max-height"] == "min(62vh, 720px)"
+    assert "Interpret all three encodings together" in rendered["caption"]
+    assert rendered["style"]["max-height"] == "min(76vh, 860px)"
 
 
 def test_layered_scatter_legend_stays_outside_the_annotation_field(tmp_path: Path) -> None:

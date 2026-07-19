@@ -220,6 +220,40 @@ returned float unchanged. Assay-scale property tests require strict directional
 improvement; arithmetic-extreme tests require finite, nondecreasing behavior
 rather than a bytewise strict-increase guarantee.
 
+### Reading the three-family landscape
+
+The standard family landscape places the response-ordering family score on the x-axis,
+the intended-ON-signal family score on the y-axis, and the intended-OFF-signal-
+suppression family score in color. Under one fixed view and protocol:
+
+- farther right means better response ordering;
+- farther up means stronger intended-ON signal;
+- redder means stronger intended-OFF suppression; and
+- a candidate that is strictly better in all three encodings must have a
+  strictly higher behavior score.
+
+Top-right is therefore desirable only when the color is also considered. A
+point can be farther right and higher yet rank below another point because its
+OFF-suppression family is worse. The scalar is computed from the same three
+family scores, so there is no hidden fourth preference; the selected-candidate
+decomposition exposes the state-level coordinates that produced each family
+score.
+
+The landscape may also contain measured observations. They provide assay
+context but are not members of the prediction pool ranked by a selector.
+Sequence-deduplicated campaign allocation is downstream of this objective and
+may advance a view to its next-best unallocated prediction. A plot must keep
+prediction, observation, selection, and allocation roles visually distinct.
+
+Zero on an axis or color scale is a reference direction. It is not a pass
+boundary, and the upper-right-red region does not by itself establish
+feasibility or measured performance.
+
+If a campaign pins a robust color extent, values outside that display extent
+must remain in the plot and evidence table, the colorbar must mark its saturated
+end or ends, and the caption must state the policy. Color saturation is a
+rendering choice; it must never clip the scored coordinate or affect ranking.
+
 ### Compensation is limited, not absent
 
 No continuous scalar can be both strictly increasing in every coordinate and
@@ -382,7 +416,7 @@ Generic OPAL review surfaces include:
 - `vector_summary_heatmap` for the objective-neutral predicted phenotype; and
 - `observed_objective_over_rounds` once multiple measured rounds exist.
 
-The frontier's selected and observed annotation layers are campaign-scoped.
+The family landscape's selected and observed annotation layers are campaign-scoped.
 Neither the plots nor the objective reconstruct Reader evidence or candidate
 identity. Study-issued Reader composites and BaseRender sequence annotations
 remain digest-verified evidence displayed through their public contracts.

@@ -37,6 +37,26 @@ from ._mpl_utils import (
     "vector_summary_heatmap",
     meta=PlotMeta(
         summary="Mean vector-channel summary by reference/cohort/round.",
+        premise=(
+            "A vector-valued predictor can improve or regress in different channels even when its downstream "
+            "scalar score rises."
+        ),
+        decision_value=(
+            "Shows whether the selected cohort's complete predicted phenotype changes across rounds and which "
+            "channels drive it."
+        ),
+        rationale=(
+            "A channel-by-round heatmap preserves the model output that scalar objectives intentionally compress."
+        ),
+        alt_text=(
+            "Heatmap with vector channels in columns and cohort summaries by round in rows. Cell color encodes the "
+            "mean predicted coordinate; an optional reference row and distance panel provide context."
+        ),
+        non_claim_boundary=(
+            "Cohort means do not show candidate-level variation, measurement uncertainty, or prospective "
+            "optimization efficacy."
+        ),
+        tier="diagnostic",
         params={
             "vector_field": "List-valued prediction field (default pred__y_hat_model).",
             "cohort": "selected|top_k|all_pool (default selected).",

@@ -76,6 +76,7 @@ def test_score_rank_reference_boundary_is_annotated_and_included_without_loose_s
             "title": "RMF score by active-view rank",
             "title_location": "center",
             "show_selection_view": True,
+            "selection_marker_label": "Allocated to this view",
             "y_axis": {
                 "reference_lines": [
                     {"value": 0.0, "label": "Feasibility boundary"},
@@ -95,6 +96,7 @@ def test_score_rank_reference_boundary_is_annotated_and_included_without_loose_s
     assert upper <= 0.30
     legend = ax.get_legend()
     assert legend is not None
+    assert "Allocated to this view" in [text.get_text() for text in legend.get_texts()]
     assert ax.get_title(loc="center") == "RMF score by active view rank · Ethanol view"
     assert ax.get_title(loc="left") == ""
     assert ax.title.get_fontsize() >= 14

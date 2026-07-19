@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from html import escape
 from typing import Any, Literal, Mapping
 
 from ._support import display_name
@@ -256,9 +257,11 @@ def _render_baserender_panel(
         slug = str((baserender_campaign_model or {}).get("campaign", {}).get("slug") or "unknown campaign")
         round_text = f"round {selected_baserender_round}" if selected_baserender_round is not None else "unknown round"
         view_label = "AND" if view_id.lower() == "and" else display_name(view_id)
+        compact_id = compact_record_id(str(payload["record_id"]))
         heading = mo.md(
-            f"#### {view_label} selection · competition rank {rank}\n"
-            f"Candidate `{compact_record_id(str(payload['record_id']))}`"
+            '<h4 style="text-align:center; margin:0 0 0.15rem 0;">'
+            f"{escape(view_label)} selection · competition rank {rank} · "
+            f"candidate <code>{escape(compact_id)}</code></h4>"
         )
         image = mo.image(
             payload["image_bytes"],

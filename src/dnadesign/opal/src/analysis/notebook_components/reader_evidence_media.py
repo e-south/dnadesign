@@ -11,10 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
-from ._support import mapping, sequence
+from ._support import display_name, mapping, sequence
 
 _SEMANTIC_KIND_LABELS = {
     "intensity_overview": "Time series + snapshot",
@@ -112,6 +114,63 @@ def semantic_kind_label(value: Any) -> str:
     return semantic_kind.replace("_", " ").strip().title() or "Reader artifact"
 
 
+def reader_round_display_label(value: Any) -> str:
+    """Return a compact human label while retaining the raw round in its row."""
+
+    token = str(value or "").strip()
+    match = re.fullmatch(r"r(\d+)", token, flags=re.IGNORECASE)
+    return f"Round {match.group(1)}" if match else display_name(token)
+
+
+def reader_experiment_display_label(value: Any) -> str:
+    """Humanize a Reader experiment slug without assigning assay semantics."""
+
+    token = str(value or "").strip()
+    if not token:
+        return ""
+    match = re.fullmatch(r"(\d{8})[_-](.+)", token)
+    if match is None:
+        return display_name(token)
+    try:
+        day = datetime.strptime(match.group(1), "%Y%m%d").date().isoformat()
+    except ValueError:
+        return display_name(token)
+    suffix = display_name(re.sub(r"(?<=\d)-(?=\d)", "–", match.group(2)))
+    return f"{day} · {suffix}" if suffix else day
+
+
+def reader_reduction_display_label(value: Any) -> str:
+    """Humanize a Reader reduction ID without changing its contract value."""
+
+    token = str(value or "").strip()
+    if not token:
+        return ""
+    if token.startswith("event_"):
+        match = re.search(r"_(\d+(?:p\d+)?)_(\d+(?:p\d+)?)h_post$", token)
+        if match is not None:
+            start, end = (part.replace("p", ".") for part in match.groups())
+            return f"{start}–{end} h post-event"
+    return display_name(token)
+
+
+def reader_media_format_label(*, path: Any, media_type: Any) -> str:
+    """Return a concise media-format label for a Reader artifact."""
+
+    suffix = Path(str(path or "")).suffix.lower().lstrip(".")
+    media = str(media_type or "").strip().lower()
+    known = {
+        "application/pdf": "PDF",
+        "image/jpeg": "JPEG",
+        "image/jpg": "JPEG",
+        "image/png": "PNG",
+    }
+    if media in known:
+        return known[media]
+    if suffix:
+        return suffix.upper()
+    return ""
+
+
 def time_selected_label(value: Any) -> str:
     """Return a compact time-selected label for Reader evidence dropdowns."""
 
@@ -128,6 +187,10 @@ __all__ = [
     "filter_reader_media_rows",
     "is_reader_media_artifact",
     "reader_media_plot_type_labels",
+    "reader_experiment_display_label",
+    "reader_media_format_label",
+    "reader_reduction_display_label",
+    "reader_round_display_label",
     "select_reader_media_artifact",
     "semantic_kind_label",
     "time_selected_label",

@@ -2,7 +2,7 @@
   "schema_id": "stress_ethanol_cipro_growth.multistate_response_behavior_activation_audit.v1",
   "schema_version": "1",
   "audit_id": "secg_msrb_learning_probe_activation_20260718",
-  "completed_at": "2026-07-18T17:24:47Z",
+  "completed_at": "2026-07-18T23:38:31Z",
   "study_id": "stress_ethanol_cipro_growth",
   "protocol_id": "secg_msrb_learning_probe_v1",
   "objective_id": "multistate_response_behavior_v1",
@@ -177,12 +177,12 @@
       {
         "role": "generic_objective_source_of_truth",
         "path": "src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md",
-        "sha256": "7d85a50dbacc1e0a234468534b109b30e161d5cce94ff8acd2d8325ed545c263"
+        "sha256": "06243fe0bfeb34920587a10f46acdd8686ad5457c4f7fd4f57afa35f4a88eb49"
       },
       {
         "role": "study_source_of_truth",
         "path": "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md",
-        "sha256": "d72d858195d39fe57c15df0b266d7ade45895b718561852621d7a802d53d31df"
+        "sha256": "986849e59b26874b391008fda6d87b9701729942800738a25e60b6d9f45ee442"
       },
       {
         "role": "active_study_protocol",
@@ -197,7 +197,7 @@
       {
         "role": "active_campaign_readme",
         "path": "src/dnadesign/opal/campaigns/secg_msrb_greedy/README.md",
-        "sha256": "02472a8fe0312043df19c45df182ca1836b06576e1e545f9d38925d37e359d44"
+        "sha256": "b7a19cd4ed40cdd07e913db18f486b7a58df7b43743385f59892a9638b01a2fa"
       },
       {
         "role": "active_campaign_config",
@@ -207,7 +207,7 @@
       {
         "role": "active_campaign_plot_config",
         "path": "src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/plots.yaml",
-        "sha256": "284239176f37a94c69e40bf74db98287419b72cc295c2e4e26a4b260adcd3e0b"
+        "sha256": "057f792bbdb14c770910e34bc04c8fea30e226f802c6578209d6a31afc63f9f5"
       },
       {
         "role": "activation_receipt_verifier",
@@ -217,7 +217,7 @@
       {
         "role": "shadow_bundle_verifier",
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/multistate_behavior_bundle_verification.py",
-        "sha256": "d07ce7e6f9da25d981345f24c65040fec09fc38ab0ff75cde792fe60ff4e1763"
+        "sha256": "806b627410ae24e7271b2cd792607ef040752ad688c3740eaea8ecc500246bd2"
       },
       {
         "role": "shadow_protocol",

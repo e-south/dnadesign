@@ -450,6 +450,7 @@ def test_behavior_frontier_declares_reference_semantics_without_feasibility_guid
     runtime = context.artifact_metadata["notebook_view"]
     assert runtime["reference_lines"] == {"x": [], "y": []}
     assert runtime["color_scale"]["center"] == pytest.approx(0.0)
+    assert runtime["color_scale"]["extend"] == "neither"
     assert "not feasibility" in runtime["color_scale"]["context"]
     assert not axis.lines
     assert axis.get_title(loc="center").startswith("Multistate behavior family landscape · Stress A")
@@ -460,9 +461,37 @@ def test_behavior_frontier_declares_reference_semantics_without_feasibility_guid
     assert not axis.spines["right"].get_visible()
     assert axis.get_legend().get_bbox_to_anchor()._bbox.y0 < 0.0
     assert min(text.get_fontsize() for text in axis.get_legend().get_texts()) >= 9.5
-    assert axis.get_legend().legend_handles[0].get_alpha() >= 0.7
+    legend_handles = axis.get_legend().legend_handles
+    assert legend_handles[0].get_markerfacecolor() == "#D0D0D0"
+    assert all(handle.get_markerfacecolor() == "none" for handle in legend_handles[1:])
     assert figure.axes[-1].get_ylabel() == r"OFF-signal-suppression family score, $S_{\mathrm{OFF}}$"
     assert runtime["color_scale"]["context"].endswith("not feasibility")
+    plt.Figure.clear(figure)
+
+
+def test_behavior_frontier_discloses_saturated_tail_colors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[plt.Figure] = []
+    monkeypatch.setattr(
+        frontier_plot,
+        "load_multistate_response_behavior_plot_data",
+        lambda _context, **_kwargs: _plot_data(),
+    )
+    monkeypatch.setattr(frontier_plot, "save_figure", lambda _context, figure: captured.append(figure))
+    monkeypatch.setattr(plt, "close", lambda _figure: None)
+    context = _context(tmp_path, filename="frontier.png", save_data=False)
+
+    frontier_plot.render_family_frontier(context, {"color_extent": 0.05})
+
+    figure = captured.pop()
+    color_scale = context.artifact_metadata["notebook_view"]["color_scale"]
+    assert color_scale["extent"] == pytest.approx(0.05)
+    assert color_scale["extend"] in {"both", "min", "max"}
+    assert "visible values saturate" in color_scale["context"]
+    assert "points and exact ledger values are retained" in color_scale["context"]
+    assert figure.axes[-1]._colorbar.extend == color_scale["extend"]
     plt.Figure.clear(figure)
 
 

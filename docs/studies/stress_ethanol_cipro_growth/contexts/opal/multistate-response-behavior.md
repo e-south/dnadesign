@@ -341,6 +341,45 @@ Scores are comparable only within one view under the same ordered states,
 mask, normalization, and objective version. An ethanol score and an AND score
 are not measurements on one interchangeable scale.
 
+#### How to read the family landscape
+
+The campaign notebook makes the three scored families visible instead of
+asking the scalar to explain itself:
+
+- farther right means stronger intended-ON versus intended-OFF response
+  ordering, $S_R$;
+- farther up means stronger intended-ON signal relative to same-state
+  pDual-10, $S_{\mathrm{ON}}$; and
+- redder means stronger intended-OFF suppression relative to same-state
+  pDual-10, $S_{\mathrm{OFF}}$.
+
+Under one fixed view, a candidate that moves right, up, and red must receive a
+higher $S_{\mathrm{MSRB}}$. Up and right alone are not sufficient because the
+color is the third family. A bright, responsive point can still rank poorly
+when its intended-OFF states remain bright.
+
+Selected predictions are not expected to be the visually highest measured
+points for three separate reasons. First, SpyP, sulAp, pDual-10, and the other
+observed labels are assay evidence, not unmeasured DenseGen candidates eligible
+for selection. Second, the selector ranks the three-dimensional family
+combination rather than either plotted axis alone. Third, the batch allocator
+requires sequence uniqueness across views; if an earlier view already claims
+a sequence, a later view advances to its next-best unallocated prediction.
+The batch table records that replacement explicitly.
+
+The selected-candidate decomposition is the authoritative explanation for one
+rank. It shows every state-level coordinate, the three family scores, the hard
+bottleneck, and the final smooth score. Zero remains a reference direction,
+not a biological acceptance threshold.
+
+The OFF-suppression color scale uses one symmetric linear extent for all three
+views: the absolute 99th percentile of the round-0 campaign prediction pool,
+`6.866` normalized units. Values beyond that display extent keep
+their exact score and remain plotted, but their colors saturate at the pointed
+colorbar ends. This view-independent display rule makes differences near the
+selected candidates legible without silently removing outliers or changing
+the objective.
+
 #### 7. Greedy allocation and prospective measurement
 
 For each view, the `top_n` selector ranks candidates by descending
@@ -491,7 +530,7 @@ primary response-window values do not become apparently exact labels.
 The OPAL notebook must keep the scalar subordinate to its evidence. For every
 selection view it provides:
 
-1. a family frontier with response ordering on the x-axis, intended-ON signal
+1. a family landscape with response ordering on the x-axis, intended-ON signal
    on the y-axis, and intended-OFF suppression in color;
 2. independent prediction-pool, allocated, observed-batch, and label toggles;
 3. a selected-candidate decomposition containing every state-level clearance,

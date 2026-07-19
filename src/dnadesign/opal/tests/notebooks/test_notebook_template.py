@@ -127,7 +127,7 @@ def test_notebook_template_uses_one_compact_title_and_disclosed_campaign_context
     assert "else selected_campaign_title_md" in text
 
 
-def test_notebook_campaign_summary_exposes_rmf_target_partition() -> None:
+def test_notebook_campaign_summary_exposes_masked_objective_target_partition() -> None:
     selection_view = {
         "id": "ethanol",
         "objective": {
@@ -136,6 +136,10 @@ def test_notebook_campaign_summary_exposes_rmf_target_partition() -> None:
                 "state_ids": ["00", "10", "01", "11"],
                 "target_mask": [0, 1, 0, 1],
             },
+        },
+        "selection": {
+            "name": "top_n",
+            "params": {"score_ref": "feasibility_margin", "objective_mode": "maximize"},
         },
     }
     view_model = {
@@ -146,12 +150,62 @@ def test_notebook_campaign_summary_exposes_rmf_target_partition() -> None:
         "status": {},
     }
 
-    target = "RMF mask=[0, 1, 0, 1]; ON=10, 11; OFF=00, 01"
+    target = "Response magnitude feasibility; maximize feasibility margin; ON=10, 11; OFF=00, 01"
     rows = build_notebook_at_a_glance_rows(view_model, selection_view=selection_view)
     assert {"field": "selection view", "value": "ethanol"} in rows
     assert {"field": "objective target", "value": target} in rows
     assert build_notebook_campaign_header_lines(view_model, selection_view=selection_view)[-1] == (
         f"**Objective target:** {target}."
+    )
+
+
+def test_notebook_campaign_summary_uses_declared_acronym_for_masked_objective() -> None:
+    selection_view = {
+        "id": "and",
+        "objective": {
+            "name": "multistate_response_behavior_v1",
+            "params": {
+                "state_ids": ["00", "10", "01", "11"],
+                "target_mask": [0, 0, 0, 1],
+                "normalization": {"response_scale": 1.0, "signal_scale": 1.0},
+            },
+        },
+        "selection": {
+            "name": "top_n",
+            "params": {"score_ref": "behavior_score", "objective_mode": "maximize"},
+        },
+    }
+    view_model = {
+        "campaign": {
+            "slug": "behavior_campaign",
+            "metadata": {"metric_acronym": "MSRB"},
+            "selection_views": [selection_view],
+        },
+        "status": {},
+    }
+
+    target = "Multistate response behavior (MSRB); maximize behavior score; ON=11; OFF=00, 10, 01"
+    assert {"field": "objective target", "value": target} in build_notebook_at_a_glance_rows(
+        view_model,
+        selection_view=selection_view,
+    )
+    assert build_notebook_campaign_header_lines(view_model, selection_view=selection_view)[-1] == (
+        f"**Objective target:** {target}."
+    )
+
+    view_model["campaign"]["selection_views"].append(
+        {
+            "id": "alternate",
+            "objective": {
+                "name": "response_magnitude_feasibility_v1",
+                "params": {"state_ids": ["00", "11"], "target_mask": [0, 1]},
+            },
+        }
+    )
+    mixed_target = "Multistate response behavior; maximize behavior score; ON=11; OFF=00, 10, 01"
+    assert {"field": "objective target", "value": mixed_target} in build_notebook_at_a_glance_rows(
+        view_model,
+        selection_view=selection_view,
     )
 
 
@@ -718,7 +772,8 @@ def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -
     visual = panel["items"][0]
     assert visual["gap"] == 0.1
     assert visual["items"][0]["text"] == (
-        "#### AND selection · competition rank 7\nCandidate `candidate-re...-long-id`"
+        '<h4 style="text-align:center; margin:0 0 0.15rem 0;">'
+        "AND selection · competition rank 7 · candidate <code>candidate-re...-long-id</code></h4>"
     )
     assert visual["items"][1]["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
     assert "candidate-record-alpha-with-long-id" not in visual["items"][0]["text"]
