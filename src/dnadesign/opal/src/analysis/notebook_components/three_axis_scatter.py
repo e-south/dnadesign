@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import html
 import re
 from collections.abc import Mapping
 from typing import Any
@@ -169,9 +170,9 @@ def build_notebook_three_axis_scatter_figure(
             "font": {"size": 21, "color": "#111827"},
         },
         scene={
-            "xaxis": {**axis_style, "title": {"text": str(runtime["x_label"])}},
-            "yaxis": {**axis_style, "title": {"text": str(runtime["y_label"])}},
-            "zaxis": {**axis_style, "title": {"text": str(runtime["color_label"])}},
+            "xaxis": {**axis_style, "title": {"text": _plotly_label(runtime["x_label"])}},
+            "yaxis": {**axis_style, "title": {"text": _plotly_label(runtime["y_label"])}},
+            "zaxis": {**axis_style, "title": {"text": _plotly_label(runtime["color_label"])}},
             "aspectmode": "cube",
             "camera": {"eye": {"x": 1.55, "y": 1.55, "z": 1.2}},
             "bgcolor": "white",
@@ -228,7 +229,9 @@ def render_notebook_three_axis_scatter(
         f"sample capped at {background_limit:,} background predictions and retains every selected "
         f"and observed record ({displayed:,} of {complete:,} ledger rows displayed). Hover for exact "
         "candidate identity and family scores. The 2D figure remains the complete publication artifact; "
-        "use the selected-candidate control for sequence inspection."
+        "use the selected-candidate control for sequence inspection. The family axes are distinct "
+        "requirements, not independent latent variables; a thin sheet can reflect shared phenotype "
+        "coordinates rather than a rendering error."
     )
     return mo.vstack([widget, caption], gap=0.2)
 
@@ -259,10 +262,10 @@ def _trace(
             strict=True,
         )
     ]
-    x_label = _plain_label(_mapping(contract["runtime"])["x_label"])
-    y_label = _plain_label(_mapping(contract["runtime"])["y_label"])
-    z_label = _plain_label(_mapping(contract["runtime"])["color_label"])
-    score_label = _plain_label(interactive["score_label"])
+    x_label = _plotly_label(_mapping(contract["runtime"])["x_label"])
+    y_label = _plotly_label(_mapping(contract["runtime"])["y_label"])
+    z_label = _plotly_label(_mapping(contract["runtime"])["color_label"])
+    score_label = _plotly_label(interactive["score_label"])
     return go.Scatter3d(
         x=rows[x_column],
         y=rows[y_column],
@@ -295,14 +298,37 @@ def _title(runtime: Mapping[str, Any]) -> str:
     return f"{title}<br><sup>{context}</sup>" if context else title
 
 
-def _plain_label(value: object) -> str:
+def _plotly_label(value: object) -> str:
+    """Translate small inline-math labels to Plotly's WebGL-safe HTML subset."""
+
     text = str(value or "").strip()
-    text = re.sub(r"\$([^$]+)\$", r"\1", text)
-    text = re.sub(r"\\mathrm\{([^{}]*)\}", r"\1", text)
-    text = re.sub(r"_\{([^{}]*)\}", r"_\1", text)
-    text = text.replace("{", "").replace("}", "")
-    text = re.sub(r"\\([A-Za-z]+)", r"\1", text)
-    return " ".join(text.split())
+    pieces = re.split(r"(\$[^$]*\$)", text)
+    rendered = [
+        _plotly_math(piece[1:-1]) if piece.startswith("$") and piece.endswith("$") else html.escape(piece)
+        for piece in pieces
+        if piece
+    ]
+    return " ".join("".join(rendered).split())
+
+
+def _plotly_math(value: str) -> str:
+    normalized = re.sub(r"\\(?:mathrm|text)\{([^{}]*)\}", r"\1", value.strip())
+    symbol = re.fullmatch(
+        r"([A-Za-z])(?:_\{([^{}]+)\}|_([A-Za-z0-9]+))?(?:\^\{([^{}]+)\}|\^([A-Za-z0-9]+))?",
+        normalized,
+    )
+    if symbol:
+        base, subscript_braced, subscript_plain, superscript_braced, superscript_plain = symbol.groups()
+        rendered = f"<i>{html.escape(base)}</i>"
+        if subscript := subscript_braced or subscript_plain:
+            rendered += f"<sub>{html.escape(subscript)}</sub>"
+        if superscript := superscript_braced or superscript_plain:
+            rendered += f"<sup>{html.escape(superscript)}</sup>"
+        return rendered
+
+    plain = normalized.replace("{", "").replace("}", "")
+    plain = re.sub(r"\\([A-Za-z]+)", r"\1", plain)
+    return html.escape(plain)
 
 
 def _mapping(value: object) -> Mapping[str, Any]:

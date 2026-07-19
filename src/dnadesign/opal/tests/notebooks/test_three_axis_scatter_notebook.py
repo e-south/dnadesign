@@ -83,9 +83,9 @@ def test_three_axis_figure_uses_exact_family_axes_and_campaign_layers() -> None:
     assert list(figure.data[0].x) == [0.2]
     assert list(figure.data[0].y) == [0.4]
     assert list(figure.data[0].z) == [-0.1]
-    assert figure.layout.scene.xaxis.title.text == r"Response-ordering family score, $S_R$"
-    assert figure.layout.scene.yaxis.title.text == r"Intended-ON signal family score, $S_{\mathrm{ON}}$"
-    assert figure.layout.scene.zaxis.title.text == r"Intended-OFF suppression family score, $S_{\mathrm{OFF}}$"
+    assert figure.layout.scene.xaxis.title.text == "Response-ordering family score, <i>S</i><sub>R</sub>"
+    assert figure.layout.scene.yaxis.title.text == "Intended-ON signal family score, <i>S</i><sub>ON</sub>"
+    assert figure.layout.scene.zaxis.title.text == "Intended-OFF suppression family score, <i>S</i><sub>OFF</sub>"
     assert figure.layout.title.x == pytest.approx(0.5)
     assert float(figure.layout.title.y) <= 0.96
     assert figure.layout.paper_bgcolor == "white"
@@ -107,7 +107,23 @@ def test_three_axis_hover_identity_is_ledger_backed() -> None:
     assert customdata == ["selected-b", "Selected B", 1.0]
     assert "Candidate: %{customdata[0]}" in figure.data[1].hovertemplate
     assert "Behavior score" in figure.data[1].hovertemplate
+    assert "<i>S</i><sub>MSRB</sub>" in figure.data[1].hovertemplate
+    assert "$" not in figure.data[1].hovertemplate
+    assert r"\mathrm" not in figure.data[1].hovertemplate
     assert figure.layout.clickmode is None
+
+
+def test_three_axis_plotly_labels_escape_html_and_preserve_supported_math_symbols() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    contract = _contract()
+    contract["runtime"]["x_label"] = r"Unsafe <axis> & score, $Q_{\mathrm{A}}$"
+
+    figure = build_notebook_three_axis_scatter_figure(_rows(), contract=contract)
+
+    assert figure.layout.scene.xaxis.title.text == "Unsafe &lt;axis&gt; &amp; score, <i>Q</i><sub>A</sub>"
 
 
 def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
@@ -143,6 +159,8 @@ def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
 
     assert widget["items"][0].points == []
     assert "deterministic SHA-256-ID sample" in widget["items"][1]["text"]
+    assert "distinct requirements, not independent latent variables" in widget["items"][1]["text"]
+    assert "shared phenotype coordinates rather than a rendering error" in widget["items"][1]["text"]
     assert captured["figure"].data[0].type == "scatter3d"
     assert captured["kwargs"] == {
         "config": {
