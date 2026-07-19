@@ -49,7 +49,7 @@ require_tree_absent() {
   local pattern="$1"
   local label="$2"
   local path="$3"
-  if rg -n "$pattern" "$path" -g '*.py' >/dev/null; then fail "$label"; else pass "$label"; fi
+  if grep -rEn --include='*.py' "$pattern" "$path" >/dev/null; then fail "$label"; else pass "$label"; fi
 }
 
 effective_line_count() {
