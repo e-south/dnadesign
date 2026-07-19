@@ -1,7 +1,15 @@
+---
+doc_id: baserender-reference
+title: BaseRender reference
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-18
+---
+
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-04
+**Last verified:** 2026-07-18
 
 
 Single technical reference for operators and integrators.

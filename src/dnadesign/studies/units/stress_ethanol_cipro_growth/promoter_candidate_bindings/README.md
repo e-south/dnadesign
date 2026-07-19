@@ -24,6 +24,10 @@ projection. Resolution rejects duplicate typed aliases, missing candidates,
 sequence disagreement, fuzzy joins, path escapes, and metadata that the public
 BaseRender adapter cannot consume.
 
+Sequence figures consume that projection through the
+[BaseRender public API](../../../../baserender/docs/reference.md#public-api-boundary);
+the binding package does not call renderer internals or define plot styling.
+
 The artifact does not contain Reader measurements, SFXI values,
 response-window values, RMF requirements or scores, OPAL state, or LatentDNA X
 vectors. Those systems reference `candidate_id`; they do not redefine candidate
