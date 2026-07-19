@@ -28,12 +28,12 @@ preferences at once:
 3. intended-OFF states should have lower same-state reference-relative signal.
 
 For this assay, the signal coordinate is reduced YFP/OD600 relative to
-same-state pDual-10. The pDual-10 plasmid contains two exact
-[BBa_J23105](../../../../../src/dnadesign/usr/datasets/usr_promoter_references/_artifacts/genbank/7e34ef10863061ca-BBa_J23105.gb)
-sequences from the Anderson promoter collection. MSRB uses the construct's
-measured output in each assay state, not its catalog strength, and does not
-assume that the reference is condition-invariant. This reference choice is a
-study binding, not part of the generic MSRB definition.
+same-state pDual-10. The pDual-10 plasmid contains two exact `BBa_J23105`
+sequences from the Anderson promoter collection; the
+[dataset registry](../../record/datasets.yaml) records the source lineage. MSRB
+uses the construct's measured output in each assay state, not its catalog
+strength, and does not assume that the reference is condition-invariant. This
+reference choice is a study binding, not part of the generic MSRB definition.
 
 The OPAL objective identifier is `multistate_response_behavior_v1`, its scalar
 is written $S_{\mathrm{MSRB}}$, and its selectable score channel is

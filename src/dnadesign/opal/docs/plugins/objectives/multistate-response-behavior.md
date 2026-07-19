@@ -115,14 +115,13 @@ channel contributes to both coordinates, but their denominators and
 interpretations are different.
 
 pDual-10 is the measured, condition-matched constitutive reference for this
-assay. Its plasmid contains two exact
-[BBa_J23105](../../../../usr/datasets/usr_promoter_references/_artifacts/genbank/7e34ef10863061ca-BBa_J23105.gb)
-sequences from the Anderson promoter collection. This documents the
-reference's promoter provenance; the measured same-state output, not nominal
-catalog strength, enters $b_i$. The calculation does not assume that pDual-10
-output is constant across conditions. Each candidate is compared with
-pDual-10 from the same condition. The result supports only a relative signal
-claim, not absolute non-expression.
+assay. Its plasmid contains two exact `BBa_J23105` sequences from the Anderson
+promoter collection; the [study dataset registry](../../../../../../docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml)
+records the source lineage. This documents the reference's promoter provenance;
+the measured same-state output, not nominal catalog strength, enters $b_i$.
+The calculation does not assume that pDual-10 output is constant across
+conditions. Each candidate is compared with pDual-10 from the same condition.
+The result supports only a relative signal claim, not absolute non-expression.
 
 The resulting study phenotype is serialized as responses followed by signals:
 

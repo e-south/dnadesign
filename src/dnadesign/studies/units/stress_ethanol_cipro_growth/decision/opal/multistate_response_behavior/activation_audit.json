@@ -177,12 +177,12 @@
       {
         "role": "generic_objective_source_of_truth",
         "path": "src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md",
-        "sha256": "071d91afd1d2babae27e3421a0dec17c704df2547938f6d177c3831d60abbf1e"
+        "sha256": "c00a06518031c4d32ddafafbe935cbc39029567c796cc0dc2cd581a152d1d239"
       },
       {
         "role": "study_application_contract",
         "path": "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md",
-        "sha256": "c76465f077e549ec178a31b72360a63bad8e43eb0309f8fb8a86965fce28c0c0"
+        "sha256": "b243d914820412aa0299a499706520176f7b309cf9dfb13c13099ec6fd6cb93f"
       },
       {
         "role": "active_study_protocol",
