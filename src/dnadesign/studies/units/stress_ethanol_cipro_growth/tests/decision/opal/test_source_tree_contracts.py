@@ -255,19 +255,31 @@ def test_msrb_study_application_covers_the_complete_evidence_path() -> None:
     assert all(line.strip() != "-" for line in text.splitlines())
 
 
-def test_generic_msrb_source_of_truth_is_k_state_and_assay_neutral() -> None:
+def test_generic_msrb_source_of_truth_is_k_state_with_bounded_assay_mapping() -> None:
     path = Path("src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md")
     text = path.read_text(encoding="utf-8")
     normalized = " ".join(text.split())
+    mapping_heading = "### Worked assay mapping: dual-reporter promoter screen"
+    mapping_start = text.index(mapping_heading)
+    mapping_end = text.index("\n### When to use this objective", mapping_start)
+    mapping = " ".join(
+        line.removeprefix("> ").strip() for line in text[mapping_start:mapping_end].splitlines() if line.strip()
+    )
+    generic_core = text[:mapping_start] + text[mapping_end:]
+    generic_core_without_study_path = generic_core.replace(
+        "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md",
+        "",
+    )
 
     for required in (
         "### From a multistate phenotype to one score",
+        mapping_heading,
         "For four states, `2 × 4 = 8`, so this happens to be an eight-value phenotype",
         "The width comes from the measured state panel. It is not fixed by MSRB.",
         "`K` counts states, not experimental factors",
         "### What the same-state reference means",
-        "### Why assay-resolution scales are needed",
-        "The scales balance measurement resolution, not biological importance.",
+        "### Why normalization scales are needed",
+        "The scales balance coordinate precision, not biological importance.",
         "Basic question:",
         "The final scalar applies the same smooth bottleneck",
         "### One complete four-state example",
@@ -276,10 +288,32 @@ def test_generic_msrb_source_of_truth_is_k_state_and_assay_neutral() -> None:
         "state_ids: [state_a, state_b, state_c]",
     ):
         assert required in normalized
+    for required in (
+        "It is an example, not part of the generic definition.",
+        "OD600, YFP, and CFP time series",
+        "[r00, r10, r01, r11, b00, b10, b01, b11]",
+        "pDual-10",
+        "BBa_J23105",
+        "`0.308` log2",
+        "`0.313` log2",
+        "not limits of detection",
+    ):
+        assert required in mapping
     assert "Partially ON targets, exact setpoints, ordinal preferences, and don't-care states" in normalized
-    assert 'state_ids: ["00", "10", "01", "11"]' not in text
-    assert "pDual-10" not in text
-    assert "Reader bootstrap" not in text
+    assert 'state_ids: ["00", "10", "01", "11"]' not in generic_core
+    assert "| State panel | `00`: no perturbation" not in generic_core
+    for study_token in (
+        "pDual-10",
+        "BBa_J23105",
+        "4–8 hours",
+        "OD600",
+        "YFP",
+        "CFP",
+        "ethanol",
+        "ciprofloxacin",
+        "Reader bootstrap",
+    ):
+        assert study_token.casefold() not in generic_core_without_study_path.casefold()
 
 
 def test_response_window_observation_operator_docs_do_not_route_to_moving_reader_output() -> None:

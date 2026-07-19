@@ -40,7 +40,7 @@ acceptance boundary, measurement quality, or predictive accuracy.
 | Input | Two values per state: ordered finite `[r(state...), b(state...)]` |
 | Selectable score | `behavior_score`, written $S_{\mathrm{MSRB}}$ |
 | Direction | Maximize |
-| Required context | Ordered state IDs, ON/OFF membership over `K` states, and two positive assay-resolution scales |
+| Required context | Ordered state IDs, ON/OFF membership over `K` states, and two positive normalization scales defined by the measurement protocol |
 | Interpretive diagnostics | Three family scores, hard bottleneck, limiting coordinate, compensation gap and bound, coordinate weights, and reference-direction status |
 | Uncertainty | The score uses a point estimate; assay and model uncertainty are reported separately |
 
@@ -48,8 +48,8 @@ acceptance boundary, measurement quality, or predictive accuracy.
 
 MSRB begins with two phenotype coordinates for each measured state:
 
-- $r_i$ summarizes the state-specific regulatory response; higher means a
-  stronger response.
+- $r_i$ is the state-specific response coordinate; higher means a stronger
+  response.
 - $b_i$ summarizes signal relative to a reference measured in that same state;
   positive means above the reference and negative means below it.
 
@@ -83,13 +83,76 @@ MSRB computes the score as follows:
 ```text
 ordered phenotype with two values per state
   -> assign states to intended ON or OFF
-  -> divide each desired difference by a declared resolution scale
+  -> divide each desired difference by a declared normalization scale
   -> summarize response ordering, ON signal, and OFF suppression separately
   -> combine the three family scores into S_MSRB
 ```
 
 The phenotype, three family scores, and weakest state-level coordinate remain
 available beside the scalar.
+
+### Worked assay mapping: dual-reporter promoter screen
+
+> **Concrete application.** This mapping shows how one four-state promoter
+> assay supplies MSRB inputs. It is an example, not part of the generic
+> definition. The [study application](../../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md)
+> gives the complete reduction, repeat, label, model, and campaign path.
+
+| Generic element | Example study binding |
+| --- | --- |
+| State panel | `00`: no perturbation; `10`: ethanol; `01`: ciprofloxacin; `11`: both perturbations |
+| Raw measurements | OD600, YFP, and CFP time series from a 96-well plate |
+| Primary window | Each well is reduced over 4–8 hours after the perturbation event, before replicate wells are combined |
+| Response $r_i$ | Median well-level reduction of $\log_2(\mathrm{YFP}/\mathrm{CFP})$ in state $i$ |
+| Signal $b_i$ | Median design $\log_2(\mathrm{YFP}/\mathrm{OD600})$ minus median same-state pDual-10 value |
+| Coordinate order | All response values first, followed by all signal values |
+
+The two coordinate types answer different questions. The response coordinate
+$r_i$ describes YFP relative to the second fluorescent reporter, CFP, within
+the candidate. The signal coordinate $b_i$ describes YFP per culture density
+relative to a reference construct measured in the same state. The same YFP
+channel contributes to both coordinates, but their denominators and
+interpretations are different.
+
+pDual-10 is the measured, condition-matched constitutive reference for this
+assay. Its plasmid contains two exact
+[BBa_J23105](../../../../usr/datasets/usr_promoter_references/_artifacts/genbank/7e34ef10863061ca-BBa_J23105.gb)
+sequences from the Anderson promoter collection. This documents the
+reference's promoter provenance; the measured same-state output, not nominal
+catalog strength, enters $b_i$. The calculation does not assume that pDual-10
+output is constant across conditions. Each candidate is compared with
+pDual-10 from the same condition. The result supports only a relative signal
+claim, not absolute non-expression.
+
+The resulting study phenotype is serialized as responses followed by signals:
+
+```text
+[r00, r10, r01, r11, b00, b10, b01, b11]
+```
+
+The same eight values support several target views. In state order
+`[00, 10, 01, 11]`, the ethanol, ciprofloxacin, and combined-perturbation views
+use masks `[0,1,0,1]`, `[0,0,1,1]`, and `[0,0,0,1]`, respectively. Changing
+the mask changes which states are rewarded as ON or OFF; it does not change
+the assay reduction or the model prediction.
+
+This study uses the 90th percentile of eligible within-experiment bootstrap
+standard deviations as each normalization scale:
+
+| Scale | Rounded value | What one unit represents |
+| --- | ---: | --- |
+| $s_R$ | `0.308` log2 | One declared response-contrast uncertainty unit |
+| $s_B$ | `0.313` log2 | One declared reference-relative signal uncertainty unit |
+
+The values happen to be similar here, but they come from different uncertainty
+distributions and are fixed independently. Dividing by them expresses both
+coordinate types relative to their own bootstrap precision before aggregation.
+Without that conversion, one raw log2 unit would be treated as equally
+informative in both coordinate types even when their precision differs. These
+scales are normalization conventions, not limits of detection, biological
+goals, pass thresholds, or preference weights. Full-precision values and their
+derivation remain in the study protocol; rounded values are sufficient for
+interpretation.
 
 ### When to use this objective
 
@@ -153,15 +216,15 @@ signal, and negative values denote lower signal. For a log2 coordinate,
 supports relative suppression only; it cannot establish background or absolute
 non-expression.
 
-### Why assay-resolution scales are needed
+### Why normalization scales are needed
 
 An ON-minus-OFF response contrast and a same-state reference-relative signal
-may have different repeat precision, even when both use log units. A raw change
-of `0.3` therefore need not represent the same assay-resolvable change in both
-measurements. Two positive scales put them on a common resolution basis:
+may have different precision, even when both use log units. A raw change of
+`0.3` therefore need not carry the same evidential meaning in both coordinate
+types. Two positive scales put them on a common normalized basis:
 
-- $s_R$ is the declared resolution of one ON-minus-OFF response contrast.
-- $s_B$ is the declared resolution of one same-state $b_i$ value.
+- $s_R$ normalizes ON-minus-OFF response contrasts.
+- $s_B$ normalizes same-state $b_i$ values.
 
 Both must be positive:
 
@@ -169,23 +232,27 @@ $$
 s_R>0,\qquad s_B>0.
 $$
 
-Dividing by these scales expresses every desired change in assay-resolution
-units. The resulting signed value is called a normalized **clearance**. A
-clearance of `+1` means one declared resolution unit in a favorable direction;
-`-1` means one unit in an unfavorable direction. Here, clearance means signed
-displacement from a reference equality, not clearance from a biological
-acceptance boundary. The scales balance measurement resolution, not biological
-importance.
+Dividing by these scales expresses every desired change in declared
+normalization units. The resulting signed value is called a normalized
+**clearance**. A clearance of `+1` means one normalization unit in a favorable
+direction; `-1` means one unit in an unfavorable direction. Here, clearance
+means signed displacement from a reference equality, not clearance from a
+biological acceptance boundary. The scales balance coordinate precision, not
+biological importance.
 
-The measurement protocol derives and fixes both scales before ranking. They are
-neither biological thresholds nor preference weights. Because either scale can
-change candidate ranks, record both at full precision for reproducibility and
-fix them before inspecting rankings; explanatory prose may use rounded values.
+The measurement protocol defines and fixes both scales before ranking. It must
+also state how they were estimated. They are neither biological thresholds nor
+preference weights. A scale derived from bootstrap standard deviations is not
+a limit of detection or proof that a one-unit difference is distinguishable.
+Because either scale can change candidate ranks, record both at full precision
+for reproducibility and fix them before inspecting rankings; explanatory prose
+may use rounded values.
 
 For example, if a response difference is `0.62` and the declared response scale
 is `0.31`, the normalized response clearance is about `+2`. The division says
-that the favorable difference spans about two assay-resolution units. It does
-not say that `0.31` is a biological goal or pass boundary.
+that the favorable difference spans about two declared normalization units. It
+does not say that `0.31` is a biological goal, a pass boundary, or a minimum
+detectable effect.
 
 ### The three behavior families
 
@@ -298,7 +365,7 @@ improvement.
 ### One complete four-state example
 
 This neutral example uses states `A`, `B`, `C`, and `D`. States `B` and `D` are
-intended ON; states `A` and `C` are intended OFF. Both resolution scales are
+intended ON; states `A` and `C` are intended OFF. Both normalization scales are
 set to `1` only to keep the arithmetic readable.
 
 The input phenotype is:
@@ -328,9 +395,9 @@ $$
 
 The weakest individual clearance is `+1`. The final score is higher because
 the remaining coordinates are stronger, but their influence is bounded. These
-numbers are ranking evidence in resolution units; `1.491` is not a pass grade.
+numbers are ranking evidence in normalized units; `1.491` is not a pass grade.
 
-One resolution unit also fixes the smoothness convention; the equation has no
+One normalization unit also fixes the smoothness convention; the equation has no
 separate temperature parameter.
 
 Family means prevent a family from gaining influence merely because it contains
@@ -345,7 +412,7 @@ the objective version, ordered state space, target mask, and normalization
 protocol are identical. Family balancing does not make one weak coordinate
 equally influential across different state-space sizes. A coordinate in family
 `G` has prior weight `1/(3|G|)`, so its maximum compensation gap is
-`log(3|G|)` resolution units. That bound grows as a family gains distinct
+`log(3|G|)` normalized units. That bound grows as a family gains distinct
 coordinates.
 
 Within the response family, each ON/OFF pair has equal prior weight. The ON and
@@ -443,7 +510,7 @@ remaining tradeoff.
 
 ### Boundary examples
 
-These examples use unit resolution scales. They demonstrate the equation and
+These examples use unit normalization scales. They demonstrate the equation and
 are not biological acceptance criteria.
 
 - If the response family is `+1`, the ON-signal family is `+100`, and the
@@ -518,8 +585,8 @@ selection_views:
         state_ids: [state_a, state_b, state_c]
         target_mask: [0, 1, 0]
         normalization:
-          response_scale: <positive study-issued assay-resolution scale>
-          signal_scale: <positive study-issued assay-resolution scale>
+          response_scale: <positive study-issued normalization scale>
+          signal_scale: <positive study-issued normalization scale>
     selection:
       name: top_n
       params:
@@ -530,7 +597,7 @@ selection_views:
         require_exact_top_k: true
 ```
 
-Each selection view binds one target mask and one fixed pair of resolution
+Each selection view binds one target mask and one fixed pair of normalization
 scales to the objective.
 
 #### Evidence and numerical boundaries
@@ -550,7 +617,7 @@ The objective rejects:
 
 Stable log-sum-exp evaluation prevents exponential overflow. Clearances beyond
 floating-point range saturate at a finite numerical guard; this affects only
-arithmetic extremes far outside assay-resolution inputs.
+arithmetic extremes far outside normalized assay inputs.
 
 #### Review views
 
@@ -574,7 +641,7 @@ analyses.
 - The assay producer defines the measurements, reduction window, replicate
   evidence, censoring, and the meaning of $r_i$ and $b_i$.
 - The biological study defines state identities, target membership, reference
-  choice, resolution scales, and whether an objective is suitable for a
+  choice, normalization scales, and whether an objective is suitable for a
   campaign.
 - OPAL evaluates the published equations, predicts the complete phenotype,
   applies the selected target view, and records ranking and allocation.

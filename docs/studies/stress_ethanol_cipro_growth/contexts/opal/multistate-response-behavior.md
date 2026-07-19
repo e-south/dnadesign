@@ -6,7 +6,7 @@ objective_id: multistate_response_behavior_v1
 y_space: reader_response_window_vector_v1
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 first_hop: ../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md
 audience:
   - scientist
@@ -28,23 +28,32 @@ preferences at once:
 3. intended-OFF states should have lower same-state reference-relative signal.
 
 For this assay, the signal coordinate is reduced YFP/OD600 relative to
-same-state pDual-10. That reference is a study binding, not part of the generic
-MSRB definition.
+same-state pDual-10. The pDual-10 plasmid contains two exact
+[BBa_J23105](../../../../../src/dnadesign/usr/datasets/usr_promoter_references/_artifacts/genbank/7e34ef10863061ca-BBa_J23105.gb)
+sequences from the Anderson promoter collection. MSRB uses the construct's
+measured output in each assay state, not its catalog strength, and does not
+assume that the reference is condition-invariant. This reference choice is a
+study binding, not part of the generic MSRB definition.
 
 The OPAL objective identifier is `multistate_response_behavior_v1`, its scalar
 is written $S_{\mathrm{MSRB}}$, and its selectable score channel is
 `behavior_score`.
 
-MSRB is the sole ranking objective for the active promoter campaign.
-The campaign is a prospectively frozen greedy learning probe. It tests whether
-the sequence-to-phenotype model and measured MSRB enrichment improve as new
-batches accumulate. Existing retrospective evidence supports the objective's
-biological semantics and implementation, but it does not establish reliable
-predictive ordering or prospective hill-climb efficacy. Selection and physical
-synthesis authorization remain separate decisions.
+MSRB is the sole ranking objective for the active promoter campaign. The
+model, score, and allocation rule are fixed before the selected candidates are
+measured. Each resulting batch tests whether the sequence-to-phenotype model
+and measured MSRB enrichment improve as evidence accumulates. This is the
+study's prospectively frozen greedy learning probe. Existing retrospective
+evidence supports the objective's biological semantics and implementation, but
+it does not establish reliable predictive ordering or prospective hill-climb
+efficacy. Selection and physical synthesis authorization remain separate
+decisions.
 
-The [generic OPAL objective contract](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
-defines the reusable equations and API. The study-owned
+The [generic MSRB definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+defines the reusable phenotype, equations, diagnostics, and claim boundaries.
+Its [worked assay mapping](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#worked-assay-mapping-dual-reporter-promoter-screen)
+provides a compact symbol-to-measurement view. This document gives the full
+study-specific assay and campaign path. The
 [`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml)
 pins the assay, normalization, target masks, model target, selection policy,
 and claim boundaries for this study.
@@ -85,9 +94,10 @@ model or changing Reader's assay contract.
 | Model fit, prediction, selector, allocation, and campaign ledger | Active OPAL campaign |
 | Cross-repository routing | Reader–study–OPAL bridge; routing only |
 
-No layer recomputes another layer's scientific contract. In particular, OPAL
-does not import Reader, Reader does not resolve candidate authority, and the
-bridge does not invent formulas, aliases, repeat rules, or campaign policy.
+Each stage consumes the prior stage's published artifact without recalculating
+its measurements or identities. OPAL does not import Reader, Reader does not
+resolve candidate authority, and the bridge does not invent formulas, aliases,
+repeat rules, or campaign policy.
 
 ### End-to-end evidence path
 
@@ -134,11 +144,13 @@ ratio scale. Each well is reduced before wells are combined. Pooling raw time
 points across wells would give wells with denser sampling more influence and
 would erase the replicate structure.
 
-The 4–8-hour window captures an established stress response while reducing the
-late-plate OD accumulation, overflow exposure, and plate-age effects seen in
-the longer 6–12-hour window. Alternative windows, event bounds, area-under-the-
-curve summaries, and delta summaries remain sensitivity evidence. They do not
-silently replace the primary reduction.
+In the available plates, the 4–8-hour window retained much of the SpyP and
+sulAp separation seen at 6–12 hours while reducing late-plate OD accumulation,
+overflow exposure, and plate-age effects. The
+[response metastudy](response-metastudy.md) records the equal-footing window
+comparison. Alternative windows, event bounds, area-under-the-curve summaries,
+and delta summaries remain sensitivity evidence. They do not silently replace
+the primary reduction.
 
 Reader's canonical details live in
 `reader/docs/lib/plate_reader/response_window.md` in the sibling Reader
@@ -285,15 +297,15 @@ begin from an assumption that it already does.
 
 #### 6. MSRB scoring
 
-The [generic objective contract](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+The [generic MSRB definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
 defines the three behavior families and their family-balanced smooth
 bottleneck. The stress-study binding supplies only the ordered states, target
-masks, and assay-resolution scales.
+masks, and normalization scales.
 
-The two scales answer a practical question: how large is one change that this
-assay can resolve reliably in each coordinate type? They put response and
-signal on common units before the three behavior families are combined. Reader
-bootstrap evidence gives:
+The two scales put response and signal on comparable units before the three
+behavior families are combined. This study uses the 90th percentile of
+eligible within-experiment bootstrap standard deviations for each coordinate
+type:
 
 | Scale | Rounded value | Meaning |
 | --- | ---: | --- |
@@ -301,18 +313,19 @@ bootstrap evidence gives:
 | $s_B$ | `0.313` log2 | q90 within-experiment uncertainty of same-state pDual-10-relative signal |
 
 In plain language, a response contrast of about `0.31` log2 or a
-reference-relative signal change of about `0.31` log2 counts as one
-assay-resolution unit. For example:
+reference-relative signal change of about `0.31` log2 counts as one declared
+bootstrap-uncertainty unit for its coordinate type. For example:
 
 - an ON-minus-OFF response difference of `0.616` log2 is about
-  `0.616 / 0.308 = +2.0` response-resolution units; and
+  `0.616 / 0.308 = +2.0` response normalization units; and
 - an intended-OFF value of `b = -0.626` log2 is about
   `-(-0.626) / 0.313 = +2.0` OFF-suppression units.
 
 This conversion lets the response and signal families share one score even
 when their measurement precision differs. On the underlying ratio scale,
-`0.31` log2 is about a 1.24-fold change. It remains a resolution convention,
-not a desired biological effect size.
+`0.31` log2 is about a 1.24-fold change. It is an uncertainty-normalization
+convention, not a desired biological effect size, a limit of detection, or
+proof that a one-unit difference is distinguishable.
 
 These numbers are not biological thresholds, metric weights, or fitted model
 parameters. Reader generated 500 joint bootstrap draws for each of 41 exact
@@ -369,10 +382,10 @@ requires sequence uniqueness across views; if an earlier view already claims
 a sequence, a later view advances to its next-best unallocated prediction.
 The batch table records that replacement explicitly.
 
-The selected-candidate decomposition is the authoritative explanation for one
-rank. It shows every state-level coordinate, the three family scores, the hard
-bottleneck, and the final smooth score. Zero remains a reference direction,
-not a biological acceptance threshold.
+Use the selected-candidate decomposition to explain one rank. It shows every
+state-level coordinate, the three family scores, the hard bottleneck, and the
+final smooth score. Zero remains a reference direction, not a biological
+acceptance threshold.
 
 The OFF-suppression color scale uses one symmetric linear extent for all three
 views: the absolute 99th percentile of the round-0 campaign prediction pool,
