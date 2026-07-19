@@ -89,9 +89,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "label_sha256": snapshot.promotion.label_sha256,
             "label_event_count": len(snapshot.labels),
             "unique_candidate_count": int(snapshot.labels["id"].astype(str).nunique()),
-            "campaign_binding_verified": args.command == "verify-campaign-binding",
+            "verification_scope": "campaign_binding" if args.command == "verify-campaign-binding" else "label_bundle",
             "verified": True,
         }
+        if args.command == "verify-campaign-binding":
+            payload["campaign_binding_verified"] = True
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 

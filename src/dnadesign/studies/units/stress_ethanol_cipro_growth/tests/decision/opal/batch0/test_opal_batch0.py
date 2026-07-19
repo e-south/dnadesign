@@ -1969,11 +1969,14 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     pipeline = yaml.safe_load(
         (STUDY_DOCS / "operations" / "runtime" / "command-groups" / "pipeline.yaml").read_text(encoding="utf-8")
     )
-    opal_notebook = pipeline["study_pipeline"]["opal"]["notebook"]
+    opal_pipeline = pipeline["study_pipeline"]["opal"]
+    opal_notebook = opal_pipeline["notebook"]
 
     assert "routes/decision/opal/README.md" in routes
     assert "Campaign configs and commands" in opal_route
-    assert "Notebook review" in opal_commands
+    assert "Read-only campaign verification" in opal_commands
+    assert "Notebook generation and live review" in opal_commands
+    assert "commands write or serve notebook artifacts" in opal_commands
     assert "uv run opal notebook generate" in opal_commands
     assert "uv run opal notebook run" in opal_commands
     assert "uv run opal status" in opal_commands
@@ -1984,6 +1987,10 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     assert opal_notebook["role"] == "campaign_specific_artifact_viewer"
     assert opal_notebook["pre_run_execution_safe"] is True
     assert opal_notebook["mutates_notebook"] is True
+    assert "review_json_command" not in opal_pipeline
+    assert "uv run opal review" in opal_pipeline["review_materialize_json_command"]
+    assert opal_pipeline["review_materialization_writes_artifacts"] is True
+    assert opal_pipeline["review_materialization_output_root"].endswith("outputs/review")
 
 
 def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_matrix() -> None:

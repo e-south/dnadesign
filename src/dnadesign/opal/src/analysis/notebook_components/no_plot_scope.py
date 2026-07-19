@@ -70,8 +70,7 @@ def build_notebook_no_plot_scope_rows(
             "field": "next commands",
             "value": (
                 f"uv run opal run -c {config_path} --round {round_selector} --resume --json; "
-                f"uv run opal plot -c {config_path} --round all; "
-                f"uv run opal review -c {config_path} --json"
+                f"uv run opal plot -c {config_path} --round all"
             ),
         },
     ]

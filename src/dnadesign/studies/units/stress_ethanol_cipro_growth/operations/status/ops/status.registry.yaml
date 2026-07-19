@@ -24,7 +24,7 @@ entries:
     owner_boundary: studies
     observes_plane: execution_readiness
     provider_ref: dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider:provide_stress_ethanol_cipro_growth_preflight
-    description: Run the read-only stress_ethanol_cipro_growth preflight suite across DenseGen, Construct, Infer, Notify, LatentDNA, and OPAL round-0 review surfaces.
+    description: Run the read-only stress_ethanol_cipro_growth preflight suite across DenseGen, Construct, Infer, Notify, LatentDNA, and OPAL round-0 integrity checks.
     surface_type: study_preflight
     cost_class: deep
     summary_scope: host

@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+
+import pandas as pd
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_window_label_promotion import (
     cli,
@@ -111,3 +114,52 @@ def test_study_verify_has_no_implicit_campaign_config(tmp_path: Path) -> None:
 
     assert not hasattr(args, "campaign_config")
     assert args.output_relative_directory == "_opal/response_window_labels_v5"
+
+
+def test_study_verify_reports_label_scope_without_claiming_campaign_failure(
+    monkeypatch,
+    capsys,
+    tmp_path: Path,
+) -> None:
+    snapshot = _verified_snapshot(tmp_path)
+    monkeypatch.setattr(cli, "verify_label_bundle", lambda *_args, **_kwargs: snapshot)
+
+    result = cli.main(["verify", "--dataset-root", str(tmp_path / "dataset")])
+
+    assert result == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["verified"] is True
+    assert payload["verification_scope"] == "label_bundle"
+    assert "campaign_binding_verified" not in payload
+
+
+def test_campaign_verify_reports_campaign_scope_and_success(monkeypatch, capsys, tmp_path: Path) -> None:
+    snapshot = _verified_snapshot(tmp_path)
+    monkeypatch.setattr(cli, "verify_campaign_binding", lambda *_args, **_kwargs: snapshot)
+
+    result = cli.main(
+        [
+            "verify-campaign-binding",
+            "--dataset-root",
+            str(tmp_path / "dataset"),
+            "--campaign-config",
+            str(tmp_path / "campaign.yaml"),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["verified"] is True
+    assert payload["verification_scope"] == "campaign_binding"
+    assert payload["campaign_binding_verified"] is True
+
+
+def _verified_snapshot(tmp_path: Path) -> SimpleNamespace:
+    output = tmp_path / "dataset/_opal/response_window_labels_v5"
+    promotion = SimpleNamespace(
+        manifest_path=output / "promotion.manifest.json",
+        manifest_sha256="a" * 64,
+        label_path=output / "observed_labels.parquet",
+        label_sha256="b" * 64,
+    )
+    return SimpleNamespace(promotion=promotion, labels=pd.DataFrame({"id": ["candidate-a"]}))

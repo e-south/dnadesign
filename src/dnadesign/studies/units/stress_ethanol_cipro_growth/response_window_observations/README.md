@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-window-observations
 title: Response-window observations
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-18
 first_hop: config/observation_policy.yaml
 ---
 
@@ -115,23 +115,40 @@ metadata system.
 
 ## Operator surface
 
-Preview without writing:
+Verify the approved immutable observation bundle without writing:
 
 ```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
+  verify \
+  --bundle-dir src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations/4_8h_v1 \
+  --allowed-root src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations
+```
+
+Preview a candidate authoring input without writing:
+
+```bash
+READER_BUNDLE=<reader-bundle-root-matching-observation-policy-digest>
+uv run python -m \
+  dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
   preview \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --reader-bundle "$READER_BUNDLE" \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
 ```
+
+The Reader input must match `source_manifests.reader_bundle_sha256` in
+`config/observation_policy.yaml`. A moving `latest` path is intentionally not
+shown: a newly regenerated Reader bundle requires an explicit study-policy
+advance before it can author a different observation publication.
 
 Publish an approved immutable bundle:
 
 ```bash
+READER_BUNDLE=<reader-bundle-root-matching-observation-policy-digest>
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
   materialize \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --reader-bundle "$READER_BUNDLE" \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --out-dir src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations/4_8h_v1 \
   --allowed-output-root src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations

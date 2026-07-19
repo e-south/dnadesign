@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-07-11
+  last_verified: 2026-07-18
   navigation:
     command_group_map: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md
     lane_sidecars:
@@ -305,7 +305,9 @@ study_pipeline:
       and: [0, 0, 0, 1]
     validate_json_command: uv run opal validate -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --json
     progress_json_command: uv run opal progress -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --round latest --json
-    review_json_command: uv run opal review -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view <selection_view_id> --round latest --json
+    review_materialize_json_command: uv run opal review -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view <selection_view_id> --round latest --json
+    review_materialization_writes_artifacts: true
+    review_materialization_output_root: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/review
     densegen_axis_probe_progress_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.densegen_axis_probe progress --run-root <run-root> --json
     selection_set_show_command: uv run opal selection-set show -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --json
     selection_set_export_command: uv run opal selection-set export -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view <selection_view_id> --round <as_of_round> --out <selection-set.csv> --format csv --json

@@ -44,7 +44,7 @@ uv run opal init -c "$CONFIG" --json
 uv run opal run -c "$CONFIG" --round 0 --json
 ```
 
-### Notebook review and verification
+### Read-only campaign verification
 
 ```bash
 CONFIG=src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
@@ -64,14 +64,23 @@ done
 uv run opal selection-batch show -c "$CONFIG" --round latest --json \
   | jq -e '.unique_count == 18 and ([.rows[].selection_batch_key] | unique | length) == 18'
 uv run opal status -c "$CONFIG" --with-ledger --json
-uv run opal notebook generate -c "$CONFIG" --round latest --force --json
-uv run opal notebook run -c "$CONFIG"
 ```
 
 Required evidence is three six-row sets, one 18-row sequence-unique batch, model
 and prediction artifacts, declared MSRB diagnostics, and zero mismatches.
 `objective-meta --profile` exposes the mask, normalization, score direction,
 hard bottleneck, and family scores. Passing establishes integrity, not validity.
+
+### Notebook generation and live review
+
+The following commands write or serve notebook artifacts; they are not part of
+the read-only verification block:
+
+```bash
+CONFIG=src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
+uv run opal notebook generate -c "$CONFIG" --round latest --force --json
+uv run opal notebook run -c "$CONFIG"
+```
 
 ### Synthesis boundary
 
