@@ -440,9 +440,11 @@ The objective sources of truth remain separate:
 - [Response Magnitude Feasibility](opal/response-magnitude-feasibility.md)
   defines the thresholded RMF requirements used by the completed round-0 audit
   and selection record.
-- [Multistate Response Behavior](opal/multistate-response-behavior.md) defines a
-  threshold-free monotonic behavior objective that remains shadow-only pending
-  prospective evidence and explicit study promotion.
+- The generic [Multistate Response Behavior objective](../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+  defines threshold-free monotonic ranking across a fixed state panel. The
+  [study application](opal/multistate-response-behavior.md) binds the active
+  assay, normalization, masks, and prospective learning probe. Prospective
+  hill-climb efficacy remains unknown.
 
 ### Case-Study Semantics
 

@@ -44,6 +44,7 @@ from .multistate_response_behavior_data import (
 from .multistate_response_behavior_support import (
     figsize,
     nonnegative_int,
+    positive_float,
     save_figure,
     selection_view_title,
     state_display_labels,
@@ -83,6 +84,10 @@ KIND = "multistate_response_behavior_selected_decomposition"
             "max_selected": "Maximum allocated rows permitted in one heatmap (default 24).",
             "max_coordinates": "Maximum state-level coordinates permitted in one heatmap (default 48).",
             "candidate_label_mode": "Candidate row labels: short_id (default) or alias.",
+            "color_extent": (
+                "Optional positive symmetric color extent in assay-resolution units. Values outside the extent "
+                "remain exact in labels and exported data while their colors saturate at rectangular endpoints."
+            ),
         },
         requires=[
             "as_of_round",
@@ -147,7 +152,21 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         BEHAVIOR_SCORE_REF,
     )
     matrix = np.concatenate((coordinate_matrix, selected.loc[:, summary_columns].to_numpy(dtype=float)), axis=1)
-    extent = max(float(np.max(np.abs(matrix))), 1.0e-9)
+    full_extent = max(float(np.max(np.abs(matrix))), 1.0e-9)
+    configured_extent = params.get("color_extent")
+    extent = full_extent if configured_extent is None else positive_float(configured_extent, name="color_extent")
+    saturated_below = bool(np.any(matrix < -extent))
+    saturated_above = bool(np.any(matrix > extent))
+    colorbar_extend = (
+        "both"
+        if saturated_below and saturated_above
+        else "min"
+        if saturated_below
+        else "max"
+        if saturated_above
+        else "neither"
+    )
+    saturated_count = int(np.count_nonzero(np.abs(matrix) > extent))
     norm = TwoSlopeNorm(vmin=-extent, vcenter=0.0, vmax=extent)
     default_width = min(15.0, max(8.2, 3.8 + 0.62 * matrix.shape[1]))
     default_height = max(4.8, min(10.0, 2.5 + 0.55 * len(selected)))
@@ -221,8 +240,25 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         label="Normalized behavior evidence",
         pad=0.06,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
+        extend=colorbar_extend,
+        extendrect=True,
     )
     colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
+    context.artifact_metadata["notebook_view"] = {
+        "title": title,
+        "context": target_context(data, params),
+        "color_scale": {
+            "center": 0.0,
+            "extent": extent,
+            "extend": colorbar_extend,
+            "context": (
+                f"{saturated_count:,} matrix values saturate at the color endpoints; exact labels and tidy data "
+                "are retained"
+                if saturated_count
+                else "Symmetric normalized behavior evidence around the zero reference direction"
+            ),
+        },
+    }
     save_figure(context, fig)
     if context.save_data:
         context.save_df(decomposition_tidy(selected, coordinate_labels=data.coordinate_labels))

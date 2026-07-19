@@ -25,6 +25,7 @@ from ._support import (
 )
 from .layered_scatter import (
     build_notebook_layered_scatter_contract,
+    filter_notebook_layered_scatter_rows,
     render_notebook_layered_scatter_image,
 )
 from .plot_scopes import (
@@ -33,6 +34,7 @@ from .plot_scopes import (
     sort_plot_scope_manifests,
 )
 from .plot_text import rounds_text
+from .three_axis_scatter import THREE_AXIS_INTERACTIVE_MODE, render_notebook_three_axis_scatter
 
 
 def build_notebook_visual_surface_model(
@@ -221,6 +223,29 @@ def render_notebook_plot_choice_image(
     if contract is None:
         contract = build_notebook_layered_scatter_contract(plot_choice)
     if contract is not None:
+        figure_mode = str(dict(view_state or {}).get("figure") or "publication_2d")
+        if figure_mode == THREE_AXIS_INTERACTIVE_MODE:
+            if not contract.get("interactive"):
+                raise ValueError("This layered-scatter plot does not declare an interactive three-axis adapter.")
+            rows = contract.get("rows")
+            if not hasattr(rows, "columns"):
+                raise ValueError("Interactive layered-scatter contract is missing verified tidy rows.")
+            filtered = filter_notebook_layered_scatter_rows(
+                rows,
+                contract=contract,
+                state=view_state,
+            )
+            if filtered.empty:
+                return mo.callout(
+                    mo.md(
+                        "**No scatter layers are visible.** Enable the prediction pool, selected candidates, "
+                        "or at least one observed batch."
+                    ),
+                    kind="neutral",
+                )
+            return render_notebook_three_axis_scatter(filtered, contract=contract, mo=mo)
+        if figure_mode != "publication_2d":
+            raise ValueError(f"Unsupported layered-scatter figure mode: {figure_mode!r}.")
         return render_notebook_layered_scatter_image(
             plot_choice,
             contract=contract,

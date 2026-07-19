@@ -33,8 +33,9 @@ selected-candidate decomposition, not either scatter axis alone, explains a
 rank.
 
 The OFF-suppression color scale is a campaign-pinned symmetric linear display
-at the prediction-pool absolute 99th percentile. Pointed colorbar ends identify
-saturated tail colors; all candidates and exact values remain available.
+at the prediction-pool absolute 99th percentile. Rectangular colorbar extensions
+identify saturated tail colors without implying another score category; all
+candidates and exact values remain available.
 
 The campaign is a prospectively frozen greedy learning probe. Retrospective
 ordering is weak, prospective hill-climb efficacy is unknown, and campaign

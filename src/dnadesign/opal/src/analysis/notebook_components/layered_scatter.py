@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from io import BytesIO
 from typing import Any, Mapping
 
@@ -136,8 +137,8 @@ def render_notebook_layered_scatter_image(
     batch_labels = [str(item["label"]) for item in prepared["observed_batches"] if str(item["id"]) in selected_batches]
     runtime = _mapping(prepared["runtime"])
     color_context = str(_mapping(runtime.get("color_scale")).get("context") or "").strip()
-    x_context = str(runtime.get("x_label") or "").strip()
-    y_context = str(runtime.get("y_label") or "").strip()
+    x_context = _plain_caption_label(runtime.get("x_label"))
+    y_context = _plain_caption_label(runtime.get("y_label"))
     return mo.image(
         payload.getvalue(),
         alt=(
@@ -185,6 +186,28 @@ def _effective_label_scope(label_scope: str, *, show_selected: bool, show_observ
 
 def _mapping(value: object) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
+
+
+def _plain_caption_label(value: object) -> str:
+    """Convert simple Matplotlib math fragments into readable caption text."""
+
+    text = str(value or "").strip()
+    text = re.sub(r"\$([^$]+)\$", lambda match: _plain_math_fragment(match.group(1)), text)
+    return " ".join(text.split()).rstrip(" ,;:")
+
+
+def _plain_math_fragment(value: str) -> str:
+    text = value
+    for command in ("mathrm", "mathbf", "mathit", "text"):
+        text = re.sub(rf"\\{command}\{{([^{{}}]*)\}}", r"\1", text)
+    for command in ("hat", "bar", "tilde"):
+        text = re.sub(rf"\\{command}\{{([^{{}}]*)\}}", rf"\1 {command}", text)
+    text = re.sub(r"_\{([^{}]*)\}", r"_\1", text)
+    text = re.sub(r"\^\{([^{}]*)\}", r"^\1", text)
+    text = text.replace("{", "").replace("}", "")
+    text = re.sub(r"\\([A-Za-z]+)", r"\1", text)
+    text = text.replace(r"\_", "_").replace(r"\,", " ")
+    return " ".join(text.split())
 
 
 __all__ = [

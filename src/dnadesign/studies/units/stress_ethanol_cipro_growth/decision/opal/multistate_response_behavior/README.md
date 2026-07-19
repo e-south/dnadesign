@@ -14,7 +14,9 @@ Y contract, state order, target masks, assay-resolution normalization, label
 policy, model target, selector, allocation rule, evidence posture, and claim
 boundaries.
 
-The didactic scientific contract is
+The generic objective source of truth is
+[`src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md`](../../../../../../opal/docs/plugins/objectives/multistate-response-behavior.md).
+The applied study contract is
 [`docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md`](../../../../../../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md).
 OPAL owns the generic objective equations; this directory owns only the
 stress-study choices applied to those equations.

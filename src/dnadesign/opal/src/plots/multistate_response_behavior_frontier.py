@@ -102,7 +102,7 @@ COLOR_CONTEXT = "red = stronger OFF-signal suppression; 0 = reference-relative f
             "rasterize_at": "Rasterize points at or above this count (default 10000).",
             "color_extent": (
                 "Optional positive symmetric color extent. Values outside the extent remain plotted and saturate "
-                "at pointed colorbar ends. The extent must be fixed independently of the active view."
+                "at rectangular colorbar extensions. The extent must be fixed independently of the active view."
             ),
             "surface_label": "Optional notebook-facing label.",
         },
@@ -159,6 +159,13 @@ COLOR_CONTEXT = "red = stronger OFF-signal suppression; 0 = reference-relative f
             "x_column": RESPONSE_FAMILY_REF,
             "y_column": ON_SIGNAL_FAMILY_REF,
             "color_column": OFF_SIGNAL_SUPPRESSION_FAMILY_REF,
+            "interactive": {
+                "adapter": "three_axis_scatter_v1",
+                "score_column": BEHAVIOR_SCORE_REF,
+                "score_label": r"Behavior score, $S_{\mathrm{MSRB}}$",
+                "prediction_sample_limit": 8_000,
+                "sampling_method": "sha256_id_v1",
+            },
         },
     ),
 )
@@ -336,6 +343,7 @@ def render_family_frontier(context: Any, params: dict) -> None:
         pad=0.065,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
         extend=colorbar_extend,
+        extendrect=True,
     )
     colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
     aliases = _display_aliases(context, frame=frame, observed=observed, selected=selected)

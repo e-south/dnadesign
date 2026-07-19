@@ -144,6 +144,9 @@ def render_notebook_visual_panel(
             selected_visual_choice=selected_visual_choice,
         )
     return _render_campaign_plot_panel(
+        baserender_record_id=baserender_record_id,
+        baserender_record_row=baserender_record_row,
+        baserender_record_selector=baserender_record_selector,
         build_notebook_plot_card_rows=build_notebook_plot_card_rows,
         build_notebook_plot_method_sections=build_notebook_plot_method_sections,
         controls=controls,
@@ -154,6 +157,8 @@ def render_notebook_visual_panel(
         plot_view_state=plot_view_state,
         layered_scatter_contract=layered_scatter_contract,
         render_notebook_plot_choice_image=render_notebook_plot_choice_image,
+        render_notebook_baserender_record=render_notebook_baserender_record,
+        selected_campaign_baserender_contract=selected_campaign_baserender_contract,
         selected_visual_choice=selected_visual_choice,
         select_notebook_plot_scope=select_notebook_plot_scope,
     )
@@ -312,6 +317,9 @@ def _render_baserender_panel(
 
 def _render_campaign_plot_panel(
     *,
+    baserender_record_id: Any,
+    baserender_record_row: Mapping[str, Any] | None,
+    baserender_record_selector: Any,
     build_notebook_plot_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]],
     build_notebook_plot_method_sections: Callable[[Mapping[str, Any]], Mapping[str, str]],
     controls: Any | None,
@@ -321,7 +329,9 @@ def _render_campaign_plot_panel(
     plot_scope_ui: Any,
     plot_view_state: Mapping[str, Any] | None,
     layered_scatter_contract: Mapping[str, Any] | None,
+    render_notebook_baserender_record: Callable[..., Mapping[str, Any]] | None,
     render_notebook_plot_choice_image: Callable[..., Any],
+    selected_campaign_baserender_contract: Mapping[str, Any] | None,
     selected_visual_choice: Mapping[str, Any],
     select_notebook_plot_scope: Callable[..., Mapping[str, Any]],
 ) -> Any:
@@ -332,18 +342,96 @@ def _render_campaign_plot_panel(
     method_sections = build_notebook_plot_method_sections(choice)
     detail_items = [mo.md(text) for text in method_sections.values()]
     detail_items.append(opal_table(pl.DataFrame(build_notebook_plot_card_rows(choice)), page_size=12))
+    visual = render_notebook_plot_choice_image(
+        choice,
+        mo=mo,
+        view_state=plot_view_state,
+        layered_scatter_contract=layered_scatter_contract,
+    )
+    sequence_companion = None
+    if str(dict(plot_view_state or {}).get("figure") or "publication_2d") == "interactive_3d":
+        sequence_companion = _render_three_axis_sequence_companion(
+            baserender_record_id=baserender_record_id,
+            baserender_record_row=baserender_record_row,
+            baserender_record_selector=baserender_record_selector,
+            contract=selected_campaign_baserender_contract,
+            mo=mo,
+            render_notebook_baserender_record=render_notebook_baserender_record,
+        )
     return _render_panel_stack(
         mo=mo,
         items=[
             controls,
-            render_notebook_plot_choice_image(
-                choice,
-                mo=mo,
-                view_state=plot_view_state,
-                layered_scatter_contract=layered_scatter_contract,
-            ),
+            visual,
+            sequence_companion,
             mo.accordion({"Plot evidence": mo.vstack(detail_items, gap=0.35)}, multiple=True),
         ],
+    )
+
+
+def _render_three_axis_sequence_companion(
+    *,
+    baserender_record_id: Any,
+    baserender_record_row: Mapping[str, Any] | None,
+    baserender_record_selector: Any,
+    contract: Mapping[str, Any] | None,
+    mo: Any,
+    render_notebook_baserender_record: Callable[..., Mapping[str, Any]] | None,
+) -> Any:
+    """Render exact selected-candidate sequence evidence below the exploratory 3D view."""
+
+    if baserender_record_selector is None:
+        return mo.callout(
+            mo.md("Selected-candidate sequence inspection is unavailable for this campaign run."),
+            kind="neutral",
+        )
+    guidance = mo.md(
+        "**Selected candidate sequence.** Choose an allocated prediction to inspect its campaign-declared "
+        "sequence annotation. Observed controls remain hover evidence because their sequence adapters are "
+        "study-issued rather than campaign-global."
+    )
+    if baserender_record_row is None:
+        rendered = mo.callout(
+            mo.md("The selected prediction has no record valid under this campaign's BaseRender contract."),
+            kind="warn",
+        )
+    else:
+        payload = _require_callable(
+            render_notebook_baserender_record,
+            "render_notebook_baserender_record",
+        )(baserender_record_row, dict(contract or {}))
+        compact_id = compact_record_id(str(baserender_record_id or payload["record_id"]))
+        rendered = mo.vstack(
+            [
+                mo.md(
+                    '<h4 style="text-align:center; margin:0 0 0.1rem 0;">'
+                    f"Candidate <code>{escape(compact_id)}</code></h4>"
+                ),
+                mo.image(
+                    payload["image_bytes"],
+                    alt=str(payload["alt_text"]),
+                    caption=str(payload["caption"]),
+                    rounded=True,
+                    style={
+                        "width": "100%",
+                        "max-width": "100%",
+                        "height": "auto",
+                        "object-fit": "contain",
+                        "margin": "0",
+                        "display": "block",
+                        "background-color": "#FFFFFF",
+                    },
+                ),
+            ],
+            gap=0.1,
+        )
+    return mo.vstack(
+        [
+            mo.hstack([baserender_record_selector], justify="start", align="end", wrap=True, gap=0.35),
+            guidance,
+            rendered,
+        ],
+        gap=0.25,
     )
 
 

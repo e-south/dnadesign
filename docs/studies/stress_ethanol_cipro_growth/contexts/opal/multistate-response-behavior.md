@@ -1,13 +1,13 @@
 ---
 id: stress-ethanol-cipro-growth-multistate-response-behavior
-title: Multistate Response Behavior for the stress-promoter study
+title: MSRB application for the stress-promoter study
 short_name: MSRB
 objective_id: multistate_response_behavior_v1
 y_space: reader_response_window_vector_v1
 owner: stress_ethanol_cipro_growth
 status: active
 last_verified: 2026-07-18
-first_hop: self
+first_hop: ../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md
 audience:
   - scientist
   - maintainer
@@ -15,23 +15,27 @@ audience:
   - agent
 ---
 
-## Multistate Response Behavior (MSRB)
+## MSRB application for the stress-promoter study
 
-Multistate Response Behavior, abbreviated **MSRB**, ranks stress-responsive
-promoters by three biological preferences at once:
+**Multistate Response Behavior (MSRB)** ranks promoters intended to
+implement condition-dependent expression programs by three biological
+preferences at once:
 
 1. intended-ON states should have greater reporter response than intended-OFF
    states;
-2. intended-ON states should produce stronger fluorescence relative to
-   pDual-10 measured in the same condition; and
-3. intended-OFF states should suppress fluorescence relative to that same
-   condition-matched reference.
+2. intended-ON states should have greater same-state reference-relative signal;
+   and
+3. intended-OFF states should have lower same-state reference-relative signal.
+
+For this assay, the signal coordinate is reduced YFP/OD600 relative to
+same-state pDual-10. That reference is a study binding, not part of the generic
+MSRB definition.
 
 The OPAL objective identifier is `multistate_response_behavior_v1`, its scalar
 is written $S_{\mathrm{MSRB}}$, and its selectable score channel is
 `behavior_score`.
 
-MSRB is the sole ranking objective for the active stress-promoter campaign.
+MSRB is the sole ranking objective for the active promoter campaign.
 The campaign is a prospectively frozen greedy learning probe. It tests whether
 the sequence-to-phenotype model and measured MSRB enrichment improve as new
 batches accumulate. Existing retrospective evidence supports the objective's
@@ -39,12 +43,35 @@ biological semantics and implementation, but it does not establish reliable
 predictive ordering or prospective hill-climb efficacy. Selection and physical
 synthesis authorization remain separate decisions.
 
-This document is the end-to-end scientific contract for the stress study. The
-[generic OPAL objective contract](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
-owns the reusable equations and API. The study-owned
+The [generic OPAL objective contract](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+defines the reusable equations and API. The study-owned
 [`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml)
 pins the assay, normalization, target masks, model target, selection policy,
-and claim boundaries used here.
+and claim boundaries for this study.
+
+### Scope of this study application
+
+Generic MSRB accepts a fixed panel of `K >= 2` named states with binary
+intended-ON/OFF membership and an ordered `2K` phenotype. The states need not
+represent stress, two perturbations, binary factor codes, or a complete
+factorial panel.
+
+This study supplies one concrete binding: four measured conditions, a
+condition-matched pDual-10 reference, a 4–8-hour response window, three target
+masks, and one active campaign. Those assay and campaign choices do not alter
+the generic objective.
+
+```text
+sequence representation X
+  -> predicted response-window phenotype Y_hat_RW
+  -> target mask plus MSRB
+  -> behavior score and diagnostics
+  -> greedy allocation
+```
+
+The model predicts the phenotype, not an MSRB scalar. One predicted phenotype
+can therefore be evaluated under several target masks without retraining the
+model or changing Reader's assay contract.
 
 ### Authority by stage
 
@@ -128,7 +155,7 @@ $$
 $$
 b_i =
 \operatorname{median}_{w \in \mathrm{design},i} F_w
--
+{}-
 \operatorname{median}_{w \in \mathrm{pDual\text{-}10},i} F_w.
 $$
 
@@ -185,7 +212,10 @@ latest exact event per candidate for cumulative training. That round-level
 policy is distinct from the study's adjudication of repeated Reader
 experiments within one published event.
 
-#### 4. The eight-value phenotype
+#### 4. The current four-state response-window phenotype
+
+Generic MSRB consumes `2K` ordered coordinates for any fixed `K >= 2`. This
+Reader assay has `K=4`, so its phenotype contains eight values.
 
 The Reader handoff is the objective-neutral response-window phenotype
 
@@ -216,9 +246,8 @@ Its exact serialized order is:
 | $b_i=-1$ | Twofold lower reduced fluorescence than same-state pDual-10 |
 
 The vector does not encode a target mask, objective score, uncertainty value,
-candidate rank, or synthesis decision. It is not an “MSRB vec8” and is not the
-SFXI vec8. The same $Y_{\mathrm{RW}}$ can be evaluated by MSRB, RMF, or another
-compatible objective without changing Reader's assay evidence.
+candidate rank, or synthesis decision. The same $Y_{\mathrm{RW}}$ can be
+evaluated by any compatible objective without changing Reader's assay evidence.
 
 #### 5. Sequence-to-phenotype prediction
 
@@ -256,78 +285,51 @@ begin from an assumption that it already does.
 
 #### 6. MSRB scoring
 
-For target-ON set $O$ and target-OFF set $F$, the study uses three behavior
-families:
+The [generic objective contract](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+defines the three behavior families and their family-balanced smooth
+bottleneck. The stress-study binding supplies only the ordered states, target
+masks, and assay-resolution scales.
 
-$$
-x^R_{ij}=\frac{r_i-r_j}{s_R},
-\qquad i\in O,\ j\in F,
-$$
+The two scales answer a practical question: how large is one change that this
+assay can resolve reliably in each coordinate type? They put response and
+signal on common units before the three behavior families are combined. Reader
+bootstrap evidence gives:
 
-$$
-x^{\mathrm{ON}}_i=\frac{b_i}{s_B},
-\qquad i\in O,
-$$
+| Scale | Rounded value | Meaning |
+| --- | ---: | --- |
+| $s_R$ | `0.308` log2 | q90 within-experiment uncertainty of declared ON-versus-OFF response contrasts |
+| $s_B$ | `0.313` log2 | q90 within-experiment uncertainty of same-state pDual-10-relative signal |
 
-$$
-x^{\mathrm{OFF}}_j=\frac{-b_j}{s_B},
-\qquad j\in F.
-$$
+In plain language, a response contrast of about `0.31` log2 or a
+reference-relative signal change of about `0.31` log2 counts as one
+assay-resolution unit. For example:
 
-The response family rewards correct state ordering. The intended-ON family
-rewards fluorescence above the same-state reference. The intended-OFF family
-rewards suppression below the same-state reference.
+- an ON-minus-OFF response difference of `0.616` log2 is about
+  `0.616 / 0.308 = +2.0` response-resolution units; and
+- an intended-OFF value of `b = -0.626` log2 is about
+  `-(-0.626) / 0.313 = +2.0` OFF-suppression units.
 
-The frozen assay-resolution scales are:
+This conversion lets the response and signal families share one score even
+when their measurement precision differs. On the underlying ratio scale,
+`0.31` log2 is about a 1.24-fold change. It remains a resolution convention,
+not a desired biological effect size.
 
-$$
-s_R=0.3080415202556689,
-\qquad
-s_B=0.3129336929825316.
-$$
+These numbers are not biological thresholds, metric weights, or fitted model
+parameters. Reader generated 500 joint bootstrap draws for each of 41 exact
+candidate-experiment units. The study calculated the uncertainty of the
+eligible response contrasts and signal values, then used the 90th percentile
+(`q90`) as each scale. Thus 90% of the eligible uncertainty estimates are no
+larger than the declared scale. Predictions and selected candidates did not
+participate in that calculation.
 
-Both are q90 bootstrap-resolution conventions over 41 exact Reader
-candidate-experiment units. They put the two measurement types into comparable
-resolution units. They are not biological pass thresholds and were not tuned
-to preserve preferred candidates.
-
-The derivation is fixed rather than inferred from the two resulting numbers:
-
-- For $s_R$, take the unique unordered union of every intended-ON versus
-  intended-OFF state pair declared by the three target masks. For each pair and
-  each exact candidate-experiment unit, compute the sample standard deviation
-  of $r_i-r_j$ over the 500 joint Reader bootstrap draws. $s_R$ is the q90 of
-  those pair-level standard deviations using the linear quantile method.
-- For $s_B$, compute the sample standard deviation of each state-specific
-  reference-relative $b_i$ coordinate over the same 500 joint Reader bootstrap
-  draws for every exact candidate-experiment unit. $s_B$ is the q90 of those
-  state-level standard deviations using the same linear quantile method.
-
-The scales therefore describe assay resolution in the complete exact
-candidate-experiment cohort. They are not fitted from predictions, selected
-candidates, or the 27 promoted candidate labels.
-
-For a family $G$, define the smooth bottleneck
-
-$$
-S_G=-\log\left(\frac{1}{|G|}\sum_{c\in G}e^{-x_c}\right).
-$$
-
-The selector score gives the three families equal prior standing:
-
-$$
-S_{\mathrm{MSRB}}=-\log\left[
-\frac{1}{3}\left(
-\operatorname{mean}_{i,j}e^{-x^R_{ij}}
-+\operatorname{mean}_{i}e^{-x^{\mathrm{ON}}_i}
-+\operatorname{mean}_{j}e^{-x^{\mathrm{OFF}}_j}
-\right)\right].
-$$
-
-Every favorable coordinate change raises the score in real arithmetic:
-higher intended-ON response, lower intended-OFF response, higher intended-ON
-signal, or lower intended-OFF signal. Poor coordinates receive exponentially
-more bottleneck weight than already favorable coordinates.
+The active
+[`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml)
+stores the exact machine-readable values and derivation recipe. Values such as
+those in the scale table carry additional digits there only so independent
+reruns use the identical conversion. Those digits support computational
+reproducibility; they do not imply matching biological precision. Rounded
+values belong in explanatory prose, while full precision belongs in the
+machine-readable contract.
 
 The three active interpretations are:
 
@@ -375,8 +377,10 @@ not a biological acceptance threshold.
 The OFF-suppression color scale uses one symmetric linear extent for all three
 views: the absolute 99th percentile of the round-0 campaign prediction pool,
 `6.866` normalized units. Values beyond that display extent keep
-their exact score and remain plotted, but their colors saturate at the pointed
-colorbar ends. This view-independent display rule makes differences near the
+their exact score and remain plotted, but their colors saturate at the fixed
+colorbar endpoints. The rectangular colorbar avoids treating saturation as a
+new score category; the notebook caption reports how many visible values are
+saturated. This view-independent display rule makes differences near the
 selected candidates legible without silently removing outliers or changing
 the objective.
 
@@ -396,113 +400,20 @@ fails.
 Every measured candidate is assayed in all four states. It therefore provides
 new evidence for all three masks, not only the view that nominated it.
 
-### Worked behavior examples
-
-The following examples use unit scales so that normalized clearances are easy
-to read. They explain the aggregation; they are not biological thresholds.
-
-#### Balanced behavior
-
-If every response, intended-ON, and intended-OFF clearance equals `+1`, then
-all three family scores and $S_{\mathrm{MSRB}}$ equal `+1`. The hard
-bottleneck is also `+1`.
-
-#### Bright but leaky
-
-Suppose the response family equals `+1`, intended-ON signal equals `+100`, and
-intended-OFF suppression equals `-1`. Then
-
-$$
-S_{\mathrm{MSRB}}
-=-\log\left(\frac{e^{-1}+e^{-100}+e^{1}}{3}\right)
-\approx -0.028.
-$$
-
-Arbitrarily strong ON signal does not erase the OFF leak. The balanced
-candidate at `+1` ranks higher.
-
-#### One favorable outlier
-
-Starting from all-zero normalized coordinates, making only one intended-ON
-signal coordinate arbitrarily favorable raises the ethanol score only toward
-
-$$
--\log(5/6)\approx 0.182,
-$$
-
-and the AND score only toward
-
-$$
--\log(2/3)\approx 0.405.
-$$
-
-The favorable coordinate's exponential term approaches zero; its benefit is
-finite. It cannot drive the score upward without bound.
-
-#### Existing assay north stars
+### Applied controls and promotion evidence
 
 SpyP ranks near the top of observed ethanol examples, and sulAp ranks near the
-top of observed ciprofloxacin examples. SpyP also illustrates the compensation
-boundary: its ethanol behavior score can be positive while its limiting
-intended-OFF suppression coordinate remains negative. These promoters are face-
-validity references, not score thresholds or DenseGen architecture matches.
-The study has no equivalent positive AND control.
+top of observed ciprofloxacin examples. They provide face-validity checks, not
+score thresholds or DenseGen architecture matches. The study has no equivalent
+positive AND control.
 
-### Compensation boundary and anti-collapse evidence
-
-MSRB does not multiply a separate logic score by an unbounded effect term.
-Each favorable coordinate enters through $e^{-x}$, so its contribution shrinks
-toward zero as it becomes more favorable and cannot drive the score upward
-without bound. This does not make MSRB noncompensatory: several favorable
-coordinates can still outweigh a modest deficit.
-
-Each biological family receives exactly one-third of the prior mass. Within a
-family, each coordinate receives
-
-$$
-w_c=\frac{1}{3|G|}.
-$$
-
-For hard bottleneck $m=\min_c x_c$ and the limiting coordinate's prior
-$w_m$:
-
-$$
-m\le S_{\mathrm{MSRB}}\le m-\log(w_m).
-$$
-
-The score can sit above the weakest coordinate, but the gap is finite and
-reported. The active masks have these exact coordinate priors:
-
-| View | Response prior per pair | ON prior per state | OFF prior per state | Largest current-mask gap |
-| --- | ---: | ---: | ---: | ---: |
-| Ethanol | $1/12$ | $1/6$ | $1/6$ | $\log(12)=2.485$ |
-| Ciprofloxacin | $1/12$ | $1/6$ | $1/6$ | $\log(12)=2.485$ |
-| AND | $1/9$ | $1/3$ | $1/9$ | $\log(9)=2.197$ |
-
-This is bounded compensation, not noncompensation. Several favorable
-coordinates can outweigh a modest deficit, and a positive score can coexist
-with a negative hard bottleneck. That tradeoff is the price of ensuring that
-every desired improvement matters instead of creating hard-minimum plateaus.
-
-The implementation and promotion tests require:
-
-- strict directional monotonicity for state panels with 2 through 16 states;
-- Pareto-dominance preservation and joint state-permutation invariance;
-- exact one-third family standing under balanced and one-ON masks;
-- ethanol, ciprofloxacin, and AND prototype separation;
-- independent penalties for response, intended-ON, and intended-OFF failures;
-- exact active-mask coordinate priors and analytic compensation ceilings;
-- normalization covariance;
-- finite, nondecreasing arithmetic at extreme inputs;
-- heterogeneous-panel replication tests that distinguish uniform replication
-  from selectively reweighting one coordinate; and
-- cardinality pressure over 2, 4, 8, and 16 states, including one-ON,
-  balanced, and one-OFF masks.
-
-OPAL records the hard bottleneck, actual compensation gap, analytic maximum
-gap, limiting coordinate, limiting prior and bottleneck weights, three family
-scores, and `all_reference_directions_met`. These diagnostics make a
-compensating selection visible; they do not impose a hidden veto.
+The generic objective tests establish directional monotonicity, Pareto
+dominance, state-permutation invariance, equal family standing, bounded
+compensation, finite extreme arithmetic, and state-panel pressure from `K=2`
+through `K=16`. Study promotion additionally evaluated the three active masks,
+Reader bootstrap and event-time sensitivity, repeated experiments, censoring,
+normalization sensitivity, and sequence-deduplicated allocation. The
+digest-bound activation receipt and shadow bundle preserve those results.
 
 ### Uncertainty and censoring
 
@@ -570,6 +481,15 @@ One batch can test directional enrichment. Multiple prospectively frozen
 rounds are required to assess whether retraining improves the $X\rightarrow Y$
 mapping and whether MSRB supports useful hill climbing. Objective semantics can
 be correct even when the predictor is weak.
+
+The planned decision horizon is two to three design-build-test-learn rounds,
+with 18 sequence-unique candidates in the current campaign contract. The
+practical no-go outcome is no repeatable enrichment toward ethanol-responsive,
+ciprofloxacin-responsive, or combined-stress behavior: the six candidates
+nominated by a view do not outperform the other twelve batch candidates under
+that same view, cumulative best measured behavior does not improve, and the
+three family diagnostics show no coherent directional gain. This is a
+prospective campaign decision, not a threshold embedded in the MSRB formula.
 
 The retrospective shadow evaluation used 27 promoted labels from six source
 experiments and 154,785 fixed prediction vectors. MSRB and RMF allocations

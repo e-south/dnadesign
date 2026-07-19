@@ -492,6 +492,7 @@ def test_behavior_frontier_discloses_saturated_tail_colors(
     assert "visible values saturate" in color_scale["context"]
     assert "points and exact ledger values are retained" in color_scale["context"]
     assert figure.axes[-1]._colorbar.extend == color_scale["extend"]
+    assert figure.axes[-1]._colorbar.extendrect is True
     plt.Figure.clear(figure)
 
 
@@ -598,6 +599,35 @@ def test_behavior_decomposition_uses_msrb_symbols_and_compact_colorbar(
     plt.Figure.clear(figure)
 
 
+def test_behavior_decomposition_honors_pinned_symmetric_color_extent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[plt.Figure] = []
+    monkeypatch.setattr(
+        decomposition_plot,
+        "load_multistate_response_behavior_plot_data",
+        lambda _context, **_kwargs: _plot_data(),
+    )
+    monkeypatch.setattr(decomposition_plot, "save_figure", lambda _context, figure: captured.append(figure))
+    monkeypatch.setattr(plt, "close", lambda _figure: None)
+    context = _context(tmp_path, filename="decomposition.png", save_data=False)
+
+    decomposition_plot.render_selected_decomposition(context, {"color_extent": 0.05})
+
+    figure = captured.pop()
+    image = figure.axes[0].images[0]
+    color_scale = context.artifact_metadata["notebook_view"]["color_scale"]
+    assert image.norm.vmin == pytest.approx(-0.05)
+    assert image.norm.vmax == pytest.approx(0.05)
+    assert color_scale["extent"] == pytest.approx(0.05)
+    assert color_scale["extend"] in {"both", "min", "max"}
+    assert "values saturate" in color_scale["context"]
+    assert figure.axes[-1]._colorbar.extend == color_scale["extend"]
+    assert figure.axes[-1]._colorbar.extendrect is True
+    plt.Figure.clear(figure)
+
+
 def test_behavior_plot_registry_and_objective_family_routing_are_explicit() -> None:
     frontier = describe_plot_kind("multistate_response_behavior_frontier")
     decomposition = describe_plot_kind("multistate_response_behavior_selected_decomposition")
@@ -610,6 +640,13 @@ def test_behavior_plot_registry_and_objective_family_routing_are_explicit() -> N
         assert metadata["tier"] == "decision"
         assert metadata["capability"]["objective_family"] == "multistate_response_behavior"
     assert frontier["notebook_view"]["adapter"] == "layered_scatter_v1"
+    assert frontier["notebook_view"]["interactive"] == {
+        "adapter": "three_axis_scatter_v1",
+        "score_column": "behavior_score",
+        "score_label": r"Behavior score, $S_{\mathrm{MSRB}}$",
+        "prediction_sample_limit": 8_000,
+        "sampling_method": "sha256_id_v1",
+    }
     assert "labels/observed_events.parquet" in frontier["requires"]
     group, _rank = notebook_visual_group(
         {

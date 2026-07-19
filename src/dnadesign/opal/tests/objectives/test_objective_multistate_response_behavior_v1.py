@@ -582,6 +582,7 @@ def test_positive_behavior_score_is_not_a_feasibility_claim() -> None:
         ([1, 1], "ON and one OFF"),
         ([0, 0.5], "binary"),
         ([False, True], "not boolean aliases"),
+        (["0", "1"], "numeric zero or one"),
     ],
 )
 def test_target_mask_is_strict_binary_partition(target_mask: list[object], match: str) -> None:

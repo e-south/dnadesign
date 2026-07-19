@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import dataclass
+from numbers import Real
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -215,11 +216,13 @@ def binary_target_mask(target_mask: Sequence[int | float]) -> np.ndarray:
         raw_values = tuple(target_mask)
     except TypeError as exc:
         raise ValueError(f"{OBJECTIVE_NAME}: target_mask must be one-dimensional.") from exc
+    if np.asarray(raw_values, dtype=object).ndim != 1:
+        raise ValueError(f"{OBJECTIVE_NAME}: target_mask must be one-dimensional.")
     if any(isinstance(value, (bool, np.bool_)) for value in raw_values):
         raise ValueError(f"{OBJECTIVE_NAME}: target_mask must use numeric zero or one, not boolean aliases.")
+    if any(not isinstance(value, Real) for value in raw_values):
+        raise ValueError(f"{OBJECTIVE_NAME}: target_mask must use numeric zero or one without coercion.")
     values = np.asarray(raw_values, dtype=float)
-    if values.ndim != 1:
-        raise ValueError(f"{OBJECTIVE_NAME}: target_mask must be one-dimensional.")
     if values.size < 2 or not np.all(np.isfinite(values)):
         raise ValueError(f"{OBJECTIVE_NAME}: target_mask must contain at least two finite entries.")
     if not np.all(np.isin(values, (0.0, 1.0))):

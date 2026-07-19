@@ -117,6 +117,13 @@ def _behavior_choice(tmp_path: Path, *, filename: str, selection_view_id: str) -
             "off_constraint_margin": "off_signal_suppression_family_score",
         }
     )
+    tidy["behavior_score"] = tidy[
+        [
+            "response_family_score",
+            "on_signal_family_score",
+            "off_signal_suppression_family_score",
+        ]
+    ].min(axis=1)
     tidy.to_csv(tidy_path, index=False)
     manifest["kind"] = "multistate_response_behavior_frontier"
     manifest["selection_view_id"] = selection_view_id
@@ -561,11 +568,41 @@ def test_layered_scatter_renderer_returns_a_publication_image(tmp_path: Path) ->
 
     assert rendered["data"].startswith(b"\x89PNG")
     assert "Batch 1" in rendered["caption"]
-    assert "Horizontal: Response separation" in rendered["caption"]
-    assert "Vertical: ON fluorescence" in rendered["caption"]
+    assert "Horizontal: Response separation, d_R" in rendered["caption"]
+    assert "Vertical: ON fluorescence, f_ON" in rendered["caption"]
     assert "red = greater clearance; 0 = configured boundary" in rendered["caption"]
     assert "Interpret all three encodings together" in rendered["caption"]
+    assert "$" not in rendered["caption"]
+    assert "\\" not in rendered["caption"]
+    assert "$" not in rendered["alt"]
     assert rendered["style"]["max-height"] == "min(76vh, 860px)"
+
+
+def test_layered_scatter_caption_plainly_preserves_msrb_symbols(tmp_path: Path) -> None:
+    class _Mo:
+        @staticmethod
+        def image(data: bytes, **kwargs):
+            return {"data": data, **kwargs}
+
+    choice = _behavior_choice(tmp_path, filename="behavior_caption.csv", selection_view_id="ethanol")
+    runtime = choice["manifest"]["artifact_metadata"]["notebook_view"]
+    runtime["x_label"] = r"Response-ordering family score, $S_R$"
+    runtime["y_label"] = r"Intended-ON signal family score, $S_{\mathrm{ON}}$"
+    rendered = render_notebook_layered_scatter_image(
+        choice,
+        state={
+            "show_prediction_pool": True,
+            "show_selected": True,
+            "observed_batches": ["batch_1"],
+            "label_scope": "none",
+        },
+        mo=_Mo(),
+    )
+
+    assert "Horizontal: Response-ordering family score, S_R" in rendered["caption"]
+    assert "Vertical: Intended-ON signal family score, S_ON" in rendered["caption"]
+    assert "$" not in rendered["caption"]
+    assert "\\" not in rendered["caption"]
 
 
 def test_layered_scatter_legend_stays_outside_the_annotation_field(tmp_path: Path) -> None:
@@ -651,6 +688,38 @@ def test_layered_scatter_all_visible_layers_keep_a_usable_square_panel(tmp_path:
         plt.close(figure)
 
 
+def test_annotated_selected_and_observed_markers_remain_visible_above_label_boxes(tmp_path: Path) -> None:
+    choice = _behavior_choice(tmp_path, filename="behavior_annotation_visibility.csv", selection_view_id="ethanol")
+    contract = build_notebook_layered_scatter_contract(choice)
+    assert contract is not None
+    visible = filter_notebook_layered_scatter_rows(
+        contract["rows"],
+        contract=contract,
+        state={
+            "show_prediction_pool": False,
+            "show_selected": True,
+            "observed_batches": [item["id"] for item in contract["observed_batches"]],
+            "label_scope": "both",
+        },
+    )
+
+    figure = render_layered_scatter_figure(visible, contract=contract)
+    try:
+        annotations = figure.axes[0].texts
+        marker_layers = [
+            collection
+            for collection in figure.axes[0].collections
+            if str(collection.get_label()).startswith(("Selected", "Observed"))
+        ]
+        assert annotations
+        assert marker_layers
+        assert min(layer.get_zorder() for layer in marker_layers) > max(
+            annotation.get_zorder() for annotation in annotations
+        )
+    finally:
+        plt.close(figure)
+
+
 def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:
     text = render_layered_scatter_cells()
     contract_cell = layered_scatter_cell_template._contract_cell()
@@ -660,14 +729,17 @@ def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:
     assert 'label="Prediction pool"' in helper_text
     assert 'label="Selected overlay"' in helper_text
     assert 'label="Observed batches"' in helper_text
-    assert 'label="Labels"' in helper_text
+    assert '"2D annotations" if interactive else "Labels"' in helper_text
+    assert 'label="Figure"' in helper_text
     assert "build_notebook_layered_scatter_controls(" in text
     assert "plot_view_state" in text
     assert 'scatter_prediction_pool_ui = layered_scatter_controls["prediction_pool"]' in text
+    assert 'scatter_figure_ui = layered_scatter_controls["figure"]' in text
     assert 'scatter_selected_ui = layered_scatter_controls["selected"]' in text
     assert 'scatter_observed_batches_ui = layered_scatter_controls["observed_batches"]' in text
     assert 'scatter_labels_ui = layered_scatter_controls["labels"]' in text
     assert '"prediction_pool": scatter_prediction_pool_ui' in text
+    assert '"figure": scatter_figure_ui' in text
     assert '"selected": scatter_selected_ui' in text
     assert '"observed_batches": scatter_observed_batches_ui' in text
     assert '"labels": scatter_labels_ui' in text

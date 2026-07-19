@@ -116,10 +116,17 @@ def _visual_controls(
     elif _is_reader_evidence_visual(selected_visual_choice):
         controls.extend(_present(reader_evidence_artifact_ui))
     else:
+        scatter = dict(layered_scatter_controls or {})
+        figure = scatter.get("figure")
+        figure_mode = str(figure.value) if figure is not None else "publication_2d"
         controls.extend(
             _present(
                 plot_scope_ui,
-                *dict(layered_scatter_controls or {}).values(),
+                figure,
+                scatter.get("prediction_pool"),
+                scatter.get("selected"),
+                scatter.get("observed_batches"),
+                scatter.get("labels") if figure_mode == "publication_2d" else None,
             )
         )
     return controls

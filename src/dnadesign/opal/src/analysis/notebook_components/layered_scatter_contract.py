@@ -81,12 +81,21 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
         raise ValueError(f"Layered-scatter runtime metadata is missing fields: {missing_runtime}.")
     _validate_runtime_semantics(runtime)
 
-    columns = list(dict.fromkeys(["id", *(str(view[key]) for key in column_spec_fields)]))
+    interactive = _interactive_spec(view)
+    columns = list(
+        dict.fromkeys(
+            [
+                "id",
+                *(str(view[key]) for key in column_spec_fields),
+                *([str(interactive["score_column"])] if interactive else []),
+            ]
+        )
+    )
     tidy = pd.read_csv(tidy_path, low_memory=False)
     missing_columns = sorted(set(columns) - set(tidy.columns))
     if missing_columns:
         raise ValueError(f"Layered-scatter tidy table is missing columns: {missing_columns}.")
-    _validate_tidy_semantics(tidy, view=view)
+    _validate_tidy_semantics(tidy, view=view, interactive=interactive)
     tidy = tidy.loc[:, columns].copy()
     record_column = str(view["record_kind_column"])
     batch_column = str(view["batch_column"])
@@ -104,6 +113,7 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
         "rows": tidy,
         "view": dict(view),
         "runtime": dict(runtime),
+        "interactive": dict(interactive),
         "observed_batches": [{"id": value, "label": batch_labels[value]} for value in batch_ids],
     }
 
@@ -131,7 +141,12 @@ def _unique_observed_batch_labels(batch_ids: list[str]) -> dict[str, str]:
     }
 
 
-def _validate_tidy_semantics(rows: pd.DataFrame, *, view: Mapping[str, Any]) -> None:
+def _validate_tidy_semantics(
+    rows: pd.DataFrame,
+    *,
+    view: Mapping[str, Any],
+    interactive: Mapping[str, Any],
+) -> None:
     record_column = str(view["record_kind_column"])
     selected_column = str(view["selection_column"])
     batch_column = str(view["batch_column"])
@@ -148,12 +163,14 @@ def _validate_tidy_semantics(rows: pd.DataFrame, *, view: Mapping[str, Any]) -> 
         )
 
     numeric_columns = [str(view[key]) for key in ("x_column", "y_column", "color_column")]
+    if interactive:
+        numeric_columns.append(str(interactive["score_column"]))
     try:
         numeric = rows[numeric_columns].apply(pd.to_numeric, errors="raise").to_numpy(dtype=float)
     except (TypeError, ValueError) as exc:
-        raise ValueError("Layered-scatter x, y, and color columns require finite numeric values.") from exc
+        raise ValueError("Layered-scatter display coordinates and scores require finite numeric values.") from exc
     if not np.isfinite(numeric).all():
-        raise ValueError("Layered-scatter x, y, and color columns require finite numeric values.")
+        raise ValueError("Layered-scatter display coordinates and scores require finite numeric values.")
 
     selected = rows[selected_column]
     valid_selected = selected.map(lambda value: pd.isna(value) or isinstance(value, (bool, np.bool_)))
@@ -207,6 +224,34 @@ def _validate_runtime_semantics(runtime: Mapping[str, Any]) -> None:
     extend = str(color_scale.get("extend") or "neither")
     if extend not in {"neither", "both", "min", "max"}:
         raise ValueError("Layered-scatter color_scale.extend must be neither, both, min, or max.")
+
+
+def _interactive_spec(view: Mapping[str, Any]) -> Mapping[str, Any]:
+    raw = view.get("interactive")
+    if raw is None:
+        return {}
+    interactive = _mapping(raw)
+    required = {
+        "adapter",
+        "score_column",
+        "score_label",
+        "prediction_sample_limit",
+        "sampling_method",
+    }
+    if missing := sorted(required - set(interactive)):
+        raise ValueError(f"Layered-scatter interactive adapter is missing fields: {missing}.")
+    if extra := sorted(set(interactive) - required):
+        raise ValueError(f"Layered-scatter interactive adapter contains unsupported fields: {extra}.")
+    if interactive["adapter"] != "three_axis_scatter_v1":
+        raise ValueError(f"Unsupported layered-scatter interactive adapter: {interactive['adapter']!r}.")
+    if not str(interactive["score_column"]).strip() or not str(interactive["score_label"]).strip():
+        raise ValueError("Layered-scatter interactive score column and label must be non-empty.")
+    limit = interactive["prediction_sample_limit"]
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+        raise ValueError("Layered-scatter interactive prediction_sample_limit must be a positive integer.")
+    if interactive["sampling_method"] != "sha256_id_v1":
+        raise ValueError("Layered-scatter interactive sampling_method must be 'sha256_id_v1'.")
+    return interactive
 
 
 def _mapping(value: object) -> Mapping[str, Any]:

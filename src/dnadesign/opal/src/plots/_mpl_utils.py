@@ -615,6 +615,7 @@ def add_flush_colorbar(
     pad: float = 0.08,
     ticklabelsize: float | None = None,
     extend: str = "neither",
+    extendrect: bool = False,
 ):
     """Add a vertical colorbar whose top and bottom align with the target axes."""
 
@@ -632,7 +633,7 @@ def add_flush_colorbar(
     cax.set_in_layout(False)
     if extend not in {"neither", "both", "min", "max"}:
         raise ValueError(f"Unsupported colorbar extension: {extend!r}.")
-    cbar = fig.colorbar(mappable, cax=cax, extend=extend)
+    cbar = fig.colorbar(mappable, cax=cax, extend=extend, extendrect=extendrect)
     if label:
         cbar.set_label(label)
     if ticklabelsize is not None:

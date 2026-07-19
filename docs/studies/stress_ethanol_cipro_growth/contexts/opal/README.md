@@ -26,10 +26,10 @@ Use `../../routes/decision/opal/README.md` for first-hop OPAL routing and
   thresholded requirements diagnostic and frozen comparator evidence. RMF is
   not an executable stress campaign; its round-0 record remains in the
   metastudy.
-- [Multistate Response Behavior](multistate-response-behavior.md): threshold-free,
-  strictly directional active ranking objective; study-owned normalization,
-  uncertainty roles, greedy allocation, and prospective learning-evidence
-  boundary.
+- [MSRB study application](multistate-response-behavior.md): assay-specific
+  normalization, masks, uncertainty roles, greedy allocation, and prospective
+  learning-evidence boundary. Generic mathematics lives in the OPAL objective
+  contract linked from that page.
 - [DenseGen TFBS learnability probe v1](densegen-tfbs-learnability-probe-v1.md):
   study-owned v1 contract for scalar TF family content and slot-position
   synthetic-control campaigns. Realized profile boundaries live in the

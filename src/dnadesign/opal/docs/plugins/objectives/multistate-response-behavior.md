@@ -5,27 +5,23 @@ short_name: MSRB
 objective_id: multistate_response_behavior_v1
 owner: dnadesign-maintainers
 status: available
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 ---
 
 ## Multistate Response Behavior (MSRB) `multistate_response_behavior_v1`
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-18
+**Last verified:** 2026-07-19
 
-`multistate_response_behavior_v1` is a threshold-free OPAL objective. It ranks
-how consistently a candidate moves in the desired directions across a binary
-multistate target. It is not a feasibility test, a selector, a label contract,
-or a statement that synthesis is authorized.
+`multistate_response_behavior_v1` ranks candidates across any fixed set of
+named states partitioned into intended-ON and intended-OFF groups. It rewards
+stronger response ordering, intended-ON signal, and intended-OFF suppression
+without embedding biological pass/fail thresholds. `behavior_score` is a
+ranking score, not feasibility, a label, or synthesis authorization.
 
-The plugin contract is available for evaluation. This status does not activate
-it in any study campaign; campaign activation remains a study-owned decision.
-
-This page is the source of truth for the objective mathematics and output
-semantics. An assay service owns the measurements. A study owns the state
-meanings, target mask, assay-resolution scales, and decision to activate the
-objective. OPAL owns the equations and exposes their result to a configured
-selector.
+The upstream producer owns measurements. A study owns state meanings, target
+membership, resolution scales, and campaign activation. OPAL owns the equations
+and exposes `behavior_score` to a configured selector.
 
 ### At a glance
 
@@ -33,12 +29,52 @@ selector.
 | --- | --- |
 | Human short name | MSRB |
 | Objective identifier | `multistate_response_behavior_v1` |
-| Input | Ordered finite `[r(state...), b(state...)]` with width `2K` |
+| Input | Two values per state: ordered finite `[r(state...), b(state...)]` |
 | Selectable score | `behavior_score`, written $S_{\mathrm{MSRB}}$ |
 | Direction | Maximize |
-| Study inputs | Ordered state IDs, binary target mask, and two positive resolution scales |
+| Study inputs | Ordered state IDs, ON/OFF membership over `K` states, and two positive resolution scales |
 | Required diagnostics | Three family scores, hard bottleneck, limiting coordinate, compensation gap and bound, coordinate weights, and natural-zero status |
 | Uncertainty | None emitted; assay and model uncertainty remain separate evidence |
+
+### From a multistate phenotype to one score
+
+MSRB begins with two measured coordinates for each state:
+
+- $r_i$: the state-specific response coordinate; higher means a stronger
+  response; and
+- $b_i$: the state-specific signal relative to a same-state reference;
+  positive means above that reference and negative means below it.
+
+Let `K` mean the number of measured states. Because each state contributes one
+response value and one reference-relative signal value, the ordered phenotype
+has two times `K` values (`2 × K`, abbreviated `2K`):
+
+$$
+Y=[r_1,\ldots,r_K,b_1,\ldots,b_K].
+$$
+
+For four states, `2 × 4 = 8`, so this happens to be an eight-value phenotype:
+
+```text
+[r_A, r_B, r_C, r_D, b_A, b_B, b_C, b_D]
+```
+
+The width comes from the measured state panel. It is not fixed by MSRB. MSRB
+accepts any fixed `K >= 2` when every state is assigned to a nonempty
+intended-ON or intended-OFF set.
+
+The reduction to one score has four explicit stages:
+
+```text
+ordered phenotype with two values per state
+  -> assign states to intended ON or OFF
+  -> divide each desired difference by a declared resolution scale
+  -> summarize response ordering, ON signal, and OFF suppression separately
+  -> combine the three family scores into S_MSRB
+```
+
+Each stage remains observable. The scalar never replaces the input phenotype,
+three family scores, or weakest state-level requirement.
 
 ### When to use this objective
 
@@ -52,12 +88,13 @@ Use this objective when the desired behavior is:
 
 Use [Response-Magnitude Feasibility](response-magnitude-feasibility.md) when a
 study has explicit acceptance thresholds and needs a non-compensatory signed
-margin. The two objectives answer different questions. The behavior objective
-does not replace or reinterpret RMF records.
+margin. MSRB ranks threshold-free directional behavior; RMF measures signed
+clearance from explicit acceptance boundaries.
 
 ### Ordered input contract
 
-For `K >= 2` explicitly named states, the input has exactly `2K` columns:
+For `K >= 2` explicitly named states, the input has exactly two columns per
+state, or `2 × K` columns in total:
 
 ```text
 [r(state_1), ..., r(state_K), b(state_1), ..., b(state_K)]
@@ -69,14 +106,56 @@ For `K >= 2` explicitly named states, the input has exactly `2K` columns:
 - `target_mask` has one binary value per state and contains at least one ON and
   one OFF state.
 
-The objective does not require two factors or a complete factorial design. It
-uses only the ordered states and their ON/OFF membership. Jointly permuting the
-state IDs, response columns, signal columns, and mask leaves every score
-unchanged.
+Any fixed state panel is valid when the mask assigns at least one intended-ON
+and one intended-OFF member. `K` counts states, not experimental factors, and
+the states need not form a factorial panel. Jointly permuting state IDs,
+response columns, signal columns, and mask leaves every score unchanged.
 
-The objective does not choose an assay window, combine experimental repeats,
-resolve a reference, infer state identity, or attach treatment names. It also
-does not consume SFXI vec8 values.
+The `2K` contract begins after assay-window selection, repeat handling,
+reference resolution, state identification, and treatment annotation. MSRB v1
+uses binary ON/OFF membership over arbitrary fixed `K`. The measured values are
+continuous; only the target membership is binary.
+
+MSRB v1 does not represent partially ON targets, exact expression setpoints,
+ordinal preference graphs, or don't-care states. Those specifications require
+a separately named target contract and objective because they change what an
+improvement means. In particular, an exact setpoint objective must penalize
+overshoot and therefore cannot remain monotonic in every raw coordinate.
+
+### Why assay-resolution scales are needed
+
+An ON-minus-OFF response contrast and a same-state reference-relative signal
+coordinate may have different repeat precision even when both are recorded in
+log units. A raw change of `0.3` therefore need not carry the same evidential
+resolution in the two evidence types. The response scale $s_R$ is the study's
+declared resolution of one ON-minus-OFF response contrast. The signal scale
+$s_B$ is the declared resolution of one same-state $b_i$ coordinate.
+
+The study supplies two positive scales:
+
+$$
+s_R>0,\qquad s_B>0.
+$$
+
+Dividing by these scales expresses every desired change in assay-resolution
+units. The resulting signed value is called a normalized **clearance**. A
+clearance of `+1` means one declared resolution unit in a favorable direction;
+`-1` means one unit in an unfavorable direction. The scales balance
+measurement resolution, not biological importance.
+
+MSRB does not estimate or tune the scales. The study declares an evidence-based
+derivation and holds the resulting values constant for a ranking comparison.
+They are not biological pass thresholds or free preference weights. Changing a
+scale changes the objective's relative sensitivity and can change scores and
+ranks, which is why the values must not be adjusted after predictions or
+preferred candidates are inspected. The machine-readable protocol stores full
+precision so a rerun produces the same scores; explanatory prose should use
+readable rounded values.
+
+For example, if a response difference is `0.62` and the declared response scale
+is `0.31`, the normalized response clearance is about `+2`. The division says
+that the favorable difference spans about two assay-resolution units. It does
+not say that `0.31` is a biological goal or pass boundary.
 
 ### The three behavior families
 
@@ -86,17 +165,16 @@ $$
 O = \{i : p_i = 1\}, \qquad F = \{i : p_i = 0\}.
 $$
 
-The study supplies two strictly positive assay-resolution scales:
-
-$$
-s_R > 0, \qquad s_S > 0.
-$$
-
-They put response and reference-relative signal changes into comparable
-resolution units. They are not biological pass/fail thresholds and are not
-fitted by the objective.
+| Behavior being sought | Evidence used | Favorable change |
+| --- | --- | --- |
+| Correct state ordering | Every intended-ON response minus every intended-OFF response | ON response rises or OFF response falls |
+| Useful ON signal | Reference-relative signal in every intended-ON state | ON signal rises |
+| OFF signal suppression | Negative reference-relative signal in every intended-OFF state | OFF signal falls |
 
 #### 1. Response ordering
+
+Basic question: **Does the response rise in every state meant to be ON compared
+with every state meant to be OFF?**
 
 Every intended ON response is compared with every intended OFF response:
 
@@ -105,33 +183,47 @@ x^R_{ij} = \frac{r_i-r_j}{s_R},
 \qquad i \in O,\ j \in F.
 $$
 
-A positive value means that one ON response exceeds one OFF response. The full
-family contains `|O| x |F|` pairwise clearances, so no response state is dropped
-by an early minimum or maximum.
+A positive value means that one ON response exceeds one OFF response; a
+negative value means that pair is ordered the wrong way. The family retains all
+`|O| x |F|` pairs. Its smooth summary emphasizes weak pairs, but the summary can
+still be positive while one pair is reversed. The hard bottleneck and
+`all_reference_directions_met` diagnostic expose that case.
+
+Only between-state response differences matter. Adding the same constant to
+every $r_i$ leaves every response-ordering clearance and the final score
+unchanged. Absolute or reference-relative signal is represented by the aligned
+$b_i$ coordinates rather than by the common level of the $r_i$ values.
 
 #### 2. ON signal
+
+Basic question: **When the program should be ON, does it produce useful signal
+relative to the same-state reference?**
 
 Every intended ON state contributes:
 
 $$
-x^{ON}_i = \frac{b_i}{s_S},
+x^{ON}_i = \frac{b_i}{s_B},
 \qquad i \in O.
 $$
 
-A positive value means that the candidate has greater signal than its declared
-same-state reference.
+A positive value means greater signal than the reference; a negative value
+means lower signal. Every intended-ON state contributes independently.
 
 #### 3. OFF signal suppression
+
+Basic question: **When the program should be OFF, is unwanted signal suppressed
+relative to the same-state reference?**
 
 Every intended OFF state contributes:
 
 $$
-x^{OFF}_j = \frac{-b_j}{s_S},
+x^{OFF}_j = \frac{-b_j}{s_B},
 \qquad j \in F.
 $$
 
-A positive value means that the candidate has lower signal than its declared
-same-state reference. More negative `b_j` always improves the score.
+The minus sign turns lower measured signal into a favorable positive clearance.
+More negative `b_j` therefore always improves the score. Every intended-OFF
+state contributes independently.
 
 An additional scored `b_ON - b_OFF` family is intentionally absent. It would
 mostly count the ON-signal and OFF-signal-suppression evidence twice. Such a
@@ -139,28 +231,77 @@ contrast can be displayed as a diagnostic without changing the selector.
 
 ### Family-balanced smooth bottleneck
 
-For a family `G` with normalized clearances `x_c`, define its smooth bottleneck:
+Each family first reduces its state-level clearances to one family score. For a
+family `G` with normalized clearances `x_c`:
 
 $$
 S_G = -\log\left(\frac{1}{|G|}\sum_{c \in G}e^{-x_c}\right).
 $$
 
-The selection scalar gives the response, ON-signal, and OFF-signal-suppression
-families equal prior standing:
+This is a smooth minimum. The weakest clearances exert the most influence, but
+improving any clearance still raises the family score. If every clearance in a
+family equals `+1`, its family score is exactly `+1`.
+
+The three resulting family scores are:
+
+- $S_R$: response-ordering behavior;
+- $S_{ON}$: intended-ON signal; and
+- $S_{OFF}$: intended-OFF suppression.
+
+The final scalar applies the same smooth bottleneck to those three family
+scores with equal one-third standing:
 
 $$
 S_{\mathrm{MSRB}} = -\log\left[
 \frac{1}{3}\left(
-\frac{1}{|R|}\sum_{c \in R}e^{-x_c}
-+ \frac{1}{|ON|}\sum_{c \in ON}e^{-x_c}
-+ \frac{1}{|OFF|}\sum_{c \in OFF}e^{-x_c}
+e^{-S_R}+e^{-S_{ON}}+e^{-S_{OFF}}
 \right)\right].
 $$
 
-The temperature is fixed at one normalized resolution unit. There is no
-objective parameter for temperature. A study must freeze the two resolution
-scales before comparing candidates; it must not tune the scales or an implicit
-temperature to preserve preferred nominations.
+Higher $S_{\mathrm{MSRB}}$ is better. The score stays close to a weak family
+without discarding improvements in the other two. It is not an average that
+allows one arbitrarily strong family to dominate without bound, and it is not a
+hard minimum that ignores every nonlimiting improvement.
+
+### One complete four-state example
+
+This neutral example uses states `A`, `B`, `C`, and `D`. States `B` and `D` are
+intended ON; states `A` and `C` are intended OFF. Both resolution scales are
+set to `1` only to keep the arithmetic readable.
+
+The input phenotype is:
+
+```text
+Y = [0, 2, 1, 3, -1, 2, -2, 1]
+    [rA rB rC rD  bA bB  bC bD]
+```
+
+The state-level clearances are:
+
+- response ordering: `[rB-rA, rB-rC, rD-rA, rD-rC] = [2, 1, 3, 2]`;
+- intended-ON signal: `[bB, bD] = [2, 1]`; and
+- intended-OFF suppression: `[-bA, -bC] = [1, 2]`.
+
+Applying the smooth minimum within each family gives:
+
+$$
+S_R=1.760,\qquad S_{ON}=1.380,\qquad S_{OFF}=1.380.
+$$
+
+Applying the same family-balanced smooth minimum once more gives:
+
+$$
+S_{\mathrm{MSRB}}=1.491.
+$$
+
+The weakest individual clearance is `+1`. The final score is higher because
+the remaining coordinates are stronger, but their influence is bounded. These
+numbers are ranking evidence in resolution units; `1.491` is not a pass grade.
+
+One normalized resolution unit fixes the smoothness convention; there is no
+free temperature parameter. The study must declare its resolution scales and
+hold them constant during ranking rather than adjust them to preserve preferred
+candidates.
 
 Family means matter. Weighting each coordinate equally would give response
 pairs or the larger mask partition more influence merely because they contain
@@ -249,6 +390,23 @@ Zero on an axis or color scale is a reference direction. It is not a pass
 boundary, and the upper-right-red region does not by itself establish
 feasibility or measured performance.
 
+An optional interactive view places the same three family scores on the x, y,
+and z axes. It uses color and marker shape only to distinguish prediction,
+selection, and observed-evidence roles; a fourth continuous color scale would
+repeat information already carried by the z-axis. The 3D view is an inspection
+aid, not the publication artifact. It may deterministically sample the large
+background prediction pool for browser performance, but it must retain every
+selected and observed row and disclose the sample. The complete 2D figure and
+tidy ledger remain authoritative.
+
+The selector maximizes the smooth bottleneck of all three family scores, not
+Euclidean distance toward a plot corner. A selected point can therefore be
+slightly less rightward or less high than another point when it has materially
+better OFF suppression. Campaign-wide sequence deduplication can also move a
+view to its next-best unallocated candidate. Hover values and the selected
+candidate's three family scores are the accurate explanation of a rank; visual
+distance in one projection is not.
+
 If a campaign pins a robust color extent, values outside that display extent
 must remain in the plot and evidence table, the colorbar must mark its saturated
 end or ends, and the caption must state the policy. Color saturation is a
@@ -274,22 +432,21 @@ more than this finite amount above the weakest clearance. The plugin reports
 weight, and its candidate-specific bottleneck weight so reviewers can see that
 tradeoff directly.
 
-### Worked score examples
+### Boundary examples
 
 These examples use unit resolution scales. They demonstrate the equation and
 are not biological acceptance criteria.
 
-- If every normalized clearance equals `+1`, every family score, the hard
-  bottleneck, and $S_{\mathrm{MSRB}}$ equal `+1`.
 - If the response family is `+1`, the ON-signal family is `+100`, and the
   OFF-suppression family is `-1`, then $S_{\mathrm{MSRB}}\approx-0.028$.
-  Arbitrarily favorable ON signal does not erase the OFF leak or outrank the
-  balanced candidate.
+  Arbitrarily favorable ON signal does not erase the OFF leak. A balanced
+  candidate with family scores `[+1, +1, +1]` scores exactly `+1` and therefore
+  ranks higher than `[+1, +100, -1]`.
 - Starting from all-zero coordinates, making one coordinate with prior weight
   $w$ arbitrarily favorable raises the score only toward $-\log(1-w)$. The
   favorable outlier has finite influence.
 - A positive `behavior_score` can coexist with a negative hard bottleneck.
-  This example prevents the scalar from being read as feasibility.
+  Therefore, a positive score is not evidence of feasibility.
 
 ### Natural zero is not feasibility
 
@@ -308,22 +465,20 @@ synthesis readiness.
 
 ### Same-state reference claim boundary
 
-The generic objective receives `b_i`; it does not know the reference's
-biological identity or how an assay aggregates replicates. Let
-$\bar{F}_{design,i}$ and $\bar{F}_{reference,i}$ denote the assay-owned reduced
-replicate aggregates for one state. The reference-relative coordinate is:
+MSRB receives a signed same-state reference-relative coordinate $b_i$. The
+upstream data contract owns the reference identity and reduction. Let
+$\bar{F}_{design,i}$ and $\bar{F}_{reference,i}$ denote the upstream reduced
+values for one state. Then:
 
 $$
 b_i = \bar{F}_{design,i}-\bar{F}_{reference,i}.
 $$
 
-In the stress promoter study, each $\bar{F}$ is a replicate median of a
-well-level geometric log mean of $YFP/OD600$, and the declared reference is
-pDual-10. There, `b_i = -3` means that the design's reduced fluorescence is
-eightfold lower than pDual-10 in the same measured state. The defensible claim
-is therefore "OFF suppression relative to same-state pDual-10." pDual-10 does
-not measure reporter background or prove absolute non-expression. No objective
-can recover an unmeasured background reference.
+`b_i = 0` denotes equality to the reference, positive values denote greater
+signal, and negative values denote lower signal. For a log2 coordinate,
+`b_i = -3` means eightfold lower signal than the reference in state $i$. This
+supports relative suppression only; it cannot establish background or absolute
+non-expression.
 
 ### Output contract
 
@@ -360,15 +515,15 @@ through the public mathematics API for study-owned evidence tables and plots.
 transforms_y:
   name: vector_from_table_v1
   params:
-    value_columns: [r00, r10, r01, r11, b00, b10, b01, b11]
+    value_columns: [r_state_a, r_state_b, r_state_c, b_state_a, b_state_b, b_state_c]
 
 selection_views:
-  - id: factor_a
+  - id: profile_1
     objective:
       name: multistate_response_behavior_v1
       params:
-        state_ids: ["00", "10", "01", "11"]
-        target_mask: [0, 1, 0, 1]
+        state_ids: [state_a, state_b, state_c]
+        target_mask: [0, 1, 0]
         normalization:
           response_scale: <positive study-issued assay-resolution scale>
           signal_scale: <positive study-issued assay-resolution scale>
@@ -382,16 +537,15 @@ selection_views:
         require_exact_top_k: true
 ```
 
-This example documents the executable contract. Adding the objective to a
-campaign config is a separate study decision. The built-in plugin does not
-activate or migrate a campaign.
+The configuration binds one target mask to one selection view. Normalization
+and campaign activation remain study-owned.
 
 ### Uncertainty and fail-fast behavior
 
-The objective consumes point estimates and emits no uncertainty channel.
-Reader bootstrap draws, event-time bounds, repeated experiments, censoring,
-and model refits must be evaluated as separate evidence rather than folded into
-the eight-value input or treated as a probabilistic standard deviation.
+The objective consumes point estimates and emits no uncertainty channel. Assay
+bootstrap draws, event-time bounds, repeated observations, censoring, and model
+refits remain separate evidence. They are neither appended to the `2K`
+point-estimate input nor treated as one probabilistic standard deviation.
 
 The objective rejects:
 
@@ -407,7 +561,7 @@ this affects only arithmetic extremes far outside assay-resolution inputs.
 
 ### Plot and review contract
 
-Generic OPAL review surfaces include:
+OPAL review surfaces for MSRB include:
 
 - `multistate_response_behavior_frontier` for the three family scores;
 - `multistate_response_behavior_selected_decomposition` for every coordinate,
@@ -416,10 +570,10 @@ Generic OPAL review surfaces include:
 - `vector_summary_heatmap` for the objective-neutral predicted phenotype; and
 - `observed_objective_over_rounds` once multiple measured rounds exist.
 
-The family landscape's selected and observed annotation layers are campaign-scoped.
-Neither the plots nor the objective reconstruct Reader evidence or candidate
-identity. Study-issued Reader composites and BaseRender sequence annotations
-remain digest-verified evidence displayed through their public contracts.
+Annotation layers are scoped by campaign, run, round, and view. Neither the
+objective nor its plots infer upstream assay evidence, candidate identity, or
+sequence annotations. External evidence is displayed only through explicitly
+configured, verified contracts.
 
 ### Source map
 
@@ -431,5 +585,5 @@ remain digest-verified evidence displayed through their public contracts.
 - Parameter schema: `src/dnadesign/opal/src/config/plugin_schemas.py`
 - Objective tests:
   `src/dnadesign/opal/tests/objectives/test_objective_multistate_response_behavior_v1.py`
-- Stress-study end-to-end example:
+- Study application example:
   `docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md`

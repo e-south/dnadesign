@@ -110,7 +110,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             edgecolors="#111111",
             linewidths=1.1,
             label=_legend_label(f"Selected (n={len(selected)})"),
-            zorder=4,
+            zorder=7,
         )
     batch_labels = {str(item["id"]): str(item["label"]) for item in contract["observed_batches"]}
     observed_batch_ids = observed[batch_column].astype(str)
@@ -134,7 +134,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             edgecolors="#111111",
             linewidths=0.8,
             label=_legend_label(f"Observed · {compact_batch_label(batch_id)} (n={len(batch)})"),
-            zorder=3,
+            zorder=7,
         )
     reference_lines = _mapping(runtime["reference_lines"])
     _draw_reference_lines(ax, reference_lines.get("x"), axis="x")
@@ -186,6 +186,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         pad=0.065,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
         extend=colorbar_extend,
+        extendrect=True,
     )
     colorbar.ax.yaxis.label.set_size(NOTEBOOK_COLORBAR_LABEL_FONTSIZE)
     colorbar.ax.yaxis.set_label_position("left")

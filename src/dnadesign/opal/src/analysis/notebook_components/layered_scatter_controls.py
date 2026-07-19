@@ -24,7 +24,7 @@ def build_notebook_layered_scatter_controls(
     """Build persistent widgets for one manifest-declared layered scatter."""
 
     if contract is None:
-        return {key: None for key in ("prediction_pool", "selected", "observed_batches", "labels")}
+        return {key: None for key in ("figure", "prediction_pool", "selected", "observed_batches", "labels")}
     key = str(contract["key"])
     remembered = dict(dict(memory()).get(key) or {})
 
@@ -49,7 +49,27 @@ def build_notebook_layered_scatter_controls(
     }
     remembered_scope = str(remembered.get("label_scope", "none"))
     label_key = next((label for label, value in label_options.items() if value == remembered_scope), "No labels")
+    interactive = bool(contract.get("interactive"))
+    figure_options = {
+        "2D publication figure": "publication_2d",
+        "3D interactive inspector": "interactive_3d",
+    }
+    remembered_figure = str(remembered.get("figure", "publication_2d"))
+    figure_key = next(
+        (label for label, value in figure_options.items() if value == remembered_figure),
+        "2D publication figure",
+    )
     return {
+        "figure": (
+            mo.ui.dropdown(
+                figure_options,
+                value=figure_key,
+                label="Figure",
+                on_change=lambda value: remember("figure", str(value)),
+            )
+            if interactive
+            else None
+        ),
         "prediction_pool": mo.ui.switch(
             value=bool(remembered.get("show_prediction_pool", True)),
             label="Prediction pool",
@@ -69,7 +89,7 @@ def build_notebook_layered_scatter_controls(
         "labels": mo.ui.dropdown(
             label_options,
             value=label_key,
-            label="Labels",
+            label="2D annotations" if interactive else "Labels",
             on_change=lambda value: remember("label_scope", str(value)),
         ),
     }
@@ -80,7 +100,9 @@ def read_notebook_layered_scatter_state(controls: Mapping[str, Any]) -> dict[str
 
     if not controls or controls.get("prediction_pool") is None:
         return None
+    figure = controls.get("figure")
     return {
+        "figure": str(figure.value) if figure is not None else "publication_2d",
         "show_prediction_pool": bool(controls["prediction_pool"].value),
         "show_selected": bool(controls["selected"].value),
         "observed_batches": [str(value) for value in controls["observed_batches"].value],

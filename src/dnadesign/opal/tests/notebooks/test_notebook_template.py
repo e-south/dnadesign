@@ -780,6 +780,61 @@ def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -
     assert "Sequence and selection evidence" in panel["items"][1]["items"]
 
 
+def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> None:
+    class _FakeMo:
+        def md(self, text: str) -> dict[str, object]:
+            return {"kind": "md", "text": text}
+
+        def image(self, data: bytes, **kwargs: object) -> dict[str, object]:
+            return {"kind": "image", "data": data, **kwargs}
+
+        def vstack(self, items: list[object], *, gap: float) -> dict[str, object]:
+            return {"kind": "vstack", "items": items, "gap": gap}
+
+        def hstack(self, items: list[object], **kwargs: object) -> dict[str, object]:
+            return {"kind": "hstack", "items": items, **kwargs}
+
+        def accordion(self, items: dict[str, object], **kwargs: object) -> dict[str, object]:
+            return {"kind": "accordion", "items": items, **kwargs}
+
+        def callout(self, item: object, **kwargs: object) -> dict[str, object]:
+            return {"kind": "callout", "item": item, **kwargs}
+
+    selector = {"kind": "selected-candidate-selector"}
+    panel = render_notebook_visual_panel(
+        active_view_mode="Campaign",
+        baserender_record_id="candidate-record-alpha-with-long-id",
+        baserender_record_row={"id": "candidate-record-alpha-with-long-id", "sequence": "ACGT"},
+        baserender_record_selector=selector,
+        build_notebook_plot_card_rows=lambda _: [],
+        build_notebook_plot_method_sections=lambda _: {},
+        control_surface="external",
+        layered_scatter_contract={"interactive": {"adapter": "three_axis_scatter_v1"}},
+        mo=_FakeMo(),
+        opal_table=lambda *_, **__: {"kind": "table"},
+        pl=pl,
+        plot_view_state={"figure": "interactive_3d"},
+        render_notebook_baserender_record=lambda *_: {
+            "record_id": "candidate-record-alpha-with-long-id",
+            "image_bytes": b"png",
+            "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
+            "alt_text": "DenseGen TFBS annotation",
+        },
+        render_notebook_plot_choice_image=lambda *_, **__: {"kind": "three-axis-plot"},
+        selected_campaign_baserender_contract={"available": True},
+        selected_visual_choice={"surface_kind": "plot", "label": "MSRB family landscape"},
+        select_notebook_plot_scope=lambda choice, _scope: choice,
+    )
+
+    assert panel["items"][0] == {"kind": "three-axis-plot"}
+    companion = panel["items"][1]
+    assert companion["items"][0]["items"] == [selector]
+    sequence = companion["items"][2]
+    assert "candidate-re...-long-id" in sequence["items"][0]["text"]
+    assert "competition rank" not in sequence["items"][0]["text"]
+    assert sequence["items"][1]["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
+
+
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
 
@@ -1570,6 +1625,7 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert "missing_outputs=2" in no_plot_rows["plot state"]
     assert "do not draw visual or biological conclusions" in no_plot_rows["evidence boundary"]
     assert "uv run opal plot -c campaign.yaml --round all" in no_plot_rows["next commands"]
+    assert "opal review" not in no_plot_rows["next commands"]
 
     card_rows = build_notebook_plot_card_rows(visual_surface["choices"][0])
     assert {"field": "media", "value": "plots/score.png"} in card_rows

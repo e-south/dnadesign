@@ -153,6 +153,14 @@ from .selection_overlap import (
     render_notebook_campaign_set_selection_overlap_image,
 )
 from .selection_views import build_notebook_selection_view_options, resolve_notebook_selection_view
+from .three_axis_scatter import (
+    THREE_AXIS_INTERACTIVE_MODE,
+    THREE_AXIS_PUBLICATION_MODE,
+    THREE_AXIS_SCATTER_ADAPTER,
+    build_notebook_three_axis_scatter_figure,
+    render_notebook_three_axis_scatter,
+    sample_notebook_three_axis_rows,
+)
 from .trust import (
     build_notebook_distrust_lines,
     build_notebook_distrust_rows,
@@ -173,11 +181,15 @@ from .zoomable_visual import render_notebook_zoomable_image
 __all__ = [
     "CAMPAIGN_SET_SELECTION_OVERLAP_SURFACE_KIND",
     "SELECTION_BATCH_SURFACE_KIND",
+    "THREE_AXIS_INTERACTIVE_MODE",
+    "THREE_AXIS_PUBLICATION_MODE",
+    "THREE_AXIS_SCATTER_ADAPTER",
     "annotate_notebook_visual_choices",
     "build_notebook_artifact_garden_lines",
     "build_notebook_artifact_garden_rows",
     "build_notebook_artifact_garden_summary_rows",
     "build_notebook_at_a_glance_rows",
+    "build_notebook_three_axis_scatter_figure",
     "build_notebook_baserender_label_rows",
     "build_notebook_baserender_contract",
     "build_notebook_baserender_contract_rows",
@@ -273,6 +285,7 @@ __all__ = [
     "render_notebook_campaign_set_selection_overlap_image",
     "render_notebook_visual_panel",
     "render_notebook_zoomable_image",
+    "render_notebook_three_axis_scatter",
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "resolve_notebook_baserender_selection_view_id",
@@ -281,5 +294,6 @@ __all__ = [
     "resolve_notebook_baserender_preferred_record_id",
     "resolve_notebook_baserender_campaign_model",
     "select_notebook_baserender_default_record_id",
+    "sample_notebook_three_axis_rows",
     "select_notebook_plot_scope",
 ]

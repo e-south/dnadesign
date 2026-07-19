@@ -187,7 +187,7 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
         "generic_objective_source_of_truth": Path(
             "src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md"
         ),
-        "study_source_of_truth": Path(
+        "study_application_contract": Path(
             "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md"
         ),
         "active_study_protocol": protocol_path,
@@ -226,28 +226,69 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
     assert mismatches == {}
 
 
-def test_msrb_study_source_of_truth_covers_the_complete_evidence_path() -> None:
+def test_msrb_study_application_covers_the_complete_evidence_path() -> None:
     path = Path("docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md")
     text = path.read_text(encoding="utf-8")
 
     for required in (
         "Multistate Response Behavior (MSRB)",
+        "### Scope of this study application",
+        "The model predicts the phenotype, not an MSRB scalar.",
         "## End-to-end evidence path",
         "### 1. Reader response-window reduction",
         "### 2. Within-experiment replicate handling",
         "### 3. Study-owned repeat adjudication and label promotion",
-        "### 4. The eight-value phenotype",
+        "### 4. The current four-state response-window phenotype",
         "[r00, r10, r01, r11, b00, b10, b01, b11]",
         "### 5. Sequence-to-phenotype prediction",
         "### 6. MSRB scoring",
-        "unique unordered union",
-        "500 joint Reader bootstrap draws",
+        "Rounded value",
+        "500 joint bootstrap draws",
         "### 7. Greedy allocation and prospective measurement",
-        "## Compensation boundary and anti-collapse evidence",
+        "### Applied controls and promotion evidence",
         "## Uncertainty and censoring",
+        "practical no-go outcome",
+        "rectangular colorbar",
         "## Claim boundaries",
     ):
         assert required in text
+    assert all(line.strip() != "-" for line in text.splitlines())
+
+
+def test_generic_msrb_source_of_truth_is_k_state_and_assay_neutral() -> None:
+    path = Path("src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md")
+    text = path.read_text(encoding="utf-8")
+    normalized = " ".join(text.split())
+
+    for required in (
+        "### From a multistate phenotype to one score",
+        "For four states, `2 × 4 = 8`, so this happens to be an eight-value phenotype",
+        "The width comes from the measured state panel. It is not fixed by MSRB.",
+        "`K` counts states, not experimental factors",
+        "### Why assay-resolution scales are needed",
+        "The scales balance measurement resolution, not biological importance.",
+        "Basic question:",
+        "The final scalar applies the same smooth bottleneck",
+        "### One complete four-state example",
+        "the summary can still be positive while one pair is reversed",
+        "point-estimate input",
+        "state_ids: [state_a, state_b, state_c]",
+    ):
+        assert required in normalized
+    assert "MSRB v1 does not represent partially ON targets, exact expression setpoints" in normalized
+    assert 'state_ids: ["00", "10", "01", "11"]' not in text
+    assert "pDual-10" not in text
+    assert "Reader bootstrap" not in text
+
+
+def test_response_window_observation_operator_docs_do_not_route_to_moving_reader_output() -> None:
+    path = STUDY_ROOT / "response_window_observations" / "README.md"
+    text = path.read_text(encoding="utf-8")
+
+    assert "response_window_observations/4_8h_v1" in text
+    assert "source_manifests.reader_bundle_sha256" in text
+    assert "--allowed-root" in text
+    assert "stress_response_window/latest" not in text
 
 
 def test_sfxi_source_evidence_root_is_study_owned() -> None:
