@@ -58,7 +58,13 @@ def collect_changed_files(
     if not _git_ref_exists(repo_root=repo_root, ref_name=tracking_ref):
         _run_git(
             repo_root=repo_root,
-            args=["fetch", "--no-tags", "--depth=1", remote, base_ref],
+            args=[
+                "fetch",
+                "--no-tags",
+                "--depth=1",
+                remote,
+                f"refs/heads/{base_ref}:refs/remotes/{tracking_ref}",
+            ],
             context="git fetch failed",
         )
     diff_output = _run_git(
