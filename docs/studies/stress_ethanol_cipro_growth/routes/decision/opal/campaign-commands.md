@@ -66,7 +66,7 @@ and prediction artifacts, declared MSRB diagnostics, and zero mismatches. The
 profile exposes the mask, normalization, score direction, and family scores.
 Passing these checks establishes artifact integrity, not biological validity.
 
-### Notebook generation and live review (writes or serves artifacts)
+### Notebook generation and live review: commands write or serve notebook artifacts
 
 ```bash
 CONFIG=src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
