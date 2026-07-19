@@ -2032,13 +2032,15 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     assert "render_notebook_baserender_record" in text
     assert "render_notebook_visual_panel(" in text
     assert render_notebook_visual_panel.__module__.endswith(".notebook_components.visual_panel")
-    helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/visual_panel.py").read_text()
+    baserender_helper_text = Path(
+        "src/dnadesign/opal/src/analysis/notebook_components/visual_panel_baserender.py"
+    ).read_text()
     collection_helper_text = Path(
         "src/dnadesign/opal/src/analysis/notebook_components/visual_panel_collection.py"
     ).read_text()
-    assert '"width": "100%"' in helper_text
-    assert '"background-color": "#FFFFFF"' in helper_text
-    assert "Sequence and selection evidence" in helper_text
+    assert '"width": "100%"' in baserender_helper_text
+    assert '"background-color": "#FFFFFF"' in baserender_helper_text
+    assert "Sequence and selection evidence" in baserender_helper_text
     assert "Collection plot evidence" in collection_helper_text
     assert "densegen__used_tfbs_detail" not in text
     ast.parse(text)
