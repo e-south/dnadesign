@@ -233,6 +233,7 @@ class SequenceRowsRenderer:
             ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
         ax._dnadesign_record_meta = record.meta
+        ax._dnadesign_sequence_center_y = (float(layout.y_forward) + float(layout.y_reverse)) / 2.0
 
         x0 = layout.x_left
         _draw_span_backdrops(ax, layout, span_backdrops, show_two=show_two)
@@ -388,7 +389,7 @@ class SequenceRowsRenderer:
         if style.legend and legend_mode == "bottom":
             from .legend import legend_entries_for_record
 
-            _draw_legend(ax, legend_entries_for_record(record), palette, style, layout.width)
+            _draw_legend(ax, legend_entries_for_record(record), palette, style, layout)
 
         if record.display.overlay_text:
             _draw_overlay(ax, layout, style, record.display.overlay_text)
@@ -1094,6 +1095,18 @@ def _actual_content_top(layout: LayoutContext) -> float:
     return float(top)
 
 
+def _actual_content_bottom(layout: LayoutContext) -> float:
+    bottom = min(
+        float(layout.y_forward - layout.sequence_extent_down),
+        float(layout.y_reverse - layout.sequence_extent_down),
+    )
+    for placement in layout.placements:
+        bottom = min(bottom, float(placement.y - (placement.h / 2.0)))
+    for y0 in layout.motif_logo_y0_by_effect.values():
+        bottom = min(bottom, float(y0))
+    return float(bottom)
+
+
 def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
     align = str(style.overlay_align).lower()
     if align == "center":
@@ -1112,16 +1125,24 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         else max(float(style.font_size_label), float(style.font_size_seq))
     )
     title_lines = max(1, len([line for line in str(text).splitlines() if line.strip()]))
-    title_line_height = max((title_size / 72.0 * style.dpi) * 1.05, layout.ch * 0.5)
-    title_block_height = title_line_height * title_lines
-    min_overlay_y = _actual_content_top(layout) + title_block_height + max(4.0, style.font_size_label * 0.25)
-    overlay_y = (
-        layout.height
-        - max(4.0, style.padding_y * 0.5)
-        - synthetic_top_pad
-        - max(0.0, float(style.overlay_title_gap_reduction_px))
+    coordinate_scale = max(1.0e-6, float(style.figure_scale))
+    title_line_height = max(
+        ((title_size / 72.0 * style.dpi) * 1.05) / coordinate_scale,
+        layout.ch * 0.5,
     )
-    overlay_y = max(min_overlay_y, overlay_y)
+    title_block_height = title_line_height * title_lines
+    title_gap = max(4.0, style.font_size_label * 0.25) / coordinate_scale
+    min_overlay_y = _actual_content_top(layout) + title_block_height + title_gap
+    if str(style.overlay_vertical_anchor).lower() == "content_top":
+        overlay_y = min_overlay_y
+    else:
+        overlay_y = (
+            layout.height
+            - max(4.0, style.padding_y * 0.5)
+            - synthetic_top_pad
+            - max(0.0, float(style.overlay_title_gap_reduction_px))
+        )
+        overlay_y = max(min_overlay_y, overlay_y)
     ax.text(
         x,
         overlay_y,
@@ -2296,7 +2317,13 @@ def _text_px_width(text: str, family: str, size_pt: int, dpi: int) -> float:
     return bbox.width / 72.0 * dpi
 
 
-def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style: Style, total_width: float) -> None:
+def _draw_legend(
+    ax,
+    legend: Sequence[tuple[str, str]],
+    palette: Palette,
+    style: Style,
+    layout: LayoutContext,
+) -> None:
     if not legend:
         return
 
@@ -2311,7 +2338,8 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         if bool(style.uniform_display_font_size)
         else float(style.padding_x)
     )
-    available_width = max(0.0, float(total_width) - (2.0 * side_pad))
+    total_width = float(layout.width)
+    available_width = max(0.0, total_width - (2.0 * side_pad))
     if available_width <= 0.0:
         return
 
@@ -2498,7 +2526,12 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         ) = selected_layout
 
     total_rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap_y)
-    y = style.legend_origin_y(total_rows_height=total_rows_height)
+    if style.legend_content_gap_px is None:
+        y = style.legend_origin_y(total_rows_height=total_rows_height)
+    else:
+        content_gap = _to_layout_units(float(style.legend_content_gap_px))
+        minimum_y = _to_layout_units(max(4.0, float(style.legend_pad_px)))
+        y = max(minimum_y, _actual_content_bottom(layout) - content_gap - total_rows_height)
     for row in rows:
         row_total = sum(entry_widths[idx] for idx in row)
         if len(row) > 1:

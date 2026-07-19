@@ -110,6 +110,7 @@ def test_public_sequence_panel_contract_renders_image() -> None:
     assert result.diagnostics.contract_id == "dnadesign.baserender.sequence_panel.v1"
     assert result.diagnostics.style_profile == "promoter_compact_slide.v1"
     assert result.diagnostics.strand_count == 2
+    assert result.diagnostics.strand_center_y_px == pytest.approx(70.0, abs=1.0)
 
 
 def test_public_sequence_panel_contract_uses_white_canvas_under_dark_rc() -> None:
@@ -224,6 +225,9 @@ def test_public_sequence_panel_contract_renders_usr_genbank_image() -> None:
     assert result.diagnostics.adapter_kind == "usr_genbank_annotations_v1"
     assert result.diagnostics.feature_count == 4
     assert result.diagnostics.strand_count == 2
+    assert result.diagnostics.strand_center_y_px == pytest.approx(70.0, abs=1.0)
+    assert result.diagnostics.title is None
+    assert result.diagnostics.record_label == "demoP"
 
 
 def test_public_sequence_panel_contract_rejects_invalid_profile_and_adapter() -> None:
