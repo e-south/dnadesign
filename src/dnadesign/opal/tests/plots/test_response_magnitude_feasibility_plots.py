@@ -617,6 +617,35 @@ def test_candidate_display_aliases_use_only_projected_labels_then_short_ids(tmp_
     assert all("__" not in value for value in aliases.values())
 
 
+def test_candidate_display_aliases_treat_pandas_missing_primary_as_null(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records_path = tmp_path / "records.parquet"
+    pl.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "usr_label__primary": [None],
+            "usr_label__aliases": [["Candidate A"]],
+        }
+    ).write_parquet(records_path)
+    monkeypatch.setattr(
+        pd,
+        "read_parquet",
+        lambda *_args, **_kwargs: pd.DataFrame(
+            {
+                "id": ["candidate-a"],
+                "usr_label__primary": pd.Series([pd.NA], dtype="string"),
+                "usr_label__aliases": [["Candidate A"]],
+            }
+        ),
+    )
+
+    aliases = resolve_candidate_display_aliases(records_path, ["candidate-a"])
+
+    assert aliases == {"candidate-a": "Candidate A"}
+
+
 def test_candidate_display_aliases_disambiguate_shared_id_prefixes(tmp_path: Path) -> None:
     records_path = tmp_path / "records.parquet"
     pl.DataFrame(

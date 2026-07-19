@@ -323,7 +323,7 @@ def _spread_centers(
 
 
 def _aliases(value: object) -> tuple[str, ...]:
-    if value is None or (isinstance(value, float) and np.isnan(value)):
+    if _is_missing_scalar(value):
         return ()
     if isinstance(value, np.ndarray):
         value = value.tolist()
@@ -333,12 +333,17 @@ def _aliases(value: object) -> tuple[str, ...]:
 
 
 def _clean_text(value: object) -> str | None:
-    if value is None or (isinstance(value, float) and np.isnan(value)):
+    if _is_missing_scalar(value):
         return None
     text = " ".join(str(value).split()).strip()
     if not text:
         return None
     return text if len(text) <= 36 else f"{text[:35].rstrip()}…"
+
+
+def _is_missing_scalar(value: object) -> bool:
+    missing = pd.isna(value)
+    return isinstance(missing, (bool, np.bool_)) and bool(missing)
 
 
 def _required_id(value: object) -> str:
