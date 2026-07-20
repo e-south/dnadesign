@@ -1,4 +1,13 @@
-"""Publication-type contracts for the MSRB shadow evidence figures."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/response_metastudy/test_multistate_behavior_plot_typography.py
+
+Publication-type contracts for the MSRB shadow evidence figures.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

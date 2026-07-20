@@ -1,4 +1,13 @@
-"""Publication typography and export for MSRB shadow figures."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/reporting/multistate_behavior_plot_style.py
+
+Publication typography and export for MSRB shadow figures.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

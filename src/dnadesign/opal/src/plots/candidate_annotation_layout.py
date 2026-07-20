@@ -1,4 +1,13 @@
-"""Collision-safe layout for candidate labels inside Matplotlib axes."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/plots/candidate_annotation_layout.py
+
+Collision-safe layout for candidate labels inside Matplotlib axes.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

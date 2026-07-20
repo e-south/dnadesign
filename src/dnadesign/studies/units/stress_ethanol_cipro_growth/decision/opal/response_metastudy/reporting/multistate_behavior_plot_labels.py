@@ -1,4 +1,13 @@
-"""Stable view and coordinate labels for MSRB shadow figures."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/reporting/multistate_behavior_plot_labels.py
+
+Stable view and coordinate labels for MSRB shadow figures.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
