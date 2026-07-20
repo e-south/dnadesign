@@ -29,7 +29,7 @@ ownership:
 data:
   location:
     kind: usr
-    path: "../../../../../../../../usr/datasets"
+    path: "../../../../../../../usr/datasets"
     dataset: usr_prom_eth_cip_opal_candidates
   x_column_name: "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
   y_column_name: "opal__secg_rmf_greedy__response_window_y"
