@@ -190,12 +190,12 @@
       {
         "role": "generic_objective_definition",
         "path": "src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md",
-      "sha256": "1616adfb10b382884b231d9df7d9907bdf8b40df76cf081494a0d579f8ed8832"
+        "sha256": "8a789527a4c42c1070b550edee2b78bd373a3e0e2496bb093bea694545c7380b"
       },
       {
         "role": "study_binding",
         "path": "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md",
-      "sha256": "3ec84bfc4cc8f8e20bcfce3cff6de81a34bdbd159dd71b06130a5c819c179785"
+        "sha256": "4128cef7a913aa0b57747692bac8125cea0d13d2e8ecd5dea8688d2b6cff2798"
       },
       {
         "role": "active_study_protocol",
@@ -220,7 +220,7 @@
       {
         "role": "active_campaign_plot_config",
         "path": "src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/plots.yaml",
-        "sha256": "3221afa8cc905c3ceaa6832dba53b0bf7e5cc7642d33b8af380ab0c76b17650d"
+        "sha256": "55b22a11b57bd04a21d0cc4340ab2dccdb2f42b94663d994be839b7f243d7413"
       },
       {
         "role": "activation_receipt_verifier",
