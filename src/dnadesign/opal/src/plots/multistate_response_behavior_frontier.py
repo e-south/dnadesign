@@ -25,7 +25,6 @@ from ._mpl_utils import (
     NOTEBOOK_COLORBAR_LABEL_FONTSIZE,
     NOTEBOOK_LEGEND_FONTSIZE,
     NOTEBOOK_TICK_FONTSIZE,
-    NOTEBOOK_TITLE_FONTSIZE,
     SIGNED_MARGIN_CMAP,
     add_flush_colorbar,
     apply_notebook_axes_style,
@@ -34,6 +33,7 @@ from ._mpl_utils import (
     ensure_mpl_config_dir,
     observed_batch_marker_map,
     scatter_smart,
+    set_notebook_title,
     wrap_plot_title,
 )
 from .candidate_annotations import (
@@ -62,7 +62,10 @@ from .multistate_response_behavior_support import (
 )
 
 KIND = "multistate_response_behavior_frontier"
-COLOR_CONTEXT = "red = stronger OFF-signal suppression; 0 = reference-relative family score; not feasibility"
+COLOR_CONTEXT = (
+    "larger colorbar values = stronger OFF-signal suppression; family scores retain objective input units; "
+    "0 = reference-relative direction; not feasibility"
+)
 
 
 @register_plot(
@@ -79,8 +82,9 @@ COLOR_CONTEXT = "red = stronger OFF-signal suppression; 0 = reference-relative f
         rationale="A three-channel landscape exposes family tradeoffs that one smooth behavior score would hide.",
         alt_text=(
             "Square scatter plot of response-family score against target-ON signal-family score. Color encodes "
-            "target-OFF signal-suppression family score, with red indicating stronger suppression relative to the "
-            "same-state reference. Distinct marker shapes identify observed batches and diamonds identify candidates "
+            "target-OFF signal-suppression family score; larger labeled colorbar values indicate stronger suppression "
+            "relative to the same-state reference. Distinct marker shapes identify observed batches; diamonds identify "
+            "candidates "
             "allocated by the active campaign view. No line denotes feasibility because this objective has no "
             "acceptance threshold."
         ),
@@ -162,7 +166,7 @@ COLOR_CONTEXT = "red = stronger OFF-signal suppression; 0 = reference-relative f
             "interactive": {
                 "adapter": "three_axis_scatter_v1",
                 "score_column": BEHAVIOR_SCORE_REF,
-                "score_label": r"Behavior score, $S_{\mathrm{MSRB}}$",
+                "score_label": r"Behavior score, $S_{\mathrm{MSRB}}$ [input units]",
                 "prediction_sample_limit": 8_000,
                 "sampling_method": "sha256_id_v1",
             },
@@ -182,17 +186,17 @@ def render_family_frontier(context: Any, params: dict) -> None:
     frame = data.frame
     observed = data.observed_frame
     response_label = nonempty(
-        params.get("response_family_label", r"Response-ordering family score, $S_R$"),
+        params.get("response_family_label", r"Response ordering, $S_R$ [input units]"),
         field="response_family_label",
     )
     on_label = nonempty(
-        params.get("on_signal_family_label", r"ON-signal family score, $S_{\mathrm{ON}}$"),
+        params.get("on_signal_family_label", r"ON signal, $S_{\mathrm{ON}}$ [input units]"),
         field="on_signal_family_label",
     )
     off_label = nonempty(
         params.get(
             "off_signal_suppression_family_label",
-            r"OFF-signal-suppression family score, $S_{\mathrm{OFF}}$",
+            r"OFF-signal suppression, $S_{\mathrm{OFF}}$ [input units]",
         ),
         field="off_signal_suppression_family_label",
     )
@@ -274,13 +278,10 @@ def render_family_frontier(context: Any, params: dict) -> None:
     ax.set_ylabel(on_label, fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     title = selection_view_title(params.get("title", "Multistate behavior family landscape"), context=context)
     target = wrap_plot_title(target_context(data, params), width=56)
-    ax.set_title(
-        f"{wrap_plot_title(title, width=50)}\n{target}",
-        loc="center",
-        fontweight="semibold",
-        fontsize=NOTEBOOK_TITLE_FONTSIZE,
-        pad=10,
-        linespacing=1.25,
+    set_notebook_title(
+        ax,
+        wrap_plot_title(title, width=50),
+        subtitle=target,
     )
     ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
     legend_handles = [
@@ -293,7 +294,7 @@ def render_family_frontier(context: Any, params: dict) -> None:
             markerfacecolor="#D0D0D0",
             markeredgecolor="#666666",
             markeredgewidth=1.0,
-            label=f"Predicted pool (n={len(frame):,})",
+            label=f"Predicted (n={len(frame):,})",
         )
     ]
     for batch_key, batch in observed.groupby("batch_key", sort=True):
@@ -321,7 +322,7 @@ def render_family_frontier(context: Any, params: dict) -> None:
             markerfacecolor="none",
             markeredgecolor="#111111",
             markeredgewidth=1.2,
-            label=f"Allocated to view (n={int(selected.sum())})",
+            label=f"Allocated (n={int(selected.sum())})",
         )
     )
     ax.legend(
@@ -353,6 +354,8 @@ def render_family_frontier(context: Any, params: dict) -> None:
         "x_label": response_label,
         "y_label": on_label,
         "color_label": off_label,
+        "score_units": "objective_input_units",
+        "softmin_scale": float(data.softmin_scale),
         "reference_lines": {"x": [], "y": []},
         "color_scale": {
             "center": 0.0,

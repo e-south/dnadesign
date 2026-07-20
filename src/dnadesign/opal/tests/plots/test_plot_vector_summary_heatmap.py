@@ -17,6 +17,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
 
 from dnadesign.opal.src.plots import vector_summary_heatmap as plot_mod
 from dnadesign.opal.src.plots._context import PlotContext
@@ -102,6 +103,87 @@ def test_vector_summary_default_layout_is_compact_for_one_round() -> None:
 
     assert width > height
     assert height <= 4.0
+
+
+def test_vector_summary_batch0_uses_square_cells_and_readable_annotations(tmp_path, monkeypatch) -> None:
+    def _stub_load_events(outputs_dir, base_columns, round_selector=None, run_id=None, **_kwargs):
+        return pd.DataFrame(
+            {
+                "as_of_round": [0, 0],
+                "run_id": ["r0", "r0"],
+                "view__is_selected": [True, True],
+                "pred__y_hat_model": [
+                    [-2.0, -1.5, -1.0, -0.5, 0.0, 0.25, 0.5, 0.75],
+                    [-1.8, -1.3, -0.8, -0.3, 0.2, 0.45, 0.7, 0.95],
+                ],
+            }
+        )
+
+    box_aspects: list[float] = []
+    annotation_font_sizes: list[float] = []
+    colorbar_labels: list[str] = []
+    original_set_box_aspect = Axes.set_box_aspect
+    original_text = Axes.text
+    original_add_flush_colorbar = plot_mod.add_flush_colorbar
+
+    def _capture_box_aspect(self, aspect=None):
+        if aspect is not None:
+            box_aspects.append(float(aspect))
+        return original_set_box_aspect(self, aspect)
+
+    def _capture_text(self, *args, **kwargs):
+        if len(args) >= 3 and isinstance(args[2], str) and args[2].count(".") == 1:
+            annotation_font_sizes.append(float(kwargs.get("fontsize", 0.0)))
+        return original_text(self, *args, **kwargs)
+
+    def _capture_colorbar(fig, ax, mappable, *, label, ticklabelsize):
+        colorbar_labels.append(str(label))
+        return original_add_flush_colorbar(
+            fig,
+            ax,
+            mappable,
+            label=label,
+            ticklabelsize=ticklabelsize,
+        )
+
+    monkeypatch.setattr(plot_mod, "load_events", _stub_load_events)
+    monkeypatch.setattr(Axes, "set_box_aspect", _capture_box_aspect)
+    monkeypatch.setattr(Axes, "text", _capture_text)
+    monkeypatch.setattr(plot_mod, "add_flush_colorbar", _capture_colorbar)
+
+    ctx = PlotContext(
+        campaign_dir=tmp_path,
+        workspace=_DummyWorkspace(tmp_path),
+        rounds="all",
+        run_id="r0",
+        selection_view_id="primary",
+        data_paths={},
+        output_dir=tmp_path / "plots",
+        filename="vector_summary.png",
+        dpi=72,
+        format="png",
+        logger=logging.getLogger("opal.test.vector_summary"),
+        save_data=False,
+    )
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+
+    plot_mod.render(
+        ctx,
+        params={
+            "cohort": "selected",
+            "channel_labels": [f"v{index}" for index in range(8)],
+            "figsize_in": [10.8, 3.6],
+            "font_size": 13,
+            "tick_font_size": 13,
+            "annotate_values": True,
+            "value_label": "Mean predicted coordinate",
+        },
+    )
+
+    assert box_aspects[0] == 1 / 8
+    assert len(annotation_font_sizes) == 8
+    assert min(annotation_font_sizes) >= 10.5
+    assert colorbar_labels == ["Mean coordinate"]
 
 
 def test_vector_summary_centered_norm_is_symmetric_and_annotations_are_bounded() -> None:

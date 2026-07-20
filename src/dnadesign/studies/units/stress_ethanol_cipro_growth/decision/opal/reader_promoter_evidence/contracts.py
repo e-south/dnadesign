@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v4"
-READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
+READER_BUNDLE_SCHEMA_VERSION = "reader.response_window.promoter_evidence_bundle.v5"
+READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v2"
 # Wire identity declared by the OPAL consumer contract. The study publishes the
 # value without importing OPAL, preserving the study-to-campaign boundary.
 READER_EVIDENCE_MANIFEST_ADAPTER = "opal.reader_evidence_manifest.v1"

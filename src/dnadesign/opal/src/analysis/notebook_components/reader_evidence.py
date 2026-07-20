@@ -25,8 +25,8 @@ from .reader_evidence_media import (
     dedupe_reader_media_labels,
     filter_reader_media_rows,
     is_reader_media_artifact,
+    preferred_reader_media_rows,
     reader_experiment_display_label,
-    reader_media_format_label,
     reader_media_plot_type_labels,
     reader_reduction_display_label,
     reader_round_display_label,
@@ -77,10 +77,6 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                         design_id,
                         reader_reduction_display_label(item.get("reduction_id")),
                         time_selected_label(item.get("time_selected_h")),
-                        reader_media_format_label(
-                            path=path,
-                            media_type=artifact_item.get("media_type"),
-                        ),
                     )
                     if part
                 )
@@ -94,8 +90,12 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                     "reduction_id": str(item.get("reduction_id") or ""),
                     "evidence_role": str(item.get("evidence_role") or ""),
                     "claim_status": str(item.get("claim_status") or ""),
+                    "non_claim_boundary": str(item.get("non_claim_boundary") or ""),
                     "selected_binding": dict(mapping(item.get("selected_binding"))),
-                    "binding_source": dict(mapping(item.get("binding_source"))),
+                    "sources": dict(mapping(item.get("sources"))),
+                    "objective_overlay": (
+                        None if item.get("objective_overlay") is None else dict(mapping(item.get("objective_overlay")))
+                    ),
                     "reader_config_path": str(item.get("reader_config_path") or ""),
                     "reader_record_id": str(item.get("reader_record_id") or ""),
                     "sequence": item.get("sequence") or "",
@@ -162,8 +162,12 @@ def build_notebook_reader_evidence_artifact_rows(view_model: Mapping[str, Any]) 
             "reduction_id": item.get("reduction_id") or "",
             "evidence_role": item.get("evidence_role") or "",
             "claim_status": item.get("claim_status") or "",
+            "non_claim_boundary": item.get("non_claim_boundary") or "",
             "selected_binding": dict(mapping(item.get("selected_binding"))),
-            "binding_source": dict(mapping(item.get("binding_source"))),
+            "sources": dict(mapping(item.get("sources"))),
+            "objective_overlay": (
+                None if item.get("objective_overlay") is None else dict(mapping(item.get("objective_overlay")))
+            ),
             "reader_config_path": item.get("reader_config_path") or "",
             "reader_record_id": item.get("reader_record_id") or "",
             "sequence": item.get("sequence") or "",
@@ -199,7 +203,9 @@ def build_notebook_reader_evidence_surface(view_model: Mapping[str, Any]) -> dic
 
     rows = build_notebook_reader_evidence_rows(view_model)
     artifact_rows = build_notebook_reader_evidence_artifact_rows(view_model)
-    media_rows = dedupe_reader_media_labels([row for row in artifact_rows if is_reader_media_artifact(row)])
+    media_rows = dedupe_reader_media_labels(
+        preferred_reader_media_rows([row for row in artifact_rows if is_reader_media_artifact(row)])
+    )
     return {
         "rows": rows,
         "artifact_rows": artifact_rows,
@@ -223,6 +229,7 @@ def build_notebook_reader_evidence_visual_choices(surface: Mapping[str, Any]) ->
             "label": f"Reader evidence | {label}",
             "title": label,
             "surface_kind": "reader_evidence",
+            "selection_scope": "campaign",
             "reader_plot_type_label": label,
         }
         for label in build_notebook_reader_evidence_plot_type_options(surface)
@@ -240,6 +247,39 @@ def build_notebook_reader_evidence_artifact_options(
     return [str(row.get("label") or "") for row in media_rows if str(row.get("label") or "").strip()]
 
 
+def build_notebook_reader_evidence_record_memory_key(
+    *,
+    campaign_slug: Any,
+    reader_plot_type_label: Any,
+) -> str:
+    """Build a stable preference key for one campaign Reader deliverable."""
+
+    scope = {
+        "campaign_slug": str(campaign_slug or "").strip(),
+        "reader_plot_type_label": str(reader_plot_type_label or "").strip(),
+    }
+    missing = [field for field, value in scope.items() if not value]
+    if missing:
+        raise ValueError(f"Reader evidence record memory scope is missing: {', '.join(missing)}.")
+    return f"reader_evidence_record_v1:{json.dumps(scope, sort_keys=True, separators=(',', ':'))}"
+
+
+def resolve_notebook_reader_evidence_preferred_record_label(
+    record_labels: Any,
+    *,
+    preferred_record_label: Any | None,
+) -> str:
+    """Restore a remembered Reader record only while it remains available."""
+
+    labels = [str(label) for label in sequence(record_labels) if str(label).strip()]
+    if not labels:
+        raise ValueError("Reader evidence record options must not be empty.")
+    if len(labels) != len(set(labels)):
+        raise ValueError("Reader evidence record labels must be unique.")
+    preferred = str(preferred_record_label or "").strip()
+    return preferred if preferred in labels else labels[0]
+
+
 def render_notebook_reader_evidence_plot_type_control(surface: Mapping[str, Any], *, mo: Any) -> Any | None:
     """Render the plot-type dropdown for generated notebooks."""
 
@@ -253,9 +293,11 @@ def render_notebook_reader_evidence_artifact_control(
     surface: Mapping[str, Any],
     *,
     selected_plot_type_label: str | None,
+    preferred_record_label: Any | None = None,
+    on_change: Any | None = None,
     mo: Any,
 ) -> Any | None:
-    """Render the plot-instance dropdown scoped to a plot type."""
+    """Render the record dropdown scoped to one Reader deliverable."""
 
     options = build_notebook_reader_evidence_artifact_options(
         surface,
@@ -263,7 +305,49 @@ def render_notebook_reader_evidence_artifact_control(
     )
     if not options:
         return None
-    return mo.ui.dropdown(options, value=options[0], label="Reader plot instance", searchable=True, full_width=True)
+    preferred = resolve_notebook_reader_evidence_preferred_record_label(
+        options,
+        preferred_record_label=preferred_record_label,
+    )
+    return mo.ui.dropdown(
+        options,
+        value=preferred,
+        label="Reader record",
+        searchable=True,
+        full_width=True,
+        on_change=on_change,
+    )
+
+
+def render_notebook_reader_evidence_record_control(
+    surface: Mapping[str, Any],
+    *,
+    campaign_slug: Any,
+    selected_plot_type_label: str | None,
+    memory: Any,
+    set_memory: Any,
+    mo: Any,
+) -> Any | None:
+    """Render a record selector remembered by campaign and Reader deliverable."""
+
+    plot_type_label = str(selected_plot_type_label or "").strip()
+    if not plot_type_label:
+        return None
+    memory_key = build_notebook_reader_evidence_record_memory_key(
+        campaign_slug=campaign_slug,
+        reader_plot_type_label=plot_type_label,
+    )
+
+    def remember_record(value: Any) -> None:
+        set_memory({**dict(memory()), memory_key: str(value)})
+
+    return render_notebook_reader_evidence_artifact_control(
+        surface,
+        selected_plot_type_label=plot_type_label,
+        preferred_record_label=dict(memory()).get(memory_key),
+        on_change=remember_record,
+        mo=mo,
+    )
 
 
 def render_notebook_reader_evidence_panel(
@@ -344,6 +428,7 @@ __all__ = [
     "build_notebook_reader_evidence_artifact_rows",
     "build_notebook_reader_evidence_artifact_options",
     "build_notebook_reader_evidence_plot_type_options",
+    "build_notebook_reader_evidence_record_memory_key",
     "build_notebook_reader_evidence_rows",
     "build_notebook_reader_evidence_surface",
     "build_notebook_reader_evidence_visual_choices",
@@ -353,4 +438,6 @@ __all__ = [
     "render_notebook_reader_evidence_artifact_control",
     "render_notebook_reader_evidence_panel",
     "render_notebook_reader_evidence_plot_type_control",
+    "render_notebook_reader_evidence_record_control",
+    "resolve_notebook_reader_evidence_preferred_record_label",
 ]

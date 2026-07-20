@@ -22,6 +22,7 @@ from .baserender import (
     build_notebook_baserender_contract_rows,
 )
 from .baserender_campaign_context import load_notebook_baserender_campaign_context
+from .baserender_candidate_catalog import build_notebook_baserender_candidate_catalog
 from .baserender_diagnostics import render_notebook_baserender_diagnostic_panel
 from .baserender_record_memory import (
     build_notebook_baserender_record_memory_key,
@@ -30,7 +31,7 @@ from .baserender_record_memory import (
 from .baserender_record_selection import (
     build_notebook_selected_baserender_record_sets,
     build_notebook_selected_baserender_records,
-    resolve_notebook_baserender_record_selection,
+    resolve_notebook_baserender_candidate_record,
     resolve_notebook_baserender_selection_batch_scope,
 )
 from .baserender_records import (
@@ -119,6 +120,7 @@ from .reader_evidence import (
     build_notebook_reader_evidence_artifact_options,
     build_notebook_reader_evidence_artifact_rows,
     build_notebook_reader_evidence_plot_type_options,
+    build_notebook_reader_evidence_record_memory_key,
     build_notebook_reader_evidence_rows,
     build_notebook_reader_evidence_surface,
     build_notebook_reader_evidence_visual_choices,
@@ -128,6 +130,8 @@ from .reader_evidence import (
     render_notebook_reader_evidence_artifact_visual,
     render_notebook_reader_evidence_panel,
     render_notebook_reader_evidence_plot_type_control,
+    render_notebook_reader_evidence_record_control,
+    resolve_notebook_reader_evidence_preferred_record_label,
 )
 from .review_controls import render_notebook_review_control_surface
 from .runs import (
@@ -192,6 +196,7 @@ __all__ = [
     "build_notebook_at_a_glance_rows",
     "build_notebook_three_axis_scatter_figure",
     "build_notebook_baserender_label_rows",
+    "build_notebook_baserender_candidate_catalog",
     "build_notebook_baserender_contract",
     "build_notebook_baserender_contract_rows",
     "build_notebook_baserender_record_annotation_counts",
@@ -248,6 +253,7 @@ __all__ = [
     "build_notebook_reader_evidence_artifact_rows",
     "build_notebook_reader_evidence_artifact_options",
     "build_notebook_reader_evidence_plot_type_options",
+    "build_notebook_reader_evidence_record_memory_key",
     "build_notebook_reader_evidence_rows",
     "build_notebook_reader_evidence_surface",
     "build_notebook_reader_evidence_visual_choices",
@@ -281,6 +287,8 @@ __all__ = [
     "render_notebook_reader_evidence_artifact_visual",
     "render_notebook_reader_evidence_panel",
     "render_notebook_reader_evidence_plot_type_control",
+    "render_notebook_reader_evidence_record_control",
+    "resolve_notebook_reader_evidence_preferred_record_label",
     "render_notebook_layered_scatter_image",
     "read_notebook_layered_scatter_state",
     "render_notebook_review_control_surface",
@@ -291,7 +299,7 @@ __all__ = [
     "render_visual_surface_cells",
     "resolve_notebook_round_default",
     "resolve_notebook_baserender_selection_view_id",
-    "resolve_notebook_baserender_record_selection",
+    "resolve_notebook_baserender_candidate_record",
     "resolve_notebook_baserender_selection_batch_scope",
     "resolve_notebook_baserender_preferred_record_id",
     "resolve_notebook_baserender_campaign_model",

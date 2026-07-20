@@ -22,8 +22,13 @@ from dnadesign.opal.api.reader_evidence import (
     parse_reader_evidence_manifest_adapter,
 )
 
+from .reader_promoter_evidence_contract import (
+    PROMOTER_EVIDENCE_BUNDLE_RECORD_ID,
+    ReaderPromoterEvidenceContextError,
+    verify_reader_promoter_evidence_context,
+)
+
 PROMOTER_RESPONSE_EVIDENCE_SEMANTIC_KIND = "promoter_response_evidence"
-PROMOTER_EVIDENCE_BUNDLE_RECORD_ID = "reader.response_window.promoter_evidence_bundle.v4"
 READER_PROMOTER_EVIDENCE_MAX_BYTES = 32 * 1024 * 1024
 
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
@@ -58,6 +63,10 @@ def verify_reader_promoter_evidence_artifact(row: Mapping[str, Any]) -> Path:
     claim_status = str(row.get("claim_status") or "")
     if evidence_role != "display_only" or claim_status not in {"objective_neutral", "screen_only"}:
         raise ReaderPromoterEvidenceIntegrityError("Promoter evidence must remain display-only with a supported claim.")
+    try:
+        verify_reader_promoter_evidence_context(row)
+    except ReaderPromoterEvidenceContextError as exc:
+        raise ReaderPromoterEvidenceIntegrityError(f"Promoter evidence context is invalid: {exc}") from exc
     artifact_path, manifest_path = _staged_artifact_path(
         row.get("path"),
         manifest_path=row.get("manifest_path"),
@@ -172,8 +181,10 @@ def _verify_publication_manifest_binding(row: Mapping[str, Any], *, manifest_pat
         "reduction_id": row.get("reduction_id"),
         "evidence_role": row.get("evidence_role"),
         "claim_status": row.get("claim_status"),
+        "non_claim_boundary": row.get("non_claim_boundary"),
         "selected_binding": row.get("selected_binding"),
-        "binding_source": row.get("binding_source"),
+        "sources": row.get("sources"),
+        "objective_overlay": row.get("objective_overlay"),
     }
     if any(publication_row.get(field) != value for field, value in row_fields.items()):
         raise ReaderPromoterEvidenceIntegrityError(
@@ -212,6 +223,7 @@ def _verify_digest(path: Path, *, expected: object, label: str) -> None:
 
 __all__ = [
     "PROMOTER_RESPONSE_EVIDENCE_SEMANTIC_KIND",
+    "PROMOTER_EVIDENCE_BUNDLE_RECORD_ID",
     "READER_PROMOTER_EVIDENCE_MAX_BYTES",
     "ReaderPromoterEvidenceIntegrityError",
     "is_reader_promoter_evidence_artifact",

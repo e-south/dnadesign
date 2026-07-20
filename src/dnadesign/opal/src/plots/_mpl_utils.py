@@ -41,12 +41,13 @@ CATEGORY_LINESTYLES: tuple[str, ...] = ("-", "--", "-.", ":")
 DEFAULT_SQUARE_FIGSIZE: tuple[float, float] = (7.2, 7.2)
 DEFAULT_LANDSCAPE_FIGSIZE: tuple[float, float] = (11.0, 3.8)
 DEFAULT_PANORAMA_FIGSIZE: tuple[float, float] = (12.0, 3.6)
-NOTEBOOK_TITLE_FONTSIZE = 14.0
-NOTEBOOK_AXIS_LABEL_FONTSIZE = 11.5
-NOTEBOOK_TICK_FONTSIZE = 10.0
-NOTEBOOK_LEGEND_FONTSIZE = 9.5
-NOTEBOOK_COLORBAR_LABEL_FONTSIZE = 10.5
-NOTEBOOK_ANNOTATION_FONTSIZE = 8.25
+NOTEBOOK_TITLE_FONTSIZE = 18.0
+NOTEBOOK_SUBTITLE_FONTSIZE = 14.0
+NOTEBOOK_AXIS_LABEL_FONTSIZE = 15.0
+NOTEBOOK_TICK_FONTSIZE = 12.0
+NOTEBOOK_LEGEND_FONTSIZE = 12.0
+NOTEBOOK_COLORBAR_LABEL_FONTSIZE = 13.5
+NOTEBOOK_ANNOTATION_FONTSIZE = 10.5
 SIGNED_MARGIN_CMAP = "RdBu_r"
 
 _PRETTY_LABELS = {
@@ -189,13 +190,13 @@ def apply_plot_style(*, variant: str = "diagnostic") -> None:
     plt.rcParams.update(
         {
             "font.size": 13,
-            "axes.titlesize": 18,
-            "axes.labelsize": 15,
-            "xtick.labelsize": 12,
-            "ytick.labelsize": 12,
-            "legend.fontsize": 12,
-            "legend.title_fontsize": 12,
-            "figure.titlesize": 18,
+            "axes.titlesize": NOTEBOOK_TITLE_FONTSIZE,
+            "axes.labelsize": NOTEBOOK_AXIS_LABEL_FONTSIZE,
+            "xtick.labelsize": NOTEBOOK_TICK_FONTSIZE,
+            "ytick.labelsize": NOTEBOOK_TICK_FONTSIZE,
+            "legend.fontsize": NOTEBOOK_LEGEND_FONTSIZE,
+            "legend.title_fontsize": NOTEBOOK_LEGEND_FONTSIZE,
+            "figure.titlesize": NOTEBOOK_TITLE_FONTSIZE,
             "axes.titlepad": 8,
             "figure.facecolor": "white",
             "axes.facecolor": "white",
@@ -236,6 +237,65 @@ def apply_notebook_axes_style(ax, *, grid: bool = True, square: bool = False) ->
             ax.set_box_aspect(1.0)
         except Exception:
             ax.set_aspect("equal", adjustable="box")
+
+
+def set_notebook_title(
+    ax,
+    title: str,
+    *,
+    subtitle: str | None = None,
+    location: str = "center",
+    title_fontsize: float = NOTEBOOK_TITLE_FONTSIZE,
+    subtitle_fontsize: float = NOTEBOOK_SUBTITLE_FONTSIZE,
+):
+    """Render a compact title hierarchy without making context look like a second title.
+
+    The main premise stays semibold. Optional target, view, or round context is
+    placed immediately below it in regular weight. Both artists participate in
+    tight bounding-box export, so long subtitles are visible rather than clipped.
+    """
+
+    from matplotlib.transforms import ScaledTranslation
+
+    cleaned_title = str(title).strip()
+    if not cleaned_title:
+        raise ValueError("Plot title must be non-empty.")
+    cleaned_subtitle = None if subtitle is None else str(subtitle).strip()
+    if subtitle is not None and not cleaned_subtitle:
+        raise ValueError("Plot subtitle must be non-empty when provided.")
+    horizontal_alignment = {"left": "left", "center": "center", "right": "right"}.get(location)
+    horizontal_position = {"left": 0.0, "center": 0.5, "right": 1.0}.get(location)
+    if horizontal_alignment is None or horizontal_position is None:
+        raise ValueError("Plot title location must be 'left', 'center', or 'right'.")
+
+    subtitle_line_count = 0 if cleaned_subtitle is None else len(cleaned_subtitle.splitlines())
+    title_pad = 10.0 if cleaned_subtitle is None else subtitle_line_count * float(subtitle_fontsize) * 1.15 + 13.0
+    title_artist = ax.set_title(
+        cleaned_title,
+        loc=location,
+        fontweight="semibold",
+        fontsize=title_fontsize,
+        pad=title_pad,
+        linespacing=1.2,
+    )
+    subtitle_artist = None
+    if cleaned_subtitle is not None:
+        subtitle_transform = ax.transAxes + ScaledTranslation(0.0, 6.0 / 72.0, ax.figure.dpi_scale_trans)
+        subtitle_artist = ax.text(
+            horizontal_position,
+            1.0,
+            cleaned_subtitle,
+            transform=subtitle_transform,
+            ha=horizontal_alignment,
+            va="bottom",
+            fontsize=subtitle_fontsize,
+            fontweight="normal",
+            color="#333333",
+            linespacing=1.15,
+            clip_on=False,
+        )
+        subtitle_artist.set_gid("notebook-plot-subtitle")
+    return title_artist, subtitle_artist
 
 
 def save_notebook_square_figure(fig, out: Path, *, dpi: int, tight: bool = True) -> None:
@@ -504,7 +564,7 @@ def apply_y_axis_scale(
                 transform=ax.get_yaxis_transform(),
                 ha="right",
                 va="bottom",
-                fontsize=8.5,
+                fontsize=NOTEBOOK_ANNOTATION_FONTSIZE,
                 color="#4D4D4D",
                 bbox={"facecolor": "white", "alpha": 0.78, "edgecolor": "none", "pad": 1.5},
             )
@@ -581,7 +641,15 @@ def _required_float(value: object, *, field: str) -> float:
     return number
 
 
-def legend_below_single_row(fig, ax, *, handles=None, labels=None, bottom: float = 0.11) -> bool:
+def legend_below_single_row(
+    fig,
+    ax,
+    *,
+    handles=None,
+    labels=None,
+    bottom: float = 0.11,
+    fontsize: float = NOTEBOOK_LEGEND_FONTSIZE,
+) -> bool:
     """Place a legend below the plot as one compact row and reserve minimal space."""
 
     if handles is None or labels is None:
@@ -597,6 +665,7 @@ def legend_below_single_row(fig, ax, *, handles=None, labels=None, bottom: float
         bbox_to_anchor=(0.5, 0.01),
         ncol=len(labels),
         frameon=False,
+        fontsize=fontsize,
         columnspacing=0.9,
         handletextpad=0.4,
         borderaxespad=0.0,

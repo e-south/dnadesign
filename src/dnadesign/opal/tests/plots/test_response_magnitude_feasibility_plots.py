@@ -421,8 +421,8 @@ def test_response_separation_plot_metadata_is_manuscript_explicit() -> None:
         assert meta["capability"]["objective_family"] == "response_magnitude_feasibility"
 
     frontier_alt_text = describe_plot_kind("response_magnitude_feasibility_frontier")["alt_text"]
-    assert "red is greater clearance" in frontier_alt_text
-    assert "move right, up, and red" in frontier_alt_text
+    assert "larger colorbar values mean greater clearance" in frontier_alt_text
+    assert "move right, up, and toward larger colorbar values" in frontier_alt_text
 
 
 def test_rmf_frontier_metadata_names_run_pinned_observed_events() -> None:
@@ -470,27 +470,29 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     frontier = captured.pop()
     frontier_axis = frontier.axes[0]
     assert frontier._suptitle is None
-    assert frontier_axis.get_title(loc="center") == (
-        "RMF candidate constraint landscape · Ethanol view\n"
-        "Target ON: Ethanol, Both stresses | OFF: No stress,\nCiprofloxacin"
-    )
+    assert frontier_axis.get_title(loc="center") == "RMF candidate constraint landscape · Ethanol view"
+    frontier_subtitle = next(text for text in frontier_axis.texts if text.get_gid() == "notebook-plot-subtitle")
+    assert frontier_subtitle.get_text() == ("Target ON: Ethanol, Both stresses | OFF: No stress,\nCiprofloxacin")
+    assert frontier_subtitle.get_fontsize() >= 14
     assert frontier_axis.get_title(loc="left") == ""
-    assert frontier_axis.title.get_fontsize() >= 14
+    assert frontier_axis.title.get_fontsize() >= 18
     assert frontier_axis.get_xlabel() == "ON-OFF response separation, $d_{response}$\nWindow mean log2(YFP / CFP)"
     assert frontier_axis.get_ylabel() == (
         "Minimum target-ON fluorescence relative to pDual-10\n$f_{on}$, log2(YFP / OD600)"
     )
-    assert frontier_axis.xaxis.label.get_fontsize() >= 11.5
-    assert frontier_axis.yaxis.label.get_fontsize() >= 11.5
-    assert min(tick.get_fontsize() for tick in frontier_axis.get_xticklabels()) >= 10
-    assert min(tick.get_fontsize() for tick in frontier_axis.get_yticklabels()) >= 10
+    assert frontier_axis.xaxis.label.get_fontsize() >= 15
+    assert frontier_axis.yaxis.label.get_fontsize() >= 15
+    assert min(tick.get_fontsize() for tick in frontier_axis.get_xticklabels()) >= 12
+    assert min(tick.get_fontsize() for tick in frontier_axis.get_yticklabels()) >= 12
     assert not frontier_axis.spines["top"].get_visible()
     assert not frontier_axis.spines["right"].get_visible()
-    assert frontier.axes[-1].get_ylabel() == ("Target-OFF clearance, $q_{off}$\nred = greater clearance; 0 = boundary")
-    assert frontier.axes[-1].yaxis.label.get_fontsize() >= 10.5
+    assert frontier.axes[-1].get_ylabel() == (
+        "Target-OFF clearance, $q_{off}$\nlarger = greater clearance; 0 = boundary"
+    )
+    assert frontier.axes[-1].yaxis.label.get_fontsize() >= 13.5
     assert "Observed · Batch 0 (n=1)" in frontier_axis.get_legend_handles_labels()[1]
     assert frontier_axis.get_legend().get_bbox_to_anchor()._bbox.y0 < 0.0
-    assert min(text.get_fontsize() for text in frontier_axis.get_legend().get_texts()) >= 9.5
+    assert min(text.get_fontsize() for text in frontier_axis.get_legend().get_texts()) >= 12
     selected_collection = frontier_axis.collections[-1]
     assert selected_collection.get_array() is not None
     assert len(selected_collection.get_array()) == 2
@@ -500,18 +502,25 @@ def test_rmf_plots_show_target_boundaries_and_observed_labels(
     decomposition = captured.pop()
     decomposition_axis = decomposition.axes[0]
     assert decomposition._suptitle is None
-    decomposition_title = decomposition_axis.get_title(loc="center").replace("\n", " ")
-    assert decomposition_title.startswith("Predicted RMF margins for selected candidates · Ethanol view ")
-    assert "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin" in decomposition_title
+    assert decomposition_axis.get_title(loc="center").replace("\n", " ") == (
+        "Predicted RMF margins for selected candidates · Ethanol view"
+    )
+    decomposition_subtitle = next(
+        text for text in decomposition_axis.texts if text.get_gid() == "notebook-plot-subtitle"
+    )
+    assert decomposition_subtitle.get_text().replace("\n", " ") == (
+        "Target ON: Ethanol, Both stresses | OFF: No stress, Ciprofloxacin"
+    )
+    assert decomposition_subtitle.get_fontsize() >= 14
     assert decomposition_axis.get_title(loc="left") == ""
-    assert decomposition_axis.title.get_fontsize() >= 14
+    assert decomposition_axis.title.get_fontsize() >= 18
     assert "$S_{\\mathrm{RMF}}=\\min" in decomposition_axis.get_xlabel()
     assert "0 marks each configured boundary" in decomposition_axis.get_xlabel()
     assert "higher is better" not in decomposition_axis.get_xlabel().lower()
-    assert decomposition_axis.xaxis.label.get_fontsize() >= 11.5
-    assert decomposition_axis.yaxis.label.get_fontsize() >= 11.5
-    assert min(tick.get_fontsize() for tick in decomposition_axis.get_xticklabels()) >= 10
-    assert min(tick.get_fontsize() for tick in decomposition_axis.get_yticklabels()) >= 10
+    assert decomposition_axis.xaxis.label.get_fontsize() >= 15
+    assert decomposition_axis.yaxis.label.get_fontsize() >= 15
+    assert min(tick.get_fontsize() for tick in decomposition_axis.get_xticklabels()) >= 12
+    assert min(tick.get_fontsize() for tick in decomposition_axis.get_yticklabels()) >= 12
     assert [tick.get_text() for tick in decomposition_axis.get_xticklabels()] == [
         "$q_R$",
         "$q_{\\mathrm{ON}}$",
@@ -556,7 +565,7 @@ def test_rmf_frontier_color_extent_includes_observed_values_outside_prediction_r
     assert context.artifact_metadata["notebook_view"]["color_scale"] == {
         "center": 0.0,
         "extent": pytest.approx(2.5),
-        "context": "red = greater clearance; 0 = configured boundary",
+        "context": "larger = greater clearance; 0 = configured boundary",
     }
     for collection in frontier.axes[0].collections[:3]:
         assert collection.norm.vmin == pytest.approx(-2.5)
@@ -692,6 +701,9 @@ def test_candidate_annotations_do_not_distort_constrained_layout() -> None:
 
     assert annotations
     assert all(not annotation.get_in_layout() for annotation in annotations)
+    assert all(
+        annotation.arrow_patch is not None and not annotation.arrow_patch.get_in_layout() for annotation in annotations
+    )
     plt.close(figure)
 
 
@@ -723,6 +735,9 @@ def test_candidate_annotations_use_two_nonoverlapping_lanes_for_dense_labels() -
     renderer = figure.canvas.get_renderer()
     axes_box = axis.get_window_extent(renderer=renderer)
     boxes = [annotation.get_bbox_patch().get_window_extent(renderer=renderer) for annotation in annotations]
+    fitted_font_sizes = {annotation.get_fontsize() for annotation in annotations}
+    assert len(fitted_font_sizes) == 1
+    assert 7.0 <= next(iter(fitted_font_sizes)) <= NOTEBOOK_ANNOTATION_FONTSIZE
     assert {annotation.get_ha() for annotation in annotations} == {"left", "right"}
     assert all(box.x0 >= axes_box.x0 and box.x1 <= axes_box.x1 for box in boxes)
     assert all(box.y0 >= axes_box.y0 and box.y1 <= axes_box.y1 for box in boxes)
@@ -821,5 +836,5 @@ def test_static_frontier_does_not_require_candidate_records(
     plot_mod.render_frontier(context, {})
 
     figure = captured.pop()
-    assert not figure.axes[0].texts
+    assert [text.get_gid() for text in figure.axes[0].texts] == ["notebook-plot-subtitle"]
     plt.Figure.clear(figure)

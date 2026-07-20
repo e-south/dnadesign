@@ -59,7 +59,7 @@ def _visual_choices_cell() -> str:
             CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
             active_view_mode,
             annotate_notebook_visual_choices,
-            baserender_has_renderable_records,
+            baserender_has_candidate_records,
             baserender_role_ui,
             build_notebook_collection_visual_choices,
             build_notebook_reader_evidence_visual_choices,
@@ -83,26 +83,26 @@ def _visual_choices_cell() -> str:
                 if (
                     baserender_role_ui is not None
                     and selected_campaign_baserender_contract.get("available")
-                    and baserender_has_renderable_records
+                    and baserender_has_candidate_records
                 ):
                     visual_choices.append(
                         {
-                            "label": "Selected sequence render",
+                            "label": "Candidate sequence render",
                             "surface_kind": CAMPAIGN_SET_BASERENDER_SURFACE_KIND,
-                            "title": "Selected sequence render",
+                            "title": "Candidate sequence render",
                         }
                     )
             else:
                 visual_choices = []
                 if (
                     selected_campaign_baserender_contract.get("available")
-                    and baserender_has_renderable_records
+                    and baserender_has_candidate_records
                 ):
                     visual_choices.append(
                         {
-                            "label": "Selected sequence render",
+                            "label": "Candidate sequence render",
                             "surface_kind": "baserender",
-                            "title": "Selected sequence render",
+                            "title": "Candidate sequence render",
                         }
                     )
                 visual_choices.extend(campaign_plot_choices)

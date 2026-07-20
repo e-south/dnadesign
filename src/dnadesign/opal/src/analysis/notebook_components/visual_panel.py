@@ -15,10 +15,7 @@ from collections.abc import Callable, Iterable
 from typing import Any, Literal, Mapping
 
 from .selection_batch_panel import render_notebook_selection_batch_panel
-from .visual_panel_baserender import (
-    render_notebook_baserender_panel,
-    render_notebook_three_axis_sequence_companion,
-)
+from .visual_panel_baserender import render_notebook_baserender_panel
 from .visual_panel_collection import render_collection_plot_panel, render_selection_overlap_panel
 
 
@@ -48,11 +45,11 @@ def render_notebook_visual_panel(
     baserender_record_id: Any = None,
     baserender_record_row: Mapping[str, Any] | None = None,
     baserender_record_selector: Any = None,
+    baserender_candidate_evidence: Mapping[str, Any] | None = None,
     baserender_role_ui: Any = None,
     baserender_selection_view_ui: Any = None,
     baserender_round_ui: Any = None,
     baserender_run_ui: Any = None,
-    baserender_selection_record: Mapping[str, Any] | None = None,
     build_notebook_baserender_contract_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]] | None = None,
     build_notebook_baserender_label_rows: Callable[..., list[dict[str, Any]]] | None = None,
     control_surface: Literal["inline", "external"] = "inline",
@@ -94,7 +91,7 @@ def render_notebook_visual_panel(
             baserender_campaign_model=baserender_campaign_model,
             baserender_record_id=baserender_record_id,
             baserender_record_row=baserender_record_row,
-            baserender_selection_record=baserender_selection_record,
+            baserender_candidate_evidence=baserender_candidate_evidence,
             build_notebook_baserender_contract_rows=build_notebook_baserender_contract_rows,
             build_notebook_baserender_label_rows=build_notebook_baserender_label_rows,
             controls=controls,
@@ -145,10 +142,6 @@ def render_notebook_visual_panel(
             selected_visual_choice=selected_visual_choice,
         )
     return _render_campaign_plot_panel(
-        baserender_record_id=baserender_record_id,
-        baserender_record_row=baserender_record_row,
-        baserender_record_selector=baserender_record_selector,
-        baserender_selection_record=baserender_selection_record,
         build_notebook_plot_card_rows=build_notebook_plot_card_rows,
         build_notebook_plot_method_sections=build_notebook_plot_method_sections,
         controls=controls,
@@ -159,8 +152,6 @@ def render_notebook_visual_panel(
         plot_view_state=plot_view_state,
         layered_scatter_contract=layered_scatter_contract,
         render_notebook_plot_choice_image=render_notebook_plot_choice_image,
-        render_notebook_baserender_record=render_notebook_baserender_record,
-        selected_campaign_baserender_contract=selected_campaign_baserender_contract,
         selected_visual_choice=selected_visual_choice,
         select_notebook_plot_scope=select_notebook_plot_scope,
     )
@@ -216,10 +207,6 @@ def _render_empty_panel(*, active_view_mode: str, controls: Any | None, mo: Any)
 
 def _render_campaign_plot_panel(
     *,
-    baserender_record_id: Any,
-    baserender_record_row: Mapping[str, Any] | None,
-    baserender_record_selector: Any,
-    baserender_selection_record: Mapping[str, Any] | None,
     build_notebook_plot_card_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]],
     build_notebook_plot_method_sections: Callable[[Mapping[str, Any]], Mapping[str, str]],
     controls: Any | None,
@@ -229,9 +216,7 @@ def _render_campaign_plot_panel(
     plot_scope_ui: Any,
     plot_view_state: Mapping[str, Any] | None,
     layered_scatter_contract: Mapping[str, Any] | None,
-    render_notebook_baserender_record: Callable[..., Mapping[str, Any]] | None,
     render_notebook_plot_choice_image: Callable[..., Any],
-    selected_campaign_baserender_contract: Mapping[str, Any] | None,
     selected_visual_choice: Mapping[str, Any],
     select_notebook_plot_scope: Callable[..., Mapping[str, Any]],
 ) -> Any:
@@ -248,23 +233,11 @@ def _render_campaign_plot_panel(
         view_state=plot_view_state,
         layered_scatter_contract=layered_scatter_contract,
     )
-    sequence_companion = None
-    if str(dict(plot_view_state or {}).get("figure") or "publication_2d") == "interactive_3d":
-        sequence_companion = render_notebook_three_axis_sequence_companion(
-            baserender_record_id=baserender_record_id,
-            baserender_record_row=baserender_record_row,
-            baserender_record_selector=baserender_record_selector,
-            baserender_selection_record=baserender_selection_record,
-            contract=selected_campaign_baserender_contract,
-            mo=mo,
-            render_notebook_baserender_record=render_notebook_baserender_record,
-        )
     return _render_panel_stack(
         mo=mo,
         items=[
             controls,
             visual,
-            sequence_companion,
             mo.accordion({"Plot evidence": mo.vstack(detail_items, gap=0.35)}, multiple=True),
         ],
     )

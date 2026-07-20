@@ -17,6 +17,7 @@ import os
 import shutil
 import uuid
 from collections.abc import Sequence
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
@@ -137,8 +138,10 @@ def _display_row(bundle: VerifiedReaderPromoterEvidenceBundle) -> dict[str, Any]
         "reduction_id": reduction_id,
         "evidence_role": "display_only",
         "claim_status": str(bundle.manifest["claim_status"]),
+        "non_claim_boundary": str(bundle.manifest["non_claim_boundary"]),
         "selected_binding": dict(bundle.manifest["selected_binding"]),
-        "binding_source": dict(bundle.manifest["sources"]["candidate_bindings"]),
+        "sources": deepcopy(bundle.manifest["sources"]),
+        "objective_overlay": deepcopy(bundle.manifest["objective_overlay"]),
         "artifacts": [
             {
                 "semantic_kind": PROMOTER_RESPONSE_SEMANTIC_KIND,

@@ -88,32 +88,52 @@ def render_notebook_campaign_set_selection_overlap_image(
                 continue
             matrix[row_index, col_index] = float(max_rank + 1 - int(row["rank"]))
 
-    fig_height = max(3.8, 0.34 * len(ids) + 1.5)
-    fig_width = max(6.0, 1.65 * len(campaigns) + 2.4)
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    fig_height = max(3.6, 0.52 * len(ids) + 1.6)
+    fig_width = max(4.8, 0.58 * len(campaigns) + 2.7)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), layout="constrained")
     masked = np.ma.masked_invalid(matrix)
     cmap = plt.get_cmap("YlGnBu").copy()
     cmap.set_bad("#F3F4F6")
-    ax.imshow(masked, aspect="auto", cmap=cmap, vmin=1, vmax=max(max_rank, 1))
+    ax.imshow(
+        masked,
+        aspect="equal",
+        cmap=cmap,
+        interpolation="nearest",
+        vmin=1,
+        vmax=max(max_rank, 1),
+    )
     counts = _candidate_counts(rows)
     ax.set_yticks(range(len(ids)))
-    ax.set_yticklabels([f"{_short_id(candidate_id)} ({counts[candidate_id]})" for candidate_id in ids], fontsize=9)
+    ax.set_yticklabels(
+        [f"{_short_id(candidate_id)} ({counts[candidate_id]})" for candidate_id in ids],
+        fontsize=10,
+    )
     ax.set_xticks(range(len(campaigns)))
-    ax.set_xticklabels(campaigns, rotation=24, ha="right", fontsize=9)
-    ax.set_xlabel("Campaign")
-    ax.set_ylabel("Selected candidate")
-    ax.set_title("Pooled selection overlap", fontweight="semibold")
+    ax.set_xticklabels(campaigns, rotation=20, ha="right", fontsize=10)
+    ax.set_xlabel("Campaign", fontsize=11)
+    ax.set_ylabel("Selected candidate", fontsize=11)
+    ax.set_title("Pooled selection overlap", fontsize=13, fontweight="semibold", pad=10)
     for row_index, candidate_id in enumerate(ids):
         for col_index, campaign in enumerate(campaigns):
             row = rank_by_cell.get((candidate_id, campaign))
             if row is None:
                 continue
-            ax.text(col_index, row_index, f"r{row.get('rank')}", ha="center", va="center", fontsize=8, color="#111827")
+            ax.text(
+                col_index,
+                row_index,
+                f"r{row.get('rank')}",
+                ha="center",
+                va="center",
+                fontsize=10,
+                color="#111827",
+            )
     ax.set_xticks(np.arange(-0.5, len(campaigns), 1), minor=True)
     ax.set_yticks(np.arange(-0.5, len(ids), 1), minor=True)
-    ax.grid(which="minor", color="white", linestyle="-", linewidth=1.2)
+    ax.grid(which="minor", color="white", linestyle="-", linewidth=1.0)
+    ax.tick_params(which="major", length=0, pad=5)
     ax.tick_params(which="minor", bottom=False, left=False)
-    fig.tight_layout()
+    for spine in ax.spines.values():
+        spine.set_visible(False)
     buffer = io.BytesIO()
     fig.savefig(buffer, format="png", dpi=int(dpi), facecolor="white")
     plt.close(fig)
@@ -136,6 +156,11 @@ def render_notebook_campaign_set_selection_overlap_image(
         "caption": caption,
         "title": "Pooled selection overlap",
         "summary": summary,
+        "visual_contract": {
+            "cell_geometry": "unit_square_cells",
+            "cell_edges": "white",
+            "minimum_tick_font_size_pt": 10,
+        },
     }
 
 

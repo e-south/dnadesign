@@ -70,7 +70,7 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
         bindings_bundle=bindings,
     )
 
-    assert payload["schema_version"] == "stress_ethanol_cipro_growth.reader_promoter_evidence.v1"
+    assert payload["schema_version"] == "stress_ethanol_cipro_growth.reader_promoter_evidence.v2"
     assert payload["opal_adapter"] == READER_EVIDENCE_MANIFEST_ADAPTER
     assert payload["campaign_slug"] == "secg_msrb_greedy"
     assert payload["round"] == "r0"
@@ -92,8 +92,10 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
         "reduction_id": "event_logmean_6_12h_post",
         "evidence_role": "display_only",
         "claim_status": "objective_neutral",
+        "non_claim_boundary": densegen_row["non_claim_boundary"],
         "selected_binding": densegen_row["selected_binding"],
-        "binding_source": densegen_row["binding_source"],
+        "sources": densegen_row["sources"],
+        "objective_overlay": None,
         "artifacts": densegen_row["artifacts"],
     }
     assert "time_selected_h" not in densegen_row
@@ -102,12 +104,15 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
     assert densegen_row["selected_binding"]["binding_status"] == "resolved"
     assert densegen_row["selected_binding"]["binding_method"] == "exact_alias"
     assert densegen_row["selected_binding"]["densegen_run_id"] == "reader_sfxi_pdual10_archive_port"
+    assert densegen_row["sources"]["response_window"]["schema_version"] == "reader.response_window.bundle.v5"
+    assert densegen_row["sources"]["baserender"]["adapter_kind"] == "densegen_tfbs"
+    assert densegen_row["sources"]["candidate_bindings"]["candidate_table_id"]
     source_manifest = densegen / "manifest.json"
     for artifact in densegen_row["artifacts"]:
         source_artifact = densegen / Path(artifact["path"]).name
         assert artifact["semantic_kind"] == "promoter_response_evidence"
         assert artifact["kind"] == "reader_publication"
-        assert artifact["record_id"] == "reader.response_window.promoter_evidence_bundle.v4"
+        assert artifact["record_id"] == "reader.response_window.promoter_evidence_bundle.v5"
         assert artifact["scope"] == "design_reduction"
         assert artifact["exists"] is True
         assert artifact["bytes"] == source_artifact.stat().st_size
@@ -115,6 +120,22 @@ def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path:
         assert not Path(artifact["path"]).is_absolute()
         assert "source_manifest_path" not in artifact
         assert artifact["source_manifest_sha256"] == _sha256(source_manifest)
+
+
+def test_preview_rejects_retired_reader_promoter_evidence_v4(tmp_path: Path) -> None:
+    bundle, bindings = _write_reader_bundle(
+        tmp_path / "reader-bundle-v4",
+        candidate_id="candidate-1",
+        design_id="pDual-10-1",
+        experiment_id="20260713_sfxi",
+    )
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = "reader.response_window.promoter_evidence_bundle.v4"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReaderPromoterEvidenceError, match="promoter_evidence_bundle.v5"):
+        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
 
 
 def test_preview_rejects_reader_claim_that_disagrees_with_explicit_study_bindings(tmp_path: Path) -> None:
@@ -171,9 +192,10 @@ def test_preview_accepts_reader_screen_only_overlay_without_promoting_a_score(tm
 
     payload = preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
 
-    assert payload["rows"][0]["claim_status"] == "screen_only"
-    assert "rmf" not in payload["rows"][0]
-    assert "score" not in payload["rows"][0]
+    row = payload["rows"][0]
+    assert row["claim_status"] == "screen_only"
+    assert row["objective_overlay"] == manifest["objective_overlay"]
+    assert "score" not in row
 
 
 @pytest.mark.parametrize("label", [" RMF", "RMF\nscore", "W" * 41])
@@ -350,7 +372,7 @@ def test_cli_previews_materializes_and_verifies_without_label_mutation(tmp_path:
         "artifact_count": 2,
         "manifest_json": str(manifest_path),
         "row_count": 1,
-        "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v1",
+        "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v2",
     }
 
 
@@ -585,7 +607,27 @@ def test_display_verifier_rejects_selected_binding_identity_tampering(tmp_path: 
     display["rows"][0]["selected_binding"]["candidate_id"] = "candidate-other"
     result.manifest_json.write_text(json.dumps(display, indent=2) + "\n", encoding="utf-8")
 
-    with pytest.raises(ReaderPromoterEvidenceError, match="identity disagrees with its row"):
+    with pytest.raises(ReaderPromoterEvidenceError, match="candidate_id disagrees with selection candidate_id"):
+        verify_reader_promoter_evidence_manifest(result.manifest_json)
+
+
+def test_display_verifier_rejects_structured_source_tampering(tmp_path: Path) -> None:
+    bundle, bindings = _write_reader_bundle(
+        tmp_path / "reader-bundle",
+        candidate_id="candidate-1",
+        design_id="pDual-10-1",
+        experiment_id="20260713_sfxi",
+    )
+    result = materialize_reader_promoter_evidence_manifest(
+        [bundle],
+        bindings_bundle=bindings,
+        out_dir=tmp_path / "campaign" / "inputs" / "r0",
+    )
+    display = json.loads(result.manifest_json.read_text(encoding="utf-8"))
+    display["rows"][0]["sources"]["baserender"]["feature_count"] = -1
+    result.manifest_json.write_text(json.dumps(display, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReaderPromoterEvidenceError, match="BaseRender diagnostics"):
         verify_reader_promoter_evidence_manifest(result.manifest_json)
 
 

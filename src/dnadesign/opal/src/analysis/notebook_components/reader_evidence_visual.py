@@ -21,6 +21,7 @@ from .reader_promoter_evidence import (
     is_reader_promoter_evidence_artifact,
     verify_reader_promoter_evidence_artifact,
 )
+from .reader_promoter_evidence_details import render_notebook_reader_promoter_evidence_details
 from .zoomable_visual import render_notebook_zoomable_image
 
 
@@ -50,7 +51,8 @@ def render_notebook_reader_evidence_artifact_visual(
 def _render_static_reader_artifact(selected: Mapping[str, Any], *, mo: Any) -> Any:
     path = Path(str(selected.get("path") or ""))
     media_type = str(selected.get("media_type") or "")
-    if is_reader_promoter_evidence_artifact(selected):
+    is_promoter_evidence = is_reader_promoter_evidence_artifact(selected)
+    if is_promoter_evidence:
         try:
             path = verify_reader_promoter_evidence_artifact(selected)
         except ReaderPromoterEvidenceIntegrityError as exc:
@@ -62,22 +64,27 @@ def _render_static_reader_artifact(selected: Mapping[str, Any], *, mo: Any) -> A
             preview_path = reader_pdf_preview_path(path)
         except RuntimeError as exc:
             return mo.md(f"PDF plot artifact could not be rendered as an image: `{path}`\n\n{exc}")
-        return _render_zoomable_artifact(
+        visual = _render_zoomable_artifact(
             path=preview_path,
             source_path=path,
             selected=selected,
             mime_type="image/png",
             mo=mo,
         )
-    if media_type.startswith("image/") or path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
-        return _render_zoomable_artifact(
+    elif media_type.startswith("image/") or path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+        visual = _render_zoomable_artifact(
             path=path,
             source_path=path,
             selected=selected,
             mime_type=_image_mime_type(path=path, media_type=media_type),
             mo=mo,
         )
-    return mo.md(f"Plot artifact: `{path}`")
+    else:
+        return mo.md(f"Plot artifact: `{path}`")
+    if not is_promoter_evidence:
+        return visual
+    details = render_notebook_reader_promoter_evidence_details(selected, mo=mo)
+    return mo.vstack([visual, details], gap=0.25)
 
 
 def _render_zoomable_artifact(

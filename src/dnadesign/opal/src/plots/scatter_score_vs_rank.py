@@ -17,8 +17,9 @@ from ..registries.plots import PlotMeta, register_plot
 from ._events_util import load_events, resolve_outputs_dir
 from ._mpl_utils import (
     DEFAULT_SQUARE_FIGSIZE,
+    NOTEBOOK_AXIS_LABEL_FONTSIZE,
     NOTEBOOK_LEGEND_FONTSIZE,
-    NOTEBOOK_TITLE_FONTSIZE,
+    NOTEBOOK_TICK_FONTSIZE,
     add_flush_colorbar,
     annotate_plot_meta,
     apply_notebook_axes_style,
@@ -34,6 +35,7 @@ from ._mpl_utils import (
     scale_to_sizes,
     scatter_smart,
     sequential_colormap,
+    set_notebook_title,
     wrap_plot_title,
 )
 from ._param_utils import (
@@ -267,19 +269,23 @@ def render(context, params: dict) -> None:
                     rasterize_at=rasterize_at,
                     label=selection_marker_label,
                 )
-        ax.set_xlabel(_rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label))
-        ax.set_ylabel(score_label)
-        ax.set_title(
-            _score_rank_title(
-                params.get("title", f"{score_label} vs rank, round {r}"),
-                context=context,
-                show_selection_view=show_selection_view,
-            ),
-            loc=title_location,
-            fontweight="semibold",
-            fontsize=NOTEBOOK_TITLE_FONTSIZE,
-            pad=10,
-            linespacing=1.25,
+        ax.set_xlabel(
+            _rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label),
+            fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE,
+            labelpad=8,
+        )
+        ax.set_ylabel(score_label, fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
+        ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
+        score_title, score_subtitle = _score_rank_title_parts(
+            params.get("title", f"{score_label} vs rank, round {r}"),
+            context=context,
+            show_selection_view=show_selection_view,
+        )
+        set_notebook_title(
+            ax,
+            score_title,
+            subtitle=score_subtitle,
+            location=title_location,
         )
         _set_rank_axis(ax, float(sub[x_field].max()), scale=rank_scale)
         if rank_scale == "linear":
@@ -365,19 +371,23 @@ def render(context, params: dict) -> None:
                         rasterize_at=rasterize_at,
                         label="_nolegend_",
                     )
-        ax.set_xlabel(_rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label))
-        ax.set_ylabel(score_label)
-        ax.set_title(
-            _score_rank_title(
-                params.get("title", f"{score_label} vs rank by round"),
-                context=context,
-                show_selection_view=show_selection_view,
-            ),
-            loc=title_location,
-            fontweight="semibold",
-            fontsize=NOTEBOOK_TITLE_FONTSIZE,
-            pad=10,
-            linespacing=1.25,
+        ax.set_xlabel(
+            _rank_axis_label(x_field=x_field, rank_mode=rank_mode, rank_label=rank_label),
+            fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE,
+            labelpad=8,
+        )
+        ax.set_ylabel(score_label, fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
+        ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
+        score_title, score_subtitle = _score_rank_title_parts(
+            params.get("title", f"{score_label} vs rank by round"),
+            context=context,
+            show_selection_view=show_selection_view,
+        )
+        set_notebook_title(
+            ax,
+            score_title,
+            subtitle=score_subtitle,
+            location=title_location,
         )
         _set_rank_axis(ax, float(df[x_field].max()), scale=rank_scale)
         if rank_scale == "linear":
@@ -476,14 +486,19 @@ def _set_rank_axis(ax, max_rank: float, *, scale: str) -> None:
     ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _position: f"{int(value):,}" if value >= 1 else ""))
 
 
-def _score_rank_title(value: object, *, context: object, show_selection_view: bool) -> str:
+def _score_rank_title_parts(
+    value: object,
+    *,
+    context: object,
+    show_selection_view: bool,
+) -> tuple[str, str | None]:
     title = pretty_title(value)
     if not show_selection_view:
-        return wrap_plot_title(title, width=54)
+        return wrap_plot_title(title, width=54), None
     selection_view_id = str(getattr(context, "selection_view_id", "") or "").strip()
     if not selection_view_id:
         raise ValueError("show_selection_view requires an active selection_view_id.")
-    return wrap_plot_title(f"{title} · {pretty_label(selection_view_id)} view", width=54)
+    return wrap_plot_title(title, width=54), f"{pretty_label(selection_view_id)} selection view"
 
 
 def _rank_axis_label(*, x_field: str, rank_mode: str, rank_label: str | None) -> str:

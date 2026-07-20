@@ -28,6 +28,11 @@ from .three_axis_scatter_data import (
 
 THREE_AXIS_PUBLICATION_MODE = "publication_2d"
 THREE_AXIS_INTERACTIVE_MODE = "interactive_3d"
+THREE_AXIS_TITLE_FONTSIZE = 23
+THREE_AXIS_AXIS_TITLE_FONTSIZE = 17
+THREE_AXIS_TICK_FONTSIZE = 14
+THREE_AXIS_LEGEND_FONTSIZE = 14
+THREE_AXIS_BASE_FONTSIZE = 15
 
 _OBSERVED_COLORS = (
     "#7C3AED",
@@ -155,8 +160,8 @@ def build_notebook_three_axis_scatter_figure(
         "zerolinecolor": "#6B7280",
         "zerolinewidth": 1.5,
         "showspikes": False,
-        "tickfont": {"size": 13, "color": "#252525"},
-        "title": {"font": {"size": 16, "color": "#111827"}},
+        "tickfont": {"size": THREE_AXIS_TICK_FONTSIZE, "color": "#252525"},
+        "title": {"font": {"size": THREE_AXIS_AXIS_TITLE_FONTSIZE, "color": "#111827"}},
     }
     title = _title(runtime)
     figure = go.Figure(data=traces)
@@ -167,12 +172,21 @@ def build_notebook_three_axis_scatter_figure(
             "xanchor": "center",
             "y": 0.96,
             "yanchor": "top",
-            "font": {"size": 21, "color": "#111827"},
+            "font": {"size": THREE_AXIS_TITLE_FONTSIZE, "color": "#111827"},
         },
         scene={
-            "xaxis": {**axis_style, "title": {"text": _plotly_label(runtime["x_label"])}},
-            "yaxis": {**axis_style, "title": {"text": _plotly_label(runtime["y_label"])}},
-            "zaxis": {**axis_style, "title": {"text": _plotly_label(runtime["color_label"])}},
+            "xaxis": {
+                **axis_style,
+                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["x_label"])},
+            },
+            "yaxis": {
+                **axis_style,
+                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["y_label"])},
+            },
+            "zaxis": {
+                **axis_style,
+                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["color_label"])},
+            },
             "aspectmode": "cube",
             "camera": {"eye": {"x": 1.55, "y": 1.55, "z": 1.2}},
             "bgcolor": "white",
@@ -183,14 +197,14 @@ def build_notebook_three_axis_scatter_figure(
             "xanchor": "center",
             "y": -0.08,
             "yanchor": "top",
-            "font": {"size": 13},
+            "font": {"size": THREE_AXIS_LEGEND_FONTSIZE},
             "bgcolor": "rgba(255,255,255,0.88)",
         },
-        font={"family": "Arial, Helvetica, sans-serif", "size": 14, "color": "#252525"},
+        font={"family": "Arial, Helvetica, sans-serif", "size": THREE_AXIS_BASE_FONTSIZE, "color": "#252525"},
         paper_bgcolor="white",
         plot_bgcolor="white",
-        height=760,
-        margin={"l": 12, "r": 12, "t": 96, "b": 82},
+        height=800,
+        margin={"l": 16, "r": 16, "t": 104, "b": 92},
         hovermode="closest",
         uirevision=str(contract.get("key") or THREE_AXIS_SCATTER_ADAPTER),
         meta={
@@ -229,9 +243,7 @@ def render_notebook_three_axis_scatter(
         f"sample capped at {background_limit:,} background predictions and retains every selected "
         f"and observed record ({displayed:,} of {complete:,} ledger rows displayed). Hover for exact "
         "candidate identity and family scores. The 2D figure remains the complete publication artifact; "
-        "use the selected-candidate control for sequence inspection. The family axes are distinct "
-        "requirements, not independent latent variables; a thin sheet can reflect shared phenotype "
-        "coordinates rather than a rendering error."
+        "use the selected-candidate control for sequence inspection."
     )
     return mo.vstack([widget, caption], gap=0.2)
 
@@ -309,6 +321,13 @@ def _plotly_label(value: object) -> str:
         if piece
     ]
     return " ".join("".join(rendered).split())
+
+
+def _plotly_axis_label(value: object) -> str:
+    """Wrap a terminal unit phrase so long three-dimensional axes do not collide."""
+
+    label = _plotly_label(value)
+    return re.sub(r"\s+(\([^()]+ units\))$", r"<br>\1", label)
 
 
 def _plotly_math(value: str) -> str:

@@ -27,6 +27,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_artifact_garden_lines,
     build_notebook_artifact_garden_rows,
     build_notebook_at_a_glance_rows,
+    build_notebook_baserender_candidate_catalog,
     build_notebook_baserender_contract,
     build_notebook_baserender_contract_rows,
     build_notebook_baserender_panel_title,
@@ -36,6 +37,7 @@ from dnadesign.opal.src.analysis.notebook_components import (
     build_notebook_baserender_record_controls,
     build_notebook_baserender_record_memory_key,
     build_notebook_baserender_record_options,
+    build_notebook_baserender_selector_model,
     build_notebook_campaign_header_lines,
     build_notebook_campaign_set_metric_comparison_rows,
     build_notebook_campaign_set_selection_overlap_card_rows,
@@ -81,7 +83,8 @@ from dnadesign.opal.src.analysis.notebook_components import (
     select_notebook_baserender_default_record_id,
     select_notebook_plot_scope,
 )
-from dnadesign.opal.src.analysis.notebook_components.plot_text import plot_alt_text
+from dnadesign.opal.src.analysis.notebook_components.plot_text import plot_alt_text, plot_math_description
+from dnadesign.opal.src.analysis.notebook_components.visual_panel_baserender import _candidate_alt_suffix
 from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_set_notebook
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
 from dnadesign.opal.src.core.utils import OpalError
@@ -168,7 +171,7 @@ def test_notebook_campaign_summary_uses_declared_acronym_for_masked_objective() 
             "params": {
                 "state_ids": ["00", "10", "01", "11"],
                 "target_mask": [0, 0, 0, 1],
-                "normalization": {"response_scale": 1.0, "signal_scale": 1.0},
+                "softmin_scale": 1.0,
             },
         },
         "selection": {
@@ -289,6 +292,17 @@ def test_notebook_deliverable_memory_is_scoped_by_review_section() -> None:
     assert 'str((selected_visual_choice or {}).get("selection_scope") or "selection_view")' in text
 
 
+def test_notebook_reader_record_memory_is_scoped_by_campaign_and_deliverable() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+
+    assert "reader_evidence_record_label_memory, set_reader_evidence_record_label_memory = mo.state({})" in text
+    assert "render_notebook_reader_evidence_record_control(" in text
+    assert 'campaign_slug=str((selected_campaign_model.get("campaign") or {}).get("slug") or "")' in text
+    assert "selected_plot_type_label=selected_reader_evidence_plot_type_label" in text
+    assert "memory=reader_evidence_record_label_memory" in text
+    assert "set_memory=set_reader_evidence_record_label_memory" in text
+
+
 def test_notebook_template_uses_visual_surface_component() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     surface_text = render_visual_surface_cells()
@@ -335,7 +349,24 @@ def test_notebook_template_centralizes_visual_control_surface() -> None:
     assert "build_notebook_reader_evidence_visual_choices(" in text
     assert "render_notebook_reader_evidence_plot_type_control(" not in text
     assert 'label="Reader plot type"' not in text
-    assert 'label="Reader plot instance"' in helper_text
+    assert 'label="Reader record"' in helper_text
+
+
+def test_notebook_template_keeps_three_axis_inspector_single_purpose() -> None:
+    text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
+    control_text = Path("src/dnadesign/opal/src/analysis/notebook_components/review_controls.py").read_text()
+    sequence_panel_text = Path(
+        "src/dnadesign/opal/src/analysis/notebook_components/visual_panel_baserender.py"
+    ).read_text()
+    visual_panel_text = Path("src/dnadesign/opal/src/analysis/notebook_components/visual_panel.py").read_text()
+    layout_text = Path("src/dnadesign/opal/src/analysis/notebook_set_template/layout_cells.py").read_text()
+
+    assert "baserender_record_selector=baserender_record_selector" in text
+    assert 'baserender_record_selector if figure_mode == "interactive_3d" else None' not in control_text
+    assert 'mo.hstack(controls, justify="start", align="end", wrap=True, gap=0.35)' in control_text
+    assert "mo.hstack([baserender_record_selector]" not in sequence_panel_text
+    assert "render_notebook_three_axis_sequence_companion" not in visual_panel_text
+    assert 'in {"baserender", "campaign_set_baserender"}' in layout_text
 
 
 def test_notebook_review_control_surface_groups_plot_controls_by_semantics() -> None:
@@ -439,6 +470,45 @@ def test_notebook_review_control_surface_only_shows_baserender_scope_controls_wi
         "selection-run",
         "selected-sequence",
     ]
+
+
+def test_notebook_review_control_surface_excludes_sequence_lookup_from_three_axis_controls() -> None:
+    class _ResponsiveMo:
+        def hstack(self, items: list[object], **kwargs: object) -> dict[str, object]:
+            return {"kind": "hstack", "items": items, "kwargs": kwargs}
+
+    figure_control = SimpleNamespace(value="interactive_3d")
+    rendered = render_notebook_review_control_surface(
+        active_view_mode="Campaign",
+        selection_view_ui="selection-view",
+        visual_group_ui="section",
+        plot_ui="deliverable",
+        layered_scatter_controls={
+            "figure": figure_control,
+            "prediction_pool": "prediction-pool",
+            "selected": "selected-layer",
+            "observed_batches": "observed-layer",
+        },
+        baserender_record_selector="selected-sequence",
+        selected_visual_choice={"surface_kind": "plot"},
+        mo=_ResponsiveMo(),
+    )
+
+    assert rendered["items"] == [
+        "selection-view",
+        "section",
+        "deliverable",
+        figure_control,
+        "prediction-pool",
+        "selected-layer",
+        "observed-layer",
+    ]
+    assert rendered["kwargs"] == {
+        "justify": "start",
+        "align": "end",
+        "wrap": True,
+        "gap": 0.35,
+    }
 
 
 def test_notebook_review_control_surface_rejects_unknown_view_mode() -> None:
@@ -644,7 +714,18 @@ def test_notebook_selection_batch_rejects_stale_presentation_contract() -> None:
         )
 
 
-def test_campaign_set_selection_overlap_choice_and_renderer(tmp_path: Path) -> None:
+def test_campaign_set_selection_overlap_choice_and_renderer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from matplotlib.axes import Axes
+
+    imshow_calls: list[dict[str, object]] = []
+    original_imshow = Axes.imshow
+
+    def _capture_imshow(self, *args, **kwargs):
+        imshow_calls.append(dict(kwargs))
+        return original_imshow(self, *args, **kwargs)
+
+    monkeypatch.setattr(Axes, "imshow", _capture_imshow)
+
     def _campaign(slug: str, rows: list[tuple[str, int, float]]) -> dict[str, object]:
         workdir = tmp_path / slug
         selection_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
@@ -692,6 +773,12 @@ def test_campaign_set_selection_overlap_choice_and_renderer(tmp_path: Path) -> N
     payload = render_notebook_campaign_set_selection_overlap_image(choice)
     assert payload is not None
     assert payload["image_bytes"].startswith(b"\x89PNG")
+    assert imshow_calls[0]["aspect"] == "equal"
+    assert payload["visual_contract"] == {
+        "cell_geometry": "unit_square_cells",
+        "cell_edges": "white",
+        "minimum_tick_font_size_pt": 10,
+    }
     assert "4 unique selected candidates" in payload["alt_text"]
     assert "1 candidates are selected by every campaign" in payload["alt_text"]
     assert build_notebook_campaign_set_selection_overlap_card_rows(choice) == [
@@ -723,7 +810,7 @@ def test_notebook_visual_panel_rejects_unknown_control_surface() -> None:
         )
 
 
-def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -> None:
+def test_notebook_baserender_panel_titles_candidate_by_selection_view_and_rank() -> None:
     rendered: dict[str, object] = {}
 
     class _FakeMo:
@@ -744,10 +831,12 @@ def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -
         baserender_campaign_model={"campaign": {"slug": "secg_msrb_greedy"}},
         baserender_record_id="candidate-record-alpha-with-long-id",
         baserender_record_row={"id": "candidate-record-alpha-with-long-id", "sequence": "ACGT"},
-        baserender_selection_record={
+        baserender_candidate_evidence={
             "record_id": "candidate-record-alpha-with-long-id",
-            "selection_view_id": "and",
-            "view_rank": 7,
+            "active_selection_view_id": "and",
+            "active_view_rank": 7,
+            "selection_memberships": [{"selection_view_id": "and", "view_rank": 7}],
+            "observed_rounds": [],
         },
         build_notebook_baserender_contract_rows=lambda _: [],
         build_notebook_baserender_label_rows=lambda *_, **__: [],
@@ -777,26 +866,86 @@ def test_notebook_baserender_panel_titles_selected_sequence_by_view_and_rank() -
     assert visual["kind"] == "image"
     assert rendered["title"] == ("AND selection · competition rank 7 · candidate candidate-re...-long-id")
     assert visual["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
+    assert visual["alt"].endswith("Selected in campaign secg_msrb_greedy, round 0.")
     assert "candidate-record-alpha-with-long-id" not in str(rendered["title"])
-    assert "Sequence and selection evidence" in panel["items"][1]["items"]
+    assert "Candidate and campaign evidence" in panel["items"][1]["items"]
 
 
 @pytest.mark.parametrize(
-    ("selection_record", "message"),
+    ("candidate_evidence", "message"),
     [
-        ({"record_id": "candidate-1", "selection_view_id": "", "view_rank": 1}, "selection_view_id"),
-        ({"record_id": "", "selection_view_id": "ethanol", "view_rank": 1}, "record_id"),
-        ({"record_id": "candidate-1", "selection_view_id": "ethanol", "view_rank": 0}, "view_rank"),
-        ({"record_id": "candidate-1", "selection_view_id": "ethanol", "view_rank": True}, "view_rank"),
-        ({"record_id": "candidate-1", "selection_view_id": "ethanol", "view_rank": 1.5}, "view_rank"),
+        ({"record_id": "", "selection_memberships": [], "observed_rounds": [0]}, "record_id"),
+        (
+            {
+                "record_id": "candidate-1",
+                "selection_memberships": [{"selection_view_id": "", "view_rank": 1}],
+            },
+            "membership",
+        ),
+        (
+            {
+                "record_id": "candidate-1",
+                "selection_memberships": [{"selection_view_id": "ethanol", "view_rank": 0}],
+            },
+            "membership",
+        ),
+        ({"record_id": "candidate-1", "selection_memberships": [], "observed_rounds": []}, "selected or observed"),
     ],
 )
-def test_notebook_baserender_panel_title_rejects_incomplete_selection_identity(
-    selection_record: dict[str, object],
+def test_notebook_baserender_panel_title_rejects_incomplete_candidate_evidence(
+    candidate_evidence: dict[str, object],
     message: str,
 ) -> None:
     with pytest.raises(ValueError, match=message):
-        build_notebook_baserender_panel_title(selection_record)
+        build_notebook_baserender_panel_title(candidate_evidence)
+
+
+def test_notebook_baserender_panel_titles_observed_only_candidate() -> None:
+    assert (
+        build_notebook_baserender_panel_title(
+            {
+                "record_id": "candidate-record-alpha-with-long-id",
+                "active_selection_view_id": "ethanol",
+                "selection_memberships": [],
+                "observed_rounds": [0, 2],
+            }
+        )
+        == "Observed candidate · round 0, 2 · candidate-re...-long-id"
+    )
+
+
+@pytest.mark.parametrize(
+    ("evidence", "selected_round", "expected"),
+    [
+        (
+            {
+                "selection_memberships": [{"selection_view_id": "ethanol", "view_rank": 1}],
+                "observed_rounds": [],
+            },
+            None,
+            " Selected in campaign fixture.",
+        ),
+        (
+            {"selection_memberships": [], "observed_rounds": [0, 2]},
+            3,
+            " Observed in campaign fixture, rounds 0, 2.",
+        ),
+        (
+            {
+                "selection_memberships": [{"selection_view_id": "and", "view_rank": 4}],
+                "observed_rounds": [0],
+            },
+            2,
+            " Selected in campaign fixture, round 2. Observed in campaign fixture, round 0.",
+        ),
+    ],
+)
+def test_notebook_baserender_alt_text_matches_candidate_evidence_roles(
+    evidence: dict[str, object],
+    selected_round: int | None,
+    expected: str,
+) -> None:
+    assert _candidate_alt_suffix(evidence, campaign_slug="fixture", selected_round=selected_round) == expected
 
 
 def test_notebook_baserender_panel_rejects_record_identity_drift() -> None:
@@ -810,15 +959,16 @@ def test_notebook_baserender_panel_rejects_record_identity_drift() -> None:
         def accordion(self, items: dict[str, object], **kwargs: object) -> dict[str, object]:
             return {"kind": "accordion", "items": items, **kwargs}
 
-    with pytest.raises(ValueError, match="authoritative selection record"):
+    with pytest.raises(ValueError, match="authoritative campaign evidence"):
         render_notebook_visual_panel(
             active_view_mode="Campaign",
             baserender_record_id="candidate-expected",
             baserender_record_row={"id": "candidate-other", "sequence": "ACGT"},
-            baserender_selection_record={
+            baserender_candidate_evidence={
                 "record_id": "candidate-expected",
-                "selection_view_id": "ethanol",
-                "view_rank": 1,
+                "active_selection_view_id": "ethanol",
+                "selection_memberships": [{"selection_view_id": "ethanol", "view_rank": 1}],
+                "observed_rounds": [],
             },
             build_notebook_baserender_contract_rows=lambda _: [],
             build_notebook_baserender_label_rows=lambda *_, **__: [],
@@ -838,7 +988,7 @@ def test_notebook_baserender_panel_rejects_record_identity_drift() -> None:
         )
 
 
-def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> None:
+def test_three_axis_panel_is_not_appended_with_baserender_evidence() -> None:
     rendered: dict[str, object] = {}
 
     class _FakeMo:
@@ -866,10 +1016,11 @@ def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> N
         baserender_record_id="candidate-record-alpha-with-long-id",
         baserender_record_row={"id": "candidate-record-alpha-with-long-id", "sequence": "ACGT"},
         baserender_record_selector=selector,
-        baserender_selection_record={
+        baserender_candidate_evidence={
             "record_id": "candidate-record-alpha-with-long-id",
-            "selection_view_id": "ciprofloxacin",
-            "view_rank": 3,
+            "active_selection_view_id": "ciprofloxacin",
+            "selection_memberships": [{"selection_view_id": "ciprofloxacin", "view_rank": 3}],
+            "observed_rounds": [],
         },
         build_notebook_plot_card_rows=lambda _: [],
         build_notebook_plot_method_sections=lambda _: {},
@@ -893,12 +1044,8 @@ def test_three_axis_panel_pairs_selected_candidate_with_public_baserender() -> N
     )
 
     assert panel["items"][0] == {"kind": "three-axis-plot"}
-    companion = panel["items"][1]
-    assert companion["items"][0]["items"] == [selector]
-    sequence = companion["items"][2]
-    assert sequence["kind"] == "image"
-    assert rendered["title"] == ("Ciprofloxacin selection · competition rank 3 · candidate candidate-re...-long-id")
-    assert sequence["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
+    assert all(item.get("kind") != "image" for item in panel["items"] if isinstance(item, dict))
+    assert rendered == {}
 
 
 def test_notebook_template_does_not_hide_generic_plots_for_sfxi_campaigns() -> None:
@@ -942,7 +1089,7 @@ def test_notebook_template_uses_public_opal_helpers() -> None:
     assert "render_notebook_reader_evidence_panel" in text
     assert "build_notebook_reader_evidence_visual_choices" in text
     assert "render_notebook_reader_evidence_plot_type_control" not in text
-    assert "render_notebook_reader_evidence_artifact_control" in text
+    assert "render_notebook_reader_evidence_record_control" in text
     assert "render_notebook_reader_evidence_time_control" not in text
     assert "render_notebook_review_control_surface" in text
     assert "build_notebook_visual_surface_model" in text
@@ -964,7 +1111,7 @@ def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
     assert 'reader_evidence_surface = _reader_evidence["surface"]' in text
     assert 'selected_visual_choice.get("surface_kind") == "reader_evidence"' in text
     assert "render_notebook_reader_evidence_plot_type_control(" not in text
-    assert "render_notebook_reader_evidence_artifact_control(" in text
+    assert "render_notebook_reader_evidence_record_control(" in text
     assert "render_notebook_reader_evidence_time_control(" not in text
     assert "render_notebook_reader_evidence_artifact_visual(" in text
     assert "render_notebook_reader_evidence_panel(" in text
@@ -973,7 +1120,7 @@ def test_notebook_template_reader_evidence_cells_are_runtime_safe() -> None:
     assert 'label="Reader plot instance"' not in text
     helper_text = Path("src/dnadesign/opal/src/analysis/notebook_components/reader_evidence.py").read_text()
     assert 'label="Reader plot type"' in helper_text
-    assert 'label="Reader plot instance"' in helper_text
+    assert 'label="Reader record"' in helper_text
     assert "mo.accordion(_accordion_items, multiple=True)" in text
     assert "mo.accordion(_accordion_items, multiple=True, lazy=True)" not in text
     assert "_table(_df(_metric_rows))" not in text
@@ -1908,6 +2055,15 @@ def test_registered_plot_alt_text_exposes_primary_visual_encoding() -> None:
         assert "Scope: round 3" in alt_text, kind
 
 
+def test_multistate_behavior_plot_text_uses_raw_units_and_one_softmin_scale() -> None:
+    description = plot_math_description("multistate_response_behavior_frontier")
+
+    assert "raw coordinates are r_on - r_off, b_on, and -b_off" in description
+    assert "shared soft-min scale" in description
+    assert "response_scale" not in description
+    assert "signal_scale" not in description
+
+
 def test_notebook_template_is_valid_python() -> None:
     text = render_campaign_notebook(Path("campaign.yaml"), round_selector="latest")
     ast.parse(text)
@@ -1957,7 +2113,7 @@ def test_campaign_set_notebook_has_campaign_and_plot_dropdowns() -> None:
     assert "build_notebook_validity_rows" in text
     assert "build_notebook_reader_evidence_visual_choices" in text
     assert "render_notebook_reader_evidence_plot_type_control" not in text
-    assert "render_notebook_reader_evidence_artifact_control" in text
+    assert "render_notebook_reader_evidence_record_control" in text
     assert "render_notebook_reader_evidence_time_control" not in text
     assert "render_notebook_review_control_surface" in text
     assert "render_notebook_visual_panel" in text
@@ -2076,7 +2232,7 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     ]
     assert "selected_campaign_analysis" not in evidence_cell
     assert "baserender_record_memory" not in evidence_cell
-    assert "resolve_notebook_baserender_record_selection" in text
+    assert "resolve_notebook_baserender_candidate_record" in text
     assert "load_notebook_baserender_campaign_context" in text
     assert "baserender_record_id" in text
     assert 'label="Selection round"' not in text
@@ -2086,11 +2242,11 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     assert "baserender_campaign_model" in text
     assert "selected_baserender_round" in text
     assert "baserender_selected_round" not in text
-    assert "selected_baserender_records" in text
+    assert "baserender_candidate_records" in text
     assert "selected_baserender_selection_view_id" in text
     assert "baserender_selection_view_ui" in text
     assert "_view_id = str(selected_baserender_selection_view_id)" in text
-    assert "baserender_selection_record" in text
+    assert "baserender_candidate_evidence" in text
     assert "baserender_has_renderable_records" in text
     assert "baserender_diagnostic_panel" in text
     assert "selected_campaign_analysis.read_run_labels_used(" in text
@@ -2106,7 +2262,7 @@ def test_campaign_set_notebook_has_contract_backed_selected_sequence_render_surf
     ).read_text()
     assert '"width": "100%"' in baserender_helper_text
     assert '"background-color": "#FFFFFF"' in baserender_helper_text
-    assert "Sequence and selection evidence" in baserender_helper_text
+    assert "Candidate and campaign evidence" in baserender_helper_text
     assert "Collection plot evidence" in collection_helper_text
     assert "densegen__used_tfbs_detail" not in text
     ast.parse(text)
@@ -2425,6 +2581,68 @@ def test_selected_baserender_record_sets_cover_each_view_exactly_once() -> None:
         )
 
 
+def test_baserender_candidate_catalog_unions_observed_and_all_selected_views() -> None:
+    selection_batch = {
+        "schema_version": "opal.selection_batch.v3",
+        "campaign": {"slug": "campaign"},
+        "as_of_round": 1,
+        "run_id": "run-1",
+        "verification": {"status": "pass"},
+        "rows": [
+            {
+                "id": "selected-ethanol",
+                "campaign_slug": "campaign",
+                "as_of_round": 1,
+                "run_id": "run-1",
+                "selection_view_ids": ["ethanol"],
+                "selection_memberships": [{"selection_view_id": "ethanol", "rank": 1}],
+            },
+            {
+                "id": "selected-cipro",
+                "campaign_slug": "campaign",
+                "as_of_round": 1,
+                "run_id": "run-1",
+                "selection_view_ids": ["ciprofloxacin"],
+                "selection_memberships": [{"selection_view_id": "ciprofloxacin", "rank": 2}],
+            },
+        ],
+    }
+    labels = pl.DataFrame(
+        {
+            "id": ["observed-only", "selected-ethanol"],
+            "observed_round": [0, 0],
+            "src": ["batch-0", "batch-0"],
+        }
+    )
+
+    catalogs, status = build_notebook_baserender_candidate_catalog(
+        selection_batch,
+        labels,
+        campaign_slug="campaign",
+        selection_view_ids=["ethanol", "ciprofloxacin"],
+        round_value=1,
+        run_id="run-1",
+    )
+
+    assert [row["record_id"] for row in catalogs["ethanol"]] == [
+        "selected-ethanol",
+        "selected-cipro",
+        "observed-only",
+    ]
+    assert [row["record_id"] for row in catalogs["ciprofloxacin"]] == [
+        "selected-cipro",
+        "selected-ethanol",
+        "observed-only",
+    ]
+    observed = next(row for row in catalogs["ethanol"] if row["record_id"] == "observed-only")
+    assert observed["evidence_roles"] == ["observed"]
+    assert observed["observed_rounds"] == [0]
+    shared = next(row for row in catalogs["ethanol"] if row["record_id"] == "selected-ethanol")
+    assert shared["evidence_roles"] == ["observed", "selected"]
+    assert shared["active_view_rank"] == 1
+    assert {row["field"]: row["value"] for row in status["ethanol"]}["candidate records"] == 3
+
+
 def test_baserender_selection_batch_scope_is_exact_and_fail_fast() -> None:
     assert resolve_notebook_baserender_selection_batch_scope(None) == (None, None)
     assert resolve_notebook_baserender_selection_batch_scope({}) == (None, None)
@@ -2441,13 +2659,26 @@ def test_baserender_record_memory_round_trip_is_scoped_to_selection_view() -> No
         run_id="run-0",
         round_value=0,
         selection_view_id="ethanol",
+        review_group_key="handoff",
+        deliverable_key="baserender",
     )
     cipro_key = build_notebook_baserender_record_memory_key(
         campaign_slug="campaign",
         run_id="run-0",
         round_value=0,
         selection_view_id="ciprofloxacin",
+        review_group_key="handoff",
+        deliverable_key="baserender",
     )
+    other_deliverable_key = build_notebook_baserender_record_memory_key(
+        campaign_slug="campaign",
+        run_id="run-0",
+        round_value=0,
+        selection_view_id="ethanol",
+        review_group_key="handoff",
+        deliverable_key="other",
+    )
+    assert len({ethanol_key, cipro_key, other_deliverable_key}) == 3
     memory = {ethanol_key: "ethanol-rank-2"}
 
     assert (
@@ -2478,9 +2709,10 @@ def test_baserender_record_memory_round_trip_is_scoped_to_selection_view() -> No
 
 def test_baserender_record_controls_restore_each_selection_view_independently() -> None:
     class _Dropdown:
-        def __init__(self, choices: dict[str, str], value: str, on_change: object) -> None:
+        def __init__(self, choices: dict[str, str], value: str, on_change: object, kwargs: dict[str, object]) -> None:
             self.value = choices[value]
             self.on_change = on_change
+            self.kwargs = kwargs
 
     class _UI:
         def dropdown(
@@ -2489,9 +2721,9 @@ def test_baserender_record_controls_restore_each_selection_view_independently() 
             *,
             value: str,
             on_change: object,
-            **_: object,
+            **kwargs: object,
         ) -> _Dropdown:
-            return _Dropdown(choices, value, on_change)
+            return _Dropdown(choices, value, on_change, kwargs)
 
     evidence = {
         view_id: {
@@ -2517,6 +2749,8 @@ def test_baserender_record_controls_restore_each_selection_view_independently() 
         "campaign_slug": "campaign",
         "run_id": "run-0",
         "round_value": 0,
+        "review_group_key": "handoff",
+        "deliverable_key": "baserender",
         "memory": lambda: memory,
         "set_memory": _set_memory,
         "mo": SimpleNamespace(ui=_UI()),
@@ -2531,6 +2765,9 @@ def test_baserender_record_controls_restore_each_selection_view_independently() 
     controls = build_notebook_baserender_record_controls(evidence, **kwargs)
     assert controls["ethanol"].value == "ethanol-rank-2"
     assert controls["ciprofloxacin"].value == "cipro-rank-2"
+    assert controls["ethanol"].kwargs["label"] == "Candidate lookup"
+    assert controls["ethanol"].kwargs["searchable"] is True
+    assert controls["ethanol"].kwargs["full_width"] is True
 
 
 def test_baserender_record_memory_allows_pre_run_unavailable_state() -> None:
@@ -2546,6 +2783,8 @@ def test_baserender_record_memory_allows_pre_run_unavailable_state() -> None:
         campaign_slug="campaign",
         run_id=None,
         round_value=None,
+        review_group_key="handoff",
+        deliverable_key="baserender",
         memory=lambda: {},
         set_memory=lambda _value: None,
         mo=object(),
@@ -2613,19 +2852,28 @@ def test_baserender_record_choices_label_counts_and_default_to_annotated_record(
         record_ids,
         counts,
         annotation_label="annotated elements",
-        view_ranks={
-            "fixture-record-no-annotations": 7,
-            "fixture-record-five-tfbs-sites": 9,
+        display_aliases={"fixture-record-five-tfbs-sites": "Candidate five"},
+        candidate_evidence={
+            "fixture-record-no-annotations": {
+                "active_view_rank": 7,
+                "selection_memberships": [{"selection_view_id": "ethanol", "view_rank": 7}],
+                "observed_rounds": [],
+            },
+            "fixture-record-five-tfbs-sites": {
+                "active_view_rank": None,
+                "selection_memberships": [],
+                "observed_rounds": [0],
+            },
         },
     )
 
     assert choices == [
         {
-            "label": "Rank 7 · fixture-reco...otations · 0 annotated elements",
+            "label": "Selected rank 7 · fixture-reco...otations · 0 annotated elements",
             "record_id": "fixture-record-no-annotations",
         },
         {
-            "label": "Rank 9 · fixture-reco...bs-sites · 5 annotated elements",
+            "label": "Observed R0 · Candidate five · fixture-reco...bs-sites · 5 annotated elements",
             "record_id": "fixture-record-five-tfbs-sites",
         },
     ]
@@ -2633,6 +2881,20 @@ def test_baserender_record_choices_label_counts_and_default_to_annotated_record(
     assert select_notebook_baserender_default_record_id(record_ids, {}) == record_ids[0]
     assert has_notebook_baserender_record_options(record_ids)
     assert not has_notebook_baserender_record_options(["(no renderable records)"])
+
+
+def test_baserender_record_choices_disambiguate_compact_identifier_collisions() -> None:
+    record_ids = [
+        "abcdefghijkl-MIDDLE-ONE-qrstuvwx",
+        "abcdefghijkl-MIDDLE-TWO-qrstuvwx",
+    ]
+
+    choices = build_notebook_baserender_record_choices_with_counts(record_ids, {})
+
+    assert len(choices) == 2
+    assert len({choice["label"] for choice in choices}) == 2
+    assert {choice["record_id"] for choice in choices} == set(record_ids)
+    assert all(f"ID {choice['record_id']}" in choice["label"] for choice in choices)
 
 
 def test_baserender_densegen_contract_uses_metadata_records_path_for_annotations(tmp_path: Path) -> None:
@@ -2905,7 +3167,7 @@ def test_notebook_baserender_record_options_reject_noncanonical_densegen_annotat
     pq.write_table(table, records_path)
     contract = build_notebook_baserender_contract(table.column_names, records_path=str(records_path))
 
-    with pytest.raises(ValueError, match="Selected BaseRender evidence is incomplete"):
+    with pytest.raises(ValueError, match="BaseRender candidate evidence is incomplete"):
         build_notebook_baserender_record_options(
             records_path,
             contract,
@@ -2947,6 +3209,25 @@ def test_notebook_baserender_record_options_reject_partial_selected_evidence(tmp
             contract,
             record_ids=["good", "bad"],
         )
+
+    model = build_notebook_baserender_selector_model(
+        records_path,
+        contract,
+        [
+            {
+                "record_id": record_id,
+                "active_selection_view_id": "ethanol",
+                "active_view_rank": index,
+                "selection_memberships": [{"selection_view_id": "ethanol", "view_rank": index}],
+                "observed_rounds": [],
+            }
+            for index, record_id in enumerate(("good", "bad"), start=1)
+        ],
+    )
+
+    assert model["record_options"] == ["good"]
+    assert model["unrenderable_record_ids"] == ["bad"]
+    assert model["has_renderable_records"] is True
 
 
 def test_notebook_baserender_record_options_reject_duplicate_record_rows(tmp_path: Path) -> None:

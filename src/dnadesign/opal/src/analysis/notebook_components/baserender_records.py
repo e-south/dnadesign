@@ -44,6 +44,7 @@ def build_notebook_baserender_record_options(
     round_value: Any | None = None,
     record_ids: Iterable[Any] | None = None,
     limit: int = 500,
+    require_all_record_ids: bool = True,
 ) -> list[str]:
     """Return renderable record ids for the active BaseRender contract."""
 
@@ -88,9 +89,9 @@ def build_notebook_baserender_record_options(
     available = set(renderable)
     if record_ids is not None:
         unavailable = [record_id for record_id in selected_ids if record_id not in available]
-        if unavailable:
+        if unavailable and require_all_record_ids:
             raise ValueError(
-                "Selected BaseRender evidence is incomplete; contract-invalid or missing record ids: "
+                "BaseRender candidate evidence is incomplete; contract-invalid or missing record ids: "
                 f"{unavailable[:10]}."
             )
         ordered = [record_id for record_id in selected_ids if record_id in available]
@@ -126,7 +127,7 @@ def build_notebook_baserender_record_annotation_counts(
     *,
     record_ids: Iterable[Any] | None = None,
 ) -> dict[str, int]:
-    """Return per-record annotation counts for selected-sequence dropdown context."""
+    """Return per-record annotation counts for campaign-candidate lookup context."""
 
     if not bool(contract.get("available")):
         return {}
@@ -178,9 +179,10 @@ def build_notebook_baserender_record_choices_with_counts(
     annotation_counts: Mapping[str, int],
     *,
     annotation_label: str = "annotations",
-    view_ranks: Mapping[str, int] | None = None,
+    display_aliases: Mapping[str, str] | None = None,
+    candidate_evidence: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
-    """Return compact dropdown labels with annotation counts and optional view ranks."""
+    """Return searchable candidate labels with annotation and campaign evidence."""
 
     rows = build_notebook_baserender_record_choices(record_ids)
     if not rows or rows[0]["record_id"] == NO_RENDERABLE_RECORDS_LABEL:
@@ -190,29 +192,53 @@ def build_notebook_baserender_record_choices_with_counts(
     for row in rows:
         record_id = str(row["record_id"])
         count = max(0, int(annotation_counts.get(record_id, 0)))
-        if view_ranks is not None:
-            if record_id not in view_ranks:
-                raise ValueError(f"Selected BaseRender record {record_id!r} is missing its competition rank.")
-            rank = int(view_ranks[record_id])
-            if rank <= 0:
-                raise ValueError(f"Selected BaseRender record {record_id!r} has invalid competition rank {rank}.")
-            display = f"Rank {rank} · {compact_record_id(record_id)} · {count} {label}"
-        else:
-            display = f"{row['label']} | {count} {label}"
+        alias = str((display_aliases or {}).get(record_id) or compact_record_id(record_id)).strip()
+        identity = alias if alias == compact_record_id(record_id) else f"{alias} · {compact_record_id(record_id)}"
+        evidence_label = _candidate_evidence_label((candidate_evidence or {}).get(record_id))
+        display = (
+            f"{evidence_label} · {identity} · {count} {label}" if evidence_label else f"{identity} · {count} {label}"
+        )
         out.append(
             {
                 "label": display,
                 "record_id": record_id,
             }
         )
+    label_counts: dict[str, int] = {}
+    for row in out:
+        row_label = str(row["label"])
+        label_counts[row_label] = label_counts.get(row_label, 0) + 1
+    for row in out:
+        row_label = str(row["label"])
+        if label_counts[row_label] > 1:
+            row["label"] = f"{row_label} · ID {row['record_id']}"
+    if len({row["label"] for row in out}) != len(out):
+        raise ValueError("BaseRender candidate labels must be unique after identity disambiguation.")
     return out
+
+
+def _candidate_evidence_label(evidence: Mapping[str, Any] | None) -> str:
+    if not evidence:
+        return ""
+    active_rank = evidence.get("active_view_rank")
+    memberships = [row for row in evidence.get("selection_memberships") or () if isinstance(row, Mapping)]
+    observed_rounds = [int(value) for value in evidence.get("observed_rounds") or ()]
+    parts: list[str] = []
+    if active_rank is not None:
+        parts.append(f"Selected rank {int(active_rank)}")
+    elif memberships:
+        views = ", ".join(sorted({str(row.get("selection_view_id") or "").strip() for row in memberships}))
+        parts.append(f"Selected in {views}")
+    if observed_rounds:
+        parts.append("Observed " + ", ".join(f"R{value}" for value in sorted(set(observed_rounds))))
+    return " + ".join(parts)
 
 
 def select_notebook_baserender_default_record_id(
     record_ids: Iterable[Any],
     annotation_counts: Mapping[str, int] | None = None,
 ) -> str:
-    """Choose the first annotated selected record, falling back to the first selected record."""
+    """Choose the first annotated candidate, falling back to the first candidate."""
 
     values = normalise_record_ids(record_ids)
     if not values:

@@ -21,8 +21,8 @@ import polars as pl
 
 from dnadesign.opal.api.multistate_response_behavior import (
     binary_target_mask,
-    parse_normalization,
     score_multistate_response_behavior,
+    validated_softmin_scale,
     validated_state_ids,
 )
 
@@ -51,7 +51,7 @@ class MultistateResponseBehaviorPlotData:
     observed_frame: pd.DataFrame
     state_ids: tuple[str, ...]
     target_mask: tuple[int, ...]
-    normalization: dict[str, float]
+    softmin_scale: float
     coordinate_labels: tuple[str, ...]
     round_k: int
     run_id: str
@@ -87,7 +87,7 @@ def load_multistate_response_behavior_plot_data(
     try:
         state_ids = validated_state_ids(params["state_ids"])
         target_mask = tuple(int(value) for value in binary_target_mask(params["target_mask"]).astype(int).tolist())
-        normalization = parse_normalization(params["normalization"])
+        softmin_scale = validated_softmin_scale(params["softmin_scale"])
     except (TypeError, ValueError) as exc:
         raise OpalError(
             f"Behavior run parameters violate the public objective contract: {exc}",
@@ -113,7 +113,7 @@ def load_multistate_response_behavior_plot_data(
         events,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
         selection_view_id=context.selection_view_id,
     )
     observed_snapshot = read_run_observed_events(
@@ -127,12 +127,12 @@ def load_multistate_response_behavior_plot_data(
         observed_snapshot.frame.to_pandas(),
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
     )
     coordinate_labels = _coordinate_labels(
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
     )
     selected_coordinate_frame = None
     if detail_scope == SELECTED_COORDINATE_DETAIL_SCOPE:
@@ -140,7 +140,7 @@ def load_multistate_response_behavior_plot_data(
             frame,
             state_ids=state_ids,
             target_mask=target_mask,
-            normalization=normalization,
+            softmin_scale=softmin_scale,
             coordinate_labels=coordinate_labels,
         )
     frame = frame.drop(columns=["pred__y_hat_model"])
@@ -149,7 +149,7 @@ def load_multistate_response_behavior_plot_data(
         observed_frame=observed_frame,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
         coordinate_labels=coordinate_labels,
         round_k=round_k,
         run_id=run_id,
@@ -162,7 +162,7 @@ def multistate_response_behavior_plot_frame(
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
-    normalization: Mapping[str, object],
+    softmin_scale: object,
     selection_view_id: str,
 ) -> pd.DataFrame:
     """Replay behavior predictions and reject persisted score drift."""
@@ -209,7 +209,7 @@ def multistate_response_behavior_plot_frame(
         values,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
         context="Behavior prediction vectors",
     )
     persisted = frame[BEHAVIOR_SCORE_REF].to_numpy(dtype=float)
@@ -228,7 +228,7 @@ def multistate_response_behavior_observed_frame(
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
-    normalization: Mapping[str, object],
+    softmin_scale: object,
 ) -> pd.DataFrame:
     """Replay every run-pinned observed event under one behavior target view."""
 
@@ -256,7 +256,7 @@ def multistate_response_behavior_observed_frame(
         values,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
         context="Behavior observed vectors",
     )
     frame = pd.DataFrame(
@@ -277,7 +277,7 @@ def _score(
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
-    normalization: Mapping[str, object],
+    softmin_scale: object,
     context: str,
 ):
     try:
@@ -285,7 +285,7 @@ def _score(
             values,
             state_ids=state_ids,
             target_mask=target_mask,
-            normalization=normalization,
+            softmin_scale=softmin_scale,
         )
     except (TypeError, ValueError) as exc:
         raise OpalError(f"{context} violate the objective contract: {exc}", ExitCodes.CONTRACT_VIOLATION) from exc
@@ -364,14 +364,14 @@ def _coordinate_labels(
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
-    normalization: Mapping[str, object],
+    softmin_scale: object,
 ) -> tuple[str, ...]:
     state_count = len(state_ids)
     scored = _score(
         np.zeros((1, 2 * state_count), dtype=float),
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
         context="Behavior coordinate contract",
     )
     return tuple(str(value) for value in scored.coordinate_labels)
@@ -382,7 +382,7 @@ def _selected_coordinate_frame(
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
-    normalization: Mapping[str, object],
+    softmin_scale: object,
     coordinate_labels: Sequence[str],
 ) -> pd.DataFrame:
     selected = frame.loc[frame["view__is_selected"]].copy()
@@ -392,7 +392,7 @@ def _selected_coordinate_frame(
         _vector_matrix(selected["pred__y_hat_model"], context="selected behavior prediction vectors"),
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
         context="Selected behavior prediction vectors",
     )
     scored_labels = tuple(str(value) for value in scored.coordinate_labels)
@@ -455,10 +455,10 @@ def _objective_params(run_row: Mapping[str, object]) -> Mapping[str, object]:
     params = run_row.get("objective_params")
     if not isinstance(params, Mapping):
         raise OpalError("Run ledger behavior objective params must be a mapping.", ExitCodes.CONTRACT_VIOLATION)
-    required = {"state_ids", "target_mask", "normalization"}
+    required = {"state_ids", "target_mask", "softmin_scale"}
     if set(params) != required:
         raise OpalError(
-            "Behavior objective params must contain exactly state_ids, target_mask, and normalization.",
+            "Behavior objective params must contain exactly state_ids, target_mask, and softmin_scale.",
             ExitCodes.CONTRACT_VIOLATION,
         )
     return params

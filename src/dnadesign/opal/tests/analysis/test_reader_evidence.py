@@ -17,6 +17,7 @@ from dnadesign.opal.src.analysis.notebook_components import reader_evidence_visu
 from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     build_notebook_reader_evidence_artifact_options,
     build_notebook_reader_evidence_plot_type_options,
+    build_notebook_reader_evidence_record_memory_key,
     build_notebook_reader_evidence_surface,
     build_notebook_reader_evidence_visual_choices,
     discover_reader_evidence_artifacts,
@@ -24,6 +25,8 @@ from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     render_notebook_reader_evidence_artifact_control,
     render_notebook_reader_evidence_artifact_visual,
     render_notebook_reader_evidence_plot_type_control,
+    render_notebook_reader_evidence_record_control,
+    resolve_notebook_reader_evidence_preferred_record_label,
 )
 
 
@@ -109,7 +112,7 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     assert build_notebook_reader_evidence_artifact_options(
         surface,
         selected_plot_type_label="SFXI vec8 heatmap",
-    ) == ["Round 0 · 2026-07-06 · SFXI · pDual-10-SECG-B0-ETH-01 · 12.04 h · PNG"]
+    ) == ["Round 0 · 2026-07-06 · SFXI · pDual-10-SECG-B0-ETH-01 · 12.04 h"]
 
 
 def test_reader_evidence_labels_disambiguate_media_without_exposing_paths(tmp_path: Path) -> None:
@@ -144,20 +147,20 @@ def test_reader_evidence_labels_disambiguate_media_without_exposing_paths(tmp_pa
                             {
                                 "semantic_kind": "promoter_response_evidence",
                                 "kind": "reader_publication",
-                                "record_id": "plot:png",
-                                "scope": "design_reduction",
-                                "path": str(png),
-                                "exists": True,
-                                "media_type": "image/png",
-                            },
-                            {
-                                "semantic_kind": "promoter_response_evidence",
-                                "kind": "reader_publication",
                                 "record_id": "plot:pdf",
                                 "scope": "design_reduction",
                                 "path": str(pdf),
                                 "exists": True,
                                 "media_type": "application/pdf",
+                            },
+                            {
+                                "semantic_kind": "promoter_response_evidence",
+                                "kind": "reader_publication",
+                                "record_id": "plot:png",
+                                "scope": "design_reduction",
+                                "path": str(png),
+                                "exists": True,
+                                "media_type": "image/png",
                             },
                         ],
                     }
@@ -177,10 +180,13 @@ def test_reader_evidence_labels_disambiguate_media_without_exposing_paths(tmp_pa
     assert build_notebook_reader_evidence_artifact_options(
         surface,
         selected_plot_type_label="Promoter response evidence",
-    ) == [
-        "Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event · PNG",
-        "Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event · PDF",
+    ) == ["Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event"]
+    assert surface["media_rows"][0]["media_type"] == "image/png"
+    assert [item["media_type"] for item in surface["media_rows"][0]["available_media"]] == [
+        "image/png",
+        "application/pdf",
     ]
+    assert len(surface["artifact_rows"]) == 2
     assert all("/reader/" not in label for label in surface["media_labels"])
 
 
@@ -285,12 +291,14 @@ def test_reader_evidence_visual_choices_join_deliverable_universe() -> None:
             "label": "Reader evidence | Plate-reader time series",
             "title": "Plate-reader time series",
             "surface_kind": "reader_evidence",
+            "selection_scope": "campaign",
             "reader_plot_type_label": "Plate-reader time series",
         },
         {
             "label": "Reader evidence | Time series + snapshot",
             "title": "Time series + snapshot",
             "surface_kind": "reader_evidence",
+            "selection_scope": "campaign",
             "reader_plot_type_label": "Time series + snapshot",
         },
     ]
@@ -313,14 +321,112 @@ def test_reader_evidence_controls_use_reader_scoped_plot_labels() -> None:
     mo = _FakeMo()
 
     plot_ui = render_notebook_reader_evidence_plot_type_control(surface, mo=mo)
+    remembered = "r1 | exp | design | 12.00 h"
+    on_change = object()
+    surface["media_rows"].append(
+        {
+            **surface["media_rows"][0],
+            "label": remembered,
+        }
+    )
     artifact_ui = render_notebook_reader_evidence_artifact_control(
         surface,
         selected_plot_type_label="Time series + snapshot",
+        preferred_record_label=remembered,
+        on_change=on_change,
         mo=mo,
     )
 
     assert plot_ui["label"] == "Reader plot type"
-    assert artifact_ui["label"] == "Reader plot instance"
+    assert artifact_ui["label"] == "Reader record"
+    assert artifact_ui["value"] == remembered
+    assert artifact_ui["on_change"] is on_change
+
+
+def test_reader_evidence_record_memory_key_is_campaign_and_deliverable_scoped() -> None:
+    key = build_notebook_reader_evidence_record_memory_key(
+        campaign_slug="secg_msrb_greedy",
+        reader_plot_type_label="Promoter response evidence",
+    )
+
+    assert key == (
+        'reader_evidence_record_v1:{"campaign_slug":"secg_msrb_greedy",'
+        '"reader_plot_type_label":"Promoter response evidence"}'
+    )
+    assert key != build_notebook_reader_evidence_record_memory_key(
+        campaign_slug="other_campaign",
+        reader_plot_type_label="Promoter response evidence",
+    )
+    assert key != build_notebook_reader_evidence_record_memory_key(
+        campaign_slug="secg_msrb_greedy",
+        reader_plot_type_label="SFXI vec8 heatmap",
+    )
+
+
+def test_reader_evidence_record_memory_restores_only_current_membership() -> None:
+    options = ["Round 0 · first", "Round 1 · second"]
+
+    assert (
+        resolve_notebook_reader_evidence_preferred_record_label(
+            options,
+            preferred_record_label="Round 1 · second",
+        )
+        == "Round 1 · second"
+    )
+    assert (
+        resolve_notebook_reader_evidence_preferred_record_label(
+            options,
+            preferred_record_label="Round 2 · stale",
+        )
+        == "Round 0 · first"
+    )
+    assert (
+        resolve_notebook_reader_evidence_preferred_record_label(
+            options,
+            preferred_record_label=None,
+        )
+        == "Round 0 · first"
+    )
+
+
+def test_reader_evidence_record_control_updates_campaign_deliverable_memory() -> None:
+    surface = {
+        "media_rows": [
+            {
+                "label": "Round 0 · first",
+                "plot_type_label": "Promoter response evidence",
+            },
+            {
+                "label": "Round 0 · second",
+                "plot_type_label": "Promoter response evidence",
+            },
+        ]
+    }
+    key = build_notebook_reader_evidence_record_memory_key(
+        campaign_slug="secg_msrb_greedy",
+        reader_plot_type_label="Promoter response evidence",
+    )
+    state = {key: "Round 0 · second"}
+
+    def memory() -> dict[str, str]:
+        return state
+
+    def set_memory(value: dict[str, str]) -> None:
+        state.clear()
+        state.update(value)
+
+    control = render_notebook_reader_evidence_record_control(
+        surface,
+        campaign_slug="secg_msrb_greedy",
+        selected_plot_type_label="Promoter response evidence",
+        memory=memory,
+        set_memory=set_memory,
+        mo=_FakeMo(),
+    )
+
+    assert control["value"] == "Round 0 · second"
+    control["on_change"]("Round 0 · first")
+    assert state == {key: "Round 0 · first"}
 
 
 def test_reader_sfxi_triptych_pdf_renders_as_completed_static_artifact(tmp_path: Path, monkeypatch) -> None:
@@ -413,6 +519,7 @@ class _FakeUi:
         label: str,
         searchable: bool = False,
         full_width: bool = False,
+        on_change: object | None = None,
     ) -> dict[str, object]:
         return {
             "kind": "dropdown",
@@ -421,6 +528,7 @@ class _FakeUi:
             "label": label,
             "searchable": searchable,
             "full_width": full_width,
+            "on_change": on_change,
         }
 
     def slider(

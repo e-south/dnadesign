@@ -25,7 +25,6 @@ from ._mpl_utils import (
     NOTEBOOK_COLORBAR_LABEL_FONTSIZE,
     NOTEBOOK_LEGEND_FONTSIZE,
     NOTEBOOK_TICK_FONTSIZE,
-    NOTEBOOK_TITLE_FONTSIZE,
     SIGNED_MARGIN_CMAP,
     add_flush_colorbar,
     apply_notebook_axes_style,
@@ -35,6 +34,7 @@ from ._mpl_utils import (
     pretty_batch_label,
     pretty_label,
     scatter_smart,
+    set_notebook_title,
     wrap_plot_title,
 )
 from .candidate_annotations import (
@@ -66,8 +66,9 @@ _DECOMPOSITION_KIND = "response_magnitude_feasibility_constraint_decomposition"
         rationale="The three requirements remain visible instead of being hidden inside one scalar score.",
         alt_text=(
             "Scatter plot of predicted target-ON/OFF response separation against the target-ON fluorescence floor. "
-            "Color encodes the signed target-OFF constraint: blue is below the boundary, white is zero, and red is "
-            "greater clearance. Favorable candidates therefore move right, up, and red. Zero marks each configured "
+            "Color encodes the signed target-OFF constraint; larger colorbar values mean greater clearance. "
+            "Favorable candidates therefore move right, up, and toward larger colorbar values. Zero marks each "
+            "configured "
             "boundary. Distinct marker shapes identify observed batches, and filled diamonds identify selected "
             "candidates without hiding their target-OFF values."
         ),
@@ -232,13 +233,10 @@ def render_frontier(context: Any, params: dict) -> None:
         context=context,
     )
     ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
-    ax.set_title(
-        f"{wrap_plot_title(title, width=50)}\n{wrap_plot_title(_target_context(data, params), width=56)}",
-        loc="center",
-        fontweight="semibold",
-        fontsize=NOTEBOOK_TITLE_FONTSIZE,
-        pad=10,
-        linespacing=1.25,
+    set_notebook_title(
+        ax,
+        wrap_plot_title(title, width=50),
+        subtitle=wrap_plot_title(_target_context(data, params), width=56),
     )
     ax.legend(
         loc="upper center",
@@ -253,7 +251,7 @@ def render_frontier(context: Any, params: dict) -> None:
         fig,
         ax,
         points,
-        label=f"{off_label}\nred = greater clearance; 0 = boundary",
+        label=f"{off_label}\nlarger = greater clearance; 0 = boundary",
         pad=0.065,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )
@@ -290,7 +288,7 @@ def render_frontier(context: Any, params: dict) -> None:
         "color_scale": {
             "center": 0.0,
             "extent": color_extent,
-            "context": "red = greater clearance; 0 = configured boundary",
+            "context": "larger = greater clearance; 0 = configured boundary",
         },
         "x_limits": [float(value) for value in ax.get_xlim()],
         "y_limits": [float(value) for value in ax.get_ylim()],
@@ -413,13 +411,10 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
         params.get("title", "Predicted RMF margins for selected candidates"),
         context=context,
     )
-    ax.set_title(
-        f"{wrap_plot_title(title, width=50)}\n{wrap_plot_title(_target_context(data, params), width=56)}",
-        loc="center",
-        fontweight="semibold",
-        fontsize=NOTEBOOK_TITLE_FONTSIZE,
-        pad=10,
-        linespacing=1.25,
+    set_notebook_title(
+        ax,
+        wrap_plot_title(title, width=50),
+        subtitle=wrap_plot_title(_target_context(data, params), width=56),
     )
     for row in range(matrix.shape[0]):
         limiting_column = int(np.argmin(matrix[row, :3]))
@@ -449,7 +444,7 @@ def render_constraint_decomposition(context: Any, params: dict) -> None:
         fig,
         ax,
         image,
-        label="Standardized margin\nred = favorable; 0 = boundary\noutline = limiting",
+        label="Standardized margin\nlarger = more favorable; 0 = boundary\noutline = limiting",
         pad=0.06,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
     )

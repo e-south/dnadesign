@@ -19,10 +19,22 @@ def render_reader_evidence_cells() -> str:
 
     return "\n\n".join(
         (
+            _reader_evidence_record_memory_cell(),
             _reader_evidence_plot_type_cell(),
             _reader_evidence_artifact_cell(),
             _reader_evidence_visual_cell(),
         )
+    )
+
+
+def _reader_evidence_record_memory_cell() -> str:
+    return block(
+        """
+        @app.cell
+        def _(mo):
+            reader_evidence_record_label_memory, set_reader_evidence_record_label_memory = mo.state({})
+            return reader_evidence_record_label_memory, set_reader_evidence_record_label_memory
+        """
     )
 
 
@@ -53,13 +65,19 @@ def _reader_evidence_artifact_cell() -> str:
         @app.cell
         def _(
             mo,
+            reader_evidence_record_label_memory,
             reader_evidence_surface,
-            render_notebook_reader_evidence_artifact_control,
+            render_notebook_reader_evidence_record_control,
+            selected_campaign_model,
             selected_reader_evidence_plot_type_label,
+            set_reader_evidence_record_label_memory,
         ):
-            reader_evidence_artifact_ui = render_notebook_reader_evidence_artifact_control(
+            reader_evidence_artifact_ui = render_notebook_reader_evidence_record_control(
                 reader_evidence_surface,
+                campaign_slug=str((selected_campaign_model.get("campaign") or {}).get("slug") or ""),
                 selected_plot_type_label=selected_reader_evidence_plot_type_label,
+                memory=reader_evidence_record_label_memory,
+                set_memory=set_reader_evidence_record_label_memory,
                 mo=mo,
             )
             return reader_evidence_artifact_ui, selected_reader_evidence_plot_type_label

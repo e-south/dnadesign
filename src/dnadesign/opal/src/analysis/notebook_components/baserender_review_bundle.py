@@ -16,9 +16,9 @@ from pathlib import Path
 from typing import Any
 
 from .baserender import build_notebook_baserender_contract_rows
+from .baserender_candidate_catalog import build_notebook_baserender_candidate_catalog
 from .baserender_diagnostics import render_notebook_baserender_diagnostic_panel
 from .baserender_record_memory import build_notebook_baserender_record_memory_key
-from .baserender_record_selection import build_notebook_selected_baserender_record_sets
 from .baserender_selector import build_notebook_baserender_selector_model, render_notebook_baserender_selector
 from .selection_views import build_notebook_selection_view_options
 
@@ -28,20 +28,22 @@ def build_notebook_baserender_evidence_bundle(
     contract: Mapping[str, Any],
     campaign_model: Mapping[str, Any],
     *,
+    labels_df: Any,
     run_id: Any,
     round_value: Any,
     mo: Any,
     opal_table: Any,
     pl: Any,
 ) -> dict[str, dict[str, Any]]:
-    """Build immutable selected-record evidence for every selection view."""
+    """Build immutable campaign-candidate evidence for every selection view."""
 
     view_options = build_notebook_selection_view_options(campaign_model)
     view_ids = tuple(dict.fromkeys(str(value) for value in view_options.values()))
     campaign = campaign_model.get("campaign") or {}
     campaign_slug = str(campaign.get("slug") or "").strip()
-    records_by_view, status_by_view = build_notebook_selected_baserender_record_sets(
+    records_by_view, status_by_view = build_notebook_baserender_candidate_catalog(
         campaign_model.get("selection_batch"),
+        labels_df,
         campaign_slug=campaign_slug,
         selection_view_ids=view_ids,
         round_value=round_value,
@@ -53,9 +55,11 @@ def build_notebook_baserender_evidence_bundle(
         status_rows = status_by_view[view_id]
         selector_model = build_notebook_baserender_selector_model(records_path, contract, records)
         has_renderable_records = bool(selector_model["has_renderable_records"])
+        unrenderable_record_ids = list(selector_model["unrenderable_record_ids"])
         diagnostic_panel = render_notebook_baserender_diagnostic_panel(
             has_renderable_records=has_renderable_records,
-            selected_record_ids=[str(row["record_id"]) for row in records],
+            candidate_record_ids=[str(row["record_id"]) for row in records],
+            unrenderable_record_ids=unrenderable_record_ids,
             status_rows=status_rows,
             contract=contract,
             build_contract_rows=build_notebook_baserender_contract_rows,
@@ -68,6 +72,8 @@ def build_notebook_baserender_evidence_bundle(
             "status_rows": status_rows,
             "selector_model": selector_model,
             "has_renderable_records": has_renderable_records,
+            "has_candidate_records": bool(records),
+            "unrenderable_record_ids": unrenderable_record_ids,
             "diagnostic_panel": diagnostic_panel,
         }
     return bundle
@@ -79,6 +85,8 @@ def build_notebook_baserender_record_controls(
     campaign_slug: Any,
     run_id: Any,
     round_value: Any,
+    review_group_key: Any,
+    deliverable_key: Any,
     memory: Any,
     set_memory: Any,
     mo: Any,
@@ -95,6 +103,8 @@ def build_notebook_baserender_record_controls(
                 run_id=run_id,
                 round_value=round_value,
                 selection_view_id=view_id,
+                review_group_key=review_group_key,
+                deliverable_key=deliverable_key,
             )
             if has_memory_scope
             else None

@@ -89,7 +89,14 @@ def test_score_rank_reference_boundary_is_annotated_and_included_without_loose_s
     ax = captured[0].axes[0]
     reference_lines = [line for line in ax.lines if line.get_linestyle() == "--" and np.allclose(line.get_ydata(), 0.0)]
     assert len(reference_lines) == 1
-    assert [text.get_text() for text in ax.texts] == ["Feasibility boundary"]
+    subtitle = next(text for text in ax.texts if text.get_gid() == "notebook-plot-subtitle")
+    assert subtitle.get_text() == "Ethanol selection view"
+    assert subtitle.get_fontsize() >= 14
+    assert [text.get_text() for text in ax.texts if text.get_gid() != "notebook-plot-subtitle"] == [
+        "Feasibility boundary"
+    ]
+    reference_label = next(text for text in ax.texts if text.get_text() == "Feasibility boundary")
+    assert reference_label.get_fontsize() >= 10.5
     lower, upper = ax.get_ylim()
     assert lower < -5.0 < upper
     assert upper > 0.0
@@ -97,10 +104,14 @@ def test_score_rank_reference_boundary_is_annotated_and_included_without_loose_s
     legend = ax.get_legend()
     assert legend is not None
     assert "Allocated to this view" in [text.get_text() for text in legend.get_texts()]
-    assert ax.get_title(loc="center") == "RMF score by active view rank · Ethanol view"
+    assert ax.get_title(loc="center") == "RMF score by active view rank"
     assert ax.get_title(loc="left") == ""
-    assert ax.title.get_fontsize() >= 14
-    assert min(text.get_fontsize() for text in legend.get_texts()) >= 9.5
+    assert ax.title.get_fontsize() >= 18
+    assert ax.xaxis.label.get_fontsize() >= 15
+    assert ax.yaxis.label.get_fontsize() >= 15
+    assert min(tick.get_fontsize() for tick in ax.get_xticklabels()) >= 12
+    assert min(tick.get_fontsize() for tick in ax.get_yticklabels()) >= 12
+    assert min(text.get_fontsize() for text in legend.get_texts()) >= 12
     captured[0].canvas.draw()
     legend_bounds = legend.get_window_extent(captured[0].canvas.get_renderer())
     reference_y = ax.transData.transform((1.0, 0.0))[1]

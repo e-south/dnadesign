@@ -54,7 +54,7 @@ class _DummyWorkspace:
 
 STATE_IDS = ("baseline", "stress-a", "stress-b")
 TARGET_MASK = (0, 1, 0)
-NORMALIZATION = {"response_scale": 1.0, "signal_scale": 1.0}
+SOFTMIN_SCALE = 1.0
 VECTORS = np.asarray(
     [
         [0.0, 2.0, 0.2, -1.0, 1.2, -0.6],
@@ -74,7 +74,7 @@ def _prediction_events(*, drift: float = 0.0) -> pd.DataFrame:
         VECTORS,
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
     )
     return pd.DataFrame(
         {
@@ -105,13 +105,13 @@ def _plot_data() -> MultistateResponseBehaviorPlotData:
         ),
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
     )
     frame = multistate_response_behavior_plot_frame(
         _prediction_events(),
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
         selection_view_id="stress-a",
     )
     coordinate_labels = (
@@ -126,7 +126,7 @@ def _plot_data() -> MultistateResponseBehaviorPlotData:
         observed_frame=observed,
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
         coordinate_labels=coordinate_labels,
         round_k=0,
         run_id="r0",
@@ -134,7 +134,7 @@ def _plot_data() -> MultistateResponseBehaviorPlotData:
             frame,
             state_ids=STATE_IDS,
             target_mask=TARGET_MASK,
-            normalization=NORMALIZATION,
+            softmin_scale=SOFTMIN_SCALE,
             coordinate_labels=coordinate_labels,
         ),
     )
@@ -195,7 +195,7 @@ def test_behavior_plot_loader_uses_run_pinned_observed_events(
                             "params": {
                                 "state_ids": list(STATE_IDS),
                                 "target_mask": list(TARGET_MASK),
-                                "normalization": NORMALIZATION,
+                                "softmin_scale": SOFTMIN_SCALE,
                             },
                         }
                     ]
@@ -263,7 +263,7 @@ def test_behavior_plot_loader_uses_run_pinned_observed_events(
         VECTORS[:2],
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
     )
     np.testing.assert_allclose(
         np.asarray(detailed.selected_coordinate_frame["coordinate_clearances"].tolist()),
@@ -284,12 +284,44 @@ def test_behavior_plot_loader_rejects_unknown_detail_scope_before_io() -> None:
         load_multistate_response_behavior_plot_data(object(), detail_scope="all_coordinates")  # type: ignore[arg-type]
 
 
+def test_behavior_plot_coordinates_remain_in_raw_input_units() -> None:
+    frame = pd.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "pred__y_hat_model": [VECTORS[0].tolist()],
+            "view__rank_competition": [1],
+            "view__is_selected": [True],
+        }
+    )
+    coordinate_labels = (
+        "response:stress-a>baseline",
+        "response:stress-a>stress-b",
+        "on_signal:stress-a",
+        "off_signal_suppression:baseline",
+        "off_signal_suppression:stress-b",
+    )
+
+    selected = _selected_coordinate_frame(
+        frame,
+        state_ids=STATE_IDS,
+        target_mask=TARGET_MASK,
+        softmin_scale=0.5,
+        coordinate_labels=coordinate_labels,
+    )
+
+    np.testing.assert_allclose(
+        np.asarray(selected.loc[0, "coordinate_clearances"], dtype=float),
+        np.asarray([2.0, 1.8, 1.2, 1.0, 0.6]),
+    )
+    assert selected.loc[0, HARD_BOTTLENECK_REF] == pytest.approx(0.6)
+
+
 def test_behavior_plot_frame_replays_public_math_and_rejects_persisted_score_drift() -> None:
     frame = multistate_response_behavior_plot_frame(
         _prediction_events(),
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
         selection_view_id="stress-a",
     )
 
@@ -311,7 +343,7 @@ def test_behavior_plot_frame_replays_public_math_and_rejects_persisted_score_dri
         VECTORS,
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
     )
     assert frame["limiting_coordinate_label"].astype(str).tolist() == list(expected.limiting_coordinate_label)
     with pytest.raises(OpalError, match="canonical objective math"):
@@ -319,7 +351,7 @@ def test_behavior_plot_frame_replays_public_math_and_rejects_persisted_score_dri
             _prediction_events(drift=0.1),
             state_ids=STATE_IDS,
             target_mask=TARGET_MASK,
-            normalization=NORMALIZATION,
+            softmin_scale=SOFTMIN_SCALE,
             selection_view_id="stress-a",
         )
 
@@ -344,7 +376,7 @@ def test_behavior_plot_frame_rejects_truthy_strings_and_fractional_ranks(
             events,
             state_ids=STATE_IDS,
             target_mask=TARGET_MASK,
-            normalization=NORMALIZATION,
+            softmin_scale=SOFTMIN_SCALE,
             selection_view_id="stress-a",
         )
 
@@ -362,7 +394,7 @@ def test_behavior_observed_replay_preserves_repeated_candidate_events() -> None:
         ),
         state_ids=STATE_IDS,
         target_mask=TARGET_MASK,
-        normalization=NORMALIZATION,
+        softmin_scale=SOFTMIN_SCALE,
     )
 
     assert observed[["id", "observed_round", "batch_key"]].to_dict(orient="records") == [
@@ -449,22 +481,29 @@ def test_behavior_frontier_declares_reference_semantics_without_feasibility_guid
     axis = figure.axes[0]
     runtime = context.artifact_metadata["notebook_view"]
     assert runtime["reference_lines"] == {"x": [], "y": []}
+    assert runtime["score_units"] == "objective_input_units"
+    assert runtime["softmin_scale"] == pytest.approx(SOFTMIN_SCALE)
     assert runtime["color_scale"]["center"] == pytest.approx(0.0)
     assert runtime["color_scale"]["extend"] == "neither"
     assert "not feasibility" in runtime["color_scale"]["context"]
     assert not axis.lines
     assert axis.get_title(loc="center").startswith("Multistate behavior family landscape · Stress A")
-    assert axis.title.get_fontsize() >= 14
-    assert axis.xaxis.label.get_fontsize() >= 11.5
-    assert axis.yaxis.label.get_fontsize() >= 11.5
+    assert "[input units]" in axis.get_xlabel()
+    assert "[input units]" in axis.get_ylabel()
+    assert axis.title.get_fontsize() >= 18
+    assert axis.xaxis.label.get_fontsize() >= 15
+    assert axis.yaxis.label.get_fontsize() >= 15
+    assert min(tick.get_fontsize() for tick in axis.get_xticklabels()) >= 12
+    assert min(tick.get_fontsize() for tick in axis.get_yticklabels()) >= 12
     assert not axis.spines["top"].get_visible()
     assert not axis.spines["right"].get_visible()
     assert axis.get_legend().get_bbox_to_anchor()._bbox.y0 < 0.0
-    assert min(text.get_fontsize() for text in axis.get_legend().get_texts()) >= 9.5
+    assert min(text.get_fontsize() for text in axis.get_legend().get_texts()) >= 12
     legend_handles = axis.get_legend().legend_handles
     assert legend_handles[0].get_markerfacecolor() == "#D0D0D0"
     assert all(handle.get_markerfacecolor() == "none" for handle in legend_handles[1:])
-    assert figure.axes[-1].get_ylabel() == r"OFF-signal-suppression family score, $S_{\mathrm{OFF}}$"
+    assert figure.axes[-1].get_ylabel() == r"OFF-signal suppression, $S_{\mathrm{OFF}}$ [input units]"
+    assert figure.axes[-1].yaxis.label.get_fontsize() >= 13.5
     assert runtime["color_scale"]["context"].endswith("not feasibility")
     plt.Figure.clear(figure)
 
@@ -550,13 +589,22 @@ def test_behavior_frontier_wraps_long_target_context_inside_figure(
     figure = captured.pop()
     figure.canvas.draw()
     title = figure.axes[0].title
+    subtitle = next(text for text in figure.axes[0].texts if text.get_gid() == "notebook-plot-subtitle")
     title_box = title.get_window_extent(renderer=figure.canvas.get_renderer())
-    assert len(title.get_text().splitlines()) >= 3
+    subtitle_box = subtitle.get_window_extent(renderer=figure.canvas.get_renderer())
+    assert len(title.get_text().splitlines()) >= 2
+    assert len(subtitle.get_text().splitlines()) >= 2
+    assert title.get_fontsize() >= 18
+    assert subtitle.get_fontsize() >= 14
     assert title_box.x0 >= figure.bbox.x0
     assert title_box.x1 <= figure.bbox.x1
+    assert subtitle_box.x0 >= figure.bbox.x0
+    assert subtitle_box.x1 <= figure.bbox.x1
+    assert not title_box.overlaps(subtitle_box)
     color_label_box = figure.axes[-1].yaxis.label.get_window_extent(renderer=figure.canvas.get_renderer())
     legend_box = figure.axes[0].get_legend().get_window_extent(renderer=figure.canvas.get_renderer())
     assert not title_box.overlaps(color_label_box)
+    assert not subtitle_box.overlaps(color_label_box)
     assert not legend_box.overlaps(color_label_box)
     plt.Figure.clear(figure)
 
@@ -593,9 +641,12 @@ def test_behavior_decomposition_uses_msrb_symbols_and_compact_colorbar(
 
     figure = captured.pop()
     labels = [tick.get_text() for tick in figure.axes[0].get_xticklabels()]
+    runtime = context.artifact_metadata["notebook_view"]
     assert r"$x_{\min}$" in labels
     assert r"$S_{\mathrm{MSRB}}$" in labels
-    assert figure.axes[-1].get_ylabel() == "Normalized behavior evidence"
+    assert figure.axes[-1].get_ylabel() == "Behavior evidence (input units)"
+    assert runtime["score_units"] == "objective_input_units"
+    assert runtime["softmin_scale"] == pytest.approx(SOFTMIN_SCALE)
     plt.Figure.clear(figure)
 
 
@@ -643,7 +694,7 @@ def test_behavior_plot_registry_and_objective_family_routing_are_explicit() -> N
     assert frontier["notebook_view"]["interactive"] == {
         "adapter": "three_axis_scatter_v1",
         "score_column": "behavior_score",
-        "score_label": r"Behavior score, $S_{\mathrm{MSRB}}$",
+        "score_label": r"Behavior score, $S_{\mathrm{MSRB}}$ [input units]",
         "prediction_sample_limit": 8_000,
         "sampling_method": "sha256_id_v1",
     }

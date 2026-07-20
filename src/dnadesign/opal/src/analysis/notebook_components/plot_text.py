@@ -146,17 +146,17 @@ def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) ->
         ),
         "multistate_response_behavior_frontier": (
             "OPAL replays each ordered [r(state...), b(state...)] vector under the run-pinned target mask and "
-            "normalization. Response coordinates are (r_on - r_off) / response_scale, ON-signal coordinates "
-            "are b_on / signal_scale, and OFF-signal-suppression coordinates are -b_off / signal_scale. Each "
-            "family score is -log(mean(exp(-x))). The selectable behavior score applies the same smooth "
-            "bottleneck to the three equally weighted family means; the frontier keeps those families separate "
-            "and draws no feasibility boundary."
+            "soft-min scale. The raw coordinates are r_on - r_off, b_on, and -b_off, all in the objective input "
+            "units. Within each family, OPAL computes -s log(mean(exp(-x/s))), where s is the shared soft-min "
+            "scale. The selectable behavior score applies the same smooth bottleneck to three equally weighted "
+            "families. The frontier keeps those families separate and draws no feasibility boundary."
         ),
         "multistate_response_behavior_selected_decomposition": (
-            "For each ledger-allocated candidate, OPAL replays every normalized response, ON-signal, and "
-            "OFF-signal-suppression coordinate. It appends the three family smooth-bottleneck scores, the hard "
-            "minimum coordinate, and the family-balanced behavior score. The outlined state-level cell is the "
-            "hard bottleneck; zero denotes the reference direction, not feasibility."
+            "For each ledger-allocated candidate, OPAL replays every raw response, ON-signal, and "
+            "OFF-signal-suppression coordinate in the objective input units. It appends the three family "
+            "smooth-bottleneck scores, the hard minimum coordinate, and the family-balanced behavior score in "
+            "those same units. The outlined state-level cell is the hard bottleneck; zero denotes the reference "
+            "direction, not feasibility."
         ),
         "observed_objective_over_rounds": (
             "OPAL replays the configured pointwise objective once for each immutable observed candidate vector. "

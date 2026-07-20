@@ -90,10 +90,16 @@ def test_three_axis_figure_uses_exact_family_axes_and_campaign_layers() -> None:
     assert float(figure.layout.title.y) <= 0.96
     assert figure.layout.paper_bgcolor == "white"
     assert figure.layout.scene.bgcolor == "white"
-    assert figure.layout.font.size >= 14
-    assert figure.layout.scene.xaxis.tickfont.size >= 12
-    assert figure.layout.scene.yaxis.tickfont.size >= 12
-    assert figure.layout.scene.zaxis.tickfont.size >= 12
+    assert figure.layout.height >= 800
+    assert figure.layout.font.size >= 15
+    assert figure.layout.title.font.size >= 23
+    assert figure.layout.legend.font.size >= 14
+    assert figure.layout.scene.xaxis.title.font.size >= 17
+    assert figure.layout.scene.yaxis.title.font.size >= 17
+    assert figure.layout.scene.zaxis.title.font.size >= 17
+    assert figure.layout.scene.xaxis.tickfont.size >= 14
+    assert figure.layout.scene.yaxis.tickfont.size >= 14
+    assert figure.layout.scene.zaxis.tickfont.size >= 14
 
 
 def test_three_axis_hover_identity_is_ledger_backed() -> None:
@@ -119,11 +125,13 @@ def test_three_axis_plotly_labels_escape_html_and_preserve_supported_math_symbol
     )
 
     contract = _contract()
-    contract["runtime"]["x_label"] = r"Unsafe <axis> & score, $Q_{\mathrm{A}}$"
+    contract["runtime"]["x_label"] = r"Unsafe <axis> & score, $Q_{\mathrm{A}}$ (log₂ units)"
 
     figure = build_notebook_three_axis_scatter_figure(_rows(), contract=contract)
 
-    assert figure.layout.scene.xaxis.title.text == "Unsafe &lt;axis&gt; &amp; score, <i>Q</i><sub>A</sub>"
+    assert (
+        figure.layout.scene.xaxis.title.text == "Unsafe &lt;axis&gt; &amp; score, <i>Q</i><sub>A</sub><br>(log₂ units)"
+    )
 
 
 def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
@@ -159,8 +167,7 @@ def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
 
     assert widget["items"][0].points == []
     assert "deterministic SHA-256-ID sample" in widget["items"][1]["text"]
-    assert "distinct requirements, not independent latent variables" in widget["items"][1]["text"]
-    assert "shared phenotype coordinates rather than a rendering error" in widget["items"][1]["text"]
+    assert "rendering error" not in widget["items"][1]["text"]
     assert captured["figure"].data[0].type == "scatter3d"
     assert captured["kwargs"] == {
         "config": {
@@ -208,7 +215,7 @@ def test_three_axis_sampling_retains_all_selected_and_observed_rows() -> None:
     assert first.attrs["displayed_background_count"] == 2
 
 
-def test_three_axis_generated_cells_route_mode_and_selected_baserender_companion() -> None:
+def test_three_axis_generated_cells_route_mode_without_baserender_companion() -> None:
     from dnadesign.opal.src.analysis.notebook_set_template.layered_scatter_cells import (
         render_layered_scatter_cells,
     )
@@ -223,4 +230,5 @@ def test_three_axis_generated_cells_route_mode_and_selected_baserender_companion
     assert '"figure": scatter_figure_ui' in text
     assert "baserender_record_selector=baserender_record_selector" in panel
     assert "baserender_record_row=baserender_record_row" in panel
-    assert "baserender_selection_record=baserender_selection_record" in panel
+    assert "baserender_candidate_evidence=baserender_candidate_evidence" in panel
+    assert "render_notebook_three_axis_sequence_companion" not in panel

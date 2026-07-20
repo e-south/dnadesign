@@ -24,16 +24,24 @@ def build_notebook_baserender_record_memory_key(
     run_id: Any,
     round_value: Any,
     selection_view_id: Any,
+    review_group_key: Any,
+    deliverable_key: Any,
 ) -> str:
-    """Build a stable key for one campaign/run/round/view record preference."""
+    """Build a stable key for one campaign/run/round/view/deliverable preference."""
 
     scope = {
         "campaign_slug": str(campaign_slug or "").strip(),
         "run_id": str(run_id or "").strip(),
         "round": _normalise_round(round_value),
         "selection_view_id": str(selection_view_id or "").strip(),
+        "review_group_key": str(review_group_key or "").strip(),
+        "deliverable_key": str(deliverable_key or "").strip(),
     }
-    missing = [key for key in ("campaign_slug", "run_id", "selection_view_id") if not scope[key]]
+    missing = [
+        key
+        for key in ("campaign_slug", "run_id", "selection_view_id", "review_group_key", "deliverable_key")
+        if not scope[key]
+    ]
     if missing:
         raise ValueError(f"BaseRender record memory scope is missing: {', '.join(missing)}.")
     return f"baserender_record_v1:{json.dumps(scope, sort_keys=True, separators=(',', ':'))}"

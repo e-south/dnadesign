@@ -18,7 +18,8 @@ from typing import Any
 def render_notebook_baserender_diagnostic_panel(
     *,
     has_renderable_records: bool,
-    selected_record_ids: Iterable[str],
+    candidate_record_ids: Iterable[str],
+    unrenderable_record_ids: Iterable[str],
     status_rows: Iterable[Mapping[str, Any]],
     contract: Mapping[str, Any],
     build_contract_rows: Callable[[Mapping[str, Any]], list[dict[str, Any]]],
@@ -26,18 +27,23 @@ def render_notebook_baserender_diagnostic_panel(
     opal_table: Callable[..., Any],
     pl: Any,
 ) -> Any | None:
-    """Show adapter or selection failures without advertising a dead visual."""
+    """Show candidate-ledger and public-adapter failures beside BaseRender."""
 
     statuses = [dict(row) for row in status_rows]
     ledger_unavailable = any("unavailable:" in str(row.get("value") or "") for row in statuses)
-    selected_but_unrenderable = bool(list(selected_record_ids)) and not has_renderable_records
-    if not ledger_unavailable and not selected_but_unrenderable:
+    candidate_ids = [str(value) for value in candidate_record_ids]
+    unrenderable_ids = [str(value) for value in unrenderable_record_ids]
+    candidates_but_none_renderable = bool(candidate_ids) and not has_renderable_records
+    if not ledger_unavailable and not candidates_but_none_renderable and not unrenderable_ids:
         return None
-    reason = (
-        "Selection evidence could not be resolved."
-        if ledger_unavailable
-        else "No selected sequence satisfies the declared public BaseRender adapter."
-    )
+    if ledger_unavailable:
+        reason = "Selection evidence could not be resolved."
+    elif candidates_but_none_renderable:
+        reason = "No campaign candidate satisfies the declared public BaseRender adapter."
+    else:
+        preview = ", ".join(unrenderable_ids[:8])
+        suffix = "" if len(unrenderable_ids) <= 8 else f" and {len(unrenderable_ids) - 8} more"
+        reason = f"{len(unrenderable_ids)} campaign candidates are missing or fail the adapter: {preview}{suffix}."
     rows = [
         *statuses,
         {"field": "renderability", "value": reason},

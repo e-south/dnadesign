@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 from ..core.utils import ExitCodes, OpalError
+from .candidate_annotation_layout import layout_candidate_annotations
 
 _ID_COLUMN = "id"
 _OPTIONAL_ALIAS_COLUMNS = (
@@ -125,10 +126,12 @@ def annotate_candidate_aliases(
     if not np.isfinite(coordinates).all():
         raise OpalError("Candidate annotation coordinates must be finite.", ExitCodes.CONTRACT_VIOLATION)
 
-    figure = ax.figure
-    figure.canvas.draw()
-    renderer = figure.canvas.get_renderer()
-    axes_box = ax.get_window_extent(renderer=renderer)
+    # Resolve constrained layout once, then hold that geometry while the label
+    # placer performs repeated canvas draws to measure text.  Keeping the live
+    # solver active can progressively collapse a square axes whose legend is
+    # anchored below the panel.
+    ax.figure.canvas.draw()
+    ax.figure.set_layout_engine(None)
     point_pixels = ax.transData.transform(coordinates)
     annotations: list[Any] = []
     for candidate_id, (x_value, y_value) in zip(ids, coordinates, strict=True):
@@ -153,80 +156,17 @@ def annotate_candidate_aliases(
         if annotation.arrow_patch is not None:
             annotation.arrow_patch.set_clip_on(True)
             annotation.arrow_patch.set_clip_path(ax.patch)
+            annotation.arrow_patch.set_in_layout(False)
         annotations.append(annotation)
 
-    figure.canvas.draw()
-    renderer = figure.canvas.get_renderer()
-    text_boxes = [annotation.get_bbox_patch().get_window_extent(renderer=renderer) for annotation in annotations]
-    heights = [box.height for box in text_boxes]
-    desired_y = point_pixels[:, 1].tolist()
-    padding = 4.0
-    lower = float(axes_box.y0 + padding)
-    upper = float(axes_box.y1 - padding)
-    try:
-        centers = _spread_centers(desired_y, heights, lower=lower, upper=upper, gap=3.0)
-    except OpalError:
-        if max_lanes == 1:
-            raise
-        ordered = sorted(range(len(annotations)), key=lambda index: (float(point_pixels[index, 0]), index))
-        split = (len(ordered) + 1) // 2
-        lane_specs = ((ordered[:split], False), (ordered[split:], True))
-    else:
-        use_right_lane = float(np.median(point_pixels[:, 0])) <= float(axes_box.x0 + axes_box.x1) / 2.0
-        lane_specs = ((list(range(len(annotations))), use_right_lane),)
-
-    inverse = ax.transData.inverted()
-    horizontal_gap = 12.0
-    for lane_indexes, use_right_lane in lane_specs:
-        lane_centers = (
-            [centers[index] for index in lane_indexes]
-            if len(lane_specs) == 1
-            else _spread_centers(
-                [desired_y[index] for index in lane_indexes],
-                [heights[index] for index in lane_indexes],
-                lower=lower,
-                upper=upper,
-                gap=3.0,
-            )
-        )
-        for index, center in zip(lane_indexes, lane_centers, strict=True):
-            annotation = annotations[index]
-            width = text_boxes[index].width
-            point_x = float(point_pixels[index, 0])
-            anchor_x, alignment = _horizontal_annotation_anchor(
-                point_x,
-                width,
-                left=float(axes_box.x0 + padding),
-                right=float(axes_box.x1 - padding),
-                gap=horizontal_gap,
-                prefer_right=use_right_lane,
-            )
-            annotation.set_ha(alignment)
-            annotation.set_position(tuple(inverse.transform((anchor_x, center))))
-    figure.canvas.draw()
+    layout_candidate_annotations(
+        ax,
+        annotations,
+        point_pixels,
+        requested_font_size=font_size,
+        max_lanes=max_lanes,
+    )
     return annotations
-
-
-def _horizontal_annotation_anchor(
-    point_x: float,
-    width: float,
-    *,
-    left: float,
-    right: float,
-    gap: float,
-    prefer_right: bool,
-) -> tuple[float, str]:
-    """Place a label beside its point, flipping lanes before a boundary clamp can cover it."""
-
-    if width > right - left:
-        raise OpalError("Candidate annotation is wider than the plot axes.", ExitCodes.CONTRACT_VIOLATION)
-    right_anchor = point_x + gap
-    left_anchor = point_x - gap
-    right_fits = right_anchor + width <= right
-    left_fits = left_anchor - width >= left
-    if (prefer_right and right_fits) or not left_fits:
-        return min(max(right_anchor, left), right - width), "left"
-    return max(min(left_anchor, right), left + width), "right"
 
 
 def short_candidate_id(candidate_id: str) -> str:
@@ -290,36 +230,6 @@ def _collision_safe_labels(candidate_ids: Sequence[str], base_labels: Sequence[s
             ExitCodes.CONTRACT_VIOLATION,
         )
     return [resolved[pair] for pair in pairs]
-
-
-def _spread_centers(
-    desired: Sequence[float],
-    heights: Sequence[float],
-    *,
-    lower: float,
-    upper: float,
-    gap: float,
-) -> list[float]:
-    order = sorted(range(len(desired)), key=lambda index: (float(desired[index]), index))
-    required_height = sum(float(heights[index]) for index in order) + gap * max(0, len(order) - 1)
-    if required_height > upper - lower:
-        raise OpalError(
-            "Candidate annotations cannot fit inside the plot axes.",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    centers_by_index: dict[int, float] = {}
-    cursor = lower
-    for index in order:
-        half_height = float(heights[index]) / 2.0
-        center = max(float(desired[index]), cursor + half_height)
-        centers_by_index[index] = center
-        cursor = center + half_height + gap
-    last_index = order[-1]
-    overflow = centers_by_index[last_index] + float(heights[last_index]) / 2.0 - upper
-    if overflow > 0.0:
-        for index in order:
-            centers_by_index[index] -= overflow
-    return [centers_by_index[index] for index in range(len(desired))]
 
 
 def _aliases(value: object) -> tuple[str, ...]:

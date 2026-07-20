@@ -105,6 +105,76 @@ def dedupe_reader_media_labels(media_rows: list[dict[str, Any]]) -> list[dict[st
     return out
 
 
+def preferred_reader_media_rows(media_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return one preferred inline representation per logical Reader deliverable."""
+
+    grouped: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    order: list[tuple[str, ...]] = []
+    for row in media_rows:
+        item = dict(row)
+        key = _reader_media_instance_key(item)
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(item)
+    preferred: list[dict[str, Any]] = []
+    for key in order:
+        choices = grouped[key]
+        variants = [_reader_media_variant(item) for item in choices]
+        duplicated = sorted({variant for variant in variants if variants.count(variant) > 1})
+        if duplicated:
+            raise ValueError("Reader evidence record publishes duplicate media variants: " + ", ".join(duplicated))
+        choices = sorted(choices, key=_inline_media_preference)
+        selected = dict(choices[0])
+        selected["available_media"] = [
+            {
+                "media_type": str(item.get("media_type") or ""),
+                "path": str(item.get("path") or ""),
+                "path_label": str(item.get("path_label") or item.get("path") or ""),
+                "sha256": str(item.get("sha256") or ""),
+            }
+            for item in choices
+        ]
+        preferred.append(selected)
+    return preferred
+
+
+def _reader_media_instance_key(row: Mapping[str, Any]) -> tuple[str, ...]:
+    return (
+        str(row.get("manifest_path") or ""),
+        str(row.get("round") or ""),
+        str(row.get("id") or ""),
+        str(row.get("candidate_id") or ""),
+        str(row.get("design_id") or ""),
+        str(row.get("reader_experiment_id") or ""),
+        str(row.get("reduction_id") or ""),
+        str(row.get("semantic_kind") or ""),
+        str(row.get("time_selected_h") or ""),
+    )
+
+
+def _reader_media_variant(row: Mapping[str, Any]) -> str:
+    media_type = str(row.get("media_type") or "").strip().lower()
+    if media_type:
+        return media_type
+    suffix = Path(str(row.get("path") or "")).suffix.lower()
+    return suffix or "unknown"
+
+
+def _inline_media_preference(row: Mapping[str, Any]) -> tuple[int, str]:
+    media_type = str(row.get("media_type") or "").lower()
+    suffix = Path(str(row.get("path") or "")).suffix.lower()
+    if media_type == "image/png" or suffix == ".png":
+        priority = 0
+    elif media_type.startswith("image/") or suffix in {".jpg", ".jpeg"}:
+        priority = 1
+    elif media_type == "application/pdf" or suffix == ".pdf":
+        priority = 2
+    else:
+        priority = 3
+    return priority, str(row.get("path") or "")
+
+
 def semantic_kind_label(value: Any) -> str:
     """Return the notebook label for a Reader artifact semantic kind."""
 
@@ -153,24 +223,6 @@ def reader_reduction_display_label(value: Any) -> str:
     return display_name(token)
 
 
-def reader_media_format_label(*, path: Any, media_type: Any) -> str:
-    """Return a concise media-format label for a Reader artifact."""
-
-    suffix = Path(str(path or "")).suffix.lower().lstrip(".")
-    media = str(media_type or "").strip().lower()
-    known = {
-        "application/pdf": "PDF",
-        "image/jpeg": "JPEG",
-        "image/jpg": "JPEG",
-        "image/png": "PNG",
-    }
-    if media in known:
-        return known[media]
-    if suffix:
-        return suffix.upper()
-    return ""
-
-
 def time_selected_label(value: Any) -> str:
     """Return a compact time-selected label for Reader evidence dropdowns."""
 
@@ -186,9 +238,9 @@ __all__ = [
     "dedupe_reader_media_labels",
     "filter_reader_media_rows",
     "is_reader_media_artifact",
+    "preferred_reader_media_rows",
     "reader_media_plot_type_labels",
     "reader_experiment_display_label",
-    "reader_media_format_label",
     "reader_reduction_display_label",
     "reader_round_display_label",
     "select_reader_media_artifact",

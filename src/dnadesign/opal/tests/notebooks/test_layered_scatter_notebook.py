@@ -294,13 +294,20 @@ def test_layered_scatter_wraps_long_title_and_target_context_inside_square_viewp
     try:
         figure.canvas.draw()
         title = figure.axes[0].title
+        subtitle = next(text for text in figure.axes[0].texts if text.get_gid() == "notebook-plot-subtitle")
         title_box = title.get_window_extent(renderer=figure.canvas.get_renderer())
-        assert len(title.get_text().splitlines()) >= 3
+        subtitle_box = subtitle.get_window_extent(renderer=figure.canvas.get_renderer())
+        assert len(title.get_text().splitlines()) >= 2
+        assert len(subtitle.get_text().splitlines()) >= 2
         assert title_box.x0 >= figure.bbox.x0
         assert title_box.x1 <= figure.bbox.x1
+        assert subtitle_box.x0 >= figure.bbox.x0
+        assert subtitle_box.x1 <= figure.bbox.x1
         color_label_box = figure.axes[-1].yaxis.label.get_window_extent(renderer=figure.canvas.get_renderer())
         legend_box = figure.axes[0].get_legend().get_window_extent(renderer=figure.canvas.get_renderer())
+        assert not title_box.overlaps(subtitle_box)
         assert not title_box.overlaps(color_label_box)
+        assert not subtitle_box.overlaps(color_label_box)
         assert not legend_box.overlaps(color_label_box)
     finally:
         plt.close(figure)
@@ -626,15 +633,16 @@ def test_layered_scatter_legend_stays_outside_the_annotation_field(tmp_path: Pat
     assert legend is not None
     assert legend.get_bbox_to_anchor()._bbox.y0 < 0.0
     axis = figure.axes[0]
-    assert axis.get_title(loc="center") == (
-        "RMF candidate constraint landscape\nEthanol target · ON: 10, 11 · OFF: 00, 01"
-    )
+    assert axis.get_title(loc="center") == "RMF candidate constraint landscape"
+    subtitle = next(text for text in axis.texts if text.get_gid() == "notebook-plot-subtitle")
+    assert subtitle.get_text() == "Ethanol target · ON: 10, 11 · OFF: 00, 01"
+    assert subtitle.get_fontsize() < axis.title.get_fontsize()
     assert axis.get_title(loc="left") == ""
-    assert axis.title.get_fontsize() >= 14
-    assert axis.xaxis.label.get_fontsize() >= 11.5
-    assert axis.yaxis.label.get_fontsize() >= 11.5
-    assert min(tick.get_fontsize() for tick in axis.get_xticklabels()) >= 10
-    assert min(text.get_fontsize() for text in legend.get_texts()) >= 9.5
+    assert axis.title.get_fontsize() >= 18
+    assert axis.xaxis.label.get_fontsize() >= 15
+    assert axis.yaxis.label.get_fontsize() >= 15
+    assert min(tick.get_fontsize() for tick in axis.get_xticklabels()) >= 12
+    assert min(text.get_fontsize() for text in legend.get_texts()) >= 12
     assert legend.legend_handles[0].get_alpha() >= 0.7
     assert not axis.spines["top"].get_visible()
     assert not axis.spines["right"].get_visible()
@@ -662,8 +670,12 @@ def test_layered_scatter_all_visible_layers_keep_a_usable_square_panel(tmp_path:
         warnings.simplefilter("always")
         figure = render_layered_scatter_figure(filtered, contract=contract)
         figure.savefig(io.BytesIO(), format="png", facecolor="white")
+        first_axis_bounds = figure.axes[0].get_window_extent().bounds
+        figure.canvas.draw()
+        second_axis_bounds = figure.axes[0].get_window_extent().bounds
     try:
         assert not any("constrained_layout not applied" in str(item.message) for item in captured)
+        np.testing.assert_allclose(first_axis_bounds, second_axis_bounds)
         figure.canvas.draw()
         renderer = figure.canvas.get_renderer()
         axis_box = figure.axes[0].get_window_extent(renderer=renderer)

@@ -93,7 +93,11 @@ def _layout_cell() -> str:
                 != "campaign"):
                 _items.append(selected_campaign_context_panel)
             _items.append(plot_panel)
-            if baserender_diagnostic_panel is not None:
+            if (
+                baserender_diagnostic_panel is not None
+                and str((selected_visual_choice or {}).get("surface_kind") or "")
+                in {"baserender", "campaign_set_baserender"}
+            ):
                 _items.append(baserender_diagnostic_panel)
             _campaign_inventory_label = "Raw campaign inventory" if collection_visuals else "Campaigns at a glance"
             _accordion_items = {

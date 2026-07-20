@@ -9,12 +9,18 @@ last_verified: 2026-07-18
 # Reader promoter evidence
 
 The study-owned adapter validates published Reader
-`reader.response_window.promoter_evidence_bundle.v4` directories against an
+`reader.response_window.promoter_evidence_bundle.v5` directories against an
 explicit `dnadesign.study.promoter_candidate_bindings.v1` bundle. It stages
 their static PNG/PDF artifacts for OPAL display. It writes the
-`stress_ethanol_cipro_growth.reader_promoter_evidence.v1` schema with semantic
+`stress_ethanol_cipro_growth.reader_promoter_evidence.v2` schema with semantic
 kind `promoter_response_evidence`; the default filename is
 `reader_evidence_promoter_response.json`.
+
+The v2 display row preserves the verified v5 selection, non-claim boundary,
+selected binding, response-window source, candidate-binding source,
+BaseRender diagnostics, and typed or null objective overlay. OPAL presents
+these fields in one disclosure below the assay figure. They are evidence, not
+inputs to objective scoring.
 
 The manifest also declares the public
 `opal.reader_evidence_manifest.v1` adapter. The study schema remains the
@@ -56,6 +62,15 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 content-addressed media directory, then publishes the manifest as the final
 commit point. It refuses to replace an existing manifest unless `--overwrite`
 is explicit. None of the commands ingest or apply labels.
+
+The published row set is exactly the set of bundle directories passed to
+`preview` or `materialize`. The adapter does not infer candidates from old
+media directories, the OPAL label table, or the candidate universe. When the
+notebook is meant to review every observed candidate, assemble the inputs from
+the study's accepted label-source contributions and confirm that the manifest
+row count and candidate IDs match that accepted label set. Supplying a subset
+publishes a subset; content-addressed media left by an earlier publication are
+not notebook records.
 
 The adapter always emits `campaign_slug: secg_msrb_greedy`, the only
 executable campaign destination for this evidence. Other campaign slugs occur

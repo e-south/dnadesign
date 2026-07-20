@@ -65,6 +65,7 @@ from ._mpl_utils import (
             "reference_vector": ("Optional explicit vector baseline; if omitted, objective setpoint metadata is used."),
             "reference_label": "Optional y-axis label for the reference row.",
             "channel_labels": "Optional channel labels, same length as the vector.",
+            "channel_axis_label": "Optional x-axis label (default Vector channel).",
             "aggregation": "Currently mean.",
             "reference_mse_panel": "When a reference vector is present, add a round-wise MSE panel (default false).",
             "cmap": "Matplotlib colormap (default opal_seafoam: low values white, high values dark seafoam).",
@@ -114,9 +115,9 @@ def render(context, params: dict) -> None:
         )
     )
     show_reference_mse = bool(params.get("reference_mse_panel", False))
-    font_size = float(params.get("font_size", 13))
-    title_font_size = float(params.get("title_font_size", font_size))
-    tick_font_size = float(params.get("tick_font_size", font_size))
+    font_size = float(params.get("font_size", 15.0))
+    title_font_size = float(params.get("title_font_size", max(18.0, font_size)))
+    tick_font_size = float(params.get("tick_font_size", min(13.5, font_size)))
 
     need = {"as_of_round", "run_id", vector_field}
     row_filters = []
@@ -277,10 +278,7 @@ def render(context, params: dict) -> None:
     )
     ax.set_xlim(0, dim)
     ax.set_ylim(len(y_labels), 0)
-    try:
-        ax.set_box_aspect(max(0.22, min(0.8, 2.0 * len(y_labels) / max(dim, 1))))
-    except Exception:
-        ax.set_aspect("auto")
+    ax.set_box_aspect(_unit_square_heatmap_box_aspect(dim=dim, row_count=len(y_labels)))
     apply_notebook_axes_style(ax, grid=False, square=False)
     ax.set_xticks(np.arange(dim) + 0.5)
     ax.set_xticklabels(
@@ -304,7 +302,13 @@ def render(context, params: dict) -> None:
     ax.set_title(title, fontsize=title_font_size, fontweight="semibold", pad=10)
     value_label = str(params.get("value_label", f"{pretty_label(aggregation)} predicted response"))
     if cax is None:
-        colorbar = add_flush_colorbar(fig, ax, im, label=value_label, ticklabelsize=tick_font_size)
+        colorbar = add_flush_colorbar(
+            fig,
+            ax,
+            im,
+            label=_short_colorbar_title(value_label),
+            ticklabelsize=tick_font_size,
+        )
         colorbar.ax.yaxis.label.set_size(font_size)
     else:
         fig.subplots_adjust(left=0.11, right=0.965, bottom=0.24, top=0.84, wspace=0.08)
@@ -354,6 +358,13 @@ def render(context, params: dict) -> None:
         enabled=bool(params.get("annotate_values", False)),
         max_cells=int(params.get("max_annotation_cells", 64)),
         center=center,
+        font_size=_adaptive_heatmap_annotation_font_size(
+            dim=dim,
+            row_count=len(y_labels),
+            figsize=figsize,
+            requested=max(10.5, min(12.0, 0.9 * font_size)),
+            has_reference_panel=ax_mse is not None,
+        ),
     )
     out = context.output_dir / context.filename
     if ax_mse is None:
@@ -414,7 +425,7 @@ def _adaptive_heatmap_tick_font_size(
     x_pitch = width * heatmap_width_fraction * 72.0 / max(int(dim), 1)
     y_pitch = height * heatmap_height_fraction * 72.0 / max(int(row_count), 1)
     fitted = min(float(requested), x_pitch * 0.82, y_pitch * 0.78)
-    return max(8.5, min(13.0, fitted))
+    return max(8.5, min(14.0, fitted))
 
 
 def _default_heatmap_figsize(*, dim: int, row_count: int) -> tuple[float, float]:
@@ -423,6 +434,33 @@ def _default_heatmap_figsize(*, dim: int, row_count: int) -> tuple[float, float]
     width = max(8.4, min(12.0, 4.8 + 0.75 * max(int(dim), 1)))
     height = max(3.4, min(7.2, 2.8 + 0.55 * max(int(row_count), 1)))
     return width, height
+
+
+def _unit_square_heatmap_box_aspect(*, dim: int, row_count: int) -> float:
+    """Return the axes height/width ratio that makes each heatmap cell square."""
+
+    if int(dim) <= 0 or int(row_count) <= 0:
+        raise ValueError("heatmap dimensions must be positive.")
+    return float(row_count) / float(dim)
+
+
+def _adaptive_heatmap_annotation_font_size(
+    *,
+    dim: int,
+    row_count: int,
+    figsize: Sequence[float],
+    requested: float,
+    has_reference_panel: bool,
+) -> float | None:
+    """Choose a readable cell-label size, or omit labels when they cannot fit."""
+
+    width, height = (float(figsize[0]), float(figsize[1]))
+    heatmap_width_fraction = 0.40 if has_reference_panel else 0.70
+    heatmap_height_fraction = 0.60 if has_reference_panel else 0.64
+    x_pitch = width * heatmap_width_fraction * 72.0 / max(int(dim), 1)
+    y_pitch = height * heatmap_height_fraction * 72.0 / max(int(row_count), 1)
+    fitted = min(float(requested), x_pitch / 2.8, y_pitch * 0.52)
+    return fitted if fitted >= 7.5 else None
 
 
 def _heatmap_norm(matrix: np.ndarray, *, center: float | None):
@@ -448,11 +486,12 @@ def _annotate_heatmap_values(
     enabled: bool,
     max_cells: int,
     center: float | None = None,
+    font_size: float | None = 8.75,
 ) -> list[object]:
     """Annotate a small heatmap without turning dense vector tables into text walls."""
 
     values = np.asarray(matrix, dtype=float)
-    if not enabled or max_cells < 1 or values.size > max_cells:
+    if not enabled or max_cells < 1 or values.size > max_cells or font_size is None:
         return []
     midpoint = 0.0 if center is None else float(center)
     extent = max(float(np.max(np.abs(values - midpoint))), 1.0e-9)
@@ -466,7 +505,7 @@ def _annotate_heatmap_values(
                     f"{value:.2f}",
                     ha="center",
                     va="center",
-                    fontsize=8.75,
+                    fontsize=float(font_size),
                     color="white" if abs(value - midpoint) > 0.58 * extent else "#111111",
                 )
             )

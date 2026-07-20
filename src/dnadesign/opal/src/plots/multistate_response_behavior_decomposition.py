@@ -23,12 +23,12 @@ from ._mpl_utils import (
     NOTEBOOK_AXIS_LABEL_FONTSIZE,
     NOTEBOOK_COLORBAR_LABEL_FONTSIZE,
     NOTEBOOK_TICK_FONTSIZE,
-    NOTEBOOK_TITLE_FONTSIZE,
     SIGNED_MARGIN_CMAP,
     add_flush_colorbar,
     apply_notebook_axes_style,
     apply_plot_style,
     ensure_mpl_config_dir,
+    set_notebook_title,
     wrap_plot_title,
 )
 from .candidate_annotations import resolve_candidate_display_aliases, short_candidate_id
@@ -43,6 +43,7 @@ from .multistate_response_behavior_data import (
 )
 from .multistate_response_behavior_support import (
     figsize,
+    nonempty,
     nonnegative_int,
     positive_float,
     save_figure,
@@ -66,10 +67,10 @@ KIND = "multistate_response_behavior_selected_decomposition"
             "A K-state component matrix reveals whether the scalar is supported broadly or by compensating behavior."
         ),
         alt_text=(
-            "Heatmap with allocated candidates as rows. Columns contain every normalized response-ordering, ON-signal, "
+            "Heatmap with allocated candidates as rows. Columns contain every raw response-ordering, ON-signal, "
             "and OFF-signal-suppression coordinate, followed by three family scores, the hard bottleneck, and the "
-            "smooth behavior score. An outline marks the lowest state-level coordinate. Zero is a reference direction, "
-            "not feasibility."
+            "smooth behavior score. All values retain the objective input units. An outline marks the lowest "
+            "state-level coordinate. Zero is a reference direction, not feasibility."
         ),
         non_claim_boundary=(
             "The decomposition is based on model predictions until measured; the behavior score is not a pass/fail "
@@ -84,8 +85,9 @@ KIND = "multistate_response_behavior_selected_decomposition"
             "max_selected": "Maximum allocated rows permitted in one heatmap (default 24).",
             "max_coordinates": "Maximum state-level coordinates permitted in one heatmap (default 48).",
             "candidate_label_mode": "Candidate row labels: short_id (default) or alias.",
+            "value_label": "Optional display label for the raw objective input units.",
             "color_extent": (
-                "Optional positive symmetric color extent in assay-resolution units. Values outside the extent "
+                "Optional positive symmetric color extent in objective input units. Values outside the extent "
                 "remain exact in labels and exported data while their colors saturate at rectangular endpoints."
             ),
         },
@@ -135,6 +137,10 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         raise ValueError("Behavior decomposition has no allocated candidates.")
     max_selected = nonnegative_int(params.get("max_selected", 24), name="max_selected")
     max_coordinates = nonnegative_int(params.get("max_coordinates", 48), name="max_coordinates")
+    value_label = nonempty(
+        params.get("value_label", "Behavior evidence (input units)"),
+        field="value_label",
+    )
     coordinate_count = len(data.coordinate_labels)
     if max_selected == 0 or len(selected) > max_selected:
         raise ValueError(f"Allocated-candidate heatmap has {len(selected)} rows; max_selected={max_selected}.")
@@ -193,20 +199,16 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
     )
     ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
     ax.set_xlabel(
-        "Normalized behavior evidence in assay-resolution units\n"
-        "0 = reference direction, not feasibility · outline = hard bottleneck",
+        "Behavior coordinate (0 = reference direction; outline = hard bottleneck)",
         fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE,
         labelpad=8,
     )
     ax.set_ylabel("Competition rank · candidate", fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     title = selection_view_title(params.get("title", "Behavior evidence for allocated candidates"), context=context)
-    ax.set_title(
-        f"{wrap_plot_title(title, width=50)}\n{wrap_plot_title(target_context(data, params), width=56)}",
-        loc="center",
-        fontweight="semibold",
-        fontsize=NOTEBOOK_TITLE_FONTSIZE,
-        pad=10,
-        linespacing=1.25,
+    set_notebook_title(
+        ax,
+        wrap_plot_title(title, width=50),
+        subtitle=wrap_plot_title(target_context(data, params), width=56),
     )
     for row_index, row in enumerate(selected.itertuples(index=False)):
         limiting_column = int(row.limiting_coordinate_index)
@@ -237,7 +239,7 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         fig,
         ax,
         image,
-        label="Normalized behavior evidence",
+        label=value_label,
         pad=0.06,
         ticklabelsize=NOTEBOOK_TICK_FONTSIZE,
         extend=colorbar_extend,
@@ -247,6 +249,9 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
     context.artifact_metadata["notebook_view"] = {
         "title": title,
         "context": target_context(data, params),
+        "score_units": "objective_input_units",
+        "softmin_scale": float(data.softmin_scale),
+        "value_label": value_label,
         "color_scale": {
             "center": 0.0,
             "extent": extent,
@@ -255,7 +260,7 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
                 f"{saturated_count:,} matrix values saturate at the color endpoints; exact labels and tidy data "
                 "are retained"
                 if saturated_count
-                else "Symmetric normalized behavior evidence around the zero reference direction"
+                else "Symmetric behavior evidence in input units around the zero reference direction"
             ),
         },
     }

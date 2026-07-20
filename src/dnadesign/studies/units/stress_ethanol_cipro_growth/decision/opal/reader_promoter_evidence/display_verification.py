@@ -16,8 +16,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .bundle_semantics import verify_reader_bundle_semantics
 from .contracts import (
     PROMOTER_EVIDENCE_ARTIFACT_IDS,
+    PROMOTER_EVIDENCE_NON_CLAIM,
     READER_EVIDENCE_MANIFEST_ADAPTER,
     READER_EVIDENCE_SCHEMA_VERSION,
     TARGET_CAMPAIGN_SLUG,
@@ -44,33 +46,11 @@ _DISPLAY_ROW_FIELDS = {
     "reduction_id",
     "evidence_role",
     "claim_status",
+    "non_claim_boundary",
     "selected_binding",
-    "binding_source",
+    "sources",
+    "objective_overlay",
     "artifacts",
-}
-_BINDING_SOURCE_FIELDS = {
-    "schema_id",
-    "schema_version",
-    "study_id",
-    "manifest_sha256",
-    "records_sha256",
-    "candidate_table_id",
-    "candidate_selection_sha256",
-}
-_SELECTED_BINDING_FIELDS = {
-    "reader_design_id",
-    "candidate_id",
-    "sequence_sha256",
-    "sequence_authority_dataset_id",
-    "sequence_authority_id",
-    "sequence_authority_sha256",
-    "source_class",
-    "design_family",
-    "binding_status",
-    "binding_method",
-    "densegen_plan",
-    "densegen_run_id",
-    "densegen_sampling_library_hash",
 }
 
 
@@ -140,11 +120,21 @@ def _verify_display_row(value: object, *, manifest_root: Path) -> dict[str, Any]
         raise ReaderPromoterEvidenceError("Reader promoter evidence must remain display_only.")
     if value["claim_status"] not in {"objective_neutral", "screen_only"}:
         raise ReaderPromoterEvidenceError("Reader display claim_status is unsupported.")
-    _verify_binding_source(value["binding_source"])
-    _verify_selected_binding(
-        value["selected_binding"],
-        reader_design_id=str(value["design_id"]),
-        candidate_id=str(value["candidate_id"]),
+    if value["non_claim_boundary"] != PROMOTER_EVIDENCE_NON_CLAIM:
+        raise ReaderPromoterEvidenceError("Reader display changed the promoter-evidence non-claim boundary.")
+    verify_reader_bundle_semantics(
+        {
+            "selection": {
+                "experiment_id": str(value["reader_experiment_id"]),
+                "design_id": str(value["design_id"]),
+                "candidate_id": str(value["candidate_id"]),
+                "reduction_id": str(value["reduction_id"]),
+            },
+            "sources": value["sources"],
+            "selected_binding": value["selected_binding"],
+            "objective_overlay": value["objective_overlay"],
+        },
+        claim_status=str(value["claim_status"]),
     )
     artifacts = value["artifacts"]
     if not isinstance(artifacts, list) or len(artifacts) != len(PROMOTER_EVIDENCE_ARTIFACT_IDS):
@@ -176,51 +166,6 @@ def _verify_display_row(value: object, *, manifest_root: Path) -> dict[str, Any]
         "experiment_id": actual_identity[2],
         "artifact_count": len(artifacts),
     }
-
-
-def _verify_binding_source(value: object) -> None:
-    if not isinstance(value, dict) or set(value) != _BINDING_SOURCE_FIELDS:
-        raise ReaderPromoterEvidenceError("Reader display binding source is malformed.")
-    if (
-        value["schema_id"] != "dnadesign.study.promoter_candidate_bindings.v1"
-        or str(value["schema_version"]) != "1"
-        or value["study_id"] != "stress_ethanol_cipro_growth"
-        or not _nonempty(value["candidate_table_id"])
-        or any(not is_sha256(value[field]) for field in value if field.endswith("sha256"))
-    ):
-        raise ReaderPromoterEvidenceError("Reader display binding source is invalid.")
-
-
-def _verify_selected_binding(
-    value: object,
-    *,
-    reader_design_id: str,
-    candidate_id: str,
-) -> None:
-    if not isinstance(value, dict) or set(value) != _SELECTED_BINDING_FIELDS:
-        raise ReaderPromoterEvidenceError("Reader display selected binding is malformed.")
-    densegen_fields = ("densegen_plan", "densegen_run_id", "densegen_sampling_library_hash")
-    text_fields = (
-        _SELECTED_BINDING_FIELDS
-        - set(densegen_fields)
-        - {
-            "sequence_sha256",
-            "sequence_authority_sha256",
-        }
-    )
-    if (
-        not is_sha256(value["sequence_sha256"])
-        or not is_sha256(value["sequence_authority_sha256"])
-        or any(not _nonempty(value[field]) for field in text_fields)
-        or value["binding_status"] != "resolved"
-        or value["binding_method"] != "exact_alias"
-    ):
-        raise ReaderPromoterEvidenceError("Reader display selected binding is invalid.")
-    if value["reader_design_id"] != reader_design_id or value["candidate_id"] != candidate_id:
-        raise ReaderPromoterEvidenceError("Reader display selected binding identity disagrees with its row.")
-    densegen_values = [value[field] for field in densegen_fields]
-    if not (all(item is None for item in densegen_values) or all(_nonempty(item) for item in densegen_values)):
-        raise ReaderPromoterEvidenceError("Reader display DenseGen binding provenance must be complete or null.")
 
 
 def _display_created_at(value: object) -> None:

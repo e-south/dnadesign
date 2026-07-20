@@ -44,7 +44,7 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
     evidence_manifest.write_text(
         json.dumps(
             {
-                "schema_version": "example_study.reader_promoter_evidence.v1",
+                "schema_version": "example_study.reader_promoter_evidence.v2",
                 "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
                 "created_at": "2026-07-13T12:00:00+00:00",
                 "campaign_slug": "secg_msrb_greedy",
@@ -65,6 +65,7 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
                         "reduction_id": "event_logmean_6_12h_post",
                         "evidence_role": "display_only",
                         "claim_status": "objective_neutral",
+                        "non_claim_boundary": _non_claim_boundary(),
                         "selected_binding": {
                             "reader_design_id": "pDual-10-1",
                             "candidate_id": "candidate-1",
@@ -80,20 +81,16 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
                             "densegen_run_id": "run-1",
                             "densegen_sampling_library_hash": "library-1",
                         },
-                        "binding_source": {
-                            "schema_id": "dnadesign.study.promoter_candidate_bindings.v1",
-                            "schema_version": "1",
-                            "study_id": "stress_ethanol_cipro_growth",
-                            "manifest_sha256": "sha256:" + "b" * 64,
-                            "records_sha256": "sha256:" + "c" * 64,
-                            "candidate_table_id": "usr_prom_eth_cip_opal_candidates",
-                            "candidate_selection_sha256": "sha256:" + "d" * 64,
-                        },
+                        "sources": _sources(
+                            experiment_id="20260713_sfxi",
+                            reduction_id="event_logmean_6_12h_post",
+                        ),
+                        "objective_overlay": None,
                         "artifacts": [
                             {
                                 "semantic_kind": "promoter_response_evidence",
                                 "kind": "reader_publication",
-                                "record_id": "reader.response_window.promoter_evidence_bundle.v4",
+                                "record_id": "reader.response_window.promoter_evidence_bundle.v5",
                                 "scope": "design_reduction",
                                 "path": relative_media.as_posix(),
                                 "path_label": "20260713_sfxi/pDual-10-1/event_logmean_6_12h_post/promoter_evidence.png",
@@ -134,7 +131,9 @@ def test_promoter_evidence_discovery_preserves_display_only_provenance(tmp_path:
     assert artifacts[0]["manifest_path"] == str(evidence_manifest)
     assert "source_manifest_path" not in artifacts[0]
     assert artifacts[0]["source_manifest_sha256"] == source_manifest_sha256
-    assert artifacts[0]["binding_source"]["candidate_table_id"] == "usr_prom_eth_cip_opal_candidates"
+    assert artifacts[0]["sources"]["candidate_bindings"]["candidate_table_id"] == ("usr_prom_eth_cip_opal_candidates")
+    assert artifacts[0]["sources"]["baserender"]["adapter_kind"] == "densegen_tfbs"
+    assert artifacts[0]["objective_overlay"] is None
     assert surface["media_plot_type_labels"] == ["Promoter response evidence"]
     assert "time_selected_h" not in artifacts[0]
 
@@ -147,7 +146,7 @@ def test_promoter_evidence_verifies_staged_relative_media_without_reader_source(
     row = {
         "semantic_kind": "promoter_response_evidence",
         "kind": "reader_publication",
-        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v4",
+        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v5",
         "scope": "design_reduction",
         "id": "candidate-1",
         "candidate_id": "candidate-1",
@@ -156,13 +155,27 @@ def test_promoter_evidence_verifies_staged_relative_media_without_reader_source(
         "reduction_id": "event_logmean_6_12h_post",
         "evidence_role": "display_only",
         "claim_status": "objective_neutral",
+        "non_claim_boundary": _non_claim_boundary(),
         "selected_binding": {
             "reader_design_id": "pDual-10-1",
             "candidate_id": "candidate-1",
+            "sequence_sha256": "sha256:" + "1" * 64,
+            "sequence_authority_dataset_id": "usr_sfxi_pdual10_densegen_promoters",
+            "sequence_authority_id": "candidate-1",
+            "sequence_authority_sha256": "sha256:" + "2" * 64,
+            "source_class": "densegen",
+            "design_family": "ethanol_ciprofloxacin",
             "binding_status": "resolved",
             "binding_method": "exact_alias",
+            "densegen_plan": "ethanol_ciprofloxacin",
+            "densegen_run_id": "run-1",
+            "densegen_sampling_library_hash": "library-1",
         },
-        "binding_source": _binding_source(),
+        "sources": _sources(
+            experiment_id="20260713_sfxi",
+            reduction_id="event_logmean_6_12h_post",
+        ),
+        "objective_overlay": None,
         "path": f"reader_evidence_media/{'a' * 64}/promoter_evidence.png",
         "path_label": "20260713_sfxi/pDual-10-1/event_logmean_6_12h_post/promoter_evidence.png",
         "manifest_path": str(manifest_path),
@@ -207,7 +220,7 @@ def test_promoter_evidence_render_rejects_authentic_media_relabeling(tmp_path: P
     )
 
     assert rendered["kind"] == "md"
-    assert "display identity" in rendered["text"]
+    assert "identity is inconsistent" in rendered["text"]
 
 
 def test_promoter_evidence_render_rejects_tilde_artifact_path(tmp_path: Path, monkeypatch) -> None:
@@ -236,6 +249,86 @@ def test_promoter_evidence_renders_verified_static_media(tmp_path: Path) -> None
     )
 
     assert rendered["kind"] == "vstack"
+    assert "Evidence details" in str(rendered)
+    assert "Objective-neutral" in str(rendered)
+    assert "DenseGen TFBS" in str(rendered)
+    assert "across-well median" in str(rendered)
+    assert "event is placed at either recorded timing bound" in str(rendered)
+
+
+def test_promoter_evidence_discloses_typed_screen_only_overlay_below_the_visual(tmp_path: Path) -> None:
+    surface, label = _valid_promoter_surface(tmp_path)
+    row = surface["media_rows"][0]
+    row["claim_status"] = "screen_only"
+    row["objective_overlay"] = {
+        "schema_version": "reader.response_window.objective_display_overlay.v2",
+        "objective_id": "multistate_response_behavior_v1",
+        "objective_display_label": "MSRB",
+        "claim_status": "screen_only",
+        "experiment_id": row["reader_experiment_id"],
+        "reader_design_id": row["design_id"],
+        "reduction_id": row["reduction_id"],
+        "manifest_sha256": "sha256:" + "f" * 64,
+        "components": [
+            {
+                "component_id": "response_ordering",
+                "label": "Response ordering",
+                "value": 0.42,
+                "unit": "log2",
+            }
+        ],
+    }
+    _write_publication_manifest(Path(str(row["manifest_path"])), row)
+
+    rendered = render_notebook_reader_evidence_artifact_visual(
+        surface,
+        selected_plot_type_label="Promoter response evidence",
+        selected_artifact_label=label,
+        mo=_FakeMo(),
+    )
+
+    assert "MSRB" in str(rendered)
+    assert "Response ordering: 0.42 log2" in str(rendered)
+    assert "screen only" in str(rendered)
+
+
+def test_promoter_evidence_discloses_genbank_source_without_densegen_provenance(tmp_path: Path) -> None:
+    surface, label = _valid_promoter_surface(tmp_path)
+    row = surface["media_rows"][0]
+    row["sources"]["baserender"]["adapter_kind"] = "usr_genbank_annotations_v1"
+    for field in ("densegen_plan", "densegen_run_id", "densegen_sampling_library_hash"):
+        row["selected_binding"][field] = None
+    _write_publication_manifest(Path(str(row["manifest_path"])), row)
+
+    rendered = render_notebook_reader_evidence_artifact_visual(
+        surface,
+        selected_plot_type_label="Promoter response evidence",
+        selected_artifact_label=label,
+        mo=_FakeMo(),
+    )
+
+    assert "GenBank source" in str(rendered)
+    assert "not recorded" not in str(rendered)
+
+
+def test_promoter_evidence_rejects_retired_v4_artifact_identity(tmp_path: Path) -> None:
+    surface, _ = _valid_promoter_surface(tmp_path)
+    row = surface["media_rows"][0]
+    row["artifact_record_id"] = "reader.response_window.promoter_evidence_bundle.v4"
+    _write_publication_manifest(Path(str(row["manifest_path"])), row)
+
+    with pytest.raises(ValueError, match="publication identity"):
+        verify_reader_promoter_evidence_artifact(row)
+
+
+def test_promoter_evidence_rejects_cross_study_source_projection(tmp_path: Path) -> None:
+    surface, _ = _valid_promoter_surface(tmp_path)
+    row = surface["media_rows"][0]
+    row["sources"]["candidate_bindings"]["study_id"] = "different_study"
+    _write_publication_manifest(Path(str(row["manifest_path"])), row)
+
+    with pytest.raises(ValueError, match="source study identities disagree"):
+        verify_reader_promoter_evidence_artifact(row)
 
 
 def test_promoter_evidence_render_enforces_media_size_ceiling(tmp_path: Path) -> None:
@@ -308,7 +401,7 @@ def _valid_promoter_surface(tmp_path: Path) -> tuple[dict[str, list[dict[str, ob
         "plot_type_label": "Promoter response evidence",
         "semantic_kind": "promoter_response_evidence",
         "kind": "reader_publication",
-        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v4",
+        "artifact_record_id": "reader.response_window.promoter_evidence_bundle.v5",
         "scope": "design_reduction",
         "id": candidate_id,
         "candidate_id": candidate_id,
@@ -317,8 +410,10 @@ def _valid_promoter_surface(tmp_path: Path) -> tuple[dict[str, list[dict[str, ob
         "reduction_id": reduction_id,
         "evidence_role": "display_only",
         "claim_status": "objective_neutral",
+        "non_claim_boundary": _non_claim_boundary(),
         "selected_binding": selected_binding,
-        "binding_source": _binding_source(),
+        "sources": _sources(experiment_id=experiment_id, reduction_id=reduction_id),
+        "objective_overlay": None,
         "path": relative_media.as_posix(),
         "path_label": f"{experiment_id}/{design_id}/{reduction_id}/promoter_evidence.png",
         "manifest_path": str(manifest_path.resolve()),
@@ -335,15 +430,45 @@ def _valid_promoter_surface(tmp_path: Path) -> tuple[dict[str, list[dict[str, ob
     )
 
 
-def _binding_source() -> dict[str, str]:
+def _non_claim_boundary() -> str:
+    return (
+        "Reader presents response-window evidence and sequence context; downstream objective scoring, "
+        "normalization or calibration, and promotion remain outside Reader."
+    )
+
+
+def _sources(*, experiment_id: str, reduction_id: str) -> dict[str, object]:
     return {
-        "schema_id": "dnadesign.study.promoter_candidate_bindings.v1",
-        "schema_version": "1",
-        "study_id": "stress_ethanol_cipro_growth",
-        "manifest_sha256": "sha256:" + "b" * 64,
-        "records_sha256": "sha256:" + "c" * 64,
-        "candidate_table_id": "usr_prom_eth_cip_opal_candidates",
-        "candidate_selection_sha256": "sha256:" + "d" * 64,
+        "response_window": {
+            "schema_version": "reader.response_window.bundle.v5",
+            "study_id": "stress_ethanol_cipro_growth",
+            "request_id": "stress-response-window-v1",
+            "experiment_id": experiment_id,
+            "reduction_id": reduction_id,
+            "manifest_sha256": "sha256:" + "e" * 64,
+        },
+        "candidate_bindings": {
+            "schema_id": "dnadesign.study.promoter_candidate_bindings.v1",
+            "schema_version": "1",
+            "study_id": "stress_ethanol_cipro_growth",
+            "manifest_sha256": "sha256:" + "b" * 64,
+            "records_sha256": "sha256:" + "c" * 64,
+            "candidate_table_id": "usr_prom_eth_cip_opal_candidates",
+            "candidate_selection_sha256": "sha256:" + "d" * 64,
+        },
+        "baserender": {
+            "contract_id": "dnadesign.baserender.sequence_panel.v1",
+            "contract_version": "1",
+            "style_profile": "promoter_compact_slide.v1",
+            "renderer_name": "sequence_rows",
+            "adapter_kind": "densegen_tfbs",
+            "sequence_length_bp": 60,
+            "feature_count": 2,
+            "strand_count": 2,
+            "legend_entries": ["tf:CpxR"],
+            "image_width_px": 2200,
+            "image_height_px": 430,
+        },
     }
 
 
@@ -358,8 +483,10 @@ def _write_publication_manifest(manifest_path: Path, row: dict[str, object]) -> 
             "reduction_id",
             "evidence_role",
             "claim_status",
+            "non_claim_boundary",
             "selected_binding",
-            "binding_source",
+            "sources",
+            "objective_overlay",
         )
     }
     publication_row["artifacts"] = [
@@ -380,7 +507,7 @@ def _write_publication_manifest(manifest_path: Path, row: dict[str, object]) -> 
     manifest_path.write_text(
         json.dumps(
             {
-                "schema_version": "example_study.reader_promoter_evidence.v1",
+                "schema_version": "example_study.reader_promoter_evidence.v2",
                 "opal_adapter": READER_EVIDENCE_MANIFEST_ADAPTER,
                 "round": "r0",
                 "summary": {
@@ -407,3 +534,6 @@ class _FakeMo:
 
     def vstack(self, items: list[object], *, gap: float) -> dict[str, object]:
         return {"kind": "vstack", "items": items, "gap": gap}
+
+    def accordion(self, items: dict[str, object], **kwargs: object) -> dict[str, object]:
+        return {"kind": "accordion", "items": items, **kwargs}

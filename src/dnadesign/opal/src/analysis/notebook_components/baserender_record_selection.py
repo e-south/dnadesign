@@ -268,21 +268,21 @@ def _selection_view_label(value: str) -> str:
     return "AND" if value.lower() == "and" else display_name(value)
 
 
-def resolve_notebook_baserender_record_selection(
+def resolve_notebook_baserender_candidate_record(
     records_path: str | Path,
     selector_value: Any | None,
-    selected_records: Sequence[Mapping[str, Any]],
+    candidate_records: Sequence[Mapping[str, Any]],
     contract: Mapping[str, Any],
 ) -> tuple[str | None, dict[str, Any] | None, dict[str, Any] | None]:
-    """Bind one selector value to exactly one ledger row and one render record."""
+    """Bind one lookup value to one campaign-evidence row and render record."""
 
     if selector_value is None:
         return None, None, None
     record_id = str(selector_value).strip()
-    matches = [dict(row) for row in selected_records if str(row.get("record_id") or "").strip() == record_id]
+    matches = [dict(row) for row in candidate_records if str(row.get("record_id") or "").strip() == record_id]
     if len(matches) != 1:
         raise ValueError(
-            f"Selected sequence {record_id!r} must resolve to exactly one selection record; found {len(matches)}."
+            f"Candidate {record_id!r} must resolve to exactly one campaign-evidence record; found {len(matches)}."
         )
     record_row = load_notebook_baserender_record_row(records_path, record_id, contract)
     return record_id, record_row, matches[0]
@@ -291,6 +291,6 @@ def resolve_notebook_baserender_record_selection(
 __all__ = [
     "build_notebook_selected_baserender_record_sets",
     "build_notebook_selected_baserender_records",
+    "resolve_notebook_baserender_candidate_record",
     "resolve_notebook_baserender_selection_batch_scope",
-    "resolve_notebook_baserender_record_selection",
 ]

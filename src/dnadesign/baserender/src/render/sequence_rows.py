@@ -758,18 +758,31 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
     x_max = float(layout.width - style.padding_x)
 
     feature_box_pad = float(style.kmer.pad_x_px)
+    coordinate_scale = max(1.0e-6, float(style.figure_scale))
+    annotation_font_height_px = (_fixed_element_annotation_font_size(style) / 72.0) * float(style.dpi)
+    feature_label_clearance = max(
+        max(0.0, margin - feature_box_pad),
+        max(8.0, annotation_font_height_px * 0.2) / coordinate_scale,
+    )
     occupied_boxes: list[tuple[float, float, float, float]] = []
     for placement in layout.placements:
         occupied_boxes.append(
             (
-                placement.x - feature_box_pad,
+                placement.x - feature_box_pad - feature_label_clearance,
                 placement.y - placement.h / 2.0,
-                placement.x + placement.w + feature_box_pad,
+                placement.x + placement.w + feature_box_pad + feature_label_clearance,
                 placement.y + placement.h / 2.0,
             )
         )
     occupied_boxes.extend(_sequence_strand_occupied_boxes(layout, style))
     occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
+    if record.display.overlay_text:
+        _x, _y, _ha, _title_size, overlay_box = _overlay_layout(
+            layout,
+            style,
+            record.display.overlay_text,
+        )
+        occupied_boxes.append(overlay_box)
 
     placed_label_boxes: list[tuple[float, float, float, float]] = []
 
@@ -811,16 +824,17 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
         if not text:
             return None
         text_size = _fixed_element_annotation_font_size(style)
-        text_w = _text_px_width(text, style.font_label, text_size, style.dpi)
-        text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi))
+        coordinate_scale = max(1.0e-6, float(style.figure_scale))
+        text_w = _text_px_width(text, style.font_label, text_size, style.dpi) / coordinate_scale
+        text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi)) / coordinate_scale
         center_x = placement.x + placement.w / 2.0
         label_gap = max(4.0, feature_box_pad + text_h * 0.25)
         if placement.above:
             away_y = placement.y + placement.h / 2.0 + label_gap + text_h / 2.0
         else:
             away_y = placement.y - placement.h / 2.0 - label_gap - text_h / 2.0
-        right_x = placement.x + placement.w + margin
-        left_x = placement.x - margin
+        right_x = placement.x + placement.w + feature_box_pad + feature_label_clearance
+        left_x = placement.x - feature_box_pad - feature_label_clearance
         return text, text_size, text_w, text_h, center_x, away_y, right_x, left_x
 
     def _candidate_fits(
@@ -881,18 +895,29 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
             continue
         text, text_size, text_w, text_h, center_x, top_y, right_x, left_x = geometry
 
+        lateral_step = max(8.0, feature_box_pad + text_h * 0.75)
+        max_lateral_steps = 6
+        side_candidates: list[tuple[float, float, str]] = []
+        top_candidates: list[tuple[float, float, str]] = [(center_x, top_y, "center")]
+        for step in range(max_lateral_steps + 1):
+            delta = lateral_step * float(step)
+            side_candidates.extend(
+                (
+                    (right_x + delta, placement.y, "left"),
+                    (left_x - delta, placement.y, "right"),
+                )
+            )
+            if step > 0:
+                top_candidates.extend(
+                    (
+                        (center_x + delta, top_y, "center"),
+                        (center_x - delta, top_y, "center"),
+                    )
+                )
         if placement.feature_id in force_baseline_label_ids:
-            candidates = (
-                (right_x, placement.y, "left"),
-                (left_x, placement.y, "right"),
-                (center_x, top_y, "center"),
-            )
+            candidates = (*side_candidates, *top_candidates)
         else:
-            candidates = (
-                (center_x, top_y, "center"),
-                (right_x, placement.y, "left"),
-                (left_x, placement.y, "right"),
-            )
+            candidates = (*top_candidates, *side_candidates)
 
         selected: tuple[float, float, str, tuple[float, float, float, float]] | None = None
         for x_anchor, y_anchor, ha in candidates:
@@ -1107,7 +1132,11 @@ def _actual_content_bottom(layout: LayoutContext) -> float:
     return float(bottom)
 
 
-def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
+def _overlay_layout(
+    layout: LayoutContext,
+    style: Style,
+    text: str,
+) -> tuple[float, float, str, float, tuple[float, float, float, float]]:
     align = str(style.overlay_align).lower()
     if align == "center":
         x = layout.width / 2.0
@@ -1143,6 +1172,38 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
             - max(0.0, float(style.overlay_title_gap_reduction_px))
         )
         overlay_y = max(min_overlay_y, overlay_y)
+
+    text_width = (
+        max(
+            (
+                _text_px_width(line, style.font_label, int(round(title_size)), style.dpi)
+                for line in str(text).splitlines()
+            ),
+            default=0.0,
+        )
+        / coordinate_scale
+    )
+    if ha == "center":
+        x0 = x - text_width / 2.0
+        x1 = x + text_width / 2.0
+    elif ha == "right":
+        x0 = x - text_width
+        x1 = x
+    else:
+        x0 = x
+        x1 = x + text_width
+    collision_pad = max(2.0, title_gap * 0.5)
+    overlay_box = (
+        x0 - collision_pad,
+        overlay_y - title_block_height - collision_pad,
+        x1 + collision_pad,
+        overlay_y + collision_pad,
+    )
+    return x, overlay_y, ha, title_size, overlay_box
+
+
+def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
+    x, overlay_y, ha, title_size, _overlay_box = _overlay_layout(layout, style, text)
     ax.text(
         x,
         overlay_y,

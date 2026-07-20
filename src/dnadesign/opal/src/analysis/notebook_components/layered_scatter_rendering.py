@@ -41,6 +41,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         compact_batch_label,
         observed_batch_marker_map,
         scatter_smart,
+        set_notebook_title,
         wrap_plot_title,
     )
     from ...plots.candidate_annotations import annotate_candidate_aliases
@@ -143,13 +144,12 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     ax.set_ylim(_limits(runtime["y_limits"], field="y_limits"))
     ax.set_xlabel(str(runtime["x_label"]), fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
     ax.set_ylabel(str(runtime["y_label"]), fontsize=NOTEBOOK_AXIS_LABEL_FONTSIZE, labelpad=8)
-    ax.set_title(
-        f"{wrap_plot_title(runtime['title'], width=50)}\n{wrap_plot_title(runtime['context'], width=56)}",
-        loc="center",
-        fontweight="semibold",
-        fontsize=NOTEBOOK_TITLE_FONTSIZE,
-        pad=10,
-        linespacing=1.25,
+    set_notebook_title(
+        ax,
+        wrap_plot_title(runtime["title"], width=50),
+        subtitle=wrap_plot_title(runtime["context"], width=56),
+        location="center",
+        title_fontsize=NOTEBOOK_TITLE_FONTSIZE,
     )
     ax.tick_params(axis="both", labelsize=NOTEBOOK_TICK_FONTSIZE)
     handles, labels = ax.get_legend_handles_labels()
