@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -401,6 +402,56 @@ def test_run_rejected_artifact_rerun_does_not_mutate_round_log(tmp_path: Path) -
     assert "already contains artifacts" in _plain_output(result.output)
     assert model_artifact.read_bytes() == b"completed-model"
     assert not round_log.exists()
+
+
+def test_run_rejected_campaign_lock_does_not_mutate_round_log(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+    round_log.parent.mkdir(parents=True, exist_ok=True)
+    round_log.write_text(json.dumps({"stage": "command_start"}) + "\n", encoding="utf-8")
+    original_log = round_log.read_bytes()
+    (workdir / ".opal.lock").write_text(
+        json.dumps({"pid": os.getpid(), "ts": "2026-07-20T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "run", "-c", str(campaign), "--round", "0", "--quiet"],
+    )
+
+    assert result.exit_code == 4
+    assert "locked by another process" in _plain_output(result.output)
+    assert round_log.read_bytes() == original_log
+
+
+def test_run_writes_every_round_log_event_while_campaign_lock_is_held(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    from dnadesign.opal.src.cli.commands import run as run_command
+
+    original_append = run_command._append_cli_round_event
+    observed: list[tuple[str, bool]] = []
+
+    def recording_append(cfg, cfg_path, round_index, stage, **payload):
+        observed.append((str(stage), (workdir / ".opal.lock").exists()))
+        return original_append(cfg, cfg_path, round_index, stage, **payload)
+
+    monkeypatch.setattr(run_command, "_append_cli_round_event", recording_append)
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "run", "-c", str(campaign), "--round", "0", "--quiet"],
+    )
+
+    assert result.exit_code == 2
+    assert "state.json not found" in _plain_output(result.output)
+    assert observed
+    assert all(lock_held for _, lock_held in observed), observed
+    assert [stage for stage, _ in observed][-2:] == ["abort", "lock_release_start"]
+    assert not (workdir / ".opal.lock").exists()
 
 
 def test_run_ledger_only_streams_candidate_x_without_full_records_load(tmp_path: Path, monkeypatch) -> None:

@@ -99,6 +99,33 @@ def _append_abort_event(
         pass
 
 
+def _release_run_lock(
+    lock: CampaignLock,
+    cfg,
+    cfg_path: Path,
+    round_index: int,
+    *,
+    attempt_id: str,
+    outcome: str,
+) -> None:
+    """Record the release boundary while ownership is held, then release it."""
+    try:
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round_index),
+            "lock_release_start",
+            attempt_id=attempt_id,
+            phase="finalize",
+            lock_scope="local_host",
+            lockfile=str(lock.lockfile),
+            status="releasing",
+            outcome=str(outcome),
+        )
+    finally:
+        lock.release()
+
+
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
 def cmd_run(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
@@ -137,6 +164,7 @@ def cmd_run(
     cfg = None
     attempt_id: str | None = None
     round_log_opened = False
+    campaign_lock: CampaignLock | None = None
     try:
         attempt_id = uuid.uuid4().hex
         cfg_path = resolve_config_path(config)
@@ -166,16 +194,46 @@ def cmd_run(
             allow_resume=bool(resume),
         )
 
+        command_started_at = now_iso()
+        lock_acquire_started_at = now_iso()
+        lockfile = Path(cfg.campaign.workdir) / ".opal.lock"
+        campaign_lock = CampaignLock(
+            Path(cfg.campaign.workdir),
+            payload_extra={"attempt_id": attempt_id, "round": int(round), "command": "run"},
+        )
+        campaign_lock.acquire()
         _append_cli_round_event(
             cfg,
             cfg_path,
             int(round),
             "command_start",
             attempt_id=attempt_id,
+            ts=command_started_at,
             command="run",
             status="started",
         )
         round_log_opened = True
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "lock_acquire_start",
+            attempt_id=attempt_id,
+            ts=lock_acquire_started_at,
+            lock_scope="local_host",
+            lockfile=str(lockfile),
+            status="started",
+        )
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "lock_acquired",
+            attempt_id=attempt_id,
+            lock_scope="local_host",
+            lockfile=str(campaign_lock.lockfile),
+            status="locked",
+        )
         store = store_from_cfg(cfg)
         _append_cli_round_event(
             cfg,
@@ -253,17 +311,6 @@ def cmd_run(
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
-        lockfile = Path(cfg.campaign.workdir) / ".opal.lock"
-        _append_cli_round_event(
-            cfg,
-            cfg_path,
-            int(round),
-            "lock_acquire_start",
-            attempt_id=attempt_id,
-            lock_scope="local_host",
-            lockfile=str(lockfile),
-            status="started",
-        )
         req = RunRoundRequest(
             cfg=cfg,
             as_of_round=int(round),
@@ -277,39 +324,7 @@ def cmd_run(
             allow_resume=bool(resume),
             progress_factory=(tui_progress_factory() if verbose and not json else None),
         )
-        lock_acquired = False
-        lock_path = str(lockfile)
-        try:
-            with CampaignLock(
-                Path(cfg.campaign.workdir),
-                payload_extra={"attempt_id": attempt_id, "round": int(round), "command": "run"},
-            ) as lock:
-                lock_acquired = True
-                lock_path = str(lock.lockfile)
-                _append_cli_round_event(
-                    cfg,
-                    cfg_path,
-                    int(round),
-                    "lock_acquired",
-                    attempt_id=attempt_id,
-                    lock_scope="local_host",
-                    lockfile=lock_path,
-                    status="locked",
-                )
-                res = run_round(store, df, req)
-        finally:
-            if lock_acquired:
-                _append_cli_round_event(
-                    cfg,
-                    cfg_path,
-                    int(round),
-                    "lock_released",
-                    attempt_id=attempt_id,
-                    phase="finalize",
-                    lock_scope="local_host",
-                    lockfile=lock_path,
-                    status="released",
-                )
+        res = run_round(store, df, req)
         selection_views = {}
         for view in cfg.selection_views:
             sel_params = dict(view.selection.params or {})
@@ -341,15 +356,67 @@ def cmd_run(
                 json_output=json,
                 labels_as_of=int(round),
             )
-    except typer.Exit:
+        _release_run_lock(
+            campaign_lock,
+            cfg,
+            cfg_path,
+            int(round),
+            attempt_id=attempt_id,
+            outcome="completed",
+        )
+    except typer.Exit as e:
+        if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
+            if round_log_opened:
+                _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
+            _release_run_lock(
+                campaign_lock,
+                cfg,
+                cfg_path,
+                int(round),
+                attempt_id=str(attempt_id),
+                outcome="aborted",
+            )
         raise
     except OpalError as e:
-        if round_log_opened and cfg is not None and cfg_path is not None:
+        if (
+            round_log_opened
+            and campaign_lock is not None
+            and campaign_lock.acquired
+            and cfg is not None
+            and cfg_path is not None
+        ):
             _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
+        if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
+            _release_run_lock(
+                campaign_lock,
+                cfg,
+                cfg_path,
+                int(round),
+                attempt_id=str(attempt_id),
+                outcome="aborted",
+            )
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
-        if round_log_opened and cfg is not None and cfg_path is not None:
+        if (
+            round_log_opened
+            and campaign_lock is not None
+            and campaign_lock.acquired
+            and cfg is not None
+            and cfg_path is not None
+        ):
             _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
+        if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
+            _release_run_lock(
+                campaign_lock,
+                cfg,
+                cfg_path,
+                int(round),
+                attempt_id=str(attempt_id),
+                outcome="aborted",
+            )
         internal_error("run", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
+    finally:
+        if campaign_lock is not None and campaign_lock.acquired:
+            campaign_lock.release()

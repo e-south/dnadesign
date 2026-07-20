@@ -91,6 +91,7 @@ def _round_dir_has_blocking_entries(rdir: Path) -> bool:
         "records_load_done",
         "lock_acquire_start",
         "lock_acquired",
+        "lock_release_start",
         "lock_released",
         "abort",
     }

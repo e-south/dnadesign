@@ -91,16 +91,37 @@ class CampaignLock:
         self.workdir = Path(workdir)
         self.lockfile = self.workdir / ".opal.lock"
         self.payload_extra = dict(payload_extra or {})
+        self._acquired = False
 
-    def __enter__(self):
+    @property
+    def acquired(self) -> bool:
+        return self._acquired
+
+    def acquire(self) -> CampaignLock:
+        if self._acquired:
+            raise OpalError(
+                f"Campaign lock is already held by this instance: {self.lockfile}",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
         _acquire_lock_file(self.lockfile, subject="Campaign", payload_extra=self.payload_extra)
+        self._acquired = True
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def release(self) -> None:
+        if not self._acquired:
+            return
         try:
             self.lockfile.unlink(missing_ok=True)
         except Exception:
             pass
+        finally:
+            self._acquired = False
+
+    def __enter__(self):
+        return self.acquire()
+
+    def __exit__(self, exc_type, exc, tb):
+        self.release()
         return False
 
 
