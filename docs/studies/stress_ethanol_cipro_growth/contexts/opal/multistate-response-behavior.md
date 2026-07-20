@@ -406,9 +406,10 @@ as candidate-specific penalties. The protocol stores the exact value and recipe.
 The executable value is
 $\tau=0.31063783855250376$ log2; the additional digits preserve the recorded
 calculation and do not imply matching biological precision.
-The digest-bound
-[`normalization.json`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/normalization.json)
-and its supporting tables preserve the calculation.
+The generated
+`workbench/outputs/multistate_response_behavior_shadow/latest/normalization.json`
+record and its supporting tables preserve the calculation; the activation
+receipt binds their verified bundle.
 
 Scores are comparable only within one view under the same state order, mask,
 scale, and objective version. An ethanol-associated score and a
@@ -474,8 +475,8 @@ mathematical families duplicates. No score can select a phenotype combination
 that the predictor does not place in its prediction surface.
 
 The per-view counts, correlations, and principal-component variance ratios are
-generated from the fixed prediction-score table and recorded in
-[`prediction_surface_diagnostics.parquet`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/tables/prediction_surface_diagnostics.parquet).
+generated from the fixed prediction-score table and recorded in the generated
+`tables/prediction_surface_diagnostics.parquet` evidence table.
 
 The OFF-suppression display uses one symmetric linear extent for all three
 views, fixed from the absolute 99th percentile of the round-0 prediction pool.
