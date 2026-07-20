@@ -107,7 +107,7 @@ def cmd_campaign_reset(
         if json:
             json_out({"preview": preview, "to_delete": to_delete})
             if not apply:
-                raise typer.Exit(code=ExitCodes.OK)
+                return
         else:
             head = kv_block("[Preview] campaign-reset", preview)
             del_list = bullet_list("Columns to prune from records.parquet", to_delete or ["(none)"])

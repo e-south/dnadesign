@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-opal-synthesis-handoff
 surface: study-context
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 type: contract
 plane: data-plane
 owner_boundary: stress_ethanol_cipro_growth
@@ -81,20 +81,24 @@ met; the synthesis record rechecks that boundary.
 ### Operator Path
 
 Inspect all three views and the logical union with `opal selection-set show
---view <id>` and `opal selection-batch show`. After the run and record are
-frozen:
+--view <id>` and `opal selection-batch show`. The current lifecycle does not
+authorize synthesis, so the operator surface is preview-only:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
-  --handoff-id <measured_round_handoff_id> --write --json
+  --handoff-id <measured_round_handoff_id> --json
 ```
 
 Draft mode accepts one campaign and one run:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
-  --source opal-round --round <as_of_round> --run-id <run_id> --write --json
+  --source opal-round --round <as_of_round> --run-id <run_id> --json
 ```
+
+After a lifecycle decision explicitly grants synthesis authorization, the
+approved command can be rerun with `--write`. A completed OPAL round or valid
+preview is not that authorization.
 
 ### Evidence Boundary
 

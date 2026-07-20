@@ -3,13 +3,13 @@ id: opal-selection-plugins
 title: OPAL selection plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-15
+last_verified: 2026-07-19
 ---
 
 ## OPAL Selection Strategies
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-15
+**Last verified:** 2026-07-19
 
 
 Selection plugins consume named objective channels and emit ranked candidate
@@ -20,7 +20,7 @@ sets under the contracts below.
 | Strategy | Inputs | Behavior | Typical pairing |
 | --- | --- | --- | --- |
 | `top_n` | `score_ref` | Deterministic rank-by-score | Any model and scalar objective channel |
-| `expected_improvement` | `score_ref` + `uncertainty_ref` | Acquisition ranking (exploration/exploitation) | A model/objective pair that emits scalar uncertainty |
+| `expected_improvement` | `score_ref` + `uncertainty_ref` | Pool-relative weighted acquisition heuristic | A model/objective pair that emits scalar uncertainty |
 
 Source modules:
 
@@ -89,13 +89,16 @@ again.
 
 Deterministic ranking by selected score channel.
 
-### `expected_improvement`
+### Pool-relative weighted acquisition (`expected_improvement`)
 
-Uncertainty-aware acquisition ranking.
+The registry ID is stable, but this is not classical expected improvement
+against the best observed result. It uses the best prediction in the current
+pool as its incumbent and min-max normalizes uncertainty within that pool.
+Changing score units or pool membership can therefore change the ranking.
 
 - consumes selected score channel (`score_ref`)
 - consumes uncertainty standard deviation channel (`uncertainty_ref`)
-- ranks by EI score first, then predicted score (objective-aware), then `id`
+- ranks by acquisition score first, then predicted score (objective-aware), then `id`
 - raises an error on missing/non-finite/non-positive uncertainty
 - does not degrade to score-only behavior
 - Acquisition details: [Expected Improvement behavior and math](expected-improvement.md)
@@ -118,7 +121,7 @@ selection_views:
         require_exact_top_k: true
 ```
 
-Expected improvement:
+Pool-relative weighted acquisition:
 
 ```yaml
 selection_views:

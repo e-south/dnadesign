@@ -51,18 +51,18 @@ opal_round0_run_context:
   ref: repo:src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/metadata/round_ctx.json
   campaign_slug: secg_msrb_greedy
   round_index: 0
-  run_id: r0-2026-07-18T17:17:17+00:00-01784395037392194000-c1e3183588a14fc7b8796041f2945c66
-  sha256: f92de306f91d8b985ee860cd2a7845acf7da6bda6cdccbbb7816adfea7bb0d0a  # pragma: allowlist secret
+  run_id: r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584
+  sha256: 1160e0037f8aab3f043d6f9420c8982efa3f5e30cca9de68d48fd8bf73944b1c  # pragma: allowlist secret
 opal_round0_selection_batch:
   artifact_type: file
   role: opal_selection_batch
   ref: repo:src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/selection/selection_batch.parquet
   campaign_slug: secg_msrb_greedy
   round_index: 0
-  run_id: r0-2026-07-18T17:17:17+00:00-01784395037392194000-c1e3183588a14fc7b8796041f2945c66
+  run_id: r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584
   row_count: 18
   deduplicate_by: sequence
-  sha256: c70ebbe1e4c173d44818f5a35313ccc6395fd30cc28e071ab1b80e1cde2a2586  # pragma: allowlist secret
+  sha256: 856b50f61186102607e80503cf02473b3d849060c8a2871adc97645a090c1cff  # pragma: allowlist secret
   authorization_state: candidate_review_only
 reference_native_dataset:
   artifact_type: dataset

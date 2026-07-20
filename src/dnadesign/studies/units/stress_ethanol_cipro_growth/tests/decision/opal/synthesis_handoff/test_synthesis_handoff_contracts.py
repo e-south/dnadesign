@@ -1031,7 +1031,7 @@ def _write_opal_round_fixture(
                   params:
                     state_ids: ["00", "10", "01", "11"]
                     target_mask: [0, 1, 0, 1]
-                    normalization: {{ response_scale: 1.0, signal_scale: 1.0 }}
+                    softmin_scale: 1.0
                 selection:
                   name: top_n
                   params:
@@ -1045,7 +1045,7 @@ def _write_opal_round_fixture(
                   params:
                     state_ids: ["00", "10", "01", "11"]
                     target_mask: [0, 0, 1, 1]
-                    normalization: {{ response_scale: 1.0, signal_scale: 1.0 }}
+                    softmin_scale: 1.0
                 selection:
                   name: top_n
                   params:

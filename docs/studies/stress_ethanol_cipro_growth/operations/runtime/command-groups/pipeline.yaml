@@ -1,6 +1,6 @@
 study_pipeline:
   study_id: stress_ethanol_cipro_growth
-  last_verified: 2026-07-18
+  last_verified: 2026-07-19
   navigation:
     command_group_map: docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/README.md
     lane_sidecars:
@@ -317,7 +317,7 @@ study_pipeline:
       ciprofloxacin: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view ciprofloxacin --round 0 --json
       and: uv run opal verify-outputs -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --view and --round 0 --json
     round0:
-      run_id: r0-2026-07-18T17:17:17+00:00-01784395037392194000-c1e3183588a14fc7b8796041f2945c66
+      run_id: r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584
       campaign_slug: secg_msrb_greedy
       round_index: 0
       status: completed
@@ -325,13 +325,13 @@ study_pipeline:
       selection_batch_rows: 18
       selection_batch_unique_sequences: 18
       selection_batch: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/selection/selection_batch.parquet
-      selection_batch_sha256: c70ebbe1e4c173d44818f5a35313ccc6395fd30cc28e071ab1b80e1cde2a2586  # pragma: allowlist secret
+      selection_batch_sha256: 856b50f61186102607e80503cf02473b3d849060c8a2871adc97645a090c1cff  # pragma: allowlist secret
       round_context: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/metadata/round_ctx.json
-      round_context_sha256: f92de306f91d8b985ee860cd2a7845acf7da6bda6cdccbbb7816adfea7bb0d0a  # pragma: allowlist secret
+      round_context_sha256: 1160e0037f8aab3f043d6f9420c8982efa3f5e30cca9de68d48fd8bf73944b1c  # pragma: allowlist secret
       authorization_state: candidate_review_only
-    synthesis_handoff_batch0_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --write --json
-    synthesis_handoff_round_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <measured_round_handoff_id> --write --json
-    synthesis_handoff_round_draft_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round <as_of_round> --run-id <run_id> --write --json
+    synthesis_handoff_source_evidence_preview_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --json
+    synthesis_handoff_round_preview_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <measured_round_handoff_id> --json
+    synthesis_handoff_round_draft_preview_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round <as_of_round> --run-id <run_id> --json
     notebook:
       role: campaign_specific_artifact_viewer
       pre_run_execution_safe: true

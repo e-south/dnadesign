@@ -1,16 +1,19 @@
-## Expected Improvement Plugin (`expected_improvement`)
+## Pool-relative weighted acquisition (`expected_improvement`)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-07-19
 
 
-`expected_improvement` follows the equations and failure conditions below.
+`expected_improvement` is the stable registry identifier. The implementation is
+a pool-relative weighted acquisition heuristic, not classical expected
+improvement against the best observed outcome. It follows the equations and
+failure conditions below.
 Registry-level contracts and required fields are listed under
 [Selection](README.md).
 
 ### Purpose
 
-`expected_improvement` ranks candidates by balancing:
+The plugin ranks candidates by balancing:
 
 - exploitation (high predicted score), and
 - exploration (high predictive uncertainty standard deviation).
@@ -62,7 +65,8 @@ Common pitfall: setting `uncertainty_ref` to a channel key that **does not** pub
 Let:
 
 - `s` = selected score channel value for a candidate
-- `s*` = current best score under the configured objective mode
+- `s*` = best predicted score in the current candidate pool under the
+  configured objective mode
 - `I` = improvement term
 - `sigma` = uncertainty standard deviation
 - `Phi` = standard normal CDF
@@ -73,7 +77,7 @@ Improvement:
 - maximize: `I = s - s*`
 - minimize: `I = s* - s`
 
-Standard EI:
+EI-shaped terms:
 
 - `Z = I / sigma`
 - `EI = I * Phi(Z) + sigma * phi(Z)`
@@ -85,6 +89,12 @@ OPAL weighted acquisition:
 
 Important:
 
+- the incumbent is pool-relative and predicted, not the best observed outcome;
+- changing candidate-pool membership can change the incumbent and the
+  min-max-normalized uncertainty term;
+- the exploitation term remains in score units while the normalized exploration
+  term is dimensionless, so `alpha` and `beta` also define an implicit unit
+  conversion; rescaling the score can change ranks;
 - raw `sigma` is used in `Z = I / sigma` (no sigma normalization in z-score denominator)
 - only the exploration multiplier uses `sigma_norm`
 

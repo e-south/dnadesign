@@ -63,6 +63,27 @@ def test_campaign_reset_prunes_and_clears(tmp_path: Path) -> None:
     assert "Y" not in df.columns
 
 
+def test_campaign_reset_json_preview_exits_cleanly_without_mutation(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records, include_opal_cols=True)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+    outputs = workdir / "outputs"
+    outputs.mkdir()
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "campaign-reset", "-c", str(campaign), "--json"],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert '"preview"' in result.stdout
+    assert outputs.is_dir()
+    assert "opal__demo__label_hist" in pd.read_parquet(records).columns
+
+
 def test_campaign_reset_allows_non_demo_without_flag(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

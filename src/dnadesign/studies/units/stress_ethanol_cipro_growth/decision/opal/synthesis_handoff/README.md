@@ -2,7 +2,7 @@
 
 **Owner:** stress_ethanol_cipro_growth study
 **Lifecycle:** measured-round contract ready; synthesis authorization pending
-**Last verified:** 2026-07-18
+**Last verified:** 2026-07-19
 
 Study-owned conversion from an OPAL logical selection batch to physical
 synthesis artifacts.
@@ -103,19 +103,23 @@ uv run opal selection-batch show \
   --round latest --json
 ```
 
-Build a draft from one explicit run:
+Preview a draft from one explicit run:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
-  --source opal-round --round <as_of_round> --run-id <run_id> --write --json
+  --source opal-round --round <as_of_round> --run-id <run_id> --json
 ```
 
-Production generation starts from a checked-in lifecycle record:
+Preview a checked-in lifecycle record:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
-  --handoff-id <measured_round_handoff_id> --write --json
+  --handoff-id <measured_round_handoff_id> --json
 ```
+
+The current lifecycle does not authorize synthesis. Artifact materialization is
+an explicit later step after study approval; materializing files does not place
+an order or itself grant authorization.
 
 `--source selected-csv` is fixture/debug input and requires explicit JSON
 `selection_memberships`. It is not a production authority.
