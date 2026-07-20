@@ -72,6 +72,9 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     multistate_behavior_labels as behavior_labels,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
+    multistate_behavior_prediction_surface_diagnostics as behavior_prediction_surface,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
     multistate_behavior_publication as behavior_publication,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
@@ -140,10 +143,10 @@ def test_adversarial_audit_pins_reviewed_snapshot_and_rejects_provenance_drift()
     audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
 
     assert audit["auditor_id"] == "codex_subagent.metric_adversarial_audit.v1"
-    assert audit["completed_at"] == "2026-07-17T22:49:20Z"
-    assert audit["reviewed_source_commit"] == "ee83c807d88f2f58958dc8cff78290dd90dbb826"  # pragma: allowlist secret
+    assert audit["completed_at"] == "2026-07-19T22:32:54Z"
+    assert audit["reviewed_source_commit"] == "5fde329e11fe551cab493b47b99ab54f7ccc2825"  # pragma: allowlist secret
     assert audit["reviewed_preliminary_manifest_sha256"] == (
-        "sha256:dbf9e651a467df76f12ffa22c6b15f8515264a8d515731a601fc26274c66869f"
+        "sha256:987a3e8e155af7fb72e31af077784fcca4d4acbfa1f291fdf8ed66cf049a8293"
     )
     behavior_audit_verification.verify_behavior_adversarial_audit_record(audit)
 
@@ -173,7 +176,9 @@ def test_checked_in_behavior_protocol_is_shadow_only_and_complete() -> None:
     assert protocol.synthesis_authorization == "prohibited"
     assert protocol.state_ids == ("00", "10", "01", "11")
     assert protocol.primary_reduction_id == "event_logmean_4_8h_post"
-    assert protocol.normalization.normalized_temperature == 1.0
+    assert protocol.normalization.scale_basis == (
+        "pooled_reader_joint_bootstrap_sd_of_declared_response_pairs_and_reference_relative_states"
+    )
     assert protocol.normalization.scale_quantile == 0.9
     assert protocol.normalization.quantile_method == "linear"
     assert protocol.normalization.event_time_role == "separate_sensitivity_evidence"
@@ -288,11 +293,13 @@ def test_protocol_rejects_state_identity_duplicate_yaml_and_numeric_strings(tmp_
         load_multistate_behavior_protocol(duplicated)
 
     payload = yaml.safe_load(PROTOCOL_PATH.read_text(encoding="utf-8"))
-    payload["objective"]["normalized_temperature"] = "1.0"
-    string_number = tmp_path / "string-number.yaml"
-    string_number.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    with pytest.raises(BehaviorProtocolError, match="positive finite number"):
-        load_multistate_behavior_protocol(string_number)
+    payload["normalization"].pop("scale_basis")
+    payload["normalization"]["response_scale_basis"] = "legacy-response"
+    payload["normalization"]["signal_scale_basis"] = "legacy-signal"
+    two_scale = tmp_path / "two-scale.yaml"
+    two_scale.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(BehaviorProtocolError, match="normalization fields must be exactly"):
+        load_multistate_behavior_protocol(two_scale)
 
 
 def test_shadow_protocol_cannot_authorize_a_checked_in_campaign() -> None:
@@ -320,7 +327,7 @@ def test_shadow_protocol_cannot_authorize_a_checked_in_campaign() -> None:
     assert objective_users == ["src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml"]
 
 
-def test_behavior_normalization_uses_bootstrap_only_and_one_common_scale_per_family() -> None:
+def test_behavior_normalization_uses_one_pooled_bootstrap_softmin_scale() -> None:
     protocol = load_multistate_behavior_protocol(PROTOCOL_PATH)
     labels, draws = _reader_evidence(samples=120)
     target_views = _target_views()
@@ -341,20 +348,41 @@ def test_behavior_normalization_uses_bootstrap_only_and_one_common_scale_per_fam
         target_views=target_views,
     )
 
-    assert result.response_scale > 0.0
-    assert result.signal_scale > 0.0
+    pooled_sd = pd.concat(
+        [
+            result.response_resolution_rows["bootstrap_sd"],
+            result.signal_resolution_rows["bootstrap_sd"],
+        ],
+        ignore_index=True,
+    ).to_numpy(dtype=float)
+    assert result.softmin_scale == pytest.approx(np.quantile(pooled_sd, 0.9, method="linear"))
+    assert result.softmin_scale > 0.0
     assert result.bootstrap_samples == 120
     assert result.unit_count == 6
     assert result.response_pair_count == 6
     assert len(result.response_resolution_rows) == 36
     assert len(result.signal_resolution_rows) == 24
-    assert result.response_scale == event_changed.response_scale
-    assert result.signal_scale == event_changed.signal_scale
-    assert result.scale_basis == "reader_joint_bootstrap_component_resolution"
+    assert result.softmin_scale == event_changed.softmin_scale
+    assert result.scale_basis == protocol.normalization.scale_basis
     assert result.event_time_role == "separate_sensitivity_evidence"
     assert result.repeat_role == "separate_disagreement_evidence"
     assert result.censor_role == "exact_only_normalization_cohort"
     assert len(result.source_rows_sha256) == 64
+
+
+def test_family_cardinality_pressure_uses_the_declared_softmin_scale() -> None:
+    protocol = load_multistate_behavior_protocol(PROTOCOL_PATH)
+
+    softmin_scale = 0.31063783855250376
+    frame = behavior_cardinality.build_family_cardinality_pressure(
+        protocol,
+        softmin_scale=softmin_scale,
+    )
+    four_state = frame.loc[frame["state_count"].eq(4)].iloc[0]
+
+    assert frame["softmin_scale"].eq(softmin_scale).all()
+    assert four_state["analytic_global_maximum_soft_vs_hard_gap"] == pytest.approx(softmin_scale * np.log(12.0))
+    assert four_state["weak_coordinate_analytic_soft_vs_hard_gap"] == pytest.approx(softmin_scale * np.log(6.0))
 
 
 def test_behavior_normalization_deduplicates_pairs_declared_by_multiple_views() -> None:
@@ -414,6 +442,9 @@ def test_normalization_record_pins_protocol_cohort_sources_and_evidence_roles() 
     assert record["status"] == "shadow_only"
     assert record["activation"] == {"campaign": "prohibited", "synthesis": "prohibited"}
     assert record["normalization"]["cohort_id"] == "exact_primary_reader_candidate_experiments_v1"
+    assert set(record["normalization"]) >= {"softmin_scale", "scale_basis"}
+    assert "response_scale" not in record["normalization"]
+    assert "signal_scale" not in record["normalization"]
     assert record["normalization"]["response_pair_count"] == 6
     assert record["normalization"]["bootstrap_samples"] == 120
     assert record["evidence_roles"] == {
@@ -820,7 +851,10 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
             labels.drop(columns="id"),
             protocol=protocol,
         ),
-        family_cardinality_pressure=behavior_cardinality.build_family_cardinality_pressure(protocol),
+        family_cardinality_pressure=behavior_cardinality.build_family_cardinality_pressure(
+            protocol,
+            softmin_scale=normalization.softmin_scale,
+        ),
         validation_labels=validation_labels,
         rmf_resolution_rows=_publication_rmf_resolution(rmf_uncertainty.rows),
         rmf_replay_calibration=rmf_replay_calibration,
@@ -889,6 +923,12 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
     assert manifest["activation"] == {"campaign": "prohibited", "synthesis": "prohibited"}
     assert manifest["tables"]["bootstrap_scores"]["rows"] == 2160
     assert manifest["tables"]["normalization_response_resolution"]["rows"] == 36
+    assert manifest["tables"]["prediction_surface_diagnostics"]["rows"] == 3
+    surface = pd.read_parquet(bundle / "tables/prediction_surface_diagnostics.parquet")
+    assert set(surface["selection_view_id"]) == {"ethanol", "ciprofloxacin", "and"}
+    assert surface["predicted_row_count"].eq(24).all()
+    assert surface["family_pca_explained_variance_ratio_pc1"].between(0.0, 1.0).all()
+    assert surface["source_table_id"].eq("prediction_scores").all()
     report = (bundle / "report.md").read_text(encoding="utf-8")
     assert "| Reader experiment | Candidate-experiment rank |" in report
     assert "| experiment-1 |" in report
@@ -927,7 +967,7 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
     scale_manifest = json.loads((scale_tamper / "manifest.json").read_text(encoding="utf-8"))
     normalization_path = scale_tamper / scale_manifest["artifacts"]["normalization"]["path"]
     normalization_payload = json.loads(normalization_path.read_text(encoding="utf-8"))
-    normalization_payload["normalization"]["response_scale"] = 999.0
+    normalization_payload["normalization"]["softmin_scale"] = 999.0
     normalization_path.write_text(json.dumps(normalization_payload), encoding="utf-8")
     _refresh_artifact_receipt(scale_tamper, scale_manifest, artifact_id="normalization")
     for table_id in (
@@ -939,7 +979,7 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
     ):
         path = scale_tamper / scale_manifest["artifacts"][f"table__{table_id}"]["path"]
         frame = pd.read_parquet(path)
-        frame["response_scale"] = 999.0
+        frame["softmin_scale"] = 999.0
         frame.to_parquet(path, index=False)
         _refresh_artifact_receipt(scale_tamper, scale_manifest, artifact_id=f"table__{table_id}")
     (scale_tamper / "manifest.json").write_text(json.dumps(scale_manifest), encoding="utf-8")
@@ -1023,6 +1063,22 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
     with pytest.raises(ValueError, match="directionally inconsistent"):
         behavior_publication.verify_multistate_behavior_shadow(event_bottleneck_tamper)
 
+    surface_tamper = tmp_path / "surface-tamper"
+    shutil.copytree(bundle, surface_tamper)
+    surface_manifest = json.loads((surface_tamper / "manifest.json").read_text(encoding="utf-8"))
+    surface_path = surface_tamper / surface_manifest["artifacts"]["table__prediction_surface_diagnostics"]["path"]
+    surface_rows = pd.read_parquet(surface_path)
+    surface_rows.loc[0, "all_reference_directions_met_count"] += 1
+    surface_rows.to_parquet(surface_path, index=False)
+    _refresh_artifact_receipt(
+        surface_tamper,
+        surface_manifest,
+        artifact_id="table__prediction_surface_diagnostics",
+    )
+    (surface_tamper / "manifest.json").write_text(json.dumps(surface_manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="does not replay"):
+        behavior_publication.verify_multistate_behavior_shadow(surface_tamper)
+
     manifest_path = bundle / "manifest.json"
     manifest_text = manifest_path.read_text(encoding="utf-8")
     manifest_path.write_text(
@@ -1046,6 +1102,35 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
     prediction_path.write_bytes(prediction_path.read_bytes() + b"drift")
     with pytest.raises(ValueError, match="size or digest mismatch"):
         behavior_publication.verify_multistate_behavior_shadow(bundle)
+
+
+def test_prediction_surface_diagnostics_are_derived_per_view() -> None:
+    frame = pd.DataFrame(
+        {
+            "selection_view_id": ["a"] * 5 + ["b"] * 5,
+            "response_family_score": [0.0, 1.0, 2.0, 3.0, 4.0] * 2,
+            "on_signal_family_score": [0.0, 1.0, 2.0, 3.0, 4.0] * 2,
+            "off_signal_suppression_family_score": [4.0, 3.0, 2.0, 1.0, 0.0] * 2,
+            "all_reference_directions_met": [False, False, True, True, True] * 2,
+            "prediction_run_id": ["run-1"] * 10,
+            "prediction_source_sha256": ["sha256:" + "a" * 64] * 10,
+            "protocol_id": ["protocol-1"] * 10,
+            "protocol_source_sha256": ["sha256:" + "b" * 64] * 10,
+            "normalization_source_rows_sha256": ["sha256:" + "c" * 64] * 10,
+        }
+    )
+
+    result = behavior_prediction_surface.build_prediction_surface_diagnostics(frame)
+
+    assert list(result["selection_view_id"]) == ["a", "b"]
+    assert result["predicted_row_count"].eq(5).all()
+    assert result["all_reference_directions_met_count"].eq(3).all()
+    assert result["all_reference_directions_met_fraction"].eq(0.6).all()
+    assert np.allclose(result["on_signal_off_suppression_spearman"], -1.0)
+    pca_columns = [f"family_pca_explained_variance_ratio_pc{index}" for index in range(1, 4)]
+    assert np.allclose(result[pca_columns].sum(axis=1), 1.0)
+    assert result["source_table_id"].eq("prediction_scores").all()
+    assert result["evidence_role"].eq("prediction_surface_shape_diagnostic_no_selection_claim").all()
 
 
 def test_censor_review_rejects_text_booleans() -> None:

@@ -133,6 +133,8 @@ def test_response_model_modules_stay_semantically_bounded() -> None:
         "reporting/response_assay_plots.py": 300,
         "reporting/response_model_plots.py": 240,
         "reporting/multistate_behavior_plots.py": 200,
+        "reporting/multistate_behavior_plot_labels.py": 80,
+        "reporting/multistate_behavior_plot_style.py": 70,
         "reporting/multistate_behavior_report.py": 280,
         "reporting/rmf_contract_plot.py": 100,
         "model_evidence/cli.py": 100,

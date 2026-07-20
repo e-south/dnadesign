@@ -46,8 +46,8 @@ def build_multistate_behavior_normalization_sensitivity(
     if set(response["id"].astype(str)) != set(signal["id"].astype(str)):
         raise ValueError("normalization sensitivity response and signal units disagree.")
     values, candidate_ids = _prediction_matrix(predictions, protocol=protocol)
-    primary_scales = _scales(response, signal, quantile=protocol.completion_gate.normalization_primary_quantile)
-    primary = _scores_by_view(values, target_views=target_views, protocol=protocol, scales=primary_scales)
+    primary_scale = _softmin_scale(response, signal, quantile=protocol.completion_gate.normalization_primary_quantile)
+    primary = _scores_by_view(values, target_views=target_views, protocol=protocol, softmin_scale=primary_scale)
     primary_rankings = {view_id: _ranking(candidate_ids, scores) for view_id, scores in primary.items()}
     scenarios: list[tuple[str, str, float, str, pd.DataFrame, pd.DataFrame]] = []
     for quantile in protocol.completion_gate.normalization_quantiles:
@@ -71,8 +71,13 @@ def build_multistate_behavior_normalization_sensitivity(
 
     records: list[dict[str, object]] = []
     for scenario_id, kind, quantile, excluded, response_rows, signal_rows in scenarios:
-        scales = _scales(response_rows, signal_rows, quantile=quantile)
-        scenario_scores = _scores_by_view(values, target_views=target_views, protocol=protocol, scales=scales)
+        softmin_scale = _softmin_scale(response_rows, signal_rows, quantile=quantile)
+        scenario_scores = _scores_by_view(
+            values,
+            target_views=target_views,
+            protocol=protocol,
+            softmin_scale=softmin_scale,
+        )
         for view in target_views:
             ranking = _ranking(candidate_ids, scenario_scores[view.id])
             primary_ranking = primary_rankings[view.id]
@@ -87,8 +92,7 @@ def build_multistate_behavior_normalization_sensitivity(
                     "normalization_unit_count": int(response_rows["id"].astype(str).nunique()),
                     "selection_view_id": view.id,
                     "candidate_count": len(candidate_ids),
-                    "response_scale": scales["response_scale"],
-                    "signal_scale": scales["signal_scale"],
+                    "softmin_scale": softmin_scale,
                     "score_spearman_vs_primary": _spearman(
                         scenario_scores[view.id],
                         primary[view.id],
@@ -150,14 +154,17 @@ def _prediction_matrix(
     return matrix, tuple(rows["id"])
 
 
-def _scales(response: pd.DataFrame, signal: pd.DataFrame, *, quantile: float) -> dict[str, float]:
-    values = {
-        "response_scale": float(np.quantile(response["bootstrap_sd"].to_numpy(dtype=float), quantile, method="linear")),
-        "signal_scale": float(np.quantile(signal["bootstrap_sd"].to_numpy(dtype=float), quantile, method="linear")),
-    }
-    if not all(np.isfinite(value) and value > 0.0 for value in values.values()):
+def _softmin_scale(response: pd.DataFrame, signal: pd.DataFrame, *, quantile: float) -> float:
+    pooled = np.concatenate(
+        [
+            response["bootstrap_sd"].to_numpy(dtype=float),
+            signal["bootstrap_sd"].to_numpy(dtype=float),
+        ]
+    )
+    value = float(np.quantile(pooled, quantile, method="linear"))
+    if not np.isfinite(value) or value <= 0.0:
         raise ValueError("normalization sensitivity produced a nonpositive or nonfinite scale.")
-    return values
+    return value
 
 
 def _scores_by_view(
@@ -165,14 +172,14 @@ def _scores_by_view(
     *,
     target_views: tuple[StressTargetView, ...],
     protocol: MultistateBehaviorShadowProtocol,
-    scales: dict[str, float],
+    softmin_scale: float,
 ) -> dict[str, np.ndarray]:
     return {
         view.id: score_multistate_response_behavior(
             matrix,
             state_ids=protocol.state_ids,
             target_mask=view.target_mask,
-            normalization=scales,
+            softmin_scale=softmin_scale,
         ).behavior_score
         for view in target_views
     }

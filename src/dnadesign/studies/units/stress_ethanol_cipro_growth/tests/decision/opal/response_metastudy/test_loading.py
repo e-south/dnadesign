@@ -36,7 +36,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
     load_training_matrix,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.source_evidence import (
-    rmf_round0_source_evidence_root,
+    response_window_round0_source_evidence_root,
     sfxi_round0_source_evidence_dir,
 )
 
@@ -162,8 +162,8 @@ def test_label_source_frame_rejects_identity_drift(tmp_path) -> None:
 
 def test_stress_campaign_contract_rejects_missing_candidate_records(tmp_path) -> None:
     repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file())
-    source_config = rmf_round0_source_evidence_root(repo_root) / "secg_rmf_greedy/configs/campaign.yaml"
-    campaign_root = rmf_round0_source_evidence_root(tmp_path)
+    source_config = response_window_round0_source_evidence_root(repo_root) / "secg_rmf_greedy/configs/campaign.yaml"
+    campaign_root = response_window_round0_source_evidence_root(tmp_path)
     target_config = campaign_root / "secg_rmf_greedy/configs/campaign.yaml"
     target_config.parent.mkdir(parents=True)
     target_config.write_text(source_config.read_text(encoding="utf-8"), encoding="utf-8")
@@ -291,7 +291,7 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
         repo_root=repo_root,
         reader_bundle_root=tmp_path / "reader-bundle",
         out_dir=tmp_path / "out",
-        campaign_root=rmf_round0_source_evidence_root(repo_root),
+        campaign_root=response_window_round0_source_evidence_root(repo_root),
     )
 
     stress_campaign = load_stress_campaign_contract(paths)
@@ -319,8 +319,8 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
 
 def _copy_campaign_config(tmp_path: Path) -> tuple[Path, Path]:
     repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file())
-    source_config = rmf_round0_source_evidence_root(repo_root) / "secg_rmf_greedy/configs/campaign.yaml"
-    campaign_root = rmf_round0_source_evidence_root(tmp_path)
+    source_config = response_window_round0_source_evidence_root(repo_root) / "secg_rmf_greedy/configs/campaign.yaml"
+    campaign_root = response_window_round0_source_evidence_root(tmp_path)
     target_config = campaign_root / "secg_rmf_greedy/configs/campaign.yaml"
     target_config.parent.mkdir(parents=True)
     target_config.write_text(source_config.read_text(encoding="utf-8"), encoding="utf-8")

@@ -107,10 +107,13 @@ def _verify_observed_scores_from_coordinates(
             sum(label.startswith("off_signal_suppression:") for label in labels),
         )
         response, on_signal, off_signal_suppression = np.split(values, np.cumsum(family_counts)[:-1])
-        family_scores = tuple(_smooth_bottleneck(family) for family in (response, on_signal, off_signal_suppression))
+        scale = semantics.softmin_scale
+        family_scores = tuple(
+            _smooth_bottleneck(family, softmin_scale=scale) for family in (response, on_signal, off_signal_suppression)
+        )
         prior = np.concatenate([np.full(count, 1.0 / (3.0 * count)) for count in family_counts])
-        log_terms = -values + np.log(prior)
-        behavior_score = float(-logsumexp(log_terms))
+        log_terms = -values / scale + np.log(prior)
+        behavior_score = float(-scale * logsumexp(log_terms))
         weights = np.exp(log_terms - logsumexp(log_terms))
         limiting_index = int(np.argmin(values))
         expected = {
@@ -136,8 +139,8 @@ def _verify_observed_scores_from_coordinates(
             raise ValueError("observed hard-bottleneck flags do not derive from coordinate evidence.")
 
 
-def _smooth_bottleneck(values: np.ndarray) -> float:
-    return float(-(logsumexp(-values) - np.log(len(values))))
+def _smooth_bottleneck(values: np.ndarray, *, softmin_scale: float) -> float:
+    return float(-softmin_scale * (logsumexp(-values / softmin_scale) - np.log(len(values))))
 
 
 def _ordered_coordinate_labels(state_ids: tuple[str, ...], mask: tuple[int, ...]) -> tuple[str, ...]:

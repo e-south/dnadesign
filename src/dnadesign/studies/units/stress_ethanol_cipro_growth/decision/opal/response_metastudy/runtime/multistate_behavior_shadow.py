@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ...source_evidence import rmf_round0_source_evidence_root
+from ...source_evidence import response_window_round0_source_evidence_root
 from ..core.contracts import MetastudyPaths
 from ..evaluation import (
     VerifiedBehaviorCohortReceipt,
@@ -69,7 +69,7 @@ def load_verified_multistate_behavior_shadow(
         repo_root=root,
         reader_bundle_root=Path(reader_bundle_root).resolve(),
         out_dir=root / ".unused-behavior-shadow",
-        campaign_root=rmf_round0_source_evidence_root(root).resolve(),
+        campaign_root=response_window_round0_source_evidence_root(root).resolve(),
     )
     campaign = load_stress_campaign_contract(paths)
     protocol_path = (

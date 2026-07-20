@@ -1,9 +1,9 @@
 ---
 id: stress-ethanol-cipro-growth-response-magnitude-feasibility
-title: Response-Magnitude Feasibility study decision
+title: Response-Magnitude Feasibility comparator
 owner: dnadesign-maintainers
-status: active
-last_verified: 2026-07-16
+status: source_evidence
+last_verified: 2026-07-19
 audience: [scientist, operator, agent]
 ---
 
@@ -11,18 +11,18 @@ audience: [scientist, operator, agent]
 
 ### Decision
 
-Treat `sfxi_v1` and `response_magnitude_feasibility_v1` as distinct objective
-contracts. This study applies **RMF** to the promoted Reader reduction under
+`sfxi_v1` and `response_magnitude_feasibility_v1` are distinct objective
+contracts. The study evaluated **RMF** on the promoted Reader reduction under
 one repeated-candidate label-source rule and one typed OPAL label contract.
-SFXI round-0 records retain their own y-space and are not RMF inputs.
+SFXI records retain their own y-space and are not RMF inputs.
 
-The round-0 policy coordinates six sequence-unique slots for each of three
-named selection views evaluated from one shared model fit. A deterministic
-round-robin allocator advances a view to its next-best unallocated sequence
-when preferred lists overlap. This is a deliberate, time-bounded test of
-whether the fixed X representation can hill-climb the declared multistate
-objectives. It is not a claim that the fitted model is well calibrated or that
-predicted feasibility is measured promoter behavior.
+The completed RMF round-0 policy coordinated six sequence-unique slots for each
+of three named selection views evaluated from one shared model fit. A
+deterministic round-robin allocator advances a view to its next-best unallocated
+sequence when preferred lists overlap. The run is frozen comparator evidence,
+not the current executable selector. It is not evidence that the fitted model
+is well calibrated, that predicted feasibility is measured promoter behavior,
+or that the policy hill-climbs.
 
 ### Premise
 
@@ -40,7 +40,7 @@ high-dynamic-range feasibility claim additionally requires biologically
 meaningful nonzero separation and tight-OFF thresholds; the frozen round-0 zero
 boundaries do not establish those effect sizes by themselves.
 
-### Why this study selects RMF rather than SFXI
+### Why RMF was evaluated after SFXI
 
 Canonical SFXI has three relevant mathematical properties:
 
@@ -201,18 +201,15 @@ observed positive separation. Ciprofloxacin has the strongest retrospective
 support. A positive archetype is not required for a negative margin to improve,
 but scarce support makes exact top-six identities uncertain.
 
-The first prospective RMF round tests the full method:
+The completed RMF allocation recorded the full computation:
 
 ```text
 fixed sequence X -> shared eight-output model -> view-specific RMF -> coordinated six-slot allocation
 ```
 
-No numerical probability of success is supported. The credible outcome is a
-directional test: whether selected constructs improve measured RMF relative to
-the 27-row promoted pre-round corpus and whether each view's nominations
-outperform the constructs nominated by the other views under that same mask.
-The 35-row retrospective screen remains diagnostic context, not the campaign's
-prospective baseline.
+No numerical probability of success is supported, and these unmeasured
+nominations do not test enrichment. The 35-row retrospective screen and the
+completed allocation remain diagnostic context for the active MSRB probe.
 
 ### Frozen round-0 contract
 
@@ -227,7 +224,7 @@ Round 0 froze and recorded:
    next-best-unallocated allocation, and exact expected batch size 18.
 
 The fixed comparator contract now lives at
-`src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_rmf_round0/secg_rmf_greedy/configs/campaign.yaml`.
+`src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_response_window_round0/secg_rmf_greedy/configs/campaign.yaml`.
 It is non-executable source evidence for the metastudy and must not be treated
 as an alternate campaign route.
 
@@ -235,7 +232,7 @@ The verified round-0 run pinned in the campaign README used 27 exact labels
 and one 100-tree RF lineage. It produced six allocations per view and 18
 sequence-unique candidates; one preferred overlap required one AND
 next-best-unallocated replacement. `model_support_ready` remains false. The
-run is a frozen learning probe, and synthesis authorization is a separate study
+run is a frozen policy audit, and synthesis authorization is a separate study
 decision.
 
 ### Threshold-free behavior promotion
@@ -250,26 +247,27 @@ a feasibility margin: a positive behavior score has no acceptance meaning.
 The RMF equations and fixed comparator results remain valid. They are not a
 second production selector and do not authorize synthesis.
 
-### Prospective evidence
+### Use as a comparator
 
-Every selected construct is measured in all four assay states, so all 18
-constructs update every view. For round 0, and after every eligible measured
-batch that retains the same six-per-view, 18-unique-candidate contract, report:
+Every construct measured through the active MSRB campaign is assayed in all
+four states. Those observations may be rescored under the frozen RMF contract
+for comparison, without creating a second executable selector. Report:
 
 - frozen predicted versus measured response separation, ON fluorescence floor,
   OFF fluorescence ceiling, `q_response`, `q_on`, `q_off`, scalar RMF, and the
   limiting requirement for all 18 constructs under every mask;
-- feasibility counts (`S_RMF >= 0`) for the view's nominated six, the other
-  twelve, the complete 18, and the promoted pre-round corpus;
+- feasibility counts (`S_RMF >= 0`) for the complete batch and promoted
+  pre-round corpus;
 - the promoted pre-round distribution versus the prospective measured round;
-- whether each view's six outperform the other twelve under that view's mask;
-- rank changes and model performance after the prospective response-window Y
-  is ingested.
+- RMF decomposition for the MSRB-nominated six and the other twelve under each
+  target pattern; and
+- rank changes after the prospective response-window Y is ingested.
 
-The other twelve are contemporaneous constructs nominated for different views,
-not untreated or randomly sampled controls. Their comparison with the nominated
-six tests prospective view-specific enrichment within the coordinated batch;
-it does not by itself estimate causal treatment effects or population-wide hit
+The other twelve are contemporaneous constructs nominated by correlated views,
+not untreated, random, or universe-representative controls. Their comparison
+with one view's six describes within-batch specificity. It does not estimate
+enrichment over the candidate universe, improvement over random selection,
+superiority of RMF or MSRB, a causal treatment effect, or population-wide hit
 rates.
 
 Before the first measured-batch checkpoint is recorded, the study needs one
@@ -279,7 +277,8 @@ subsequently promoted observations. For the current contract its
 candidate-by-view table has 54 rows: 18 measured candidates evaluated under
 three masks. Preserve final allocation view and rank, predicted and measured
 components and margins, feasibility, limiting requirement, Reader and
-label-publication provenance, and campaign prediction and selection digests.
+label-publication provenance, and active-campaign prediction and selection
+digests.
 The immutable model-evidence checkpoint references this publication; mutable
 OPAL runtime state is not the scientific record.
 

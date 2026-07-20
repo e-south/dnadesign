@@ -252,10 +252,9 @@ def _fold_parameters(
         )
         return {
             **exclusion,
-            "response_scale": _positive_quantile(response, quantile),
-            "scale_basis": "reader_joint_bootstrap_component_resolution",
+            "softmin_scale": _positive_quantile(np.concatenate([response, signal]), quantile),
+            "scale_basis": protocol.normalization.scale_basis,
             "scale_quantile": quantile,
-            "signal_scale": _positive_quantile(signal, quantile),
         }
     if objective_name != protocol.comparator_objective_name:
         raise ValueError(f"unknown grouped validation objective {objective_name!r}.")
@@ -315,10 +314,7 @@ def _objective_scores(
             values,
             state_ids=protocol.state_ids,
             target_mask=view.target_mask,
-            normalization={
-                "response_scale": float(parameters["response_scale"]),
-                "signal_scale": float(parameters["signal_scale"]),
-            },
+            softmin_scale=float(parameters["softmin_scale"]),
         ).behavior_score
     calibration = {
         field: float(parameters[field])

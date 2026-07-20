@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-candidate-table
 title: OPAL candidate table
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-16
+last_verified: 2026-07-19
 audience:
   - operator
   - agent
@@ -11,12 +11,12 @@ audience:
 
 ## OPAL Candidate Table Context
 
-Use one shared USR `opal_candidate_feature_table` for the unified OPAL
-campaign. Its materialized universe starts with the dense generated promoter
+Use one shared USR `opal_candidate_feature_table` as the OPAL candidate
+universe. Its materialized rows start with the dense generated promoter
 subset from the LatentDNA view and includes measured-reader batch0 additions
 that already exist in the same selected LatentDNA view.
 
-The unified campaign uses `data.location.kind: usr`; the checked-in dataset ID
+The current campaign uses `data.location.kind: usr`; the checked-in dataset ID
 and sidecar paths are authoritative. It does not depend on a campaign-local
 copy of `records.parquet`.
 
@@ -70,8 +70,8 @@ panel = render_sequence_panel_image(candidate_row, config=config)
   campaign. Keep target masks and selectors in named selection views.
 - Treat observed assay labels as study-level truth, not selection-view truth.
   The SFXI source runs used one shared pool. The study publisher has published
-  one typed response-window sidecar and promotion manifest for the RMF
-  campaign: 27 exact labels and eight measured-candidate exclusions.
+  one typed response-window sidecar and promotion manifest. `secg_msrb_greedy`
+  consumes its 27 exact labels and records eight measured-candidate exclusions.
 - OPAL run and explain read the unified response-window observed labels through
   `labels.source.kind: usr_sidecar` at
   `_opal/response_window_labels_v5/observed_labels.parquet`.
@@ -106,8 +106,10 @@ panel = render_sequence_panel_image(candidate_row, config=config)
 - Write contract: the campaign writes one prediction ledger, view-indexed
   objective scores and selections, and one deduplicated selection batch. It
   does not rewrite the candidate universe or duplicate assay labels.
-- Metric boundary: `_opal/observed_labels.parquet` and the SFXI source ledgers
-  remain immutable round-0 evidence; they are not RMF inputs.
+- Metric boundary: the SFXI sidecar and source ledgers remain immutable
+  `sfxi_vec8` evidence. They are not `reader_response_window_vector_v1` labels.
+  The current MSRB campaign consumes only the typed response-window publication;
+  the frozen RMF analysis reads the same Y-space as comparator evidence.
 - Materialization contract: notebook and review summaries are regenerated from
   the label sidecar and campaign ledger. They are derived artifacts, not assay
   truth.

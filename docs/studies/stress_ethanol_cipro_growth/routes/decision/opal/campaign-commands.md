@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-opal-campaign-commands
 surface: study-runbook
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-18
+last_verified: 2026-07-20
 parent_route: README.md
 type: runbook
 plane: control-plane
@@ -27,18 +27,6 @@ uv run opal validate -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/ca
 
 Validation binds 27 exact labels and eight exclusions to their provenance,
 candidate snapshot, and campaign contract. `opal ingest-y` cannot modify it.
-
-### Round 0 initialization
-
-The campaign owns its state, model, predictions, and ledgers. Round 0 is
-complete; initialize only in a clean workspace after an explicit reset decision:
-
-```bash
-CONFIG=src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
-uv run opal validate -c "$CONFIG" --json
-uv run opal init -c "$CONFIG" --json
-uv run opal run -c "$CONFIG" --round 0 --json
-```
 
 ### Read-only campaign verification
 
@@ -66,15 +54,35 @@ and prediction artifacts, declared MSRB diagnostics, and zero mismatches. The
 profile exposes the mask, normalization, score direction, and family scores.
 Passing these checks establishes artifact integrity, not biological validity.
 
-### Notebook generation and live review: commands write or serve notebook artifacts
+### Notebook review
+
+Regenerate the plot artifacts before regenerating the notebook. Notebook
+generation binds existing plot manifests; it does not rerender figures.
 
 ```bash
 CONFIG=src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
+for VIEW in ethanol ciprofloxacin and; do
+  uv run opal plot -c "$CONFIG" --view "$VIEW" --json
+done
 uv run opal notebook generate -c "$CONFIG" --round latest --force --json
 uv run opal notebook run -c "$CONFIG"
 ```
 
-### Synthesis boundary
+Do not pin `--run-id` in the general plot loop. The response-window history
+plot requests all rounds; an explicit run ID would narrow that plot to one run.
 
+### Reset and replay round 0
+The campaign owns its state, model, predictions, and ledgers. Round 0 is
+complete. Run these mutating commands only in a clean workspace after an
+explicit reset decision:
+
+```bash
+CONFIG=src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
+uv run opal validate -c "$CONFIG" --json
+uv run opal init -c "$CONFIG" --json
+uv run opal run -c "$CONFIG" --round 0 --json
+```
+
+### Synthesis boundary
 The synthesis handoff must name one run and its view memberships. Passing does not
 authorize synthesis; the RF remains the campaign model and `model_support_ready` is false.

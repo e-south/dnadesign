@@ -11,10 +11,9 @@ campaign:
     response_reduction: event_logmean_4_8h_post
     y_space: reader_response_window_vector_v1
     metric_acronym: MSRB
-    normalization:
-      protocol: exact_primary_reader_candidate_experiments_q90_v1
-      response_scale: 0.3080415202556689
-      signal_scale: 0.3129336929825316
+    softmin:
+      protocol: exact_primary_reader_candidate_experiments_pooled_q90_v1
+      scale: 0.31063783855250376
       reader_bundle_manifest_sha256: bdc6f7afc8b00a7960eac7bf402be2632f9815c7fedc88cae4c27d47e9d09418  # pragma: allowlist secret
       candidate_bindings_manifest_sha256: 273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8  # pragma: allowlist secret
       unit_count: 41
@@ -131,9 +130,7 @@ selection_views:
       params:
         state_ids: ["00", "10", "01", "11"]
         target_mask: [0, 1, 0, 1]
-        normalization:
-          response_scale: 0.3080415202556689
-          signal_scale: 0.3129336929825316
+        softmin_scale: 0.31063783855250376
     selection:
       name: top_n
       params:
@@ -149,9 +146,7 @@ selection_views:
       params:
         state_ids: ["00", "10", "01", "11"]
         target_mask: [0, 0, 1, 1]
-        normalization:
-          response_scale: 0.3080415202556689
-          signal_scale: 0.3129336929825316
+        softmin_scale: 0.31063783855250376
     selection:
       name: top_n
       params:
@@ -167,9 +162,7 @@ selection_views:
       params:
         state_ids: ["00", "10", "01", "11"]
         target_mask: [0, 0, 0, 1]
-        normalization:
-          response_scale: 0.3080415202556689
-          signal_scale: 0.3129336929825316
+        softmin_scale: 0.31063783855250376
     selection:
       name: top_n
       params:

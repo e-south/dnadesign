@@ -87,7 +87,7 @@ def _score(
         values,
         state_ids=protocol.state_ids,
         target_mask=view.target_mask,
-        normalization=normalization.normalization,
+        softmin_scale=normalization.softmin_scale,
     )
 
 
@@ -120,8 +120,7 @@ def _add_provenance(
     frame["protocol_id"] = protocol.protocol_id
     frame["protocol_source_sha256"] = f"sha256:{protocol.source_sha256}"
     frame["normalization_source_rows_sha256"] = f"sha256:{normalization.source_rows_sha256}"
-    frame["response_scale"] = normalization.response_scale
-    frame["signal_scale"] = normalization.signal_scale
+    frame["softmin_scale"] = normalization.softmin_scale
     frame["status"] = protocol.status
     frame["campaign_activation"] = protocol.campaign_activation
     frame["synthesis_authorization"] = protocol.synthesis_authorization

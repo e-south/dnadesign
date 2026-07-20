@@ -176,12 +176,13 @@ def _fold_parameters(
     }
     quantile = protocol.completion_gate.normalization_primary_quantile
     if objective_name == protocol.objective_name:
+        response_values = _resolution_values(response, heldout, candidates)
+        signal_values = _resolution_values(signal, heldout, candidates)
         return {
             **exclusion,
-            "response_scale": _resolution_quantile(response, heldout, candidates, quantile),
-            "scale_basis": "reader_joint_bootstrap_component_resolution",
+            "softmin_scale": _positive_quantile(pd.concat([response_values, signal_values]), quantile),
+            "scale_basis": protocol.normalization.scale_basis,
             "scale_quantile": quantile,
-            "signal_scale": _resolution_quantile(signal, heldout, candidates, quantile),
         }
     if objective_name != protocol.comparator_objective_name:
         raise ValueError(f"grouped objective {objective_name!r} is unknown.")
@@ -206,12 +207,11 @@ def _fold_parameters(
     }
 
 
-def _resolution_quantile(frame: pd.DataFrame, heldout: str, candidates: frozenset[str], quantile: float) -> float:
-    training = frame.loc[
+def _resolution_values(frame: pd.DataFrame, heldout: str, candidates: frozenset[str]) -> pd.Series:
+    return frame.loc[
         ~frame["reader_experiment_id"].astype(str).eq(heldout) & ~frame["candidate_id"].astype(str).isin(candidates),
         "bootstrap_sd",
     ]
-    return _positive_quantile(training, quantile)
 
 
 def _verify_correlations(frame: pd.DataFrame) -> None:
@@ -257,10 +257,7 @@ def _objective_score(
                 matrix,
                 state_ids=protocol.state_ids,
                 target_mask=view.target_mask,
-                normalization={
-                    "response_scale": float(parameters["response_scale"]),
-                    "signal_scale": float(parameters["signal_scale"]),
-                },
+                softmin_scale=float(parameters["softmin_scale"]),
             ).behavior_score[0]
         )
     calibration = {

@@ -16,8 +16,8 @@ from pathlib import Path
 SFXI_ROUND0_SOURCE_EVIDENCE_ROOT = Path(
     "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0"
 )
-RMF_ROUND0_SOURCE_EVIDENCE_ROOT = Path(
-    "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_rmf_round0"
+RESPONSE_WINDOW_ROUND0_SOURCE_EVIDENCE_ROOT = Path(
+    "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_response_window_round0"
 )
 
 
@@ -30,15 +30,15 @@ def sfxi_round0_source_evidence_dir(repo_root: str | Path, *, source_slug: str) 
     return Path(repo_root) / SFXI_ROUND0_SOURCE_EVIDENCE_ROOT / slug
 
 
-def rmf_round0_source_evidence_root(repo_root: str | Path) -> Path:
-    """Resolve the frozen, non-executable RMF comparator evidence root."""
+def response_window_round0_source_evidence_root(repo_root: str | Path) -> Path:
+    """Resolve frozen response-window prediction evidence outside campaign routing."""
 
-    return Path(repo_root) / RMF_ROUND0_SOURCE_EVIDENCE_ROOT
+    return Path(repo_root) / RESPONSE_WINDOW_ROUND0_SOURCE_EVIDENCE_ROOT
 
 
 __all__ = [
-    "RMF_ROUND0_SOURCE_EVIDENCE_ROOT",
+    "RESPONSE_WINDOW_ROUND0_SOURCE_EVIDENCE_ROOT",
     "SFXI_ROUND0_SOURCE_EVIDENCE_ROOT",
-    "rmf_round0_source_evidence_root",
+    "response_window_round0_source_evidence_root",
     "sfxi_round0_source_evidence_dir",
 ]

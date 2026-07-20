@@ -112,16 +112,15 @@ def _verify_normalization_coverage(
             raise ValueError(f"{table_id} normalization SD evidence must be finite and nonnegative.")
         if not frame["bootstrap_samples"].eq(semantics.bootstrap_samples).all():
             raise ValueError(f"{table_id} normalization bootstrap support drifted.")
-    observed_response = float(
-        np.quantile(response["bootstrap_sd"].to_numpy(dtype=float), scale_quantile, method=quantile_method)
+    pooled = np.concatenate(
+        [
+            response["bootstrap_sd"].to_numpy(dtype=float),
+            signal["bootstrap_sd"].to_numpy(dtype=float),
+        ]
     )
-    observed_signal = float(
-        np.quantile(signal["bootstrap_sd"].to_numpy(dtype=float), scale_quantile, method=quantile_method)
-    )
-    if not np.isclose(observed_response, semantics.response_scale, rtol=1e-12, atol=0.0):
-        raise ValueError("response scale does not derive from persisted normalization rows.")
-    if not np.isclose(observed_signal, semantics.signal_scale, rtol=1e-12, atol=0.0):
-        raise ValueError("signal scale does not derive from persisted pDual-10-relative fluorescence rows.")
+    observed = float(np.quantile(pooled, scale_quantile, method=quantile_method))
+    if not np.isclose(observed, semantics.softmin_scale, rtol=1e-12, atol=0.0):
+        raise ValueError("soft-min scale does not derive from the pooled persisted normalization rows.")
 
 
 def _require_view_product(

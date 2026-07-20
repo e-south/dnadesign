@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-metastudy-package
 title: Response metric metastudy package
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 ---
 
 # Response Metric Metastudy
@@ -49,7 +49,7 @@ Reader-owned response-window Y.
   candidate IDs, accounts explicitly for Reader designs that have no study
   candidate binding, and has no label-truth role.
 - `config/multistate_response_behavior_shadow_v1.yaml`: persisted, shadow-only
-  binding for target masks, assay-resolution normalization, evidence roles,
+  binding for target masks, the shared soft-min scale recipe, evidence roles,
   and activation gates. It does not configure a campaign.
 
 The shadow behavior modules expose a bounded builder for observed rows, Reader
@@ -63,12 +63,32 @@ sequence-deduplicated runtime.
 
 Use `multistate_behavior_cli.py preview` for a read-only summary, `publish` for
 the atomic shadow bundle, and `verify` for a fail-closed artifact check. The
-publisher preserves normalization rows and bootstrap scores rather than
+publisher preserves scale-derivation rows and bootstrap scores rather than
 retaining only derived summaries. It also emits normalization sensitivity,
 grouped behavior-versus-RMF prediction-to-truth validation, corrected-Reader
 RMF replay scales, fixed raw prediction vectors, sequence-unique allocation
 previews, a digest-bound split decision, an independent adversarial audit,
 `report.md`, and three minimal review plots.
+
+To reproduce the current shadow bundle without changing its prediction source,
+read the pinned run ID from the existing manifest and pass it back to the
+publisher:
+
+```bash
+BUNDLE=src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest
+PREDICTION_RUN_ID=$(jq -r '.source.prediction.run_id' "$BUNDLE/manifest.json")
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.multistate_behavior_cli publish \
+  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
+  --prediction-run-id "$PREDICTION_RUN_ID" \
+  --out-dir "$BUNDLE" \
+  --overwrite
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.multistate_behavior_cli verify \
+  --bundle "$BUNDLE"
+```
+
+Publication stages the complete bundle and replaces the destination only after
+its tables, figures, report, manifest, and digests verify.
 
 The objective-neutral response-window Reader request and candidate-observation
 policy live in the study-level `response_window_observations/` package. The metastudy consumes

@@ -23,7 +23,11 @@ from .multistate_behavior_protocol import MultistateBehaviorShadowProtocol
 _STATE_COUNTS = (2, 4, 8, 16)
 
 
-def build_family_cardinality_pressure(protocol: MultistateBehaviorShadowProtocol) -> pd.DataFrame:
+def build_family_cardinality_pressure(
+    protocol: MultistateBehaviorShadowProtocol,
+    *,
+    softmin_scale: float,
+) -> pd.DataFrame:
     """Quantify family dilution while preserving the fixed-K campaign boundary."""
 
     records: list[dict[str, object]] = []
@@ -39,7 +43,7 @@ def build_family_cardinality_pressure(protocol: MultistateBehaviorShadowProtocol
             values,
             state_ids=state_ids,
             target_mask=mask,
-            normalization={"response_scale": 1.0, "signal_scale": 1.0},
+            softmin_scale=softmin_scale,
         )
         weak_label = f"off_signal_suppression:{state_ids[on_count]}"
         weak_index = score.coordinate_labels.index(weak_label)
@@ -50,8 +54,9 @@ def build_family_cardinality_pressure(protocol: MultistateBehaviorShadowProtocol
                 "on_state_count": on_count,
                 "off_state_count": off_count,
                 "response_pair_count": response_pair_count,
-                "analytic_global_maximum_soft_vs_hard_gap": math.log(3.0 * response_pair_count),
-                "weak_coordinate_analytic_soft_vs_hard_gap": math.log(3.0 * off_count),
+                "softmin_scale": softmin_scale,
+                "analytic_global_maximum_soft_vs_hard_gap": softmin_scale * math.log(3.0 * response_pair_count),
+                "weak_coordinate_analytic_soft_vs_hard_gap": softmin_scale * math.log(3.0 * off_count),
                 "realizable_behavior_score": float(score.behavior_score[0]),
                 "realizable_hard_bottleneck": float(score.hard_bottleneck_clearance[0]),
                 "realizable_soft_vs_hard_gap": float(score.behavior_score[0] - score.hard_bottleneck_clearance[0]),

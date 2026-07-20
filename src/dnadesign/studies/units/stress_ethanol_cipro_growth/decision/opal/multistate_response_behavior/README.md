@@ -3,16 +3,15 @@ id: secg-msrb-study-protocol
 title: Stress-promoter MSRB protocol
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 ---
 
 ## Stress-Promoter MSRB Protocol
 
 `protocol.yaml` is the machine-readable study decision for the active
 Multistate Response Behavior (MSRB) learning probe. It fixes the response-window
-Y contract, state order, target masks, assay-resolution normalization, label
-policy, model target, selector, allocation rule, evidence posture, and claim
-boundaries.
+Y contract, state order, target masks, shared soft-min scale, label policy,
+model target, selector, allocation rule, evidence posture, and claim boundaries.
 
 The generic objective source of truth is
 [`src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md`](../../../../../../opal/docs/plugins/objectives/multistate-response-behavior.md).

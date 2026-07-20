@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 
 import pandas as pd
@@ -32,6 +33,9 @@ def render_multistate_behavior_report(
     technical = _mapping(decision, "technical_readiness")
     implementation = _mapping(decision, "shadow_implementation")
     audit = _mapping(decision, "independent_adversarial_implementation_audit")
+    softmin_scale = _single_softmin_scale(family_cardinality_pressure)
+    balanced_four_state_gap = softmin_scale * math.log(12.0)
+    one_on_four_state_gap = softmin_scale * math.log(9.0)
     lines = [
         "# Multistate Response Behavior shadow decision",
         "",
@@ -74,14 +78,16 @@ def render_multistate_behavior_report(
             "does not make the selector noncompensatory. One weak coordinate receives less bottleneck weight as its "
             "family grows. The conditional semantic GO applies only to within-view ranking under the same ordered "
             "states, "
-            "target mask, normalization record, and protocol. Scores are not comparable across views or state spaces. "
+            "target mask, soft-min scale, and protocol. Scores are not comparable across views or state spaces. "
             "The behavior score is not a conformance test; the hard bottleneck is observable but does not constrain "
             "selection. In this study, ethanol/ciprofloxacin response coordinates have prior 1/12 "
-            "(log(12)=2.485 maximum gap), while AND response/OFF coordinates have prior 1/9 (log(9)=2.197). "
+            f"and a maximum gap of about {balanced_four_state_gap:.3f} log₂, while AND response/OFF coordinates "
+            f"have prior 1/9 and a maximum gap of about {one_on_four_state_gap:.3f} log₂ under the declared "
+            f"{softmin_scale:.3f}-log₂ soft-min scale. "
             "A materially negative coordinate can coexist with a positive score."
         ),
         "",
-        "## Normalization robustness",
+        "## Soft-min scale robustness",
         "",
         (
             "Protocol-frozen quantile and leave-one-source-experiment-out scenarios: "
@@ -262,6 +268,15 @@ def _cardinality_table(frame: pd.DataFrame) -> str:
             f"{float(row.realizable_hard_bottleneck):.1f} | {float(row.weak_coordinate_bottleneck_weight):.3f} |"
         )
     return "\n".join(output)
+
+
+def _single_softmin_scale(frame: pd.DataFrame) -> float:
+    if "softmin_scale" not in frame:
+        raise ValueError("family-cardinality evidence lacks softmin_scale.")
+    values = pd.to_numeric(frame["softmin_scale"], errors="raise").drop_duplicates().tolist()
+    if len(values) != 1 or not math.isfinite(float(values[0])) or float(values[0]) <= 0.0:
+        raise ValueError("family-cardinality evidence must contain one positive finite softmin_scale.")
+    return float(values[0])
 
 
 def _mapping(record: Mapping[str, object], key: str) -> Mapping[str, object]:

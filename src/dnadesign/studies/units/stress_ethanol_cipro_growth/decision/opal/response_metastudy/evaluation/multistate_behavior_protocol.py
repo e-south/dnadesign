@@ -42,9 +42,6 @@ from .multistate_behavior_protocol_fields import (
     parse_target_views as _target_views,
 )
 from .multistate_behavior_protocol_fields import (
-    positive_float as _positive_float,
-)
-from .multistate_behavior_protocol_fields import (
     require_exact_fields as _require_exact_fields,
 )
 from .multistate_behavior_protocol_fields import (
@@ -188,7 +185,6 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
         {
             "name",
             "family_weighting",
-            "normalized_temperature",
             "selector_output",
             "hard_bottleneck_role",
         },
@@ -198,10 +194,6 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
     _require_literal(objective, "family_weighting", "equal_one_third", context="objective")
     _require_literal(objective, "selector_output", "behavior_score", context="objective")
     _require_literal(objective, "hard_bottleneck_role", "diagnostic_only", context="objective")
-    normalized_temperature = _positive_float(objective["normalized_temperature"], field="normalized_temperature")
-    if normalized_temperature != 1.0:
-        raise BehaviorProtocolError("normalized_temperature must be fixed at 1.0 resolution unit.")
-
     assay = _mapping(payload["assay"], context="assay")
     _require_exact_fields(
         assay,
@@ -244,11 +236,7 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
 
     normalization_payload = _mapping(payload["normalization"], context="normalization")
     evidence = _mapping(payload["evidence_roles"], context="evidence_roles")
-    normalization = parse_behavior_normalization_protocol(
-        normalization_payload,
-        evidence,
-        normalized_temperature=normalized_temperature,
-    )
+    normalization = parse_behavior_normalization_protocol(normalization_payload, evidence)
     activation = _mapping(payload["activation"], context="activation")
     _require_exact_fields(activation, {"campaign", "synthesis", "promotion_gate"}, context="activation")
     _require_literal(activation, "campaign", "prohibited", context="activation")

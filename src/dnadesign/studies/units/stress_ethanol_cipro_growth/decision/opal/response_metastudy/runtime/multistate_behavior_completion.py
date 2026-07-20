@@ -120,7 +120,10 @@ def build_multistate_behavior_completion_evidence(
         grouped_objective_validation=grouped,
         allocation_comparison=allocation,
         observed_control_face_validity=face_validity,
-        family_cardinality_pressure=build_family_cardinality_pressure(protocol),
+        family_cardinality_pressure=build_family_cardinality_pressure(
+            protocol,
+            softmin_scale=normalization.softmin_scale,
+        ),
         validation_labels=validation_labels,
         rmf_resolution_rows=_rmf_resolution_projection(rmf_uncertainty_rows),
         rmf_replay_calibration=rmf_replay_calibration,

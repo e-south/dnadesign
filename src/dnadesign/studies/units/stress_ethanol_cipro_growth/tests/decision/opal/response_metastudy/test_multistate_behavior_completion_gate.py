@@ -83,8 +83,7 @@ def test_normalization_sensitivity_covers_quantiles_and_source_holdouts() -> Non
     ].unique()
     assert set(holdouts) == {"experiment-a", "experiment-b", "experiment-c"}
     assert len(table) == (5 + 3) * 3
-    assert table["response_scale"].gt(0.0).all()
-    assert table["signal_scale"].gt(0.0).all()
+    assert table["softmin_scale"].gt(0.0).all()
     assert table["raw_top_k_overlap"].between(0, 6).all()
 
 

@@ -1,5 +1,5 @@
-schema_id: stress_ethanol_cipro_growth.multistate_response_behavior_protocol.v1
-schema_version: "1"
+schema_id: stress_ethanol_cipro_growth.multistate_response_behavior_protocol.v2
+schema_version: "2"
 protocol_id: secg_msrb_learning_probe_v1
 study_id: stress_ethanol_cipro_growth
 status: active_learning_probe
@@ -31,20 +31,17 @@ target_views:
   - id: and
     target_mask: [0, 0, 0, 1]
 
-normalization:
-  protocol: exact_primary_reader_candidate_experiments_q90_v1
+softmin:
+  protocol: exact_primary_reader_candidate_experiments_pooled_q90_v1
   family_weighting: equal_one_third
-  normalized_temperature: 1.0
   derivation:
-    response_scale_basis: reader_joint_bootstrap_sd_of_declared_on_off_response_pairs
-    signal_scale_basis: reader_joint_bootstrap_sd_of_each_reference_relative_state
+    scale_basis: pooled_reader_joint_bootstrap_sd_of_declared_response_pairs_and_reference_relative_states
     pair_deduplication: unique_unordered_state_pair_union
     reader_joint_bootstrap_draws: 500
     scale_quantile: 0.90
     quantile_method: linear
   values:
-    response_scale: 0.3080415202556689
-    signal_scale: 0.3129336929825316
+    softmin_scale: 0.31063783855250376
   cohort:
     id: exact_primary_reader_candidate_experiments_v1
     unit: reader_candidate_experiment
@@ -84,12 +81,13 @@ evidence:
   implementation: verified
   retrospective_predictive_ordering: insufficient
   prospective_hill_climb_efficacy: unproven
+  acquisition_baseline_contract: not_yet_published
   campaign_role: prospectively_frozen_greedy_learning_probe
   synthesis_authorization: prohibited
-  shadow_manifest_sha256: 76d07a05e341dd4ad4d5a43d721bcf0834de902662f85452f5ea57777c578c64  # pragma: allowlist secret
-  shadow_decision_sha256: f1e81a750ce99efae6c6cac4ed50423ae7db89b49a70662cfab6632971fa49ef  # pragma: allowlist secret
-  shadow_normalization_sha256: 2eeace704e3348b6ca3c21068646e5abe8f967f58cf2c57079302d7467bd79a3  # pragma: allowlist secret
-  shadow_adversarial_audit_sha256: 7f33bb0c18d84db1ddcccfea8cc0be74ec1a7b75a0f1982159db64747ebec169  # pragma: allowlist secret
+  shadow_manifest_sha256: a50e6c81789a2214026c5dbfac9deb95b86106465129d6223e4708ac71084a4a  # pragma: allowlist secret
+  shadow_decision_sha256: e372554ba49e5a3fe6964541c86687e1ea12d403ba15ffbbc0d00a1fa9646257  # pragma: allowlist secret
+  shadow_normalization_sha256: a1512f56c2e490618fc2fcc50cfa4a88015251ab60e78d8546623c12974ac29d  # pragma: allowlist secret
+  shadow_adversarial_audit_sha256: 6cd5f4918f0468487acba42e6cc8eee3b4e15a693fc406ed9f7f9c94412e7b63  # pragma: allowlist secret
   reader_normalization_bundle_sha256: bdc6f7afc8b00a7960eac7bf402be2632f9815c7fedc88cae4c27d47e9d09418  # pragma: allowlist secret
   reader_label_bundle_sha256: e0065183fe010fe40e88e75da998cff5ed1399e56ff1d2bc1268f9331b573a67  # pragma: allowlist secret
   candidate_bindings_manifest_sha256: 273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8  # pragma: allowlist secret

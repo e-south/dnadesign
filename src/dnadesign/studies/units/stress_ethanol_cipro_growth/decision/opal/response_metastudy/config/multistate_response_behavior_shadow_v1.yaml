@@ -14,7 +14,6 @@ source_equivalence:
 objective:
   name: multistate_response_behavior_v1
   family_weighting: equal_one_third
-  normalized_temperature: 1.0
   selector_output: behavior_score
   hard_bottleneck_role: diagnostic_only
 
@@ -37,8 +36,7 @@ target_views:
 normalization:
   cohort_id: exact_primary_reader_candidate_experiments_v1
   unit: reader_candidate_experiment
-  response_scale_basis: reader_joint_bootstrap_sd_of_declared_on_off_response_pairs
-  signal_scale_basis: reader_joint_bootstrap_sd_of_each_reference_relative_state
+  scale_basis: pooled_reader_joint_bootstrap_sd_of_declared_response_pairs_and_reference_relative_states
   pair_deduplication: unique_unordered_state_pair_union
   scale_quantile: 0.90
   quantile_method: linear

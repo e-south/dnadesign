@@ -3,7 +3,7 @@ id: opal-campaign-secg-msrb-greedy
 title: SECG MSRB greedy campaign
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 surface: opal_campaign
 campaign_slug: secg_msrb_greedy
 campaign_kind: study
@@ -43,7 +43,7 @@ selection does not authorize synthesis. The
 [study protocol](../../../studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/README.md)
 owns those scientific boundaries.
 
-Round 0 completed on 2026-07-18 with 27 measured labels, 154,785 scored
+Round 0 completed on 2026-07-19 with 27 measured labels, 154,785 scored
 candidates, six allocations per view, and 18 sequence-unique candidates after
 one cross-view overlap was replaced by AND's next unallocated rank. Output
 verification found zero score or membership mismatches. These checks establish

@@ -38,11 +38,10 @@ _SOURCE_DIGEST_FIELDS = {
 
 @dataclass(frozen=True)
 class MultistateBehaviorNormalizationEvidence:
-    """Two assay-resolution scales plus the rows that establish them."""
+    """One soft-min scale plus the response and signal rows that establish it."""
 
     protocol: MultistateBehaviorShadowProtocol
-    response_scale: float
-    signal_scale: float
+    softmin_scale: float
     bootstrap_samples: int
     unit_count: int
     response_pair_count: int
@@ -53,7 +52,7 @@ class MultistateBehaviorNormalizationEvidence:
 
     @property
     def scale_basis(self) -> str:
-        return "reader_joint_bootstrap_component_resolution"
+        return self.protocol.normalization.scale_basis
 
     @property
     def event_time_role(self) -> str:
@@ -69,10 +68,7 @@ class MultistateBehaviorNormalizationEvidence:
 
     @property
     def normalization(self) -> dict[str, float]:
-        return {
-            "response_scale": self.response_scale,
-            "signal_scale": self.signal_scale,
-        }
+        return {"softmin_scale": self.softmin_scale}
 
 
 def derive_multistate_behavior_normalization(
@@ -83,7 +79,7 @@ def derive_multistate_behavior_normalization(
     target_views: tuple[StressTargetView, ...],
     verified_cohort_receipt: VerifiedBehaviorCohortReceipt | None = None,
 ) -> MultistateBehaviorNormalizationEvidence:
-    """Derive one response and one reference-relative signal resolution."""
+    """Derive one soft-min scale from pooled response and signal resolution rows."""
 
     protocol.assert_target_views(target_views)
     label_rows, draw_rows = validated_behavior_evidence(labels, draws, protocol=protocol)
@@ -129,10 +125,14 @@ def derive_multistate_behavior_normalization(
     signal_rows = pd.DataFrame.from_records(signal_records).sort_values(["id", "state_id"], kind="mergesort")
     quantile = protocol.normalization.scale_quantile
     method = protocol.normalization.quantile_method
-    response_scale = float(np.quantile(response_rows["bootstrap_sd"].to_numpy(dtype=float), quantile, method=method))
-    signal_scale = float(np.quantile(signal_rows["bootstrap_sd"].to_numpy(dtype=float), quantile, method=method))
-    _assert_positive_scale(response_scale, family="response")
-    _assert_positive_scale(signal_scale, family="reference-relative signal")
+    pooled_sd = np.concatenate(
+        [
+            response_rows["bootstrap_sd"].to_numpy(dtype=float),
+            signal_rows["bootstrap_sd"].to_numpy(dtype=float),
+        ]
+    )
+    softmin_scale = float(np.quantile(pooled_sd, quantile, method=method))
+    _assert_positive_scale(softmin_scale)
     source_rows_sha256 = behavior_normalization_source_rows_sha256(
         label_rows,
         draw_rows,
@@ -148,8 +148,7 @@ def derive_multistate_behavior_normalization(
             raise ValueError("behavior cohort receipt source-row digest disagrees with the exhaustive projection.")
     return MultistateBehaviorNormalizationEvidence(
         protocol=protocol,
-        response_scale=response_scale,
-        signal_scale=signal_scale,
+        softmin_scale=softmin_scale,
         bootstrap_samples=draw_count,
         unit_count=len(label_rows),
         response_pair_count=len(pairs),
@@ -204,7 +203,6 @@ def build_multistate_behavior_normalization_record(
         "objective": {
             "name": protocol.objective_name,
             "family_weighting": protocol.family_weighting,
-            "normalized_temperature": protocol.normalization.normalized_temperature,
         },
         "assay": {
             "state_ids": list(protocol.state_ids),
@@ -215,12 +213,10 @@ def build_multistate_behavior_normalization_record(
             {"id": view.id, "target_mask": [int(value) for value in view.target_mask]} for view in protocol.target_views
         ],
         "normalization": {
-            "response_scale": evidence.response_scale,
-            "signal_scale": evidence.signal_scale,
+            "softmin_scale": evidence.softmin_scale,
             "scale_quantile": protocol.normalization.scale_quantile,
             "quantile_method": protocol.normalization.quantile_method,
-            "response_scale_basis": protocol.normalization.response_scale_basis,
-            "signal_scale_basis": protocol.normalization.signal_scale_basis,
+            "scale_basis": protocol.normalization.scale_basis,
             "pair_deduplication": protocol.normalization.pair_deduplication,
             "cohort_id": protocol.normalization.cohort_id,
             "unit": protocol.normalization.unit,
@@ -251,7 +247,7 @@ def verify_multistate_behavior_normalization_source(
     *,
     evidence: MultistateBehaviorNormalizationEvidence,
 ) -> None:
-    """Require scoring evidence to reproduce the cohort that fixed the scales."""
+    """Require scoring evidence to reproduce the cohort that fixed the scale."""
 
     label_rows, draw_rows = validated_behavior_evidence(labels, draws, protocol=evidence.protocol)
     observed_digest = behavior_normalization_source_rows_sha256(
@@ -305,9 +301,9 @@ def _declaring_views(
     return {pair: tuple(sorted(set(view_ids))) for pair, view_ids in declared.items()}
 
 
-def _assert_positive_scale(value: float, *, family: str) -> None:
+def _assert_positive_scale(value: float) -> None:
     if not math.isfinite(value) or value <= 0.0:
-        raise ValueError(f"behavior {family} resolution scale must be positive and finite; observed {value!r}.")
+        raise ValueError(f"behavior soft-min scale must be positive and finite; observed {value!r}.")
 
 
 def _canonical_digest(value: str, *, field: str) -> str:

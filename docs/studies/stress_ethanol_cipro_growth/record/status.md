@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-07-18
+- Last verified: 2026-07-19
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
@@ -8,7 +8,10 @@
 - LatentDNA binding: `../contexts/latentdna/binding.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Snapshot posture: synchronized after local pull from BU SCC `cluster`
-- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes are complete. The next main-path readiness question is the OPAL candidate feature table and pre-assay campaign handoff, not GPU Infer submission or RegulonDB-native appendix visualization.
+- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes and
+  the OPAL candidate feature table are complete. The next main-path decision is
+  review and authorization of the frozen MSRB round-0 experimental batch, not
+  GPU Infer submission or RegulonDB-native appendix visualization.
 
 ### Datasets
 
@@ -31,9 +34,9 @@
 
 ### Study Phase
 
-- Declared phase: `opal_candidate_table_pre_assay`; the nested OPAL
-  decision route is in `round0_selection_review`. The study remains pre-assay
-  because no revised selection has been authorized for synthesis.
+- Declared phase: `opal_candidate_table_pre_assay`; the current decision is
+  review of the completed MSRB round-0 selection. The study remains pre-assay
+  because that selection has not been authorized for synthesis.
 - LatentDNA has selected the pre-assay X. RegulonDB/native appendix visualization
   does not gate OPAL readiness.
 - DenseGen growth: `parallel_optional`
@@ -51,7 +54,7 @@
 
 Pre-assay representation triage has selected the OPAL `X`. It is not a
 phenotype-validated final representation, but it is the chosen fixed-length
-input for the next OPAL active-learning handoff.
+input used by the current frozen MSRB campaign run.
 
 ### Infer Coverage
 
@@ -101,7 +104,7 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   response-window Y, then evaluates ethanol, ciprofloxacin, and AND target
   masks with `multistate_response_behavior_v1`. Each view requests six
   candidates, and the declared round-robin allocator requires 18 unique
-  sequences. Round 0 completed on 2026-07-18 using 27 labels and scored
+  sequences. Round 0 completed on 2026-07-19 using 27 labels and scored
   154785 candidates. The three views produced six allocations each; one
   cross-view overlap was replaced by AND's next unallocated rank, yielding 18
   sequence-unique candidates. Output replay found zero score or membership
@@ -142,10 +145,10 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   separately from descriptive challengers and is the only basis for the model
   support gate. Generic `opal ingest-y` cannot publish this source. This is not
   a synthesis handoff.
-- Synthesis handoff: `generated_pending_acceptance` scaffold exists in
-  `synthesis_handoffs.yaml`; batch zero is the granular single-axis/AND
-  pre-assay seed order with actual parsed TFBS regulator and slot-pattern
-  checks. Preview it with
+- Pre-assay SFXI synthesis scaffold: the `generated_pending_acceptance` record
+  remains digest-pinned source evidence in `synthesis_handoffs.yaml`. It is not
+  the MSRB round-0 selection and is not exposed as a current write command.
+  Inspect it without writing with
   `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --json`.
   Batch-0 generated files are study-owned source-evidence artifacts. The
   lifecycle record pins manifest, workbook, GenBank-directory, and feature-table

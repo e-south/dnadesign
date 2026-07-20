@@ -35,8 +35,7 @@ class BehaviorBundleSemantics:
 
     state_ids: tuple[str, ...]
     view_masks: dict[str, tuple[int, ...]]
-    response_scale: float
-    signal_scale: float
+    softmin_scale: float
     bootstrap_samples: int
     unit_count: int
     prediction_count: int
@@ -179,8 +178,7 @@ def verify_behavior_record_semantics(
         view_masks={
             str(row["id"]): tuple(int(value) for value in row["target_mask"]) for row in normalization["target_views"]
         },
-        response_scale=positive_float(normalization_values["response_scale"], field="response_scale"),
-        signal_scale=positive_float(normalization_values["signal_scale"], field="signal_scale"),
+        softmin_scale=positive_float(normalization_values["softmin_scale"], field="softmin_scale"),
         bootstrap_samples=positive_int(normalization_values["bootstrap_samples"], field="bootstrap_samples"),
         unit_count=positive_int(normalization_values["unit_count"], field="unit_count"),
         prediction_count=positive_int(prediction.get("candidate_count"), field="prediction.candidate_count"),

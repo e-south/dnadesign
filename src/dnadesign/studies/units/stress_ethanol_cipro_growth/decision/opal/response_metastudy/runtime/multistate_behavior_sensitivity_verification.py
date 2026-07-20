@@ -48,9 +48,9 @@ def verify_normalization_sensitivity(
 
     matrix = vectors.loc[:, _components(protocol)].to_numpy(dtype=float)
     candidate_ids = tuple(vectors["id"].astype(str))
-    primary_scales = _scales(response, signal, protocol.completion_gate.normalization_primary_quantile)
+    primary_scale = _softmin_scale(response, signal, protocol.completion_gate.normalization_primary_quantile)
     primary_scores = {
-        view.id: _behavior_scores(matrix, view.target_mask, primary_scales, protocol=protocol)
+        view.id: _behavior_scores(matrix, view.target_mask, primary_scale, protocol=protocol)
         for view in protocol.target_views
     }
     primary_rankings = {view_id: _rank(candidate_ids, values) for view_id, values in primary_scores.items()}
@@ -58,7 +58,7 @@ def verify_normalization_sensitivity(
     for row in frame.itertuples(index=False):
         scenario_id = str(row.scenario_id)
         kind, quantile, excluded, response_rows, signal_rows = expected_scenarios[scenario_id]
-        expected_scales = _scales(response_rows, signal_rows, quantile)
+        expected_scale = _softmin_scale(response_rows, signal_rows, quantile)
         expected_literals = {
             "scenario_kind": kind,
             "excluded_reader_experiment_id": excluded,
@@ -75,12 +75,11 @@ def verify_normalization_sensitivity(
                 raise ValueError(f"normalization sensitivity {scenario_id!r} field {field!r} drifted.")
         if not np.isclose(float(row.scale_quantile), quantile, rtol=0.0, atol=0.0):
             raise ValueError("normalization sensitivity scale quantile drifted.")
-        for field, expected in expected_scales.items():
-            if not np.isclose(float(getattr(row, field)), expected, rtol=1e-12, atol=1e-12):
-                raise ValueError(f"normalization sensitivity {field} does not derive from resolution rows.")
+        if not np.isclose(float(row.softmin_scale), expected_scale, rtol=1e-12, atol=1e-12):
+            raise ValueError("normalization sensitivity soft-min scale does not derive from resolution rows.")
 
         view = next(item for item in protocol.target_views if item.id == str(row.selection_view_id))
-        scores = _behavior_scores(matrix, view.target_mask, expected_scales, protocol=protocol)
+        scores = _behavior_scores(matrix, view.target_mask, expected_scale, protocol=protocol)
         correlation = pd.Series(scores).corr(pd.Series(primary_scores[view.id]), method="spearman")
         if not np.isclose(float(row.score_spearman_vs_primary), float(correlation), rtol=1e-12, atol=1e-12):
             raise ValueError("normalization sensitivity rank correlation does not replay.")
@@ -95,10 +94,8 @@ def verify_normalization_sensitivity(
         if int(row.raw_top_k_overlap) != len(set(expected_ids) & set(expected_primary_ids)):
             raise ValueError("normalization sensitivity Top-K overlap does not replay.")
     primary = frame.loc[frame["scenario_id"].eq("quantile_q90")]
-    if not np.allclose(primary["response_scale"], semantics.response_scale, rtol=1e-12, atol=0.0):
-        raise ValueError("normalization sensitivity q90 response scale disagrees with the primary record.")
-    if not np.allclose(primary["signal_scale"], semantics.signal_scale, rtol=1e-12, atol=0.0):
-        raise ValueError("normalization sensitivity q90 signal scale disagrees with the primary record.")
+    if not np.allclose(primary["softmin_scale"], semantics.softmin_scale, rtol=1e-12, atol=0.0):
+        raise ValueError("normalization sensitivity q90 soft-min scale disagrees with the primary record.")
 
 
 def _scenario_sources(
@@ -122,20 +119,23 @@ def _scenario_sources(
     return scenarios
 
 
-def _scales(response: pd.DataFrame, signal: pd.DataFrame, quantile: float) -> dict[str, float]:
-    values = {
-        "response_scale": float(np.quantile(response["bootstrap_sd"].to_numpy(dtype=float), quantile, method="linear")),
-        "signal_scale": float(np.quantile(signal["bootstrap_sd"].to_numpy(dtype=float), quantile, method="linear")),
-    }
-    if not all(np.isfinite(value) and value > 0.0 for value in values.values()):
+def _softmin_scale(response: pd.DataFrame, signal: pd.DataFrame, quantile: float) -> float:
+    pooled = np.concatenate(
+        [
+            response["bootstrap_sd"].to_numpy(dtype=float),
+            signal["bootstrap_sd"].to_numpy(dtype=float),
+        ]
+    )
+    value = float(np.quantile(pooled, quantile, method="linear"))
+    if not np.isfinite(value) or value <= 0.0:
         raise ValueError("normalization sensitivity replay produced an invalid scale.")
-    return values
+    return value
 
 
 def _behavior_scores(
     matrix: np.ndarray,
     mask: tuple[float, ...],
-    scales: dict[str, float],
+    softmin_scale: float,
     *,
     protocol: MultistateBehaviorShadowProtocol,
 ) -> np.ndarray:
@@ -143,7 +143,7 @@ def _behavior_scores(
         matrix,
         state_ids=protocol.state_ids,
         target_mask=mask,
-        normalization=scales,
+        softmin_scale=softmin_scale,
     ).behavior_score
 
 

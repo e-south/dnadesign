@@ -30,6 +30,7 @@ _EVIDENCE_TABLES = (
     "rmf_replay_calibration",
     "prediction_vectors",
     "prediction_scores",
+    "prediction_surface_diagnostics",
     "hard_behavior_summary",
 )
 

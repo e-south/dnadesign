@@ -1975,8 +1975,8 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     assert "routes/decision/opal/README.md" in routes
     assert "Campaign configs and commands" in opal_route
     assert "Read-only campaign verification" in opal_commands
-    assert "Notebook generation and live review" in opal_commands
-    assert "commands write or serve notebook artifacts" in opal_commands
+    assert "Notebook review" in opal_commands
+    assert "Notebook generation writes the notebook artifact" in opal_commands
     assert "uv run opal notebook generate" in opal_commands
     assert "uv run opal notebook run" in opal_commands
     assert "uv run opal status" in opal_commands
@@ -1991,6 +1991,33 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     assert "uv run opal review" in opal_pipeline["review_materialize_json_command"]
     assert opal_pipeline["review_materialization_writes_artifacts"] is True
     assert opal_pipeline["review_materialization_output_root"].endswith("outputs/review")
+
+
+def test_study_pipeline_exposes_only_readonly_synthesis_handoff_previews() -> None:
+    operations = STUDY_DOCS / "operations"
+    pipeline = yaml.safe_load((operations / "runtime" / "command-groups" / "pipeline.yaml").read_text(encoding="utf-8"))
+    command_catalog = yaml.safe_load(
+        (
+            operations / "contract" / "surfaces" / "execution" / "commands" / "opal" / "synthesis-handoffs.yaml"
+        ).read_text(encoding="utf-8")
+    )
+    opal_pipeline = pipeline["study_pipeline"]["opal"]
+
+    assert opal_pipeline["synthesis_authorization"] == "not_granted"
+    handoff_commands = {
+        key: value
+        for key, value in opal_pipeline.items()
+        if key.startswith("synthesis_handoff_") and key.endswith("_command")
+    }
+    assert set(handoff_commands) == {
+        "synthesis_handoff_round_draft_preview_command",
+        "synthesis_handoff_round_preview_command",
+        "synthesis_handoff_source_evidence_preview_command",
+    }
+    assert all("--write" not in command for command in handoff_commands.values())
+    assert command_catalog
+    assert all(surface["writes_artifacts"] is False for surface in command_catalog.values())
+    assert all("--write" not in surface["argv"] for surface in command_catalog.values())
 
 
 def test_study_status_catalog_handoff_routes_to_opal_without_generic_feature_matrix() -> None:

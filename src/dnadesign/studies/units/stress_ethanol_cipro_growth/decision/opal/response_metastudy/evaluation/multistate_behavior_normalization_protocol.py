@@ -27,13 +27,11 @@ from .multistate_behavior_protocol_fields import (
 class BehaviorNormalizationProtocol:
     cohort_id: str
     unit: str
-    response_scale_basis: str
-    signal_scale_basis: str
+    scale_basis: str
     pair_deduplication: Literal["unique_unordered_state_pair_union"]
     scale_quantile: float
     quantile_method: Literal["linear"]
     minimum_bootstrap_draws: int
-    normalized_temperature: float
     bootstrap_role: str
     event_time_role: str
     repeat_role: str
@@ -43,8 +41,6 @@ class BehaviorNormalizationProtocol:
 def parse_behavior_normalization_protocol(
     payload: dict[str, object],
     evidence: dict[str, object],
-    *,
-    normalized_temperature: float,
 ) -> BehaviorNormalizationProtocol:
     """Parse the fixed, study-owned assay-resolution convention."""
 
@@ -53,8 +49,7 @@ def parse_behavior_normalization_protocol(
         {
             "cohort_id",
             "unit",
-            "response_scale_basis",
-            "signal_scale_basis",
+            "scale_basis",
             "pair_deduplication",
             "scale_quantile",
             "quantile_method",
@@ -74,14 +69,8 @@ def parse_behavior_normalization_protocol(
         (payload, "unit", "reader_candidate_experiment", "normalization"),
         (
             payload,
-            "response_scale_basis",
-            "reader_joint_bootstrap_sd_of_declared_on_off_response_pairs",
-            "normalization",
-        ),
-        (
-            payload,
-            "signal_scale_basis",
-            "reader_joint_bootstrap_sd_of_each_reference_relative_state",
+            "scale_basis",
+            "pooled_reader_joint_bootstrap_sd_of_declared_response_pairs_and_reference_relative_states",
             "normalization",
         ),
         (
@@ -105,19 +94,11 @@ def parse_behavior_normalization_protocol(
     return BehaviorNormalizationProtocol(
         cohort_id=nonempty_string(payload["cohort_id"], field="cohort_id"),
         unit=nonempty_string(payload["unit"], field="unit"),
-        response_scale_basis=nonempty_string(
-            payload["response_scale_basis"],
-            field="response_scale_basis",
-        ),
-        signal_scale_basis=nonempty_string(
-            payload["signal_scale_basis"],
-            field="signal_scale_basis",
-        ),
+        scale_basis=nonempty_string(payload["scale_basis"], field="scale_basis"),
         pair_deduplication="unique_unordered_state_pair_union",
         scale_quantile=scale_quantile,
         quantile_method="linear",
         minimum_bootstrap_draws=minimum_draws,
-        normalized_temperature=normalized_temperature,
         bootstrap_role=nonempty_string(evidence["bootstrap"], field="bootstrap"),
         event_time_role="separate_sensitivity_evidence",
         repeat_role="separate_disagreement_evidence",

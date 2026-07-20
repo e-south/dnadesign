@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-route-decision-opal
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 parent_route: ../../README.md
 type: route
 plane: control-plane
@@ -72,7 +72,7 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - Lifecycle record: `../../record/synthesis_handoffs.yaml`
 - Dev spec: `../../../contexts/opal/synthesis-handoff.md`
-- Preview/write: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <handoff_id> [--write] --json`
+- Preview while synthesis remains unauthorized: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <handoff_id> --json`
 
 ### Boundaries
 

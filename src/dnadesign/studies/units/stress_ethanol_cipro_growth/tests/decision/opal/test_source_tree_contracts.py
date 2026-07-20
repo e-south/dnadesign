@@ -17,8 +17,9 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.opal import load_config
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.source_evidence import (
-    RMF_ROUND0_SOURCE_EVIDENCE_ROOT,
+    RESPONSE_WINDOW_ROUND0_SOURCE_EVIDENCE_ROOT,
     SFXI_ROUND0_SOURCE_EVIDENCE_ROOT,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings import (
@@ -72,10 +73,11 @@ def test_msrb_has_one_study_protocol_and_one_matching_executable_campaign() -> N
         "acronym": "MSRB",
         "score_channel": "behavior_score",
     }
+    assert protocol["schema_id"] == "stress_ethanol_cipro_growth.multistate_response_behavior_protocol.v2"
+    assert protocol["schema_version"] == "2"
     assert protocol["status"] == "active_learning_probe"
-    assert protocol["normalization"]["derivation"] == {
-        "response_scale_basis": "reader_joint_bootstrap_sd_of_declared_on_off_response_pairs",
-        "signal_scale_basis": "reader_joint_bootstrap_sd_of_each_reference_relative_state",
+    assert protocol["softmin"]["derivation"] == {
+        "scale_basis": "pooled_reader_joint_bootstrap_sd_of_declared_response_pairs_and_reference_relative_states",
         "pair_deduplication": "unique_unordered_state_pair_union",
         "reader_joint_bootstrap_draws": 500,
         "scale_quantile": 0.90,
@@ -92,7 +94,7 @@ def test_msrb_has_one_study_protocol_and_one_matching_executable_campaign() -> N
         assert objective["name"] == protocol["metric"]["id"]
         assert objective["params"]["state_ids"] == protocol["assay"]["state_ids"]
         assert objective["params"]["target_mask"] == target_mask
-        assert objective["params"]["normalization"] == protocol["normalization"]["values"]
+        assert objective["params"]["softmin_scale"] == protocol["softmin"]["values"]["softmin_scale"]
         assert campaign_views[view_id]["selection"]["params"]["score_ref"] == "behavior_score"
 
 
@@ -170,7 +172,9 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
     assert review["cryptographic_signature"] is False
     assert review["oracle_reimplementation"]["random_case_count"] == 60_000
     assert review["oracle_reimplementation"]["discrepancy_count"] == 0
-    assert review["property_suite"]["collected_test_count"] == 78
+    assert review["common_unit_rescaling_covariance"]["random_case_count"] == 60_000
+    assert review["common_unit_rescaling_covariance"]["limiting_coordinate_mismatch_count"] == 0
+    assert review["property_suite"]["collected_test_count"] == 84
     assert review["cardinality_pressure"]["state_counts"] == [2, 4, 8, 16]
 
     bindings = receipt["source_bindings"]
@@ -227,29 +231,54 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
 def test_msrb_study_doc_covers_the_complete_evidence_path() -> None:
     path = Path("docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md")
     text = path.read_text(encoding="utf-8")
+    normalized = " ".join(text.split())
 
     for required in (
         "Multistate Response Behavior (MSRB)",
         "### Study binding",
-        "The model predicts the response-window phenotype, not an MSRB scalar.",
+        "The model does not fit one scalar per target view and does not predict MSRB directly.",
         "### End-to-end evidence path",
-        "#### 1. Reader response-window reduction",
-        "#### 2. Within-experiment replicate handling",
-        "#### 3. Study-owned repeat adjudication and label promotion",
-        "#### 4. Four-state response-window phenotype",
+        "### 1. Reader reduces each experiment",
+        "### 2. Reader summarizes wells within an experiment",
+        "### 3. The study establishes candidate-level labels",
+        "### 4. Coordinate reference for the eight-value phenotype",
         "[r00, r10, r01, r11, b00, b10, b01, b11]",
-        "#### 5. Sequence-to-phenotype prediction",
-        "#### 6. MSRB scoring",
-        "Rounded value",
-        "500 joint bootstrap draws",
-        "#### 7. Greedy allocation and prospective measurement",
-        "### Applied controls and promotion evidence",
+        "### 5. OPAL predicts the complete phenotype",
+        "### 6. The study defines target views and score scale",
+        "one shared soft-min scale",
+        "A shared value therefore removes a second scale",
+        "0.31 log2",
+        "500 Reader well-resampling draws",
+        "41 candidate-by-experiment units",
+        "correlated summaries from 41 units, not 410 independent experiments",
+        "### 7. OPAL ranks and allocates candidates",
+        "### Evidence supporting the present probe",
         "### Uncertainty and censoring",
-        "practical no-go outcome",
-        "rectangular colorbar",
+        "A no-go decision should use the declared prospective evidence and baseline",
         "### Claim boundaries",
     ):
-        assert required in text
+        assert required in normalized
+
+    progressive_headings = (
+        "### Study binding",
+        "### End-to-end evidence path",
+        "### 1. Reader reduces each experiment",
+        "### 2. Reader summarizes wells within an experiment",
+        "### 3. The study establishes candidate-level labels",
+        "### 4. Coordinate reference for the eight-value phenotype",
+        "### 5. OPAL predicts the complete phenotype",
+        "### 6. The study defines target views and score scale",
+        "### 7. OPAL ranks and allocates candidates",
+        "### Reading the campaign landscape",
+        "### Evidence supporting the present probe",
+        "### Uncertainty and censoring",
+        "### Required observability",
+        "### Prospective evaluation",
+        "### Claim boundaries",
+        "### Authority and sources",
+    )
+    positions = [text.index(heading) for heading in progressive_headings]
+    assert positions == sorted(positions)
     assert all(line.strip() != "-" for line in text.splitlines())
     assert "source of truth" not in text.casefold()
 
@@ -258,9 +287,9 @@ def test_generic_msrb_doc_is_k_state_with_bounded_assay_mapping() -> None:
     path = Path("src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md")
     text = path.read_text(encoding="utf-8")
     normalized = " ".join(text.split())
-    mapping_heading = "### Worked assay mapping: dual-reporter promoter screen"
+    mapping_heading = "### Example assay binding"
     mapping_start = text.index(mapping_heading)
-    mapping_end = text.index("\n### When to use this objective", mapping_start)
+    mapping_end = text.index("\n### What the score does not establish", mapping_start)
     mapping = " ".join(
         line.removeprefix("> ").strip() for line in text[mapping_start:mapping_end].splitlines() if line.strip()
     )
@@ -271,34 +300,51 @@ def test_generic_msrb_doc_is_k_state_with_bounded_assay_mapping() -> None:
     )
 
     for required in (
-        "### From a multistate phenotype to one score",
+        "### Phenotype and target",
         mapping_heading,
-        "For four states, `2 × 4 = 8`, so the phenotype has eight values",
-        "The measured state panel determines the width; MSRB does not.",
         "`K` counts states, not experimental factors",
-        "### What the same-state reference means",
-        "### Why normalization scales are needed",
-        "The scales balance coordinate precision, not biological importance.",
-        "Basic question:",
-        "The final scalar applies the same smooth bottleneck",
-        "### One complete four-state example",
-        "the summary can still be positive while one pair is reversed",
-        "not appended to the `2K` phenotype as another component",
+        "### Reference-relative signal",
+        "### Three behavior families",
+        "### Family weights balance unequal counts",
+        "### Why MSRB uses a soft minimum",
+        "#### What $\\tau$ controls",
+        "The scale is therefore part of the ranking rule",
+        "Removing the field would not remove this choice",
+        "`behavior_score` is the only selectable score channel",
+        "### Worked four-state example",
+        "MSRB ranks B above A",
+        "does not become a ninth phenotype value",
         "state_ids: [state_a, state_b, state_c]",
     ):
         assert required in normalized
     for required in (
-        "The assay choices are not part of the objective.",
-        "OD600, YFP, and CFP time series",
+        "One four-state dual-reporter promoter assay publishes",
         "[r00, r10, r01, r11, b00, b10, b01, b11]",
-        "pDual-10",
-        "BBa_J23105",
-        "`0.308` log2",
-        "`0.313` log2",
-        "not limits of detection",
+        "condition-matched reference promoter",
+        (
+            "The assay window, replicate handling, reference identity, target patterns, "
+            "soft-min-scale recipe, and campaign evidence belong to the study."
+        ),
     ):
         assert required in mapping
-    assert "Partially ON targets, exact setpoints, ordinal preferences, and don't-care states" in normalized
+    progressive_headings = (
+        "### Phenotype and target",
+        "### Reference-relative signal",
+        "### Three behavior families",
+        "### Family weights balance unequal counts",
+        "### Why MSRB uses a soft minimum",
+        "### Outputs and interpretation",
+        "### Worked four-state example",
+        "### Mathematical properties",
+        "### Example assay binding",
+        "### What the score does not establish",
+        "### When to use MSRB",
+        "### Lifecycle and OPAL contract",
+        "### Responsibility and sources",
+    )
+    positions = [text.index(heading) for heading in progressive_headings]
+    assert positions == sorted(positions)
+    assert "partially ON states, exact setpoints, ordinal targets, or don't-care states" in normalized
     assert 'state_ids: ["00", "10", "01", "11"]' not in generic_core
     assert "| State panel | `00`: no perturbation" not in generic_core
     for study_token in (
@@ -330,8 +376,13 @@ def test_sfxi_source_evidence_root_is_study_owned() -> None:
     assert SFXI_ROUND0_SOURCE_EVIDENCE_ROOT == (STUDY_ROOT / "workbench" / "source_evidence" / "opal_sfxi_round0")
 
 
-def test_rmf_comparator_is_study_owned_and_not_an_executable_campaign() -> None:
-    assert RMF_ROUND0_SOURCE_EVIDENCE_ROOT == (STUDY_ROOT / "workbench" / "source_evidence" / "opal_rmf_round0")
-    frozen = RMF_ROUND0_SOURCE_EVIDENCE_ROOT / "secg_rmf_greedy" / "configs" / "campaign.yaml"
+def test_response_window_comparator_is_study_owned_and_not_an_executable_campaign() -> None:
+    assert RESPONSE_WINDOW_ROUND0_SOURCE_EVIDENCE_ROOT == (
+        STUDY_ROOT / "workbench" / "source_evidence" / "opal_response_window_round0"
+    )
+    frozen = RESPONSE_WINDOW_ROUND0_SOURCE_EVIDENCE_ROOT / "secg_rmf_greedy" / "configs" / "campaign.yaml"
     assert frozen.is_file()
     assert not (OPAL_CAMPAIGNS_ROOT / "secg_rmf_greedy").joinpath("configs", "campaign.yaml").exists()
+
+    config = load_config(frozen.resolve())
+    assert Path(config.data.location.path) == (Path.cwd() / "src/dnadesign/usr/datasets").resolve()

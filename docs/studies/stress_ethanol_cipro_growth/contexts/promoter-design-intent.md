@@ -483,14 +483,16 @@ Study instance:
 The active MSRB views and the frozen RMF comparison use this shared assay state
 order:
 
-| Campaign intent | Setpoint vector |
+| Campaign intent | Binary target mask |
 | --- | --- |
-| Ethanol factor | `[0, 1, 0, 1]` |
-| Ciprofloxacin factor | `[0, 0, 1, 1]` |
-| Combined-state AND | `[0, 0, 0, 1]` |
+| Ethanol-associated pattern | `[0, 1, 0, 1]` |
+| Ciprofloxacin-associated pattern | `[0, 0, 1, 1]` |
+| Combined-state-only pattern | `[0, 0, 0, 1]` |
 
 The stress system is therefore a concrete example of a general multi-state
-promoter specification problem.
+promoter specification problem. MSRB v1 covers binary ON/OFF target patterns;
+it does not yet encode the broader graded or exact-setpoint expression programs
+described in this design narrative.
 
 ### Narrative Spine
 
@@ -529,12 +531,11 @@ These premises should guide talks, manuscripts, and study-facing summaries:
 | Interpretation | The biological value comes from learning which regulatory architectures produce which expression programs, not merely from identifying top-ranked sequences. | Feature enrichment among successful and failed promoters; architecture-to-response examples. |
 | Conclusion | The contribution is a general design discipline for moving from regulatory priors to specified promoter behavior under context dependence. | Return to the opening specification loop. |
 
-The study now has 27 verified round-0 labels and one digest-pinned RMF round-0
-selection record. Those artifacts establish a reproducible learning probe, not
-validated model support or promoter performance for the nominated batch. The
-next result-bearing step is prospective measurement of that batch. The
-threshold-free behavior objective remains a verified shadow evaluation, and
-neither objective evaluation authorizes synthesis.
+Operational campaign state belongs in the [study status
+record](../record/status.md). Verified labels, a frozen objective protocol, and
+a completed selection run establish a reproducible policy probe. They do not
+establish model support, promoter performance, acquisition efficacy, or
+synthesis authorization.
 
 ### Minimal Figure Logic
 
@@ -733,9 +734,9 @@ Keep the claim state tied to the available evidence.
 | Evidence state | Safe claim |
 | --- | --- |
 | Candidate table materialized and X selected | The study has prepared a controlled candidate universe and an auditable model representation. This is input readiness, not phenotype evidence. |
-| Twenty-seven round-0 labels verified and one RMF selection record completed | The study has a reproducible prospective learning probe. Weak grouped prediction-to-truth support, unmeasured nominations, and the study-owned synthesis gate prevent a policy-efficacy or synthesis claim. |
-| First prospectively frozen batch measured | The study can compare nominated candidates with the same-round alternatives under each declared view and test enrichment without claiming that one batch establishes learning. |
-| Multiple active-learning rounds completed | The study can ask whether iterative selection improves hit recovery, exposes architecture-response relationships, and identifies failure modes. |
+| Verified labels and one frozen selection policy | The study has a reproducible prospective policy probe. Weak grouped prediction-to-truth support, unmeasured nominations, and the study-owned synthesis gate prevent a policy-efficacy or synthesis claim. |
+| First prospectively frozen batch measured | The study can report frozen raw-phenotype error, within-view rank preservation, within-batch specificity, and comparison with a prespecified baseline. One batch does not establish learning. |
+| Multiple prospectively evaluated rounds completed | The study can ask whether prequential prediction and policy outcomes improve against the frozen baseline, while separating larger sample size from evidence of learning. |
 | Strong hits validated across repeats or secondary contexts | The study can claim specific useful promoter designs within the tested host, construct, assay, and stress conditions. |
 
 Do not let pre-assay representation audits sound like phenotype results. Do not

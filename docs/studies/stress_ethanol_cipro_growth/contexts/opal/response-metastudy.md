@@ -2,8 +2,8 @@
 id: stress-ethanol-cipro-growth-opal-response-metastudy
 title: Response metric metastudy
 owner: dnadesign-maintainers
-status: active
-last_verified: 2026-07-17
+status: source_evidence
+last_verified: 2026-07-19
 audience:
   - scientist
   - maintainer
@@ -12,26 +12,31 @@ audience:
 
 ## Response Metric Metastudy
 
-**Status:** round-0 selection review
+**Status:** frozen comparative evidence
 **Owner:** `stress_ethanol_cipro_growth` study
-**Last verified:** 2026-07-15
+**Last verified:** 2026-07-19
 **Implementation:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy`
 **Generated evidence:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_metastudy/latest`
 
 ### Premise
 
-The study should promote response-window observed Y and activate an
-objective-selector pairing only when the assay summary is reproducible,
-changing the stress target view changes ranking as intended, and X preserves
-useful ordering in held-out Reader experiments.
+The metastudy separates label truth from model support. The response-window
+label contract passed its study-owned promotion gate, while held-out ordering
+remained weak. A separate explicit study decision authorized one frozen MSRB
+greedy probe without changing `model_support_ready=false`. Technical
+executability, predictive support, and synthesis authorization are distinct
+decisions.
 
 ### Scope
 
-The metastudy compares two distinct questions:
+The metastudy compares three distinct questions:
 
 1. Why did canonical SFXI produce correlated target-view selections?
-2. Can event-relative response and reference-relative fluorescence support a
-   more direct target-margin objective and a defensible next-build strategy?
+2. How do thresholded RMF and threshold-free MSRB encode response ordering,
+   intended-ON signal, and intended-OFF suppression on the same Reader
+   phenotype?
+3. What evidence supports label promotion, predictor ranking, and a bounded
+   prospective probe without overstating hill-climb efficacy?
 
 It is read-only with respect to Reader records, OPAL labels, campaign configs,
 ledgers, and synthesis handoffs.
@@ -44,17 +49,20 @@ ledgers, and synthesis handoffs.
 - The stress study owns target masks, Reader-to-candidate joins, label
   representation comparisons, repeated-candidate label-source decisions,
   grouped model evaluation, and promotion policy.
-- OPAL owns canonical SFXI, Response-Magnitude Feasibility (RMF) math, model fitting,
-  candidate scoring, selection, and ledgers after promotion.
+- OPAL owns canonical SFXI, Response-Magnitude Feasibility (RMF), and MSRB
+  mathematics, plus model fitting, candidate scoring, selection, and ledgers
+  after promotion.
 
 The metastudy consumes Reader's public bundle. It does not import Reader or
 maintain duplicate trajectory math.
 
 ### Campaign, target-view, and source boundaries
 
-The completed `secg_rmf_greedy` run is frozen under the study-owned
-`workbench/source_evidence/opal_rmf_round0/` shelf. It is comparator evidence,
-not an executable campaign. The metastudy loads that fixed source contract and
+The raw response-window prediction run that originated in
+`secg_rmf_greedy` is frozen under the study-owned
+`workbench/source_evidence/opal_response_window_round0/` shelf. The original
+slug is provenance; this is comparator evidence, not an executable campaign.
+The metastudy loads that fixed source contract and
 derives exactly three immutable
 `StressTargetView` records in declared order: `ethanol`, `ciprofloxacin`, and
 `and`. Each view must use `response_magnitude_feasibility_v1`, state order
@@ -117,10 +125,11 @@ The response-metastudy publication schema is
 10. Publish typed tables, a manifest-backed plot catalog, a report, and one
     Marimo review notebook.
 
-The minimal review path is Reader summary -> target mask -> three raw
-requirements -> one maximin feasibility margin -> grouped model check. SFXI
-parameter sweeps, overlap screens, and alternative reductions remain diagnostic
-because none can replace that path.
+The minimal review path is Reader phenotype -> target pattern -> objective
+decomposition -> grouped model evidence -> allocation diagnostics. SFXI, RMF,
+and MSRB remain distinct objectives with distinct claim boundaries. Parameter
+sweeps, overlap screens, and alternative reductions remain sensitivity or
+comparator evidence rather than production selectors.
 
 ### Canonical Sources
 
@@ -136,7 +145,7 @@ Response-Magnitude Feasibility (RMF) mathematics:
 - `src/dnadesign/opal/src/objectives/response_magnitude_feasibility_math.py`
 - `src/dnadesign/opal/src/objectives/response_magnitude_feasibility_v1.py`
 
-Multistate Response Behavior shadow evaluation:
+Multistate Response Behavior objective and study evidence:
 
 - `src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md`
 - `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/multistate_response_behavior_shadow_v1.yaml`
@@ -264,8 +273,10 @@ The label-truth gate is complete: the checked-in source policy selects eight
 reviewed repeat sources, excludes four unresolved repeated candidates, and the
 typed publication verifies 27 exact labels plus eight measured-candidate
 exclusions. That result does not satisfy the independent model-support gate.
-`model_support_ready` remains false, round 0 is a prospective learning probe,
-and synthesis authorization remains a separate study decision. The
+`model_support_ready` remains false. The sole executable stress campaign is the
+MSRB round-0 prospective learning probe; the RMF run is frozen comparator
+evidence. Explicit probe authorization did not promote model support, and
+synthesis authorization remains a separate study decision. The
 nearest-12-hour SFXI vec8 remains immutable provenance and is not an RMF label.
 
 The metastudy can reject unsupported choices. A biological hill climb exists

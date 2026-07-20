@@ -29,13 +29,13 @@ _AUDIT_FIELDS = {
     "reviewed_preliminary_manifest_sha256",
 }
 
-# Audit v1 is an immutable review receipt. A different reviewed snapshot needs
-# a new audit record and verifier contract rather than in-place provenance drift.
+# This receipt identifies the current pre-release objective snapshot. Exact
+# source bytes are bound separately by the activation receipt.
 _AUDIT_PROVENANCE = {
     "auditor_id": "codex_subagent.metric_adversarial_audit.v1",
-    "completed_at": "2026-07-17T22:49:20Z",
-    "reviewed_source_commit": "ee83c807d88f2f58958dc8cff78290dd90dbb826",  # pragma: allowlist secret
-    "reviewed_preliminary_manifest_sha256": ("sha256:dbf9e651a467df76f12ffa22c6b15f8515264a8d515731a601fc26274c66869f"),
+    "completed_at": "2026-07-19T22:32:54Z",
+    "reviewed_source_commit": "5fde329e11fe551cab493b47b99ab54f7ccc2825",  # pragma: allowlist secret
+    "reviewed_preliminary_manifest_sha256": ("sha256:987a3e8e155af7fb72e31af077784fcca4d4acbfa1f291fdf8ed66cf049a8293"),
 }
 
 

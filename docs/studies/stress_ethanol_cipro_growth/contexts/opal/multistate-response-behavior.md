@@ -6,7 +6,7 @@ objective_id: multistate_response_behavior_v1
 y_space: reader_response_window_vector_v1
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-19
+last_verified: 2026-07-20
 first_hop: ../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md
 audience:
   - scientist
@@ -17,56 +17,48 @@ audience:
 
 ## Multistate Response Behavior in the stress-promoter study
 
-Multistate Response Behavior (MSRB) is the ranking objective for this promoter
-campaign. It favors stronger intended-ON than intended-OFF response, higher
-intended-ON signal, and lower intended-OFF signal. The [objective
-definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
-defines the reusable inputs, equations, diagnostics, and limits. The binding
-below specifies how the stress-promoter assay supplies those inputs and how the
-campaign uses the resulting score.
+This campaign uses Multistate Response Behavior (MSRB) to rank promoter
+phenotypes toward three binary stress-response patterns. Here, a phenotype is
+the ordered set of values that describes one promoter across the four measured
+conditions. Reader reduces each experiment to eight such values; the stress
+study resolves candidate identity and publishes reviewed labels; OPAL predicts
+the complete phenotype and scores the same prediction under each target
+pattern.
 
-The OPAL objective identifier is `multistate_response_behavior_v1`, its scalar
-is written $S_{\mathrm{MSRB}}$, and its selectable score channel is
-`behavior_score`.
+The [generic MSRB definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+defines the reusable phenotype, equations, diagnostics, and limits. This page
+records the assay-specific reduction, label policy, target masks, soft-min
+scale, model, allocation rule, and evidence boundaries.
 
-MSRB is the campaign's only ranking objective. The model, score, and allocation
-rule are fixed before each selected batch is measured. Each batch then tests
-whether predicted rankings enrich for measured MSRB and whether retraining
-improves later rounds. Retrospective evidence supports the objective's
-implementation and biological interpretation, but not reliable predictive
-ordering or prospective hill-climb efficacy. Selection does not authorize
-physical synthesis.
+The objective identifier is `multistate_response_behavior_v1`. Its selected
+score channel is `behavior_score`, written $S_{\mathrm{MSRB}}$ and maximized.
+MSRB is the campaign's only ranking objective.
 
-The generic page includes a compact [assay
-mapping](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#worked-assay-mapping-dual-reporter-promoter-screen).
-The study's [`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml)
-records the exact assay, normalization, target masks, model target, selection
-policy, and claim boundaries.
+The model, objective, and allocation rule are fixed before the selected batch
+is measured. The run therefore tests a declared greedy ranking policy rather
+than revising that policy after seeing the results. Existing evidence supports
+the calculation and its alignment with the stated binary ON/OFF preference,
+but not reliable predictive ordering, prospective enrichment, or hill-climb
+efficacy. Selection does not authorize synthesis.
 
 ### Study binding
 
-This study binds MSRB to four measured conditions, a condition-matched
-pDual-10 reference, a 4–8-hour response window, three target masks, and one
-campaign. The model predicts the response-window phenotype, not an MSRB scalar.
-The same prediction can therefore be scored under each target mask without
-retraining the model or changing Reader's assay contract.
-
-### Authority by stage
-
-| Stage | Authority |
+| Element | Study choice |
 | --- | --- |
-| Workbook ingest, event alignment, well reduction, within-experiment bootstrap, and censor provenance | Reader response-window contract |
-| Reader alias, candidate, sequence, and BaseRender identity | Study promoter-candidate bindings |
-| Repeated-experiment disposition and normalization cohort | Stress study |
-| Candidate-level observed-Y publication | Study response-window label promotion |
-| Generic MSRB mathematics and diagnostics | OPAL objective plugin |
-| Model fit, prediction, selector, allocation, and campaign ledger | Active OPAL campaign |
-| Cross-repository routing | Reader–study–OPAL bridge; routing only |
+| Measured states | `00`: no stress; `10`: ethanol; `01`: ciprofloxacin; `11`: both stresses |
+| Primary response window | 4–8 hours after intervention |
+| Response coordinate, $r_i$ | Reduced base-2 log ratio of yellow fluorescent protein (YFP) to cyan fluorescent protein (CFP), measured from the same plasmid in each well |
+| Signal coordinate, $b_i$ | Reduced base-2 log ratio of YFP to optical density at 600 nm (OD600), relative to pDual-10 measured in the same state on the same plate |
+| Signal reference | pDual-10, measured in the candidate's state on the same plate |
+| Phenotype | `[r00, r10, r01, r11, b00, b10, b01, b11]` |
+| Target views | Ethanol-associated, ciprofloxacin-associated, and combined-state-only |
+| Soft-min scale | One shared $\tau\approx0.31$ log2 |
+| Model target | Complete eight-value phenotype |
+| Selector | Greedy `top_n`, six per view |
+| Allocation | Round-robin next-best-unallocated, 18 sequence-unique candidates |
 
-Each stage consumes the prior stage's published artifact without recalculating
-measurements or identities. OPAL does not import Reader. Reader does not
-resolve candidate authority. The bridge routes artifacts without defining
-formulas, aliases, repeat rules, or campaign policy.
+The exact binding is recorded in
+[`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml).
 
 ### End-to-end evidence path
 
@@ -74,27 +66,31 @@ formulas, aliases, repeat rules, or campaign policy.
 OD600, YFP, and CFP well trajectories
   -> event-relative 4-8 h reduction for each well
   -> within-experiment replicate medians
-  -> same-state pDual-10 fluorescence subtraction
-  -> one Reader experiment-level response-window vector
-  -> exact Reader alias-to-candidate binding
-  -> study adjudication of repeated experiments
-  -> one exact candidate-level observed vector
-  -> immutable, manifest-pinned OPAL label event
+  -> same-state pDual-10 signal subtraction
+  -> one Reader experiment-level response-window phenotype
+  -> identity-verified Reader alias-to-candidate binding
+  -> study review of repeated experiments
+  -> one candidate-level observed phenotype
+  -> verified candidate-level OPAL label
   -> sequence representation X
-  -> predicted response-window vector Y_hat_RW
+  -> predicted response-window phenotype Y_hat_RW
   -> target-view MSRB score
   -> top-six ranking per view
   -> sequence-unique 18-candidate allocation
-  -> prospective measurement and round-over-round evaluation
+  -> prospective measurement
 ```
 
-#### 1. Reader response-window reduction
+Each stage preserves the prior stage's artifact rather than recalculating its
+measurements or identities.
+
+### 1. Reader reduces each experiment
 
 Reader starts from annotated OD600, YFP, and CFP trajectories. It resolves the
-intervention interval and expresses time relative to the intervention. The
-primary reduction is the geometric log mean from 4 to 8 hours after the event.
+intervention interval, expresses time relative to that event, and averages
+each log2 ratio from 4 to 8 hours after intervention. On the original ratio
+scale, this is equivalent to a geometric time mean.
 
-For each well $w$, Reader first reduces the trajectory in time:
+For each well $w$, Reader calculates
 
 $$
 R_w = \frac{1}{4\ \mathrm{h}}
@@ -108,26 +104,31 @@ F_w = \frac{1}{4\ \mathrm{h}}
 \log_2\left(\frac{\mathrm{YFP}_w(t)}{\mathrm{OD600}_w(t)}\right)dt.
 $$
 
-Integrating the log ratio is equivalent to taking a geometric time mean on the
-ratio scale. Each well is reduced before wells are combined. Pooling raw time
-points across wells would give wells with denser sampling more influence and
-would erase the replicate structure.
+In $R_w$, YFP and CFP are the two reporters on the same assayed plasmid. The
+ratio is calculated within each well; it is not a comparison between separate
+constructs.
 
-In the available plates, the 4–8-hour window retained much of the SpyP and
-sulAp separation seen at 6–12 hours while reducing late-plate OD accumulation,
-overflow exposure, and plate-age effects. The
-[response metastudy](response-metastudy.md) records the equal-footing window
-comparison. Alternative windows, event bounds, area-under-the-curve summaries,
-and delta summaries remain sensitivity evidence. They do not silently replace
-the primary reduction.
+Each well is reduced before wells are combined. Pooling raw time points across
+wells would give densely sampled wells more influence and would erase the
+replicate structure.
 
-Reader defines the reduction and its evidence contract in
+In the assay-development plates, the 4–8-hour window retained much of the SpyP
+and sulAp separation seen at 6–12 hours while reducing late-plate OD
+accumulation, overflow exposure, and plate-age effects. The window was chosen
+with the available corpus and is now fixed for the prospective probe. It is
+not independent validation of the window. The [response
+metastudy](response-metastudy.md) records the equal-footing window comparison.
+
+Alternative windows, event bounds, area-under-the-curve summaries, and delta
+summaries remain sensitivity evidence. They do not replace the primary
+reduction. Reader owns the full contract in
 `reader/docs/lib/plate_reader/response_window.md` in the sibling Reader
 repository.
 
-#### 2. Within-experiment replicate handling
+### 2. Reader summarizes wells within an experiment
 
-For assay state $i$, Reader summarizes technical replicate wells with medians:
+For state $i$, Reader combines replicate wells from the same experiment with
+medians:
 
 $$
 r_i = \operatorname{median}_{w \in \mathrm{design},i} R_w,
@@ -140,117 +141,117 @@ b_i =
 \operatorname{median}_{w \in \mathrm{pDual\text{-}10},i} F_w.
 $$
 
-This creates one estimate per experiment, design, and state. The reference is
-both experiment-matched and state-matched. A stressed candidate is never
-compared with pDual-10 measured in another condition.
+This produces one estimate per experiment, design, and state. The pDual-10
+reference is measured in the same state on the same plate as the candidate. A
+candidate is never compared with pDual-10 from another plate or state.
 
-The pDual-10 plasmid contains two exact `BBa_J23105` sequences from the
-Anderson promoter collection; the [dataset registry](../../record/datasets.yaml)
-records the source lineage. The calculation uses measured output, not nominal
-catalog strength, and does not assume that pDual-10 is condition-invariant.
+pDual-10 is the study's condition-matched promoter reference. The [dataset
+registry](../../record/datasets.yaml) records its construct and source lineage.
+The calculation uses measured pDual-10 output and does not assume that the
+reference is condition-invariant.
 
-Reader preserves three evidence layers alongside the central estimates:
+Reader publishes three evidence layers beside the central estimates:
 
-- within each state, bootstrap draws reuse the same sampled design-well
-  indices for $r_i$ and the design contribution to $b_i$; independently
-  generated state draws are then assembled into one eight-component draw;
-- event-time bounds show sensitivity to intervention-time uncertainty; and
-- censor provenance distinguishes exact values from instrument overflow or
-  policy bounds.
+- a well-resampling bootstrap shows sensitivity to which wells were measured;
+- event-time bounds rerun the reduction at the earliest and latest recorded
+  intervention times and show the largest change from the central estimate;
+  and
+- censor provenance identifies values bounded by instrument overflow or a
+  declared policy.
 
-The bootstrap preserves the measured response/fluorescence pairing within a
-state. It does not estimate covariance between states, candidates, or
-experiments. These evidence layers are not averaged into the central vector.
-For pDual-10 compared with itself, the same resampled wells are reused, so all
-central and bootstrap $b_i$ values are definitionally zero rather than
-carrying artificial reference uncertainty.
+These layers are not averaged into the central phenotype or appended as a
+ninth value. Well resampling creates no new observations and does not estimate
+variation across future experiments. Within a state, Reader keeps the response
+and design-signal contributions paired during resampling. When pDual-10 is
+compared with itself, the same sampled reference wells appear on both sides,
+so every $b_i$ draw is exactly zero rather than carrying artificial
+self-comparison noise.
 
-#### 3. Study-owned repeat adjudication and label promotion
-
-One Reader experiment is one evidence unit regardless of how many valid wells
-it contains. When a candidate appears in more than one experiment, the study
-does not pool all wells, infer authority from the latest timestamp, or average
-discordant experiments automatically.
-
-The study applies an explicit disposition:
-
-- a singleton experiment contributes its exact vector;
-- an accepted repeated candidate contributes one reviewed Reader experiment;
-- a discordant or unresolved candidate is excluded pending remeasurement; and
-- any candidate with a bounded primary component is excluded from exact-label
-  promotion.
-
-Every contributing experiment, exclusion, Reader manifest digest, candidate
-binding, and uncertainty source remains recorded. Cross-experiment differences
-stay visible as repeat diagnostics even when one reviewed source supplies the
-training label.
-
-The candidate binding is exact and study-owned. A Reader design alias must
-resolve to one candidate and a matching sequence digest. Missing, duplicated,
-fuzzy, prefix-based, or sequence-mismatched joins fail. Reader aliases never
-become candidate authority by themselves.
-
-The published label set contains 27 exact candidate vectors.
-OPAL verifies its `opal.observed_label_promotion.v1` receipt and artifact
-digests before reading any label. Across future campaign rounds, all label
-events remain in the ledger; the configured `latest_only` policy chooses the
-latest exact event per candidate for cumulative training. That round-level
-policy is distinct from the study's adjudication of repeated Reader
-experiments within one published event.
-
-#### 4. Four-state response-window phenotype
-
-Generic MSRB consumes `2K` ordered coordinates for any fixed `K >= 2`. This
-Reader assay has `K=4`, so its phenotype contains eight values.
-
-The Reader handoff is the objective-neutral response-window phenotype
+Together, the four $r_i$ values and four $b_i$ values form one
+experiment-level phenotype:
 
 $$
 Y_{\mathrm{RW}}=
 [r_{00},r_{10},r_{01},r_{11},b_{00},b_{10},b_{01},b_{11}].
 $$
 
-Its exact serialized order is:
+This is the eight-component object that the study reviews when a candidate has
+one or more experiments. Section 4 provides a compact coordinate reference.
 
-```text
-[r00, r10, r01, r11, b00, b10, b01, b11]
-```
+### 3. The study establishes candidate-level labels
 
-| State | Assay condition |
-| --- | --- |
-| `00` | No stress |
-| `10` | Ethanol |
-| `01` | Ciprofloxacin |
-| `11` | Ethanol plus ciprofloxacin |
+One Reader experiment is one evidence unit, regardless of how many valid wells
+it contains. When a candidate appears in more than one experiment, the study
+does not pool all wells, infer authority from a timestamp, or average
+discordant experiments automatically.
+
+The study applies an explicit disposition:
+
+- a singleton experiment contributes its uncensored phenotype;
+- an accepted repeated candidate contributes one reviewed Reader experiment;
+- a discordant or unresolved candidate is excluded pending remeasurement; and
+- the selected label-source experiment must have eight uncensored primary
+  components.
+
+A bounded component in a nonselected experiment remains repeat evidence and
+does not block promotion from a reviewed uncensored source. Here, `uncensored`
+means only that none of the selected source's eight components is a bound. It
+does not mean error-free, repeat-stable, population-average, or representative
+of a future experiment.
+
+Every contributing experiment, exclusion, Reader manifest digest, candidate
+binding, and uncertainty source remains recorded. Cross-experiment differences
+remain repeat diagnostics even when one reviewed source supplies the training
+label.
+
+The study-owned, digest-matched candidate binding requires each Reader alias to
+resolve to one candidate and a matching sequence digest. Missing, duplicated,
+fuzzy, prefix-based, or sequence-mismatched joins fail. A Reader alias does not
+become candidate authority by itself.
+
+The current label set contains 27 candidate phenotypes from uncensored selected
+sources. OPAL verifies its `opal.observed_label_promotion.v1` receipt and
+artifact digests before reading the labels. Across campaign rounds, the ledger
+retains every label event; the configured `latest_only` policy chooses the
+latest uncensored event per candidate for cumulative training. That round-level
+rule is separate from study review of repeated Reader experiments within one
+event.
+
+### 4. Coordinate reference for the eight-value phenotype
+
+Generic MSRB consumes `2K` ordered values for any fixed `K >= 2`. This assay
+has four states, so Reader publishes
+
+$$
+Y_{\mathrm{RW}}=
+[r_{00},r_{10},r_{01},r_{11},b_{00},b_{10},b_{01},b_{11}].
+$$
 
 | Coordinate | Meaning |
 | --- | --- |
-| $r_i$ | Median well-level 4–8-hour reduced $\log_2(\mathrm{YFP}/\mathrm{CFP})$ response in state $i$ |
-| $b_i$ | Median design $\log_2(\mathrm{YFP}/\mathrm{OD600})$ minus median same-state pDual-10 value |
-| $b_i=0$ | Equal reduced fluorescence to pDual-10 in the same state |
-| $b_i=1$ | Twofold higher reduced fluorescence than same-state pDual-10 |
-| $b_i=-1$ | Twofold lower reduced fluorescence than same-state pDual-10 |
+| $r_i$ | Median well-level 4–8-hour reduced log2(YFP/CFP) response from the same plasmid in state $i$ |
+| $b_i$ | Median design log2(YFP/OD600) minus median pDual-10 log2(YFP/OD600), measured in the same state on the same plate |
+| $b_i=0$ | Equal reduced signal to same-state, same-plate pDual-10 |
+| $b_i=1$ | Twofold higher reduced signal than same-state, same-plate pDual-10 |
+| $b_i=-1$ | Twofold lower reduced signal than same-state, same-plate pDual-10 |
 
-The vector does not encode a target mask, objective score, uncertainty value,
-candidate rank, or synthesis decision. The same $Y_{\mathrm{RW}}$ can be
-evaluated by any compatible objective without changing Reader's assay evidence.
+The phenotype does not contain a target mask, objective score, uncertainty
+value, candidate rank, or synthesis decision. Its meaning is objective-neutral.
 
-#### 5. Sequence-to-phenotype prediction
+### 5. OPAL predicts the complete phenotype
 
-The active campaign trains one multi-output random forest:
+The campaign trains one multi-output random forest:
 
 $$
-X_{\mathrm{sequence}}
-\longrightarrow
-\widehat{Y}_{\mathrm{RW}}.
+X_{\mathrm{sequence}}\longrightarrow\widehat{Y}_{\mathrm{RW}}.
 $$
 
 $X_{\mathrm{sequence}}$ is the declared 8,192-component sequence
-representation. The training target is the complete observed response-window
-vector. The model does not fit one scalar per selection view and does not
+representation. The training target is the complete observed eight-value
+phenotype. The model does not fit one scalar per target view and does not
 predict MSRB directly.
 
-OPAL applies each target mask to the same predicted vector after model fitting:
+OPAL scores the same prediction under each target mask:
 
 $$
 X_{\mathrm{sequence}}
@@ -259,250 +260,396 @@ X_{\mathrm{sequence}}
 \longrightarrow \operatorname{topN}_v.
 $$
 
-Changing a target mask changes the interpretation and ranking of predictions;
-it does not retrain the raw-Y model. This separation makes prediction errors
-observable component by component and avoids creating three disconnected
-scalar-model lineages.
+Changing the target mask changes the interpretation and ranking of a
+prediction; it does not retrain the model. This keeps component-level
+prediction errors observable and avoids three disconnected scalar-model
+lineages.
 
 The 100-tree random forest is a fixed prospective baseline, not a claim that
-random forests are optimal. Retrospective experiment-held-out rank support is
-weak. The first batches test whether the loop learns.
+random forests are optimal. It is trained on 27 labels from six selected source
+experiments against an 8,192-component representation. Aggregate out-of-bag
+$R^2$ is approximately `0.067`; this internal leave-some-training-rows-out
+diagnostic explains little of the observed variation. Retrospective
+experiment-held-out rank support is also weak. The prospective run tests these
+frozen predictions rather than assuming they are accurate.
 
-#### 6. MSRB scoring
+On fixed grouped validation, median held-out Spearman rank correlations were
+as follows. A value near `1` preserves ordering, while a value near `0` carries
+little monotonic ordering information. The table includes the frozen
+[Response-Magnitude Feasibility (RMF)](response-magnitude-feasibility.md)
+comparator.
 
-The [generic MSRB definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
-defines the three behavior families and their family-balanced smooth
-bottleneck. The stress-study binding supplies only the ordered states, target
-masks, and normalization scales.
+| Objective | Combined-state-only | Ciprofloxacin-associated | Ethanol-associated |
+| --- | ---: | ---: | ---: |
+| MSRB | `0.257` | `-0.200` | `0.086` |
+| RMF | `0.143` | `-0.071` | `-0.086` |
 
-The two scales put response and signal on comparable units before the three
-behavior families are combined. This study uses the 90th percentile of
-eligible within-experiment bootstrap standard deviations for each coordinate
-type:
+Neither row supports reliable ranking. MSRB was chosen for semantic alignment,
+not because this table establishes predictive superiority.
 
-| Scale | Rounded value | Meaning |
-| --- | ---: | --- |
-| $s_R$ | `0.308` log2 | q90 within-experiment uncertainty of declared ON-versus-OFF response contrasts |
-| $s_B$ | `0.313` log2 | q90 within-experiment uncertainty of same-state pDual-10-relative signal |
+### 6. The study defines target views and score scale
 
-A response contrast of about `0.31` log2 or a reference-relative signal change
-of about `0.31` log2 counts as one bootstrap-uncertainty unit for its coordinate
-type. For example:
+The generic objective defines the three behavior families, equal total family
+weights, and the soft minimum. This study supplies the ordered states, masks,
+and one shared soft-min scale.
 
-- an ON-minus-OFF response difference of `0.616` log2 is about
-  `0.616 / 0.308 = +2.0` response normalization units; and
-- an intended-OFF value of `b = -0.626` log2 is about
-  `-(-0.626) / 0.313 = +2.0` OFF-suppression units.
+#### Target views
 
-This conversion lets the response and signal families share one score even
-when their measurement precision differs. On the underlying ratio scale,
-`0.31` log2 is about a 1.24-fold change. It is an uncertainty-normalization
-convention, not a desired biological effect size, a limit of detection, or
-proof that a one-unit difference is distinguishable.
+| View | Plain interpretation | Mask `[00, 10, 01, 11]` | Intended-ON states |
+| --- | --- | --- | --- |
+| Ethanol | Ethanol-associated pattern | `[0, 1, 0, 1]` | Ethanol; both stresses |
+| Ciprofloxacin | Ciprofloxacin-associated pattern | `[0, 0, 1, 1]` | Ciprofloxacin; both stresses |
+| AND | Combined-state-only pattern | `[0, 0, 0, 1]` | Both stresses only |
 
-These numbers are not biological thresholds, metric weights, or fitted model
-parameters. Reader generated 500 joint bootstrap draws for each of 41 exact
-candidate-experiment units. The study calculated the uncertainty of the
-eligible response contrasts and signal values, then used the 90th percentile
-(`q90`) as each scale. Thus 90% of the eligible uncertainty estimates are no
-larger than the declared scale. Predictions and selected candidates did not
-participate in that calculation.
+The ethanol-associated view (`[0, 1, 0, 1]`) compares every ethanol-present
+response with every ethanol-absent response:
 
-The active
-[`protocol.yaml`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml)
-stores the exact machine-readable values and derivation recipe. Values such as
-those in the scale table carry additional digits there only so independent
-reruns use the identical conversion. Those digits support computational
-reproducibility; they do not imply matching biological precision. Rounded
-values belong in explanatory prose, while full precision belongs in the
-machine-readable contract.
+$$
+r_{10}-r_{00},\quad r_{10}-r_{01},\quad
+r_{11}-r_{00},\quad r_{11}-r_{01}.
+$$
 
-The three active interpretations are:
+This is global ordering by target membership. It is not limited to the matched
+conditional effects $r_{10}-r_{00}$ and $r_{11}-r_{01}$. The
+ciprofloxacin-associated view (`[0, 0, 1, 1]`) uses the analogous all-pairs
+ordering. The combined-state-only view (`[0, 0, 0, 1]`) asks for $r_{11}$ to
+exceed $r_{00}$, $r_{10}$, and $r_{01}$; it does not calculate biochemical
+interaction or the superadditive contrast
+$r_{11}-r_{10}-r_{01}+r_{00}$.
 
-| View | Mask `[00, 10, 01, 11]` | Intended-ON states |
+For any one mask, the predicted phenotype becomes three behavior families:
+
+| Family | Values supplied to MSRB | Favorable direction |
 | --- | --- | --- |
-| Ethanol | `[0, 1, 0, 1]` | Ethanol; both stresses |
-| Ciprofloxacin | `[0, 0, 1, 1]` | Ciprofloxacin; both stresses |
-| AND | `[0, 0, 0, 1]` | Both stresses only |
+| Response ordering | Every intended-ON $r_i$ minus every intended-OFF $r_j$ | Larger ON-over-OFF differences |
+| Intended-ON signal | Each intended-ON $b_i$ | Brighter than the same-state pDual-10 reference |
+| Intended-OFF suppression | The negative of each intended-OFF $b_j$ | Dimmer than the same-state pDual-10 reference |
 
-Scores are comparable only within one view under the same ordered states,
-mask, normalization, and objective version. An ethanol score and an AND score
-are not measurements on one interchangeable scale.
+Each family receives one third of the starting weight, regardless of how many
+state comparisons it contains. The shared soft minimum then combines all
+values into `behavior_score`. The [generic objective
+definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
+gives the complete equations and compensation examples.
 
-#### How to read the family landscape
+#### What the soft-min scale changes
 
-The campaign notebook shows all three family scores:
+All scored values are log2 differences: ON-minus-OFF response,
+intended-ON signal relative to pDual-10, and the negative of intended-OFF
+signal relative to pDual-10. The campaign uses one shared scale of approximately
+$0.31$ log2.
 
-- farther right means stronger intended-ON versus intended-OFF response
-  ordering, $S_R$;
-- farther up means stronger intended-ON signal relative to same-state
-  pDual-10, $S_{\mathrm{ON}}$; and
-- redder means stronger intended-OFF suppression relative to same-state
-  pDual-10, $S_{\mathrm{OFF}}$.
+The scale controls how readily strong behavior compensates for weak behavior.
+It is not a biological threshold, a minimum detectable effect, or a
+candidate-specific uncertainty penalty. Using one shared value avoids an
+additional preference about how much a response change is worth relative to a
+signal change.
 
-Under one fixed view, a candidate that moves right, up, and red must receive a
-higher $S_{\mathrm{MSRB}}$. Up and right alone are not sufficient because the
-color is the third family. A bright, responsive point can still rank poorly
-when its intended-OFF states remain bright.
+#### Why the study uses approximately 0.31 log2
 
-Selected predictions are not expected to be the visually highest measured
-points for three separate reasons. First, SpyP, sulAp, pDual-10, and the other
-observed labels are assay evidence, not unmeasured DenseGen candidates eligible
-for selection. Second, the selector ranks the three-dimensional family
-combination rather than either plotted axis alone. Third, the batch allocator
-requires sequence uniqueness across views; if an earlier view already claims
-a sequence, a later view advances to its next-best unallocated prediction.
-The batch table records that replacement explicitly.
+The study derived the value from within-experiment well-resampling evidence:
 
-Use the selected-candidate decomposition to explain one rank. It shows every
-state-level coordinate, the three family scores, the hard bottleneck, and the
-final smooth score. Zero remains a reference direction, not a biological
-acceptance threshold.
+1. Start with 41 candidate-by-experiment units whose primary eight values are
+   uncensored. They cover 32 candidates and eight Reader experiments; six
+   units containing at least one bounded primary value are excluded.
+2. Use 500 Reader well-resampling draws for each unit while preserving the
+   paired response and signal calculations.
+3. Calculate one standard deviation for each of six distinct response
+   state-pair differences and four state-specific pDual-10-relative signal
+   values.
+4. Pool those standard deviations and take their 90th percentile.
 
-The OFF-suppression color scale uses one symmetric linear extent for all three
-views: the absolute 99th percentile of the round-0 campaign prediction pool,
-`6.866` normalized units. Values beyond that display extent keep
-their exact score and remain plotted, but their colors saturate at the fixed
-colorbar endpoints. The rectangular colorbar avoids treating saturation as a
-new score category; the notebook caption reports how many visible values are
-saturated. This view-independent display rule makes differences near the
-selected candidates legible without silently removing outliers or changing
-the objective.
+| Resampling summary | Count | 90th percentile SD (log2) |
+| --- | ---: | ---: |
+| Response state-pair differences | 246 | `0.308` |
+| pDual-10-relative state values | 164 | `0.313` |
+| Pooled values used for $\tau$ | 410 | `0.311` |
 
-#### 7. Greedy allocation and prospective measurement
+The response and signal summaries differ by less than `0.005 log2` at the
+chosen percentile. A shared value therefore removes a second scale without
+hiding a meaningful difference at that percentile.
 
-For each view, the `top_n` selector ranks candidates by descending
-`behavior_score` and nominates six. MSRB is the objective; `top_n` is the
-selector. The policy is deterministic greedy exploitation, not Bayesian
-optimization and not uncertainty-aware acquisition.
+#### What the resampling does not establish
 
-The campaign then allocates one sequence at a time in the declared view order:
-ethanol, ciprofloxacin, AND. If another view has already claimed a sequence,
-the current view advances to its next-best unallocated sequence. The batch must
-contain exactly six candidates per view and 18 unique sequences or the run
-fails.
+The 90th percentile is an assay-development convention, not a biological
+constant. It places the compensation scale near the upper end of observed
+within-experiment resampling variation without letting a few extreme values
+set it. The pooled median is `0.136 log2`, the 95th percentile is `0.361
+log2`, and the maximum is `1.130 log2`. The available data do not uniquely
+select the 90th percentile.
 
-Every measured candidate is assayed in all four states. It therefore provides
-new evidence for all three masks, not only the view that nominated it.
+The 410 values are correlated summaries from 41 units, not 410 independent
+experiments. They describe sensitivity to resampling measured wells. They do
+not estimate instrument resolution, between-experiment reproducibility, model
+uncertainty, or a limit of detection. The rule was developed on the available
+assay corpus rather than independently validated on a new corpus.
 
-### Applied controls and promotion evidence
+#### Sensitivity and reproducibility
 
-SpyP ranks near the top of observed ethanol examples, and sulAp ranks near the
-top of observed ciprofloxacin examples. They provide face-validity checks, not
+For unit intuition, $2^{0.31}\approx1.24$. For a response difference, this is
+a ratio of YFP/CFP ratios; for a signal value, it is a design-to-pDual-10
+YFP/OD600 ratio. It is not a desired 1.24-fold biological effect.
+
+Under the current masks, the behavior score can lie at most `0.34–0.77 log2`
+above its hard bottleneck, depending on the limiting coordinate's family. An
+implicit scale of `1 log2` would raise the largest bound from `0.77` to `2.48
+log2`; omitting the field would therefore hide a more permissive rule rather
+than remove a choice.
+
+Across 13 prespecified scale and source-cohort checks, pool-wide ranks remained
+broadly similar to the selected convention (minimum Spearman correlation
+`0.955`), but raw top-six overlap fell to `3/6` in the most sensitive case.
+Broad ordering was fairly stable; exact greedy nominations remained
+scale-sensitive. The value must therefore be fixed before allocation.
+
+Well-resampling bootstrap draws are not inserted into candidate scores or used
+as candidate-specific penalties. The protocol stores the exact value and recipe.
+The executable value is
+$\tau=0.31063783855250376$ log2; the additional digits preserve the recorded
+calculation and do not imply matching biological precision.
+The digest-bound
+[`normalization.json`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/normalization.json)
+and its supporting tables preserve the calculation.
+
+Scores are comparable only within one view under the same state order, mask,
+scale, and objective version. An ethanol-associated score and a
+combined-state-only score are not interchangeable measurements.
+
+### 7. OPAL ranks and allocates candidates
+
+For each view, `top_n` ranks candidates by decreasing `behavior_score` and
+nominates six. MSRB is the objective; `top_n` is the selector. The policy is
+deterministic greedy exploitation, not Bayesian optimization or
+uncertainty-aware acquisition.
+
+OPAL then allocates one sequence at a time in the declared view order:
+ethanol, ciprofloxacin, and AND. If a sequence was claimed by an earlier view,
+the current view advances to its next-best unallocated candidate. The batch
+must contain six candidates per view and 18 unique sequences or the run fails.
+Sequence uniqueness prevents exact duplicates; it is not a general diversity
+criterion.
+
+Every candidate is measured in all four states, so it supplies evidence for
+all three views, not only the view that nominated it.
+
+### Reading the campaign landscape
+
+The campaign notebook shows the three family scores:
+
+- farther right means stronger response ordering, $S_R$;
+- farther up means stronger intended-ON signal, $S_{ON}$; and
+- larger labeled values on the colorbar or z-axis mean stronger intended-OFF suppression,
+  $S_{OFF}$.
+
+The hue is only a display encoding of the third family. It does not represent
+YFP color or a separate biological quantity. A candidate that improves on all
+three axes must receive a higher MSRB score. A point that is only higher and
+farther right can rank below another point when its OFF suppression is worse.
+
+Selected predictions need not be the visually highest observed points. SpyP,
+sulAp, pDual-10, and other observed labels are assay evidence, not unmeasured
+DenseGen candidates eligible for selection. The selector ranks all three
+families rather than either plotted axis alone, and sequence-unique allocation
+can advance a later view to its next-best unallocated sequence.
+
+The selected-candidate decomposition gives the defensible explanation of one
+rank: every state-level clearance, the three family scores, the hard
+bottleneck, and the final smooth score. Zero is a reference direction, not a
+biological acceptance threshold.
+
+The current prediction surface is narrow. No predicted candidate meets every
+reference direction for the ethanol-associated or combined-state-only views;
+about 19.4% do for the ciprofloxacin-associated view. Some
+combined-state-only predictions have a positive behavior score while every
+candidate still has a negative hard bottleneck. These are least-bad predicted
+compromises, not predicted conforming programs.
+
+Predicted ON-signal and OFF-suppression family scores are strongly
+anticorrelated: Spearman correlations are approximately `-0.924`, `-0.948`,
+and `-0.986` for the ethanol-associated, ciprofloxacin-associated, and
+combined-state-only views. After standardization, the third principal
+direction explains only about 0.1–0.2% of family-score variance. The fitted
+model mainly represents a global-expression tradeoff in which brighter ON
+states accompany brighter OFF states. This does not make the three
+mathematical families duplicates. No score can select a phenotype combination
+that the predictor does not place in its prediction surface.
+
+The per-view counts, correlations, and principal-component variance ratios are
+generated from the fixed prediction-score table and recorded in
+[`prediction_surface_diagnostics.parquet`](../../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/tables/prediction_surface_diagnostics.parquet).
+
+The OFF-suppression display uses one symmetric linear extent for all three
+views, fixed from the absolute 99th percentile of the round-0 prediction pool.
+Values outside the extent keep their exact scores and remain plotted, but
+their colors saturate at the colorbar endpoints. The caption reports the
+saturated count. This view-independent display rule changes neither the
+objective nor candidate rank.
+
+### Evidence supporting the present probe
+
+MSRB was chosen because the target is binary and directional, every favorable
+change should affect rank, and no biological pass threshold is justified. Its
+declared preferences remain visible: binary target membership, equal total
+weight for three behavior families, one compensation scale, and bounded
+tradeoffs.
+
+RMF is better suited to validated engineering thresholds that must all be met.
+Its hard minimum prevents compensation, but a nonlimiting improvement is
+invisible and one noisy extreme can control rank. The fixed zero-boundary RMF
+run remains comparator evidence rather than a second executable selector.
+
+[Setpoint Fidelity × Intensity
+(SFXI)](../../../../../src/dnadesign/opal/docs/plugins/objectives/sfxi.md) uses a
+distinct Reader vec8 and does not directly score target-OFF signal. Vector
+target similarity requires absolute setpoints and penalizes overshoot. A
+single vector channel omits two behavior families. Scalar identity and
+[SPOP](../../../../../src/dnadesign/opal/docs/plugins/objectives/spop.md) belong
+to different Y contracts.
+
+SpyP ranks near the top of observed ethanol-associated examples but retains an
+OFF-suppression failure. SulAp ranks near the top of observed
+ciprofloxacin-associated examples. These are limited face-validity checks, not
 score thresholds or DenseGen architecture matches. The study has no equivalent
-positive AND control.
+positive combined-state-only control.
 
-The generic objective tests establish directional monotonicity, Pareto
-dominance, state-permutation invariance, equal family standing, bounded
-compensation, finite extreme arithmetic, and state-panel pressure from `K=2`
-through `K=16`. Study promotion additionally evaluated the three active masks,
-Reader bootstrap and event-time sensitivity, repeated experiments, censoring,
-normalization sensitivity, and sequence-deduplicated allocation. The
-digest-bound activation receipt and shadow bundle preserve those results.
+The objective tests establish directional monotonicity, Pareto dominance
+(improving every coordinate cannot lower rank), unchanged results after a
+consistent reordering of states, equal family standing, bounded compensation,
+numerical stability for extreme finite inputs, and state-panel pressure from
+`K=2` through `K=16`. Study review additionally covered the active masks, Reader bootstrap
+and event-time sensitivity, repeated experiments, censoring, scale
+sensitivity, and sequence-deduplicated allocation.
+
+These checks support the equations and implementation. They do not repair the
+weak sequence-to-phenotype predictor. Greedy Top-K searches the largest
+predicted scores among 154,785 candidates, where the largest model errors may
+also occur. The campaign has neither a tested estimate of prediction
+uncertainty nor a safeguard for sequences unlike the training examples. Under
+the same prediction matrix, MSRB and RMF differ on 3 of 18 allocated
+sequences. Their 15-of-18 overlap does not establish either objective's
+prospective efficacy.
 
 ### Uncertainty and censoring
 
-Uncertainty is evidence alongside the eight-value phenotype. It is not a ninth
-component and is not part of the current selector.
+Uncertainty is not a ninth phenotype component and does not enter the current
+selector.
 
 | Evidence | Meaning | Current role |
 | --- | --- | --- |
-| Joint state bootstrap | Within-experiment replicate uncertainty; paired response and design-fluorescence resampling within each state | Scale derivation and rank-sensitivity review |
-| Event-time bounds | Sensitivity to intervention-time uncertainty | Separate envelope review |
-| Repeat disagreement | Between-experiment source dependence for one candidate | Study adjudication and exclusion |
+| Well-resampling bootstrap | Sensitivity to which within-experiment wells were measured; not future-experiment variation | Scale derivation and rank-sensitivity review |
+| Event-time bounds | Sensitivity to uncertainty in intervention timing | Separate envelope review |
+| Repeat disagreement | Dependence on which experiment measured one candidate | Study adjudication and exclusion |
 | Censor provenance | Exact, lower-bounded, or upper-bounded assay value | Exact-label gate |
 | Model uncertainty | Epistemic uncertainty in $X\rightarrow Y$ | Not calibrated or used by the selector |
 
 Reader bootstrap variation must not be relabeled as model uncertainty. Random-
-forest tree dispersion is also not a calibrated posterior. Expected
-improvement or another uncertainty-aware acquisition policy would require a
-separate validated uncertainty contract.
-
-The active campaign consumes point estimates only. Candidates with bounded
-primary response-window values do not become apparently exact labels.
+forest tree dispersion is not a calibrated posterior. An uncertainty-aware
+acquisition policy would require a separate validated uncertainty contract.
+Between-experiment disagreement remains the larger unresolved measurement
+variation and is handled by study review rather than hidden in MSRB.
 
 ### Required observability
 
-For every selection view, the OPAL notebook shows:
+The campaign needs five evidence surfaces:
 
-1. a family landscape with response ordering on the x-axis, intended-ON signal
-   on the y-axis, and intended-OFF suppression in color;
-2. independent prediction-pool, allocated, observed-batch, and label toggles;
-3. a selected-candidate decomposition containing every state-level clearance,
-   the three family scores, hard bottleneck, and $S_{\mathrm{MSRB}}$;
-4. score-versus-rank context for the complete prediction pool;
-5. the response-window phenotype summary with mathematical channel labels;
-6. BaseRender sequence evidence through its public adapter; and
-7. run, model, label, normalization, candidate-binding, allocation, and plot
-   digests.
+1. Reader evidence for the selected time window, trajectories, replicate
+   support, censoring, and growth context.
+2. The three family scores, hard bottleneck, limiting coordinate, and
+   direction-met status for every selected candidate.
+3. One pool-wide landscape that distinguishes predictions, observations,
+   selections, and allocation replacements.
+4. Experiment-held-out raw-$Y$ and objective-ranking validation with sample
+   counts and undefined folds visible.
+5. After measurement, one frozen table containing predicted and observed
+   $Y_{\mathrm{RW}}$, family scores, MSRB, raw rank, allocated view and rank,
+   and the declared comparison.
 
-After prospective measurements arrive, the same notebook must add predicted-
-versus-observed $Y_{\mathrm{RW}}$ and MSRB evidence. Round-over-round objective
-distributions and cumulative best traces become informative after at least two
-measured campaign batches; empty or single-round panels should not pretend to
-show learning.
+BaseRender sequence evidence and artifact digests support identity and
+provenance; they do not add another scored behavior. Round-over-round plots are
+appropriate after at least two measured batches and should show predictions
+made before each measured batch against a prespecified baseline. Cumulative
+best score alone tends to rise as more candidates are measured and is not
+evidence of learning.
 
-### Prospective hill-climb evaluation
+### Prospective evaluation
 
-The first batch evaluates the complete loop:
+The first measured batch evaluates the complete loop:
 
 ```text
 sequence X -> predicted Y_RW -> MSRB -> greedy allocation -> measured Y_RW
 ```
 
-For each view and round, record:
+It can establish four bounded results:
 
-- the six candidates nominated by that view versus the other twelve batch
-  candidates scored under the same view;
-- their frozen predicted and measured eight-component phenotypes;
-- predicted and measured family scores, hard bottlenecks, and MSRB scores;
-- objective enrichment relative to the pre-round observed corpus;
-- candidate overlap among views and any next-best-unallocated replacements;
-- component-wise prediction error and within-view rank preservation; and
-- cumulative best measured behavior and distribution shifts across rounds.
+1. frozen component-wise prediction error for $Y_{\mathrm{RW}}$;
+2. frozen within-view rank preservation;
+3. within-batch view specificity; and
+4. descriptive performance relative to the pre-round observed corpus.
 
-One batch can test directional enrichment. Multiple prospectively frozen
-rounds are required to assess whether retraining improves the $X\rightarrow Y$
-mapping and whether MSRB supports useful hill climbing. Objective semantics can
-be correct even when the predictor is weak.
+For one view, comparing its six nominees with the other twelve candidates
+tests within-batch specificity only. The other twelve are not random controls;
+they were selected by two correlated MSRB views. This comparison does not
+estimate enrichment over the full candidate universe, improvement over random
+selection, superiority to another acquisition policy, or a causal benefit
+from retraining.
 
-The planned decision horizon is two to three design-build-test-learn rounds,
-with 18 sequence-unique candidates in the current campaign contract. The
-practical no-go outcome is no repeatable enrichment toward ethanol-responsive,
-ciprofloxacin-responsive, or combined-stress behavior: the six candidates
-nominated by a view do not outperform the other twelve batch candidates under
-that same view, cumulative best measured behavior does not improve, and the
-three family diagnostics show no coherent directional gain. This is a
-prospective campaign decision, not a threshold embedded in the MSRB formula.
+Judging acquisition efficacy requires a comparison baseline fixed before
+outcomes are observed. A model-free or random-selection simulation over
+existing measurements is a useful computational baseline and does not require
+another physical plate. It cannot establish prospective enrichment for
+unmeasured candidates. Before outcome review, the study still needs to record
+the candidate universe, baseline generator, random seed or exact draw,
+per-view endpoint, and comparison rule.
 
-The retrospective shadow evaluation used 27 promoted labels from six source
-experiments and 154,785 fixed prediction vectors. MSRB and RMF allocations
-overlapped on 15 of 18 sequences. The weakest grouped MSRB ordering was
-negative, and normalization sensitivity changed some top-six identities. This
-supports a cautious prospective test, not a claim of validated optimization.
-The digest-bound comparator evidence remains in the metastudy; RMF is not an
-alternate executable stress campaign.
+Multiple prospectively frozen rounds are needed to test whether retraining
+improves the $X\rightarrow Y$ map and policy outcomes. The planned decision
+horizon is two to three design-build-test-learn rounds with 18
+sequence-unique candidates per round. A no-go decision should use the declared
+prospective evidence and baseline, not a flat cumulative maximum or a
+six-versus-twelve contrast. This decision belongs to the campaign protocol,
+not to MSRB.
 
 ### Claim boundaries
 
-The [objective definition](../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md)
-states the mathematical claims. For this study, MSRB does not establish:
+For this study, MSRB does not establish:
 
 - feasibility or conformance to a biological specification;
 - absolute OFF, reporter background, or absence of expression;
+- response latency, transient peaks, adaptation, or other kinetics removed by
+  the 4–8-hour reduction;
+- whether YFP/CFP changed through YFP induction or CFP loss;
+- whether YFP/OD600 changed partly through growth or OD600 reduction;
 - growth, viability, metabolic burden, or toxicity;
+- cell-population heterogeneity hidden by bulk well measurements;
+- a population-average label across experiments or future-experiment
+  uncertainty;
 - comparable scores across target views or protocol versions;
 - calibrated predictive uncertainty;
+- graded or don't-care targets, causal stress effects, or biochemical
+  interaction;
+- diversity beyond exact sequence identity or out-of-distribution safety;
 - reliable prospective hill-climb efficacy; or
 - synthesis authorization.
 
-pDual-10 is a condition-matched fluorescence reference. Therefore the exact
-OFF claim is **suppression relative to same-state pDual-10**. No transformation
-of $b_i$ can recover an unmeasured reporter-negative background.
+pDual-10 is a condition-matched signal reference. The supported OFF claim is
+**suppression relative to same-state pDual-10**, not absolute non-expression.
 
-### Verification and source map
+### Authority and sources
 
-Scientific and implementation sources are split by authority:
+| Stage | Authority |
+| --- | --- |
+| Workbook ingest, event alignment, well reduction, within-experiment bootstrap, and censor provenance | Reader response-window contract |
+| Reader alias, candidate, sequence, and BaseRender identity | Study promoter-candidate bindings |
+| Repeated-experiment disposition and soft-min evidence cohort | Stress study |
+| Candidate-level observed-Y publication | Study response-window label promotion |
+| Generic MSRB mathematics and diagnostics | OPAL objective plugin |
+| Model fit, prediction, selector, allocation, and campaign ledger | Active OPAL campaign |
+| Cross-repository routing | Reader–study–OPAL bridge; routing only |
+
+The bridge routes artifacts. It does not define formulas, aliases, repeat
+rules, or campaign policy. OPAL does not import Reader, and Reader does not
+resolve candidate authority.
+
+Source map:
 
 - Reader response-window contract:
   `reader/docs/lib/plate_reader/response_window.md`
@@ -514,20 +661,17 @@ Scientific and implementation sources are split by authority:
   `src/dnadesign/studies/units/stress_ethanol_cipro_growth/promoter_candidate_bindings/README.md`
 - Active study protocol:
   `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml`
-- Generic objective mathematics:
+- Generic objective definition:
   `src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md`
 - Objective implementation:
   `src/dnadesign/opal/src/objectives/multistate_response_behavior_math.py`
 - Active campaign:
   `src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml`
-- Pre-promotion pressure tests and RMF comparison:
+- Pressure tests and RMF comparison:
   `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest/`
 
-The digest-bound metastudy results are evidence, not an executable campaign.
-The active protocol permits a prospective MSRB learning probe but does not
-authorize synthesis.
-
-The generated workbench bundle contains the shadow manifest and decision. Its
-verifier checks the artifact inventory, bytes, schemas, derivations, and
-provenance together. The activation receipt records the bundle path and
-digests.
+The digest-bound workbench bundle is evidence, not an executable campaign. Its
+verifier checks the artifact inventory, schemas, derivations, and provenance.
+The activation receipt binds the protocol to the reviewed bundle. The active
+protocol permits a prospective MSRB learning probe but does not authorize
+synthesis.

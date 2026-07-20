@@ -228,6 +228,7 @@ def _verify_evidence_receipts(
         "rmf_replay_calibration",
         "prediction_vectors",
         "prediction_scores",
+        "prediction_surface_diagnostics",
         "hard_behavior_summary",
     }
     if set(evidence) != expected:

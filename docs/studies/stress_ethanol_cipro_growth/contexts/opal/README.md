@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-context-index
 title: Stress OPAL context
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-19
 audience:
   - operator
   - agent
@@ -11,25 +11,37 @@ audience:
 
 ## Stress OPAL Context
 
-Use this lane for durable shared candidate-table and observed-label semantics.
-Use `../../routes/decision/opal/README.md` for first-hop OPAL routing and
-`../../routes/decision/opal/campaign-commands.md` for command examples.
+`secg_msrb_greedy` is the sole executable stress-study campaign and uses
+`multistate_response_behavior_v1`. SFXI and RMF remain source or comparator
+evidence. Start with the [study status](../../record/status.md), the [MSRB assay
+binding](multistate-response-behavior.md), or [read-only campaign
+verification](../../routes/decision/opal/campaign-commands.md#read-only-campaign-verification).
+
+### Current campaign
 
 - [Candidate table](candidate-table.md): shared USR candidate-table and label
   source contract.
+- [MSRB study application](multistate-response-behavior.md): assay binding and
+  campaign interpretation. Focused routes cover the [Reader-to-label
+  path](multistate-response-behavior.md#end-to-end-evidence-path),
+  [soft-min scale](multistate-response-behavior.md#what-the-soft-min-scale-changes),
+  [uncertainty](multistate-response-behavior.md#uncertainty-and-censoring), and
+  [claim limits](multistate-response-behavior.md#claim-boundaries).
+
+### Comparator evidence
+
 - [SFXI round-0 source evidence](sfxi-round0-source-evidence.md): declared
   SFXI vec8 inputs, source runs, and immutable artifact provenance.
 - [Response metric metastudy](response-metastudy.md): read-only review of the
-  SFXI source ledgers, Reader response-window summaries, RMF, and
-  predictor support.
+  SFXI source ledgers, Reader response-window summaries, RMF/MSRB comparison,
+  label truth, and predictor support.
 - [Response-Magnitude Feasibility (RMF)](response-magnitude-feasibility.md):
   thresholded requirements diagnostic and frozen comparator evidence. RMF is
   not an executable stress campaign; its round-0 record remains in the
   metastudy.
-- [MSRB study application](multistate-response-behavior.md): assay-specific
-  normalization, masks, uncertainty roles, greedy allocation, and prospective
-  learning-evidence boundary. Generic mathematics lives in the OPAL objective
-  contract linked from that page.
+
+### Separate in-silico probes
+
 - [DenseGen TFBS learnability probe v1](densegen-tfbs-learnability-probe-v1.md):
   study-owned v1 contract for scalar TF family content and slot-position
   synthetic-control campaigns. Realized profile boundaries live in the

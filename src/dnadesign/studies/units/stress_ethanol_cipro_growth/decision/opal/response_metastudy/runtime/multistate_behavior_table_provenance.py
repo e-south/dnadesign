@@ -49,14 +49,7 @@ def verify_behavior_table_provenance(
     for table_id in _SCORE_TABLES:
         frame = tables[table_id]
         _require_single(frame, "objective_name", objective_name, table_id=table_id)
-        _require_single(frame, "response_scale", semantics.response_scale, table_id=table_id, numeric=True)
-        _require_single(
-            frame,
-            "signal_scale",
-            semantics.signal_scale,
-            table_id=table_id,
-            numeric=True,
-        )
+        _require_single(frame, "softmin_scale", semantics.softmin_scale, table_id=table_id, numeric=True)
         _require_single(frame, "status", "shadow_only", table_id=table_id)
         _require_single(frame, "campaign_activation", "prohibited", table_id=table_id)
         _require_single(frame, "synthesis_authorization", "prohibited", table_id=table_id)

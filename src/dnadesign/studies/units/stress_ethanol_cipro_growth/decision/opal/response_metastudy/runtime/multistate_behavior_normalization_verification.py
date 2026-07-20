@@ -68,7 +68,6 @@ def verify_behavior_normalization_record(
         {
             "name": protocol.objective_name,
             "family_weighting": protocol.family_weighting,
-            "normalized_temperature": protocol.normalization.normalized_temperature,
         },
         context="normalization.objective",
         exact=True,
@@ -124,12 +123,10 @@ def _verify_normalization_values(
     require_fields(
         values,
         {
-            "response_scale",
-            "signal_scale",
+            "softmin_scale",
             "scale_quantile",
             "quantile_method",
-            "response_scale_basis",
-            "signal_scale_basis",
+            "scale_basis",
             "pair_deduplication",
             "cohort_id",
             "unit",
@@ -147,16 +144,14 @@ def _verify_normalization_values(
         {
             "scale_quantile": protocol.normalization.scale_quantile,
             "quantile_method": protocol.normalization.quantile_method,
-            "response_scale_basis": protocol.normalization.response_scale_basis,
-            "signal_scale_basis": protocol.normalization.signal_scale_basis,
+            "scale_basis": protocol.normalization.scale_basis,
             "pair_deduplication": protocol.normalization.pair_deduplication,
             "cohort_id": protocol.normalization.cohort_id,
             "unit": protocol.normalization.unit,
         },
         context="normalization.normalization",
     )
-    for field in ("response_scale", "signal_scale"):
-        positive_float(values[field], field=field)
+    positive_float(values["softmin_scale"], field="softmin_scale")
     for field in (
         "unit_count",
         "candidate_count",

@@ -25,6 +25,7 @@ from .multistate_behavior_bundle_verification import (
 )
 from .multistate_behavior_decision import build_multistate_behavior_decision
 from .multistate_behavior_json import load_strict_behavior_json
+from .multistate_behavior_prediction_surface_diagnostics import build_prediction_surface_diagnostics
 from .multistate_behavior_shadow import VerifiedMultistateBehaviorShadow
 from .multistate_behavior_source_equivalence import build_source_equivalence_receipt
 from .publication import (
@@ -144,6 +145,7 @@ def _publication_frames(preview: VerifiedMultistateBehaviorShadow) -> dict[str, 
         "repeated_candidate_agreement": evidence.repeated_candidate_agreement,
         "censor_exclusions": preview.censor_exclusions,
         "prediction_scores": evidence.prediction_scores,
+        "prediction_surface_diagnostics": build_prediction_surface_diagnostics(evidence.prediction_scores),
         "hard_behavior_summary": preview.hard_comparison.summary,
         "hard_behavior_detail": preview.hard_comparison.detail,
         "normalization_sensitivity": preview.completion.normalization_sensitivity,

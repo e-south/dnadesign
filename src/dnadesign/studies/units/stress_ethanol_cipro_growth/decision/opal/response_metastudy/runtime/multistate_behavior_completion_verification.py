@@ -24,6 +24,7 @@ from ..evaluation.multistate_behavior_rmf_replay import build_current_rmf_predic
 from .multistate_behavior_allocation_verification import verify_allocation_comparison
 from .multistate_behavior_frame_verification import assert_frame_equal_by_key
 from .multistate_behavior_grouped_verification import verify_grouped_objective_validation
+from .multistate_behavior_prediction_surface_diagnostics import build_prediction_surface_diagnostics
 from .multistate_behavior_semantic_verification import BehaviorBundleSemantics
 from .multistate_behavior_sensitivity_verification import verify_normalization_sensitivity
 
@@ -39,12 +40,13 @@ def verify_behavior_completion_tables(
 
     _verify_completion_provenance(tables, semantics=semantics, protocol=protocol)
     _verify_prediction_scores(tables, semantics=semantics, protocol=protocol)
+    _verify_prediction_surface_diagnostics(tables)
     verify_normalization_sensitivity(tables, semantics=semantics, protocol=protocol)
     verify_grouped_objective_validation(tables, protocol=protocol)
     _verify_observed_control_face_validity(tables, protocol=protocol)
     _assert_frame(
         tables["family_cardinality_pressure"],
-        build_family_cardinality_pressure(protocol),
+        build_family_cardinality_pressure(protocol, softmin_scale=semantics.softmin_scale),
         ["state_count"],
     )
     _verify_rmf_replay(
@@ -108,7 +110,7 @@ def _verify_prediction_scores(
             matrix,
             state_ids=protocol.state_ids,
             target_mask=view.target_mask,
-            normalization={"response_scale": semantics.response_scale, "signal_scale": semantics.signal_scale},
+            softmin_scale=semantics.softmin_scale,
         )
         observed = scores.loc[scores["selection_view_id"].astype(str).eq(view.id)].set_index("id").loc[vectors["id"]]
         expected = {
@@ -128,6 +130,14 @@ def _verify_prediction_scores(
             result.all_reference_directions_met,
         ):
             raise ValueError("prediction natural-zero diagnostic does not replay from fixed raw vectors.")
+
+
+def _verify_prediction_surface_diagnostics(tables: dict[str, pd.DataFrame]) -> None:
+    _assert_frame(
+        tables["prediction_surface_diagnostics"],
+        build_prediction_surface_diagnostics(tables["prediction_scores"]),
+        ["selection_view_id"],
+    )
 
 
 def _verify_observed_control_face_validity(
