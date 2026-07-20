@@ -12,15 +12,13 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from ..src.objectives.multistate_response_behavior_math import (
-    NORMALIZATION_FIELDS,
-    NORMALIZED_TEMPERATURE,
     MultistateResponseBehaviorClearances,
     MultistateResponseBehaviorScore,
     binary_target_mask,
     multistate_response_behavior_clearances,
-    parse_normalization,
     score_multistate_response_behavior,
     validated_response_signal,
+    validated_softmin_scale,
     validated_state_ids,
 )
 
@@ -28,14 +26,12 @@ MULTISTATE_RESPONSE_BEHAVIOR_API_VERSION = "1"
 
 __all__ = [
     "MULTISTATE_RESPONSE_BEHAVIOR_API_VERSION",
-    "NORMALIZATION_FIELDS",
-    "NORMALIZED_TEMPERATURE",
     "MultistateResponseBehaviorClearances",
     "MultistateResponseBehaviorScore",
     "binary_target_mask",
     "multistate_response_behavior_clearances",
-    "parse_normalization",
     "score_multistate_response_behavior",
     "validated_response_signal",
+    "validated_softmin_scale",
     "validated_state_ids",
 ]

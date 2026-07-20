@@ -35,15 +35,15 @@ def _state_ids(state_count: int) -> list[str]:
     return [f"s{index}" for index in range(state_count)]
 
 
-def _normalization() -> dict[str, float]:
-    return {"response_scale": 2.0, "signal_scale": 4.0}
+def _softmin_scale() -> float:
+    return 1.0
 
 
 def _params(target_mask: list[int]) -> dict[str, object]:
     return {
         "state_ids": _state_ids(len(target_mask)),
         "target_mask": target_mask,
-        "normalization": _normalization(),
+        "softmin_scale": _softmin_scale(),
     }
 
 
@@ -52,7 +52,7 @@ def _score(values: np.ndarray, target_mask: list[int]) -> MultistateResponseBeha
         values,
         state_ids=_state_ids(len(target_mask)),
         target_mask=target_mask,
-        normalization=_normalization(),
+        softmin_scale=_softmin_scale(),
     )
 
 
@@ -63,7 +63,7 @@ def _family_level_vector(
     on_signal: float,
     off_suppression: float,
 ) -> np.ndarray:
-    """Build one row with a constant normalized level inside each family."""
+    """Build one row with a constant raw clearance inside each family."""
 
     target = np.asarray(target_mask, dtype=bool)
     response_values = np.where(target, response / 2.0, -response / 2.0)
@@ -84,14 +84,46 @@ def test_public_api_version_is_explicit() -> None:
     assert MULTISTATE_RESPONSE_BEHAVIOR_API_VERSION == "1"
 
 
+def test_one_softmin_scale_keeps_scores_in_raw_clearance_units() -> None:
+    values = np.asarray([[0.0, 2.0, -1.0, 2.0]], dtype=float)
+
+    result = score_multistate_response_behavior(
+        values,
+        state_ids=["off", "on"],
+        target_mask=[0, 1],
+        softmin_scale=0.5,
+    )
+
+    assert result.clearances.response.tolist() == [[2.0]]
+    assert result.clearances.on_signal.tolist() == [[2.0]]
+    assert result.clearances.off_signal_suppression.tolist() == [[1.0]]
+    expected = -0.5 * np.log(np.mean(np.exp(-np.asarray([2.0, 2.0, 1.0]) / 0.5)))
+    assert result.behavior_score.tolist() == pytest.approx([expected])
+    assert result.hard_bottleneck_clearance.tolist() == pytest.approx([1.0])
+    assert result.softmin_scale == pytest.approx(0.5)
+
+
+def test_old_two_scale_parameter_shape_is_rejected() -> None:
+    with pytest.raises(ValueError, match="params do not match the contract"):
+        multistate_response_behavior_v1(
+            y_pred=np.zeros((1, 4), dtype=float),
+            params={
+                "state_ids": ["off", "on"],
+                "target_mask": [0, 1],
+                "normalization": {"response_scale": 1.0, "signal_scale": 1.0},
+            },
+            ctx=None,
+        )
+
+
 def test_documented_clearances_and_family_balanced_score() -> None:
     values = np.asarray([[0.0, 4.0, 2.0, -4.0, 4.0, -8.0]], dtype=float)
 
     result = _score(values, [0, 1, 0])
 
-    np.testing.assert_allclose(result.clearances.response, [[2.0, 1.0]])
-    np.testing.assert_allclose(result.clearances.on_signal, [[1.0]])
-    np.testing.assert_allclose(result.clearances.off_signal_suppression, [[1.0, 2.0]])
+    np.testing.assert_allclose(result.clearances.response, [[4.0, 2.0]])
+    np.testing.assert_allclose(result.clearances.on_signal, [[4.0]])
+    np.testing.assert_allclose(result.clearances.off_signal_suppression, [[4.0, 8.0]])
     assert result.coordinate_labels == (
         "response:s1>s0",
         "response:s1>s2",
@@ -99,14 +131,14 @@ def test_documented_clearances_and_family_balanced_score() -> None:
         "off_signal_suppression:s0",
         "off_signal_suppression:s2",
     )
-    expected_response = -np.log(np.mean(np.exp(-np.asarray([2.0, 1.0]))))
-    expected_off = -np.log(np.mean(np.exp(-np.asarray([1.0, 2.0]))))
-    expected = -np.log(np.mean(np.exp(-np.asarray([expected_response, 1.0, expected_off]))))
+    expected_response = -np.log(np.mean(np.exp(-np.asarray([4.0, 2.0]))))
+    expected_off = -np.log(np.mean(np.exp(-np.asarray([4.0, 8.0]))))
+    expected = -np.log(np.mean(np.exp(-np.asarray([expected_response, 4.0, expected_off]))))
     assert result.response_family_score.tolist() == pytest.approx([expected_response])
-    assert result.on_signal_family_score.tolist() == pytest.approx([1.0])
+    assert result.on_signal_family_score.tolist() == pytest.approx([4.0])
     assert result.off_signal_suppression_family_score.tolist() == pytest.approx([expected_off])
     assert result.behavior_score.tolist() == pytest.approx([expected])
-    assert result.hard_bottleneck_clearance.tolist() == pytest.approx([1.0])
+    assert result.hard_bottleneck_clearance.tolist() == pytest.approx([2.0])
     assert result.limiting_coordinate_label == ("response:s1>s2",)
     assert result.all_reference_directions_met.tolist() == [True]
     np.testing.assert_allclose(np.sum(result.coordinate_weights, axis=1), np.ones(1))
@@ -157,13 +189,13 @@ def test_joint_state_permutation_is_equivariant() -> None:
         values,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=_normalization(),
+        softmin_scale=_softmin_scale(),
     )
     reordered = score_multistate_response_behavior(
         permuted,
         state_ids=[state_ids[index] for index in permutation],
         target_mask=[target_mask[index] for index in permutation],
-        normalization=_normalization(),
+        softmin_scale=_softmin_scale(),
     )
 
     np.testing.assert_allclose(reordered.behavior_score, direct.behavior_score)
@@ -184,13 +216,13 @@ def test_family_means_prevent_coordinate_cardinality_from_reweighting_a_family()
         two_state,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     expanded = score_multistate_response_behavior(
         repeated_off_state,
         state_ids=["off-a", "off-b", "off-c", "on"],
         target_mask=[0, 0, 0, 1],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
 
     assert expanded.behavior_score.tolist() == pytest.approx(baseline.behavior_score.tolist())
@@ -205,7 +237,7 @@ def test_equal_clearances_give_each_family_one_third_total_weight() -> None:
         np.zeros((1, 8), dtype=float),
         state_ids=["off-a", "on", "off-b", "off-c"],
         target_mask=[0, 1, 0, 0],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     response_count = result.clearances.response.shape[1]
     on_count = result.clearances.on_signal.shape[1]
@@ -232,7 +264,7 @@ def test_asymmetric_masks_preserve_equal_family_standing(target_mask: list[int])
             ),
             state_ids=["00", "10", "01", "11"],
             target_mask=target_mask,
-            normalization={"response_scale": 1.0, "signal_scale": 1.0},
+            softmin_scale=1.0,
         )
         family_scores = (
             float(result.response_family_score[0]),
@@ -261,7 +293,7 @@ def test_stress_view_prototypes_do_not_collapse_to_one_shared_axis() -> None:
                     _ideal_prototype(prototype_mask),
                     state_ids=state_ids,
                     target_mask=view_mask,
-                    normalization={"response_scale": 1.0, "signal_scale": 1.0},
+                    softmin_scale=1.0,
                 ).behavior_score[0]
             )
             for view_id, view_mask in masks.items()
@@ -278,7 +310,7 @@ def test_stress_views_penalize_each_distinct_behavior_failure(target_mask: list[
         baseline_values,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     state_count = len(target_mask)
     on_index = target_mask.index(1)
@@ -301,7 +333,7 @@ def test_stress_views_penalize_each_distinct_behavior_failure(target_mask: list[
             perturbed_values,
             state_ids=state_ids,
             target_mask=target_mask,
-            normalization={"response_scale": 1.0, "signal_scale": 1.0},
+            softmin_scale=1.0,
         )
 
         assert perturbed.behavior_score[0] < baseline.behavior_score[0]
@@ -335,7 +367,7 @@ def test_current_stress_masks_expose_analytic_coordinate_priors_and_compensation
         ),
         state_ids=["00", "10", "01", "11"],
         target_mask=target_mask,
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     expected_priors = np.concatenate([np.full(count, 1.0 / (3.0 * count)) for count in family_sizes])
 
@@ -347,35 +379,69 @@ def test_current_stress_masks_expose_analytic_coordinate_priors_and_compensation
 
 
 @pytest.mark.parametrize("target_mask", ([0, 1, 0, 1], [0, 0, 0, 1]))
-def test_normalization_covariance_preserves_scores_and_diagnostics(target_mask: list[int]) -> None:
+def test_common_unit_rescaling_preserves_ranks_and_weights(target_mask: list[int]) -> None:
     rng = np.random.default_rng(20260718)
     values = rng.normal(size=(7, 8))
     baseline = score_multistate_response_behavior(
         values,
         state_ids=["00", "10", "01", "11"],
         target_mask=target_mask,
-        normalization={"response_scale": 2.0, "signal_scale": 3.0},
+        softmin_scale=2.0,
     )
-    scaled = values.copy()
-    scaled[:, :4] *= 7.0
-    scaled[:, 4:] *= 0.25
+    factor = 7.0
     transformed = score_multistate_response_behavior(
-        scaled,
+        values * factor,
         state_ids=["00", "10", "01", "11"],
         target_mask=target_mask,
-        normalization={"response_scale": 14.0, "signal_scale": 0.75},
+        softmin_scale=2.0 * factor,
     )
 
+    np.testing.assert_allclose(transformed.coordinate_weights, baseline.coordinate_weights)
     for field in (
-        "coordinate_clearances",
-        "coordinate_weights",
         "behavior_score",
         "hard_bottleneck_clearance",
         "compensation_gap",
         "maximum_compensation_gap",
     ):
-        np.testing.assert_allclose(getattr(transformed, field), getattr(baseline, field))
+        np.testing.assert_allclose(getattr(transformed, field), factor * getattr(baseline, field))
     assert transformed.limiting_coordinate_label == baseline.limiting_coordinate_label
+
+
+def test_common_scale_is_part_of_ranking_geometry() -> None:
+    """A shared scale still controls smooth compensation and may reverse rank."""
+
+    target_mask = [0, 1]
+    balanced = _family_level_vector(
+        target_mask,
+        response=0.5,
+        on_signal=0.5,
+        off_suppression=0.5,
+    )
+    compensated = _family_level_vector(
+        target_mask,
+        response=-1.0,
+        on_signal=10.0,
+        off_suppression=10.0,
+    )
+    values = np.concatenate((balanced, compensated), axis=0)
+
+    unit_scale = score_multistate_response_behavior(
+        values,
+        state_ids=["off", "on"],
+        target_mask=target_mask,
+        softmin_scale=1.0,
+    )
+    broad_scale = score_multistate_response_behavior(
+        values,
+        state_ids=["off", "on"],
+        target_mask=target_mask,
+        softmin_scale=10.0,
+    )
+
+    assert unit_scale.behavior_score.tolist() == pytest.approx([0.5, 0.0985788858244106])
+    assert broad_scale.behavior_score.tolist() == pytest.approx([0.5, 4.883415183671416])
+    assert unit_scale.behavior_score[0] > unit_scale.behavior_score[1]
+    assert broad_scale.behavior_score[0] < broad_scale.behavior_score[1]
 
 
 def test_uniform_state_replication_is_invariant_but_selective_duplication_is_not() -> None:
@@ -384,7 +450,7 @@ def test_uniform_state_replication_is_invariant_but_selective_duplication_is_not
         baseline_values,
         state_ids=["off-a", "off-b", "on"],
         target_mask=[0, 0, 1],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     uniformly_replicated = score_multistate_response_behavior(
         np.asarray(
@@ -393,13 +459,13 @@ def test_uniform_state_replication_is_invariant_but_selective_duplication_is_not
         ),
         state_ids=["off-a-1", "off-a-2", "off-b-1", "off-b-2", "on-1", "on-2"],
         target_mask=[0, 0, 0, 0, 1, 1],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     selectively_duplicated = score_multistate_response_behavior(
         np.asarray([[-1.0, -1.0, 0.0, 2.0, 0.5, 0.5, -1.0, -2.0]], dtype=float),
         state_ids=["off-a-1", "off-a-2", "off-b", "on"],
         target_mask=[0, 0, 0, 1],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
 
     assert uniformly_replicated.behavior_score.tolist() == pytest.approx(baseline.behavior_score.tolist())
@@ -434,7 +500,7 @@ def test_cardinality_pressure_exposes_weak_coordinate_dilution(
             np.concatenate((response, signal))[None, :],
             state_ids=_state_ids(state_count),
             target_mask=target_mask,
-            normalization={"response_scale": 1.0, "signal_scale": 1.0},
+            softmin_scale=1.0,
         )
         limiting_index = int(result.limiting_coordinate_index[0])
         limiting_prior = float(result.coordinate_prior_weights[limiting_index])
@@ -460,7 +526,7 @@ def test_one_arbitrarily_favorable_coordinate_has_a_finite_score_gain(
         superstar,
         state_ids=["00", "10", "01", "11"],
         target_mask=target_mask,
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
 
     assert result.behavior_score[0] == pytest.approx(-np.log(1.0 - on_coordinate_prior))
@@ -472,13 +538,13 @@ def test_one_family_superstar_does_not_outrank_balanced_behavior() -> None:
         _family_level_vector(target_mask, response=1.0, on_signal=1.0, off_suppression=1.0),
         state_ids=["00", "10", "01", "11"],
         target_mask=target_mask,
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     bright_but_leaky = score_multistate_response_behavior(
         _family_level_vector(target_mask, response=1.0, on_signal=100.0, off_suppression=-1.0),
         state_ids=["00", "10", "01", "11"],
         target_mask=target_mask,
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
 
     assert balanced.behavior_score[0] == pytest.approx(1.0)
@@ -499,7 +565,7 @@ def test_extreme_finite_values_remain_finite_and_weighted() -> None:
         values,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0e-100, "signal_scale": 1.0e-100},
+        softmin_scale=1.0e-100,
     )
 
     for array in (
@@ -523,12 +589,11 @@ def test_extreme_desired_direction_moves_never_decrease_score(scale: float) -> N
         [[-1.0e300, -1.0e100, 1.0e100, 1.0e300, -1.0e300, 0.0, 1.0e100, 1.0e300]],
         dtype=float,
     )
-    normalization = {"response_scale": scale, "signal_scale": scale}
     baseline = score_multistate_response_behavior(
         values,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=scale,
     ).behavior_score
 
     for state_index, state_is_on in enumerate(target_mask):
@@ -540,7 +605,7 @@ def test_extreme_desired_direction_moves_never_decrease_score(scale: float) -> N
                 improved,
                 state_ids=state_ids,
                 target_mask=target_mask,
-                normalization=normalization,
+                softmin_scale=scale,
             ).behavior_score
             assert np.all(score >= baseline)
 
@@ -551,7 +616,7 @@ def test_smooth_compensation_above_hard_bottleneck_is_bounded() -> None:
         values,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
     minimum_prior_weight = 1.0 / 3.0
 
@@ -567,7 +632,7 @@ def test_positive_behavior_score_is_not_a_feasibility_claim() -> None:
         values,
         state_ids=["off", "on"],
         target_mask=[0, 1],
-        normalization={"response_scale": 1.0, "signal_scale": 1.0},
+        softmin_scale=1.0,
     )
 
     assert result.behavior_score[0] > 0.0
@@ -591,7 +656,7 @@ def test_target_mask_is_strict_binary_partition(target_mask: list[object], match
             np.zeros((1, 4), dtype=float),
             state_ids=["a", "b"],
             target_mask=target_mask,
-            normalization=_normalization(),
+            softmin_scale=_softmin_scale(),
         )
 
 
@@ -601,27 +666,18 @@ def test_target_mask_must_be_one_dimensional() -> None:
             np.zeros((1, 4), dtype=float),
             state_ids=["off", "on"],
             target_mask=[[0, 1]],  # type: ignore[list-item]
-            normalization=_normalization(),
+            softmin_scale=_softmin_scale(),
         )
 
 
-@pytest.mark.parametrize(
-    "normalization",
-    [
-        {},
-        {"response_scale": 1.0, "signal_scale": 1.0, "threshold": 0.0},
-        {"response_scale": True, "signal_scale": 1.0},
-        {"response_scale": 0.0, "signal_scale": 1.0},
-        {"response_scale": 1.0, "signal_scale": np.inf},
-    ],
-)
-def test_normalization_requires_exact_positive_finite_scales(normalization: dict[str, float]) -> None:
-    with pytest.raises(ValueError, match="normalization"):
+@pytest.mark.parametrize("softmin_scale", [None, True, 0.0, -1.0, np.inf, np.nan, "not-a-number"])
+def test_softmin_scale_requires_one_positive_finite_number(softmin_scale: object) -> None:
+    with pytest.raises(ValueError, match="softmin_scale"):
         score_multistate_response_behavior(
             np.zeros((1, 4), dtype=float),
             state_ids=["a", "b"],
             target_mask=[0, 1],
-            normalization=normalization,
+            softmin_scale=softmin_scale,
         )
 
 
@@ -635,7 +691,7 @@ def test_state_ids_are_aligned_unique_and_nonempty(state_ids: list[object]) -> N
             np.zeros((1, 4), dtype=float),
             state_ids=state_ids,
             target_mask=[0, 1],
-            normalization=_normalization(),
+            softmin_scale=_softmin_scale(),
         )
 
 
@@ -646,7 +702,7 @@ def test_state_ids_reject_whitespace_normalization(state_ids: list[str]) -> None
             np.zeros((1, 4), dtype=float),
             state_ids=state_ids,
             target_mask=[0, 1],
-            normalization=_normalization(),
+            softmin_scale=_softmin_scale(),
         )
 
 
@@ -660,7 +716,7 @@ def test_input_contract_is_exact_2k_nonempty_and_finite(values: np.ndarray) -> N
             values,
             state_ids=["a", "b"],
             target_mask=[0, 1],
-            normalization=_normalization(),
+            softmin_scale=_softmin_scale(),
         )
 
 
@@ -725,10 +781,7 @@ def test_plugin_registry_contract_and_config_schema_are_explicit() -> None:
         validate_params(
             "objective",
             "multistate_response_behavior_v1",
-            {
-                **_params([0, 1]),
-                "normalization": {"response_scale": True, "signal_scale": 1.0},
-            },
+            {**_params([0, 1]), "softmin_scale": True},
         )
 
 
@@ -737,7 +790,7 @@ def test_clearance_builder_is_public_and_matches_scoring_result() -> None:
     kwargs = {
         "state_ids": ["off", "on", "also-off"],
         "target_mask": [0, 1, 0],
-        "normalization": _normalization(),
+        "softmin_scale": _softmin_scale(),
     }
 
     clearances = multistate_response_behavior_clearances(values, **kwargs)

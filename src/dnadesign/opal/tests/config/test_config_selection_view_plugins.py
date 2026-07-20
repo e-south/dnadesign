@@ -196,7 +196,7 @@ def _multistate_response_behavior_payload() -> dict:
         objective_params={
             "state_ids": ["00", "10", "01", "11"],
             "target_mask": [0, 1, 0, 1],
-            "normalization": {"response_scale": 0.25, "signal_scale": 0.5},
+            "softmin_scale": 0.25,
         },
         score_ref="behavior_score",
     )
@@ -216,7 +216,7 @@ def test_load_config_accepts_multistate_response_behavior_view(tmp_path: Path) -
     assert objective.params == {
         "state_ids": ["00", "10", "01", "11"],
         "target_mask": [0, 1, 0, 1],
-        "normalization": {"response_scale": 0.25, "signal_scale": 0.5},
+        "softmin_scale": 0.25,
     }
 
 
@@ -225,6 +225,25 @@ def test_load_config_rejects_multistate_response_behavior_temperature(tmp_path: 
     payload["selection_views"][0]["objective"]["params"]["temperature"] = 2.0
 
     with pytest.raises(ConfigError, match="temperature"):
+        load_config(_write(tmp_path / "campaign.yaml", payload))
+
+
+def test_load_config_rejects_removed_two_scale_behavior_shape(tmp_path: Path) -> None:
+    payload = _multistate_response_behavior_payload()
+    params = payload["selection_views"][0]["objective"]["params"]
+    params.pop("softmin_scale")
+    params["normalization"] = {"response_scale": 0.25, "signal_scale": 0.5}
+
+    with pytest.raises(ConfigError, match="normalization"):
+        load_config(_write(tmp_path / "campaign.yaml", payload))
+
+
+@pytest.mark.parametrize("softmin_scale", [True, 0.0, -1.0, float("inf")])
+def test_load_config_rejects_invalid_behavior_softmin_scale(tmp_path: Path, softmin_scale: object) -> None:
+    payload = _multistate_response_behavior_payload()
+    payload["selection_views"][0]["objective"]["params"]["softmin_scale"] = softmin_scale
+
+    with pytest.raises(ConfigError, match="softmin_scale"):
         load_config(_write(tmp_path / "campaign.yaml", payload))
 
 

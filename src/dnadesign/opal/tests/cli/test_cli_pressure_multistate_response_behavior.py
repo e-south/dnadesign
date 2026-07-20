@@ -38,7 +38,7 @@ CHANNELS = ("r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11")
 OBJECTIVE_PARAMS = {
     "state_ids": ["00", "10", "01", "11"],
     "target_mask": [0, 1, 0, 1],
-    "normalization": {"response_scale": 1.0, "signal_scale": 1.0},
+    "softmin_scale": 1.0,
 }
 
 

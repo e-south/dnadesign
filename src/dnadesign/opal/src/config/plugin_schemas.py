@@ -410,28 +410,22 @@ class _ResponseMagnitudeFeasibilityParams(BaseModel):
         return self
 
 
-class _MultistateResponseBehaviorNormalization(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    response_scale: float
-    signal_scale: float
-
-    @field_validator("response_scale", "signal_scale", mode="before")
-    @classmethod
-    def _positive_finite_scale(cls, v: object) -> float:
-        if isinstance(v, (bool, np.bool_)):
-            raise ValueError("multistate response behavior normalization scales cannot be boolean")
-        value = float(v)
-        if not np.isfinite(value) or value <= 0.0:
-            raise ValueError("multistate response behavior normalization scales must be positive and finite")
-        return value
-
-
 @register_param_schema("objective", "multistate_response_behavior_v1")
 class _MultistateResponseBehaviorParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     state_ids: List[str]
     target_mask: List[Literal[0, 1]]
-    normalization: _MultistateResponseBehaviorNormalization
+    softmin_scale: float
+
+    @field_validator("softmin_scale", mode="before")
+    @classmethod
+    def _positive_finite_scale(cls, v: object) -> float:
+        if isinstance(v, (bool, np.bool_)):
+            raise ValueError("multistate response behavior softmin_scale cannot be boolean")
+        value = float(v)
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError("multistate response behavior softmin_scale must be positive and finite")
+        return value
 
     @field_validator("target_mask", mode="before")
     @classmethod

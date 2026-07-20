@@ -3,16 +3,19 @@ id: opal-objective-plugins
 title: OPAL objective plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-17
+last_verified: 2026-07-19
 ---
 
 ## OPAL Objective Plugins
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-17
+**Last verified:** 2026-07-19
 
 Objective plugins convert shared model predictions into named score and
 uncertainty channels. Objective-specific pages define the equations.
+
+An objective name is part of the Y contract. Matching array width does not make
+two objectives semantically interchangeable.
 
 `sfxi_v1`, `response_magnitude_feasibility_v1`, and
 `multistate_response_behavior_v1` are independent objective plugins. The two
@@ -22,16 +25,6 @@ boundaries; the behavior objective ranks threshold-free desired behavior.
 `top_n` and `expected_improvement` are selection plugins. A selection view binds
 one objective to one selector; an objective does not choose candidates, and a
 selector does not infer objective identity from Y.
-
-Source modules:
-
-- `src/dnadesign/opal/src/objectives/sfxi_v1.py`
-- `src/dnadesign/opal/src/objectives/response_magnitude_feasibility_v1.py`
-- `src/dnadesign/opal/src/objectives/multistate_response_behavior_v1.py`
-- `src/dnadesign/opal/src/objectives/spop_v1.py`
-- `src/dnadesign/opal/src/objectives/scalar_identity_v1.py`
-- `src/dnadesign/opal/src/objectives/vector_channel_v1.py`
-- `src/dnadesign/opal/src/objectives/vector_target_similarity_v1.py`
 
 ### Channel reference format
 
@@ -47,89 +40,25 @@ of the same objective plugin cannot collide.
 
 ### Built-in objective plugins
 
-### `sfxi_v1`
+| Objective | Required Y meaning | Selected score | Uncertainty | Main preference encoded |
+| --- | --- | --- | --- | --- |
+| [`multistate_response_behavior_v1`](multistate-response-behavior.md) | Ordered response and aligned reference-relative signal states | `behavior_score` | None | Threshold-free binary ON/OFF behavior with bounded compensation |
+| [`response_magnitude_feasibility_v1`](response-magnitude-feasibility.md) | Ordered response and aligned reference-relative magnitude states | `feasibility_margin` | None | Worst clearance from explicit response, ON, and OFF requirements |
+| [`sfxi_v1`](sfxi.md) | SFXI-specific logic and intensity vec8 | `sfxi` | `sfxi` SD | Setpoint fidelity multiplied by scaled intensity |
+| `vector_target_similarity_v1` | Generic vector in one declared coordinate system | `negative_mse` | None | Unweighted distance to an absolute target |
+| `vector_channel_v1` | Generic vector | Configured channel | None | One selected channel only |
+| `scalar_identity_v1` | One scalar that already is the objective | `scalar` | None | Passthrough |
+| [`spop_v1`](spop.md) | Reader SPOP endpoint scalar | `spop` | None | Passthrough with SPOP identity |
 
-Use for vec8 SFXI objective scoring (logic fidelity x intensity).
-
-- Score channels:
-  - `sfxi` (maximize)
-  - `logic_fidelity` (maximize)
-  - `effect_scaled` (maximize)
-- Uncertainty channels:
-  - `sfxi`
-
-### `response_magnitude_feasibility_v1`
-
-Use for `K` ordered response states plus `K` aligned reference-relative
-magnitude states after a study has calibrated explicit constraint thresholds
-and scales.
-
-- Score channels:
-  - `feasibility_margin` (maximize)
-  - `response_separation` (maximize)
-  - `on_magnitude_floor` (maximize)
-  - `off_magnitude_ceiling` (minimize)
-- Uncertainty channels:
-  - none
-
-### `multistate_response_behavior_v1`
-
-Use for `K` ordered response states plus `K` aligned reference-relative signal
-states when every desired state-level improvement should affect a
-threshold-free, family-balanced smooth bottleneck.
-
-- Score channels:
-  - `behavior_score` (maximize)
-- Candidate-aligned diagnostics:
-  - `hard_bottleneck_clearance`
-  - `response_family_score`
-  - `on_signal_family_score`
-  - `off_signal_suppression_family_score`
-- Uncertainty channels:
-  - none
-
-### `scalar_identity_v1`
-
-Use when the model output is already a single scalar objective.
-
-- Score channels:
-  - `scalar` (maximize)
-- Uncertainty channels:
-  - none
-
-### `spop_v1`
-
-Use when the model output is one Reader SPOP endpoint scalar.
-
-- Score channels:
-  - `spop` (maximize)
-- Uncertainty channels:
-  - none
-
-### `vector_channel_v1`
-
-Use when a vector target should select on one declared channel.
-
-- Score channels:
-  - configured as `<channel_name>` (mode from params)
-- Uncertainty channels:
-  - none
-
-### `vector_target_similarity_v1`
-
-Use when a vector target should select by closeness to a declared target vector.
-
-- Score channels:
-  - `negative_mse` (maximize)
-- Uncertainty channels:
-  - none
-
-### Objective detail pages
-
-- [SFXI behavior and math](sfxi.md)
-- [Response-Magnitude Feasibility (RMF) behavior and math](response-magnitude-feasibility.md)
-- [Multistate Response Behavior math and contract](multistate-response-behavior.md)
-- [SPOP scalar objective](spop.md)
+No row in this table is preference-free. Target vectors, selected channels,
+thresholds, scales, family priors, and setpoints all express different design
+intent. A campaign must choose an objective from the meaning of Y and the
+scientific preference, not from shape compatibility alone. For MSRB, read
+[the soft minimum and
+scale](multistate-response-behavior.md#why-msrb-uses-a-soft-minimum), [the three
+families](multistate-response-behavior.md#three-behavior-families),
+[compensation](multistate-response-behavior.md#the-central-compensation-example),
+and [claim limits](multistate-response-behavior.md#what-the-score-does-not-establish).
 
 ### Common selection wiring examples
 
@@ -144,7 +73,7 @@ selection_views:
       params: {top_k: 12, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank}
 ```
 
-Expected improvement:
+Pool-relative weighted acquisition (`expected_improvement` registry ID):
 
 ```yaml
 selection_views:

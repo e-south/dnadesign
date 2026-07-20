@@ -52,7 +52,7 @@ def multistate_response_behavior_v1(
     del ctx, train_view, y_pred_std
     if not isinstance(params, Mapping):
         raise ValueError(f"{OBJECTIVE_NAME}: params must be a mapping.")
-    required = {"state_ids", "target_mask", "normalization"}
+    required = {"state_ids", "target_mask", "softmin_scale"}
     missing = sorted(required - set(params))
     extra = sorted(set(params) - required)
     if missing or extra:
@@ -62,7 +62,7 @@ def multistate_response_behavior_v1(
         y_pred,
         state_ids=params["state_ids"],
         target_mask=params["target_mask"],
-        normalization=params["normalization"],
+        softmin_scale=params["softmin_scale"],
     )
     scores = {"behavior_score": np.asarray(scored.behavior_score, dtype=float)}
     limiting_bottleneck_weight = scored.coordinate_weights[

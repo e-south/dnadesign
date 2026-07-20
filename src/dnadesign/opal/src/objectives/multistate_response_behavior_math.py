@@ -13,13 +13,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from numbers import Real
-from typing import Mapping, Sequence
+from typing import Sequence
 
 import numpy as np
 
 OBJECTIVE_NAME = "multistate_response_behavior_v1"
-NORMALIZATION_FIELDS = ("response_scale", "signal_scale")
-NORMALIZED_TEMPERATURE = 1.0
 _CLEARANCE_LIMIT = np.finfo(float).max / 64.0
 
 
@@ -35,7 +33,7 @@ class MultistateResponseBehaviorClearances:
     off_signal_suppression_labels: tuple[str, ...]
     state_ids: tuple[str, ...]
     target_mask: tuple[int, ...]
-    normalization: dict[str, float]
+    softmin_scale: float
 
     @property
     def coordinate_clearances(self) -> np.ndarray:
@@ -67,11 +65,11 @@ class MultistateResponseBehaviorScore:
     compensation_gap: np.ndarray
     maximum_compensation_gap: np.ndarray
     all_reference_directions_met: np.ndarray
-    normalization: dict[str, float]
+    softmin_scale: float
 
     @property
     def coordinate_clearances(self) -> np.ndarray:
-        """Return all normalized state-level clearances."""
+        """Return all raw state-level clearances in the input unit."""
 
         return self.clearances.coordinate_clearances
 
@@ -87,9 +85,9 @@ def multistate_response_behavior_clearances(
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
-    normalization: Mapping[str, object],
+    softmin_scale: object,
 ) -> MultistateResponseBehaviorClearances:
-    """Build every normalized response, ON-signal, and OFF-signal-suppression clearance."""
+    """Build every raw response, ON-signal, and OFF-signal-suppression clearance."""
 
     states = validated_state_ids(state_ids)
     target_on = binary_target_mask(target_mask)
@@ -99,26 +97,19 @@ def multistate_response_behavior_clearances(
             f"got {len(states)} and {target_on.size}."
         )
     values = validated_response_signal(response_signal, state_count=len(states))
-    scales = parse_normalization(normalization)
+    scale = validated_softmin_scale(softmin_scale)
     target_off = ~target_on
     on_indices = np.flatnonzero(target_on)
     off_indices = np.flatnonzero(target_off)
     response = values[:, : len(states)]
     signal = values[:, len(states) :]
 
-    response_pairs = _safe_scaled_difference(
+    response_pairs = _safe_difference(
         response[:, on_indices, None],
         response[:, None, off_indices],
-        scale=scales["response_scale"],
     ).reshape(len(values), -1)
-    on_signal = _safe_scaled(
-        signal[:, on_indices],
-        scale=scales["signal_scale"],
-    )
-    off_signal_suppression = _safe_scaled(
-        -signal[:, off_indices],
-        scale=scales["signal_scale"],
-    )
+    on_signal = _safe_clearance(signal[:, on_indices])
+    off_signal_suppression = _safe_clearance(-signal[:, off_indices])
 
     response_labels = tuple(
         f"response:{states[on_index]}>{states[off_index]}" for on_index in on_indices for off_index in off_indices
@@ -134,7 +125,7 @@ def multistate_response_behavior_clearances(
         off_signal_suppression_labels=off_labels,
         state_ids=states,
         target_mask=tuple(int(value) for value in target_on),
-        normalization=scales,
+        softmin_scale=scale,
     )
 
 
@@ -143,7 +134,7 @@ def score_multistate_response_behavior(
     *,
     state_ids: Sequence[str],
     target_mask: Sequence[int | float],
-    normalization: Mapping[str, object],
+    softmin_scale: object,
 ) -> MultistateResponseBehaviorScore:
     """Score a finite ``[r(state...), b(state...)]`` matrix without thresholds."""
 
@@ -151,11 +142,12 @@ def score_multistate_response_behavior(
         response_signal,
         state_ids=state_ids,
         target_mask=target_mask,
-        normalization=normalization,
+        softmin_scale=softmin_scale,
     )
-    response_score = _smooth_bottleneck(clearances.response)
-    on_score = _smooth_bottleneck(clearances.on_signal)
-    off_score = _smooth_bottleneck(clearances.off_signal_suppression)
+    scale = clearances.softmin_scale
+    response_score = _smooth_bottleneck(clearances.response, softmin_scale=scale)
+    on_score = _smooth_bottleneck(clearances.on_signal, softmin_scale=scale)
+    off_score = _smooth_bottleneck(clearances.off_signal_suppression, softmin_scale=scale)
     coordinate_clearances = clearances.coordinate_clearances
     coordinate_prior = np.concatenate(
         (
@@ -170,11 +162,12 @@ def score_multistate_response_behavior(
     behavior_score, coordinate_weights = _weighted_smooth_bottleneck(
         coordinate_clearances,
         prior_weights=coordinate_prior,
+        softmin_scale=scale,
     )
     limiting_index = np.argmin(coordinate_clearances, axis=1).astype(int)
     hard_bottleneck = np.min(coordinate_clearances, axis=1)
     compensation_gap = behavior_score - hard_bottleneck
-    maximum_compensation_gap = -np.log(coordinate_prior[limiting_index])
+    maximum_compensation_gap = -scale * np.log(coordinate_prior[limiting_index])
     labels = clearances.coordinate_labels
     return MultistateResponseBehaviorScore(
         clearances=clearances,
@@ -190,7 +183,7 @@ def score_multistate_response_behavior(
         compensation_gap=compensation_gap,
         maximum_compensation_gap=maximum_compensation_gap,
         all_reference_directions_met=np.all(coordinate_clearances >= 0.0, axis=1),
-        normalization=dict(clearances.normalization),
+        softmin_scale=scale,
     )
 
 
@@ -256,53 +249,43 @@ def validated_response_signal(values: np.ndarray, *, state_count: int) -> np.nda
     return matrix
 
 
-def parse_normalization(raw: Mapping[str, object]) -> dict[str, float]:
-    """Validate the exact two-scale assay-resolution normalization contract."""
+def validated_softmin_scale(raw: object) -> float:
+    """Validate the one positive scale that controls smooth compensation."""
 
-    if not isinstance(raw, Mapping):
-        raise ValueError(f"{OBJECTIVE_NAME}: normalization must be an explicit mapping.")
-    missing = sorted(set(NORMALIZATION_FIELDS) - set(raw))
-    extra = sorted(set(raw) - set(NORMALIZATION_FIELDS))
-    if missing or extra:
-        raise ValueError(
-            f"{OBJECTIVE_NAME}: normalization keys do not match the contract; missing={missing}, extra={extra}."
-        )
-    if any(isinstance(raw[name], (bool, np.bool_)) for name in NORMALIZATION_FIELDS):
-        raise ValueError(f"{OBJECTIVE_NAME}: normalization values must be numeric, not boolean.")
+    if isinstance(raw, (bool, np.bool_)):
+        raise ValueError(f"{OBJECTIVE_NAME}: softmin_scale must be numeric, not boolean.")
     try:
-        normalization = {name: float(raw[name]) for name in NORMALIZATION_FIELDS}
+        scale = float(raw)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{OBJECTIVE_NAME}: normalization values must be numeric.") from exc
-    invalid = [name for name, value in normalization.items() if not np.isfinite(value) or value <= 0.0]
-    if invalid:
-        raise ValueError(f"{OBJECTIVE_NAME}: normalization scales must be positive and finite; invalid={invalid}.")
-    return normalization
+        raise ValueError(f"{OBJECTIVE_NAME}: softmin_scale must be numeric.") from exc
+    if not np.isfinite(scale) or scale <= 0.0:
+        raise ValueError(f"{OBJECTIVE_NAME}: softmin_scale must be positive and finite.")
+    return scale
 
 
-def _safe_scaled(values: np.ndarray, *, scale: float) -> np.ndarray:
-    """Scale finite values and saturate only arithmetic overflow at a finite bound."""
+def _safe_clearance(values: np.ndarray) -> np.ndarray:
+    """Keep raw finite clearances while saturating only arithmetic overflow."""
 
-    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-        scaled = np.asarray(values, dtype=float) / float(scale)
     return np.nan_to_num(
-        scaled,
+        np.asarray(values, dtype=float),
         nan=0.0,
         posinf=_CLEARANCE_LIMIT,
         neginf=-_CLEARANCE_LIMIT,
     )
 
 
-def _safe_scaled_difference(left: np.ndarray, right: np.ndarray, *, scale: float) -> np.ndarray:
+def _safe_difference(left: np.ndarray, right: np.ndarray) -> np.ndarray:
     with np.errstate(over="ignore", invalid="ignore"):
         difference = np.asarray(left, dtype=float) - np.asarray(right, dtype=float)
-    return _safe_scaled(difference, scale=scale)
+    return _safe_clearance(difference)
 
 
-def _smooth_bottleneck(clearances: np.ndarray) -> np.ndarray:
+def _smooth_bottleneck(clearances: np.ndarray, *, softmin_scale: float) -> np.ndarray:
     count = clearances.shape[1]
     score, _weights = _weighted_smooth_bottleneck(
         clearances,
         prior_weights=np.full(count, 1.0 / count),
+        softmin_scale=softmin_scale,
     )
     return score
 
@@ -311,6 +294,7 @@ def _weighted_smooth_bottleneck(
     clearances: np.ndarray,
     *,
     prior_weights: np.ndarray,
+    softmin_scale: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     values = np.asarray(clearances, dtype=float)
     prior = np.asarray(prior_weights, dtype=float).reshape(-1)
@@ -318,26 +302,27 @@ def _weighted_smooth_bottleneck(
         raise ValueError("smooth bottleneck values and prior weights must be non-empty and aligned.")
     if np.any(prior <= 0.0) or not np.isclose(float(np.sum(prior)), 1.0):
         raise ValueError("smooth bottleneck prior weights must be positive and sum to one.")
-    log_terms = -(values / NORMALIZED_TEMPERATURE) + np.log(prior)[None, :]
-    row_max = np.max(log_terms, axis=1, keepdims=True)
-    with np.errstate(over="ignore", under="ignore", invalid="ignore"):
-        shifted = np.exp(log_terms - row_max)
+    scale = validated_softmin_scale(softmin_scale)
+    row_min = np.min(values, axis=1, keepdims=True)
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        distance = (values - row_min) / scale
+    distance = np.nan_to_num(distance, nan=0.0, posinf=_CLEARANCE_LIMIT, neginf=0.0)
+    with np.errstate(under="ignore"):
+        shifted = prior[None, :] * np.exp(-distance)
     normalizer = np.sum(shifted, axis=1, keepdims=True)
     weights = shifted / normalizer
-    score = -NORMALIZED_TEMPERATURE * (row_max[:, 0] + np.log(normalizer[:, 0]))
+    score = row_min[:, 0] - scale * np.log(normalizer[:, 0])
     return np.asarray(score, dtype=float), np.asarray(weights, dtype=float)
 
 
 __all__ = [
-    "NORMALIZATION_FIELDS",
-    "NORMALIZED_TEMPERATURE",
     "OBJECTIVE_NAME",
     "MultistateResponseBehaviorClearances",
     "MultistateResponseBehaviorScore",
     "binary_target_mask",
     "multistate_response_behavior_clearances",
-    "parse_normalization",
     "score_multistate_response_behavior",
+    "validated_softmin_scale",
     "validated_response_signal",
     "validated_state_ids",
 ]
