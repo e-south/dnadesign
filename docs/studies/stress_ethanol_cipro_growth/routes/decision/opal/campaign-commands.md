@@ -51,13 +51,14 @@ uv run opal status -c "$CONFIG" --with-ledger --json
 
 Required evidence is three six-row sets, one 18-row sequence-unique batch, model
 and prediction artifacts, declared MSRB diagnostics, and zero mismatches. The
-profile exposes the mask, normalization, score direction, and family scores.
+profile exposes the mask, shared soft-min scale, score direction, and family
+scores.
 Passing these checks establishes artifact integrity, not biological validity.
 
 ### Notebook review
 
-Regenerate the plot artifacts before regenerating the notebook. Notebook
-generation binds existing plot manifests; it does not rerender figures.
+Regenerate the plot artifacts before regenerating the notebook. Notebook generation writes the notebook artifact
+and binds existing plot manifests; it does not rerender figures.
 
 ```bash
 CONFIG=src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
