@@ -3,13 +3,13 @@ id: opal-selection-plugins
 title: OPAL selection plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-19
+last_verified: 2026-07-20
 ---
 
 ## OPAL Selection Strategies
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-19
+**Last verified:** 2026-07-20
 
 
 Selection plugins consume named objective channels and emit ranked candidate

@@ -1,7 +1,7 @@
 ## Pool-relative weighted acquisition (`expected_improvement`)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-19
+**Last verified:** 2026-07-20
 
 
 `expected_improvement` is the stable registry identifier. The implementation is
