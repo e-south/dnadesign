@@ -46,7 +46,10 @@ REPORTER_DESIGN_ID = "pBbS2c-rfp"
 READER_RATIO_RECORD_ID = "ratio_reporter_normalizer/df"
 SPOP_CANDIDATE_SUMMARY_TABLE = "reader_spop_candidate_summary.parquet"
 SPOP_OBSERVATION_TABLE = "reader_spop_observations.parquet"
-_RETRON_DESIGN_RE = re.compile(r"pES-retron-(?P<number>\d+);\s*pBbS2c-rfp", flags=re.IGNORECASE)
+_RETRON_DESIGN_RE = re.compile(
+    r"pES-retron-(?P<number>\d+)(?:-[^;]+)?;\s*pBbS2c-rfp",
+    flags=re.IGNORECASE,
+)
 _TREATMENT_RE = re.compile(
     r"^\s*(?P<atc>[0-9]+(?:\.[0-9]+)?)\s*nm\s*aTc;\s*"
     r"(?P<iptg>[0-9]+(?:\.[0-9]+)?)\s*[uµ]M\s*IPTG\s*$",

@@ -341,6 +341,32 @@ def test_reader_spop_plan_scores_dose_ladder_and_summarizes_controls(tmp_path: P
     assert summaries["retron26"].spop_score_median > summaries["retron43"].spop_score_median
 
 
+def test_reader_spop_plan_accepts_literal_retron_descriptor_design_id(tmp_path: Path) -> None:
+    reader_root = tmp_path / "reader"
+    experiment_id = "20260720_retron_Eco1_26_180_201_202_203_204_benchmark"
+    reader_design_id = "pES-retron-201-msd[TetR]-r26-w02-17; pBbS2c-rfp"
+    rows = _ratio_rows(
+        design_id=reader_design_id,
+        time=10.0,
+        z_by_treatment={
+            "0 nm aTc; 0 uM IPTG": 100.0,
+            "200 nm aTc; 0 uM IPTG": 500.0,
+            "0 nm aTc; 5 uM IPTG": 160.0,
+            "0 nm aTc; 500 uM IPTG": 460.0,
+        },
+    )
+    _write_reader_experiment(reader_root, experiment_id=experiment_id, report_time=10.0, rows=rows)
+
+    plan = build_reader_spop_plan(reader_root=reader_root, experiment_ids=(experiment_id,), strict=True)
+
+    assert plan.ok, plan.issues
+    assert len(plan.observations) == 1
+    observation = plan.observations[0]
+    assert observation.candidate_key == "retron201"
+    assert observation.assay_subject_key == "retron201"
+    assert observation.reader_design_id == reader_design_id
+
+
 def test_reader_spop_default_experiments_include_retron_177_186_benchmark() -> None:
     assert "20260529_retron_Eco1_26_43_177_186_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
     assert "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
