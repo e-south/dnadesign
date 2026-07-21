@@ -65,6 +65,23 @@ def test_resolve_test_targets_includes_changed_study_unit_tests(tmp_path: Path) 
     assert targets == [str(shared_tests), str(stress_tests)]
 
 
+def test_resolve_test_targets_includes_changed_study_unit_for_study_record(tmp_path: Path) -> None:
+    shared_tests = tmp_path / "src" / "dnadesign" / "studies" / "tests"
+    stress_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "stress_ethanol_cipro_growth" / "tests"
+    retron_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "retron_hairpin_design" / "tests"
+    shared_tests.mkdir(parents=True, exist_ok=True)
+    stress_tests.mkdir(parents=True, exist_ok=True)
+    retron_tests.mkdir(parents=True, exist_ok=True)
+
+    targets = resolve_test_targets(
+        repo_root=tmp_path,
+        tool_names=["studies"],
+        changed_files=["docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml"],
+    )
+
+    assert targets == [str(shared_tests), str(stress_tests)]
+
+
 def test_resolve_test_targets_includes_all_study_units_for_shared_studies_change(tmp_path: Path) -> None:
     shared_tests = tmp_path / "src" / "dnadesign" / "studies" / "tests"
     retron_tests = tmp_path / "src" / "dnadesign" / "studies" / "units" / "retron_hairpin_design" / "tests"

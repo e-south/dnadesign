@@ -53,7 +53,13 @@ def _study_unit_test_dirs(*, studies_root: Path, changed_files: list[str]) -> li
     shared_studies_change = not changed_files
     for raw_path in changed_files:
         parts = Path(raw_path).parts
-        if len(parts) < 3 or parts[:3] != ("src", "dnadesign", "studies"):
+        if parts[:2] == ("docs", "studies"):
+            if len(parts) >= 3 and (units_root / parts[2]).is_dir():
+                changed_study_ids.add(parts[2])
+            else:
+                shared_studies_change = True
+            continue
+        if parts[:3] != ("src", "dnadesign", "studies"):
             continue
         if len(parts) >= 5 and parts[3] == "units":
             changed_study_ids.add(parts[4])

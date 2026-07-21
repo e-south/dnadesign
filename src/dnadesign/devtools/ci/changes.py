@@ -37,6 +37,7 @@ _FULL_CORE_EXACT_FILES = {
     ".github/tool-coverage-baseline.json",
 }
 _SHARED_PACKAGE_TOOLS = {"contracts", "thread"}
+_STUDIES_TOOL_NAME = "studies"
 _NON_TOOL_DIRS = {
     "devtools",
     "__pycache__",
@@ -218,6 +219,7 @@ def determine_scope(
         path = path.strip()
         if not path:
             continue
+        parts = Path(path).parts
 
         if path in _EXTERNAL_INTEGRATION_GLOBAL_FILES:
             run_external_integration = True
@@ -225,8 +227,14 @@ def determine_scope(
         if path in _FULL_CORE_EXACT_FILES:
             run_full_core = True
 
+        if parts[:2] == ("docs", "studies"):
+            if _STUDIES_TOOL_NAME in tool_names:
+                affected_tools.add(_STUDIES_TOOL_NAME)
+            else:
+                run_full_core = True
+                run_external_integration = True
+
         if path.startswith("src/dnadesign/"):
-            parts = Path(path).parts
             if len(parts) < 3:
                 run_full_core = True
                 run_external_integration = True

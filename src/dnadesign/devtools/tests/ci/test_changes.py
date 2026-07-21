@@ -106,6 +106,21 @@ def test_determine_scope_pr_docs_only_skips_tool_coverage_gate() -> None:
     assert result.run_coverage_gate is False
 
 
+def test_determine_scope_pr_study_record_scopes_studies_tool() -> None:
+    result = determine_scope(
+        event_name="pull_request",
+        changed_files=["docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml"],
+        tool_names={"studies", "usr"},
+        external_integration_tool_names=set(),
+    )
+
+    assert result.run_full_core is False
+    assert result.run_external_integration is False
+    assert result.affected_tools == ["studies"]
+    assert result.external_integration_tools == []
+    assert result.run_coverage_gate is True
+
+
 def test_determine_scope_pr_shared_code_change_triggers_full_core_and_external_integration() -> None:
     result = determine_scope(
         event_name="pull_request",
