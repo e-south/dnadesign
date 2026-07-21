@@ -30,6 +30,7 @@ class CurrentCampaignNavigation:
     campaign_slug: str
     config_path: Path
     notebook_path: Path
+    notebook_materialized: bool
     selection_view_ids: tuple[str, ...]
     objective_names: tuple[str, ...]
     run_command: str
@@ -79,8 +80,6 @@ def load_current_campaign_navigation(
     except ValueError as exc:
         raise ValueError("Current OPAL campaign workdir escapes the repository.") from exc
     notebook_path = workdir / "notebooks" / f"opal_{config.campaign.slug}_analysis.py"
-    if not notebook_path.is_file():
-        raise FileNotFoundError(f"Current OPAL campaign notebook not found: {notebook_path}")
 
     relative_config = config_path.relative_to(root)
     objective_names = tuple(dict.fromkeys(view.objective.name for view in config.selection_views))
@@ -88,6 +87,7 @@ def load_current_campaign_navigation(
         campaign_slug=config.campaign.slug,
         config_path=relative_config,
         notebook_path=notebook_path.relative_to(root),
+        notebook_materialized=notebook_path.is_file(),
         selection_view_ids=tuple(view.id for view in config.selection_views),
         objective_names=objective_names,
         run_command=f"uv run opal notebook run -c {relative_config}",

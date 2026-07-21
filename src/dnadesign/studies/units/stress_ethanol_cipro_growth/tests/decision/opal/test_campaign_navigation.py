@@ -32,6 +32,7 @@ def test_current_campaign_navigation_resolves_study_record() -> None:
     assert navigation.objective_names == ("multistate_response_behavior_v1",)
     assert navigation.config_path.as_posix().endswith("secg_msrb_greedy/configs/campaign.yaml")
     assert navigation.notebook_path.as_posix().endswith("notebooks/opal_secg_msrb_greedy_analysis.py")
+    assert navigation.notebook_materialized is (repo_root / navigation.notebook_path).is_file()
     assert navigation.run_command == f"uv run opal notebook run -c {navigation.config_path}"
 
 

@@ -149,6 +149,9 @@ def _(bundle_manifest, campaign_navigation, deliverable, mo, response_metastudy,
         )
     else:
         objective_label = "Objective" if len(campaign_navigation.objective_names) == 1 else "Objectives"
+        notebook_status = (
+            "generated" if campaign_navigation.notebook_materialized else "generate with the command below"
+        )
         campaign_review = mo.accordion(
             {
                 "Current OPAL review — outside this evidence bundle": mo.md(
@@ -161,7 +164,7 @@ def _(bundle_manifest, campaign_navigation, deliverable, mo, response_metastudy,
 
                     **Config:** `{campaign_navigation.config_path}`
 
-                    **Notebook:** `{campaign_navigation.notebook_path}`
+                    **Notebook target:** `{campaign_navigation.notebook_path}` ({notebook_status})
 
                     ```bash
                     {campaign_navigation.run_command}
