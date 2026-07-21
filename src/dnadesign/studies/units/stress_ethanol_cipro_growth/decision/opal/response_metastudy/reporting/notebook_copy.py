@@ -11,6 +11,22 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+STUDY_CONTEXT_MARKDOWN = """
+        **Scope:** {review_summary.scope}
+
+        **Observed labels:** {review_summary.label_state}
+
+        **Predictor support:** {review_summary.predictor_support}
+
+        **Basis:** {review_summary.basis}
+
+        **Primary assay summary:** {review_summary.primary_assay_summary}
+
+        **Evidence base:** {review_summary.evidence_base}
+
+        **Prospective hill climb:** {review_summary.prospective_hill_climb}
+        """
+
 COMPARATOR_GUIDE_MARKDOWN = """
 Reader publishes the same eight measured values for every target view:
 
@@ -39,4 +55,4 @@ a separate setpoint-fidelity and intensity phenotype. Both remain retrospective 
 neither is the active campaign selector.
 """
 
-__all__ = ["COMPARATOR_GUIDE_MARKDOWN"]
+__all__ = ["COMPARATOR_GUIDE_MARKDOWN", "STUDY_CONTEXT_MARKDOWN"]

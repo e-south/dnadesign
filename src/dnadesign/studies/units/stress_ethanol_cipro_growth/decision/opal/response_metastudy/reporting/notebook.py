@@ -14,7 +14,7 @@ from __future__ import annotations
 from importlib.metadata import version
 from pathlib import Path
 
-from .notebook_copy import COMPARATOR_GUIDE_MARKDOWN
+from .notebook_copy import COMPARATOR_GUIDE_MARKDOWN, STUDY_CONTEXT_MARKDOWN
 
 
 def write_review_notebook(out_dir: Path) -> Path:
@@ -26,6 +26,7 @@ def write_review_notebook(out_dir: Path) -> Path:
         "__COMPARATOR_GUIDE_MARKDOWN__",
         COMPARATOR_GUIDE_MARKDOWN,
     )
+    source = source.replace("__STUDY_CONTEXT_MARKDOWN__", STUDY_CONTEXT_MARKDOWN)
     path.write_text(source, encoding="utf-8")
     if path.stat().st_size <= 0:
         raise RuntimeError("generated response metric metastudy review notebook is empty.")
@@ -142,21 +143,7 @@ def _(deliverable, mo, review_section):
 def _(bundle_manifest, campaign_navigation, mo, response_metastudy):
     review_summary = response_metastudy.build_review_summary(bundle_manifest)
     study_context = mo.md(
-        f"""
-        **Scope:** {review_summary.scope}
-
-        **Observed labels:** {review_summary.label_state}
-
-        **Predictor support:** {review_summary.predictor_support}
-
-        **Basis:** {review_summary.basis}
-
-        **Primary assay summary:** {review_summary.primary_assay_summary}
-
-        **Evidence base:** {review_summary.evidence_base}
-
-        **Prospective hill climb:** {review_summary.prospective_hill_climb}
-        """
+        f"""__STUDY_CONTEXT_MARKDOWN__"""
     )
     if campaign_navigation is None:
         campaign_review = mo.md("Current OPAL navigation is unavailable outside a source checkout.")
