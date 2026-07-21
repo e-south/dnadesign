@@ -81,7 +81,10 @@ evidence:
   implementation: verified
   retrospective_predictive_ordering: insufficient
   prospective_hill_climb_efficacy: unproven
-  acquisition_baseline_contract: not_yet_published
+  acquisition_baseline_contract:
+    schema_id: stress_ethanol_cipro_growth.msrb_evaluation_baseline.v1
+    path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/evaluation_baseline.yaml
+    sha256: 56409b8e03607d91f1adeae95b65fdc7602990feafe27332f2d140b61bd732d0  # pragma: allowlist secret
   campaign_role: prospectively_frozen_greedy_learning_probe
   synthesis_authorization: prohibited
   shadow_manifest_sha256: a50e6c81789a2214026c5dbfac9deb95b86106465129d6223e4708ac71084a4a  # pragma: allowlist secret

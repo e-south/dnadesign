@@ -25,6 +25,22 @@ measure whether sequence-to-phenotype predictions and MSRB enrichment improve
 as observations accumulate. It does not authorize synthesis by itself and does
 not claim that retrospective prediction support is strong.
 
+`evaluation_baseline.yaml` fixes how the first measured batch will be judged
+before its outcomes are known. It binds the campaign configuration, allocator
+version, prediction ledger, selected 18, aliases, and prior 27-label corpus.
+The verifier recomputes MSRB from every predicted eight-value phenotype and
+requires the sequence-unique allocation to reproduce the selected 18 exactly.
+It also fixes the treatment of ties, even-sample medians, undefined rank
+correlations, and missing values so the later comparison has one replayable
+interpretation.
+
+For each target view, all 296,010 possible groups of six prior labels form a
+deterministic historical reference for the best and median observed MSRB. This
+comparison needs no random seed and no extra plate. It is not a randomized
+control from the current candidate universe and cannot by itself establish
+acquisition efficacy or hill climbing. Verification does not change campaign
+or synthesis state.
+
 `activation_audit.json` records the bounded activation decision and binds the
 exact protocol, objective, tests, documentation, campaign, and review-plot
 configuration by SHA-256. The receipt includes the protocol digest, while the

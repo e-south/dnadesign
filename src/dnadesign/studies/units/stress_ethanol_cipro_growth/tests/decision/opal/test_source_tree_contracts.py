@@ -174,7 +174,8 @@ def test_msrb_activation_receipt_is_one_way_digest_bound_and_claim_scoped() -> N
     assert review["oracle_reimplementation"]["discrepancy_count"] == 0
     assert review["common_unit_rescaling_covariance"]["random_case_count"] == 60_000
     assert review["common_unit_rescaling_covariance"]["limiting_coordinate_mismatch_count"] == 0
-    assert review["property_suite"]["collected_test_count"] == 84
+    assert review["property_suite"]["independent_reviewed_collection_count"] == 84
+    assert review["property_suite"]["collected_test_count"] == 99
     assert review["cardinality_pressure"]["state_counts"] == [2, 4, 8, 16]
 
     bindings = receipt["source_bindings"]

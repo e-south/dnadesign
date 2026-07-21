@@ -1,0 +1,228 @@
+schema_id: stress_ethanol_cipro_growth.msrb_evaluation_baseline.v1
+schema_version: "1"
+baseline_id: secg_msrb_round0_evaluation_v1
+study_id: stress_ethanol_cipro_growth
+
+campaign:
+  slug: secg_msrb_greedy
+  protocol_id: secg_msrb_learning_probe_v1
+  run_id: r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584
+  round_index: 0
+  objective_id: multistate_response_behavior_v1
+  selection_policy: greedy_top6_per_view_round_robin_sequence_unique
+  config:
+    path: src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
+    sha256: 7741d47728df8c855b0052d9d4a20969bd47f2c8557698cd12a49d7605e6385b
+  selection_allocation_api_version: "1"
+
+alias_registry:
+  schema_id: dnadesign.study.promoter_alias_registry.v1
+  namespace: study.promoter_alias
+  path: docs/studies/stress_ethanol_cipro_growth/record/promoter_aliases.yaml
+
+artifacts:
+  prediction_ledger:
+    path: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/ledger/predictions/part-2a5e38c8b6ec419b8087f66b6d25bc0e.parquet
+    sha256: 704c5ee1658bc5efd0bafd1558a63e957a3291231a196521b0739f8ccc62e2b3
+    row_count: 154785
+  selection_batch:
+    path: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/run_artifacts/r0-2026-07-19t22-21-41-00-00-0178449970129850800-efe1c3e05f7b1ff30279fa080715edf46016ad1a0ea3cb39d3c2f32d4e03b19e/selection/selection_batch.parquet
+    sha256: 856b50f61186102607e80503cf02473b3d849060c8a2871adc97645a090c1cff
+    row_count: 18
+  labels_used:
+    path: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/run_artifacts/r0-2026-07-19t22-21-41-00-00-0178449970129850800-efe1c3e05f7b1ff30279fa080715edf46016ad1a0ea3cb39d3c2f32d4e03b19e/labels/labels_used.parquet
+    sha256: 93ef26fd4a391043e459ca629b0660c160061ef1e40c4835aee6fc9946ca3020
+    row_count: 27
+
+allocations:
+  - study_alias: SECG-019
+    candidate_id: 0a1649a2577534c7b29604ed50cd6c8435e5caea
+    sequence_sha256: e915cd3d7c2070c697b7f4515d4b664e0642eecd1fe441f4c13fd53e21d45c2c
+    selection_view: ethanol
+    allocation_slot: 1
+  - study_alias: SECG-020
+    candidate_id: 91faac06d69bea9deb8d6da5df952d5d4c849fca
+    sequence_sha256: 6e430e7473207b0b7ae3e46bbc32e21b163d68297b248a86e140edfe7b923c8f
+    selection_view: ethanol
+    allocation_slot: 2
+  - study_alias: SECG-021
+    candidate_id: eb3a405cf74e845c01f2adeec86e5824d949794b
+    sequence_sha256: bbc6c6133038a9180667d7ca5f9b52ddf4057d1c8cf758c96a259415dec2e781
+    selection_view: ethanol
+    allocation_slot: 3
+  - study_alias: SECG-022
+    candidate_id: 11781779c6c9e8aa32f7cb03816f97f3b7407dcc
+    sequence_sha256: d3c077bc8d9e7708aff38492f3feafeca9f1cf54d84b1a41ade26467f6bda122
+    selection_view: ethanol
+    allocation_slot: 4
+  - study_alias: SECG-023
+    candidate_id: 765abbdc6730a552c62cdb3ba52a077221f8b5fb
+    sequence_sha256: 774a85c550e94a9a831ddd93e56fc01cd4dcf245d8c7176fc95e4298a4afaab5
+    selection_view: ethanol
+    allocation_slot: 5
+  - study_alias: SECG-024
+    candidate_id: 5bb837f7af842f993e551ca93de90a68ab56d9c8
+    sequence_sha256: a64f638544a61c3c78a79ed2637b04e11576ce4d79fb35424a4b1c79209bd7cb
+    selection_view: ethanol
+    allocation_slot: 6
+  - study_alias: SECG-025
+    candidate_id: a52819bb39e768a258df0a790ee8a27241450490
+    sequence_sha256: 3e8e2decd4d3fa4a501bf51291086ec8357f1f04765284aa9b81e7c76169bec0
+    selection_view: ciprofloxacin
+    allocation_slot: 1
+  - study_alias: SECG-026
+    candidate_id: 34653ff540413f25916d1bc86107751e855e4cfe
+    sequence_sha256: 7b367fb7eff6a97ff0c92cc94ef717f8e8d1df5c08398dbe9cc6dd12825347ea
+    selection_view: ciprofloxacin
+    allocation_slot: 2
+  - study_alias: SECG-027
+    candidate_id: 03d8699ee580644b026ea03e732cdb302a7d4de0
+    sequence_sha256: 5bdaec9644f5369ae0e51e33e421fa13e389a812335558ab2002de6826209314
+    selection_view: ciprofloxacin
+    allocation_slot: 3
+  - study_alias: SECG-028
+    candidate_id: a724b85dff69986b5bb0e3f8558ff8bb0285f727
+    sequence_sha256: cc450cefbbc5e480507dc7a0d839f6a87d7e79853b6fe1925c882b5c2a496e68
+    selection_view: ciprofloxacin
+    allocation_slot: 4
+  - study_alias: SECG-029
+    candidate_id: 1f734d88d72d7f0b5bd34082dfb0dcacd023851c
+    sequence_sha256: 84b12392e99eda23b42f0618b5d091a36e144f1278109ecf83e5e2e2c9a0e1d0
+    selection_view: ciprofloxacin
+    allocation_slot: 5
+  - study_alias: SECG-030
+    candidate_id: eec0452293f311a213e4113610bf87f522f8fb85
+    sequence_sha256: 5d210a867e7969fa65dc74d76ead5cf764b384f116d1ce09cd98036623b921bf
+    selection_view: ciprofloxacin
+    allocation_slot: 6
+  - study_alias: SECG-031
+    candidate_id: f000b69d74a49dba5bb2e3f82df74be695584cb1
+    sequence_sha256: 265aa16036ba1012386455784db422f6c1a966a5fe168f95975fe670dcc3333d
+    selection_view: and
+    allocation_slot: 1
+  - study_alias: SECG-032
+    candidate_id: 31ff505def5cc0545abdf5fe8d879d35251b7a83
+    sequence_sha256: 46473b5a516a023e0829c2adde3666d263b8ea181c5fd4ff2714e6c92cb478a0
+    selection_view: and
+    allocation_slot: 2
+  - study_alias: SECG-033
+    candidate_id: c60e2bc0b4d9f48cfd7edd3ad099f7cee083e737
+    sequence_sha256: dbc2b7b8fd3244111b8aa475364c5d3351beabe7aa8072e119fc66476462e34d
+    selection_view: and
+    allocation_slot: 3
+  - study_alias: SECG-034
+    candidate_id: 6ae726abe7d2b981cde8b09032d16d54dbf11837
+    sequence_sha256: d437851d0539954b020d7019b29eb83bb67bb6dd7ed57e545bb12361b4683f82
+    selection_view: and
+    allocation_slot: 4
+  - study_alias: SECG-035
+    candidate_id: 48c215e9e44c7aecce1d58810486c005b7027bc2
+    sequence_sha256: abb0425f2f421fc6e86d6f830b1bb31579393c1cb59ef0140d448d2e1aef39a5
+    selection_view: and
+    allocation_slot: 5
+  - study_alias: SECG-036
+    candidate_id: 7f79342eebe5afcbd32be843a9ef24fbb54d9a71
+    sequence_sha256: 877fb44c3787090ad6e4f21b7e3af50612e301ead4978c83bd1556a69734982f
+    selection_view: and
+    allocation_slot: 6
+
+comparison_set:
+  role: historical_model_free_six_candidate_baseline
+  source_artifact: labels_used
+  generator:
+    method: exhaustive_unordered_subsets_without_replacement
+    subset_size: 6
+    subset_count: 296010
+    random_seed: null
+  physical_random_control: false
+  statement: Every six-candidate subset of the 27 prior observed labels defines a deterministic historical reference distribution for best and median observed MSRB by view. This is not a randomized or physically measured control cohort.
+  candidate_ids:
+    - 0f87f1782ff87562775ede346ba2d70038b678ec
+    - 1ab35c09c138033fcaa5f8e262a08864319c6be5
+    - 21cdfcb087bc27adb5a7ca856c82bf489993dc2c
+    - 2fe51277935496ce8f02932e2866143258c80d55
+    - 327c50188aad1cfd1d09baeb1875839df3264f89
+    - 3a5bb4f8f8e7b1ac376a4cca795262e159e37638
+    - 44628e31125e1322a7d64c5ae60e7260eb512de1
+    - 4aefb5bf64c8c5a1afd64ee269ea8172779167f8
+    - 4bb63c6c63c4b14720f12751a4f8101228a46c42
+    - 53a22effaf67926c919918bec9313e8ef9e60304
+    - 687595af953278a6262ce4098d265489e9aec9be
+    - 6e8c55fab287424a828a38e2c412893d9b095309
+    - 7fbad9f6a67a832413439e489a7fbba41ccfab75
+    - 8771ea1f730687244d5e91829580ebc228a80b2e
+    - 8d5364fd4d59531967f2aed6eb09be00de0728a1
+    - 97b4ac8535ae8c1f67c079b0644e87777d29e1d1
+    - a4732405b3705e431fd02eac6d23c386f4dc3aeb
+    - a89764830326f815bf69c816024fb5250b0e2934
+    - ae9d3425d07795a586fc0bc13bfdedb418c02f3c
+    - b9ccc2fb6cb43829ce5275b3ea238ec2e7770086
+    - c986c251d60dc4a33ef4caaafc40e38093db17bb
+    - ce82dd440bd35d6dc43feaaf3d74c8927c6c4a85
+    - d48422cfa6b4d8b25235cf2c1840dcfb1d92662f
+    - e038f01044323e4b7d58b134a6cd158721140c8f
+    - f110905871ae1d944fbb83d6535de7da889f7375
+    - f4b58c1e961a012025711cc54fa4aa6ea1b2e287
+    - f69532ccc017ed0bcba3b5771b5f5d6edfd59467
+
+evaluation:
+  conventions:
+    missing_or_nonfinite: error
+    score_direction: higher_is_better
+    raw_y8:
+      coordinate_order: [r00, r10, r01, r11, b00, b10, b01, b11]
+      candidate_weighting: equal
+      coordinate_weighting: equal
+      coordinate_mae: mean_absolute_error_across_candidates
+      coordinate_rmse: root_mean_squared_error_across_candidates
+      pooled_mae: mean_absolute_error_across_all_candidates_and_coordinates
+      pooled_rmse: root_mean_squared_error_across_all_candidates_and_coordinates
+    spearman:
+      rank_ties: average_rank
+      tie_equality: exact_numeric_equality
+      correlation: pearson_correlation_of_average_ranks
+      constant_input: undefined_null
+    median:
+      even_sample: arithmetic_midpoint_of_two_central_sorted_values
+    exhaustive_subset_percentile:
+      enumeration: each_unordered_subset_exactly_once
+      ties: midrank
+      tie_equality: exact_numeric_equality
+      formula: 100 * (count(reference < observed) + 0.5 * count(reference == observed)) / subset_count
+      range: [0, 100]
+  endpoints:
+    - id: raw_y8_prediction_fidelity
+      method: mae_and_rmse_by_coordinate_plus_pooled
+      unit: candidate
+      scope: frozen_prediction_vs_first_subsequent_exact_observation
+    - id: within_view_rank_preservation
+      method: spearman_tie_aware_average_ranks_with_undefined_constant_case
+      unit: selection_view
+      scope: all_18_allocated_candidates_rescored_in_each_view
+    - id: within_batch_view_specificity
+      method: median_observed_score_allocated_six_minus_other_twelve
+      unit: selection_view
+      scope: same_18_candidate_batch
+    - id: prior_observed_corpus_context
+      method: allocated_six_best_and_median_percentile_against_all_historical_six_subsets
+      unit: selection_view
+      scope: allocated_six_vs_exhaustive_subsets_of_exact_27_prior_observed_labels
+  required_candidate_outputs:
+    - study_alias
+    - candidate_id
+    - allocated_view
+    - allocation_slot
+    - predicted_y8
+    - observed_y8
+    - predicted_and_observed_family_scores
+    - predicted_and_observed_behavior_score
+    - predicted_and_observed_hard_bottleneck
+    - predicted_and_observed_all_reference_directions_met
+    - predicted_and_observed_within_view_rank
+
+claim_limits:
+  allowed_interpretation: prospectively_frozen_greedy_learning_probe_evaluation
+  acquisition_efficacy: not_supported
+  hill_climb: not_supported
+  synthesis_authorization: prohibited
+  statement: This baseline does not support acquisition-efficacy or hill-climb claims and does not authorize synthesis.

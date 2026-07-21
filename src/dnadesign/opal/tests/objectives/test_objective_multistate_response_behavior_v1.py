@@ -208,6 +208,38 @@ def test_joint_state_permutation_is_equivariant() -> None:
     )
 
 
+@pytest.mark.parametrize("state_count", range(2, 17))
+def test_common_response_offset_is_invariant(state_count: int) -> None:
+    """Response ordering depends on differences, not a shared response baseline."""
+
+    rng = np.random.default_rng(20260720 + state_count)
+    target_mask = [int(index % 3 == 1) for index in range(state_count)]
+    values = rng.normal(size=(11, 2 * state_count))
+    shifted = values.copy()
+    shifted[:, :state_count] += 8.75
+
+    baseline = _score(values, target_mask)
+    transformed = _score(shifted, target_mask)
+
+    for field in (
+        "behavior_score",
+        "hard_bottleneck_clearance",
+        "response_family_score",
+        "on_signal_family_score",
+        "off_signal_suppression_family_score",
+        "coordinate_weights",
+        "coordinate_prior_weights",
+        "compensation_gap",
+        "maximum_compensation_gap",
+    ):
+        np.testing.assert_allclose(getattr(transformed, field), getattr(baseline, field), atol=1.0e-12)
+    np.testing.assert_array_equal(
+        transformed.all_reference_directions_met,
+        baseline.all_reference_directions_met,
+    )
+    assert transformed.limiting_coordinate_label == baseline.limiting_coordinate_label
+
+
 def test_family_means_prevent_coordinate_cardinality_from_reweighting_a_family() -> None:
     two_state = np.asarray([[0.0, 2.0, -4.0, 4.0]], dtype=float)
     repeated_off_state = np.asarray([[0.0, 0.0, 0.0, 2.0, -4.0, -4.0, -4.0, 4.0]], dtype=float)

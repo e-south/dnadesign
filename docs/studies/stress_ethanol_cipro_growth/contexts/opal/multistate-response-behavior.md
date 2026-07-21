@@ -593,13 +593,25 @@ estimate enrichment over the full candidate universe, improvement over random
 selection, superiority to another acquisition policy, or a causal benefit
 from retraining.
 
-Judging acquisition efficacy requires a comparison baseline fixed before
-outcomes are observed. A model-free or random-selection simulation over
-existing measurements is a useful computational baseline and does not require
-another physical plate. It cannot establish prospective enrichment for
-unmeasured candidates. Before outcome review, the study still needs to record
-the candidate universe, baseline generator, random seed or exact draw,
-per-view endpoint, and comparison rule.
+Judging acquisition efficacy requires a comparison rule fixed before outcomes
+are observed. The round-0 receipt uses all 296,010 unordered groups of six from
+the 27 prior observed labels. For each target view, that exhaustive historical
+distribution provides a model-free reference for the best and median observed
+MSRB among six candidates. No random seed is needed because every possible
+six-candidate group is included.
+
+This reference is deliberately limited. The prior 27 labels are an existing
+measured corpus, not a randomized or physically measured control cohort from
+the current candidate universe. The comparison can show where the newly
+measured six fall relative to historical six-candidate groups. It cannot by
+itself establish prospective enrichment, acquisition efficacy, or hill
+climbing. The exact inputs, rule, endpoints, artifacts, and claim limits are
+frozen in the study-owned `evaluation_baseline.yaml` receipt before outcome
+review. The receipt also binds the campaign configuration and allocator
+version. Its verifier recomputes all three predicted MSRB score surfaces and
+requires the sequence-unique allocation to reproduce the selected 18 exactly.
+Tie handling, even-sample medians, undefined rank correlations, and missing
+values have fixed rules rather than being chosen after measurement.
 
 Multiple prospectively frozen rounds are needed to test whether retraining
 improves the $X\rightarrow Y$ map and policy outcomes. The planned decision

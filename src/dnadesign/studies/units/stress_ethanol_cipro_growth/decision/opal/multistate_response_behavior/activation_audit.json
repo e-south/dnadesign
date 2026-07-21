@@ -102,8 +102,8 @@
     "property_suite": {
       "path": "src/dnadesign/opal/tests/objectives/test_objective_multistate_response_behavior_v1.py",
       "independent_reviewed_collection_count": 84,
-      "collected_test_count": 84,
-      "post_review_hardening": "The final collection covers the one-scale raw-unit contract, removed two-scale shape, scale-dependent ranking geometry, and finite extreme-input behavior.",
+      "collected_test_count": 99,
+      "post_review_hardening": "The current collection adds 15 response-offset invariance cases to the 84 independently reviewed cases. It covers the one-scale raw-unit contract, removed two-scale shape, scale-dependent ranking geometry, finite extreme-input behavior, and invariance to a common response offset.",
       "result": "pass",
       "properties": [
         "strict directional monotonicity in finite assay-relevant ranges",
@@ -185,7 +185,7 @@
       {
         "role": "objective_property_tests",
         "path": "src/dnadesign/opal/tests/objectives/test_objective_multistate_response_behavior_v1.py",
-        "sha256": "d1f0b1e01cc5b4fd5cc4ad1ad5828204b4b3ae4bf648f6669222ddd680eb8b5e"
+        "sha256": "76846437b337ddd4cdb6e6427ff996401af210cf21038075df401da124cdc3e9"
       },
       {
         "role": "generic_objective_definition",
@@ -195,17 +195,17 @@
       {
         "role": "study_binding",
         "path": "docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md",
-        "sha256": "faf83f80bf945268e3bf771c915f628d609a1f179fbb473a4cf5162891a74165"
+        "sha256": "155e3ee49ee121640f8285d79d743c92cf288ca1e29626c014d865f887f9c92a"
       },
       {
         "role": "active_study_protocol",
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/protocol.yaml",
-      "sha256": "09c1a03119bc7659b35eccd4ef43e65bbcc8ec2594f9962e94e19327bb43852e"
+        "sha256": "57f74b809880bdcb471799c7f70157e23c4e325ec59f12e8462d067a5437b75b"
       },
       {
         "role": "active_study_protocol_readme",
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/README.md",
-        "sha256": "86fdaf77902415564559774428820e1213dec05b52a376f59ec0a8a3f90c5fa2"
+        "sha256": "3dab6957edb09e5ba4f9d9889a416c6970b47048c69550437726b8cc6c67bab2"
       },
       {
         "role": "active_campaign_readme",
@@ -225,7 +225,7 @@
       {
         "role": "activation_receipt_verifier",
         "path": "src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/test_source_tree_contracts.py",
-      "sha256": "90fab6f95e2bbe1fa9bb702814ff2ca422d4e3d5846b6e5118ea56f6c9eaa118"
+        "sha256": "0946ea9fe1d4c599ef006480d11a7e04b9c1d8450859c7de78b03229365376d2"
       },
       {
         "role": "shadow_bundle_verifier",
