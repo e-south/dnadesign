@@ -45,7 +45,7 @@ from .helpers import (
 )
 from .source_fixtures import _fixture_source_record_resolver, _write_source_promotion_fixture
 
-GENBANK_CONSTRUCT_SUBJECT_COUNT = 42
+GENBANK_CONSTRUCT_SUBJECT_COUNT = 46
 RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT = 19
 CRAWFORD_FIXTURE_CONSTRUCT_SUBJECT_COUNT = 2
 KHAN_FIXTURE_CONSTRUCT_SUBJECT_COUNT = 0

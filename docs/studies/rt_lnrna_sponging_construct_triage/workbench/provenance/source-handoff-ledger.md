@@ -1,6 +1,6 @@
 ## Source Handoff Ledger
 
-- Last verified: 2026-05-26
+- Last verified: 2026-07-21
 - Owner: dnadesign-maintainers
 
 ### Live Inventories
@@ -22,7 +22,7 @@
 | Scar-nick profile panel | `docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml` | Finite engineered variant rationale and MsdDesignSpec provenance. |
 | Compiler MSD lnRNA pool fixture | `docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/source-promotions/msd-compiler-pool.yaml` | YIU-compatible study-owned MSD primitive pool that emits 5 x 16 compiler-generated lnRNA variants with reverse-complement insertion into the retron26 template lnRNA. |
 | RT-lnRNA variant GenBank metadata | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml` | User-supplied variant comments, Benchling links, and expected RT/lnRNA class. |
-| RT-lnRNA variant GenBank catalog | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml` | Parsed lnRNA and RT slot source authority for 42 Construct-representable variants: 41 whole-plasmid GenBank sources plus the BL21 lnRNA-only source paired with Eco1 WT RT. |
+| RT-lnRNA variant GenBank catalog | `docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml` | Parsed lnRNA and RT slot source authority for 46 Construct-representable variants: 35 whole-plasmid sources, ten MSD-only handoffs paired with Eco1 WT RT, and the BL21 lnRNA-only source paired with Eco1 WT RT. |
 
 ### GenBank Source Authorities
 
@@ -52,7 +52,7 @@ Parsed offsets and SHA-256 values are pinned in
 - Exact pES retron-26 and pES retron-43 vector constants in source records.
 - Exact 2,000 bp target context:
   `genbank:2000bp-region.gb#record`, contained in pES retron-26 at `[56,2056)`.
-- 42 GenBank-authorized RT-lnRNA construct subjects resolve to explicit lnRNA
+- 46 GenBank-authorized RT-lnRNA construct subjects resolve to explicit lnRNA
   and RT CDS slot sequences.
 - 4,148 abundance-affiliated Crawford Eco1-local source lnRNA sequences pass
   DNA4 validation, Eco1 forward k-mer orientation QC, and reverse-complement
@@ -81,8 +81,9 @@ Parsed offsets and SHA-256 values are pinned in
   2.2 kb would block 15, 2.3 kb would block 5, 2.5 kb would block 1, and
   2.626 kb would block 0. The checked-in lane remains fixed at 2,000 bp.
 - Evo2 Infer sidecars for the six declared Construct sequence views.
-- OPAL-ready fixed-size feature table with real sponging labels.
+- OPAL-ready training table after selecting one fixed-size feature vector `X`;
+  durable Reader sponging labels are materialized.
 
-The live consolidated Construct workspace now materializes 10,421 construct
-subjects into 20,842 realized 2,000 bp contexts with 62,526 sequence-view
+The live consolidated Construct workspace now materializes 10,425 construct
+subjects into 20,850 realized 2,000 bp contexts with 62,550 sequence-view
 declarations.

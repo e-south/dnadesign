@@ -29,4 +29,4 @@
 - id: phase_7_opal_readiness
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/opal-handoff.md
-  notes: Blocked until rt_lnrna_sponging_construct_triage_opal_training_examples_v1 has fixed-size X and real sponging labels.
+  notes: Blocked until rt_lnrna_sponging_construct_triage_opal_training_examples_v1 has a selected fixed-size X and joins the materialized Reader sponging labels.

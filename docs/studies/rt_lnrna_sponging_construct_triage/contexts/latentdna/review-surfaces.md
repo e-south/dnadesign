@@ -1,7 +1,7 @@
 ## RT-lnRNA LatentDNA Review Surfaces
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-26
+**Last verified:** 2026-07-21
 
 This page holds durable LatentDNA review-surface and browser-control semantics
 for `rt_lnrna_sponging_construct_triage`. Current status and next actions live
@@ -55,5 +55,6 @@ Crawford high/low abundance examples. These overlays are provenance and review
 aids; they are not pseudo-records and they do not merge Khan and Crawford
 abundance scales.
 
-SPOP remains a future label-readiness overlay until Reader-to-Construct labels
-are materialized.
+SPOP is materialized as a durable Reader-to-Construct label overlay. It remains
+separate from any OPAL training table until candidate-X selection and the
+explicit label join are complete.

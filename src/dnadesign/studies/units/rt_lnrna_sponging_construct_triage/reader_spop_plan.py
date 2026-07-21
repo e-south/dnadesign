@@ -37,6 +37,7 @@ DEFAULT_READER_EXPERIMENT_IDS: tuple[str, ...] = (
     "20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark",
     "20260529_retron_Eco1_26_43_177_186_benchmark",
     "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark",
+    "20260720_retron_Eco1_26_180_201_202_203_204_benchmark",
 )
 
 SPOP_SOURCE_OF_TRUTH_DOC = "reader/docs/lib/spop_endpoint_in_reader.md"
@@ -46,10 +47,6 @@ REPORTER_DESIGN_ID = "pBbS2c-rfp"
 READER_RATIO_RECORD_ID = "ratio_reporter_normalizer/df"
 SPOP_CANDIDATE_SUMMARY_TABLE = "reader_spop_candidate_summary.parquet"
 SPOP_OBSERVATION_TABLE = "reader_spop_observations.parquet"
-_RETRON_DESIGN_RE = re.compile(
-    r"pES-retron-(?P<number>\d+)(?:-[^;]+)?;\s*pBbS2c-rfp",
-    flags=re.IGNORECASE,
-)
 _TREATMENT_RE = re.compile(
     r"^\s*(?P<atc>[0-9]+(?:\.[0-9]+)?)\s*nm\s*aTc;\s*"
     r"(?P<iptg>[0-9]+(?:\.[0-9]+)?)\s*[uµ]M\s*IPTG\s*$",
@@ -833,11 +830,28 @@ def _parse_treatment(value: str) -> tuple[float, float] | None:
 
 
 def _candidate_key_for_design(value: object) -> str | None:
-    text = str(value or "").strip()
-    match = _RETRON_DESIGN_RE.search(text)
-    if match is None:
-        return None
-    return f"retron{int(match.group('number'))}"
+    return _reader_design_candidate_keys().get(str(value or "").strip().casefold())
+
+
+@cache
+def _reader_design_candidate_keys() -> dict[str, str]:
+    catalog = build_variant_genbank_catalog()
+    if not catalog.ok:
+        joined = "; ".join(catalog.errors)
+        raise ReaderSpopContractError(f"Variant GenBank catalog is invalid: {joined}")
+
+    candidate_keys: dict[str, str] = {}
+    for record in catalog.records:
+        reader_design_id = record.reader_design_id.strip().casefold()
+        if not reader_design_id:
+            raise ReaderSpopContractError(f"Variant {record.variant_id!r} has an empty Reader design ID")
+        existing = candidate_keys.get(reader_design_id)
+        if existing is not None and existing != record.variant_id:
+            raise ReaderSpopContractError(
+                f"Reader design ID {record.reader_design_id!r} resolves to both {existing!r} and {record.variant_id!r}"
+            )
+        candidate_keys[reader_design_id] = record.variant_id
+    return candidate_keys
 
 
 @cache

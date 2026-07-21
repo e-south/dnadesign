@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-reader-spop-condition-structure-matrix-route
 surface: study-route-detail
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-07-08
+last_verified: 2026-07-21
 status: materialized
 ---
 
@@ -194,7 +194,7 @@ in `render.py`; keep source-asset joins in `structure_manifest.py`.
 - Current `na` structure rows mean the assay subject is absent from the
   configured retron-hairpin materialized structure source. The default source
   is `reader_spop_msd_structure_panel_v1/materialized`, which provides
-  sequence-indexed structures for the 36 Reader SPOP assay subjects.
+  sequence-indexed structures for the 40 Reader SPOP assay subjects.
 - If a row claims `structure_status: available` but the referenced PNG or SVG
   path is absent, the renderer fails. Regenerate or repair the thumbnail
   manifest before plotting.

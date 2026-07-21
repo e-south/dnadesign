@@ -34,7 +34,7 @@ replacement_sources:
   included_variant_ids:
   - retron198
   source_role: replacement_overlay
-variant_source_count: 36
+variant_source_count: 40
 variant_sources:
 - variant_id: retron26
   display_id: pES-retron-26
@@ -216,3 +216,23 @@ variant_sources:
   source_file: variants/pes-retron-200.gb
   source_sha256: 6b0946697247437ac23272f834e3379a837d28c4b359791011d6d8f4bf8112df  # pragma: allowlist secret
   source_role: bulk_migration_input
+- variant_id: retron201
+  display_id: pES-retron-201
+  source_file: variants/pes-retron-201.gb
+  source_sha256: ad766f117866923a71f01e00081d1469473388ffb450b499a10b7957ea38f778  # pragma: allowlist secret
+  source_role: variant_genbank_source
+- variant_id: retron202
+  display_id: pES-retron-202
+  source_file: variants/pes-retron-202.gb
+  source_sha256: d99ed25d9c515a3ac6b94fe24c2fc668ec4da186941b543f7668efdcf18dffce  # pragma: allowlist secret
+  source_role: variant_genbank_source
+- variant_id: retron203
+  display_id: pES-retron-203
+  source_file: variants/pes-retron-203.gb
+  source_sha256: 8ca96dfb613a9e4a1014b034de15f926c49a1298384053d9a2709d9940817102  # pragma: allowlist secret
+  source_role: variant_genbank_source
+- variant_id: retron204
+  display_id: pES-retron-204
+  source_file: variants/pes-retron-204.gb
+  source_sha256: e025748cdcd30159de2cb3f76145c22214e17460f4932d6089f56ba2d312e3d1  # pragma: allowlist secret
+  source_role: variant_genbank_source

@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-opal-training-dataset
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-31
+last_verified: 2026-07-21
 ---
 
 ## OPAL Training Dataset
@@ -25,8 +25,10 @@ OPAL readiness means this dataset has:
 - canonical base columns: `id`, `bio_type`, `sequence`, `alphabet`, and
   `length`;
 - one explicit Arrow fixed-size-list vector `X` column selected by the study;
-- a future label slot for `SpongingAssayObservation`;
-- no learned `Y ~ X` campaign before real labels exist.
+- a joined `SpongingAssayObservation` label sourced from the durable Reader
+  sidecar;
+- no learned `Y ~ X` campaign before that label join and fixed-size `X`
+  selection are complete.
 
 The planned label materializer is the Reader-to-Construct bridge documented in
 `reader-spop-label-contract.md`. Reader owns the SPOP metric definition; the
@@ -41,7 +43,8 @@ slot-pair gallery views. Do not default to the largest slot-pair concat merely
 because it contains more dimensions.
 
 Pre-assay records may be OPAL-ready in shape, but OPAL `run` and `explain` are
-blocked until a configured label source satisfies OPAL's own label contract.
+blocked until the materialized Reader label source is joined into the training
+table and satisfies OPAL's own label contract.
 For shared labels, prefer `labels.source.kind: usr_sidecar` and
 `writeback.prediction_records: ledger_only`.
 
@@ -49,5 +52,6 @@ Abundance priors are allowed as metadata or separate analysis targets. They
 must not be exported as `normalized_TF_sponging_label`.
 
 OPAL has a registered `spop_v1` objective for the one-dimensional Reader SPOP
-scalar. This study still must not run OPAL until a selected fixed-size `X` and
-Reader-materialized labels are both available in the OPAL training table.
+scalar. Reader labels are now materialized as a study sidecar; this study still
+must not run OPAL until a selected fixed-size `X` and those labels are both
+available in the OPAL training table.

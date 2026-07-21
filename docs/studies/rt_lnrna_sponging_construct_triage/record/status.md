@@ -1,11 +1,11 @@
 ## rt_lnrna_sponging_construct_triage
 
-- Last verified: 2026-05-26
+- Last verified: 2026-07-21
 - Owner: dnadesign-maintainers
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
 - Study execution map: `../operations/runtime/command-groups/pipeline.yaml`
-- Lifecycle posture: record-only and paused; LatentDNA review artifacts are retained for audit, while OPAL remains blocked on real labels and candidate-X selection
+- Lifecycle posture: record-only and paused; Reader SPOP labels and LatentDNA review artifacts are materialized, while OPAL remains blocked on candidate-X selection
 - OPS provider: study execution surfaces include a six-view Infer batch runbook
 
 ### Current Phase
@@ -16,8 +16,8 @@ promotions, Khan source RT-lnRNA rows that fit the current 2,000 bp construct
 geometry, a bounded compiler-generated MSD lnRNA variant fixture pool, and
 RT-CDS in silico DMS variants, plus a fixed-size representation-table contract
 for the next LatentDNA and OPAL handoff. It is not ready for OPAL training
-because materialized `SpongingAssayObservation` labels and a selected fixed
-candidate-X vector are still absent.
+because a fixed candidate-X vector has not yet been selected; durable
+`SpongingAssayObservation` labels are now materialized and schema-validated.
 
 ### Current Evidence
 
@@ -36,10 +36,11 @@ candidate-X vector are still absent.
   contained in pES-retron-26 at zero-based half-open vector coordinates
   `[56,2056)`.
 - `../workbench/provenance/retron-variant-genbank-metadata.yaml` preserves
-  available Benchling links, antibiotic markers, and user comments for 41
-  retron whole-plasmid variants plus the BL21 wild-type lnRNA-only source;
+  available Benchling links, antibiotic markers, and user comments for 35
+  retron whole-plasmid variants, ten retron-hairpin MSD-only handoffs, and the
+  BL21 wild-type lnRNA-only source;
   `../workbench/provenance/retron-variant-genbank-catalog.yaml` records parsed
-  lnRNA and RT slot source authority for 42 Construct-representable rows.
+  lnRNA and RT slot source authority for 46 Construct-representable rows.
 - Multi-slot Construct projection is declared in
   `../operations/contract/fixtures/construct/construct-projection-manifest.yaml`.
 - `src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/construct_materialization.py`
@@ -56,10 +57,10 @@ candidate-X vector are still absent.
   prefix/interstitial/suffix sequence, forward/reverse-complement rows, and the
   forward/RC lnRNA plus RT CDS fixed-window anchor-mean views with
   `context_kind=template_custom`. The GenBank catalog uses one projection path
-  for all 42 representable rows. The retron26 fixture emits slot spans
+  for all 46 representable rows. The retron26 fixture emits slot spans
   `lnrna: [130,303)` and `rt_cds: [468,1431)`; the retron43 fixture emits
   `lnrna: [123,310)` and `rt_cds: [475,1438)`.
-- The catalog-to-Construct materializer now dogfoods all 42 catalog rows into
+- The catalog-to-Construct materializer now dogfoods all 46 catalog rows into
   the consolidated 2,000 bp output surface. It groups rows by per-candidate
   window offset so positive lnRNA/RT length deltas truncate only the outer
   prefix/suffix flanks, while preserving full lnRNA and RT slot spans. The
@@ -94,14 +95,14 @@ candidate-X vector are still absent.
   template MSD plus 5-prime/3-prime flanks, and writes ordinary Construct
   subject rows with fixed Eco1 WT RT. It does not formalize or materialize a
   pre-Infer concat.
-- The live consolidated Construct input dogfood contains 10,421 construct
-  subjects: 42 GenBank-authorized subjects, 4,148 abundance-affiliated Crawford
+- The live consolidated Construct input dogfood contains 10,425 construct
+  subjects: 46 GenBank-authorized subjects, 4,148 abundance-affiliated Crawford
   source-sequence subjects paired with fixed WT Eco1 RT, 71 abundance-affiliated
   Khan RT-lnRNA subjects, 80 compiler-generated MSD lnRNA variant subjects, and
   6,080 RT-CDS DMS subjects generated through the public `dnadesign.permuter`
   API.
-- The live Construct output dogfood validates strictly with 20,842 realized
-  context rows and 62,526 explicit sequence-view declarations. Each construct
+- The live Construct output dogfood validates strictly with 20,850 realized
+  context rows and 62,550 explicit sequence-view declarations. Each construct
   subject has all six required view names.
 - The executable Infer-readiness gate at
   `../../../../src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
@@ -109,8 +110,8 @@ candidate-X vector are still absent.
   forward context row, one reverse-complement context row, and exactly the six
   declared source sequence-view names per construct subject before the study can
   hand the dataset to Infer. A full temp dogfood through public dnadesign-data
-  source IDs passed with 10,421 subjects, 20,842 Construct output rows, and
-  62,526 sequence-view rows; the source-promotion issues are explicit: 76
+  source IDs passed with 10,425 subjects, 20,850 Construct output rows, and
+  62,550 sequence-view rows; the source-promotion issues are explicit: 76
   missing affiliated abundance observations, 2 missing RT CDS rows, and 40
   over-window Khan rows.
 - `../operations/contract/schemas/representation-table.schema.yaml` declares the
@@ -134,8 +135,9 @@ candidate-X vector are still absent.
 - Current Reader SPOP materialization evidence is label-planner clean with one explicit
   no-call warning:
   `uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan`
-  reports 42 observations across 30 candidate summaries, including
-  `20260529_retron_Eco1_26_43_177_186_benchmark`. The
+  reports 56 observations across 40 candidate summaries, including
+  `20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark` and
+  `20260720_retron_Eco1_26_180_201_202_203_204_benchmark`. The
   `20251105_retron_Eco1_RT_variants` Reader artifact is treated as a
   single-point mid-log read at approximately 10 h after seeding, even though the
   artifact stores row time as 0 h and the historical config reported 12 h.
@@ -149,7 +151,7 @@ candidate-X vector are still absent.
 - `retron-179-a1-a2.gb` is orientation evidence for explicit left/right base,
   snapback cap, foldback, and payload/complement geometry.
 - The variant catalog resolves sequence authority for retron18, 24-27, 43,
-  45-56, 170-186, and `msrmsdwt_bl21`.
+  45-56, 170-186, 195-204, and `msrmsdwt_bl21`.
 - The study-owned Infer runbook
   `../../../../src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml`
   records the batch entrypoint for completing the six-view Evo2 7B workload with one
@@ -158,9 +160,9 @@ candidate-X vector are still absent.
 
 ### Remaining Blockers
 
-- Reader SPOP labels and OPAL handoff. LatentDNA sidecars and review surfaces
-  are materialized, but OPAL still needs a selected fixed-size `X` and durable
-  `SpongingAssayObservation` labels.
+- Reader SPOP labels and OPAL handoff. Durable Reader label tables, LatentDNA
+  sidecars, and review surfaces are materialized, but OPAL still needs a
+  selected fixed-size `X` and the final training-table join.
 - Khan source rows exceeding the current fixed 2,000 bp Construct window. The
   translation-validated Khan RT CDS path is present, but 40 cross-retron RTs are
   too long for the current lnRNA-centered 2,000 bp geometry when paired with
@@ -175,11 +177,6 @@ candidate-X vector are still absent.
   are projected into the dnadesign dual-cassette context and explicitly
   annotated as not native/exact Crawford expression-context recreations; A1/A2
   extension geometry is not assumed to match the dnadesign A1/A2=20 convention.
-- Durable Reader SPOP label sidecar. The planner now resolves live Reader rows
-  through the variant GenBank catalog and carries the known 2025-11-05
-  single-point endpoint caveat plus 2026-05-07 retron176 no-strain omission, but
-  the durable sidecar still needs to be written and schema-validated.
-
 ### Phase 1 Posture
 
 The checked-in construct-subject fixtures are representative GenBank

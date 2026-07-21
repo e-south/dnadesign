@@ -409,6 +409,62 @@ records:
     lnrna_extraction: msd_record
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO
     comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [3,16).
+  - variant_id: retron201
+    retron_number: 201
+    plasmid_name: pES-retron-201
+    source_file: pes-retron-201-msd-tetr-r26-w02-17.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: "pES-retron-201-msd[TetR]-r26-w02-17; pBbS2c-rfp"
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [2,17).
+  - variant_id: retron202
+    retron_number: 202
+    plasmid_name: pES-retron-202
+    source_file: pes-retron-202-msd-tetr-r26-w03-16.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: "pES-retron-202-msd[TetR]-r26-w03-16; pBbS2c-rfp"
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron202_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1 Benchling GenBank handoff; source precedent pES-retron-26, retained payload window [3,16).
+  - variant_id: retron203
+    retron_number: 203
+    plasmid_name: pES-retron-203
+    source_file: pes-retron-203-msd-tetr-r180-w02-17.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: "pES-retron-203-msd[TetR]-r180-w02-17; pBbS2c-rfp"
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron203_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [2,17).
+  - variant_id: retron204
+    retron_number: 204
+    plasmid_name: pES-retron-204
+    source_file: pes-retron-204-msd-tetr-r180-w03-16.gb
+    source_kind: lnrna_only
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: "pES-retron-204-msd[TetR]-r180-w03-16; pBbS2c-rfp"
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    rt_mode: wt_eco1_rt
+    rt_reference_source_file: retron-eco1-rt.gb
+    lnrna_extraction: msd_record
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron204_msd_lnrna__tetO
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1 Benchling GenBank handoff; source precedent pES-retron-180, retained payload window [3,16).
   - variant_id: msrmsdwt_bl21
     retron_number: 0
     plasmid_name: msr/msd(wt)_BL21

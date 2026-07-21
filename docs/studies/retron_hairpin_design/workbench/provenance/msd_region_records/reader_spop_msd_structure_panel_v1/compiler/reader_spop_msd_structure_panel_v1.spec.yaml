@@ -254,6 +254,34 @@ designs:
   right_base: CATG
   source_notes: Generated from decomposed retron-hairpin MSD-region source record
     pes-retron-200-msd-region.yaml.
+- construct_id: pES-retron-201
+  payload_id: MSDRegion201_payload
+  cap_id: C201_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-201-msd-region.yaml.
+- construct_id: pES-retron-202
+  payload_id: MSDRegion202_payload
+  cap_id: C202_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-202-msd-region.yaml.
+- construct_id: pES-retron-203
+  payload_id: MSDRegion203_payload
+  cap_id: C203_msd_region
+  left_base: AGTG
+  right_base: CATG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-203-msd-region.yaml.
+- construct_id: pES-retron-204
+  payload_id: MSDRegion204_payload
+  cap_id: C204_msd_region
+  left_base: AGTG
+  right_base: CATG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-204-msd-region.yaml.
 payload_sequences:
   MSDRegion26_payload:
     sequence: TCCCTATCAGTGATAGAGA
@@ -399,6 +427,22 @@ payload_sequences:
     sequence: TATATCTGATATA
     display_name: pES-retron-200 source primary arm
     selection_basis: msd_region_canonical_interval
+  MSDRegion201_payload:
+    sequence: CCTATCAGTGATAGA
+    display_name: pES-retron-201 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion202_payload:
+    sequence: CTATCAGTGATAG
+    display_name: pES-retron-202 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion203_payload:
+    sequence: CCTATCAGTGATAGA
+    display_name: pES-retron-203 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion204_payload:
+    sequence: CTATCAGTGATAG
+    display_name: pES-retron-204 source primary arm
+    selection_basis: msd_region_canonical_interval
 payload_complement_sequences:
   MSDRegion45_payload:
     sequence: TCTCTATCACTGATAGGGACTCGGAAA
@@ -488,4 +532,12 @@ cap_sequences:
   C199_msd_region:
     sequence: GAGAGACTC
   C200_msd_region:
+    sequence: GAGAGACTC
+  C201_msd_region:
+    sequence: AGGC
+  C202_msd_region:
+    sequence: AGGC
+  C203_msd_region:
+    sequence: GAGAGACTC
+  C204_msd_region:
     sequence: GAGAGACTC

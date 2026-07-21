@@ -20,6 +20,7 @@ import pyarrow.parquet as pq
 import pytest
 import yaml
 
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage import reader_spop_plan as reader_spop_plan_module
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.condition_matrix import (
     build_reader_spop_condition_matrix,
     write_reader_spop_condition_matrix,
@@ -367,9 +368,24 @@ def test_reader_spop_plan_accepts_literal_retron_descriptor_design_id(tmp_path: 
     assert observation.reader_design_id == reader_design_id
 
 
+@pytest.mark.parametrize(
+    "reader_design_id",
+    [
+        "prefix pES-retron-201-msd[TetR]-r26-w02-17; pBbS2c-rfp",
+        "pES-retron-201-arbitrary-descriptor; pBbS2c-rfp",
+        "pES-retron-201-msd[TetR]-r26-w2-17; pBbS2c-rfp",
+        "pES-retron-201-msd[TetR]-r180-w03-16; pBbS2c-rfp",
+        "pES-retron-201-msd[TetR]-r999-w99-99; pBbS2c-rfp",
+    ],
+)
+def test_reader_spop_plan_rejects_malformed_retron_descriptor_design_id(reader_design_id: str) -> None:
+    assert reader_spop_plan_module._candidate_key_for_design(reader_design_id) is None
+
+
 def test_reader_spop_default_experiments_include_retron_177_186_benchmark() -> None:
     assert "20260529_retron_Eco1_26_43_177_186_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
     assert "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
+    assert "20260720_retron_Eco1_26_180_201_202_203_204_benchmark" in DEFAULT_READER_EXPERIMENT_IDS
 
 
 def test_reader_spop_condition_matrix_uses_200nm_positive_control_and_preserves_missing_cells(
@@ -710,6 +726,7 @@ def test_reader_spop_contract_docs_route_label_materialization_without_opal_obje
     assert (
         "20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark" in reader_spop_dataset["reader_experiment_ids"]
     )
+    assert "20260720_retron_Eco1_26_180_201_202_203_204_benchmark" in reader_spop_dataset["reader_experiment_ids"]
     assert reader_spop_dataset["source_of_truth_api"] == "reader.domains.plate_reader.analysis.spop.score_spop_endpoint"
     composite_dataset = next(
         dataset for dataset in datasets["datasets"] if dataset["role"] == "reader_spop_condition_structure_matrix"

@@ -32,7 +32,7 @@ def test_variant_genbank_catalog_extracts_slot_authority_and_preserves_metadata(
     catalog = build_variant_genbank_catalog(repo_root=_repo_root())
 
     assert catalog.ok, "\n".join(catalog.errors)
-    assert catalog.variant_count == 42
+    assert catalog.variant_count == 46
 
     retron26 = catalog.record("retron26")
     assert retron26.plasmid_name == "pES-retron-26"
@@ -100,6 +100,20 @@ def test_variant_genbank_catalog_extracts_slot_authority_and_preserves_metadata(
     assert retron200.lnrna.length_nt == 67
     assert retron200.rt_cds.sequence_sha256 == retron26.rt_cds.sequence_sha256
 
+    retron201 = catalog.record("retron201")
+    assert retron201.source_kind == "lnrna_only"
+    assert retron201.record_id == "pES-retron-201"
+    assert retron201.reader_design_id == "pES-retron-201-msd[TetR]-r26-w02-17; pBbS2c-rfp"
+    assert retron201.lnrna.length_nt == 66
+    assert retron201.rt_cds.sequence_sha256 == retron26.rt_cds.sequence_sha256
+
+    retron204 = catalog.record("retron204")
+    assert retron204.source_kind == "lnrna_only"
+    assert retron204.record_id == "pES-retron-204"
+    assert retron204.reader_design_id == "pES-retron-204-msd[TetR]-r180-w03-16; pBbS2c-rfp"
+    assert retron204.lnrna.length_nt == 67
+    assert retron204.rt_cds.sequence_sha256 == retron26.rt_cds.sequence_sha256
+
     bl21 = catalog.record("msrmsdwt_bl21")
     assert bl21.variant_class == "native_lnrna_wt_rt"
     assert bl21.lnrna.label == "record"
@@ -116,7 +130,7 @@ def test_variant_genbank_catalog_source_files_are_study_owned_and_complete() -> 
     temp_dir = repo_root.parent / "temp_location_for_retron_genbanks"
 
     assert not temp_dir.exists()
-    assert len(list(genbank_dir.glob("*.gb"))) == 46
+    assert len(list(genbank_dir.glob("*.gb"))) == 50
     assert not catalog.missing_metadata_source_files
     assert not catalog.missing_genbank_source_files
 
@@ -126,7 +140,8 @@ def test_variant_genbank_catalog_source_files_are_study_owned_and_complete() -> 
     )
     payload = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
     assert payload["catalog_id"] == "rt_lnrna_sponging_construct_triage_retron_variant_genbank_catalog_v1"
-    assert payload["variant_count"] == 42
+    assert payload["variant_count"] == 46
     assert payload["records"]["retron47"]["rt_cds"]["length_nt"] == 1170
     assert payload["records"]["retron195"]["lnrna"]["authority_kind"] == "msd_record"
+    assert payload["records"]["retron201"]["reader_design_id"].startswith("pES-retron-201-msd[TetR]")
     assert payload["records"]["msrmsdwt_bl21"]["lnrna"]["length_nt"] == 170

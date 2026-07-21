@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-reader-spop-label-contract
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-31
+last_verified: 2026-07-21
 ---
 
 ## Reader SPOP Construct Bridge
@@ -61,16 +61,18 @@ Construct-representable. Rows without catalog authority may carry assay labels,
 but they must remain `missing_construct_sequence_authority` until promoted
 through Construct.
 
-As of 2026-07-07, the live Reader bridge resolves the observed catalog-backed
+As of 2026-07-21, the live Reader bridge resolves the observed catalog-backed
 retron rows to Construct subject ids, including retron47/retron48, retron49-56,
-retron170-175, retron177-186, retron195-200, retron26, retron43, and retron180.
-It materializes 50 Reader SPOP observations across 36 candidate summaries for
+retron170-175, retron177-186, retron195-204, retron26, retron43, and retron180.
+It materializes 56 Reader SPOP observations across 40 candidate summaries for
 LatentDNA overlays. The 2025-11-05 RT-variant experiment is a single-point
 mid-log read, not a time course; the Reader artifact stores row time as 0 h, but
 the study planner records the endpoint as approximately 10 h after seeding and
 adds `single_point_endpoint_time_override`. The 2026-05-07 retron176 wells are
 omitted from labels because the plate map carried retron176 but no actual strain
-was present in those wells.
+was present in those wells. The 2026-07-20 benchmark contributes retron201-204
+plus repeated retron26/retron180 observations under the standard 200 nM aTc
+positive-control convention.
 
 ### Reader Evidence
 

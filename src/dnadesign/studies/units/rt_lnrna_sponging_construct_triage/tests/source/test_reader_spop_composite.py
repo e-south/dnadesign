@@ -180,6 +180,8 @@ def test_reader_spop_row_categories_map_variant_groups() -> None:
     assert category_for_assay_subject("retron172").label == "Foldback cores"
     assert category_for_assay_subject("retron177").label == "Stem/cap wobbles"
     assert category_for_assay_subject("retron195").label == "tetO truncations"
+    assert category_for_assay_subject("retron201").label == "tetO truncations"
+    assert category_for_assay_subject("retron206").label == "tetO truncations"
 
     spans = category_spans_for_variants(("retron26", "retron45", "retron46", "retron47"))
 

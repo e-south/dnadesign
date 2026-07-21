@@ -166,6 +166,12 @@ ASSAY_SUBJECT_CATEGORY_IDS: dict[str, str] = {
     "retron198": "teto_truncations",
     "retron199": "teto_truncations",
     "retron200": "teto_truncations",
+    "retron201": "teto_truncations",
+    "retron202": "teto_truncations",
+    "retron203": "teto_truncations",
+    "retron204": "teto_truncations",
+    "retron205": "teto_truncations",
+    "retron206": "teto_truncations",
 }
 
 

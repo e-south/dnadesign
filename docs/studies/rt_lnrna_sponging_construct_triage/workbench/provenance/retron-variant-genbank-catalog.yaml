@@ -2,7 +2,7 @@ catalog_id: rt_lnrna_sponging_construct_triage_retron_variant_genbank_catalog_v1
 study_id: rt_lnrna_sponging_construct_triage
 source_metadata_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-metadata.yaml
 genbank_dir: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank
-variant_count: 42
+variant_count: 46
 ok: true
 missing_metadata_source_files: []
 missing_genbank_source_files: []
@@ -2167,8 +2167,9 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-195; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
-      GenBank handoff; source precedent pES-retron-26, retained payload window [2,17).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1
+      Benchling GenBank handoff; source precedent pES-retron-26, retained payload
+      window [2,17).
     lnrna:
       sequence_id: genbank:pes-retron-195-msd-tetr-r26-w02-17.gb#msd_record
       label: msd_record
@@ -2227,8 +2228,9 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-196; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
-      GenBank handoff; source precedent pES-retron-26, retained payload window [3,16).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1
+      Benchling GenBank handoff; source precedent pES-retron-26, retained payload
+      window [3,16).
     lnrna:
       sequence_id: genbank:pes-retron-196-msd-tetr-r26-w03-16.gb#msd_record
       label: msd_record
@@ -2287,8 +2289,9 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-197; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
-      GenBank handoff; source precedent pES-retron-43, retained payload window [2,17).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1
+      Benchling GenBank handoff; source precedent pES-retron-43, retained payload
+      window [2,17).
     lnrna:
       sequence_id: genbank:pes-retron-197-msd-tetr-r43-w02-17.gb#msd_record
       label: msd_record
@@ -2347,8 +2350,9 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-198; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
-      GenBank handoff; source precedent pES-retron-43, retained payload window [3,16).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1
+      Benchling GenBank handoff; source precedent pES-retron-43, retained payload
+      window [3,16).
     lnrna:
       sequence_id: genbank:pes-retron-198-msd-tetr-r43-w03-16.gb#msd_record
       label: msd_record
@@ -2407,8 +2411,9 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-199; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
-      GenBank handoff; source precedent pES-retron-180, retained payload window [2,17).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1
+      Benchling GenBank handoff; source precedent pES-retron-180, retained payload
+      window [2,17).
     lnrna:
       sequence_id: genbank:pes-retron-199-msd-tetr-r180-w02-17.gb#msd_record
       label: msd_record
@@ -2466,8 +2471,9 @@ records:
     benchling_url: local_retron_hairpin_handoff
     reader_design_id: pES-retron-200; pBbS2c-rfp
     variant_class: retron_hairpin_trim_msd_wt_rt
-    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1 Benchling
-      GenBank handoff; source precedent pES-retron-180, retained payload window [3,16).
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_tetr_pwm_elite_v1
+      Benchling GenBank handoff; source precedent pES-retron-180, retained payload
+      window [3,16).
     lnrna:
       sequence_id: genbank:pes-retron-200-msd-tetr-r180-w03-16.gb#msd_record
       label: msd_record
@@ -2499,6 +2505,248 @@ records:
       mutation_labels: []
       fusion_part_labels: []
     construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 183
+      - 250
+      rt_cds:
+      - 415
+      - 1378
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_extended_to_2000bp
+  retron201:
+    variant_id: retron201
+    retron_number: 201
+    plasmid_name: pES-retron-201
+    source_file: pes-retron-201-msd-tetr-r26-w02-17.gb
+    source_kind: lnrna_only
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-201-msd-tetr-r26-w02-17.gb
+    source_sha256: 1f88ac3aee887ff72945a1367ba3db575e7737660fe14615984c8c1ba99cf819  # pragma: allowlist secret
+    record_id: pES-retron-201
+    record_name: pES-retron-201
+    sequence_length_bp: 66
+    topology: null
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: pES-retron-201-msd[TetR]-r26-w02-17; pBbS2c-rfp
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1
+      Benchling GenBank handoff; source precedent pES-retron-26, retained payload
+      window [2,17).
+    lnrna:
+      sequence_id: genbank:pes-retron-201-msd-tetr-r26-w02-17.gb#msd_record
+      label: msd_record
+      span_0:
+      - 0
+      - 66
+      span_1:
+      - 1
+      - 66
+      strand: 1
+      length_nt: 66
+      sequence_sha256: 903900ec29d4eb4e0120fc671c5cf535909cc24595af15e2a41094828848cf88  # pragma: allowlist secret
+      authority_kind: msd_record
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 0
+      - 963
+      span_1:
+      - 1
+      - 963
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 184
+      - 250
+      rt_cds:
+      - 415
+      - 1378
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_extended_to_2000bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron202:
+    variant_id: retron202
+    retron_number: 202
+    plasmid_name: pES-retron-202
+    source_file: pes-retron-202-msd-tetr-r26-w03-16.gb
+    source_kind: lnrna_only
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-202-msd-tetr-r26-w03-16.gb
+    source_sha256: bca7898048d1b36b883d867a6f625eab0dd5685f003d32df74b1017558e1364e  # pragma: allowlist secret
+    record_id: pES-retron-202
+    record_name: pES-retron-202
+    sequence_length_bp: 62
+    topology: null
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: pES-retron-202-msd[TetR]-r26-w03-16; pBbS2c-rfp
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1
+      Benchling GenBank handoff; source precedent pES-retron-26, retained payload
+      window [3,16).
+    lnrna:
+      sequence_id: genbank:pes-retron-202-msd-tetr-r26-w03-16.gb#msd_record
+      label: msd_record
+      span_0:
+      - 0
+      - 62
+      span_1:
+      - 1
+      - 62
+      strand: 1
+      length_nt: 62
+      sequence_sha256: c234593ccf02127c65d7ca97de95fed2e1201ca699ce140d33040e9ce414fd5c  # pragma: allowlist secret
+      authority_kind: msd_record
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 0
+      - 963
+      span_1:
+      - 1
+      - 963
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron202_msd_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 186
+      - 248
+      rt_cds:
+      - 413
+      - 1376
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_extended_to_2000bp
+    - context_flank_adjustment_1bp_asymmetry
+  retron203:
+    variant_id: retron203
+    retron_number: 203
+    plasmid_name: pES-retron-203
+    source_file: pes-retron-203-msd-tetr-r180-w02-17.gb
+    source_kind: lnrna_only
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-203-msd-tetr-r180-w02-17.gb
+    source_sha256: 531f25f0b82fe3f837765abd9ca37f7f69c4e1036791e4565a73387bc4f4e1d4  # pragma: allowlist secret
+    record_id: pES-retron-203
+    record_name: pES-retron-203
+    sequence_length_bp: 71
+    topology: null
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: pES-retron-203-msd[TetR]-r180-w02-17; pBbS2c-rfp
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1
+      Benchling GenBank handoff; source precedent pES-retron-180, retained payload
+      window [2,17).
+    lnrna:
+      sequence_id: genbank:pes-retron-203-msd-tetr-r180-w02-17.gb#msd_record
+      label: msd_record
+      span_0:
+      - 0
+      - 71
+      span_1:
+      - 1
+      - 71
+      strand: 1
+      length_nt: 71
+      sequence_sha256: 8e63dba95076184d8d97d0eec32671d11c70268e0ccdbddfc10ef1489b521bb1  # pragma: allowlist secret
+      authority_kind: msd_record
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 0
+      - 963
+      span_1:
+      - 1
+      - 963
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron203_msd_lnrna__tetO
+    construct_spans_0:
+      lnrna:
+      - 181
+      - 252
+      rt_cds:
+      - 417
+      - 1380
+    construct_projection_status: representable
+    qc_flags:
+    - context_flanks_extended_to_2000bp
+  retron204:
+    variant_id: retron204
+    retron_number: 204
+    plasmid_name: pES-retron-204
+    source_file: pes-retron-204-msd-tetr-r180-w03-16.gb
+    source_kind: lnrna_only
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-204-msd-tetr-r180-w03-16.gb
+    source_sha256: 9e042646de8887bc775ad60c5d070c64a1b433cdc219f08155af9dc38b599e3e  # pragma: allowlist secret
+    record_id: pES-retron-204
+    record_name: pES-retron-204
+    sequence_length_bp: 67
+    topology: null
+    antibiotic: Carb
+    benchling_url: local_retron_hairpin_handoff
+    reader_design_id: pES-retron-204-msd[TetR]-r180-w03-16; pBbS2c-rfp
+    variant_class: retron_hairpin_trim_msd_wt_rt
+    comment: Promoted from retron_hairpin_design teto_retained_span_trim_ecoli_working_v1
+      Benchling GenBank handoff; source precedent pES-retron-180, retained payload
+      window [3,16).
+    lnrna:
+      sequence_id: genbank:pes-retron-204-msd-tetr-r180-w03-16.gb#msd_record
+      label: msd_record
+      span_0:
+      - 0
+      - 67
+      span_1:
+      - 1
+      - 67
+      strand: 1
+      length_nt: 67
+      sequence_sha256: 09f928d08508df8769c2bd87bc9c7e3da0ac2c541b43c6d48b521cc8f37301e0  # pragma: allowlist secret
+      authority_kind: msd_record
+      mutation_labels: []
+      fusion_part_labels: []
+    rt_cds:
+      sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+      label: ECD_00831
+      span_0:
+      - 0
+      - 963
+      span_1:
+      - 1
+      - 963
+      strand: 1
+      length_nt: 963
+      sequence_sha256: ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d  # pragma: allowlist secret
+      authority_kind: wt_eco1_rt
+      mutation_labels: []
+      fusion_part_labels: []
+    construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron204_msd_lnrna__tetO
     construct_spans_0:
       lnrna:
       - 183

@@ -52,7 +52,7 @@ registered through the study execution surfaces.
 | Cross-study manuscript framing | `../contexts/retron-tf-decoy-design-logic.md` | routed prose context present |
 | Construct subject universe | `../workbench/design_sets/v1-construct-subject-scope.md` | Phase 0 planned |
 | Exact sequence authority | `../workbench/provenance/genbank-feature-offset-audit.md` | source-authority resolved |
-| Additional variant GenBanks | `../workbench/provenance/retron-variant-genbank-catalog.yaml` | 42 cataloged sources: 35 retron whole-plasmid variants, six retron-hairpin MSD-only handoffs paired with WT Eco1 RT, plus BL21 wild-type lnRNA; all Construct-representable under prefix/suffix flank adjustment |
+| Additional variant GenBanks | `../workbench/provenance/retron-variant-genbank-catalog.yaml` | 46 cataloged sources: 35 retron whole-plasmid variants, ten retron-hairpin MSD-only handoffs paired with WT Eco1 RT, plus BL21 wild-type lnRNA; all Construct-representable under prefix/suffix flank adjustment |
 | Construct projection | `../contexts/construct-contract.md` and `../contexts/representation-contract.md` | multi-slot strategy resolved; six source views declared |
 | RT-CDS DMS variants | `../contexts/permuter-onboarding.md` | study-owned construct-subject-envelope promotion through public Permuter API |
 | Source overlays | `../contexts/source-overlays.md` plus `../record/datasets.yaml` | source inventory pinned |
