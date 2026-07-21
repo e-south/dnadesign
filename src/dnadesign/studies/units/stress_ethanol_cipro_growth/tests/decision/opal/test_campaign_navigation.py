@@ -29,7 +29,7 @@ def test_current_campaign_navigation_resolves_study_record() -> None:
 
     assert navigation.campaign_slug == "secg_msrb_greedy"
     assert navigation.selection_view_ids == ("ethanol", "ciprofloxacin", "and")
-    assert set(navigation.objective_names) == {"multistate_response_behavior_v1"}
+    assert navigation.objective_names == ("multistate_response_behavior_v1",)
     assert navigation.config_path.as_posix().endswith("secg_msrb_greedy/configs/campaign.yaml")
     assert navigation.notebook_path.as_posix().endswith("notebooks/opal_secg_msrb_greedy_analysis.py")
     assert navigation.run_command == f"uv run opal notebook run -c {navigation.config_path}"

@@ -83,12 +83,13 @@ def load_current_campaign_navigation(
         raise FileNotFoundError(f"Current OPAL campaign notebook not found: {notebook_path}")
 
     relative_config = config_path.relative_to(root)
+    objective_names = tuple(dict.fromkeys(view.objective.name for view in config.selection_views))
     return CurrentCampaignNavigation(
         campaign_slug=config.campaign.slug,
         config_path=relative_config,
         notebook_path=notebook_path.relative_to(root),
         selection_view_ids=tuple(view.id for view in config.selection_views),
-        objective_names=tuple(view.objective.name for view in config.selection_views),
+        objective_names=objective_names,
         run_command=f"uv run opal notebook run -c {relative_config}",
     )
 

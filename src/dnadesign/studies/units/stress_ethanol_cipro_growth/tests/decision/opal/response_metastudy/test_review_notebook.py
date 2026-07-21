@@ -39,6 +39,8 @@ def test_review_notebook_has_one_deliverable_selector_and_one_viewport(tmp_path:
     assert "discover_current_campaign_navigation(bundle_root)" in source
     assert "Current OPAL review — outside this evidence bundle" in source
     assert "Current OPAL navigation is unavailable outside a source checkout" in source
+    assert 'objective_label = "Objective" if len(campaign_navigation.objective_names) == 1 else "Objectives"' in source
+    assert "**{objective_label}:**" in source
     assert "secg_msrb_greedy" not in source
     assert "publication.verify_bundle_artifacts(bundle_root)" in source
     assert 'label="Review section"' in source

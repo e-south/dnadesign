@@ -148,6 +148,7 @@ def _(bundle_manifest, campaign_navigation, deliverable, mo, response_metastudy,
             kind="info",
         )
     else:
+        objective_label = "Objective" if len(campaign_navigation.objective_names) == 1 else "Objectives"
         campaign_review = mo.accordion(
             {
                 "Current OPAL review — outside this evidence bundle": mo.md(
@@ -156,7 +157,7 @@ def _(bundle_manifest, campaign_navigation, deliverable, mo, response_metastudy,
 
                     **Selection views:** {", ".join(campaign_navigation.selection_view_ids)}
 
-                    **Objectives:** {", ".join(campaign_navigation.objective_names)}
+                    **{objective_label}:** {", ".join(campaign_navigation.objective_names)}
 
                     **Config:** `{campaign_navigation.config_path}`
 
