@@ -28,6 +28,33 @@ from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     render_notebook_reader_evidence_record_control,
     resolve_notebook_reader_evidence_preferred_record_label,
 )
+from dnadesign.opal.src.analysis.notebook_components.reader_evidence_media import (
+    preferred_reader_media_rows,
+)
+
+
+def test_reader_media_grouping_distinguishes_zero_hour_from_missing_time() -> None:
+    base = {
+        "manifest_path": "reader-evidence.json",
+        "round": 0,
+        "id": "candidate-1",
+        "design_id": "design-1",
+        "reader_experiment_id": "experiment-1",
+        "reduction_id": "snapshot",
+        "semantic_kind": "promoter_response_evidence",
+        "media_type": "image/png",
+    }
+
+    rows = preferred_reader_media_rows(
+        [
+            {**base, "time_selected_h": 0.0, "path": "zero-hour.png"},
+            {**base, "path": "time-not-recorded.png"},
+        ]
+    )
+
+    assert len(rows) == 2
+    assert rows[0]["time_selected_h"] == 0.0
+    assert "time_selected_h" not in rows[1]
 
 
 def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> None:

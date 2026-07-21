@@ -140,16 +140,20 @@ def preferred_reader_media_rows(media_rows: list[dict[str, Any]]) -> list[dict[s
 
 
 def _reader_media_instance_key(row: Mapping[str, Any]) -> tuple[str, ...]:
+    def key_text(field: str) -> str:
+        value = row.get(field)
+        return "" if value is None else str(value)
+
     return (
-        str(row.get("manifest_path") or ""),
-        str(row.get("round") or ""),
-        str(row.get("id") or ""),
-        str(row.get("candidate_id") or ""),
-        str(row.get("design_id") or ""),
-        str(row.get("reader_experiment_id") or ""),
-        str(row.get("reduction_id") or ""),
-        str(row.get("semantic_kind") or ""),
-        str(row.get("time_selected_h") or ""),
+        key_text("manifest_path"),
+        key_text("round"),
+        key_text("id"),
+        key_text("candidate_id"),
+        key_text("design_id"),
+        key_text("reader_experiment_id"),
+        key_text("reduction_id"),
+        key_text("semantic_kind"),
+        key_text("time_selected_h"),
     )
 
 
