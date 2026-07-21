@@ -127,59 +127,7 @@ def _(mo, plot_catalog, review_section):
 
 
 @app.cell
-def _(bundle_manifest, campaign_navigation, deliverable, mo, response_metastudy, review_section):
-    review_summary = response_metastudy.build_review_summary(bundle_manifest)
-    summary = mo.md(
-        f"""
-        # Response assay and objective comparison
-
-        **Scope:** {review_summary.scope}
-        **Observed labels:** {review_summary.label_state}
-        **Predictor support:** {review_summary.predictor_support}
-        **Basis:** {review_summary.basis}
-        **Primary assay summary:** {review_summary.primary_assay_summary}
-        **Evidence base:** {review_summary.evidence_base}
-        **Prospective hill climb:** {review_summary.prospective_hill_climb}
-        """
-    )
-    if campaign_navigation is None:
-        campaign_review = mo.callout(
-            mo.md("Current OPAL navigation is unavailable outside a source checkout."),
-            kind="info",
-        )
-    else:
-        objective_label = "Objective" if len(campaign_navigation.objective_names) == 1 else "Objectives"
-        notebook_status = (
-            "generated" if campaign_navigation.notebook_materialized else "generate with the command below"
-        )
-        campaign_review = mo.accordion(
-            {
-                "Current OPAL review — outside this evidence bundle": mo.md(
-                    f"""
-                    **Campaign:** `{campaign_navigation.campaign_slug}`
-
-                    **Selection views:** {", ".join(campaign_navigation.selection_view_ids)}
-
-                    **{objective_label}:** {", ".join(campaign_navigation.objective_names)}
-
-                    **Config:** `{campaign_navigation.config_path}`
-
-                    **Notebook target:** `{campaign_navigation.notebook_path}` ({notebook_status})
-
-                    ```bash
-                    {campaign_navigation.run_command}
-                    ```
-                    """
-                )
-            }
-        )
-    comparator_guide = mo.accordion(
-        {
-            "Objective comparators": mo.md(
-                """__COMPARATOR_GUIDE_MARKDOWN__"""
-            )
-        }
-    )
+def _(deliverable, mo, review_section):
     controls = mo.hstack(
         [review_section, deliverable],
         widths=[1, 2],
@@ -187,12 +135,67 @@ def _(bundle_manifest, campaign_navigation, deliverable, mo, response_metastudy,
         align="end",
         wrap=True,
     )
-    mo.vstack([summary, campaign_review, comparator_guide, controls], gap=1.0)
     return (controls,)
 
 
 @app.cell
-def _(Path, bundle_root, deliverable, mo, pd, plot_catalog):
+def _(bundle_manifest, campaign_navigation, mo, response_metastudy):
+    review_summary = response_metastudy.build_review_summary(bundle_manifest)
+    study_context = mo.md(
+        f"""
+        **Scope:** {review_summary.scope}
+
+        **Observed labels:** {review_summary.label_state}
+
+        **Predictor support:** {review_summary.predictor_support}
+
+        **Basis:** {review_summary.basis}
+
+        **Primary assay summary:** {review_summary.primary_assay_summary}
+
+        **Evidence base:** {review_summary.evidence_base}
+
+        **Prospective hill climb:** {review_summary.prospective_hill_climb}
+        """
+    )
+    if campaign_navigation is None:
+        campaign_review = mo.md("Current OPAL navigation is unavailable outside a source checkout.")
+    else:
+        objective_label = "Objective" if len(campaign_navigation.objective_names) == 1 else "Objectives"
+        notebook_status = (
+            "generated" if campaign_navigation.notebook_materialized else "generate with the command below"
+        )
+        campaign_review = mo.md(
+            f"""
+            **Campaign:** `{campaign_navigation.campaign_slug}`
+
+            **Selection views:** {", ".join(campaign_navigation.selection_view_ids)}
+
+            **{objective_label}:** {", ".join(campaign_navigation.objective_names)}
+
+            **Config:** `{campaign_navigation.config_path}`
+
+            **Notebook target:** `{campaign_navigation.notebook_path}` ({notebook_status})
+
+            ```bash
+            {campaign_navigation.run_command}
+            ```
+            """
+        )
+    review_context = mo.accordion(
+        {
+            "Study context": study_context,
+            "Current OPAL review — outside this evidence bundle": campaign_review,
+            "Objective comparators": mo.md(
+                """__COMPARATOR_GUIDE_MARKDOWN__"""
+            ),
+        }
+    )
+    return (review_context,)
+
+
+@app.cell
+def _(Path, bundle_root, controls, deliverable, mo, pd, plot_catalog, review_context):
     selected_rows = plot_catalog.loc[plot_catalog["plot_id"].eq(deliverable.value)]
     if len(selected_rows) != 1:
         raise ValueError(f"Deliverable selection must resolve exactly once: {deliverable.value!r}")
@@ -221,6 +224,7 @@ def _(Path, bundle_root, deliverable, mo, pd, plot_catalog):
     )
     viewport = mo.vstack(
         [
+            controls,
             mo.image(
                 str(plot_path),
                 alt=str(selected["alt_text"]),
@@ -231,9 +235,9 @@ def _(Path, bundle_root, deliverable, mo, pd, plot_catalog):
                     "height": "auto",
                     "object-fit": "contain",
                 },
-                caption=str(selected["decision_value"]),
             ),
             details,
+            review_context,
         ],
         gap=1.0,
     )

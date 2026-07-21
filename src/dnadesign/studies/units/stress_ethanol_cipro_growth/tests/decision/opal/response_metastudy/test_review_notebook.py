@@ -59,6 +59,10 @@ def test_review_notebook_has_one_deliverable_selector_and_one_viewport(tmp_path:
     assert "Positive values clear its configured requirement boundaries" in normalized_source
     assert "Higher is better" not in source
     assert "a strong component cannot compensate for a failed one" in normalized_source
+    assert '"Study context": study_context' in source
+    assert "mo.vstack(\n        [\n            controls,\n            mo.image(" in source
+    assert "            details,\n            review_context," in source
+    assert "caption=" not in source
     assert "wrap=True" in source
     assert 'width="100%"' in source
     assert '"max-width": "100%"' in source
