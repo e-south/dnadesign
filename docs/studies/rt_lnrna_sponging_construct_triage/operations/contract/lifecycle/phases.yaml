@@ -17,7 +17,7 @@
 - id: phase_4_overlay_linkage
   status: planned
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/source-overlays.md
-  notes: Keep abundance priors separate from future sponging labels.
+  notes: Keep abundance priors separate from materialized Reader sponging labels.
 - id: phase_5_analysis
   status: planned
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/design_sets/v1-construct-subject-scope.md
@@ -25,7 +25,7 @@
 - id: phase_6_wet_lab_handoff
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/status.md
-  notes: Blocked until candidate-X review is accepted and real label materialization is complete.
+  notes: Reader label materialization is complete; this phase remains blocked only until candidate-X review is accepted.
 - id: phase_7_opal_readiness
   status: blocked
   next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/opal-handoff.md

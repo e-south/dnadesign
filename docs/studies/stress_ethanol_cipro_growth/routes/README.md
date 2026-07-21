@@ -46,18 +46,12 @@ Use this page after the checked-in study status tells you where the record stand
 
 ### Terminology Guardrails
 
-- The study's center of gravity is specification-driven promoter design across
-  regulatory contexts; ethanol/ciprofloxacin is the tractable case study, not
-  the whole contribution.
+- The study's center of gravity is specification-driven promoter design across regulatory contexts; ethanol/ciprofloxacin is the tractable case study, not the whole contribution.
 - DenseGen generation plans are biological generation conditions such as `background_only`, `ethanol`, `ciprofloxacin`, and `ethanol_ciprofloxacin`.
 - OPAL campaigns are downstream objectives: ethanol factor, ciprofloxacin factor, and AND. AND is not a synonym for every `ethanol_ciprofloxacin` DenseGen row.
 - OPAL reads an `opal_candidate_feature_table`, not just a matrix. The materialized table is the dense generated promoter subset plus measured pDual-10 Reader round-0 rows in `usr_prom_eth_cip_opal_candidates` with X column `latentdna__evo2_7b__context_anchor_mean_bidir_concat`.
 - The shared assay state order is `[00, 10, 01, 11]`; each objective owns its own vector interpretation, masks, diagnostics, and claim boundary.
-- Repeat-label truth, model decision quality, and physical handoff acceptance are
-  independent. The observation policy publishes 27 exact labels and eight
-  exclusions; `model_support_ready` remains false even though the exact
-  18-candidate handoff is accepted for order.
-- Study lifecycle phases are record-plane state labels such as the current
-  `opal_assay_b1_order_ready`; they are not DenseGen generation plans.
+- Repeat-label truth, model decision quality, and physical handoff acceptance are independent. The observation policy publishes 27 exact labels and eight exclusions; `model_support_ready` remains false even though the exact 18-candidate handoff is accepted for order.
+- Study lifecycle phases are record-plane state labels such as the current `opal_assay_b1_order_ready`; they are not DenseGen generation plans.
 - Infer lanes are model-family and dataset-target configs such as `anchor_only_20b` or `anchor_plus_template_7b`; they are not lifecycle phases.
 - Route `Plane` values use the repo-wide enum from `ARCHITECTURE.md`. If extra nuance is needed, use `Surface role` rather than inventing a new plane name.

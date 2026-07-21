@@ -91,13 +91,8 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   Per-record lineage and batch-0 provenance remain study-owned.
 - Study visuals enter notebooks only through registered plot APIs and
   `opal.plot_artifact.v1` manifests.
-- Response metric review is study-owned and read-only. It uses OPAL's public
-  objective facades, verifies the Reader bundle, keeps policy and model gates
-  separate, and writes generated workbench evidence. Its `review.py` is not
-  campaign state.
+- Response metric review is study-owned and read-only. It uses OPAL's public objective facades, verifies the Reader bundle, keeps policy and model gates separate, and writes generated workbench evidence. Its `review.py` is not campaign state.
 - LatentDNA can narrow `X`; OPAL owns label-source validation, training,
   scoring, active selection, and ledgers after labels exist.
-- A campaign owns learning; a selection view owns a target; a selection batch
-  owns the logical union. Physical synthesis remains study-owned.
-- The DenseGen axis probe exercises round mechanics in silico. It is not a
-  physical synthesis source and must not fork batch0 or OPAL-ledger semantics.
+- A campaign owns learning; a selection view owns a target; a selection batch owns the logical union. Physical synthesis remains study-owned.
+- The DenseGen axis probe exercises round mechanics in silico. It is not a physical synthesis source and must not fork batch0 or OPAL-ledger semantics.

@@ -193,9 +193,9 @@ view ids.
 2. Decide whether to add a larger or alternate Construct context for
    over-capacity Khan source rows, or keep the current 2,000 bp lane as an
    Eco1-sized normalized context. The 2,000 bp lane is useful but not complete.
-3. Run the Reader SPOP label planner against sibling Reader manifests and audit
-   any endpoint drift, malformed treatments, or weak aTc positive controls
-   before writing a durable label sidecar.
+3. Rerun the Reader SPOP label planner as new sibling Reader manifests arrive,
+   audit any endpoint drift, malformed treatments, or weak aTc positive
+   controls, and refresh the durable label sidecar only after that audit passes.
 4. Run the schema/check fixtures before materializing larger construct subject tables.
-5. Keep abundance priors and future sponging labels separate through OPAL
+5. Keep abundance priors and Reader sponging labels separate through OPAL
    handoff.

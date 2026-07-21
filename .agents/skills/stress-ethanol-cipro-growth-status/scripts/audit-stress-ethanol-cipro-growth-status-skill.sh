@@ -242,7 +242,7 @@ require_pattern 'multistate_response_behavior/protocol\.yaml' "skill names the s
 require_pattern 'activation_audit\.json' "skill names the MSRB activation audit"
 require_pattern 'secg_msrb_greedy' "skill names the sole executable stress campaign"
 require_pattern 'command-groups/README\.md' "skill routes runtime command groups through progressive map"
-require_pattern 'opal_round0_candidate_review' "preflight contract documents current OPAL main-path gate" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
+require_pattern 'opal_assay_b1_order_ready' "preflight contract documents current OPAL main-path gate" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
 require_pattern 'opal\.candidate_table\.contract' "OPAL preflight checks validate candidate-table contract" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/contract/readiness/checks/opal_candidate_table_pre_assay.yaml"
 require_pattern 'appendix_source_datasets' "LatentDNA binding separates appendix sources" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml"
 require_pattern 'latentdna\.readiness\.semantic' "preflight contract documents LatentDNA semantic readiness" "$REPO_ROOT/docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md"
