@@ -832,7 +832,7 @@ def validate_genbank_record_set(
             expected_features = feature_table.copy().fillna("")
         _validate_feature_table_identity(manifest, expected_features)
     expected_filenames = [genbank_record_filename(row) for _, row in manifest.iterrows()]
-    observed_filenames = sorted(path.name for path in genbank_dir.glob("*.gb"))
+    observed_filenames = [path.name for path in genbank_record_paths(genbank_dir)]
     if observed_filenames != sorted(expected_filenames):
         missing = sorted(set(expected_filenames).difference(observed_filenames))
         extra = sorted(set(observed_filenames).difference(expected_filenames))
@@ -856,6 +856,25 @@ def validate_genbank_record_set(
                 raise ValueError(f"GenBank feature table has no rows for {expected['id']}")
         _validate_record_against_manifest_row(records[0], expected, expected_features=record_features)
     return {"status": "pass", "row_count": int(len(manifest)), "genbank_dir_path": str(genbank_dir)}
+
+
+def genbank_record_paths(output_dir: str | Path) -> tuple[Path, ...]:
+    """Return the exact regular ``.gb`` files in a handoff directory."""
+
+    genbank_dir = Path(output_dir)
+    if not genbank_dir.is_dir():
+        raise ValueError(f"GenBank record-set directory not found: {genbank_dir}")
+    entries = tuple(sorted(genbank_dir.iterdir(), key=lambda path: path.name))
+    symlinks = [path.name for path in entries if path.is_symlink()]
+    if symlinks:
+        raise ValueError("GenBank directory entries must be regular files, not symlinks: " + ", ".join(symlinks[:5]))
+    irregular = [path.name for path in entries if not path.is_file()]
+    if irregular:
+        raise ValueError("GenBank directory entries must be regular files: " + ", ".join(irregular[:5]))
+    unexpected = [path.name for path in entries if path.suffix != ".gb"]
+    if unexpected:
+        raise ValueError("unexpected GenBank directory entries: " + ", ".join(unexpected[:5]))
+    return entries
 
 
 def _validate_feature_table_identity(manifest: pd.DataFrame, feature_table: pd.DataFrame) -> None:

@@ -28,7 +28,7 @@ from .contracts import (
     require_nonnegative_integer,
     require_positive_integer,
 )
-from .genbank import validate_genbank_record_set
+from .genbank import genbank_record_paths, validate_genbank_record_set
 
 DEFAULT_SYNTHESIS_HANDOFF_RECORD = Path("docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml")
 SYNTHESIS_HANDOFF_RECORD_VERSION = 3
@@ -911,7 +911,7 @@ def validate_materialization_contract_inputs(
 
 def _sha256_genbank_dir(path: Path) -> str:
     digest = hashlib.sha256()
-    for file_path in sorted(path.glob("*.gb")):
+    for file_path in genbank_record_paths(path):
         digest.update(file_path.name.encode("utf-8"))
         digest.update(b"\0")
         with file_path.open("rb") as handle:

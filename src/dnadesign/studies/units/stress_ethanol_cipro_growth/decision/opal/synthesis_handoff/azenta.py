@@ -109,9 +109,12 @@ def read_azenta_workbook(path: str | Path) -> pd.DataFrame:
         rows = pd.read_excel(workbook_path, sheet_name=AZENTA_SHEET_NAME, dtype=str).fillna("")
     except ValueError as exc:
         raise ValueError(f"Azenta workbook missing sheet {AZENTA_SHEET_NAME!r}: {workbook_path}") from exc
-    missing = [column for column in ("Sequence Name", "Sequence") if column not in rows.columns]
-    if missing:
-        raise ValueError("Azenta workbook missing required columns: " + ", ".join(missing))
+    observed_columns = tuple(str(column) for column in rows.columns)
+    if observed_columns != AZENTA_COLUMNS:
+        raise ValueError(
+            "Azenta workbook column contract mismatch: "
+            f"expected {list(AZENTA_COLUMNS)!r}, observed {list(observed_columns)!r}"
+        )
     return rows
 
 
@@ -120,14 +123,8 @@ def validate_azenta_workbook(manifest: pd.DataFrame, path: str | Path) -> dict[s
 
     _require_manifest_columns(manifest)
     workbook_path = Path(path)
-    expected = (
-        manifest.loc[:, list(_MANIFEST_COLUMNS)]
-        .rename(columns={"synthesis_name": "Sequence Name", "final_sequence": "Sequence"})
-        .astype(str)
-        .reset_index(drop=True)
-    )
-    observed = read_azenta_workbook(workbook_path).loc[:, ["Sequence Name", "Sequence"]]
-    observed = observed.astype(str).reset_index(drop=True)
+    expected = azenta_rows_from_manifest(manifest).astype(str).reset_index(drop=True)
+    observed = read_azenta_workbook(workbook_path).astype(str).reset_index(drop=True)
 
     if len(observed) != len(expected):
         raise ValueError(f"Azenta workbook row count mismatch: expected {len(expected)}, observed {len(observed)}")
@@ -148,5 +145,14 @@ def validate_azenta_workbook(manifest: pd.DataFrame, path: str | Path) -> dict[s
             "Azenta workbook sequence mismatch at row "
             f"{first + 2}: expected manifest final_sequence for {expected.loc[first, 'Sequence Name']!r}"
         )
+
+    for column in ("Add Protection Nt.", "5' Phosphorylation"):
+        option_mismatches = observed[column] != expected[column]
+        if bool(option_mismatches.any()):
+            first = int(option_mismatches[option_mismatches].index[0])
+            raise ValueError(
+                f"Azenta workbook {column} mismatch at row {first + 2}: "
+                f"expected {expected.loc[first, column]!r}, observed {observed.loc[first, column]!r}"
+            )
 
     return {"status": "pass", "row_count": int(len(expected)), "workbook_path": str(workbook_path)}

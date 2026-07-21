@@ -425,13 +425,40 @@ def test_azenta_workbook_readback_fails_on_sequence_mismatch(tmp_path: Path) -> 
     workbook_path = tmp_path / "azenta-order.xlsx"
     broken = pd.DataFrame(
         [
-            {"Sequence Name": "ES-promoter-32", "Sequence": f"{LEFT_FLANK}{CORE_A}{RIGHT_FLANK}"},
-            {"Sequence Name": "ES-promoter-33", "Sequence": f"{LEFT_FLANK}{CORE_A}{RIGHT_FLANK}"},
+            {
+                "Sequence Name": "ES-promoter-32",
+                "Sequence": f"{LEFT_FLANK}{CORE_A}{RIGHT_FLANK}",
+                "Add Protection Nt.": "",
+                "5' Phosphorylation": "",
+            },
+            {
+                "Sequence Name": "ES-promoter-33",
+                "Sequence": f"{LEFT_FLANK}{CORE_A}{RIGHT_FLANK}",
+                "Add Protection Nt.": "",
+                "5' Phosphorylation": "",
+            },
         ]
     )
     broken.to_excel(workbook_path, sheet_name="Azenta Gene Synthesis", index=False)
 
     with pytest.raises(ValueError, match="sequence mismatch"):
+        validate_azenta_workbook(manifest, workbook_path)
+
+
+@pytest.mark.parametrize("column", ["Add Protection Nt.", "5' Phosphorylation"])
+def test_azenta_workbook_readback_rejects_vendor_option_drift(tmp_path: Path, column: str) -> None:
+    manifest = build_synthesis_manifest(
+        selected=_selected_candidates(),
+        strategy=_strategy(),
+        batch_id="stress-opal-r0-20260617",
+    )
+    workbook_path = tmp_path / "azenta-order.xlsx"
+    render_azenta_workbook(manifest, workbook_path)
+    drifted = read_azenta_workbook(workbook_path)
+    drifted.loc[0, column] = "Yes"
+    drifted.to_excel(workbook_path, sheet_name="Azenta Gene Synthesis", index=False)
+
+    with pytest.raises(ValueError, match=column.replace(".", r"\.")):
         validate_azenta_workbook(manifest, workbook_path)
 
 
@@ -784,6 +811,40 @@ def test_genbank_validation_rejects_membership_qualifier_drift(tmp_path: Path) -
 
     with pytest.raises(ValueError, match="selection_views mismatch"):
         validate_genbank_record_set(manifest, genbank_dir)
+
+
+def test_genbank_validation_rejects_unexpected_directory_entries(tmp_path: Path) -> None:
+    selected = selected_candidates_from_batch0_review(
+        pd.DataFrame([{"campaign": "secg_ethanol_rf_sfxi_topn", "id": "eth-a", "sequence": CORE_A}])
+    )
+    manifest = build_synthesis_manifest(selected=selected, strategy=_strategy(), batch_id="stress-opal-batch0-sfxi-v1")
+    feature_table = build_genbank_feature_table(manifest)
+    genbank_dir = tmp_path / "genbank"
+    render_genbank_record_set(manifest, feature_table, genbank_dir)
+    (genbank_dir / "notes.txt").write_text("not part of the handoff\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unexpected GenBank directory entries: notes.txt"):
+        validate_genbank_record_set(manifest, genbank_dir)
+
+
+def test_genbank_validation_rejects_symlinked_record(tmp_path: Path) -> None:
+    selected = selected_candidates_from_batch0_review(
+        pd.DataFrame([{"campaign": "secg_ethanol_rf_sfxi_topn", "id": "eth-a", "sequence": CORE_A}])
+    )
+    manifest = build_synthesis_manifest(selected=selected, strategy=_strategy(), batch_id="stress-opal-batch0-sfxi-v1")
+    feature_table = build_genbank_feature_table(manifest)
+    genbank_dir = tmp_path / "genbank"
+    rendered = render_genbank_record_set(manifest, feature_table, genbank_dir)
+    record_path = Path(rendered.iloc[0]["genbank_file_path"])
+    outside_record = tmp_path / "outside.gb"
+    record_path.replace(outside_record)
+    record_path.symlink_to(outside_record)
+
+    with pytest.raises(ValueError, match="GenBank directory entries must be regular files, not symlinks"):
+        validate_genbank_record_set(manifest, genbank_dir)
+
+    with pytest.raises(ValueError, match="GenBank directory entries must be regular files, not symlinks"):
+        synthesis_handoff_records._sha256_genbank_dir(genbank_dir)
 
 
 def test_genbank_validation_rejects_record_identity_drift(tmp_path: Path) -> None:
