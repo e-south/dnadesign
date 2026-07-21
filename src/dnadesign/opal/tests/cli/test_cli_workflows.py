@@ -425,6 +425,44 @@ def test_run_rejected_campaign_lock_does_not_mutate_round_log(tmp_path: Path) ->
     assert round_log.read_bytes() == original_log
 
 
+def test_run_rechecks_round_artifacts_after_acquiring_campaign_lock(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    from dnadesign.opal.src.cli.commands import run as run_command
+
+    model_artifact = workdir / "outputs" / "rounds" / "round_0" / "model" / "model.joblib"
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+    original_check = run_command.assert_round_artifacts_writable
+    completed_log = json.dumps({"stage": "command_complete"}).encode() + b"\n"
+    check_count = 0
+
+    def check_after_competing_run(*args, **kwargs):
+        nonlocal check_count
+        result = original_check(*args, **kwargs)
+        check_count += 1
+        if check_count == 1:
+            model_artifact.parent.mkdir(parents=True, exist_ok=True)
+            model_artifact.write_bytes(b"completed-by-competing-run")
+            round_log.parent.mkdir(parents=True, exist_ok=True)
+            round_log.write_bytes(completed_log)
+        return result
+
+    monkeypatch.setattr(run_command, "assert_round_artifacts_writable", check_after_competing_run)
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "run", "-c", str(campaign), "--round", "0", "--quiet"],
+    )
+
+    assert result.exit_code == 2
+    assert "already contains artifacts" in _plain_output(result.output)
+    assert model_artifact.read_bytes() == b"completed-by-competing-run"
+    assert round_log.read_bytes() == completed_log
+    assert not (workdir / ".opal.lock").exists()
+
+
 def test_run_writes_every_round_log_event_while_campaign_lock_is_held(
     tmp_path: Path,
     monkeypatch,

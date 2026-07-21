@@ -126,6 +126,29 @@ def _release_run_lock(
         lock.release()
 
 
+def _release_failed_run_lock(
+    lock: CampaignLock,
+    cfg,
+    cfg_path: Path,
+    round_index: int,
+    *,
+    attempt_id: str,
+    round_log_opened: bool,
+) -> None:
+    """Release without creating a round log that this attempt never opened."""
+    if not round_log_opened:
+        lock.release()
+        return
+    _release_run_lock(
+        lock,
+        cfg,
+        cfg_path,
+        int(round_index),
+        attempt_id=attempt_id,
+        outcome="aborted",
+    )
+
+
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
 def cmd_run(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
@@ -202,6 +225,14 @@ def cmd_run(
             payload_extra={"attempt_id": attempt_id, "round": int(round), "command": "run"},
         )
         campaign_lock.acquire()
+        # Another invocation may have completed this round between the
+        # pre-lock check and lock acquisition. Recheck before opening the
+        # immutable round log or writing any other round-scoped artifact.
+        assert_round_artifacts_writable(
+            ws.round_dir(int(round)),
+            round_index=int(round),
+            allow_resume=bool(resume),
+        )
         _append_cli_round_event(
             cfg,
             cfg_path,
@@ -368,13 +399,13 @@ def cmd_run(
         if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
             if round_log_opened:
                 _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
-            _release_run_lock(
+            _release_failed_run_lock(
                 campaign_lock,
                 cfg,
                 cfg_path,
                 int(round),
                 attempt_id=str(attempt_id),
-                outcome="aborted",
+                round_log_opened=round_log_opened,
             )
         raise
     except OpalError as e:
@@ -387,13 +418,13 @@ def cmd_run(
         ):
             _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
         if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
-            _release_run_lock(
+            _release_failed_run_lock(
                 campaign_lock,
                 cfg,
                 cfg_path,
                 int(round),
                 attempt_id=str(attempt_id),
-                outcome="aborted",
+                round_log_opened=round_log_opened,
             )
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
@@ -407,13 +438,13 @@ def cmd_run(
         ):
             _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
         if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
-            _release_run_lock(
+            _release_failed_run_lock(
                 campaign_lock,
                 cfg,
                 cfg_path,
                 int(round),
                 attempt_id=str(attempt_id),
-                outcome="aborted",
+                round_log_opened=round_log_opened,
             )
         internal_error("run", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
