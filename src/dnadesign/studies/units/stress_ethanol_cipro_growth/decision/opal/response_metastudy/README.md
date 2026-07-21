@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-metastudy-package
 title: Response assay and objective comparison package
 owner: stress_ethanol_cipro_growth
 status: source_evidence
-last_verified: 2026-07-20
+last_verified: 2026-07-21
 ---
 
 # Response assay and objective comparison
@@ -198,7 +198,8 @@ diagnostics and are not alternate names for RMF.
 - `plot_manifest.csv`: plot title, premise, value, rationale, alt text, review
   section, storage tier, and data source.
 - `tables/`: policy, label, model, uncertainty, repeated-measurement, and
-  greedy-support evidence.
+  greedy-support evidence, including the historical observed-SFXI component
+  replay and its source-deletion and ES-design sensitivity checks.
 - `plots/`: primary decision, metric diagnostic, and screen appendix figures.
 - `model_evidence/`: optional immutable checkpoints projected from verified
   metastudy bundles; see `model_evidence/README.md`.
@@ -215,7 +216,9 @@ not the user-facing navigation ontology.
 SFXI source evidence is evaluated only under its declared vec8 contract.
 Response-window evidence is evaluated only from its declared `r` and `b`
 fields; the study does not translate those fields into an SFXI vector. The SFXI
-source selections are too effect-dominated for synthesis. The Reader primary
+replay shows that measured score ranks in this 35-label corpus followed scaled
+target-state effect much more closely than logic fidelity. This is historical
+comparator evidence, not a universal claim about SFXI. The Reader primary
 response reduction is the duration-weighted mean log2 ratio from 4-8 hours
 after the intervention. The configured campaign random forest is evaluated as
 the campaign model. Fixed challengers and the mean baseline remain separate

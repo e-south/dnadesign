@@ -33,6 +33,8 @@ def save_metastudy_figure(figure: plt.Figure, path: Path) -> None:
         str(text.get_gid() or "").startswith("column-group-label:") for axis in data_axes for text in axis.texts
     )
     title = fill(_TITLES[plot_id], width=max(48, int(figure.get_figwidth() * 7)))
+    declared_title_size = figure._suptitle.get_fontsize() if figure._suptitle is not None else 13
+    title_size = max(13, float(declared_title_size))
     if len(data_axes) == 1:
         for location in ("left", "center", "right"):
             data_axes[0].set_title("", loc=location)
@@ -40,7 +42,7 @@ def save_metastudy_figure(figure: plt.Figure, path: Path) -> None:
             title,
             loc="center",
             fontweight="semibold",
-            fontsize=13,
+            fontsize=title_size,
             pad=52 if has_group_labels else 12,
         )
     else:
@@ -50,7 +52,7 @@ def save_metastudy_figure(figure: plt.Figure, path: Path) -> None:
             y=1.11 if has_group_labels else 1.04,
             ha="center",
             fontweight="semibold",
-            fontsize=13,
+            fontsize=title_size,
         )
         for axis in data_axes:
             _center_panel_title(axis)
@@ -96,9 +98,10 @@ def _center_panel_title(axis: plt.Axes) -> None:
         raise ValueError("response-metastudy panel axis declares multiple titles.")
     if not populated:
         return
+    fontsize = axis.title.get_fontsize()
     for location in ("left", "center", "right"):
         axis.set_title("", loc=location)
-    axis.set_title(populated[0], loc="center")
+    axis.set_title(populated[0], loc="center", fontsize=fontsize)
 
 
 __all__ = ["save_metastudy_figure"]

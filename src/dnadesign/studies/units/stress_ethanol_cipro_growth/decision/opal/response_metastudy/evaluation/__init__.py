@@ -36,11 +36,17 @@ from .multistate_behavior_protocol import BehaviorProtocolError, load_multistate
 from .multistate_behavior_rows import bootstrap_rows_with_identity
 from .multistate_behavior_shadow import build_multistate_behavior_shadow_evidence
 from .multistate_behavior_stability import build_bootstrap_rank_stability
+from .observed_sfxi_replay import (
+    ObservedSfxiViewContext,
+    build_observed_sfxi_decomposition,
+    summarize_observed_sfxi_decomposition,
+)
 
 __all__ = [
     "CAMPAIGN_MODEL_SCREEN_ID",
     "DEFAULT_MODEL_SCREEN_SPECS",
     "ModelScreenSpec",
+    "ObservedSfxiViewContext",
     "VerifiedBehaviorCohortReceipt",
     "behavior_cohort_unit_ids_sha256",
     "behavior_normalization_source_rows_sha256",
@@ -49,6 +55,7 @@ __all__ = [
     "build_multistate_behavior_event_sensitivity",
     "build_repeated_behavior_agreement",
     "build_multistate_behavior_shadow_evidence",
+    "build_observed_sfxi_decomposition",
     "build_bootstrap_rank_stability",
     "compare_hard_and_behavior_scores",
     "bootstrap_rows_with_identity",
@@ -58,6 +65,7 @@ __all__ = [
     "load_multistate_behavior_protocol",
     "response_magnitude_to_factorial_contrast7",
     "screen_label_models",
+    "summarize_observed_sfxi_decomposition",
     "verify_multistate_behavior_normalization_source",
     "window_evidence",
 ]

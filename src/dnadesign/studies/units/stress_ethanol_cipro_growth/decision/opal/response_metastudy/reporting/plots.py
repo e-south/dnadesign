@@ -36,6 +36,7 @@ from .metric_behavior_plots import (
     write_target_view_pareto_fronts,
 )
 from .model_validation_plot import write_model_validation
+from .observed_sfxi_plot import write_historical_observed_sfxi_decomposition
 from .plot_catalog import PLOT_TIER_DIRS, build_plot_manifest, specs_by_id
 from .primary_plots import (
     write_policy_decision_frontier,
@@ -79,6 +80,8 @@ def write_visuals(
     response_screen: ResponseMetricScreen,
     response_examples: pd.DataFrame,
     rmf_cardinality_pressure: pd.DataFrame,
+    observed_sfxi_components: pd.DataFrame,
+    observed_sfxi_robustness: pd.DataFrame,
     scored: dict[str, dict[str, pd.DataFrame]],
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...],
     thresholds: RecommendationThresholds,
@@ -95,6 +98,11 @@ def write_visuals(
     write_rmf_cardinality_pressure(
         rmf_cardinality_pressure,
         paths["rmf_cardinality_pressure"],
+    )
+    write_historical_observed_sfxi_decomposition(
+        observed_sfxi_components,
+        observed_sfxi_robustness,
+        paths["historical_observed_sfxi_decomposition"],
     )
 
     write_policy_guardrail_matrix(

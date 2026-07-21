@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 from dnadesign.opal import ObservedLabelVerificationError
@@ -71,6 +72,7 @@ def test_verified_configured_promotion_manifest_is_promoted(
         "verify_observed_label_snapshot",
         lambda *_args, **_kwargs: SimpleNamespace(
             promotion=SimpleNamespace(manifest_sha256="a" * 64),
+            labels=pd.DataFrame({"id": ["candidate-a", "candidate-b"]}),
         ),
     )
 
@@ -82,6 +84,7 @@ def test_verified_configured_promotion_manifest_is_promoted(
         "path": "_opal/labels/promotion.manifest.json",
         "sha256": "a" * 64,
     }
+    assert state.candidate_ids == ("candidate-a", "candidate-b")
     assert state.ready is True
 
 

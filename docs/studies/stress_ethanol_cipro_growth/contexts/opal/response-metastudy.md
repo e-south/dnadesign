@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-response-metastudy
 title: Response assay and objective comparison
 owner: dnadesign-maintainers
 status: source_evidence
-last_verified: 2026-07-19
+last_verified: 2026-07-21
 audience:
   - scientist
   - maintainer
@@ -14,7 +14,7 @@ audience:
 
 **Status:** frozen comparative evidence
 **Owner:** `stress_ethanol_cipro_growth` study
-**Last verified:** 2026-07-19
+**Last verified:** 2026-07-21
 **Implementation:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy`
 **Generated evidence:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_metastudy/latest`
 
@@ -118,7 +118,9 @@ The response-metastudy publication schema is
    a prespecified coordinated six-slot policy.
 7. Verify the three immutable round-0 SFXI source ledgers, shared 35-row label
    pool, candidate IDs, and equivalent predictor surfaces. Recompute persisted
-   SFXI scores through the public OPAL API and audit its historical variants.
+   SFXI scores through the public OPAL API, decompose each measured score into
+   logic fidelity and scaled effect, and test the result after deleting each
+   source experiment and restricting the comparison to ES designs.
 8. Publish typed tables, a manifest-backed plot catalog, a report, and one
     Marimo review notebook.
 
@@ -181,8 +183,16 @@ observed Y; OPAL applies the configured objective and owns campaign scoring.
 
 ### Evidence Findings
 
-Canonical SFXI recomputes exactly, but its persisted top-six results remain
-effect-dominated:
+Canonical SFXI recomputes exactly on the 35 historical observed labels. Across
+the ethanol-associated, ciprofloxacin-associated, and combined-state-only
+views, the rank correlations between SFXI and scaled effect are 0.967, 0.920,
+and 0.955. The corresponding correlations with logic fidelity are -0.209,
+-0.030, and -0.170. Deleting each source experiment in turn or restricting the
+analysis to the 23 ES designs preserves the conclusion. These are
+corpus-sensitivity checks, not cross-validation or evidence that SFXI is
+universally effect-dominated.
+
+The persisted predicted top-six results show the related allocation pattern:
 
 - 18 target-view slots collapse to 11 unique sequences;
 - 2 candidates appear in all three target-view lists;
@@ -221,8 +231,9 @@ layout:
    prospective ordering visible.
 3. **RMF comparator** retains thresholded requirements, uncertainty, and
    retrospective greedy evidence as comparator material.
-4. **SFXI comparator** retains setpoint, score-coupling, overlap, and policy
-   screens under the distinct SFXI phenotype contract.
+4. **SFXI comparator** opens with the measured-label decomposition, then
+   retains predicted setpoint, score-coupling, overlap, and policy screens under
+   the distinct SFXI phenotype contract.
 
 The active `secg_msrb_greedy` campaign is reviewed in its own OPAL notebook.
 The metastudy does not reproduce active campaign state or use comparator plots

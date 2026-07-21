@@ -30,6 +30,7 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
         spec.tier for spec in plot_catalog.PLOT_SPECS
     }
     assert {
+        "historical_observed_sfxi_decomposition",
         "measured_response_examples",
         "sfxi_score_contours",
         "target_view_pareto_fronts",
@@ -91,7 +92,15 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
     assert sections["repeated_design_agreement"] == "assay_and_labels"
     assert sections["label_model_screen"] == "historical_model_screens"
     assert sections["measured_response_examples"] == "rmf_comparator"
+    assert sections["historical_observed_sfxi_decomposition"] == "sfxi_comparator"
+    assert orders["historical_observed_sfxi_decomposition"] == 1
+    assert orders["policy_guardrail_matrix"] == 2
     assert sections["sfxi_score_contours"] == "sfxi_comparator"
+    observed_sfxi = next(
+        spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "historical_observed_sfxi_decomposition"
+    )
+    assert observed_sfxi.data_table == "tables/sfxi_round0_training_components.csv"
+    assert "measured corpus" in observed_sfxi.title.lower()
     measured = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "measured_response_examples")
     assert measured.title == "The target mask changes which fixed Reader states define each RMF requirement"
     assert "same measured SpyP and sulAp summaries" in measured.decision_value

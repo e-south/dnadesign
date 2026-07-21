@@ -61,10 +61,9 @@ from .loading import (
 )
 from .manifest import write_metastudy_manifest
 from .measurement_selection import load_response_measurement_selection
+from .observed_sfxi import build_historical_observed_sfxi_evidence
 from .publication import create_staging_dir, publish_staging_dir, remove_staging_dir, sha256_arrays
-from .response_screen import (
-    build_response_metric_screen,
-)
+from .response_screen import build_response_metric_screen
 from .response_screen_publication import response_screen_manifest
 from .review_bundle import ReviewBundleEvidence, materialize_review_bundle
 from .run_contracts import assert_shared_label_sources, predictor_parity
@@ -147,6 +146,13 @@ def _materialize_metastudy(
         measurement_selection=measurement_selection.rows,
         excluded_designs=measurement_selection.excluded_designs,
         bundle_root=candidate_binding_bundle_root,
+    )
+    observed_sfxi = build_historical_observed_sfxi_evidence(
+        label_sources,
+        observed_labels,
+        sfxi_evidence=sfxi_evidence,
+        label_truth_state=label_truth_state,
+        candidate_bindings=candidate_identity_bindings,
     )
     response_labels = build_selected_response_labels(
         reader_bundle,
@@ -310,7 +316,6 @@ def _materialize_metastudy(
         setpoint_support=setpoint_support,
         intrinsic_tests=intrinsic_tests,
     )
-
     artifact_records = materialize_review_bundle(
         paths,
         ReviewBundleEvidence(
@@ -326,6 +331,8 @@ def _materialize_metastudy(
             response_screen=response_screen,
             response_examples=response_examples,
             rmf_cardinality_pressure=rmf_cardinality_pressure,
+            observed_sfxi_components=observed_sfxi.components,
+            observed_sfxi_robustness=observed_sfxi.robustness,
             scored=scored,
             sfxi_evidence=sfxi_evidence,
             thresholds=thresholds,

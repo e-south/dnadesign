@@ -41,6 +41,8 @@ def write_report(
     comparison_panel: pd.DataFrame,
     model_validation: pd.DataFrame,
     setpoint_support: pd.DataFrame,
+    observed_sfxi_components: pd.DataFrame,
+    observed_sfxi_robustness: pd.DataFrame,
     response_screen: ResponseMetricScreen,
     pressure_tests: pd.DataFrame,
     plot_manifest: pd.DataFrame,
@@ -82,6 +84,10 @@ def write_report(
     support_at_guardrail = setpoint_support[
         (setpoint_support["logic_threshold"] - thresholds.min_target_view_median_logic).abs() < 1.0e-12
     ]
+    observed_sfxi_summary, observed_sfxi_sensitivity = _observed_sfxi_report_evidence(
+        observed_sfxi_components,
+        observed_sfxi_robustness,
+    )
     primary_reduction_label = representation_label(primary_reduction_id).replace("\n", " ")
     label_truth_summary = (
         "The configured observed-label publication is verified."
@@ -170,6 +176,20 @@ def write_report(
         "- State order: `[00, 10, 01, 11]`.",
         "- Score: `logic_fidelity^beta * effect_scaled^gamma`.",
         "- Effect scaling: weighted target-state intensity divided by the source run's denominator.",
+        "",
+        "### Historical observed-label decomposition",
+        "",
+        "This replay evaluates the 35 historical SFXI vec8 labels under each persisted target view. It does not "
+        "translate the active response-window phenotype into SFXI coordinates. Canonical SFXI is the product of "
+        "logic fidelity and scaled target-state effect, so the component associations show which factor most "
+        "closely followed the measured score ranks in this corpus.",
+        "",
+        _markdown_table(observed_sfxi_summary),
+        "",
+        observed_sfxi_sensitivity,
+        "",
+        "These are corpus-sensitivity checks, not cross-validation or evidence that SFXI is universally "
+        "effect-dominated.",
         "",
         "### Historical SFXI verdict",
         "",
@@ -297,6 +317,43 @@ def _validate_evidence_section_order(lines: list[str]) -> None:
         positions.append(lines.index(heading))
     if positions != sorted(positions):
         raise ValueError(f"Report evidence sections are out of order: {EVIDENCE_SECTION_ORDER!r}")
+
+
+def _observed_sfxi_report_evidence(
+    components: pd.DataFrame,
+    robustness: pd.DataFrame,
+) -> tuple[pd.DataFrame, str]:
+    expected_views = {"ethanol", "ciprofloxacin", "and"}
+    full = robustness.loc[robustness["sensitivity_scope"].eq("all_observed_labels")].copy()
+    if set(full["selection_view_id"].astype(str)) != expected_views or len(full) != len(expected_views):
+        raise ValueError("Observed SFXI report requires one full-corpus row per target view.")
+    if components.groupby("selection_view_id")["id"].nunique().to_dict() != {
+        view_id: 35 for view_id in sorted(expected_views)
+    }:
+        raise ValueError("Observed SFXI report requires 35 measured labels per target view.")
+    full = full[
+        ["selection_view_id", "candidate_count", "sfxi_vs_logic_spearman", "sfxi_vs_effect_spearman"]
+    ].sort_values("selection_view_id", kind="mergesort")
+    full = full.rename(
+        columns={
+            "selection_view_id": "target_view",
+            "candidate_count": "measured_labels",
+            "sfxi_vs_logic_spearman": "rank_rho_logic",
+            "sfxi_vs_effect_spearman": "rank_rho_scaled_effect",
+        }
+    )
+    deletion = robustness.loc[robustness["sensitivity_scope"].eq("leave_one_experiment_out")]
+    es_only = robustness.loc[robustness["sensitivity_scope"].eq("es_designs_only")]
+    if deletion.empty or set(es_only["selection_view_id"].astype(str)) != expected_views:
+        raise ValueError("Observed SFXI report requires source-deletion and ES-only sensitivity evidence.")
+    deletion_count = deletion["excluded_reader_experiment_id"].astype(str).nunique()
+    es_count = int(es_only["candidate_count"].min())
+    sentence = (
+        f"Across {deletion_count} source-experiment deletions, the minimum SFXI-versus-scaled-effect rank "
+        f"correlation was {float(deletion['sfxi_vs_effect_spearman'].min()):.3f}. Among the {es_count} ES designs, "
+        f"the minimum was {float(es_only['sfxi_vs_effect_spearman'].min()):.3f}."
+    )
+    return full, sentence
 
 
 def _markdown_table(frame: pd.DataFrame) -> str:

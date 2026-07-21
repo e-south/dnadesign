@@ -42,6 +42,8 @@ class ReviewBundleEvidence:
     response_screen: ResponseMetricScreen
     response_examples: pd.DataFrame
     rmf_cardinality_pressure: pd.DataFrame
+    observed_sfxi_components: pd.DataFrame
+    observed_sfxi_robustness: pd.DataFrame
     scored: dict[str, dict[str, pd.DataFrame]]
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...]
     thresholds: RecommendationThresholds
@@ -75,6 +77,8 @@ def materialize_review_bundle(
         response_screen=evidence.response_screen,
         response_examples=evidence.response_examples,
         rmf_cardinality_pressure=evidence.rmf_cardinality_pressure,
+        observed_sfxi_components=evidence.observed_sfxi_components,
+        observed_sfxi_robustness=evidence.observed_sfxi_robustness,
         scored=evidence.scored,
         sfxi_evidence=evidence.sfxi_evidence,
         thresholds=evidence.thresholds,
@@ -94,6 +98,8 @@ def materialize_review_bundle(
         comparison_panel=evidence.comparison_panel,
         model_validation=evidence.model_validation,
         setpoint_support=evidence.setpoint_support,
+        observed_sfxi_components=evidence.observed_sfxi_components,
+        observed_sfxi_robustness=evidence.observed_sfxi_robustness,
         response_screen=evidence.response_screen,
         pressure_tests=evidence.pressure_tests,
         plot_manifest=plot_manifest,
@@ -127,6 +133,8 @@ def _write_core_tables(tables_dir: Path, evidence: ReviewBundleEvidence) -> dict
         "setpoint_support": evidence.setpoint_support,
         "measured_response_examples": evidence.response_examples,
         "rmf_cardinality_pressure": evidence.rmf_cardinality_pressure,
+        "sfxi_round0_training_components": evidence.observed_sfxi_components,
+        "sfxi_round0_training_robustness": evidence.observed_sfxi_robustness,
     }
     paths: dict[str, Path] = {}
     for table_id, frame in frames.items():

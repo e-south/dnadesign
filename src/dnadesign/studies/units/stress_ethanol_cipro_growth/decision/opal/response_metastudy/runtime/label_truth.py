@@ -36,6 +36,7 @@ class LabelTruthState:
     state: Literal["not_ready", "promoted"]
     label_source_state: Literal["not_verified", "verified"]
     observed_label_promotion_manifest: dict[str, object] | None
+    candidate_ids: tuple[str, ...] = ()
 
     @property
     def ready(self) -> bool:
@@ -71,6 +72,7 @@ def resolve_configured_label_truth(campaign_config_path: Path) -> LabelTruthStat
             state="not_ready",
             label_source_state="not_verified",
             observed_label_promotion_manifest=None,
+            candidate_ids=(),
         )
 
     snapshot = verify_observed_label_snapshot(
@@ -94,6 +96,7 @@ def resolve_configured_label_truth(campaign_config_path: Path) -> LabelTruthStat
             "path": manifest_path,
             "sha256": snapshot.promotion.manifest_sha256,
         },
+        candidate_ids=tuple(snapshot.labels["id"].astype(str)),
     )
 
 

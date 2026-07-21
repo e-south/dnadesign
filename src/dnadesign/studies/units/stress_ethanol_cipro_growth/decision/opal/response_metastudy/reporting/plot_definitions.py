@@ -52,9 +52,28 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ),
     ),
     PlotSpec(
-        plot_id="policy_guardrail_matrix",
+        plot_id="historical_observed_sfxi_decomposition",
         review_section="sfxi_comparator",
         section_order=1,
+        filename="historical_observed_sfxi_decomposition.png",
+        tier="metric_diagnostic",
+        visual_type="measured component decomposition scatter",
+        premise="In this measured corpus, observed SFXI ranks follow scaled effect more closely than logic fidelity.",
+        decision_value=(
+            "Shows the two canonical SFXI factors for all 35 historical observed labels, with the six highest "
+            "measured scores and the SpyP and sulAp controls identified in each target view."
+        ),
+        alt_text=(
+            "Three square scatter panels show logic fidelity on the horizontal axis and scaled target-state effect "
+            "on the vertical axis for 35 historical observed SFXI labels. Dark rings identify the six highest "
+            "measured SFXI scores per view, light curves join equal product scores, and text reports rank "
+            "correlations between SFXI and each factor."
+        ),
+    ),
+    PlotSpec(
+        plot_id="policy_guardrail_matrix",
+        review_section="sfxi_comparator",
+        section_order=2,
         filename="policy_guardrail_matrix.png",
         tier="screen_appendix",
         visual_type="guardrail heatmap",
@@ -71,7 +90,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="policy_decision_frontier",
         review_section="sfxi_comparator",
-        section_order=2,
+        section_order=3,
         filename="policy_decision_frontier.png",
         tier="screen_appendix",
         visual_type="tradeoff scatter",
@@ -86,7 +105,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="score_component_dominance",
         review_section="sfxi_comparator",
-        section_order=3,
+        section_order=4,
         filename="score_component_dominance.png",
         tier="metric_diagnostic",
         visual_type="correlation bars",
@@ -100,7 +119,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="selected_setpoint_residuals",
         review_section="sfxi_comparator",
-        section_order=4,
+        section_order=5,
         filename="selected_setpoint_residuals.png",
         tier="screen_appendix",
         visual_type="residual heatmap",
@@ -114,7 +133,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_gate_feasibility",
         review_section="sfxi_comparator",
-        section_order=5,
+        section_order=6,
         filename="logic_gate_feasibility.png",
         tier="metric_diagnostic",
         visual_type="gate sweep scatter",
@@ -128,7 +147,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_effect_topk_scatter",
         review_section="sfxi_comparator",
-        section_order=6,
+        section_order=7,
         filename="logic_effect_topk_scatter.png",
         tier="metric_diagnostic",
         visual_type="component scatter",
@@ -142,7 +161,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="score_correlation_matrix",
         review_section="sfxi_comparator",
-        section_order=7,
+        section_order=8,
         filename="score_correlation_matrix.png",
         tier="metric_diagnostic",
         visual_type="correlation heatmap",
@@ -156,7 +175,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="selected_vec8_profiles",
         review_section="sfxi_comparator",
-        section_order=8,
+        section_order=9,
         filename="selected_vec8_profiles.png",
         tier="metric_diagnostic",
         visual_type="profile heatmap",
@@ -170,7 +189,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="sfxi_score_contours",
         review_section="sfxi_comparator",
-        section_order=9,
+        section_order=10,
         filename="sfxi_score_contours.png",
         tier="metric_diagnostic",
         visual_type="score-surface contour",
@@ -184,7 +203,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="target_view_pareto_fronts",
         review_section="sfxi_comparator",
-        section_order=10,
+        section_order=11,
         filename="target_view_pareto_fronts.png",
         tier="metric_diagnostic",
         visual_type="Pareto scatter",
@@ -200,7 +219,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="denominator_sensitivity",
         review_section="sfxi_comparator",
-        section_order=11,
+        section_order=12,
         filename="denominator_sensitivity.png",
         tier="metric_diagnostic",
         visual_type="sensitivity line plot",
@@ -214,7 +233,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="policy_comparison_panel_roles",
         review_section="sfxi_comparator",
-        section_order=12,
+        section_order=13,
         filename="policy_comparison_panel_roles.png",
         tier="screen_appendix",
         visual_type="panel composition bars",
@@ -245,7 +264,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="candidate_logic_support",
         review_section="sfxi_comparator",
-        section_order=13,
+        section_order=14,
         filename="candidate_logic_support.png",
         tier="metric_diagnostic",
         visual_type="threshold support curve",
@@ -259,7 +278,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_effect_tradeoff_overlap",
         review_section="sfxi_comparator",
-        section_order=14,
+        section_order=15,
         filename="logic_effect_tradeoff_overlap.png",
         tier="screen_appendix",
         visual_type="tradeoff line plot",
@@ -273,7 +292,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_effect_tradeoff_fidelity",
         review_section="sfxi_comparator",
-        section_order=15,
+        section_order=16,
         filename="logic_effect_tradeoff_fidelity.png",
         tier="screen_appendix",
         visual_type="tradeoff line plot",
@@ -287,7 +306,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="policy_overlap_summary",
         review_section="sfxi_comparator",
-        section_order=16,
+        section_order=17,
         filename="policy_overlap_summary.png",
         tier="screen_appendix",
         visual_type="overlap bar plot",
@@ -298,7 +317,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="topk_overlap_curve",
         review_section="sfxi_comparator",
-        section_order=17,
+        section_order=18,
         filename="topk_overlap_curve.png",
         tier="screen_appendix",
         visual_type="overlap curve",

@@ -10,6 +10,10 @@ Module Author(s): Eric J. South
 """
 
 PLOT_RATIONALES: dict[str, str] = {
+    "historical_observed_sfxi_decomposition": (
+        "Replaying the canonical product on measured labels distinguishes scalarization behavior in the assay "
+        "corpus from compression introduced by the sequence model."
+    ),
     "measured_response_examples": (
         "One measured assay summary should remain fixed while the declared target determines its ON and OFF partition."
     ),
@@ -67,6 +71,10 @@ PLOT_RATIONALES: dict[str, str] = {
 }
 
 PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
+    "historical_observed_sfxi_decomposition": (
+        "This corpus-specific replay does not show that SFXI is universally invalid or prospectively inferior, "
+        "and it does not score the active response-window phenotype."
+    ),
     "measured_response_examples": (
         "SpyP and sulAp are measured interpretation examples, not complete or optimal biological archetypes."
     ),
@@ -111,6 +119,7 @@ PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
 }
 
 PLOT_DATA_TABLES: dict[str, str] = {
+    "historical_observed_sfxi_decomposition": "tables/sfxi_round0_training_components.csv",
     "measured_response_examples": "tables/measured_response_examples.csv",
     "rmf_cardinality_pressure": "tables/rmf_cardinality_pressure.csv",
     "policy_guardrail_matrix": "tables/policy_summary.csv",
