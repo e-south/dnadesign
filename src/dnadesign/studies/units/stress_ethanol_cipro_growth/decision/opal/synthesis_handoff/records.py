@@ -31,7 +31,7 @@ from .contracts import (
 from .genbank import validate_genbank_record_set
 
 DEFAULT_SYNTHESIS_HANDOFF_RECORD = Path("docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml")
-SYNTHESIS_HANDOFF_RECORD_VERSION = 2
+SYNTHESIS_HANDOFF_RECORD_VERSION = 3
 SYNTHESIS_HANDOFF_STUDY_ID = "stress_ethanol_cipro_growth"
 SYNTHESIS_HANDOFF_RECORD_KIND = "synthesis_handoff_lifecycle"
 LIFECYCLE_STATUSES = frozenset(
@@ -132,6 +132,104 @@ class ExpectedSelectionView:
         }
 
 
+def _canonical_study_alias(value: str, *, label: str) -> str:
+    alias = str(value).strip()
+    match = re.fullmatch(r"SECG-([0-9]{3,})", alias)
+    if match is None:
+        raise ValueError(f"{label} requires canonical stable study alias syntax SECG-NNN: {alias!r}")
+    ordinal = int(match.group(1))
+    if ordinal < 1 or alias != f"SECG-{ordinal:03d}":
+        raise ValueError(f"{label} requires canonical stable study alias syntax SECG-NNN: {alias!r}")
+    return alias
+
+
+@dataclass(frozen=True)
+class MaterializationInputReceipt:
+    """Digest-bound repository input used to authorize one materialization."""
+
+    path: str
+    sha256: str
+
+    def __post_init__(self) -> None:
+        raw_path = str(self.path).strip()
+        path = Path(raw_path)
+        if not raw_path or path.is_absolute() or ".." in path.parts:
+            raise ValueError("materialization input path must be repository-relative without parent traversal")
+        digest = str(self.sha256).strip()
+        if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise ValueError("materialization input sha256 must contain 64 lowercase hexadecimal characters")
+        object.__setattr__(self, "path", path.as_posix())
+        object.__setattr__(self, "sha256", digest)
+
+    def to_json(self) -> dict[str, str]:
+        return {"path": self.path, "sha256": self.sha256}
+
+
+@dataclass(frozen=True)
+class ExpectedMaterializedCandidate:
+    """Exact stable alias, candidate, and promoter-core identity."""
+
+    study_alias: str
+    candidate_id: str
+    core_sha256: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "study_alias",
+            _canonical_study_alias(self.study_alias, label="materialization candidate"),
+        )
+        candidate_id = str(self.candidate_id).strip()
+        if not candidate_id:
+            raise ValueError("materialization candidate_id must be non-empty")
+        digest = str(self.core_sha256).strip()
+        if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise ValueError("materialization candidate core_sha256 must contain 64 lowercase hexadecimal characters")
+        object.__setattr__(self, "candidate_id", candidate_id)
+        object.__setattr__(self, "core_sha256", digest)
+
+    def to_json(self) -> dict[str, str]:
+        return {
+            "study_alias": self.study_alias,
+            "candidate_id": self.candidate_id,
+            "core_sha256": self.core_sha256,
+        }
+
+
+@dataclass(frozen=True)
+class MeasuredRoundMaterializationContract:
+    """Inputs and exact candidate identities authorized for one measured round."""
+
+    campaign_config: MaterializationInputReceipt
+    selection_batch: MaterializationInputReceipt
+    candidate_records: MaterializationInputReceipt
+    promoter_alias_registry: MaterializationInputReceipt
+    cloning_strategy: MaterializationInputReceipt
+    expected_candidates: tuple[ExpectedMaterializedCandidate, ...]
+
+    def __post_init__(self) -> None:
+        if not self.expected_candidates:
+            raise ValueError("measured-round materialization contract requires expected_candidates")
+        for field in (
+            "study_alias",
+            "candidate_id",
+            "core_sha256",
+        ):
+            values = [getattr(row, field) for row in self.expected_candidates]
+            if len(values) != len(set(values)):
+                raise ValueError(f"measured-round materialization contract has duplicate {field}")
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "campaign_config": self.campaign_config.to_json(),
+            "selection_batch": self.selection_batch.to_json(),
+            "candidate_records": self.candidate_records.to_json(),
+            "promoter_alias_registry": self.promoter_alias_registry.to_json(),
+            "cloning_strategy": self.cloning_strategy.to_json(),
+            "expected_candidates": [row.to_json() for row in self.expected_candidates],
+        }
+
+
 @dataclass(frozen=True)
 class SynthesisHandoffRecord:
     """One lifecycle record from ``synthesis_handoffs.yaml``."""
@@ -147,7 +245,7 @@ class SynthesisHandoffRecord:
     expected_campaigns: tuple[ExpectedHandoffArtifact, ...] = ()
     campaign_slug: str | None = None
     expected_selection_views: tuple[ExpectedSelectionView, ...] = ()
-    expected_study_aliases: tuple[str, ...] = ()
+    materialization_contract: MeasuredRoundMaterializationContract | None = None
     expected_artifact: ExpectedHandoffArtifact | None = None
 
     def __post_init__(self) -> None:
@@ -188,7 +286,7 @@ class SynthesisHandoffRecord:
             if (
                 self.campaign_slug is not None
                 or self.expected_selection_views
-                or self.expected_study_aliases
+                or self.materialization_contract is not None
                 or self.expected_artifact is not None
             ):
                 raise ValueError(f"batch-0 handoff record {self.handoff_id} cannot declare measured-round fields")
@@ -217,33 +315,14 @@ class SynthesisHandoffRecord:
                 raise ValueError(f"measured-round handoff record {self.handoff_id} requires expected_selection_views")
             if self.expected_artifact is None:
                 raise ValueError(f"measured-round handoff record {self.handoff_id} requires expected_artifact")
-            if not self.expected_study_aliases:
-                raise ValueError(f"measured-round handoff record {self.handoff_id} requires expected_study_aliases")
-            aliases = [str(alias).strip() for alias in self.expected_study_aliases]
-            if any(not alias for alias in aliases):
-                raise ValueError(f"measured-round handoff record {self.handoff_id} has an empty expected study alias")
-            invalid_aliases: list[str] = []
-            for alias in aliases:
-                match = re.fullmatch(r"SECG-([0-9]{3,})", alias)
-                if match is None:
-                    invalid_aliases.append(alias)
-                    continue
-                ordinal = int(match.group(1))
-                if ordinal < 1 or alias != f"SECG-{ordinal:03d}":
-                    invalid_aliases.append(alias)
-            if invalid_aliases:
+            if self.materialization_contract is None:
+                raise ValueError(f"measured-round handoff record {self.handoff_id} requires materialization_contract")
+            candidate_count = len(self.materialization_contract.expected_candidates)
+            if candidate_count != int(self.expected_artifact.expected_rows):
                 raise ValueError(
-                    f"measured-round handoff record {self.handoff_id} requires canonical stable study alias "
-                    f"syntax SECG-NNN: {invalid_aliases[:5]}"
-                )
-            if len(aliases) != len(set(aliases)):
-                raise ValueError(
-                    f"measured-round handoff record {self.handoff_id} has duplicate expected study aliases"
-                )
-            if len(aliases) != int(self.expected_artifact.expected_rows):
-                raise ValueError(
-                    f"measured-round handoff record {self.handoff_id} expected study alias count "
-                    f"does not match expected rows: aliases={len(aliases)} rows={self.expected_artifact.expected_rows}"
+                    f"measured-round handoff record {self.handoff_id} materialization candidate count "
+                    f"does not match expected rows: candidates={candidate_count} "
+                    f"rows={self.expected_artifact.expected_rows}"
                 )
             if self.expected_artifact.campaign_slug != self.campaign_slug:
                 raise ValueError(
@@ -272,6 +351,12 @@ class SynthesisHandoffRecord:
     @property
     def expected_selection_view_counts(self) -> dict[str, int]:
         return {row.selection_view_id: int(row.expected_rows) for row in self.expected_selection_views}
+
+    @property
+    def expected_study_aliases(self) -> tuple[str, ...]:
+        if self.materialization_contract is None:
+            return ()
+        return tuple(row.study_alias for row in self.materialization_contract.expected_candidates)
 
     @property
     def artifacts(self) -> tuple[ExpectedHandoffArtifact, ...]:
@@ -346,7 +431,7 @@ def _record_from_raw(raw: dict[str, Any]) -> SynthesisHandoffRecord:
     source_authority = str(raw["source_authority"])
     expected_campaigns: tuple[ExpectedHandoffArtifact, ...] = ()
     expected_selection_views: tuple[ExpectedSelectionView, ...] = ()
-    expected_study_aliases: tuple[str, ...] = ()
+    materialization_contract: MeasuredRoundMaterializationContract | None = None
     expected_artifact: ExpectedHandoffArtifact | None = None
     if source_authority == "study_batch0_selector":
         campaigns_raw = raw.get("expected_campaigns")
@@ -366,12 +451,38 @@ def _record_from_raw(raw: dict[str, Any]) -> SynthesisHandoffRecord:
             )
             for item in views_raw
         )
-        aliases_raw = raw.get("expected_study_aliases")
-        if not isinstance(aliases_raw, list):
+        if "expected_study_aliases" in raw:
             raise ValueError(
-                f"handoff record {raw.get('handoff_id', '<unknown>')} expected_study_aliases must be a list"
+                f"handoff record {raw.get('handoff_id', '<unknown>')} uses removed expected_study_aliases; "
+                "declare materialization_contract.expected_candidates"
             )
-        expected_study_aliases = tuple(str(alias).strip() for alias in aliases_raw)
+        contract_raw = _require_mapping(raw.get("materialization_contract"), label="materialization contract")
+
+        def receipt_from(field: str) -> MaterializationInputReceipt:
+            item = _require_mapping(contract_raw.get(field), label=f"materialization contract {field}")
+            return MaterializationInputReceipt(path=str(item["path"]), sha256=str(item["sha256"]))
+
+        candidates_raw = contract_raw.get("expected_candidates")
+        if not isinstance(candidates_raw, list):
+            raise ValueError(
+                f"handoff record {raw.get('handoff_id', '<unknown>')} "
+                "materialization_contract.expected_candidates must be a list"
+            )
+        materialization_contract = MeasuredRoundMaterializationContract(
+            campaign_config=receipt_from("campaign_config"),
+            selection_batch=receipt_from("selection_batch"),
+            candidate_records=receipt_from("candidate_records"),
+            promoter_alias_registry=receipt_from("promoter_alias_registry"),
+            cloning_strategy=receipt_from("cloning_strategy"),
+            expected_candidates=tuple(
+                ExpectedMaterializedCandidate(
+                    study_alias=str(_require_mapping(item, label="expected candidate")["study_alias"]),
+                    candidate_id=str(item["candidate_id"]),
+                    core_sha256=str(item["core_sha256"]),
+                )
+                for item in candidates_raw
+            ),
+        )
         expected_artifact = artifact_from(raw.get("expected_artifact"), label="expected artifact")
     return SynthesisHandoffRecord(
         handoff_id=str(raw["handoff_id"]),
@@ -385,7 +496,7 @@ def _record_from_raw(raw: dict[str, Any]) -> SynthesisHandoffRecord:
         expected_campaigns=expected_campaigns,
         campaign_slug=_optional_text(raw.get("campaign_slug")),
         expected_selection_views=expected_selection_views,
-        expected_study_aliases=expected_study_aliases,
+        materialization_contract=materialization_contract,
         expected_artifact=expected_artifact,
     )
 
@@ -494,11 +605,20 @@ def source_mode_from_handoff_record(record: SynthesisHandoffRecord) -> tuple[str
     )
 
 
-def _resolve_repo_path(repo_root: str | Path, value: str | Path) -> Path:
-    path = Path(value)
-    if path.is_absolute():
-        return path
-    return Path(repo_root) / path
+def _resolve_repo_path(
+    repo_root: str | Path,
+    value: str | Path,
+    *,
+    label: str = "repository path",
+) -> Path:
+    root = Path(repo_root).resolve()
+    raw = Path(value)
+    resolved = (raw if raw.is_absolute() else root / raw).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"{label} must remain inside repository root {root}: {resolved}") from exc
+    return resolved
 
 
 def _field_values(manifest: pd.DataFrame, column: str) -> set[Any]:
@@ -604,6 +724,31 @@ def _validate_measured_round_manifest(manifest: pd.DataFrame, record: SynthesisH
             "handoff record study alias membership mismatch: "
             f"expected={sorted(expected_aliases)} observed={sorted(observed_alias_set)}"
         )
+    if record.materialization_contract is not None:
+        binding_columns = ("synthesis_name", "id", "core_sha256")
+        missing_binding_columns = [column for column in binding_columns if column not in manifest.columns]
+        if missing_binding_columns:
+            raise ValueError(
+                "synthesis manifest missing exact candidate-binding columns required by measured-round record: "
+                + ", ".join(missing_binding_columns)
+            )
+        expected_bindings = {
+            (row.study_alias, row.candidate_id, row.core_sha256)
+            for row in record.materialization_contract.expected_candidates
+        }
+        observed_bindings = {
+            (
+                str(row.synthesis_name).strip(),
+                str(row.id).strip(),
+                str(row.core_sha256).strip(),
+            )
+            for row in manifest.loc[:, list(binding_columns)].itertuples(index=False)
+        }
+        if observed_bindings != expected_bindings:
+            raise ValueError(
+                "handoff record study alias candidate binding mismatch: "
+                f"expected={sorted(expected_bindings)} observed={sorted(observed_bindings)}"
+            )
     observed_view_counts = _selection_view_membership_counts(manifest)
     expected_view_counts = record.expected_selection_view_counts
     if observed_view_counts != expected_view_counts:
@@ -687,6 +832,83 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _resolve_repo_contained_path(
+    repo_root: Path,
+    value: str | Path,
+    *,
+    label: str,
+) -> Path:
+    """Resolve one path and reject lexical or symlink escape from ``repo_root``."""
+
+    return _resolve_repo_path(repo_root, value, label=label)
+
+
+def validate_materialization_contract_inputs(
+    record: SynthesisHandoffRecord,
+    *,
+    repo_root: str | Path,
+    campaign_config_path: str | Path,
+    selection_batch_path: str | Path,
+    candidate_records_path: str | Path,
+    promoter_alias_registry_path: str | Path,
+    cloning_strategy_path: str | Path,
+) -> dict[str, Any]:
+    """Verify the exact repository inputs authorized for measured-round generation."""
+
+    contract = record.materialization_contract
+    if record.source_authority != "opal_selection_batch" or contract is None:
+        raise ValueError(f"handoff record {record.handoff_id} has no measured-round materialization contract")
+    root = Path(repo_root).resolve()
+    actual_by_field = {
+        "campaign_config": Path(campaign_config_path),
+        "selection_batch": Path(selection_batch_path),
+        "candidate_records": Path(candidate_records_path),
+        "promoter_alias_registry": Path(promoter_alias_registry_path),
+        "cloning_strategy": Path(cloning_strategy_path),
+    }
+    receipt_by_field = {
+        "campaign_config": contract.campaign_config,
+        "selection_batch": contract.selection_batch,
+        "candidate_records": contract.candidate_records,
+        "promoter_alias_registry": contract.promoter_alias_registry,
+        "cloning_strategy": contract.cloning_strategy,
+    }
+    verified: dict[str, dict[str, str]] = {}
+    for field, actual_path in actual_by_field.items():
+        actual_path = _resolve_repo_contained_path(
+            root,
+            actual_path,
+            label=f"materialization contract {field} input",
+        )
+        receipt = receipt_by_field[field]
+        expected_path = _resolve_repo_contained_path(
+            root,
+            receipt.path,
+            label=f"materialization contract {field} receipt",
+        )
+        if actual_path != expected_path:
+            raise ValueError(
+                f"materialization contract {field} path mismatch: expected={expected_path} observed={actual_path}"
+            )
+        if not actual_path.is_file():
+            raise ValueError(f"materialization contract {field} input is missing: {actual_path}")
+        observed_sha256 = _sha256_file(actual_path)
+        if observed_sha256 != receipt.sha256:
+            raise ValueError(
+                f"materialization contract {field} sha256 mismatch: "
+                f"expected={receipt.sha256} observed={observed_sha256}"
+            )
+        verified[field] = {
+            "path": receipt.path,
+            "sha256": observed_sha256,
+        }
+    return {
+        "status": "pass",
+        "inputs": verified,
+        "expected_candidate_count": len(contract.expected_candidates),
+    }
+
+
 def _sha256_genbank_dir(path: Path) -> str:
     digest = hashlib.sha256()
     for file_path in sorted(path.glob("*.gb")):
@@ -744,10 +966,26 @@ def artifact_status_for_handoff_record(
     workbook_readback_pass_count = 0
     genbank_readback_pass_count = 0
     for expected in record.artifacts:
-        manifest_path = _resolve_repo_path(repo_root, expected.manifest_path)
-        workbook_path = _resolve_repo_path(repo_root, expected.vendor_workbook_path)
-        genbank_dir_path = _resolve_repo_path(repo_root, expected.genbank_dir_path)
-        genbank_feature_table_path = _resolve_repo_path(repo_root, expected.genbank_feature_table_path)
+        manifest_path = _resolve_repo_path(
+            repo_root,
+            expected.manifest_path,
+            label="generated manifest_path",
+        )
+        workbook_path = _resolve_repo_path(
+            repo_root,
+            expected.vendor_workbook_path,
+            label="generated vendor_workbook_path",
+        )
+        genbank_dir_path = _resolve_repo_path(
+            repo_root,
+            expected.genbank_dir_path,
+            label="generated genbank_dir_path",
+        )
+        genbank_feature_table_path = _resolve_repo_path(
+            repo_root,
+            expected.genbank_feature_table_path,
+            label="generated genbank_feature_table_path",
+        )
         row: dict[str, Any] = {
             "campaign_slug": expected.campaign_slug,
             "expected_rows": int(expected.expected_rows),
@@ -895,6 +1133,9 @@ def handoff_record_payload(
         "strategy_id": record.strategy_id,
         "expected_selection_views": [row.to_json() for row in record.expected_selection_views],
         "expected_study_aliases": list(record.expected_study_aliases),
+        "materialization_contract": (
+            record.materialization_contract.to_json() if record.materialization_contract is not None else None
+        ),
         "expected_artifacts": [row.to_json() for row in record.artifacts],
         "artifact_status": artifact_status_for_handoff_record(record, repo_root=repo_root),
     }

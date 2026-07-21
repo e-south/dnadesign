@@ -1,8 +1,8 @@
-version: 2
+version: 3
 study_id: stress_ethanol_cipro_growth
 record_kind: synthesis_handoff_lifecycle
 owner: dnadesign-maintainers
-last_verified: 2026-07-14
+last_verified: 2026-07-20
 authority: checked_in_study_record
 generated_artifact_policy:
   outputs_are_generated: true
@@ -13,6 +13,8 @@ generated_artifact_policy:
   accepted_handoff_requires_genbank_feature_table_sha256: true
   accepted_handoff_requires_workbook_readback_pass: true
   accepted_handoff_requires_genbank_readback_pass: true
+  measured_round_materialization_requires_input_sha256_receipts: true
+  measured_round_materialization_requires_exact_alias_candidate_core_bindings: true
 operator_preview_command: >-
   uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff
   --handoff-id <handoff_id> --json
@@ -40,7 +42,13 @@ canonical_contract:
     - selection_view_ids
     - selection_memberships
     - expected_selection_views
-    - expected_study_aliases
+    - materialization_contract
+    - campaign_config
+    - selection_batch
+    - candidate_records
+    - promoter_alias_registry
+    - cloning_strategy
+    - expected_candidates
     - expected_artifact
   measured_round_record_rules:
     - source_authority must be opal_selection_batch
@@ -49,7 +57,11 @@ canonical_contract:
     - assay_batch_index must be the physical order batch index
     - campaign_slug and run_id identify one unified OPAL learning lifecycle
     - expected_selection_views records each target view and its logical membership count
-    - expected_study_aliases binds the exact stable study aliases in the physical handoff
+    - materialization_contract binds the five repository inputs by path and SHA-256
+    - candidate_records binds the table used to annotate the generated GenBank records
+    - expected_candidates binds every stable study alias to one candidate id and promoter-core SHA-256
+    - write mode resolves the lifecycle record, campaign config, alias registry, and cloning strategy only from their canonical paths in the active source checkout
+    - every materialization input and generated artifact path must resolve inside the active checkout, including through symlinks
     - expected_artifact records the deduplicated selection-batch artifact set
     - operators should invoke measured rounds by --handoff-id after adding the record row
     - alias assignment alone does not mean a sequence was accepted, ordered, received, or assayed

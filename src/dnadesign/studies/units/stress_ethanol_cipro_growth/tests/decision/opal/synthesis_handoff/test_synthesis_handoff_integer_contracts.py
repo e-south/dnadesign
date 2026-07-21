@@ -22,7 +22,10 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.records import (
     ExpectedHandoffArtifact,
+    ExpectedMaterializedCandidate,
     ExpectedSelectionView,
+    MaterializationInputReceipt,
+    MeasuredRoundMaterializationContract,
     SynthesisHandoffRecord,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff.strategy import (
@@ -38,6 +41,23 @@ def _artifact(*, expected_rows: object = 1) -> ExpectedHandoffArtifact:
         vendor_workbook_path="out/order.xlsx",
         genbank_dir_path="out/genbank",
         genbank_feature_table_path="out/features.csv",
+    )
+
+
+def _materialization_contract() -> MeasuredRoundMaterializationContract:
+    return MeasuredRoundMaterializationContract(
+        campaign_config=MaterializationInputReceipt(path="inputs/campaign.yaml", sha256="0" * 64),
+        selection_batch=MaterializationInputReceipt(path="inputs/selection.parquet", sha256="1" * 64),
+        candidate_records=MaterializationInputReceipt(path="inputs/candidates.parquet", sha256="2" * 64),
+        promoter_alias_registry=MaterializationInputReceipt(path="inputs/aliases.yaml", sha256="3" * 64),
+        cloning_strategy=MaterializationInputReceipt(path="inputs/strategy.yaml", sha256="4" * 64),
+        expected_candidates=(
+            ExpectedMaterializedCandidate(
+                study_alias="SECG-019",
+                candidate_id="candidate-1",
+                core_sha256="4" * 64,
+            ),
+        ),
     )
 
 
@@ -72,7 +92,7 @@ def test_lifecycle_indices_reject_non_integer_or_negative_values(field: str, bad
             strategy_id="stress_promoter_insert:v1",
             campaign_slug="secg_msrb_greedy",
             expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-            expected_study_aliases=("SECG-019",),
+            materialization_contract=_materialization_contract(),
             expected_artifact=_artifact(),
         )
 

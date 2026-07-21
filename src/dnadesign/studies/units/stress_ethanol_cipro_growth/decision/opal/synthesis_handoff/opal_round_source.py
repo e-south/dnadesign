@@ -237,6 +237,7 @@ def selected_candidates_from_opal_round(
         "source": OPAL_ROUND_SELECTION_SOURCE,
         "campaign_slug": cfg.campaign.slug,
         "config_path": str(config_path),
+        "config_sha256": hashlib.sha256(config_path.read_bytes()).hexdigest(),
         "workdir": str(batch["campaign"]["workdir"]),
         "as_of_round": int(batch["as_of_round"]),
         "run_id": str(batch["run_id"]),
@@ -249,6 +250,7 @@ def selected_candidates_from_opal_round(
         "replay_mismatch_count": replay_mismatch_count,
         "selection_batch_schema_version": str(batch["schema_version"]),
         "selection_batch_path": str(batch["selection_batch_path"]),
+        "selection_batch_sha256": hashlib.sha256(Path(str(batch["selection_batch_path"])).read_bytes()).hexdigest(),
         "candidate_records_path": str(_records_path(config_path)),
         "promoter_alias_registry": {
             "path": str(root / alias_registry.path),

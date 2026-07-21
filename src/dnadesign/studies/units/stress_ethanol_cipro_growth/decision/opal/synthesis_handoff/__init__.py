@@ -18,6 +18,9 @@ _PUBLIC_EXPORTS = {
     "CloningStrategy": ".contracts",
     "DEFAULT_SYNTHESIS_HANDOFF_RECORD": ".records",
     "DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG": ".campaigns",
+    "ExpectedMaterializedCandidate": ".records",
+    "MaterializationInputReceipt": ".records",
+    "MeasuredRoundMaterializationContract": ".records",
     "SelectedCandidate": ".contracts",
     "SelectionMembership": ".contracts",
     "apply_handoff_record_lifecycle": ".records",
@@ -44,6 +47,7 @@ _PUBLIC_EXPORTS = {
     "validate_azenta_workbook": ".azenta",
     "validate_genbank_record_set": ".genbank",
     "validate_manifest_against_handoff_record": ".records",
+    "validate_materialization_contract_inputs": ".records",
 }
 
 __all__ = sorted(_PUBLIC_EXPORTS)

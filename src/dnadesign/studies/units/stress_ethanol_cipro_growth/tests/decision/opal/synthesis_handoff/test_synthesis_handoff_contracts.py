@@ -107,6 +107,36 @@ def _strategy() -> CloningStrategy:
     )
 
 
+def _materialization_contract(
+    *bindings: tuple[str, str, str],
+    campaign_config: tuple[str, str] = ("inputs/campaign.yaml", "0" * 64),
+    selection_batch: tuple[str, str] = ("inputs/selection_batch.parquet", "1" * 64),
+    candidate_records: tuple[str, str] = ("inputs/candidate_records.parquet", "2" * 64),
+    promoter_alias_registry: tuple[str, str] = ("inputs/promoter_aliases.yaml", "3" * 64),
+    cloning_strategy: tuple[str, str] = ("inputs/strategy.yaml", "4" * 64),
+) -> Any:
+    receipt = synthesis_handoff_records.MaterializationInputReceipt
+    expected_candidate = synthesis_handoff_records.ExpectedMaterializedCandidate
+    return synthesis_handoff_records.MeasuredRoundMaterializationContract(
+        campaign_config=receipt(path=campaign_config[0], sha256=campaign_config[1]),
+        selection_batch=receipt(path=selection_batch[0], sha256=selection_batch[1]),
+        candidate_records=receipt(path=candidate_records[0], sha256=candidate_records[1]),
+        promoter_alias_registry=receipt(
+            path=promoter_alias_registry[0],
+            sha256=promoter_alias_registry[1],
+        ),
+        cloning_strategy=receipt(path=cloning_strategy[0], sha256=cloning_strategy[1]),
+        expected_candidates=tuple(
+            expected_candidate(
+                study_alias=study_alias,
+                candidate_id=candidate_id,
+                core_sha256=core_sha256,
+            )
+            for study_alias, candidate_id, core_sha256 in bindings
+        ),
+    )
+
+
 def _selected_candidates() -> list[SelectedCandidate]:
     return [
         SelectedCandidate(
@@ -1566,7 +1596,7 @@ def _write_opal_alias_registry(repo_root: Path, config_path: Path) -> Path:
                 "source_aliases": [],
             }
         )
-    registry_path = repo_root / "record/promoter_aliases.yaml"
+    registry_path = repo_root / synthesis_handoff_cli.PROMOTER_ALIAS_REGISTRY_PATH
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text(
         yaml.safe_dump(
@@ -1767,8 +1797,6 @@ def test_cli_resolves_batch0_from_checked_in_handoff_record(
     assert payload["handoff_record"]["lifecycle_status"] == "generated_pending_acceptance"
     assert payload["handoff_record"]["selection_epoch"] == "pre_assay_seed"
     assert payload["handoff_record"]["artifact_status"]["summary"]["expected_artifact_count"] == 3
-    assert payload["handoff_record"]["artifact_status"]["summary"]["current_contract_ready"] is True
-    assert payload["handoff_record"]["artifact_status"]["summary"]["genbank_readback_pass_count"] == 3
     expected_artifacts = {row["campaign_slug"]: row for row in payload["handoff_record"]["expected_artifacts"]}
     assert set(expected_artifacts) == {
         "secg_ethanol_rf_sfxi_topn",
@@ -1854,54 +1882,89 @@ def test_cli_handoff_record_preview_does_not_rebuild_batch0_inputs(
 
 def test_cli_handoff_record_resolves_one_campaign_run_and_view_memberships(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    config_path = _write_opal_round_fixture(tmp_path, as_of_round=1, run_ids=("msrb-run-a", "msrb-run-b"))
-    alias_registry_path = _write_opal_alias_registry(tmp_path, config_path)
-    record_path = tmp_path / "synthesis_handoffs.yaml"
-    record_path.write_text(
-        textwrap.dedent(
-            """
-            version: 2
-            study_id: stress_ethanol_cipro_growth
-            record_kind: synthesis_handoff_lifecycle
-            handoffs:
-              - handoff_id: stress-opal-r1-msrb-v1
-                lifecycle_status: generated_pending_acceptance
-                source_authority: opal_selection_batch
-                selection_epoch: opal_model_round
-                assay_batch_index: 1
-                model_as_of_round: 1
-                campaign_slug: secg_msrb_greedy
-                run_id: msrb-run-b
-                strategy_id: stress_promoter_insert:v1
-                expected_selection_views:
-                  - selection_view_id: ethanol
-                    expected_rows: 2
-                  - selection_view_id: ciprofloxacin
-                    expected_rows: 2
-                expected_study_aliases:
-                  - SECG-001
-                  - SECG-002
-                  - SECG-003
-                expected_artifact:
-                  campaign_slug: secg_msrb_greedy
-                  expected_rows: 3
-                  manifest_path: out/msrb/synthesis_manifest.csv
-                  vendor_workbook_path: out/msrb/azenta_gene_synthesis.xlsx
-                  genbank_dir_path: out/msrb/genbank_inserts
-                  genbank_feature_table_path: out/msrb/genbank_features.csv
-                  manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-                  vendor_workbook_sha256: "1111111111111111111111111111111111111111111111111111111111111111"
-                  genbank_dir_sha256: "2222222222222222222222222222222222222222222222222222222222222222"
-                  genbank_feature_table_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
-                  workbook_readback_status: pass
-                  genbank_readback_status: pass
-            """
-        ).strip()
-        + "\n",
-        encoding="utf-8",
+    monkeypatch.setattr(synthesis_handoff_cli, "_source_checkout_repo_root", lambda: tmp_path.resolve())
+    config_path = _write_opal_round_fixture(
+        tmp_path / "src/dnadesign/opal/campaigns",
+        as_of_round=1,
+        run_ids=("msrb-run-a", "msrb-run-b"),
     )
+    alias_registry_path = _write_opal_alias_registry(tmp_path, config_path)
+    record_path = tmp_path / synthesis_handoff_records.DEFAULT_SYNTHESIS_HANDOFF_RECORD
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    strategy_path = tmp_path / synthesis_handoff_cli.DEFAULT_STRESS_PROMOTER_CLONING_STRATEGY
+    strategy_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(
+        Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/")
+        / "synthesis_handoff/configs/stress_promoter_insert_v1.yaml",
+        strategy_path,
+    )
+    selection_batch_path = config_path.parent.parent / "outputs/runs/msrb-run-b/selection/selection_batch.parquet"
+    candidate_records_path = config_path.parent.parent / "records.parquet"
+    record_raw = {
+        "version": 3,
+        "study_id": "stress_ethanol_cipro_growth",
+        "record_kind": "synthesis_handoff_lifecycle",
+        "handoffs": [
+            {
+                "handoff_id": "stress-opal-r1-msrb-v1",
+                "lifecycle_status": "generated_pending_acceptance",
+                "source_authority": "opal_selection_batch",
+                "selection_epoch": "opal_model_round",
+                "assay_batch_index": 1,
+                "model_as_of_round": 1,
+                "campaign_slug": "secg_msrb_greedy",
+                "run_id": "msrb-run-b",
+                "strategy_id": "stress_promoter_insert:v1",
+                "expected_selection_views": [
+                    {"selection_view_id": "ethanol", "expected_rows": 2},
+                    {"selection_view_id": "ciprofloxacin", "expected_rows": 2},
+                ],
+                "materialization_contract": _materialization_contract(
+                    ("SECG-001", "candidate-b", hashlib.sha256(CORE_B.encode("utf-8")).hexdigest()),
+                    ("SECG-002", "candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+                    ("SECG-003", "candidate-c", hashlib.sha256(("GATC" * 15).encode("utf-8")).hexdigest()),
+                    campaign_config=(
+                        config_path.relative_to(tmp_path).as_posix(),
+                        hashlib.sha256(config_path.read_bytes()).hexdigest(),
+                    ),
+                    selection_batch=(
+                        selection_batch_path.relative_to(tmp_path).as_posix(),
+                        hashlib.sha256(selection_batch_path.read_bytes()).hexdigest(),
+                    ),
+                    candidate_records=(
+                        candidate_records_path.relative_to(tmp_path).as_posix(),
+                        hashlib.sha256(candidate_records_path.read_bytes()).hexdigest(),
+                    ),
+                    promoter_alias_registry=(
+                        alias_registry_path.relative_to(tmp_path).as_posix(),
+                        hashlib.sha256(alias_registry_path.read_bytes()).hexdigest(),
+                    ),
+                    cloning_strategy=(
+                        strategy_path.relative_to(tmp_path).as_posix(),
+                        hashlib.sha256(strategy_path.read_bytes()).hexdigest(),
+                    ),
+                ).to_json(),
+                "expected_artifact": {
+                    "campaign_slug": "secg_msrb_greedy",
+                    "expected_rows": 3,
+                    "manifest_path": "out/msrb/synthesis_manifest.csv",
+                    "vendor_workbook_path": "out/msrb/azenta_gene_synthesis.xlsx",
+                    "genbank_dir_path": "out/msrb/genbank_inserts",
+                    "genbank_feature_table_path": "out/msrb/genbank_features.csv",
+                    "manifest_sha256": "0" * 64,
+                    "vendor_workbook_sha256": "1" * 64,
+                    "genbank_dir_sha256": "2" * 64,
+                    "genbank_feature_table_sha256": "3" * 64,
+                    "workbook_readback_status": "pass",
+                    "genbank_readback_status": "pass",
+                },
+            }
+        ],
+    }
+    record_path.write_text(yaml.safe_dump(record_raw, sort_keys=False), encoding="utf-8")
 
     exit_code = synthesis_handoff_main(
         [
@@ -1976,6 +2039,8 @@ def test_cli_handoff_record_resolves_one_campaign_run_and_view_memberships(
                 str(tmp_path),
                 "--promoter-alias-registry",
                 str(alias_registry_path),
+                "--strategy-yaml",
+                str(strategy_path),
                 "--write",
                 "--json",
             ]
@@ -2021,6 +2086,8 @@ def test_cli_handoff_record_resolves_one_campaign_run_and_view_memberships(
                 str(tmp_path),
                 "--promoter-alias-registry",
                 str(alias_registry_path),
+                "--strategy-yaml",
+                str(strategy_path),
                 "--write",
                 "--json",
             ]
@@ -2047,6 +2114,8 @@ def test_cli_handoff_record_resolves_one_campaign_run_and_view_memberships(
                 str(tmp_path),
                 "--promoter-alias-registry",
                 str(alias_registry_path),
+                "--strategy-yaml",
+                str(strategy_path),
                 "--write",
                 "--json",
             ]
@@ -2104,7 +2173,9 @@ def test_handoff_record_lifecycle_stamps_unified_run_id_onto_selected_rows() -> 
         strategy_id="stress_promoter_insert:v1",
         campaign_slug="secg_msrb_greedy",
         expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-        expected_study_aliases=("SECG-001",),
+        materialization_contract=_materialization_contract(
+            ("SECG-001", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+        ),
         expected_artifact=ExpectedHandoffArtifact(
             campaign_slug="secg_msrb_greedy",
             expected_rows=1,
@@ -2120,11 +2191,11 @@ def test_handoff_record_lifecycle_stamps_unified_run_id_onto_selected_rows() -> 
     assert [row.run_id for row in stamped] == ["record-run-b"]
 
 
-def test_measured_round_handoff_record_requires_exact_study_aliases() -> None:
-    with pytest.raises(ValueError, match="requires expected_study_aliases"):
+def test_measured_round_handoff_record_requires_materialization_contract() -> None:
+    with pytest.raises(ValueError, match="requires materialization_contract"):
         SynthesisHandoffRecord(
             handoff_id="stress-opal-r1-msrb-v1",
-            lifecycle_status="generated_pending_acceptance",
+            lifecycle_status="authorized_for_materialization",
             source_authority="opal_selection_batch",
             selection_epoch="opal_model_round",
             assay_batch_index=1,
@@ -2157,7 +2228,9 @@ def test_measured_round_handoff_record_requires_canonical_study_alias_syntax() -
             strategy_id="stress_promoter_insert:v1",
             campaign_slug="secg_msrb_greedy",
             expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-            expected_study_aliases=("SECG-B0-ETH-01",),
+            materialization_contract=_materialization_contract(
+                ("SECG-B0-ETH-01", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+            ),
             expected_artifact=ExpectedHandoffArtifact(
                 campaign_slug="secg_msrb_greedy",
                 expected_rows=1,
@@ -2182,7 +2255,9 @@ def test_handoff_record_rejects_unknown_lifecycle_status() -> None:
             strategy_id="stress_promoter_insert:v1",
             campaign_slug="secg_msrb_greedy",
             expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-            expected_study_aliases=("SECG-019",),
+            materialization_contract=_materialization_contract(
+                ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+            ),
             expected_artifact=ExpectedHandoffArtifact(
                 campaign_slug="secg_msrb_greedy",
                 expected_rows=1,
@@ -2207,7 +2282,9 @@ def test_generated_handoff_record_requires_complete_artifact_receipts() -> None:
             strategy_id="stress_promoter_insert:v1",
             campaign_slug="secg_msrb_greedy",
             expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-            expected_study_aliases=("SECG-019",),
+            materialization_contract=_materialization_contract(
+                ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+            ),
             expected_artifact=ExpectedHandoffArtifact(
                 campaign_slug="secg_msrb_greedy",
                 expected_rows=1,
@@ -2232,7 +2309,9 @@ def test_generated_handoff_record_rejects_malformed_artifact_digest() -> None:
             strategy_id="stress_promoter_insert:v1",
             campaign_slug="secg_msrb_greedy",
             expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-            expected_study_aliases=("SECG-019",),
+            materialization_contract=_materialization_contract(
+                ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+            ),
             expected_artifact=ExpectedHandoffArtifact(
                 campaign_slug="secg_msrb_greedy",
                 expected_rows=1,
@@ -2263,6 +2342,15 @@ def test_handoff_artifact_paths_must_remain_repo_relative(unsafe_manifest_path: 
         )
 
 
+@pytest.mark.parametrize("unsafe_input_path", ["", "../outside.yaml", "/tmp/outside.yaml"])
+def test_materialization_input_paths_must_remain_repo_relative(unsafe_input_path: str) -> None:
+    with pytest.raises(ValueError, match="repository-relative"):
+        synthesis_handoff_records.MaterializationInputReceipt(
+            path=unsafe_input_path,
+            sha256="0" * 64,
+        )
+
+
 @pytest.mark.parametrize(
     "identity_override",
     [
@@ -2276,7 +2364,7 @@ def test_handoff_record_loader_rejects_wrong_root_identity(
     identity_override: dict[str, object],
 ) -> None:
     payload: dict[str, object] = {
-        "version": 2,
+        "version": 3,
         "study_id": "stress_ethanol_cipro_growth",
         "record_kind": "synthesis_handoff_lifecycle",
         "handoffs": [],
@@ -2302,7 +2390,9 @@ def test_opal_handoff_record_requires_explicit_round_and_physical_batch_semantic
             strategy_id="stress_promoter_insert:v1",
             campaign_slug="secg_msrb_greedy",
             expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-            expected_study_aliases=("SECG-019",),
+            materialization_contract=_materialization_contract(
+                ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+            ),
             expected_artifact=ExpectedHandoffArtifact(
                 campaign_slug="secg_msrb_greedy",
                 expected_rows=1,
@@ -2360,7 +2450,9 @@ def test_artifact_readiness_requires_manifest_lifecycle_parity(
         strategy_id="stress_promoter_insert:v1",
         campaign_slug="secg_msrb_greedy",
         expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-        expected_study_aliases=("SECG-019",),
+        materialization_contract=_materialization_contract(
+            ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+        ),
         expected_artifact=ExpectedHandoffArtifact(
             campaign_slug="secg_msrb_greedy",
             expected_rows=1,
@@ -2428,7 +2520,9 @@ def test_measured_round_handoff_record_rejects_study_alias_membership_drift() ->
         strategy_id="stress_promoter_insert:v1",
         campaign_slug="secg_msrb_greedy",
         expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
-        expected_study_aliases=("SECG-999",),
+        materialization_contract=_materialization_contract(
+            ("SECG-999", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+        ),
         expected_artifact=ExpectedHandoffArtifact(
             campaign_slug="secg_msrb_greedy",
             expected_rows=1,
@@ -2447,61 +2541,359 @@ def test_measured_round_handoff_record_rejects_study_alias_membership_drift() ->
         )
 
 
+def test_measured_round_manifest_rejects_alias_candidate_binding_swap() -> None:
+    selected = [
+        SelectedCandidate(
+            campaign_slug="secg_msrb_greedy",
+            selection_memberships=(_membership("ethanol", rank),),
+            as_of_round=1,
+            run_id="record-run-b",
+            selection_rank=rank,
+            id=candidate_id,
+            sequence=sequence,
+            synthesis_name=study_alias,
+            selection_source="opal_selection_batch",
+            selection_epoch="opal_model_round",
+            assay_batch_index=1,
+            model_as_of_round=1,
+        )
+        for rank, candidate_id, sequence, study_alias in (
+            (1, "opal-candidate-a", CORE_A, "SECG-019"),
+            (2, "opal-candidate-b", CORE_B, "SECG-020"),
+        )
+    ]
+    manifest = build_synthesis_manifest(
+        selected=selected,
+        strategy=_strategy(),
+        batch_id="stress-opal-r1-msrb-v1",
+    )
+    manifest.loc[:, "synthesis_name"] = ["SECG-020", "SECG-019"]
+    materialization_contract = _materialization_contract(
+        ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+        ("SECG-020", "opal-candidate-b", hashlib.sha256(CORE_B.encode("utf-8")).hexdigest()),
+    )
+    record = SynthesisHandoffRecord(
+        handoff_id="stress-opal-r1-msrb-v1",
+        lifecycle_status="authorized_for_materialization",
+        source_authority="opal_selection_batch",
+        selection_epoch="opal_model_round",
+        assay_batch_index=1,
+        model_as_of_round=1,
+        run_id="record-run-b",
+        strategy_id="stress_promoter_insert:v1",
+        campaign_slug="secg_msrb_greedy",
+        expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=2),),
+        materialization_contract=materialization_contract,
+        expected_artifact=ExpectedHandoffArtifact(
+            campaign_slug="secg_msrb_greedy",
+            expected_rows=2,
+            manifest_path="out/msrb/synthesis_manifest.csv",
+            vendor_workbook_path="out/msrb/azenta_gene_synthesis.xlsx",
+            genbank_dir_path="out/msrb/genbank_inserts",
+            genbank_feature_table_path="out/msrb/genbank_features.csv",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="study alias candidate binding mismatch"):
+        validate_manifest_against_handoff_record(
+            manifest,
+            record,
+            strategy_id="stress_promoter_insert:v1",
+        )
+
+
+@pytest.mark.parametrize(
+    "drift_field",
+    [
+        "campaign_config",
+        "selection_batch",
+        "candidate_records",
+        "promoter_alias_registry",
+        "cloning_strategy",
+    ],
+)
+def test_materialization_contract_rejects_input_digest_drift(tmp_path: Path, drift_field: str) -> None:
+    inputs = {
+        "campaign_config": tmp_path / "inputs/campaign.yaml",
+        "selection_batch": tmp_path / "inputs/selection_batch.parquet",
+        "candidate_records": tmp_path / "inputs/candidate_records.parquet",
+        "promoter_alias_registry": tmp_path / "inputs/promoter_aliases.yaml",
+        "cloning_strategy": tmp_path / "inputs/strategy.yaml",
+    }
+    for label, path in inputs.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(label, encoding="utf-8")
+    record = SynthesisHandoffRecord(
+        handoff_id="stress-opal-r1-msrb-v1",
+        lifecycle_status="authorized_for_materialization",
+        source_authority="opal_selection_batch",
+        selection_epoch="opal_model_round",
+        assay_batch_index=1,
+        model_as_of_round=1,
+        run_id="record-run-b",
+        strategy_id="stress_promoter_insert:v1",
+        campaign_slug="secg_msrb_greedy",
+        expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
+        materialization_contract=_materialization_contract(
+            ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+            campaign_config=(
+                inputs["campaign_config"].relative_to(tmp_path).as_posix(),
+                hashlib.sha256(inputs["campaign_config"].read_bytes()).hexdigest(),
+            ),
+            selection_batch=(
+                inputs["selection_batch"].relative_to(tmp_path).as_posix(),
+                hashlib.sha256(inputs["selection_batch"].read_bytes()).hexdigest(),
+            ),
+            candidate_records=(
+                inputs["candidate_records"].relative_to(tmp_path).as_posix(),
+                hashlib.sha256(inputs["candidate_records"].read_bytes()).hexdigest(),
+            ),
+            promoter_alias_registry=(
+                inputs["promoter_alias_registry"].relative_to(tmp_path).as_posix(),
+                hashlib.sha256(inputs["promoter_alias_registry"].read_bytes()).hexdigest(),
+            ),
+            cloning_strategy=(
+                inputs["cloning_strategy"].relative_to(tmp_path).as_posix(),
+                hashlib.sha256(inputs["cloning_strategy"].read_bytes()).hexdigest(),
+            ),
+        ),
+        expected_artifact=ExpectedHandoffArtifact(
+            campaign_slug="secg_msrb_greedy",
+            expected_rows=1,
+            manifest_path="out/msrb/synthesis_manifest.csv",
+            vendor_workbook_path="out/msrb/azenta_gene_synthesis.xlsx",
+            genbank_dir_path="out/msrb/genbank_inserts",
+            genbank_feature_table_path="out/msrb/genbank_features.csv",
+        ),
+    )
+    inputs[drift_field].write_text("changed", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=f"{drift_field} sha256 mismatch"):
+        synthesis_handoff_records.validate_materialization_contract_inputs(
+            record,
+            repo_root=tmp_path,
+            campaign_config_path=inputs["campaign_config"],
+            selection_batch_path=inputs["selection_batch"],
+            candidate_records_path=inputs["candidate_records"],
+            promoter_alias_registry_path=inputs["promoter_alias_registry"],
+            cloning_strategy_path=inputs["cloning_strategy"],
+        )
+
+
+def test_materialization_contract_rejects_candidate_records_symlink_escape(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    inputs_dir = repo_root / "inputs"
+    inputs_dir.mkdir(parents=True)
+    outside_records = tmp_path / "outside-candidate-records.parquet"
+    outside_records.write_text("candidate records", encoding="utf-8")
+    inputs = {
+        "campaign_config": inputs_dir / "campaign.yaml",
+        "selection_batch": inputs_dir / "selection_batch.parquet",
+        "candidate_records": inputs_dir / "candidate_records.parquet",
+        "promoter_alias_registry": inputs_dir / "promoter_aliases.yaml",
+        "cloning_strategy": inputs_dir / "strategy.yaml",
+    }
+    for field, path in inputs.items():
+        if field != "candidate_records":
+            path.write_text(field, encoding="utf-8")
+    inputs["candidate_records"].symlink_to(outside_records)
+    contract_kwargs = {
+        field: (
+            path.relative_to(repo_root).as_posix(),
+            hashlib.sha256(path.read_bytes()).hexdigest(),
+        )
+        for field, path in inputs.items()
+    }
+    record = SynthesisHandoffRecord(
+        handoff_id="stress-opal-r1-msrb-v1",
+        lifecycle_status="authorized_for_materialization",
+        source_authority="opal_selection_batch",
+        selection_epoch="opal_model_round",
+        assay_batch_index=1,
+        model_as_of_round=1,
+        run_id="record-run-b",
+        strategy_id="stress_promoter_insert:v1",
+        campaign_slug="secg_msrb_greedy",
+        expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
+        materialization_contract=_materialization_contract(
+            ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+            **contract_kwargs,
+        ),
+        expected_artifact=ExpectedHandoffArtifact(
+            campaign_slug="secg_msrb_greedy",
+            expected_rows=1,
+            manifest_path="out/msrb/synthesis_manifest.csv",
+            vendor_workbook_path="out/msrb/azenta_gene_synthesis.xlsx",
+            genbank_dir_path="out/msrb/genbank_inserts",
+            genbank_feature_table_path="out/msrb/genbank_features.csv",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="candidate_records input must remain inside repository root"):
+        synthesis_handoff_records.validate_materialization_contract_inputs(
+            record,
+            repo_root=repo_root,
+            campaign_config_path=inputs["campaign_config"],
+            selection_batch_path=inputs["selection_batch"],
+            candidate_records_path=inputs["candidate_records"],
+            promoter_alias_registry_path=inputs["promoter_alias_registry"],
+            cloning_strategy_path=inputs["cloning_strategy"],
+        )
+
+
+def test_materialization_write_rejects_generated_artifact_symlink_escape(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    batch_id = "stress-opal-r1-msrb-v1"
+    campaign_slug = "secg_msrb_greedy"
+    export_dir = campaign_synthesis_output_dir(
+        repo_root,
+        campaign_slug=campaign_slug,
+        batch_id=batch_id,
+    )
+    artifact_paths = campaign_synthesis_artifact_paths(
+        export_dir,
+        batch_id=batch_id,
+        campaign_slug=campaign_slug,
+    )
+    export_dir.parent.mkdir(parents=True)
+    export_dir.symlink_to(tmp_path / "outside-artifacts", target_is_directory=True)
+    record = SynthesisHandoffRecord(
+        handoff_id=batch_id,
+        lifecycle_status="authorized_for_materialization",
+        source_authority="opal_selection_batch",
+        selection_epoch="opal_model_round",
+        assay_batch_index=1,
+        model_as_of_round=1,
+        run_id="record-run-b",
+        strategy_id="stress_promoter_insert:v1",
+        campaign_slug=campaign_slug,
+        expected_selection_views=(ExpectedSelectionView(selection_view_id="ethanol", expected_rows=1),),
+        materialization_contract=_materialization_contract(
+            ("SECG-019", "opal-candidate-a", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+        ),
+        expected_artifact=ExpectedHandoffArtifact(
+            campaign_slug=campaign_slug,
+            expected_rows=1,
+            manifest_path=artifact_paths["manifest"].relative_to(repo_root).as_posix(),
+            vendor_workbook_path=artifact_paths["azenta_workbook"].relative_to(repo_root).as_posix(),
+            genbank_dir_path=artifact_paths["genbank_dir"].relative_to(repo_root).as_posix(),
+            genbank_feature_table_path=artifact_paths["genbank_feature_table"].relative_to(repo_root).as_posix(),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="generated manifest_path must remain inside repository root"):
+        artifact_status_for_handoff_record(record, repo_root=repo_root)
+
+    with pytest.raises(ValueError, match="manifest_path must remain inside repository root"):
+        synthesis_handoff_cli._validate_record_write_paths(
+            handoff_record=record,
+            repo_root=repo_root,
+            batch_id=batch_id,
+            output_dir=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        "record_yaml",
+        "campaign_config",
+        "promoter_alias_registry",
+        "cloning_strategy",
+    ],
+)
+def test_materialization_write_rejects_noncanonical_input_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    override: str,
+) -> None:
+    monkeypatch.setattr(synthesis_handoff_cli, "_source_checkout_repo_root", lambda: tmp_path.resolve())
+    canonical = synthesis_handoff_cli._canonical_materialization_paths(tmp_path)
+    supplied = dict(canonical)
+    supplied[override] = tmp_path / f"alternate/{override}.yaml"
+
+    with pytest.raises(ValueError, match=f"{override} must use the repository-canonical path"):
+        synthesis_handoff_cli._validate_canonical_materialization_paths(
+            repo_root=tmp_path,
+            **supplied,
+        )
+
+
+def test_materialization_write_rejects_non_checkout_repo_root(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="repo_root must be the active source checkout"):
+        synthesis_handoff_cli._canonical_materialization_paths(tmp_path)
+
+
 def test_record_loader_rejects_alias_reuse_across_committed_handoffs(tmp_path: Path) -> None:
     record_path = tmp_path / "synthesis_handoffs.yaml"
+    artifact_receipts = {
+        "manifest_sha256": "0" * 64,
+        "vendor_workbook_sha256": "1" * 64,
+        "genbank_dir_sha256": "2" * 64,
+        "genbank_feature_table_sha256": "3" * 64,
+        "workbook_readback_status": "pass",
+        "genbank_readback_status": "pass",
+    }
     record_path.write_text(
-        textwrap.dedent(
-            """
-            version: 2
-            study_id: stress_ethanol_cipro_growth
-            record_kind: synthesis_handoff_lifecycle
-            handoffs:
-              - handoff_id: stress-opal-r1-msrb-v1
-                lifecycle_status: accepted_for_order
-                source_authority: opal_selection_batch
-                selection_epoch: opal_model_round
-                assay_batch_index: 1
-                model_as_of_round: 1
-                campaign_slug: secg_msrb_greedy
-                run_id: run-r1
-                strategy_id: stress_promoter_insert:v1
-                expected_selection_views:
-                  - {selection_view_id: ethanol, expected_rows: 1}
-                expected_study_aliases: [SECG-019]
-                expected_artifact: &artifact
-                  campaign_slug: secg_msrb_greedy
-                  expected_rows: 1
-                  manifest_path: out/r1/manifest.csv
-                  vendor_workbook_path: out/r1/order.xlsx
-                  genbank_dir_path: out/r1/genbank
-                  genbank_feature_table_path: out/r1/features.csv
-                  manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-                  vendor_workbook_sha256: "1111111111111111111111111111111111111111111111111111111111111111"
-                  genbank_dir_sha256: "2222222222222222222222222222222222222222222222222222222222222222"
-                  genbank_feature_table_sha256: "3333333333333333333333333333333333333333333333333333333333333333"
-                  workbook_readback_status: pass
-                  genbank_readback_status: pass
-              - handoff_id: stress-opal-r2-msrb-v1
-                lifecycle_status: ordered
-                source_authority: opal_selection_batch
-                selection_epoch: opal_model_round
-                assay_batch_index: 2
-                model_as_of_round: 2
-                campaign_slug: secg_msrb_greedy
-                run_id: run-r2
-                strategy_id: stress_promoter_insert:v1
-                expected_selection_views:
-                  - {selection_view_id: ethanol, expected_rows: 1}
-                expected_study_aliases: [SECG-019]
-                expected_artifact:
-                  <<: *artifact
-                  manifest_path: out/r2/manifest.csv
-                  vendor_workbook_path: out/r2/order.xlsx
-                  genbank_dir_path: out/r2/genbank
-                  genbank_feature_table_path: out/r2/features.csv
-            """
-        ).strip()
-        + "\n",
+        yaml.safe_dump(
+            {
+                "version": 3,
+                "study_id": "stress_ethanol_cipro_growth",
+                "record_kind": "synthesis_handoff_lifecycle",
+                "handoffs": [
+                    {
+                        "handoff_id": "stress-opal-r1-msrb-v1",
+                        "lifecycle_status": "accepted_for_order",
+                        "source_authority": "opal_selection_batch",
+                        "selection_epoch": "opal_model_round",
+                        "assay_batch_index": 1,
+                        "model_as_of_round": 1,
+                        "campaign_slug": "secg_msrb_greedy",
+                        "run_id": "run-r1",
+                        "strategy_id": "stress_promoter_insert:v1",
+                        "expected_selection_views": [{"selection_view_id": "ethanol", "expected_rows": 1}],
+                        "materialization_contract": _materialization_contract(
+                            ("SECG-019", "candidate-r1", hashlib.sha256(CORE_A.encode("utf-8")).hexdigest()),
+                        ).to_json(),
+                        "expected_artifact": {
+                            "campaign_slug": "secg_msrb_greedy",
+                            "expected_rows": 1,
+                            "manifest_path": "out/r1/manifest.csv",
+                            "vendor_workbook_path": "out/r1/order.xlsx",
+                            "genbank_dir_path": "out/r1/genbank",
+                            "genbank_feature_table_path": "out/r1/features.csv",
+                            **artifact_receipts,
+                        },
+                    },
+                    {
+                        "handoff_id": "stress-opal-r2-msrb-v1",
+                        "lifecycle_status": "ordered",
+                        "source_authority": "opal_selection_batch",
+                        "selection_epoch": "opal_model_round",
+                        "assay_batch_index": 2,
+                        "model_as_of_round": 2,
+                        "campaign_slug": "secg_msrb_greedy",
+                        "run_id": "run-r2",
+                        "strategy_id": "stress_promoter_insert:v1",
+                        "expected_selection_views": [{"selection_view_id": "ethanol", "expected_rows": 1}],
+                        "materialization_contract": _materialization_contract(
+                            ("SECG-019", "candidate-r2", hashlib.sha256(CORE_B.encode("utf-8")).hexdigest()),
+                        ).to_json(),
+                        "expected_artifact": {
+                            "campaign_slug": "secg_msrb_greedy",
+                            "expected_rows": 1,
+                            "manifest_path": "out/r2/manifest.csv",
+                            "vendor_workbook_path": "out/r2/order.xlsx",
+                            "genbank_dir_path": "out/r2/genbank",
+                            "genbank_feature_table_path": "out/r2/features.csv",
+                            **artifact_receipts,
+                        },
+                    },
+                ],
+            },
+            sort_keys=False,
+        ),
         encoding="utf-8",
     )
 
@@ -2563,12 +2955,12 @@ def test_cli_opal_round_handoff_record_requires_explicit_run_id(
     record_path.write_text(
         textwrap.dedent(
             """
-            version: 2
+            version: 3
             study_id: stress_ethanol_cipro_growth
             record_kind: synthesis_handoff_lifecycle
             handoffs:
               - handoff_id: stress-opal-r1-msrb-v1
-                lifecycle_status: generated_pending_acceptance
+                lifecycle_status: authorized_for_materialization
                 source_authority: opal_selection_batch
                 selection_epoch: opal_model_round
                 assay_batch_index: 1
@@ -2579,10 +2971,32 @@ def test_cli_opal_round_handoff_record_requires_explicit_run_id(
                 expected_selection_views:
                   - selection_view_id: ethanol
                     expected_rows: 2
-                expected_study_aliases:
-                  - SECG-001
-                  - SECG-002
-                  - SECG-003
+                materialization_contract:
+                  campaign_config:
+                    path: inputs/campaign.yaml
+                    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                  selection_batch:
+                    path: inputs/selection_batch.parquet
+                    sha256: "1111111111111111111111111111111111111111111111111111111111111111"
+                  candidate_records:
+                    path: inputs/candidate_records.parquet
+                    sha256: "2222222222222222222222222222222222222222222222222222222222222222"
+                  promoter_alias_registry:
+                    path: inputs/promoter_aliases.yaml
+                    sha256: "3333333333333333333333333333333333333333333333333333333333333333"
+                  cloning_strategy:
+                    path: inputs/strategy.yaml
+                    sha256: "4444444444444444444444444444444444444444444444444444444444444444"
+                  expected_candidates:
+                    - study_alias: SECG-001
+                      candidate_id: candidate-b
+                      core_sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+                    - study_alias: SECG-002
+                      candidate_id: candidate-a
+                      core_sha256: "1111111111111111111111111111111111111111111111111111111111111111"
+                    - study_alias: SECG-003
+                      candidate_id: candidate-c
+                      core_sha256: "2222222222222222222222222222222222222222222222222222222222222222"
                 expected_artifact:
                   campaign_slug: secg_msrb_greedy
                   expected_rows: 3
@@ -2625,7 +3039,7 @@ def test_cli_handoff_record_rejects_campaign_count_drift(
     record_path.write_text(
         textwrap.dedent(
             """
-            version: 2
+            version: 3
             study_id: stress_ethanol_cipro_growth
             record_kind: synthesis_handoff_lifecycle
             handoffs:

@@ -60,7 +60,10 @@ Before generation, add one row to
 - one `campaign_slug` and immutable `run_id`;
 - `model_as_of_round` and physical `assay_batch_index`;
 - one expected membership count per selection view;
-- the exact stable `SECG-NNN` aliases in the deduplicated batch;
+- SHA-256 receipts for the campaign config, selection batch, candidate-record
+  Parquet, study alias registry, and cloning strategy;
+- one exact `(SECG-NNN, candidate_id, promoter-core SHA-256)` row per selected
+  candidate;
 - one artifact set for the deduplicated batch.
 
 The intended greedy round declares six memberships per view and 18 unique
@@ -107,7 +110,11 @@ later artifact sets are immutable. A completed OPAL round or valid preview is
 not authorization.
 
 The stable `SECG-NNN` registry records candidate identity and nomination
-provenance. Alias assignment does not prove physical ordering or measurement.
+provenance. The numbering is cumulative across rounds and does not encode a
+selection view or order batch. A candidate nominated but not physically used in
+one batch keeps its alias and may be selected later; the registry rejects reuse
+of that alias for another candidate or sequence. Alias assignment does not
+prove physical ordering or measurement.
 Before a future handoff is accepted for order, its exact aliases must be bound
 to that lifecycle event and checked against aliases already committed by an
 accepted, ordered, received, or assayed event. A pending preview does not make
@@ -120,6 +127,15 @@ candidate identity, then generates a new lifecycle-bound handoff.
 The legacy batch-level record cannot enter a committed state until actual
 physical inclusion is adjudicated per alias; absence from Reader is not proof
 that a sequence was never ordered.
+
+Materialization is more restrictive than preview. `--write` must use the active
+source checkout and its canonical lifecycle record, MSRB campaign config, alias
+registry, and cloning strategy. The run-selected candidate-record Parquet is
+also digest-bound because it supplies the annotations written into GenBank.
+Each of these five inputs must match its recorded digest before any output is
+created. Every input and generated artifact path must resolve inside the active
+checkout, including through symlinks. Preview commands may use alternate
+fixture paths because they cannot write artifacts.
 
 ### Evidence Boundary
 

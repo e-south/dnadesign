@@ -50,6 +50,15 @@ Every measured-round row includes campaign, round, run, JSON
 identity, cloning spans, hashes, and physical validation. A candidate selected
 by multiple views appears once with every membership.
 
+### Stable study aliases
+
+The study alias registry assigns one cumulative `SECG-NNN` name to each exact
+candidate and promoter-core sequence. An alias does not encode a campaign,
+selection view, or order batch. This keeps the same name usable in later OPAL
+rounds and Reader bindings, including for candidates nominated earlier but not
+physically included in a prior batch. Reusing an alias for another candidate or
+sequence is rejected.
+
 ## Lifecycle Record
 
 The authority is
@@ -77,25 +86,17 @@ If synthesis is authorized, its reviewed handoff record uses this mapping:
     - {selection_view_id: ethanol, expected_rows: 6}
     - {selection_view_id: ciprofloxacin, expected_rows: 6}
     - {selection_view_id: and, expected_rows: 6}
-  expected_study_aliases:
-    - SECG-019
-    - SECG-020
-    - SECG-021
-    - SECG-022
-    - SECG-023
-    - SECG-024
-    - SECG-025
-    - SECG-026
-    - SECG-027
-    - SECG-028
-    - SECG-029
-    - SECG-030
-    - SECG-031
-    - SECG-032
-    - SECG-033
-    - SECG-034
-    - SECG-035
-    - SECG-036
+  materialization_contract:
+    campaign_config: {path: <canonical-campaign-config>, sha256: <sha256>}
+    selection_batch: {path: <run-selection-batch>, sha256: <sha256>}
+    candidate_records: {path: <candidate-records-parquet>, sha256: <sha256>}
+    promoter_alias_registry: {path: <canonical-alias-registry>, sha256: <sha256>}
+    cloning_strategy: {path: <canonical-cloning-strategy>, sha256: <sha256>}
+    expected_candidates:
+      - study_alias: SECG-019
+        candidate_id: <exact-candidate-id>
+        core_sha256: <promoter-core-sha256>
+      # One exact row per selected candidate, through SECG-036 for this preview.
   expected_artifact:
     campaign_slug: secg_msrb_greedy
     expected_rows: 18
@@ -105,9 +106,13 @@ If synthesis is authorized, its reviewed handoff record uses this mapping:
     genbank_feature_table_path: <generated-feature-table-path>
 ```
 
-The record fails if campaign, run, stable alias membership, unique batch count,
-or per-view membership counts drift. The alias list binds the selected identity
-set; it does not claim that the sequences were ordered or assayed.
+The record fails if campaign, run, input digest, alias-to-candidate binding,
+promoter-core digest, unique batch count, or per-view membership count drifts.
+The candidate-record receipt is required because that table supplies the
+DenseGen and fixed-element annotations written into GenBank. All input and
+output paths must resolve inside the active repository checkout, including
+through existing symlinks. These bindings authorize one materialization; they
+do not claim that the sequences were ordered or assayed.
 
 ## Commands
 
@@ -141,6 +146,11 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
 The current lifecycle does not authorize synthesis. A reviewed record moves
 through `authorized_for_materialization`, `generated_pending_acceptance`, and
 then `accepted_for_order`. Materializing files does not place an order.
+
+Write mode accepts only the canonical lifecycle record, active campaign config,
+study alias registry, and cloning strategy in the active source checkout. Each
+file must match the SHA-256 recorded for the measured round. Preview mode may
+use alternate fixture paths because it cannot create handoff artifacts.
 
 `--source selected-csv` is fixture/debug input and requires explicit JSON
 `selection_memberships`. It is preview-only: the CLI rejects `--write` because

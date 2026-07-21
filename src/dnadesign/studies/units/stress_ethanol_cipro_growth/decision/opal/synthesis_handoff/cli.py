@@ -54,8 +54,14 @@ from .records import (
     handoff_record_payload,
     source_mode_from_handoff_record,
     validate_manifest_against_handoff_record,
+    validate_materialization_contract_inputs,
 )
 from .strategy import load_cloning_strategy
+
+DEFAULT_STRESS_PROMOTER_CLONING_STRATEGY = Path(
+    "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/"
+    "synthesis_handoff/configs/stress_promoter_insert_v1.yaml"
+)
 
 
 def _selected_from_csv(path: Path) -> list[SelectedCandidate]:
@@ -221,6 +227,72 @@ def _record_path_for(repo_root: Path, explicit_path: Path | None) -> Path:
     return repo_root / DEFAULT_SYNTHESIS_HANDOFF_RECORD
 
 
+def _source_checkout_repo_root() -> Path:
+    return _repo_root_from(Path(__file__)).resolve()
+
+
+def _require_repo_contained_path(repo_root: Path, value: Path, *, label: str) -> Path:
+    """Resolve one path and reject lexical or symlink escape from ``repo_root``."""
+
+    root = repo_root.resolve()
+    resolved = (value if value.is_absolute() else root / value).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"{label} must remain inside repository root {root}: {resolved}") from exc
+    return resolved
+
+
+def _canonical_materialization_paths(repo_root: Path) -> dict[str, Path]:
+    root = _source_checkout_repo_root()
+    supplied_root = repo_root.resolve()
+    if supplied_root != root:
+        raise ValueError(
+            f"materialization repo_root must be the active source checkout: expected={root} observed={supplied_root}"
+        )
+    paths = {
+        "record_yaml": root / DEFAULT_SYNTHESIS_HANDOFF_RECORD,
+        "campaign_config": root / DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG,
+        "promoter_alias_registry": root / PROMOTER_ALIAS_REGISTRY_PATH,
+        "cloning_strategy": root / DEFAULT_STRESS_PROMOTER_CLONING_STRATEGY,
+    }
+    return {
+        field: _require_repo_contained_path(root, path, label=f"materialization {field}")
+        for field, path in paths.items()
+    }
+
+
+def _validate_canonical_materialization_paths(
+    *,
+    repo_root: Path,
+    record_yaml: Path,
+    campaign_config: Path,
+    promoter_alias_registry: Path,
+    cloning_strategy: Path,
+) -> dict[str, Path]:
+    canonical = _canonical_materialization_paths(repo_root)
+    supplied = {
+        "record_yaml": record_yaml,
+        "campaign_config": campaign_config,
+        "promoter_alias_registry": promoter_alias_registry,
+        "cloning_strategy": cloning_strategy,
+    }
+    mismatches: list[str] = []
+    for field, supplied_path in supplied.items():
+        path = _require_repo_contained_path(
+            repo_root,
+            supplied_path,
+            label=f"materialization {field}",
+        )
+        if path != canonical[field]:
+            mismatches.append(
+                f"{field} must use the repository-canonical path: expected={canonical[field]} observed={path}"
+            )
+    if mismatches:
+        raise ValueError("; ".join(mismatches))
+    return canonical
+
+
 def _batch0_candidate_records_path(*, config_path: Path, repo_root: Path) -> Path:
     with config_path.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle) or {}
@@ -326,10 +398,11 @@ def _validate_record_write_paths(
         raise ValueError(
             "A lifecycle-bound OPAL handoff writes only to its recorded artifact paths; omit --output-dir."
         )
+    root = repo_root.resolve()
     assert handoff_record.campaign_slug is not None
     assert handoff_record.expected_artifact is not None
     export_dir = campaign_synthesis_output_dir(
-        repo_root,
+        root,
         campaign_slug=handoff_record.campaign_slug,
         batch_id=batch_id,
     )
@@ -353,11 +426,18 @@ def _validate_record_write_paths(
     }
     mismatches: list[str] = []
     for field, declared_value in declared.items():
-        declared_path = Path(declared_value)
-        if not declared_path.is_absolute():
-            declared_path = repo_root / declared_path
-        generated_path = generated_by_field[field]
-        if declared_path.resolve() != generated_path.resolve():
+        declared_path = _require_repo_contained_path(
+            root,
+            Path(declared_value),
+            label=f"handoff record {field}",
+        )
+        generated_path = _require_repo_contained_path(
+            root,
+            generated_by_field[field],
+            label=f"generated {field}",
+        )
+        generated_by_field[field] = generated_path
+        if declared_path != generated_path:
             mismatches.append(f"{field} declared={declared_path} generated={generated_path}")
     if mismatches:
         raise ValueError(
@@ -473,6 +553,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "authorized_for_materialization. Generated, accepted, or later artifacts are immutable.",
             )
 
+    canonical_write_inputs: dict[str, Path] | None = None
+    if args.write and source == "opal-round":
+        try:
+            canonical_write_inputs = _validate_canonical_materialization_paths(
+                repo_root=fallback_repo_root,
+                record_yaml=_record_path_for(fallback_repo_root, args.record_yaml),
+                campaign_config=(
+                    args.campaign_config
+                    if args.campaign_config is not None
+                    else fallback_repo_root / DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG
+                ),
+                promoter_alias_registry=args.promoter_alias_registry,
+                cloning_strategy=args.strategy_yaml,
+            )
+        except ValueError as exc:
+            _parser_error(parser, args, str(exc))
+
     try:
         batch_id = _batch_id_from_source(
             source=source,
@@ -510,7 +607,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
-    strategy = load_cloning_strategy(args.strategy_yaml)
+    strategy_path = (
+        canonical_write_inputs["cloning_strategy"] if canonical_write_inputs is not None else args.strategy_yaml
+    )
+    strategy = load_cloning_strategy(strategy_path)
     source_report: dict[str, Any] = {}
     candidate_records_path: Path | None = None
     if source == "batch0":
@@ -528,7 +628,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             _parser_error(parser, args, str(exc))
     elif source == "opal-round":
         repo_root = args.repo_root or _repo_root_from(Path.cwd())
-        campaign_config = args.campaign_config or repo_root / DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG
+        campaign_config = (
+            canonical_write_inputs["campaign_config"]
+            if canonical_write_inputs is not None
+            else args.campaign_config or repo_root / DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG
+        )
+        alias_registry_path = (
+            canonical_write_inputs["promoter_alias_registry"]
+            if canonical_write_inputs is not None
+            else args.promoter_alias_registry
+        )
         try:
             run_id = _run_id_for_opal_round_source(
                 args_run_id=args.run_id,
@@ -542,7 +651,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 as_of_round=int(as_of_round),
                 run_id=run_id,
                 repo_root=repo_root,
-                alias_registry_path=args.promoter_alias_registry,
+                alias_registry_path=alias_registry_path,
             )
             candidate_records_path = Path(str(source_report["candidate_records_path"]))
         except ValueError as exc:
@@ -558,6 +667,22 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if handoff_record is not None:
         selected = apply_handoff_record_lifecycle(selected, handoff_record)
+
+    materialization_input_validation: dict[str, Any] | None = None
+    if canonical_write_inputs is not None:
+        assert handoff_record is not None
+        try:
+            materialization_input_validation = validate_materialization_contract_inputs(
+                handoff_record,
+                repo_root=repo_root,
+                campaign_config_path=canonical_write_inputs["campaign_config"],
+                selection_batch_path=Path(str(source_report["selection_batch_path"])),
+                candidate_records_path=Path(str(source_report["candidate_records_path"])),
+                promoter_alias_registry_path=canonical_write_inputs["promoter_alias_registry"],
+                cloning_strategy_path=canonical_write_inputs["cloning_strategy"],
+            )
+        except ValueError as exc:
+            _parser_error(parser, args, str(exc))
 
     try:
         manifest = build_synthesis_manifest(selected=selected, strategy=strategy, batch_id=batch_id)
@@ -580,6 +705,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     }
     if source_report:
         payload["source_report"] = source_report
+    if materialization_input_validation is not None:
+        payload["materialization_input_validation"] = materialization_input_validation
 
     if args.write:
         assert source == "opal-round"
