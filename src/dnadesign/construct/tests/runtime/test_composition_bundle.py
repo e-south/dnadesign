@@ -95,7 +95,7 @@ def test_composition_bundle_rejects_nonempty_deprecated_visual_contract_dir(tmp_
     assert not (artifact_bundle / "manifest.json").exists()
 
 
-def test_composition_bundle_clears_stale_folding_mirror_when_folding_disabled(tmp_path: Path) -> None:
+def test_composition_bundle_clears_stale_folding_artifacts_when_folding_disabled(tmp_path: Path) -> None:
     artifact_bundle = tmp_path / "artifacts" / "synthetic_x3"
     first_config = _write_minimal_composition_config(
         tmp_path,
@@ -103,12 +103,15 @@ def test_composition_bundle_clears_stale_folding_mirror_when_folding_disabled(tm
         folding_enabled=True,
     )
     run_linear_ssdna_composition(first_config)
+    stale_folding_artifacts = artifact_bundle / "folding"
     stale_folding_mirror = artifact_bundle / "manifest" / "folding"
+    assert (stale_folding_artifacts / "secondary_structure_prediction_v1.json").is_file()
     assert (stale_folding_mirror / "secondary_structure_prediction_v1.json").is_file()
 
     second_config = _write_minimal_composition_config(tmp_path, artifact_bundle=artifact_bundle)
     run_linear_ssdna_composition(second_config)
 
+    assert not stale_folding_artifacts.exists()
     assert not stale_folding_mirror.exists()
 
 

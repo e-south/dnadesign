@@ -31,6 +31,7 @@ def write_folding_artifacts(artifact_bundle: Path, composed: ComposedLinearSsdna
     if not composed.config.folding.enabled:
         return
     folding_dir = artifact_bundle / "folding"
+    folding_dir.mkdir(parents=True, exist_ok=True)
     folding_sequence_payload = canonical_sequence_artifact_payload(composed)
     _write_json(artifact_bundle / CANONICAL_FOLDING_SEQUENCE_PATH, folding_sequence_payload)
     request = _folding_request(composed, folding_sequence_payload=folding_sequence_payload)

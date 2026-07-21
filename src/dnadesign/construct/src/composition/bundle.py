@@ -30,6 +30,7 @@ from .visual import (
 
 _DEPRECATED_GENERATED_DIR_PATHS = (Path("folding/src"),)
 _OPTIONAL_GENERATED_DIR_PATHS = (
+    Path("folding"),
     Path("manifest/folding"),
     Path("visual/viennarna_secondary_structure"),
     Path("manifest/visual/secondary_structure"),
@@ -39,7 +40,6 @@ _OPTIONAL_GENERATED_DIR_PATHS = (
 def write_composition_bundle(composed: ComposedLinearSsdna, *, artifact_bundle: Path, config_path: Path) -> None:
     artifact_bundle.mkdir(parents=True, exist_ok=True)
     (artifact_bundle / "baserender_jobs").mkdir(parents=True, exist_ok=True)
-    (artifact_bundle / "folding").mkdir(parents=True, exist_ok=True)
     (artifact_bundle / "visual").mkdir(parents=True, exist_ok=True)
     (artifact_bundle / "visual" / "renders").mkdir(parents=True, exist_ok=True)
     _remove_deprecated_generated_artifacts(artifact_bundle)
