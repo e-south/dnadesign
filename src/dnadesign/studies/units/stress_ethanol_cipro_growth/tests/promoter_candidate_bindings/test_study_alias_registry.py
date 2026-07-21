@@ -21,9 +21,14 @@ import yaml
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings import (
     PromoterCandidateBindingsError,
-    preview_promoter_candidate_bindings_from_repo,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings.source_registry import (
+    load_source_registry,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings.study_alias_registry import (
+    REGISTRY_PATH,
+    REGISTRY_SCHEMA_ID,
+    REGISTRY_SCHEMA_VERSION,
     STUDY_ALIAS_NAMESPACE,
     load_study_promoter_alias_registry,
     plan_study_aliases,
@@ -89,6 +94,18 @@ def _assignment(
         "source_aliases": source_aliases or [],
         "sequence": sequence,
     }
+
+
+def _checked_in_registry_payload(repo_root: Path) -> dict[str, object]:
+    payload = yaml.safe_load((repo_root / REGISTRY_PATH).read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def _require_repository_alias_candidate_table(path: Path) -> None:
+    if path.is_file():
+        return
+    pytest.skip(f"requires local promoter candidate table; missing {path}")
 
 
 def test_registry_loads_exact_append_only_aliases(tmp_path: Path) -> None:
@@ -190,61 +207,89 @@ def test_alias_plan_rejects_registered_sequence_under_new_candidate_id(tmp_path:
         plan_study_aliases(registry, [("candidate-b", sequence)])
 
 
-def test_checked_in_registry_covers_prior_and_current_batches() -> None:
+def test_checked_in_registry_declares_prior_and_current_batches() -> None:
     repo_root = Path(__file__).resolve().parents[7]
+    payload = _checked_in_registry_payload(repo_root)
+    assignments = payload["assignments"]
+    assert isinstance(assignments, list)
+
+    assert payload["schema_id"] == REGISTRY_SCHEMA_ID
+    assert payload["schema_version"] == REGISTRY_SCHEMA_VERSION
+    assert payload["study_id"] == "stress_ethanol_cipro_growth"
+    assert payload["alias_namespace"] == STUDY_ALIAS_NAMESPACE
+    assert payload["candidate_table"] == {
+        "dataset_id": "usr_prom_eth_cip_opal_candidates",
+        "records_path": "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet",
+    }
+    assert len(assignments) == 36
+    assert [row["alias"] for row in assignments] == [f"SECG-{index:03d}" for index in range(1, 37)]
+    assert f"SECG-{int(assignments[-1]['ordinal']) + 1:03d}" == "SECG-037"
+    assert assignments[0]["source_aliases"] == ["SECG-B0-ETH-01"]
+    assert assignments[17]["source_aliases"] == ["SECG-B0-AND-06"]
+    assert assignments[18]["candidate_id"] == "0a1649a2577534c7b29604ed50cd6c8435e5caea"
+    assert assignments[-1]["candidate_id"] == "7f79342eebe5afcbd32be843a9ef24fbb54d9a71"
+    assert assignments[0]["first_assignment"] == {
+        "source_authority": "study_batch0_selector",
+        "source_id": "stress-opal-batch0-sfxi-v1",
+        "nomination_batch_index": 0,
+        "model_as_of_round": None,
+    }
+    assert assignments[18]["first_assignment"] == {
+        "source_authority": "opal_selection_batch",
+        "source_id": ("r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584"),
+        "nomination_batch_index": 1,
+        "model_as_of_round": 0,
+    }
+
+
+def test_local_checked_in_registry_verifies_candidate_table() -> None:
+    repo_root = Path(__file__).resolve().parents[7]
+    payload = _checked_in_registry_payload(repo_root)
+    candidate_table = payload["candidate_table"]
+    assert isinstance(candidate_table, dict)
+    candidate_table_path = Path(str(candidate_table["records_path"]))
+    _require_repository_alias_candidate_table(repo_root / candidate_table_path)
+
     registry = load_study_promoter_alias_registry(repo_root)
 
     assert len(registry.assignments) == 36
-    assert [row.alias for row in registry.assignments] == [f"SECG-{index:03d}" for index in range(1, 37)]
-    assert registry.assignments[0].source_aliases == ("SECG-B0-ETH-01",)
-    assert registry.assignments[17].source_aliases == ("SECG-B0-AND-06",)
-    assert registry.assignments[18].candidate_id == "0a1649a2577534c7b29604ed50cd6c8435e5caea"
-    assert registry.assignments[-1].candidate_id == "7f79342eebe5afcbd32be843a9ef24fbb54d9a71"
+    assert registry.next_ordinal == 37
+
+
+def test_repository_alias_candidate_table_gate_skips_unmaterialized_input(tmp_path: Path) -> None:
+    with pytest.raises(pytest.skip.Exception, match="requires local promoter candidate table"):
+        _require_repository_alias_candidate_table(tmp_path / "records.parquet")
 
 
 def test_checked_in_registry_preserves_immutable_assignment_prefixes() -> None:
     repo_root = Path(__file__).resolve().parents[7]
-    registry = load_study_promoter_alias_registry(repo_root)
+    assignments = _checked_in_registry_payload(repo_root)["assignments"]
+    assert isinstance(assignments, list)
 
     expected_prefix_sha256 = {
         18: "707ac26a7cadb356e5b074fef7ccec74ad7f43ee1df7ab1d37d7c58dd4382498",  # pragma: allowlist secret
         36: "0bfb2302fb0d705ed4ebb33bcb9b95ab19b4557bdb9797a980926910ddda8037",  # pragma: allowlist secret
     }
     for prefix_length, expected_sha256 in expected_prefix_sha256.items():
-        payload = json.dumps(
-            [
-                {
-                    "ordinal": row.ordinal,
-                    "alias": row.alias,
-                    "candidate_id": row.candidate_id,
-                    "sequence_sha256": row.sequence_sha256,
-                    "first_assignment": {
-                        "source_authority": row.first_assignment.source_authority,
-                        "source_id": row.first_assignment.source_id,
-                        "nomination_batch_index": row.first_assignment.nomination_batch_index,
-                        "model_as_of_round": row.first_assignment.model_as_of_round,
-                    },
-                    "source_aliases": list(row.source_aliases),
-                }
-                for row in registry.assignments[:prefix_length]
-            ],
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        payload = json.dumps(assignments[:prefix_length], sort_keys=True, separators=(",", ":")).encode("utf-8")
         assert hashlib.sha256(payload).hexdigest() == expected_sha256
 
 
-def test_checked_in_bindings_project_canonical_aliases_for_reader_and_synthesis() -> None:
+def test_checked_in_binding_registry_projects_canonical_aliases_for_reader_and_synthesis() -> None:
     repo_root = Path(__file__).resolve().parents[7]
+    assignments = _checked_in_registry_payload(repo_root)["assignments"]
+    assert isinstance(assignments, list)
+    registry = load_source_registry(repo_root)
+    study_sources = [source for source in registry.alias_sources if source.source_id == "study_promoter_aliases"]
 
-    preview = preview_promoter_candidate_bindings_from_repo(repo_root)
-    aliases = preview.bindings.loc[
-        preview.bindings["candidate_id"].eq("0a1649a2577534c7b29604ed50cd6c8435e5caea"),
-        ["alias_namespace", "alias"],
+    assert len(study_sources) == 1
+    source = study_sources[0]
+    assert source.adapter == "study_promoter_alias_registry.v1"
+    assert source.config["registry_path"] == REGISTRY_PATH.as_posix()
+    assert source.config["aliases"] == [
+        {"namespace": "study.promoter_alias", "template": "{study_alias}"},
+        {"namespace": "synthesis.name", "template": "{study_alias}"},
+        {"namespace": "reader.design_id", "template": "pDual-10-{study_alias}"},
     ]
-
-    assert set(map(tuple, aliases.to_records(index=False))) == {
-        ("study.promoter_alias", "SECG-019"),
-        ("synthesis.name", "SECG-019"),
-        ("reader.design_id", "pDual-10-SECG-019"),
-    }
+    assert assignments[18]["alias"] == "SECG-019"
+    assert assignments[18]["candidate_id"] == "0a1649a2577534c7b29604ed50cd6c8435e5caea"
