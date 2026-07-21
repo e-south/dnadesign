@@ -50,28 +50,50 @@ def load_frozen_artifact(
 ) -> FrozenArtifact:
     """Parse one artifact reference and verify its bytes and declared row count."""
 
+    artifact = parse_frozen_artifact(
+        value,
+        artifact_id=artifact_id,
+        expected_count=expected_count,
+    )
+    return verify_frozen_artifact(root, artifact, artifact_id=artifact_id)
+
+
+def parse_frozen_artifact(
+    value: object,
+    *,
+    artifact_id: str,
+    expected_count: int,
+) -> FrozenArtifact:
+    """Parse one frozen-artifact declaration without weakening source verification."""
+
     raw = _mapping(value, context=f"artifacts.{artifact_id}")
     _exact_fields(raw, {"path", "sha256", "row_count"}, context=f"artifacts.{artifact_id}")
     relative_path = _relative_path(raw["path"], context=f"artifacts.{artifact_id}.path")
-    path = (root / relative_path).resolve()
-    try:
-        path.relative_to(root)
-    except ValueError as exc:
-        raise MsrbEvaluationBaselineError(f"{artifact_id} path escapes the repository.") from exc
-    if not path.is_file():
-        raise MsrbEvaluationBaselineError(f"{artifact_id} artifact is missing: {path}")
     expected_sha256 = _sha256_text(raw["sha256"], context=f"artifacts.{artifact_id}.sha256")
-    actual_sha256 = file_sha256(path)
-    if actual_sha256 != expected_sha256:
-        raise MsrbEvaluationBaselineError(
-            f"{artifact_id} SHA-256 mismatch: expected {expected_sha256}, observed {actual_sha256}."
-        )
     row_count = _positive_integer(raw["row_count"], context=f"artifacts.{artifact_id}.row_count")
     if row_count != expected_count:
         raise MsrbEvaluationBaselineError(
             f"{artifact_id} row count mismatch: this baseline requires {expected_count}, observed {row_count}."
         )
     return FrozenArtifact(path=relative_path, sha256=expected_sha256, row_count=row_count)
+
+
+def verify_frozen_artifact(root: Path, artifact: FrozenArtifact, *, artifact_id: str) -> FrozenArtifact:
+    """Verify one parsed frozen artifact against repository bytes."""
+
+    path = (root / artifact.path).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise MsrbEvaluationBaselineError(f"{artifact_id} path escapes the repository.") from exc
+    if not path.is_file():
+        raise MsrbEvaluationBaselineError(f"{artifact_id} artifact is missing: {path}")
+    actual_sha256 = file_sha256(path)
+    if actual_sha256 != artifact.sha256:
+        raise MsrbEvaluationBaselineError(
+            f"{artifact_id} SHA-256 mismatch: expected {artifact.sha256}, observed {actual_sha256}."
+        )
+    return artifact
 
 
 def load_frozen_file(

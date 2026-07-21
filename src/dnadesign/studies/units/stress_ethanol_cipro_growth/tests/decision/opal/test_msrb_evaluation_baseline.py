@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -51,7 +52,87 @@ def _write_payload(tmp_path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
-def test_round0_baseline_verifies_exact_frozen_sources_and_allocations() -> None:
+def _repository_msrb_baseline_artifacts(repo_root: Path) -> tuple[Path, ...]:
+    artifacts = _payload()["artifacts"]
+    return tuple(repo_root / str(artifacts[artifact_id]["path"]) for artifact_id in artifacts)
+
+
+def _require_repository_msrb_baseline_artifacts(repo_root: Path) -> None:
+    required = _repository_msrb_baseline_artifacts(repo_root)
+    missing = tuple(path for path in required if not path.is_file())
+    if not missing:
+        return
+    if len(missing) == len(required):
+        pytest.skip(f"requires local MSRB baseline artifacts; missing {missing[0].relative_to(repo_root)}")
+    missing_paths = [str(path.relative_to(repo_root)) for path in missing]
+    raise AssertionError(f"MSRB baseline artifacts are partially materialized; missing={missing_paths}")
+
+
+def test_repository_msrb_baseline_artifact_gate_skips_unmaterialized_inputs(tmp_path: Path) -> None:
+    with pytest.raises(pytest.skip.Exception, match="requires local MSRB baseline artifacts"):
+        _require_repository_msrb_baseline_artifacts(tmp_path)
+
+
+def test_repository_msrb_baseline_artifact_gate_rejects_partial_materialization(tmp_path: Path) -> None:
+    first_artifact = _repository_msrb_baseline_artifacts(tmp_path)[0]
+    first_artifact.parent.mkdir(parents=True)
+    first_artifact.touch()
+
+    with pytest.raises(AssertionError, match="partially materialized"):
+        _require_repository_msrb_baseline_artifacts(tmp_path)
+
+
+def test_round0_baseline_receipt_declares_exact_sources_and_allocations() -> None:
+    payload = _payload()
+    campaign = payload["campaign"]
+    artifacts = payload["artifacts"]
+    allocations = payload["allocations"]
+
+    assert payload["schema_id"] == SCHEMA_ID
+    assert payload["schema_version"] == "1"
+    assert campaign["slug"] == CAMPAIGN_SLUG
+    assert campaign["run_id"] == RUN_ID
+    assert campaign["round_index"] == 0
+    assert campaign["config"]["path"] == ("src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml")
+    assert (
+        campaign["config"]["sha256"]
+        == hashlib.sha256((REPO_ROOT / campaign["config"]["path"]).read_bytes()).hexdigest()
+    )
+    assert campaign["selection_allocation_api_version"] == "1"
+
+    assert set(artifacts) == {"prediction_ledger", "selection_batch", "labels_used"}
+    assert {artifact_id: artifact["row_count"] for artifact_id, artifact in artifacts.items()} == {
+        "prediction_ledger": 154_785,
+        "selection_batch": 18,
+        "labels_used": 27,
+    }
+    for artifact in artifacts.values():
+        assert set(artifact) == {"path", "sha256", "row_count"}
+        path = Path(artifact["path"])
+        assert not path.is_absolute()
+        assert ".." not in path.parts
+        assert re.fullmatch(r"[0-9a-f]{64}", artifact["sha256"])
+
+    assert tuple(row["study_alias"] for row in allocations) == tuple(f"SECG-{ordinal:03d}" for ordinal in range(19, 37))
+    assert len({row["candidate_id"] for row in allocations}) == 18
+    assert len({row["sequence_sha256"] for row in allocations}) == 18
+    assert Counter(row["selection_view"] for row in allocations) == {
+        "ethanol": 6,
+        "ciprofloxacin": 6,
+        "and": 6,
+    }
+
+    alias_registry_path = REPO_ROOT / payload["alias_registry"]["path"]
+    alias_registry = yaml.safe_load(alias_registry_path.read_text(encoding="utf-8"))
+    aliases = {row["alias"]: row for row in alias_registry["assignments"]}
+    for allocation in allocations:
+        registered = aliases[allocation["study_alias"]]
+        assert registered["candidate_id"] == allocation["candidate_id"]
+        assert registered["sequence_sha256"] == allocation["sequence_sha256"]
+
+
+def test_local_round0_baseline_verifies_frozen_artifact_contents() -> None:
+    _require_repository_msrb_baseline_artifacts(REPO_ROOT)
     baseline = load_msrb_evaluation_baseline(REPO_ROOT)
 
     assert baseline.schema_id == SCHEMA_ID
@@ -136,6 +217,7 @@ def test_baseline_rejects_wrong_campaign_identity(
 
 
 def test_baseline_rejects_artifact_digest_drift(tmp_path: Path) -> None:
+    _require_repository_msrb_baseline_artifacts(REPO_ROOT)
     payload = _payload()
     payload["artifacts"]["prediction_ledger"]["sha256"] = "0" * 64
 
@@ -189,6 +271,7 @@ def test_baseline_rejects_wrong_selection_count_and_quota(tmp_path: Path) -> Non
 
 
 def test_baseline_rejects_unknown_study_alias(tmp_path: Path) -> None:
+    _require_repository_msrb_baseline_artifacts(REPO_ROOT)
     payload = copy.deepcopy(_payload())
     payload["allocations"][0]["study_alias"] = "SECG-999"
 
@@ -197,6 +280,7 @@ def test_baseline_rejects_unknown_study_alias(tmp_path: Path) -> None:
 
 
 def test_baseline_rejects_labels_comparison_set_drift(tmp_path: Path) -> None:
+    _require_repository_msrb_baseline_artifacts(REPO_ROOT)
     payload = _payload()
     payload["comparison_set"]["candidate_ids"][0] = "not-a-label"
 

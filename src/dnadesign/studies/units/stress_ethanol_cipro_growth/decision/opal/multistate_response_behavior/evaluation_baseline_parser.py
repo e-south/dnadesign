@@ -22,7 +22,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
     REGISTRY_SCHEMA_ID,
 )
 
-from .evaluation_baseline_artifacts import load_frozen_artifact, load_frozen_file
+from .evaluation_baseline_artifacts import load_frozen_file, parse_frozen_artifact, verify_frozen_artifact
 from .evaluation_baseline_contracts import (
     CAMPAIGN_CONFIG_PATH,
     CAMPAIGN_SLUG,
@@ -63,25 +63,6 @@ def parse_baseline(payload: object, *, root: Path) -> ParsedBaseline:
 
     artifacts = _mapping(raw["artifacts"], context="artifacts")
     _exact_fields(artifacts, {"prediction_ledger", "selection_batch", "labels_used"}, context="artifacts")
-    prediction_ledger = load_frozen_artifact(
-        artifacts["prediction_ledger"],
-        root=root,
-        artifact_id="prediction_ledger",
-        expected_count=154_785,
-    )
-    selection_batch = load_frozen_artifact(
-        artifacts["selection_batch"],
-        root=root,
-        artifact_id="selection_batch",
-        expected_count=18,
-    )
-    labels_used = load_frozen_artifact(
-        artifacts["labels_used"],
-        root=root,
-        artifact_id="labels_used",
-        expected_count=27,
-    )
-
     allocations = _allocations(raw["allocations"])
     alias_registry_path = _alias_registry_path(raw["alias_registry"])
     comparison_ids, comparison_method, comparison_subset_size, comparison_subset_count = _comparison_set(
@@ -89,6 +70,28 @@ def parse_baseline(payload: object, *, root: Path) -> ParsedBaseline:
     )
     endpoint_ids = _evaluation(raw["evaluation"])
     claims = _claims(raw["claim_limits"])
+
+    prediction_ledger = parse_frozen_artifact(
+        artifacts["prediction_ledger"],
+        artifact_id="prediction_ledger",
+        expected_count=154_785,
+    )
+    selection_batch = parse_frozen_artifact(
+        artifacts["selection_batch"],
+        artifact_id="selection_batch",
+        expected_count=18,
+    )
+    labels_used = parse_frozen_artifact(
+        artifacts["labels_used"],
+        artifact_id="labels_used",
+        expected_count=27,
+    )
+    for artifact_id, artifact in (
+        ("prediction_ledger", prediction_ledger),
+        ("selection_batch", selection_batch),
+        ("labels_used", labels_used),
+    ):
+        verify_frozen_artifact(root, artifact, artifact_id=artifact_id)
     return ParsedBaseline(
         campaign_config=campaign_config,
         selection_allocation_api_version=selection_allocation_api_version,
