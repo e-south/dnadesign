@@ -22,6 +22,17 @@ from dnadesign.aligner.pairwise.cache import generate_cache_filename, load_cache
 from dnadesign.aligner.pairwise.validation import extract_sequence, validate_sequence
 
 
+def _max_score_denominator(seq_a: str, seq_b: str, *, match: int) -> int:
+    """Return the symmetric maximum self-score used by every public pairwise path."""
+
+    return match * max(len(seq_a), len(seq_b))
+
+
+def _validate_normalization(normalization: str) -> None:
+    if normalization != "max_score":
+        raise ValueError("Only 'max_score' normalization is supported.")
+
+
 def global_alignment(
     seq_a: str,
     seq_b: str,
@@ -74,7 +85,8 @@ def compute_alignment_scores(
 ) -> float | np.ndarray | dict[str, Any]:
     """Compute global pairwise alignment scores for a sequence collection."""
 
-    del output, normalization, parallel, num_workers
+    del output, parallel, num_workers
+    _validate_normalization(normalization)
     cache_path = Path("./swcache") if cache_dir is None else Path(cache_dir)
     clean_seqs = [extract_sequence(item, sequence_key) for item in sequences]
     n = len(clean_seqs)
@@ -112,7 +124,7 @@ def compute_alignment_scores(
         for i in range(n):
             norm_matrix[i, i] = 1.0
             for j in range(i + 1, n):
-                denom = match * max(len(clean_seqs[i]), len(clean_seqs[j]))
+                denom = _max_score_denominator(clean_seqs[i], clean_seqs[j], match=match)
                 value = full_matrix[i, j] / denom if denom > 0 else 0.0
                 norm_matrix[i, j] = value
                 norm_matrix[j, i] = value
@@ -176,6 +188,7 @@ def score_pairwise(
 ) -> float | dict[str, float | str]:
     """Compute a normalized global alignment score for a pair of nucleotide sequences."""
 
+    _validate_normalization(normalization)
     seq_a = validate_sequence(seq_a)
     seq_b = validate_sequence(seq_b)
     result = global_alignment(
@@ -193,12 +206,7 @@ def score_pairwise(
     else:
         raw_score = result
 
-    if normalization == "max_score":
-        denom = match * min(len(seq_a), len(seq_b))
-    elif normalization == "alignment_length":
-        denom = min(len(seq_a), len(seq_b))
-    else:
-        raise ValueError(f"Unknown normalization strategy: {normalization}")
+    denom = _max_score_denominator(seq_a, seq_b, match=match)
 
     norm_score = raw_score / denom if denom > 0 else 0.0
     ret: dict[str, float | str] = {"raw": float(raw_score), "normalized": float(norm_score)}

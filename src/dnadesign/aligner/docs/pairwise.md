@@ -1,7 +1,7 @@
 # Pairwise Alignment
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-21
 
 Use `dnadesign.aligner.pairwise` when a workflow needs global pairwise
 nucleotide alignment scores.
@@ -26,12 +26,17 @@ layout.
 - `matrix`: full square score matrix
 - `condensed`: upper-triangular condensed vector
 
-Pairwise scores preserve the historical normalization behavior:
+Pairwise scores use one supported `max_score` contract:
 
 ```text
-normalized_similarity = alignment_score / (match_score * reference_length)
+normalized_similarity = alignment_score / (match_score * longer_sequence_length)
 dissimilarity = 1 - normalized_similarity
 ```
+
+Using the longer sequence makes the default `max_score` result symmetric and
+keeps the scalar and batch APIs on the same denominator contract.
+Other normalization names fail rather than silently changing or ignoring the
+requested rule.
 
 ## Example
 

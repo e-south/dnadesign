@@ -96,3 +96,37 @@ def test_compute_alignment_scores_normalized_matrix_is_symmetric_for_unequal_len
     assert reverse["matrix"][0, 1] == reverse["matrix"][1, 0]
     assert forward["mean"] == reverse["mean"]
     np.testing.assert_allclose(forward["condensed"], reverse["condensed"])
+
+
+def test_scalar_and_batch_max_score_normalization_match_for_unequal_lengths() -> None:
+    sequences = ["AAAA", "AAAAAA"]
+
+    scalar = aligner.score_pairwise(
+        *sequences,
+        normalization="max_score",
+        gap_open=0,
+        gap_extend=0,
+    )
+    batch = aligner.compute_alignment_scores(
+        sequences,
+        normalization="max_score",
+        gap_open=0,
+        gap_extend=0,
+        use_cache=False,
+        return_formats=("mean",),
+    )
+
+    assert scalar == pytest.approx(2 / 3)
+    assert batch == pytest.approx(2 / 3)
+
+
+def test_public_pairwise_paths_reject_unsupported_normalization() -> None:
+    with pytest.raises(ValueError, match="Only 'max_score' normalization is supported"):
+        aligner.score_pairwise("AAAA", "AAAAAA", normalization="alignment_length")
+
+    with pytest.raises(ValueError, match="Only 'max_score' normalization is supported"):
+        aligner.compute_alignment_scores(
+            ["AAAA", "AAAAAA"],
+            normalization="alignment_length",
+            use_cache=False,
+        )
