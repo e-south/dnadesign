@@ -181,7 +181,7 @@ jobs:
           )
 
           if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" = "true" ]; then
-            uv run pytest -q -m "$marker_expr" --maxfail=1 --durations=25 \
+            uv run pytest -q -m "$marker_expr" --durations=25 \
               --cov=src/dnadesign \
               --cov-report=json:coverage-core.json \
               --cov-report=xml:coverage-core.xml
@@ -195,7 +195,7 @@ jobs:
               exit 1
             fi
             echo "No affected tools in PR scope; running core-lane smoke tests without coverage upload."
-            uv run pytest -q --maxfail=1 --durations=25 "${smoke_targets[@]}"
+            uv run pytest -q --durations=25 "${smoke_targets[@]}"
             exit 0
           fi
 
@@ -208,14 +208,14 @@ jobs:
 
           if [ "${#targets[@]}" -eq 0 ]; then
             echo "No test directories found for affected tools: $affected_csv; running core-lane smoke tests."
-            uv run pytest -q --maxfail=1 --durations=25 "${smoke_targets[@]}" \
+            uv run pytest -q --durations=25 "${smoke_targets[@]}" \
               --cov=src/dnadesign \
               --cov-report=json:coverage-core.json \
               --cov-report=xml:coverage-core.xml
             exit 0
           fi
 
-          uv run pytest -q -m "$marker_expr" --maxfail=1 --durations=25 "${targets[@]}" \
+          uv run pytest -q -m "$marker_expr" --durations=25 "${targets[@]}" \
             --cov=src/dnadesign \
             --cov-report=json:coverage-core.json \
             --cov-report=xml:coverage-core.xml

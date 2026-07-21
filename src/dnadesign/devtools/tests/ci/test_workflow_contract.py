@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -174,6 +175,16 @@ def test_no_tool_smoke_targets_include_workflow_contracts() -> None:
     test_step = next(step for step in steps if step.get("name") == "Tests (core lane) + coverage report")
 
     assert "src/dnadesign/devtools/tests/ci/test_workflow_contract.py" in test_step["run"]
+
+
+def test_core_pytest_collects_the_complete_failure_set() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["core-lint-test-build"]["steps"]
+    test_step = next(step for step in steps if step.get("name") == "Tests (core lane) + coverage report")
+    run_script = str(test_step["run"])
+
+    assert "--maxfail" not in run_script
+    assert re.search(r"(^|\s)-x(?:\s|$)", run_script) is None
 
 
 def test_core_installs_ffmpeg_only_after_static_gates() -> None:
