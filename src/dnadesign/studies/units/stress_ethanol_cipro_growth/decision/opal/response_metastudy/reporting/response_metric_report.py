@@ -11,13 +11,26 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import pandas as pd
 
 from ..core.response_contracts import ResponseMetricScreen
 
 
-def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduction_id: str) -> list[str]:
-    """Summarize event alignment, calibration, and learnability without overclaiming."""
+@dataclass(frozen=True)
+class ResponseMetricReportSections:
+    assay_and_labels: tuple[str, ...]
+    historical_model_screens: tuple[str, ...]
+    rmf_comparator: tuple[str, ...]
+
+
+def response_metric_report_sections(
+    screen: ResponseMetricScreen,
+    *,
+    primary_reduction_id: str,
+) -> ResponseMetricReportSections:
+    """Separate assay, historical model, and RMF-comparator evidence."""
 
     event_gap = (
         screen.event_intervals["event_interval_end_assay_h"] - screen.event_intervals["event_interval_start_assay_h"]
@@ -56,12 +69,11 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "pls4_weakest_ordering_spearman",
         "pls6_weakest_ordering_spearman",
     ]
-    return [
-        "## Response-Window Label And RMF Screen",
+    assay_and_labels = (
+        "### Assay scope",
         "",
-        "The signed response separation does not require a positive exemplar. A negative value still gives a direction "
-        "for relative improvement. Positive feasibility is therefore a configured decision target, not an entry "
-        "condition for a prospective next-build round.",
+        "The response-window comparison uses the same Reader experiments, candidate identities, controls, and "
+        "measurement checks for every declared reduction.",
         "",
         f"- Explicit source event bindings: {len(screen.event_intervals)} Reader experiments.",
         f"- Unresolved stress-addition interval: {event_gap.min():.3f}-{event_gap.max():.3f} h.",
@@ -69,11 +81,9 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         f"{screen.labels['id'].nunique()} labels.",
         f"- Primary Reader reduction: `{primary_reduction_id}`.",
         "- Event-bound sensitivity is propagated separately from replicate resampling.",
-        "- Active views use global target-state separation: every target-ON state is compared with every "
-        "target-OFF state. Conditional induction and interaction are separate diagnostics, not aliases for RMF.",
         "- No Reader record, OPAL label, campaign config, or synthesis handoff is changed by this screen.",
         "",
-        "### Equal-Footing Window Evidence",
+        "### Equal-footing window evidence",
         "",
         "Every declared reduction uses the same Reader experiments, candidate identities, response controls, "
         "anchor summaries, repeat comparison, and fixed model screen. Reader-published trajectories are consumed "
@@ -88,35 +98,7 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "",
         _markdown_table(screen.window_evidence.loc[:, window_model_columns]),
         "",
-        "### Provisional Reference Boundaries And Review Scales",
-        "",
-        "All three semantic thresholds are zero: ON response must exceed OFF response, ON fluorescence must be at "
-        "least the same-state pDual-10 reference, and OFF fluorescence must not exceed it. Target-view review "
-        "scales use the 90th percentile of replicate-bootstrap variation combined with event-bound sensitivity. "
-        "These values make the screen interpretable but are not an activated production calibration or biological law.",
-        "",
-        _markdown_table(screen.calibration),
-        "",
-        "### Observed Constraint Support",
-        "",
-        _markdown_table(
-            primary[
-                [
-                    "selection_view_id",
-                    "n",
-                    "positive_response_count",
-                    "zero_constraint_feasible_count",
-                    "median_response_separation",
-                    "median_on_magnitude_floor",
-                    "median_off_magnitude_ceiling",
-                ]
-            ]
-        ),
-        "",
-        "The observed corpus can start a directional search, but grouped evidence does not support the same "
-        "selection posture for every target view.",
-        "",
-        "### Repeated-Design Evidence",
+        "### Repeated-design evidence",
         "",
         f"- Repeatedly measured designs: {len(screen.repeated_agreement)}.",
         f"- Largest chosen screen-source difference from the cross-experiment median: "
@@ -128,7 +110,9 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "reviewed experiment for each included repeated candidate while retaining every contributing Reader "
         "record.",
         "",
-        "### Grouped Model Screen",
+    )
+    historical_model_screens = (
+        "### Response-window phenotype screen",
         "",
         "The fixed screen compares a robust-target RF challenger, PLS, and fold-fitted PCA plus ridge. Complete "
         "Reader experiments are held out. Correlations are calculated within each held-out experiment and then "
@@ -149,7 +133,18 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
             ]
         ),
         "",
-        "### Retrospective Enrichment Proxy",
+    )
+    rmf_comparator = (
+        "## RMF comparator",
+        "",
+        "The signed response separation does not require a positive exemplar. A negative value still gives a "
+        "direction for relative improvement. Positive RMF feasibility is a configured comparator target, not an "
+        "entry condition for the active MSRB learning probe.",
+        "",
+        "Every target-ON response is compared with every target-OFF response. Conditional induction and "
+        "interaction are separate diagnostics.",
+        "",
+        "### Retrospective enrichment proxy",
         "",
         _markdown_table(
             enrichment[
@@ -169,7 +164,7 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "climb; that requires predictions frozen before a prospective selection is measured and comparison "
         "against its declared baseline.",
         "",
-        "### Evidence For Greedy Selection",
+        "### Evidence for greedy selection",
         "",
         _markdown_table(
             screen.campaign_greedy_support[
@@ -192,7 +187,40 @@ def response_metric_report_lines(screen: ResponseMetricScreen, *, primary_reduct
         "authorization are outside this metastudy. Fixed-challenger support is retained separately for "
         "descriptive comparison.",
         "",
-    ]
+        "### Provisional reference boundaries and review scales",
+        "",
+        "All three semantic thresholds are zero: ON response must exceed OFF response, ON fluorescence must be at "
+        "least the same-state pDual-10 reference, and OFF fluorescence must not exceed it. Target-view review "
+        "scales use the 90th percentile of replicate-bootstrap variation combined with event-bound sensitivity. "
+        "These values make the historical screen interpretable but are not biological laws.",
+        "",
+        _markdown_table(screen.calibration),
+        "",
+        "### Observed constraint support",
+        "",
+        _markdown_table(
+            primary[
+                [
+                    "selection_view_id",
+                    "n",
+                    "positive_response_count",
+                    "zero_constraint_feasible_count",
+                    "median_response_separation",
+                    "median_on_magnitude_floor",
+                    "median_off_magnitude_ceiling",
+                ]
+            ]
+        ),
+        "",
+        "The observed corpus can support directional comparison, but the requirements are unevenly supported "
+        "across target views.",
+        "",
+    )
+    return ResponseMetricReportSections(
+        assay_and_labels=assay_and_labels,
+        historical_model_screens=historical_model_screens,
+        rmf_comparator=rmf_comparator,
+    )
 
 
 def _markdown_table(frame: pd.DataFrame) -> str:
@@ -214,4 +242,4 @@ def _format_cell(value: object) -> str:
     return str(value)
 
 
-__all__ = ["response_metric_report_lines"]
+__all__ = ["ResponseMetricReportSections", "response_metric_report_sections"]

@@ -32,7 +32,7 @@ verification](../../routes/decision/opal/campaign-commands.md#read-only-campaign
 
 - [SFXI round-0 source evidence](sfxi-round0-source-evidence.md): declared
   SFXI vec8 inputs, source runs, and immutable artifact provenance.
-- [Response metric metastudy](response-metastudy.md): read-only review of the
+- [Response assay and objective comparison](response-metastudy.md): read-only review of the
   SFXI source ledgers, Reader response-window summaries, RMF/MSRB comparison,
   label truth, and predictor support.
 - [Response-Magnitude Feasibility (RMF)](response-magnitude-feasibility.md):

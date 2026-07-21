@@ -36,22 +36,26 @@ def test_review_notebook_has_one_deliverable_selector_and_one_viewport(tmp_path:
     assert 'bundle_manifest["recommendation"]' not in source
     assert "**Prospective hill climb:** {review_summary.prospective_hill_climb}" in source
     assert "review_summary.primary_assay_summary" in source
+    assert "discover_current_campaign_navigation(bundle_root)" in source
+    assert "Current OPAL review — outside this evidence bundle" in source
+    assert "Current OPAL navigation is unavailable outside a source checkout" in source
+    assert "secg_msrb_greedy" not in source
     assert "publication.verify_bundle_artifacts(bundle_root)" in source
-    assert 'label="Evidence tier"' in source
+    assert 'label="Review section"' in source
+    assert '"Historical model screens": "historical_model_screens"' in source
     assert 'label="Figure"' in source
-    assert "options=tier_options" in source
-    assert "value=next(iter(tier_options))" in source
-    assert 'plot_catalog["tier"].eq(tier.value)' in source
+    assert "options=section_options" in source
+    assert "value=next(iter(section_options))" in source
+    assert 'plot_catalog["review_section"].eq(review_section.value)' in source
     assert "row.title" in source
-    assert "How the target mask changes the score" in source
+    assert "Objective comparators" in source
     assert "log2[(YFP / CFP)_design,i(t)]" in source
     assert "log2[(YFP / OD600)_design,i(t)]" in source
     assert "Ethanol | ethanol; ethanol + ciprofloxacin" in source
     assert "S_RMF = min(q_response, q_on, q_off)" in source
-    assert "**RMF selection rule**" in source
-    assert "Positive values clear the configured requirement" in normalized_source
+    assert "**RMF selection rule**" not in source
+    assert "Positive values clear its configured requirement boundaries" in normalized_source
     assert "Higher is better" not in source
-    assert "top-K selects" in normalized_source
     assert "a strong component cannot compensate for a failed one" in normalized_source
     assert "wrap=True" in source
     assert 'width="100%"' in source
@@ -68,17 +72,22 @@ def test_review_notebook_initializes_dropdown_with_an_option_name(tmp_path: Path
     assert 'value=plot_catalog.iloc[0]["plot_id"]' not in source
 
 
-def test_review_notebook_numbers_and_sorts_primary_evidence(tmp_path: Path) -> None:
+def test_review_notebook_sorts_each_review_section(tmp_path: Path) -> None:
     source = write_review_notebook(tmp_path).read_text(encoding="utf-8")
 
-    assert 'plot_catalog["tier"].eq(tier.value)' in source
-    assert 'tier_catalog.sort_values("review_step", kind="mergesort")' in source
-    assert 'f"{int(row.review_step)}. {row.title}"' in source
-    assert "Primary evidence figures require an explicit review step" in source
+    assert 'plot_catalog["review_section"].eq(review_section.value)' in source
+    assert 'section_catalog.sort_values("section_order", kind="mergesort")' in source
+    assert 'f"{int(row.section_order)}. {row.title}"' in source
+    assert "Review-section figures require an explicit order" in source
 
 
-def test_review_summary_is_rmf_specific_and_fail_fast() -> None:
+def test_review_summary_is_assay_and_model_scoped_and_fail_fast() -> None:
     manifest = {
+        "label_truth": {
+            "label_source_state": "verified",
+            "state": "promoted",
+        },
+        "decision_gates": {"model_support_ready": False},
         "response_metric_screen": {
             "status": "screen_complete_not_promoted",
             "primary_reduction_candidate": "event_logmean_4_8h_post",
@@ -97,18 +106,25 @@ def test_review_summary_is_rmf_specific_and_fail_fast() -> None:
                     }
                 ]
             },
-        }
+        },
     }
 
     summary = build_review_summary(manifest)
 
-    assert summary.decision == "RMF production selection remains unsupported"
+    assert summary.scope == "assay development and retrospective objective comparison"
+    assert summary.label_state == "verified and promoted"
+    assert summary.predictor_support == "weak; prospective ordering is not established"
     assert "0.15" in summary.basis
     assert summary.evidence_base == "35 screen-selected candidates across 8 Reader experiments"
 
 
 def test_review_summary_rejects_unpromoted_screen_with_hill_climb_claim() -> None:
     manifest = {
+        "label_truth": {
+            "label_source_state": "verified",
+            "state": "promoted",
+        },
+        "decision_gates": {"model_support_ready": False},
         "response_metric_screen": {
             "status": "screen_complete_not_promoted",
             "primary_reduction_candidate": "event_logmean_4_8h_post",
@@ -127,7 +143,7 @@ def test_review_summary_rejects_unpromoted_screen_with_hill_climb_claim() -> Non
                     }
                 ]
             },
-        }
+        },
     }
 
     with pytest.raises(ValueError, match="cannot claim a prospective hill climb"):

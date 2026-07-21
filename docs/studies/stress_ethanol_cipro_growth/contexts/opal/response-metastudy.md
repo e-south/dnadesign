@@ -1,6 +1,6 @@
 ---
 id: stress-ethanol-cipro-growth-opal-response-metastudy
-title: Response metric metastudy
+title: Response assay and objective comparison
 owner: dnadesign-maintainers
 status: source_evidence
 last_verified: 2026-07-19
@@ -10,7 +10,7 @@ audience:
   - agent
 ---
 
-## Response Metric Metastudy
+## Response assay and objective comparison
 
 **Status:** frozen comparative evidence
 **Owner:** `stress_ethanol_cipro_growth` study
@@ -29,14 +29,13 @@ decisions.
 
 ### Scope
 
-The metastudy compares three distinct questions:
+The metastudy addresses three distinct questions:
 
-1. Why did canonical SFXI produce correlated target-view selections?
-2. How do thresholded RMF and threshold-free MSRB encode response ordering,
-   intended-ON signal, and intended-OFF suppression on the same Reader
-   phenotype?
-3. What evidence supports label promotion, predictor ranking, and a bounded
-   prospective probe without overstating hill-climb efficacy?
+1. Which response window and label-source rules produce an auditable
+   candidate-level phenotype?
+2. What do grouped model checks say about prediction and ranking support?
+3. What did the historical SFXI and RMF comparisons reveal about objective
+   behavior before MSRB became the executable selector?
 
 It is read-only with respect to Reader records, OPAL labels, campaign configs,
 ledgers, and synthesis handoffs.
@@ -99,30 +98,28 @@ The response-metastudy publication schema is
 
 ### Evidence Flow
 
-1. Verify the three immutable round-0 SFXI source ledgers, shared 35-row label pool,
-   candidate IDs, and their equivalent predictor surfaces.
-2. Recompute persisted SFXI scores through the public OPAL API.
-3. Audit SFXI exponent, gate, lexicographic, and OFF-state-logic variants
-   without changing active campaign state.
-4. Verify `reader.response_window.bundle.v5`, all record contracts, source
+1. Verify `reader.response_window.bundle.v5`, all record contracts, source
    provenance, artifact digests, and row counts.
-5. Verify the response-owned 35-row screen selection against the Reader bundle,
+2. Verify the response-owned 35-row screen selection against the Reader bundle,
    resolve each design alias through the study binding artifact, and join by
    exact Reader experiment and design identity.
-6. Evaluate response and fluorescence requirement stability across seven
+3. Evaluate response and fluorescence requirement stability across seven
    Reader-owned event-relative reductions. Compare pDual-10 replicate spread,
    cross-experiment anchor drift, SpyP and sulAp response separation, OD context,
    event sensitivity, repeat agreement, censoring support, and the same fixed
    model screen for every reduction. Model performance is diagnostic and does
    not choose the response window.
-7. Apply ethanol, ciprofloxacin, AND, and OR pressure-test masks to raw Reader
+4. Apply ethanol, ciprofloxacin, AND, and OR pressure-test masks to raw Reader
    state summaries and joint bootstrap draws.
-8. Compare the exact configured campaign RF separately from the fixed mean,
+5. Compare the exact configured campaign RF separately from the fixed mean,
    robust-target RF, fold-fitted PCA-ridge, and PLS challengers with complete
    Reader experiments held out.
-9. Measure repeated-design agreement, retrospective enrichment, and the risk of
+6. Measure repeated-design agreement, retrospective enrichment, and the risk of
    a prespecified coordinated six-slot policy.
-10. Publish typed tables, a manifest-backed plot catalog, a report, and one
+7. Verify the three immutable round-0 SFXI source ledgers, shared 35-row label
+   pool, candidate IDs, and equivalent predictor surfaces. Recompute persisted
+   SFXI scores through the public OPAL API and audit its historical variants.
+8. Publish typed tables, a manifest-backed plot catalog, a report, and one
     Marimo review notebook.
 
 The minimal review path is Reader phenotype -> target pattern -> objective
@@ -212,44 +209,34 @@ completion does not promote the model or authorize synthesis; the metastudy
 records predictive risk and does not derive slot allocations from uncertain
 retrospective intervals.
 
-### Plot Surface
+### Plot surface
 
-Four ordered primary plots carry the decision narrative:
+The Marimo review has one image viewport and two controls: **Review section**
+and **Figure**. The sections follow the evidence path rather than the directory
+layout:
 
-- a measured-example check shows how the same SpyP and sulAp summaries change
-  when ethanol, ciprofloxacin, and AND masks reassign ON and OFF states, without
-  treating either promoter as a required paradigm;
-- response-window stability tests whether the promoted reduction preserves the
-  ordering of the three RMF components;
-- the grouped label-model screen tests whether X preserves RMF ordering in held-out
-  Reader experiments;
-- the greedy-support interval tests whether predicted leaders enrich held-out
-  measurements beyond the experiment median and bounds the claim made by a
-  prospective greedy round.
+1. **Assay and labels** opens on the 4–8-hour response-window comparison, then
+   exposes event timing and repeated-design agreement.
+2. **Model support** contains grouped prediction checks and keeps weak
+   prospective ordering visible.
+3. **RMF comparator** retains thresholded requirements, uncertainty, and
+   retrospective greedy evidence as comparator material.
+4. **SFXI comparator** retains setpoint, score-coupling, overlap, and policy
+   screens under the distinct SFXI phenotype contract.
 
-Metric diagnostics explain behavior without deciding promotion:
+The active `secg_msrb_greedy` campaign is reviewed in its own OPAL notebook.
+The metastudy does not reproduce active campaign state or use comparator plots
+as selection authority.
 
-- canonical SFXI component dominance, target residuals, Pareto views, score
-  correlations, and candidate support;
-- Reader event intervals, uncertainty sources, and response-reduction
-  sensitivity;
-- SFXI vec8 model validation, observed constraint coverage, repeated-design
-  variation, and retrospective enrichment.
-
-Screen appendices retain the policy guardrail matrix and complete policy,
-selected-profile, and overlap sweeps.
-Every plot declares one premise, a concise title without terminal
-punctuation, decision value, rationale, alt text, non-claim boundary, tier, and
-source table. Plot files use a white canvas independent of notebook theme.
-
-The generated Marimo review uses the medium-width layout, one responsive
-tier-and-figure control row, and one image viewport constrained to the notebook
-column. Compact matrix plots use square cells. The repeated-design matrix groups
+Every plot declares one premise, a concise title without terminal punctuation,
+decision value, rationale, alt text, non-claim boundary, review section,
+storage tier, and source table. Plot files use a white canvas independent of
+notebook theme. Compact matrix plots use square cells. The repeated-design matrix groups
 `r00`, `r10`, `r01`, and `r11` under `log2(YFP/CFP)` response and `b00`, `b10`,
 `b01`, and `b11` under pDual-10-relative
 `log2(YFP/OD600)` fluorescence, while naming each stress condition below the
 group header. The row-dense policy guardrail remains rectangular because square
-cells would create a needlessly tall appendix figure.
+cells would create a needlessly tall comparator figure.
 
 ### Run
 

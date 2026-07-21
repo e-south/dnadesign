@@ -48,10 +48,10 @@ def write_policy_guardrail_matrix(
                 "Logic fidelity": (
                     data["min_target_view_median_logic"] >= thresholds.min_target_view_median_logic
                 ).to_numpy(),
-                "Target-view overlap": (
+                "Target-view\noverlap": (
                     data["all_target_views_overlap"] <= thresholds.max_all_target_views_overlap
                 ).to_numpy(),
-                "Score coupling": (
+                "Score\ncoupling": (
                     data["mean_pairwise_score_spearman"] <= thresholds.max_mean_pairwise_score_spearman
                 ).to_numpy(),
                 "Held-out model": model_support_passed,
@@ -62,7 +62,7 @@ def write_policy_guardrail_matrix(
         .astype(int)
     )
     annotations = checks.replace({0: "fail", 1: "pass"})
-    fig, ax = plt.subplots(figsize=(10.2, max(5.2, 0.46 * len(checks))))
+    fig, ax = plt.subplots(figsize=(11.0, max(5.2, 0.46 * len(checks))))
     sns.heatmap(
         checks,
         annot=annotations,

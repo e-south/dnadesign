@@ -12,8 +12,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
+from typing import get_args
 
-from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.reporting import plot_catalog
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.reporting import (
+    plot_catalog,
+    plot_contracts,
+)
 
 
 def test_plot_catalog_has_unique_semantic_deliverables() -> None:
@@ -55,7 +59,16 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
         (4, "greedy_support_evidence"),
     ]
     assert all(spec.review_step is None for spec in plot_catalog.PLOT_SPECS if spec.tier != "primary_decision")
+    section_order: dict[str, list[int]] = {}
     for spec in plot_catalog.PLOT_SPECS:
+        assert spec.review_section in {
+            "assay_and_labels",
+            "historical_model_screens",
+            "rmf_comparator",
+            "sfxi_comparator",
+        }
+        assert spec.section_order > 0
+        section_order.setdefault(spec.review_section, []).append(spec.section_order)
         assert spec.premise.strip()
         assert spec.decision_value.strip()
         assert spec.rationale.strip()
@@ -68,6 +81,17 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
         reader_text = " ".join((spec.title, spec.decision_value, spec.alt_text))
         assert "effect_scaled" not in reader_text
         assert "policy_id" not in reader_text
+    for orders in section_order.values():
+        assert sorted(orders) == list(range(1, len(orders) + 1))
+    sections = {spec.plot_id: spec.review_section for spec in plot_catalog.PLOT_SPECS}
+    orders = {spec.plot_id: spec.section_order for spec in plot_catalog.PLOT_SPECS}
+    assert sections["response_separation_stability"] == "assay_and_labels"
+    assert orders["response_separation_stability"] == 1
+    assert sections["reader_event_intervals"] == "assay_and_labels"
+    assert sections["repeated_design_agreement"] == "assay_and_labels"
+    assert sections["label_model_screen"] == "historical_model_screens"
+    assert sections["measured_response_examples"] == "rmf_comparator"
+    assert sections["sfxi_score_contours"] == "sfxi_comparator"
     measured = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "measured_response_examples")
     assert measured.title == "The target mask changes which fixed Reader states define each RMF requirement"
     assert "same measured SpyP and sulAp summaries" in measured.decision_value
@@ -77,6 +101,15 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
     greedy = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "greedy_support_evidence")
     assert "configured campaign random forest" in greedy.alt_text
     assert "not selection authority" in greedy.alt_text
+
+
+def test_review_section_type_matches_the_published_section_ontology() -> None:
+    assert set(get_args(plot_contracts.ReviewSection)) == {
+        "assay_and_labels",
+        "historical_model_screens",
+        "rmf_comparator",
+        "sfxi_comparator",
+    }
 
 
 def test_plot_manifest_preserves_catalog_order_and_fields() -> None:
@@ -89,6 +122,8 @@ def test_plot_manifest_preserves_catalog_order_and_fields() -> None:
         "plot_id",
         "filename",
         "tier",
+        "review_section",
+        "section_order",
         "visual_type",
         "review_step",
         "title",

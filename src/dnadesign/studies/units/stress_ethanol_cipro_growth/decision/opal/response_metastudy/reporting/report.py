@@ -20,7 +20,14 @@ from ..core.policies import CANONICAL_SFXI_POLICY_ID, primary_policy_ids
 from ..core.response_contracts import ResponseMetricScreen
 from .model_validation_report import model_validation_summary_table
 from .plot_vocabulary import representation_label
-from .response_metric_report import response_metric_report_lines
+from .response_metric_report import response_metric_report_sections
+
+EVIDENCE_SECTION_ORDER = (
+    "Assay and label evidence",
+    "Historical model screens",
+    "RMF comparator",
+    "SFXI comparator",
+)
 
 
 def write_report(
@@ -81,109 +88,60 @@ def write_report(
         if label_truth_ready
         else "The configured observed-label publication is not yet available."
     )
+    response_sections = response_metric_report_sections(
+        response_screen,
+        primary_reduction_id=primary_reduction_id,
+    )
     text = [
-        "# Response Metric Metastudy",
+        "# Response Assay and Objective Comparison",
         "",
-        "This metastudy tests whether Reader time-series summaries, study target masks, and the configured sequence "
-        "representation can support a defensible next-build ranking. Canonical SFXI remains a diagnostic baseline. "
-        "The metastudy does not rewrite labels, campaign configs, ledgers, or synthesis handoffs.",
+        "This frozen evidence package records assay development, label construction, historical model screens, "
+        "and objective comparisons. It does not contain active campaign state or choose a synthesis batch.",
         "",
         "## Premise",
         "",
-        "A useful selector must preserve reproducible assay information, respond to the declared target mask, and "
-        "retain ordering that transfers to held-out Reader experiments.",
+        "A response-based campaign needs a reproducible assay summary, candidate-level label provenance, and "
+        "evidence showing how well sequence predictions preserve measured ordering.",
         "",
-        "## Minimal Data And Score Path",
+        "## Current route and decision boundary",
         "",
-        f"- Reader label candidate: `{primary_reduction_id}`, the {primary_reduction_label}.",
+        "The executable route is Reader response-window evidence → study-owned observed labels → the MSRB "
+        "protocol → the OPAL campaign selected by "
+        "`docs/studies/stress_ethanol_cipro_growth/record/campaign.yaml`. This package supplies assay-development "
+        "and comparator evidence only. It does not authorize synthesis.",
+        "",
+        f"{label_truth_summary} Predictor support remains weak, and prospective hill climbing has not been shown.",
+        "",
+        "## Assay and label evidence",
+        "",
+        f"- Reader primary reduction: `{primary_reduction_id}`, the {primary_reduction_label}.",
         "- Response state: `r_i = median-well window mean log2(YFP / CFP)`.",
-        "- Anchored fluorescence state: `b_i = median design-well window mean log2(YFP / OD600) "
+        "- Referenced signal: `b_i = median design-well window mean log2(YFP / OD600) "
         "- median same-state pDual-10 well mean`.",
-        "- Reader fields: `[r00, r10, r01, r11, b00, b10, b01, b11]` in no-stress, ethanol, "
+        "- Four-state phenotype: `[r00, r10, r01, r11, b00, b10, b01, b11]` in no-stress, ethanol, "
         "ciprofloxacin, and both-stresses order.",
-        "- Each stress target view assigns those fixed states to ON and OFF sets.",
-        "- Raw requirements: `m_response = min_ON(r) - max_OFF(r)`, `b_on = min_ON(b)`, and `b_off = max_OFF(b)`.",
-        "- Selection channel: `S_feasible = min(z_response, z_on, z_off)` after explicit thresholds and positive "
-        "scales are promoted.",
+        "- Study-owned target views assign those fixed states to intended-ON and intended-OFF sets.",
+        "- Objective-specific transforms do not change the Reader phenotype.",
         "",
-        "Changing the target mask changes which states enter each minimum or maximum; it does not change the Reader "
-        "measurements. Scores order candidates within one target view and are not calibrated for numeric comparison "
-        "between target views.",
+        *response_sections.assay_and_labels,
+        "## Historical model screens",
         "",
-        "## SFXI Diagnostic Baseline",
+        "These retrospective screens evaluate earlier response-window/RMF and SFXI predictor formulations. They "
+        "do not validate the active MSRB selector; current MSRB evidence is maintained with its study protocol.",
         "",
-        "- Documentation: `src/dnadesign/opal/docs/plugins/objectives/sfxi.md`.",
-        "- Math helpers: `src/dnadesign/opal/src/objectives/sfxi_math.py`.",
-        "- Objective plugin: `src/dnadesign/opal/src/objectives/sfxi_v1.py`.",
-        "- State order: `[00, 10, 01, 11]`.",
-        "- Score: `logic_fidelity^beta * effect_scaled^gamma`.",
-        "- Effect scaling: weighted target-state intensity divided by the run's current-round denominator.",
+        *response_sections.historical_model_screens,
+        "### SFXI vec8 screen",
         "",
-        "## Verdict",
-        "",
-        f"- Recommendation: `{recommendation['verdict']}`.",
-        f"- Policy promotion ready: `{recommendation['policy_promotion_ready']}`.",
-        f"- Promoted policy: `{recommendation['promoted_policy_id'] or 'none'}`.",
-        f"- Shape-ceiling comparison: `{recommendation['comparison_policy_id']}`.",
-        f"- Comparison rule: {recommendation['comparison_plain_rule']}",
-        f"- Rationale: {recommendation['rationale']}",
-        "",
-        "Do not synthesize from the canonical SFXI selections. Held-out model support and target-shape coverage are "
-        "insufficient, and canonical SFXI remains strongly coupled across target views.",
-        "",
-        "## Canonical SFXI Scoring Evidence",
-        "",
-        f"- Recompute max absolute score error: {canonical_sfxi_validation['max_abs_error']:.3g}.",
-        f"- Canonical top-6 unique candidate IDs: {int(canonical['unique_topk'])} across 18 slots.",
-        f"- Canonical all-target-view overlap: {int(canonical['all_target_views_overlap'])}.",
-        f"- Canonical pairwise overlap total: {int(canonical['pairwise_overlap_total'])}.",
-        "- Canonical weakest target-view median top-6 logic fidelity: "
-        f"{float(canonical['min_target_view_median_logic']):.3f}.",
-        "- Canonical mean pairwise score Spearman correlation: "
-        f"{float(canonical['mean_pairwise_score_spearman']):.3f}.",
-        f"- Canonical minimum effective eligible top-k: {int(canonical['min_effective_topk'])}.",
-        "",
-        "## Held-Out Model Support",
-        "",
-        "Shuffled five-fold and leave-one-experiment-out retraining test whether the shared vec8 predictor "
-        "preserves observed response ordering. Leave-one-experiment-out results gate policy promotion; "
-        "shuffled folds remain a descriptive interpolation check.",
-        "Held-out predictions use each SFXI source run's persisted denominator so this tests ordering under the "
-        "objective that produced the ledger; no denominator is fitted from held-out labels.",
+        "Shuffled five-fold and leave-one-experiment-out retraining test whether the historical shared SFXI vec8 "
+        "predictor preserves observed ordering. Leave-one-experiment-out results governed the historical SFXI "
+        "promotion decision; shuffled folds are descriptive interpolation checks.",
         "",
         _markdown_table(model_summary),
         "",
-        "## Assay Time-Course Robustness",
+        "### Historical SFXI setpoint support",
         "",
-        f"Reader publishes seven event-relative reductions: a primary {primary_reduction_label}, four declared "
-        "window checks, a "
-        "duration-normalized linear AUC, and a pre-window-delta check. Response uses log2 YFP/CFP. The magnitude "
-        "channel is same-state pDual-10-relative log2 YFP/OD600 fluorescence.",
-        "",
-        "Reader owns event resolution, trajectory reduction, replicate aggregation, and joint bootstrap records. "
-        "The study consumes those records and applies target-view masks; it does not reopen PlateReader trajectories.",
-        "",
-        f"- Reader primary reduction: `{primary_reduction_id}`. It is the only promotion candidate; the other "
-        "windows, AUC, and pre-window delta remain equal-footing sensitivity analyses.",
-        "- Response reductions are evaluated only through response and fluorescence requirements. They are not "
-        "translated into SFXI logic or intensity fields.",
-        "- The SFXI source records remain independent evidence and are evaluated only under their declared vec8 "
-        "contract.",
-        "",
-        *response_metric_report_lines(response_screen, primary_reduction_id=primary_reduction_id),
-        "## Activation Boundary",
-        "",
-        "`response_magnitude_feasibility_v1` is implemented. The Reader response-window bundle provides raw "
-        "four-state response, reference-relative fluorescence, event bounds, and joint bootstrap draws. "
-        f"{label_truth_summary} Model support, selection-policy promotion, and synthesis authorization remain "
-        "separate decisions. SFXI vec8 labels use a distinct metric contract and are not accepted as RMF labels. "
-        "OR remains a pressure-test mask, not a configured campaign or synthesis allocation.",
-        "",
-        "## Predicted Setpoint Support",
-        "",
-        "This table asks whether the fitted SFXI predictor produces enough candidate response shapes near each "
-        "setpoint. "
-        "A selection rule cannot recover shapes absent from this surface.",
+        "This table asks whether the fitted SFXI predictor produced candidate shapes near each historical setpoint. "
+        "It is not an MSRB support table.",
         "",
         _markdown_table(
             support_at_guardrail[
@@ -197,29 +155,63 @@ def write_report(
             ]
         ),
         "",
-        "## Shape-Ceiling Comparison",
+        *response_sections.rmf_comparator,
+        "The RMF implementation and its historical screens remain comparator evidence. The active campaign uses "
+        "`multistate_response_behavior_v1`; SFXI vec8 labels remain a separate assay contract.",
         "",
-        f"- Comparison top-6 unique candidate IDs: {int(comparison['unique_topk'])} across 18 slots.",
-        f"- Comparison all-target-view overlap: {int(comparison['all_target_views_overlap'])}.",
-        f"- Comparison pairwise overlap total: {int(comparison['pairwise_overlap_total'])}.",
-        "- Comparison weakest target-view median top-6 logic fidelity: "
-        f"{float(comparison['min_target_view_median_logic']):.3f}.",
-        "- Comparison mean pairwise score Spearman correlation: "
-        f"{float(comparison['mean_pairwise_score_spearman']):.3f}.",
-        f"- Comparison minimum effective eligible top-k: {int(comparison['min_effective_topk'])}.",
+        "## SFXI comparator",
         "",
-        "## Policy Comparison Candidate Panel",
+        "SFXI evaluates a distinct Reader vec8 contract. Its analyses remain useful for explaining why target-view "
+        "selections collapsed, but they do not supply response-window labels or the active selector.",
         "",
-        "`policy_comparison_panel.csv` is a metric-behavior comparison, not a synthesis handoff. It mixes "
-        "canonical SFXI high-effect rows, shape-ceiling comparison rows, logic-first rows, OFF-state-penalized "
-        "rows, canonical SFXI shared-overlap rows, and target-view-specific provisional rows.",
+        "### Definition used in this package",
+        "",
+        "- Documentation: `src/dnadesign/opal/docs/plugins/objectives/sfxi.md`.",
+        "- State order: `[00, 10, 01, 11]`.",
+        "- Score: `logic_fidelity^beta * effect_scaled^gamma`.",
+        "- Effect scaling: weighted target-state intensity divided by the source run's denominator.",
+        "",
+        "### Historical SFXI verdict",
+        "",
+        f"- Recommendation: `{recommendation['verdict']}`.",
+        f"- Policy promotion ready: `{recommendation['policy_promotion_ready']}`.",
+        f"- Promoted policy: `{recommendation['promoted_policy_id'] or 'none'}`.",
+        f"- Shape-ceiling comparison: `{recommendation['comparison_policy_id']}`.",
+        f"- Comparison rule: {recommendation['comparison_plain_rule']}",
+        f"- Rationale: {recommendation['rationale']}",
+        "",
+        "The canonical SFXI selections were not authorized for synthesis because held-out support and target-shape "
+        "coverage were insufficient and selections were strongly coupled across target views.",
+        "",
+        "### Canonical SFXI evidence",
+        "",
+        f"- Recompute max absolute score error: {canonical_sfxi_validation['max_abs_error']:.3g}.",
+        f"- Unique candidate IDs: {int(canonical['unique_topk'])} across 18 top-six slots.",
+        f"- All-view overlap: {int(canonical['all_target_views_overlap'])}.",
+        f"- Pairwise overlap total: {int(canonical['pairwise_overlap_total'])}.",
+        f"- Weakest-view median top-six logic fidelity: {float(canonical['min_target_view_median_logic']):.3f}.",
+        f"- Mean pairwise score Spearman correlation: {float(canonical['mean_pairwise_score_spearman']):.3f}.",
+        f"- Minimum effective eligible top-k: {int(canonical['min_effective_topk'])}.",
+        "",
+        "### Shape-ceiling comparison",
+        "",
+        f"- Unique candidate IDs: {int(comparison['unique_topk'])} across 18 top-six slots.",
+        f"- All-view overlap: {int(comparison['all_target_views_overlap'])}.",
+        f"- Pairwise overlap total: {int(comparison['pairwise_overlap_total'])}.",
+        f"- Weakest-view median top-six logic fidelity: {float(comparison['min_target_view_median_logic']):.3f}.",
+        f"- Mean pairwise score Spearman correlation: {float(comparison['mean_pairwise_score_spearman']):.3f}.",
+        f"- Minimum effective eligible top-k: {int(comparison['min_effective_topk'])}.",
+        "",
+        "### Candidate panel",
+        "",
+        "`policy_comparison_panel.csv` compares historical SFXI scoring behavior; it is not a synthesis handoff.",
         "",
         _markdown_table(panel_summary),
         "",
-        "## Denominator Sensitivity",
+        "### Denominator sensitivity",
         "",
-        "This probe rescales the SFXI denominator over predicted effect raw values and recomputes top-k summaries. "
-        "It checks whether intensity scaling is acting as a hidden driver of candidate choice.",
+        "This probe rescales the historical SFXI denominator and recomputes top-k summaries to test whether "
+        "intensity scaling drives candidate choice.",
         "",
         _markdown_table(
             denom_focus[
@@ -235,19 +227,17 @@ def write_report(
             ]
         ),
         "",
-        "## Review Guardrails",
+        "### Review guardrails",
         "",
         f"- Minimum eligible candidates in weakest target view: {thresholds.min_eligible_count}.",
         f"- Minimum effective top-k in each target view: {thresholds.min_effective_topk}.",
-        f"- Minimum weakest-target-view median top-k logic fidelity: {thresholds.min_target_view_median_logic:.2f}.",
-        f"- Maximum all-target-view top-k overlap: {thresholds.max_all_target_views_overlap}.",
+        f"- Minimum weakest-view median top-k logic fidelity: {thresholds.min_target_view_median_logic:.2f}.",
+        f"- Maximum all-view top-k overlap: {thresholds.max_all_target_views_overlap}.",
         f"- Maximum mean pairwise score Spearman correlation: {thresholds.max_mean_pairwise_score_spearman:.2f}.",
-        "- Minimum weakest-target-view median held-out score Spearman correlation: "
+        "- Minimum weakest-view median held-out score Spearman correlation: "
         f"{thresholds.min_target_view_cv_score_spearman:.2f}.",
         "",
-        "These are review guardrails for metric design. They are not biological thresholds.",
-        "",
-        "## Primary Policy Summary",
+        "These are historical metric-review guardrails, not biological thresholds.",
         "",
         _markdown_table(
             primary[
@@ -264,31 +254,15 @@ def write_report(
             ]
         ),
         "",
-        "## Adversarial Pressure Tests",
+        "### Adversarial pressure tests",
         "",
-        _markdown_table(
-            pressure_tests[
-                [
-                    "agent",
-                    "check_id",
-                    "status",
-                    "severity",
-                    "evidence",
-                    "threshold",
-                    "action",
-                ]
-            ]
-        ),
+        _markdown_table(pressure_tests[["agent", "check_id", "status", "severity", "evidence", "threshold", "action"]]),
         "",
-        "## Canonical SFXI Pairwise Correlations",
+        "### Pairwise correlations, overlap, and shared candidates",
         "",
         _markdown_table(pair_canonical[["selection_view_a", "selection_view_b", "pearson", "spearman"]]),
         "",
-        "## Canonical SFXI Overlap By K",
-        "",
         _markdown_table(overlap_canonical[["k", "observed_overlap", "unique_topk"]]),
-        "",
-        "## Canonical SFXI Shared Top Candidates",
         "",
         _markdown_table(
             top_shared[
@@ -296,21 +270,33 @@ def write_report(
             ].head(18)
         ),
         "",
-        "## Figure Premises And Alt Text",
+        "## Figure premises and alt text",
         "",
         _plot_manifest_tables(plot_manifest),
         "",
-        "## Guardrails",
+        "## Claim boundaries",
         "",
-        "- Treat this as metric design over predictions, not biological validation.",
-        "- Separate scalarizer changes from downstream diversity policy.",
-        "- Avoid thresholds that only work at one exact value; prefer regions stable across nearby gates or exponents.",
-        "- Require a rerun of OPAL or a formal rerank step before any measured-round synthesis handoff.",
-        "- Keep the nearest-12-hour snapshot as provenance after any response-window label is promoted.",
+        "- Treat retrospective objective comparisons as design evidence, not biological validation.",
+        "- Keep objective scoring separate from downstream allocation and diversity policy.",
+        "- Require a prospectively frozen prediction before interpreting a later measurement as selection evidence.",
+        "- Keep Reader reductions and assay evidence unchanged when comparing objectives.",
+        "- Preserve the nearest-12-hour snapshot as provenance for the promoted response-window label.",
         "",
     ]
+    _validate_evidence_section_order(text)
     report_path.write_text("\n".join(text), encoding="utf-8")
     return report_path
+
+
+def _validate_evidence_section_order(lines: list[str]) -> None:
+    headings = [f"## {section}" for section in EVIDENCE_SECTION_ORDER]
+    positions: list[int] = []
+    for heading in headings:
+        if lines.count(heading) != 1:
+            raise ValueError(f"Report must contain exactly one {heading!r} heading")
+        positions.append(lines.index(heading))
+    if positions != sorted(positions):
+        raise ValueError(f"Report evidence sections are out of order: {EVIDENCE_SECTION_ORDER!r}")
 
 
 def _markdown_table(frame: pd.DataFrame) -> str:
@@ -330,16 +316,24 @@ def _plot_manifest_tables(plot_manifest: pd.DataFrame) -> str:
     if plot_manifest.empty:
         return "_No plots rendered._"
     sections: list[str] = []
-    for tier in ("primary_decision", "metric_diagnostic", "screen_appendix"):
-        tier_rows = plot_manifest[plot_manifest["tier"] == tier]
-        if tier_rows.empty:
+    for review_section in (
+        "assay_and_labels",
+        "historical_model_screens",
+        "rmf_comparator",
+        "sfxi_comparator",
+    ):
+        section_rows = plot_manifest[plot_manifest["review_section"] == review_section].sort_values(
+            "section_order", kind="mergesort"
+        )
+        if section_rows.empty:
             continue
-        sections.append(f"### {tier.replace('_', ' ').title()}")
+        sections.append(f"### {review_section.replace('_', ' ').title()}")
         sections.append(
             _markdown_table(
-                tier_rows[
+                section_rows[
                     [
                         "plot_id",
+                        "tier",
                         "visual_type",
                         "premise",
                         "decision_value",

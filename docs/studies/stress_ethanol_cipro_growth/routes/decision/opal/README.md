@@ -31,7 +31,7 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 - Candidate table and label-source semantics: `../../../contexts/opal/candidate-table.md`
 - DenseGen TFBS learnability v1 contract/spec: `../../../contexts/opal/densegen-tfbs-learnability-probe-v1.md`
-- Response metric metastudy and verified scoring verdict: `../../../contexts/opal/response-metastudy.md`
+- Response assay and objective comparison: `../../../contexts/opal/response-metastudy.md`
 - MSRB study protocol and interpretation: `../../../contexts/opal/multistate-response-behavior.md`
 - Frozen RMF comparator contract: `../../../contexts/opal/response-magnitude-feasibility.md`
 - Physical synthesis handoff dev spec: `../../../contexts/opal/synthesis-handoff.md`

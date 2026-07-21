@@ -19,7 +19,9 @@ from dataclasses import dataclass
 class ReviewSummary:
     """Reader-facing decision summary derived from one verified manifest."""
 
-    decision: str
+    scope: str
+    label_state: str
+    predictor_support: str
     basis: str
     primary_assay_summary: str
     evidence_base: str
@@ -27,7 +29,7 @@ class ReviewSummary:
 
 
 def build_review_summary(bundle_manifest: Mapping[str, object]) -> ReviewSummary:
-    """Build the RMF-specific header independently of the SFXI verdict."""
+    """Build an assay- and evidence-scoped header without implying campaign state."""
 
     response_screen = _mapping(bundle_manifest, "response_metric_screen")
     status = str(response_screen.get("status") or "")
@@ -57,9 +59,17 @@ def build_review_summary(bundle_manifest: Mapping[str, object]) -> ReviewSummary
         raise ValueError(f"Unsupported primary reduction method: {method!r}")
     if response_screen.get("prospective_hill_climb_demonstrated") is not False:
         raise ValueError("Unpromoted response screen cannot claim a prospective hill climb.")
+    label_truth = _mapping(bundle_manifest, "label_truth")
+    if label_truth.get("label_source_state") != "verified" or label_truth.get("state") != "promoted":
+        raise ValueError("Metastudy label truth must be verified and promoted.")
+    decision_gates = _mapping(bundle_manifest, "decision_gates")
+    if decision_gates.get("model_support_ready") is not False:
+        raise ValueError("Metastudy model support must remain explicitly not ready.")
 
     return ReviewSummary(
-        decision="RMF production selection remains unsupported",
+        scope="assay development and retrospective objective comparison",
+        label_state="verified and promoted",
+        predictor_support="weak; prospective ordering is not established",
         basis=(
             "The leading fixed challenger has weakest target-view response-separation ordering of "
             f"{weakest_ordering:.2f}; prospective rank stability is not established"

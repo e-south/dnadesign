@@ -32,6 +32,10 @@ def _validate_catalog_contract() -> None:
         raise RuntimeError("primary decision plots must declare contiguous review steps in catalog order.")
     if any(spec.review_step is not None for spec in PLOT_SPECS if spec.tier != "primary_decision"):
         raise RuntimeError("only primary decision plots may declare a review step.")
+    for section in {spec.review_section for spec in PLOT_SPECS}:
+        orders = sorted(spec.section_order for spec in PLOT_SPECS if spec.review_section == section)
+        if orders != list(range(1, len(orders) + 1)):
+            raise RuntimeError(f"review section {section!r} must declare contiguous section order values.")
     for field, mapping in (
         ("rationale", PLOT_RATIONALES),
         ("non_claim_boundary", PLOT_NON_CLAIM_BOUNDARIES),
@@ -61,6 +65,8 @@ def build_plot_manifest(paths: dict[str, Path], *, root: Path) -> pd.DataFrame:
                 "plot_id": spec.plot_id,
                 "filename": spec.filename,
                 "tier": spec.tier,
+                "review_section": spec.review_section,
+                "section_order": spec.section_order,
                 "visual_type": spec.visual_type,
                 "review_step": spec.review_step,
                 "title": spec.title,

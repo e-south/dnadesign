@@ -17,6 +17,7 @@ from typing import Literal
 from .plot_narrative import PLOT_DATA_TABLES, PLOT_NON_CLAIM_BOUNDARIES, PLOT_RATIONALES
 
 PlotTier = Literal["primary_decision", "metric_diagnostic", "screen_appendix"]
+ReviewSection = Literal["assay_and_labels", "historical_model_screens", "rmf_comparator", "sfxi_comparator"]
 PLOT_TIER_DIRS: dict[PlotTier, str] = {
     "primary_decision": "primary",
     "metric_diagnostic": "diagnostics",
@@ -29,6 +30,8 @@ class PlotSpec:
     plot_id: str
     filename: str
     tier: PlotTier
+    review_section: ReviewSection
+    section_order: int
     visual_type: str
     premise: str
     decision_value: str

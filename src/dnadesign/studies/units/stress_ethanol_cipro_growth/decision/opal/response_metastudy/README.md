@@ -1,12 +1,12 @@
 ---
 id: stress-ethanol-cipro-growth-response-metastudy-package
-title: Response metric metastudy package
+title: Response assay and objective comparison package
 owner: stress_ethanol_cipro_growth
-status: active
+status: source_evidence
 last_verified: 2026-07-20
 ---
 
-# Response Metric Metastudy
+# Response assay and objective comparison
 
 Study-owned, read-only evaluation of response-window Y, objectives, models, and
 next-build policy.
@@ -178,8 +178,9 @@ reduced `log2(YFP/CFP)` response, while the `b` values are same-state
 pDual-10-relative `log2(YFP/OD600)` fluorescence. They are not SFXI vec8. The
 eight-component vector is response-window Y, not an RMF vec8. The primary
 reduction is the 4-8-hour post-event geometric log mean. Reader owns the
-reduction; OPAL applies the RMF objective. Response-window labels enter OPAL
-only through the study's verified, manifest-pinned publication contract.
+reduction. This package applies RMF only as a historical comparator; the active
+OPAL campaign applies MSRB. Response-window labels enter OPAL only through the
+study's verified, manifest-pinned publication contract.
 
 Every active view uses global target-state separation: the least responsive ON
 state is compared with the most responsive OFF state under the declared mask.
@@ -191,21 +192,23 @@ diagnostics and are not alternate names for RMF.
 - `manifest.json`: source, contract, model, recommendation, and artifact
   provenance.
 - `report.md`: plain-language scientific interpretation and claim boundaries.
-- `review.py`: one-viewport Marimo evidence review with tier-first progressive
-  disclosure.
-- `plot_manifest.csv`: plot title, premise, value, rationale, alt text, tier,
-  and data source.
+- `review.py`: one-viewport Marimo review organized by assay and labels,
+  historical model screens, RMF comparator evidence, and SFXI comparator
+  evidence.
+- `plot_manifest.csv`: plot title, premise, value, rationale, alt text, review
+  section, storage tier, and data source.
 - `tables/`: policy, label, model, uncertainty, repeated-measurement, and
   greedy-support evidence.
 - `plots/`: primary decision, metric diagnostic, and screen appendix figures.
 - `model_evidence/`: optional immutable checkpoints projected from verified
   metastudy bundles; see `model_evidence/README.md`.
 
-The primary tier is intentionally limited to four figures: target-mask effects
-on measured SpyP and sulAp summaries, response-window stability, grouped
-label-model support, and retrospective greedy evidence. Observed constraint
-support and repeated-design agreement remain diagnostic; the full SFXI source-
-evidence policy screen remains in the appendix.
+The default review section begins with response-window stability, followed by
+event timing and repeated-design agreement. Historical SFXI and response-window
+model screens remain separate from RMF and SFXI comparator sections; they are
+not direct validation of the active MSRB campaign. Storage tiers continue to
+place files under primary, diagnostic, and appendix directories, but they are
+not the user-facing navigation ontology.
 
 ## Evidence Posture
 

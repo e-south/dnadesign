@@ -126,6 +126,7 @@ def test_response_model_modules_stay_semantically_bounded() -> None:
         "runtime/response_screen_publication.py": 220,
         "runtime/review_bundle.py": 200,
         "reporting/notebook.py": 240,
+        "reporting/notebook_copy.py": 80,
         "reporting/notebook_summary.py": 120,
         "reporting/matrix_annotations.py": 120,
         "reporting/plot_style.py": 100,

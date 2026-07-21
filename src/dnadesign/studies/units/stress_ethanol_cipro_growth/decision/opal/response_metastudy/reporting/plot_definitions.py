@@ -14,6 +14,8 @@ from .plot_contracts import PlotSpec
 PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="measured_response_examples",
+        review_section="rmf_comparator",
+        section_order=1,
         filename="measured_response_examples.png",
         tier="primary_decision",
         review_step=1,
@@ -32,6 +34,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="rmf_cardinality_pressure",
+        review_section="rmf_comparator",
+        section_order=6,
         filename="rmf_cardinality_pressure.png",
         tier="metric_diagnostic",
         visual_type="synthetic state-cardinality sensitivity",
@@ -49,6 +53,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="policy_guardrail_matrix",
+        review_section="sfxi_comparator",
+        section_order=1,
         filename="policy_guardrail_matrix.png",
         tier="screen_appendix",
         visual_type="guardrail heatmap",
@@ -64,6 +70,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="policy_decision_frontier",
+        review_section="sfxi_comparator",
+        section_order=2,
         filename="policy_decision_frontier.png",
         tier="screen_appendix",
         visual_type="tradeoff scatter",
@@ -77,6 +85,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="score_component_dominance",
+        review_section="sfxi_comparator",
+        section_order=3,
         filename="score_component_dominance.png",
         tier="metric_diagnostic",
         visual_type="correlation bars",
@@ -89,6 +99,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="selected_setpoint_residuals",
+        review_section="sfxi_comparator",
+        section_order=4,
         filename="selected_setpoint_residuals.png",
         tier="screen_appendix",
         visual_type="residual heatmap",
@@ -101,6 +113,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="logic_gate_feasibility",
+        review_section="sfxi_comparator",
+        section_order=5,
         filename="logic_gate_feasibility.png",
         tier="metric_diagnostic",
         visual_type="gate sweep scatter",
@@ -113,6 +127,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="logic_effect_topk_scatter",
+        review_section="sfxi_comparator",
+        section_order=6,
         filename="logic_effect_topk_scatter.png",
         tier="metric_diagnostic",
         visual_type="component scatter",
@@ -125,6 +141,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="score_correlation_matrix",
+        review_section="sfxi_comparator",
+        section_order=7,
         filename="score_correlation_matrix.png",
         tier="metric_diagnostic",
         visual_type="correlation heatmap",
@@ -137,6 +155,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="selected_vec8_profiles",
+        review_section="sfxi_comparator",
+        section_order=8,
         filename="selected_vec8_profiles.png",
         tier="metric_diagnostic",
         visual_type="profile heatmap",
@@ -149,6 +169,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="sfxi_score_contours",
+        review_section="sfxi_comparator",
+        section_order=9,
         filename="sfxi_score_contours.png",
         tier="metric_diagnostic",
         visual_type="score-surface contour",
@@ -161,6 +183,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="target_view_pareto_fronts",
+        review_section="sfxi_comparator",
+        section_order=10,
         filename="target_view_pareto_fronts.png",
         tier="metric_diagnostic",
         visual_type="Pareto scatter",
@@ -175,6 +199,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="denominator_sensitivity",
+        review_section="sfxi_comparator",
+        section_order=11,
         filename="denominator_sensitivity.png",
         tier="metric_diagnostic",
         visual_type="sensitivity line plot",
@@ -187,6 +213,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="policy_comparison_panel_roles",
+        review_section="sfxi_comparator",
+        section_order=12,
         filename="policy_comparison_panel_roles.png",
         tier="screen_appendix",
         visual_type="panel composition bars",
@@ -199,6 +227,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="model_validation",
+        review_section="historical_model_screens",
+        section_order=2,
         filename="model_validation.png",
         tier="metric_diagnostic",
         visual_type="held-out performance summary",
@@ -214,6 +244,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="candidate_logic_support",
+        review_section="sfxi_comparator",
+        section_order=13,
         filename="candidate_logic_support.png",
         tier="metric_diagnostic",
         visual_type="threshold support curve",
@@ -226,6 +258,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="logic_effect_tradeoff_overlap",
+        review_section="sfxi_comparator",
+        section_order=14,
         filename="logic_effect_tradeoff_overlap.png",
         tier="screen_appendix",
         visual_type="tradeoff line plot",
@@ -238,6 +272,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="logic_effect_tradeoff_fidelity",
+        review_section="sfxi_comparator",
+        section_order=15,
         filename="logic_effect_tradeoff_fidelity.png",
         tier="screen_appendix",
         visual_type="tradeoff line plot",
@@ -250,6 +286,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="policy_overlap_summary",
+        review_section="sfxi_comparator",
+        section_order=16,
         filename="policy_overlap_summary.png",
         tier="screen_appendix",
         visual_type="overlap bar plot",
@@ -259,6 +297,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="topk_overlap_curve",
+        review_section="sfxi_comparator",
+        section_order=17,
         filename="topk_overlap_curve.png",
         tier="screen_appendix",
         visual_type="overlap curve",
@@ -268,6 +308,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="reader_event_intervals",
+        review_section="assay_and_labels",
+        section_order=2,
         filename="reader_event_intervals.png",
         tier="metric_diagnostic",
         visual_type="event interval bars",
@@ -280,6 +322,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="response_separation_stability",
+        review_section="assay_and_labels",
+        section_order=1,
         filename="response_separation_stability.png",
         tier="primary_decision",
         review_step=2,
@@ -297,6 +341,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="response_constraint_coverage",
+        review_section="rmf_comparator",
+        section_order=2,
         filename="response_constraint_coverage.png",
         tier="metric_diagnostic",
         visual_type="constraint support bars",
@@ -310,6 +356,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="response_uncertainty_sources",
+        review_section="rmf_comparator",
+        section_order=3,
         filename="response_uncertainty_sources.png",
         tier="metric_diagnostic",
         visual_type="uncertainty source bars",
@@ -323,6 +371,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="label_model_screen",
+        review_section="historical_model_screens",
+        section_order=1,
         filename="label_model_screen.png",
         tier="primary_decision",
         review_step=3,
@@ -343,6 +393,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="retrospective_enrichment",
+        review_section="rmf_comparator",
+        section_order=4,
         filename="retrospective_enrichment.png",
         tier="metric_diagnostic",
         visual_type="held-out enrichment heatmap",
@@ -356,6 +408,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="greedy_support_evidence",
+        review_section="rmf_comparator",
+        section_order=5,
         filename="greedy_support_evidence.png",
         tier="primary_decision",
         review_step=4,
@@ -370,6 +424,8 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     ),
     PlotSpec(
         plot_id="repeated_design_agreement",
+        review_section="assay_and_labels",
+        section_order=3,
         filename="repeated_design_agreement.png",
         tier="metric_diagnostic",
         visual_type="cross-experiment range heatmap",
