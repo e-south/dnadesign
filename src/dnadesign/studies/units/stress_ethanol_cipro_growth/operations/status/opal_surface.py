@@ -16,6 +16,7 @@ from collections.abc import Mapping
 from dnadesign.ops.status import resolve_repo_relative_path
 
 from .opal_run_receipt import inspect_opal_round0_run_receipt
+from .synthesis_handoff_surface import inspect_synthesis_handoff_surface
 
 _STATUS_KIND = "stress-ethanol-cipro-growth-status"
 _OPAL_CANDIDATE_TABLE_ARTIFACT = "opal_candidate_feature_table"
@@ -51,8 +52,14 @@ def inspect_opal_surface(*, study_context: object, default_doc: str) -> dict[str
         payload["entry_artifact"] = candidate_table["dataset"]
         payload["candidate_feature_table"] = candidate_table
     run_receipt = inspect_opal_round0_run_receipt(study_context=study_context, opal_config=opal_config)
-    payload["integrity_state"] = run_receipt["state"]
+    synthesis_handoff = inspect_synthesis_handoff_surface(study_context=study_context, opal_config=opal_config)
+    payload["integrity_state"] = (
+        "attention"
+        if run_receipt["state"] == "attention" or synthesis_handoff["state"] == "attention"
+        else run_receipt["state"]
+    )
     payload["run_receipt"] = run_receipt
+    payload["synthesis_handoff"] = synthesis_handoff
     return payload
 
 

@@ -16,6 +16,8 @@ next_scope:
     - opal_candidate_table
     opal_round0_candidate_review:
     - opal
+    opal_assay_b1_order_ready:
+    - opal
   runtime_phase_groups:
   - infer
   - notify

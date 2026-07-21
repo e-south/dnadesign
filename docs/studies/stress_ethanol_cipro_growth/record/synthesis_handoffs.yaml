@@ -128,7 +128,7 @@ handoffs:
         genbank_readback_status: pass
     note: Batch zero contains six pre-assay candidates for each declared selection view. Acceptance requires recorded hashes plus current-contract workbook and GenBank readback.
   - handoff_id: stress-opal-assay-b1-r0-msrb-v1
-    lifecycle_status: authorized_for_materialization
+    lifecycle_status: accepted_for_order
     source_authority: opal_selection_batch
     selection_epoch: opal_model_round
     assay_batch_index: 1
@@ -221,4 +221,10 @@ handoffs:
       vendor_workbook_path: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/synthesis_handoff/stress-opal-assay-b1-r0-msrb-v1/stress-opal-assay-b1-r0-msrb-v1__secg_msrb_greedy__azenta_gene_synthesis.xlsx
       genbank_dir_path: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/synthesis_handoff/stress-opal-assay-b1-r0-msrb-v1/stress-opal-assay-b1-r0-msrb-v1__secg_msrb_greedy__genbank_inserts
       genbank_feature_table_path: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/synthesis_handoff/stress-opal-assay-b1-r0-msrb-v1/stress-opal-assay-b1-r0-msrb-v1__secg_msrb_greedy__genbank_features.csv
+      manifest_sha256: 08557d4bbe8115c53ec0c4f25753958aa2cbcf033ed3c844c58493e2879fb9e1  # pragma: allowlist secret
+      vendor_workbook_sha256: 0dff7bc9107199e83a5b64e43d3455e0f30840191cb8f49b4737c8e22ffa1905  # pragma: allowlist secret
+      genbank_dir_sha256: 4027b9184403d099588e5da325a1966ac16c4743af0ad7417809c297028f295c  # pragma: allowlist secret
+      genbank_feature_table_sha256: ec06d39601628768c215ff698191057014fa0f4c6b0f3b72042260379d7744fa  # pragma: allowlist secret
+      workbook_readback_status: pass
+      genbank_readback_status: pass
     note: The study authorizes SECG-019 through SECG-036 for one materialization as a prospectively frozen greedy learning probe. This does not establish predictor support, MSRB enrichment, hill climbing, or vendor submission.

@@ -129,6 +129,7 @@ def build_stress_ethanol_cipro_growth_status(
     latentdna_state = dependencies.inspect_latentdna_readiness(study_context=study_context)
     additional_downstream_surfaces = dependencies.inspect_additional_downstream_surfaces(study_context=study_context)
     opal_run_receipt = _attention_opal_run_receipt(additional_downstream_surfaces)
+    opal_synthesis_handoff = _opal_synthesis_handoff(additional_downstream_surfaces)
     exploratory_analysis = dependencies.inspect_exploratory_analysis(
         study_context=study_context,
         latentdna_state=latentdna_state,
@@ -186,13 +187,19 @@ def build_stress_ethanol_cipro_growth_status(
         summary_text = str(opal_run_receipt.get("summary") or "").strip()
         if summary_text:
             summary_parts.append(summary_text)
+    if opal_synthesis_handoff is not None:
+        summary_text = str(opal_synthesis_handoff.get("summary") or "").strip()
+        if summary_text:
+            summary_parts.append(summary_text)
     if planned_outputs_state is not None and bool(planned_outputs_state.get("include_in_summary")):
         summary_parts.append(str(planned_outputs_state["summary"]))
     if study_context.next_ready_phase is not None:
-        summary_parts.append(f"next ready {study_context.next_ready_phase['id']}")
+        if _phase_is_after_current(study_context.next_ready_phase, current_phase=study_context.current_phase):
+            summary_parts.append(f"next ready {study_context.next_ready_phase['id']}")
     elif study_context.next_in_progress_phase is not None:
-        summary_parts.append(f"next in_progress {study_context.next_in_progress_phase['id']}")
-    elif study_context.next_planned_phase is not None:
+        if _phase_is_after_current(study_context.next_in_progress_phase, current_phase=study_context.current_phase):
+            summary_parts.append(f"next in_progress {study_context.next_in_progress_phase['id']}")
+    elif _phase_is_after_current(study_context.next_planned_phase, current_phase=study_context.current_phase):
         summary_parts.append(f"next planned {study_context.next_planned_phase['id']}")
 
     attention_reasons: list[str] = []
@@ -218,6 +225,8 @@ def build_stress_ethanol_cipro_growth_status(
         attention_reasons.append("LatentDNA readiness is not ok")
     if opal_run_receipt is not None:
         attention_reasons.append("OPAL round-0 run receipt integrity is not ok")
+    if opal_synthesis_handoff is not None and bool(opal_synthesis_handoff.get("drives_top_level_attention")):
+        attention_reasons.append("OPAL synthesis handoff record integrity is not ok")
     if planned_outputs_state is not None and bool(planned_outputs_state.get("drives_top_level_attention")):
         attention_reasons.append("planned shared outputs remain pending")
     if status_context.infer_runtime.preferred_model_family is not None and any(
@@ -248,6 +257,17 @@ def _latentdna_readiness_drives_attention(latentdna_state: dict[str, object]) ->
     return state not in {"", "ok"}
 
 
+def _phase_is_after_current(
+    phase: Mapping[str, object] | None,
+    *,
+    current_phase: str | None,
+) -> bool:
+    if phase is None:
+        return False
+    phase_id = str(phase.get("id") or "").strip()
+    return bool(phase_id and phase_id != str(current_phase or "").strip())
+
+
 def _attention_opal_run_receipt(
     downstream_surfaces: Mapping[str, object],
 ) -> Mapping[str, object] | None:
@@ -262,6 +282,18 @@ def _attention_opal_run_receipt(
     if bool(run_receipt.get("drives_top_level_attention")):
         return run_receipt
     return None
+
+
+def _opal_synthesis_handoff(
+    downstream_surfaces: Mapping[str, object],
+) -> Mapping[str, object] | None:
+    opal_surface = downstream_surfaces.get("opal")
+    if not isinstance(opal_surface, Mapping):
+        return None
+    handoff = opal_surface.get("synthesis_handoff")
+    if not isinstance(handoff, Mapping) or not bool(handoff.get("configured")):
+        return None
+    return handoff
 
 
 def _build_source_growth_state(

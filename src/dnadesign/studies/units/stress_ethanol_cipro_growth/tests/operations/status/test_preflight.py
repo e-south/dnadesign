@@ -29,6 +29,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.prefl
     StressEthanolCiproGrowthPreflightContextDependencies,
     StressEthanolCiproGrowthPreflightCoordinatorDependencies,
     StressEthanolCiproGrowthPreflightResolvedContext,
+    _build_synthesis_handoff_check,
     build_stress_ethanol_cipro_growth_preflight_progress,
     resolve_stress_ethanol_cipro_growth_preflight_context,
 )
@@ -62,6 +63,31 @@ def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str
         stderr=stderr,
         timed_out=False,
     )
+
+
+def test_synthesis_handoff_preflight_check_preserves_exact_record_state() -> None:
+    context = SimpleNamespace(
+        contract=SimpleNamespace(preflight=SimpleNamespace(group_phase_bindings={"opal": "opal_assay_b1_order_ready"})),
+        scope_plan=SimpleNamespace(target_phase_id="opal_assay_b1_order_ready"),
+        current_phase="opal_assay_b1_order_ready",
+        synthesis_handoff_state={
+            "configured": True,
+            "state": "ok",
+            "summary": "OPAL synthesis handoff verified stress-opal-assay-b1-r0-msrb-v1 (accepted_for_order)",
+            "handoff_id": "stress-opal-assay-b1-r0-msrb-v1",
+            "vendor_submission": "not_performed",
+            "mismatches": [],
+        },
+    )
+
+    check = _build_synthesis_handoff_check(context=context)
+
+    assert check is not None
+    assert check.id == "opal.synthesis_handoff.accepted"
+    assert check.state == "ok"
+    assert check.phase_id == "opal_assay_b1_order_ready"
+    assert check.artifact_id == "stress-opal-assay-b1-r0-msrb-v1"
+    assert check.details["vendor_submission"] == "not_performed"
 
 
 def test_stress_ethanol_cipro_preflight_command_runner_applies_operator_timeout(tmp_path: Path, monkeypatch) -> None:

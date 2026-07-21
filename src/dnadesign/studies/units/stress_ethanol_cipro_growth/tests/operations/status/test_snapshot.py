@@ -434,8 +434,7 @@ def test_build_stress_ethanol_cipro_growth_status_preserves_summary_and_attentio
     assert summary == (
         "demo_study: phase infer_batch_preparation; preferred infer evo2_20b; "
         "source gate active densegen_demo_anchor 8/10 rows (gap=2); "
-        "handoffs ready anchor=8 construct=8; "
-        "next in_progress infer_batch_preparation"
+        "handoffs ready anchor=8 construct=8"
     )
     assert evidence["attention_reasons"] == ["DenseGen source gate is still active"]
     assert evidence["source_growth_state"] == {
@@ -500,6 +499,7 @@ def test_build_status_fails_closed_on_opal_round_receipt_drift(tmp_path: Path) -
         )
     )
     receipt_summary = "OPAL round-0 run receipt has 1 integrity mismatch(es)"
+    handoff_summary = "OPAL synthesis handoff has 1 integrity mismatch(es)"
 
     state, summary, evidence = build_stress_ethanol_cipro_growth_status(
         study_context=study_context,
@@ -534,6 +534,19 @@ def test_build_status_fails_closed_on_opal_round_receipt_drift(tmp_path: Path) -
                             }
                         ],
                     },
+                    "synthesis_handoff": {
+                        "configured": True,
+                        "state": "attention",
+                        "drives_top_level_attention": True,
+                        "summary": handoff_summary,
+                        "mismatches": [
+                            {
+                                "field": "lifecycle_status",
+                                "expected": "accepted_for_order",
+                                "actual": "authorized_for_materialization",
+                            }
+                        ],
+                    },
                 },
             },
         ),
@@ -542,7 +555,9 @@ def test_build_status_fails_closed_on_opal_round_receipt_drift(tmp_path: Path) -
 
     assert state == "attention"
     assert receipt_summary in summary
+    assert handoff_summary in summary
     assert "OPAL round-0 run receipt integrity is not ok" in evidence["attention_reasons"]
+    assert "OPAL synthesis handoff record integrity is not ok" in evidence["attention_reasons"]
 
 
 def test_build_stress_ethanol_cipro_growth_status_demotes_source_gate_once_handoffs_exceed_target(
@@ -658,8 +673,7 @@ def test_build_stress_ethanol_cipro_growth_status_demotes_source_gate_once_hando
     assert summary == (
         "demo_study: phase infer_batch_preparation; preferred infer evo2_20b; "
         "handoffs ready anchor=12 construct=12; "
-        "source gate superseded by downstream handoffs densegen_demo_anchor 8/10 rows (gap=2); "
-        "next in_progress infer_batch_preparation"
+        "source gate superseded by downstream handoffs densegen_demo_anchor 8/10 rows (gap=2)"
     )
     assert "attention_reasons" not in evidence
     assert evidence["source_growth_state"]["state"] == "ok"

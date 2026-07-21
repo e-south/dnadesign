@@ -329,6 +329,9 @@ study_pipeline:
       round_context: src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/metadata/round_ctx.json
       round_context_sha256: 1160e0037f8aab3f043d6f9420c8982efa3f5e30cca9de68d48fd8bf73944b1c  # pragma: allowlist secret
       authorization_state: candidate_review_only
+    synthesis_handoff:
+      handoff_id: stress-opal-assay-b1-r0-msrb-v1
+      required_lifecycle_status: accepted_for_order
     synthesis_handoff_source_evidence_preview_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-batch0-sfxi-v1 --json
     synthesis_handoff_round_preview_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <measured_round_handoff_id> --json
     synthesis_handoff_round_draft_preview_command: uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --source opal-round --round <model_as_of_round> --run-id <run_id> --batch-id <physical_assay_batch_id> --json
@@ -339,5 +342,4 @@ study_pipeline:
       generate_command: uv run opal notebook generate -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml --round 0 --force
       run_command: uv run opal notebook run -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml
     batch0_selector: src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml
-    state: round0_candidate_review
-    synthesis_authorization: not_granted
+    state: assay_b1_order_ready

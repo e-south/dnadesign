@@ -1,0 +1,202 @@
+LOCUS       SECG-024                  90 bp    DNA     linear   SYN 01-JAN-2000
+DEFINITION  SECG-024 secg_msrb_greedy stress-opal-assay-b1-r0-msrb-v1.
+ACCESSION   SECG-024
+VERSION     SECG-024
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     source          1..90
+                     /label="SECG-024"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ethanol"
+                     /selection_membership="view=ethanol|rank=6|score=-0.5478679
+                     482507364|score_ref=ethanol/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-024"
+                     /canonical_id="5bb837f7af842f993e551ca93de90a68ab56d9c8"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="a64f638544a61c3c78a79ed2637b04e11576ce4d79fb3
+                     5424a4b1c79209bd7cb"
+                     /final_sha256="b17dac82c855693a5dfdd2bf30284e82a961655f61e2
+                     fbe4dc5a19e3b32032d4"
+                     /dnadesign_feature_id="SECG-024:source"
+                     /dnadesign_source="synthesis_handoff"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     misc_feature    1..15
+                     /label="5' cloning flank"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ethanol"
+                     /selection_membership="view=ethanol|rank=6|score=-0.5478679
+                     482507364|score_ref=ethanol/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-024"
+                     /canonical_id="5bb837f7af842f993e551ca93de90a68ab56d9c8"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="a64f638544a61c3c78a79ed2637b04e11576ce4d79fb3
+                     5424a4b1c79209bd7cb"
+                     /final_sha256="b17dac82c855693a5dfdd2bf30284e82a961655f61e2
+                     fbe4dc5a19e3b32032d4"
+                     /dnadesign_feature_id="SECG-024:left_flank"
+                     /dnadesign_source="cloning_strategy"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     promoter        16..75
+                     /label="60 nt promoter core"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ethanol"
+                     /selection_membership="view=ethanol|rank=6|score=-0.5478679
+                     482507364|score_ref=ethanol/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-024"
+                     /canonical_id="5bb837f7af842f993e551ca93de90a68ab56d9c8"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="a64f638544a61c3c78a79ed2637b04e11576ce4d79fb3
+                     5424a4b1c79209bd7cb"
+                     /final_sha256="b17dac82c855693a5dfdd2bf30284e82a961655f61e2
+                     fbe4dc5a19e3b32032d4"
+                     /dnadesign_feature_id="SECG-024:promoter_core"
+                     /dnadesign_source="opal_candidate"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     misc_feature    76..90
+                     /label="3' cloning flank"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ethanol"
+                     /selection_membership="view=ethanol|rank=6|score=-0.5478679
+                     482507364|score_ref=ethanol/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-024"
+                     /canonical_id="5bb837f7af842f993e551ca93de90a68ab56d9c8"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="a64f638544a61c3c78a79ed2637b04e11576ce4d79fb3
+                     5424a4b1c79209bd7cb"
+                     /final_sha256="b17dac82c855693a5dfdd2bf30284e82a961655f61e2
+                     fbe4dc5a19e3b32032d4"
+                     /dnadesign_feature_id="SECG-024:right_flank"
+                     /dnadesign_source="cloning_strategy"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     misc_feature    complement(16..34)
+                     /label="LexA TFBS"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ethanol"
+                     /selection_membership="view=ethanol|rank=6|score=-0.5478679
+                     482507364|score_ref=ethanol/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-024"
+                     /canonical_id="5bb837f7af842f993e551ca93de90a68ab56d9c8"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="a64f638544a61c3c78a79ed2637b04e11576ce4d79fb3
+                     5424a4b1c79209bd7cb"
+                     /final_sha256="b17dac82c855693a5dfdd2bf30284e82a961655f61e2
+                     fbe4dc5a19e3b32032d4"
+                     /dnadesign_feature_id="SECG-024:tfbs:0"
+                     /dnadesign_source="densegen_tfbs"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+                     /dg_coord_key="offset"
+                     /dg_offset="0"
+                     /dg_offset_raw="0"
+                     /dg_orientation="rev"
+                     /dg_expected_seq="AAATCTGTGTTTATACACA"
+                     /dg_part_kind="tfbs"
+                     /regulator="lexA"
+                     /motif_id="5f10d2e24e44d05f59e20122f7aa7156dec2e939f50114c0
+                     d482dc692158c8a6"
+                     /tfbs_id="8ee5043e5facc61caf7741e0789819ee73818dd27e2ac46dd
+                     9c5f6c72d0be35a"
+                     /dg_rel_score="0.7332228190764729"
+                     /tier="2.0"
+     misc_feature    32..37
+                     /label="-35 (d)"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ethanol"
+                     /selection_membership="view=ethanol|rank=6|score=-0.5478679
+                     482507364|score_ref=ethanol/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-024"
+                     /canonical_id="5bb837f7af842f993e551ca93de90a68ab56d9c8"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="a64f638544a61c3c78a79ed2637b04e11576ce4d79fb3
+                     5424a4b1c79209bd7cb"
+                     /final_sha256="b17dac82c855693a5dfdd2bf30284e82a961655f61e2
+                     fbe4dc5a19e3b32032d4"
+                     /dnadesign_feature_id="SECG-024:sigma70:upstream"
+                     /dnadesign_source="densegen_fixed_element"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+                     /dg_coord_key="offset_raw"
+                     /dg_offset="16"
+                     /dg_offset_raw="16"
+                     /dg_expected_seq="TTTACA"
+                     /dg_part_kind="fixed_element"
+                     /role="upstream"
+                     /dg_constraint="sigma70_core"
+                     /variant_id="d"
+                     /spacer_len="18.0"
+                     /sigma35_variant="d"
+                     /sigma35_sequence="TTTACA"
+     misc_feature    56..61
+                     /label="-10 (consensus)"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ethanol"
+                     /selection_membership="view=ethanol|rank=6|score=-0.5478679
+                     482507364|score_ref=ethanol/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-024"
+                     /canonical_id="5bb837f7af842f993e551ca93de90a68ab56d9c8"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="a64f638544a61c3c78a79ed2637b04e11576ce4d79fb3
+                     5424a4b1c79209bd7cb"
+                     /final_sha256="b17dac82c855693a5dfdd2bf30284e82a961655f61e2
+                     fbe4dc5a19e3b32032d4"
+                     /dnadesign_feature_id="SECG-024:sigma70:downstream"
+                     /dnadesign_source="densegen_fixed_element"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+                     /dg_coord_key="offset_raw"
+                     /dg_offset="40"
+                     /dg_offset_raw="40"
+                     /dg_expected_seq="TATAAT"
+                     /dg_part_kind="fixed_element"
+                     /role="downstream"
+                     /dg_constraint="sigma70_core"
+                     /variant_id="consensus"
+                     /spacer_len="18.0"
+                     /sigma10_variant="consensus"
+                     /sigma10_sequence="TATAAT"
+ORIGIN
+        1 accgggatcc tgcagtgtgt ataaacacag atttacaggt ttcccggtgg gctaatataa
+       61 ttcccctgag tctgctgagg gaattcgcga
+//

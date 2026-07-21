@@ -74,4 +74,7 @@ uv run opal run -c "$CONFIG" --round 0 --json
 
 ### Synthesis boundary
 
-The handoff must name one run and its view memberships. Passing does not authorize synthesis; the RF remains the campaign model and `model_support_ready` is false.
+The handoff must name one run and its view memberships. Campaign validation does
+not authorize synthesis; the RF remains the campaign model and
+`model_support_ready` is false. The study separately accepted
+`stress-opal-assay-b1-r0-msrb-v1` for order.

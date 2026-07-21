@@ -3265,6 +3265,34 @@ def test_current_msrb_round0_receipt_is_complete_sequence_unique_alias_handoff()
         }
 
 
+def test_current_accepted_msrb_handoff_bundle_is_durable_and_verified() -> None:
+    repo_root = Path(__file__).resolve().parents[9]
+    record_path = repo_root / "docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml"
+    record = load_synthesis_handoff_records(record_path)["stress-opal-assay-b1-r0-msrb-v1"]
+
+    status = artifact_status_for_handoff_record(record, repo_root=repo_root)
+
+    assert record.lifecycle_status == "accepted_for_order"
+    assert status["summary"] == {
+        "expected_artifact_count": 1,
+        "present_artifact_count": 1,
+        "manifest_lifecycle_pass_count": 1,
+        "workbook_readback_pass_count": 1,
+        "genbank_readback_pass_count": 1,
+        "current_contract_ready": True,
+    }
+    artifact = status["artifacts"][0]
+    assert artifact["manifest_row_count"] == 18
+    assert artifact["manifest_lifecycle_validation"]["selection_view_counts"] == {
+        "ethanol": 6,
+        "ciprofloxacin": 6,
+        "and": 6,
+    }
+    assert artifact["manifest_lifecycle_validation"]["study_aliases"] == [
+        f"SECG-{ordinal:03d}" for ordinal in range(19, 37)
+    ]
+
+
 def test_local_current_msrb_round0_is_complete_sequence_unique_genbank_handoff(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[9]
     _require_repository_msrb_round0_handoff_artifacts(repo_root)

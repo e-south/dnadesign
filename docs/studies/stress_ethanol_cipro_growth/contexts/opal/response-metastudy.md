@@ -262,8 +262,9 @@ typed publication verifies 27 exact labels plus eight measured-candidate
 exclusions. That result does not satisfy the independent model-support gate.
 `model_support_ready` remains false. The sole executable stress campaign is the
 MSRB round-0 prospective learning probe; the RMF run is frozen comparator
-evidence. Explicit probe authorization did not promote model support, and
-synthesis authorization remains a separate study decision. The
+evidence. Explicit probe authorization did not promote model support. The study
+later accepted the exact assay-batch-1 synthesis handoff as a separate physical
+decision; that acceptance does not change the model-support result. The
 nearest-12-hour SFXI vec8 remains immutable provenance and is not an RMF label.
 
 The metastudy can reject unsupported choices. A biological hill climb exists

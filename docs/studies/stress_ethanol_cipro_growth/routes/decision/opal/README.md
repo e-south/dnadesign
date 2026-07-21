@@ -3,13 +3,13 @@ doc_id: study-stress-ethanol-cipro-growth-route-decision-opal
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-19
+last_verified: 2026-07-21
 parent_route: ../../README.md
 type: route
 plane: control-plane
 owner_boundary: opal
 surface_role: decision
-current_state: opal_round0_candidate_review
+current_state: opal_assay_b1_order_ready
 entry_artifact: usr_prom_eth_cip_opal_candidates
 exit_artifact: opal_campaign_records_and_ledgers
 ---
@@ -20,7 +20,7 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
 
 ### Surface
 
-- Route state: `opal_round0_candidate_review`
+- Route state: `opal_assay_b1_order_ready`
 - Entry artifact: `usr_prom_eth_cip_opal_candidates` shared USR candidate table
 - Candidate table role: `opal_candidate_feature_table`
 - Candidate table X: `latentdna__evo2_7b__context_anchor_mean_bidir_concat`
@@ -64,15 +64,18 @@ Use this only after `routes/README.md` selects the OPAL campaign surface.
   candidates, and zero output-replay mismatches.
 - The campaign is a prospectively frozen greedy learning probe, not evidence
   of RF predictive support or prospective MSRB enrichment.
-  `model_support_ready` remains false; selection does not authorize synthesis.
+  `model_support_ready` remains false. A separate study lifecycle decision has
+  accepted the exact `SECG-019` through `SECG-036` handoff for order.
 - Candidate eligibility applies OPAL's generic `restriction_site_exclusion`;
   study-specific synthesis constraints remain study-owned.
 
 ### Physical Synthesis Handoff
 
-- Lifecycle record: `../../record/synthesis_handoffs.yaml`
+- Lifecycle record: [synthesis_handoffs.yaml](../../../record/synthesis_handoffs.yaml)
 - Dev spec: `../../../contexts/opal/synthesis-handoff.md`
-- Preview while synthesis remains unauthorized: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id <handoff_id> --json`
+- Accepted handoff: `stress-opal-assay-b1-r0-msrb-v1`
+- Verify the record and retained order bundle: `uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff --handoff-id stress-opal-assay-b1-r0-msrb-v1 --json`
+- Lifecycle state: `accepted_for_order`; vendor submission is not recorded.
 
 ### Boundaries
 

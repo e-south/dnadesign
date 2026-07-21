@@ -38,6 +38,7 @@ from .infer_runtime import (
 )
 from .latentdna_readiness import inspect_stress_ethanol_cipro_growth_latentdna_readiness
 from .record_normalizer import StressEthanolCiproGrowthResolvedContext
+from .synthesis_handoff_surface import inspect_synthesis_handoff_surface
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,7 @@ class StressEthanolCiproGrowthPreflightResolvedContext:
     infer_phase_targets: dict[str, StressEthanolCiproGrowthInferPhaseTarget]
     scope_plan: StudyPreflightPlan
     latentdna_readiness: Mapping[str, object] | None = None
+    synthesis_handoff_state: Mapping[str, object] | None = None
 
 
 def resolve_stress_ethanol_cipro_growth_preflight_context(
@@ -109,6 +111,14 @@ def resolve_stress_ethanol_cipro_growth_preflight_context(
         if "latentdna" in scope_plan.included_groups
         else None
     )
+    synthesis_handoff_state = (
+        inspect_synthesis_handoff_surface(
+            study_context=study_context,
+            opal_config=_mapping(study_pipeline.get("opal")),
+        )
+        if "opal" in scope_plan.included_groups
+        else None
+    )
     study_id = study_context.study_id or study_context.resolved_study_dir.name
     phase_states = tuple(dict(phase) for phase in study_context.phase_states)
     return StressEthanolCiproGrowthPreflightResolvedContext(
@@ -127,6 +137,7 @@ def resolve_stress_ethanol_cipro_growth_preflight_context(
         infer_phase_targets=infer_phase_targets,
         scope_plan=scope_plan,
         latentdna_readiness=latentdna_readiness,
+        synthesis_handoff_state=synthesis_handoff_state,
     )
 
 
@@ -155,6 +166,9 @@ def build_stress_ethanol_cipro_growth_preflight_progress(
                 label: str(path) for label, path in context.infer_runtime.infer_notify_profile_paths.items()
             },
             "infer_notify_profile_errors": dict(context.infer_runtime.infer_notify_profile_errors),
+            "synthesis_handoff": (
+                dict(context.synthesis_handoff_state) if context.synthesis_handoff_state is not None else None
+            ),
         }
     )
 
@@ -182,6 +196,10 @@ def build_stress_ethanol_cipro_growth_preflight_progress(
         add_check(check)
     if "latentdna" in enabled_groups:
         check = _build_latentdna_readiness_check(context=context)
+        if check is not None:
+            add_check(check)
+    if "opal" in enabled_groups:
+        check = _build_synthesis_handoff_check(context=context)
         if check is not None:
             add_check(check)
     for check in _build_dataset_refresh_checks(context=context):
@@ -217,7 +235,12 @@ def build_stress_ethanol_cipro_growth_preflight_progress(
 
     summary_parts = [f"{context.study_id}: preflight phase {context.current_phase or 'unknown'}"]
     if context.scope_plan.scope == "next" and context.scope_plan.target_phase_id is not None:
-        phase_label = "next phase" if context.next_ready_phase is not None else "focus phase"
+        next_ready_id = str((context.next_ready_phase or {}).get("id") or "").strip()
+        phase_label = (
+            "next phase"
+            if next_ready_id and next_ready_id != str(context.current_phase or "").strip()
+            else "focus phase"
+        )
         summary_parts.append(f"{phase_label} {context.scope_plan.target_phase_id}")
     effective_counts = evaluation.effective_counts
     if effective_counts.get("ok"):
@@ -326,6 +349,39 @@ def _build_latentdna_readiness_check(
             "workspace_id": readiness.get("workspace_id"),
         },
     )
+
+
+def _build_synthesis_handoff_check(
+    *,
+    context: StressEthanolCiproGrowthPreflightResolvedContext,
+) -> PreflightCheck | None:
+    handoff = context.synthesis_handoff_state
+    if handoff is None:
+        return None
+    raw_state = str(handoff.get("state") or "").strip()
+    state = raw_state if raw_state in {"ok", "attention", "missing"} else "missing"
+    phase_id = (
+        context.contract.preflight.group_phase_bindings.get("opal")
+        or context.scope_plan.target_phase_id
+        or context.current_phase
+    )
+    summary = str(handoff.get("summary") or "").strip() or "OPAL synthesis handoff is not configured."
+    return build_state_check(
+        check_id="opal.synthesis_handoff.accepted",
+        kind="synthesis_handoff",
+        required=True,
+        check_group="opal",
+        phase="opal",
+        phase_id=str(phase_id or "").strip() or None,
+        state=state,
+        summary=summary,
+        artifact_id=str(handoff.get("handoff_id") or "").strip() or None,
+        details=dict(handoff),
+    )
+
+
+def _mapping(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
 
 
 def _infer_freshness_phase_id(*, context: StressEthanolCiproGrowthPreflightResolvedContext) -> str | None:

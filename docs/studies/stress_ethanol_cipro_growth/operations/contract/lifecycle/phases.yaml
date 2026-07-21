@@ -78,9 +78,13 @@
   output_dataset: usr_prom_eth_cip_opal_candidates
   next_surface: repo:docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md
 - id: opal_round0_candidate_review
-  status: in_progress
+  status: complete
   next_surface: repo:src/dnadesign/opal/campaigns/secg_msrb_greedy/notebooks/opal_secg_msrb_greedy_analysis.py
-  notes: Round-0 candidate evidence is ready for review; this phase does not authorize synthesis.
+  notes: Round-0 candidate evidence was reviewed before the study authorized its exact physical handoff.
+- id: opal_assay_b1_order_ready
+  status: ready
+  next_surface: repo:src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/README.md
+  notes: The digest-bound SECG-019 through SECG-036 handoff is accepted for order. Vendor submission is separate and has not been performed.
 - id: infer_anchor_only_20b
   status: planned
   required_for_main_study_state: false

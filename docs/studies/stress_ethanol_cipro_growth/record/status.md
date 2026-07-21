@@ -1,6 +1,6 @@
 ## stress_ethanol_cipro_growth
 
-- Last verified: 2026-07-19
+- Last verified: 2026-07-21
 - Owner: Shockwing
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
@@ -8,10 +8,10 @@
 - LatentDNA binding: `../contexts/latentdna/binding.yaml`
 - USR root: `src/dnadesign/usr/datasets`
 - Snapshot posture: synchronized after local pull from BU SCC `cluster`
-- Preflight posture: available; supported Evo2 7B Infer sequence-view lanes and
-  the OPAL candidate feature table are complete. The next main-path decision is
-  review and authorization of the frozen MSRB round-0 experimental batch, not
-  GPU Infer submission or RegulonDB-native appendix visualization.
+- Preflight posture: available; the MSRB round-0 campaign, exact 18-candidate
+  selection, synthesis export, and readback checks are complete. Handoff
+  `stress-opal-assay-b1-r0-msrb-v1` is accepted for order. Vendor submission is
+  a separate action and has not been performed.
 
 ### Datasets
 
@@ -34,9 +34,9 @@
 
 ### Study Phase
 
-- Declared phase: `opal_candidate_table_pre_assay`; the current decision is
-  review of the completed MSRB round-0 selection. The study remains pre-assay
-  because that selection has not been authorized for synthesis.
+- Declared phase: `opal_assay_b1_order_ready`. The study accepted the exact
+  `SECG-019` through `SECG-036` handoff after manifest, workbook, GenBank, and
+  feature-table digest and readback checks passed.
 - LatentDNA has selected the pre-assay X. RegulonDB/native appendix visualization
   does not gate OPAL readiness.
 - DenseGen growth: `parallel_optional`
@@ -47,7 +47,7 @@
 - Supported infer families: `evo2_7b`, `evo2_20b`
 - Secondary/debug-required family: `evo2_20b`
 - LatentDNA browser default family: `evo2_7b`
-- Next surface: `docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md`
+- Next surface: `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/README.md`
 - Selected pre-assay `X`: `intermediate_embedding_7b_context_anchor_mean_bidir_concat`
 - Conservative DenseGen-plan baseline: `intermediate_embedding_7b_anchor_60bp`
 - Strength-standard interpretation lens: `intermediate_embedding_7b_full_context_anchor_mean`
@@ -88,7 +88,7 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
 - LatentDNA native TF-axis overlay: `verified`; the deliverable renders over the existing context-anchor bidirectional view after RegulonDB native core60 rows were appended through `usr_prom_eth_cip_anchor` and `construct_prom_eth_cip_context`, regulatory interactions were populated, and matching 7B feature sidecars were filled.
 - RegulonDB functional annotation sidecars: `verified`; `usr_regulondb_native_promoters/_relations/` now carries BioCyc KB 29.6 regulator GO terms, promoter-regulator-GO term rows, and regulator coverage rows. LatentDNA has a separate BioCyc GO biological-process appendix plot that reuses the native plan-margin tail tables for interpretation. These are source-backed annotation sidecars, not OPAL inputs or mechanistic labels.
 - Cluster: `planned`; use `../routes/README.md` for the exploratory-clustering handoff.
-- OPAL: `round0_selection_review`; three digest-pinned SFXI source runs remain
+- OPAL: `assay_b1_order_ready`; three digest-pinned SFXI source runs remain
   immutable diagnostic evidence. Their run IDs are
   `r0-2026-07-09T18:37:10+00:00` (ethanol),
   `r0-2026-07-09T18:37:49+00:00` (ciprofloxacin), and
@@ -108,8 +108,10 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   154785 candidates. The three views produced six allocations each; one
   cross-view overlap was replaced by AND's next unallocated rank, yielding 18
   sequence-unique candidates. Output replay found zero score or membership
-  mismatches. This is a prospectively frozen greedy learning probe.
-  `model_support_ready` remains false, and no selection authorizes synthesis.
+  mismatches. The study accepted its exact physical handoff as a prospectively
+  frozen greedy learning probe. `model_support_ready` remains false; the
+  lifecycle decision does not establish predictive support, enrichment, or
+  hill climbing.
 - Candidate TFBS metadata: `verified`; the 2026-07-12 rematerialization repaired
   79505 dropped `densegen__used_tfbs_detail` values by binding the authoritative
   DenseGen sidecar. The readiness contract now fails if any DenseGen-backed row
@@ -160,6 +162,12 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
 
 ### Next Actions
 
+- Review the accepted `stress-opal-assay-b1-r0-msrb-v1` order package. It binds
+  18 unique candidates, aliases `SECG-019` through `SECG-036`, six allocations
+  per selection view, and passing workbook and GenBank readbacks. Vendor
+  submission and the later transition to `ordered` remain separate recorded
+  actions.
+
 - Keep the SFXI round-0 selections in their declared y-space as metric-review
   evidence, not a synthesis-ready handoff. The candidate table is materialized as
   157160 generated promoter rows from `background_only`, `ethanol`,
@@ -167,13 +175,13 @@ browser-control semantics, UMAP caveats, and pooling guardrails.
   rows, with `latentdna__evo2_7b__context_anchor_mean_bidir_concat` as its
   fixed-length X. The SFXI labels remain separate from the promoted
   response-window Y. Do not synthesize response-window Y from an SFXI score.
-- Preserve and review the completed MSRB round 0 through the pinned Reader
+- Preserve the completed MSRB round 0 through the pinned Reader
   response-window label snapshot, RF model artifact, three six-row selection
   sets, allocation trace, and 18-row logical batch. Keep the frozen predictions
   and allocation evidence with the future measurements. Treat the result as a
-  learning probe while
-  `model_support_ready` remains false. Physical synthesis still requires a
-  separate study-owned handoff and lifecycle decision.
+  learning probe while `model_support_ready` remains false. Evaluate the new
+  measurements against the frozen predictions and acquisition baseline before
+  making any enrichment or hill-climbing claim.
 - Use the response metric metastudy `report.md`, generated `review.py`,
   `tables/pressure_tests.csv`, `tables/setpoint_support.csv`,
   `tables/reader_event_intervals.csv`,

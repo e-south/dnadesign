@@ -18,8 +18,9 @@ phase_order:
 - latentdna_reference_normalization_audit
 - opal_candidate_table_pre_assay
 - opal_round0_candidate_review
+- opal_assay_b1_order_ready
 - infer_anchor_only_20b
 - infer_anchor_plus_template_20b
 current_phase:
   strategy: explicit
-  id: opal_round0_candidate_review
+  id: opal_assay_b1_order_ready

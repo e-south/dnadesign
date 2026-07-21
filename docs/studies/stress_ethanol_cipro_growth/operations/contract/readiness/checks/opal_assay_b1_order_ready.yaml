@@ -1,5 +1,5 @@
 checks:
-  opal_round0_candidate_review:
+  opal_assay_b1_order_ready:
   - kind: path_exists
     check_id: opal.response_window_labels.promotion
     check_group: opal

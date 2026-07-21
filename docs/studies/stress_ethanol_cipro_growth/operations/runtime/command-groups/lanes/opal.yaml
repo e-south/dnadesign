@@ -3,9 +3,9 @@ schema_version: 1
 study_id: stress_ethanol_cipro_growth
 lane_id: opal
 owner: opal
-last_verified: 2026-07-15
+last_verified: 2026-07-21
 surface_role: decision
-current_state: round0_candidate_review
+current_state: assay_b1_order_ready
 route_detail: repo:docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md
 canonical_payload:
   path: repo:docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml
@@ -17,4 +17,5 @@ entry_artifacts:
 exit_artifacts:
   - opal_round0_run_context
   - opal_round0_selection_batch
-navigation_note: Open the campaign notebook and round-0 review commands for candidate review. This lane does not authorize synthesis.
+  - stress-opal-assay-b1-r0-msrb-v1
+navigation_note: The exact MSRB assay-batch-1 handoff is accepted for order. Use the handoff record and generated exports for order review; vendor submission remains separate.

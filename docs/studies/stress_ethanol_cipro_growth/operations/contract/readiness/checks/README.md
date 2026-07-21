@@ -9,7 +9,8 @@ batch-runbook fragments. Keep cross-phase scope, group bindings, and next-scope
 rules in the sibling `scope.yaml`, `group-bindings.yaml`, and `next-scope.yaml`
 files.
 
-`opal_candidate_table_pre_assay.yaml` is the current main-path readiness gate:
-it validates the OPAL candidate table row contract, including measured Reader
-round-0 rows that already have candidate IDs, sequence parity, and selected X,
-without coupling OPAL readiness to LatentDNA appendix visualizations.
+`opal_assay_b1_order_ready.yaml` is the current main-path readiness gate. It
+replays the MSRB campaign and selection evidence; the study-owned preflight adds
+the exact accepted synthesis-handoff record check. The earlier candidate-table
+gate remains available in full-scope preflight without coupling OPAL readiness
+to LatentDNA appendix visualizations.

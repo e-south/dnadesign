@@ -1899,7 +1899,7 @@ def test_opal_candidate_table_contract_tracks_round0_augmented_materialization()
     assert "measured Reader round-0 rows" in check["summary"]
 
 
-def test_opal_round0_ops_phase_routes_to_readonly_candidate_review() -> None:
+def test_opal_ops_phase_routes_to_accepted_assay_batch_handoff() -> None:
     operations = STUDY_DOCS / "operations"
     lifecycle = yaml.safe_load((operations / "contract" / "lifecycle" / "mode.yaml").read_text(encoding="utf-8"))
     phases = yaml.safe_load((operations / "contract" / "lifecycle" / "phases.yaml").read_text(encoding="utf-8"))
@@ -1907,7 +1907,7 @@ def test_opal_round0_ops_phase_routes_to_readonly_candidate_review() -> None:
         (operations / "contract" / "readiness" / "group-bindings.yaml").read_text(encoding="utf-8")
     )
     readiness = yaml.safe_load(
-        (operations / "contract" / "readiness" / "checks" / "opal_round0_candidate_review.yaml").read_text(
+        (operations / "contract" / "readiness" / "checks" / "opal_assay_b1_order_ready.yaml").read_text(
             encoding="utf-8"
         )
     )
@@ -1919,15 +1919,19 @@ def test_opal_round0_ops_phase_routes_to_readonly_candidate_review() -> None:
     artifacts = yaml.safe_load((operations / "contract" / "surfaces" / "artifacts.yaml").read_text(encoding="utf-8"))
 
     phase_by_id = {phase["id"]: phase for phase in phases}
-    assert lifecycle["current_phase"] == {"strategy": "explicit", "id": "opal_round0_candidate_review"}
+    assert lifecycle["current_phase"] == {"strategy": "explicit", "id": "opal_assay_b1_order_ready"}
     assert phase_by_id["opal_candidate_table_pre_assay"]["status"] == "complete"
     review_phase = phase_by_id["opal_round0_candidate_review"]
-    assert review_phase["status"] == "in_progress"
+    assert review_phase["status"] == "complete"
     assert review_phase["next_surface"].endswith("notebooks/opal_secg_msrb_greedy_analysis.py")
-    assert "does not authorize synthesis" in review_phase["notes"]
-    assert bindings["group_phase_bindings"]["opal"] == "opal_round0_candidate_review"
+    handoff_phase = phase_by_id["opal_assay_b1_order_ready"]
+    assert handoff_phase["status"] == "ready"
+    assert handoff_phase["next_surface"].endswith("decision/opal/synthesis_handoff/README.md")
+    assert "accepted for order" in handoff_phase["notes"]
+    assert "Vendor submission" in handoff_phase["notes"]
+    assert bindings["group_phase_bindings"]["opal"] == "opal_assay_b1_order_ready"
 
-    checks = readiness["checks"]["opal_round0_candidate_review"]
+    checks = readiness["checks"]["opal_assay_b1_order_ready"]
     assert {check["check_id"] for check in checks} == {
         "opal.response_window_labels.promotion",
         "opal.round0.run_context",
@@ -1993,7 +1997,7 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     assert opal_pipeline["review_materialization_output_root"].endswith("outputs/review")
 
 
-def test_study_pipeline_exposes_only_readonly_synthesis_handoff_previews() -> None:
+def test_study_pipeline_exposes_accepted_handoff_and_only_readonly_commands() -> None:
     operations = STUDY_DOCS / "operations"
     pipeline = yaml.safe_load((operations / "runtime" / "command-groups" / "pipeline.yaml").read_text(encoding="utf-8"))
     command_catalog = yaml.safe_load(
@@ -2003,7 +2007,11 @@ def test_study_pipeline_exposes_only_readonly_synthesis_handoff_previews() -> No
     )
     opal_pipeline = pipeline["study_pipeline"]["opal"]
 
-    assert opal_pipeline["synthesis_authorization"] == "not_granted"
+    assert opal_pipeline["synthesis_handoff"] == {
+        "handoff_id": "stress-opal-assay-b1-r0-msrb-v1",
+        "required_lifecycle_status": "accepted_for_order",
+    }
+    assert opal_pipeline["state"] == "assay_b1_order_ready"
     handoff_commands = {
         key: value
         for key, value in opal_pipeline.items()
@@ -2042,6 +2050,6 @@ def test_study_route_map_uses_progressive_disclosure_for_opal_and_latentdna() ->
     assert len(routes.splitlines()) <= 140
     assert "routes/decision/opal/README.md" in routes
     assert "routes/analysis/latentdna.md" in routes
-    assert "opal_round0_candidate_review" in opal_route
+    assert "opal_assay_b1_order_ready" in opal_route
     assert "response-window label snapshot" in opal_context
     assert "intermediate_embedding_7b_context_anchor_mean_bidir_concat" in latentdna_route

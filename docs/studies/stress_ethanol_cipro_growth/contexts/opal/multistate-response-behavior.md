@@ -39,7 +39,8 @@ is measured. The run therefore tests a declared greedy ranking policy rather
 than revising that policy after seeing the results. Existing evidence supports
 the calculation and its alignment with the stated binary ON/OFF preference,
 but not reliable predictive ordering, prospective enrichment, or hill-climb
-efficacy. Selection does not authorize synthesis.
+efficacy. Selection does not authorize synthesis; the study separately accepted
+the exact `SECG-019` through `SECG-036` physical handoff.
 
 ### Study binding
 
@@ -685,6 +686,7 @@ Source map:
 
 The digest-bound workbench bundle is evidence, not an executable campaign. Its
 verifier checks the artifact inventory, schemas, derivations, and provenance.
-The activation receipt binds the protocol to the reviewed bundle. The active
-protocol permits a prospective MSRB learning probe but does not authorize
-synthesis.
+The activation receipt binds the protocol to the reviewed bundle. It permits a
+prospective MSRB learning probe but does not authorize synthesis. That separate
+authority is recorded for the exact assay-batch-1 package in
+`docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml`.

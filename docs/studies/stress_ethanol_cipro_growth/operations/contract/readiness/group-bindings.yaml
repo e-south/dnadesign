@@ -4,4 +4,4 @@ group_phase_bindings:
   notify_environment: infer_batch_preparation
   latentdna: latentdna_reference_normalization_audit
   opal_candidate_table: opal_candidate_table_pre_assay
-  opal: opal_round0_candidate_review
+  opal: opal_assay_b1_order_ready

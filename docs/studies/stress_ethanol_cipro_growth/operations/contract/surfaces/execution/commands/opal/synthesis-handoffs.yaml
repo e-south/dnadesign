@@ -20,7 +20,7 @@ opal_synthesis_handoff_round_preview_json:
   - -m
   - dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff
   - --handoff-id
-  - <measured_round_handoff_id>
+  - stress-opal-assay-b1-r0-msrb-v1
   - --json
 opal_synthesis_handoff_round_draft_preview_json:
   surface_type: command

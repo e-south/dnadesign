@@ -1,8 +1,8 @@
 # Stress OPAL Synthesis Handoff
 
 **Owner:** stress_ethanol_cipro_growth study
-**Lifecycle:** measured-round contract ready; synthesis authorization pending
-**Last verified:** 2026-07-19
+**Lifecycle:** assay batch 1 accepted for order; vendor submission not performed
+**Last verified:** 2026-07-21
 
 Study-owned conversion from an OPAL logical selection batch to physical
 synthesis artifacts.
@@ -64,17 +64,17 @@ sequence is rejected.
 The authority is
 `docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml`.
 
-The first physical assay batch selected by the MSRB campaign will have assay
-index 1 and will be chosen by the model fitted at OPAL round 0. Those axes are
+The first physical assay batch selected by the MSRB campaign has assay index 1
+and was chosen by the model fitted at OPAL round 0. Those axes are
 related but not interchangeable: `assay_batch_index` counts physical assay
 batches, while `model_as_of_round` identifies the label snapshot and model
 that made the selection.
 
-If synthesis is authorized, its reviewed handoff record uses this mapping:
+The accepted handoff uses this mapping:
 
 ```yaml
 - handoff_id: stress-opal-assay-b1-r0-msrb-v1
-  lifecycle_status: authorized_for_materialization
+  lifecycle_status: accepted_for_order
   source_authority: opal_selection_batch
   selection_epoch: opal_model_round
   assay_batch_index: 1
@@ -143,9 +143,13 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
   --handoff-id <measured_round_handoff_id> --json
 ```
 
-The current lifecycle does not authorize synthesis. A reviewed record moves
-through `authorized_for_materialization`, `generated_pending_acceptance`, and
-then `accepted_for_order`. Materializing files does not place an order.
+The current handoff has moved through `authorized_for_materialization` and
+`generated_pending_acceptance` to `accepted_for_order`. Materializing and
+accepting files does not place a vendor order.
+
+The exact accepted bundle is retained in the repository. A clean checkout can
+therefore rerun the readback and digest checks without reopening write mode.
+Missing, partial, or modified accepted files fail live status and preflight.
 
 Write mode accepts only the canonical lifecycle record, active campaign config,
 study alias registry, and cloning strategy in the active source checkout. Each
@@ -168,5 +172,6 @@ one GenBank file per insert, and a DenseGen feature-table sidecar. DenseGen
 TFBS coordinates use `offset`; sigma-70 fixed elements use `offset_raw`.
 Neither is a fallback for the other.
 
-Generating files does not authorize synthesis. Acceptance remains an explicit
-study-record lifecycle change.
+Generating files alone does not authorize synthesis. The checked-in
+`accepted_for_order` lifecycle state records that decision for this exact
+handoff; vendor submission remains a later action.

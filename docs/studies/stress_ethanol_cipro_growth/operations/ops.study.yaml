@@ -48,4 +48,4 @@ parts:
   - contract/readiness/checks/infer_batch_preparation/batch-runbooks.yaml
   - contract/readiness/checks/latentdna_reference_normalization_audit.yaml
   - contract/readiness/checks/opal_candidate_table_pre_assay.yaml
-  - contract/readiness/checks/opal_round0_candidate_review.yaml
+  - contract/readiness/checks/opal_assay_b1_order_ready.yaml

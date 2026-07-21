@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-opal-synthesis-handoff
 surface: study-context
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-19
+last_verified: 2026-07-21
 type: contract
 plane: data-plane
 owner_boundary: stress_ethanol_cipro_growth
@@ -85,12 +85,12 @@ met; the synthesis record rechecks that boundary.
 ### Operator Path
 
 Inspect all three views and the logical union with `opal selection-set show
---view <id>` and `opal selection-batch show`. The current lifecycle does not
-authorize synthesis, so the operator surface is preview-only:
+--view <id>` and `opal selection-batch show`. The accepted assay-batch-1 record
+can be reverified without rewriting it:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
-  --handoff-id <measured_round_handoff_id> --json
+  --handoff-id stress-opal-assay-b1-r0-msrb-v1 --json
 ```
 
 Draft mode accepts one campaign and one run:
@@ -108,6 +108,12 @@ and readback, change the status to `generated_pending_acceptance`; that state is
 not writable. Raw `--source opal-round` remains preview-only, and accepted or
 later artifact sets are immutable. A completed OPAL round or valid preview is
 not authorization.
+
+An accepted artifact set is retained with the repository so a clean checkout
+can review the workbook, manifest, GenBank records, and feature table. Live
+status requires every accepted file to be present and to match its recorded
+digest and readback contract. Missing, partial, or modified accepted files are
+an integrity failure.
 
 The stable `SECG-NNN` registry records candidate identity and nomination
 provenance. The numbering is cumulative across rounds and does not encode a
@@ -139,10 +145,11 @@ fixture paths because they cannot write artifacts.
 
 ### Evidence Boundary
 
-The handoff proves identity, membership, cloning, and export integrity. It does
-not prove response-window prediction accuracy, prospective MSRB enrichment,
-exact rank stability, or order authorization. Those require OPAL model
-evidence, prospective Reader measurements, and an explicit lifecycle decision.
+The handoff proves identity, membership, cloning, and export integrity. Its
+`accepted_for_order` state records the physical decision for this exact batch.
+It does not prove response-window prediction accuracy, prospective MSRB
+enrichment, exact rank stability, hill climbing, or vendor submission. Those
+claims require prospective Reader measurements or a later lifecycle record.
 
 ### Validation
 
