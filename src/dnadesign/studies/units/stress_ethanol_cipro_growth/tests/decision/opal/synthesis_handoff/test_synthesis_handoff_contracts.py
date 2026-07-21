@@ -3135,8 +3135,78 @@ def test_cli_opal_round_missing_ledger_exits_without_traceback(
     assert "required OPAL parquet artifact is missing" in payload["error"]["message"]
 
 
-def test_current_msrb_round0_is_complete_sequence_unique_genbank_handoff(tmp_path: Path) -> None:
+def _repository_msrb_round0_handoff_artifacts(repo_root: Path) -> tuple[Path, ...]:
+    campaign_root = repo_root / "src/dnadesign/opal/campaigns/secg_msrb_greedy"
+    return (
+        repo_root / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet",
+        campaign_root / "outputs/ledger/predictions",
+        campaign_root / "outputs/ledger/runs.parquet",
+        campaign_root / "outputs/rounds/round_0/run_artifacts",
+    )
+
+
+def _require_repository_msrb_round0_handoff_artifacts(repo_root: Path) -> None:
+    required = _repository_msrb_round0_handoff_artifacts(repo_root)
+    missing = tuple(path for path in required if not path.exists())
+    if not missing:
+        return
+    if len(missing) == len(required):
+        pytest.skip(f"requires local MSRB round-0 OPAL artifacts; missing {missing[0].relative_to(repo_root)}")
+    missing_paths = [str(path.relative_to(repo_root)) for path in missing]
+    raise AssertionError(f"MSRB round-0 OPAL artifacts are partially materialized; missing={missing_paths}")
+
+
+def test_repository_msrb_round0_handoff_gate_skips_unmaterialized_inputs(tmp_path: Path) -> None:
+    with pytest.raises(pytest.skip.Exception, match="requires local MSRB round-0 OPAL artifacts"):
+        _require_repository_msrb_round0_handoff_artifacts(tmp_path)
+
+
+def test_repository_msrb_round0_handoff_gate_rejects_partial_materialization(tmp_path: Path) -> None:
+    candidate_records = tmp_path / "src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet"
+    candidate_records.parent.mkdir(parents=True)
+    candidate_records.touch()
+
+    with pytest.raises(AssertionError, match="partially materialized"):
+        _require_repository_msrb_round0_handoff_artifacts(tmp_path)
+
+
+def test_current_msrb_round0_receipt_is_complete_sequence_unique_alias_handoff() -> None:
     repo_root = Path(__file__).resolve().parents[9]
+    run_id = "r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584"
+    baseline_path = (
+        repo_root / "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/"
+        "multistate_response_behavior/evaluation_baseline.yaml"
+    )
+    alias_registry_path = repo_root / "docs/studies/stress_ethanol_cipro_growth/record/promoter_aliases.yaml"
+    baseline = yaml.safe_load(baseline_path.read_text(encoding="utf-8"))
+    alias_registry = yaml.safe_load(alias_registry_path.read_text(encoding="utf-8"))
+    allocations = baseline["allocations"]
+    aliases = [f"SECG-{ordinal:03d}" for ordinal in range(19, 37)]
+
+    assert baseline["campaign"]["run_id"] == run_id
+    assert [row["study_alias"] for row in allocations] == aliases
+    assert [row["selection_view"] for row in allocations] == ["ethanol"] * 6 + ["ciprofloxacin"] * 6 + ["and"] * 6
+    assert [row["allocation_slot"] for row in allocations] == [*range(1, 7)] * 3
+    assert len({row["candidate_id"] for row in allocations}) == 18
+    assert len({row["sequence_sha256"] for row in allocations}) == 18
+
+    assignments_by_alias = {row["alias"]: row for row in alias_registry["assignments"]}
+    assert len(assignments_by_alias) == 36
+    for allocation in allocations:
+        assignment = assignments_by_alias[allocation["study_alias"]]
+        assert assignment["candidate_id"] == allocation["candidate_id"]
+        assert assignment["sequence_sha256"] == allocation["sequence_sha256"]
+        assert assignment["first_assignment"] == {
+            "source_authority": "opal_selection_batch",
+            "source_id": run_id,
+            "nomination_batch_index": 1,
+            "model_as_of_round": 0,
+        }
+
+
+def test_local_current_msrb_round0_is_complete_sequence_unique_genbank_handoff(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[9]
+    _require_repository_msrb_round0_handoff_artifacts(repo_root)
     config_path = repo_root / "src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml"
     run_id = "r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584"
     selected, report = selected_candidates_from_opal_round(
