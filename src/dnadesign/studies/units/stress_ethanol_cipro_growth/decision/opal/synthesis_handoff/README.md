@@ -65,7 +65,7 @@ If synthesis is authorized, its reviewed handoff record uses this mapping:
 
 ```yaml
 - handoff_id: stress-opal-assay-b1-r0-msrb-v1
-  lifecycle_status: generated_pending_acceptance
+  lifecycle_status: authorized_for_materialization
   source_authority: opal_selection_batch
   selection_epoch: opal_model_round
   assay_batch_index: 1
@@ -77,6 +77,25 @@ If synthesis is authorized, its reviewed handoff record uses this mapping:
     - {selection_view_id: ethanol, expected_rows: 6}
     - {selection_view_id: ciprofloxacin, expected_rows: 6}
     - {selection_view_id: and, expected_rows: 6}
+  expected_study_aliases:
+    - SECG-019
+    - SECG-020
+    - SECG-021
+    - SECG-022
+    - SECG-023
+    - SECG-024
+    - SECG-025
+    - SECG-026
+    - SECG-027
+    - SECG-028
+    - SECG-029
+    - SECG-030
+    - SECG-031
+    - SECG-032
+    - SECG-033
+    - SECG-034
+    - SECG-035
+    - SECG-036
   expected_artifact:
     campaign_slug: secg_msrb_greedy
     expected_rows: 18
@@ -86,8 +105,9 @@ If synthesis is authorized, its reviewed handoff record uses this mapping:
     genbank_feature_table_path: <generated-feature-table-path>
 ```
 
-The record fails if campaign, run, unique batch count, or per-view membership
-counts drift.
+The record fails if campaign, run, stable alias membership, unique batch count,
+or per-view membership counts drift. The alias list binds the selected identity
+set; it does not claim that the sequences were ordered or assayed.
 
 ## Commands
 
@@ -107,7 +127,8 @@ Preview a draft from one explicit run:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
-  --source opal-round --round <as_of_round> --run-id <run_id> --json
+  --source opal-round --round <model_as_of_round> --run-id <run_id> \
+  --batch-id <physical_assay_batch_id> --json
 ```
 
 Preview a checked-in lifecycle record:
@@ -117,12 +138,14 @@ uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.op
   --handoff-id <measured_round_handoff_id> --json
 ```
 
-The current lifecycle does not authorize synthesis. Artifact materialization is
-an explicit later step after study approval; materializing files does not place
-an order or itself grant authorization.
+The current lifecycle does not authorize synthesis. A reviewed record moves
+through `authorized_for_materialization`, `generated_pending_acceptance`, and
+then `accepted_for_order`. Materializing files does not place an order.
 
 `--source selected-csv` is fixture/debug input and requires explicit JSON
-`selection_memberships`. It is not a production authority.
+`selection_memberships`. It is preview-only: the CLI rejects `--write` because
+only a checked-in OPAL handoff record at `authorized_for_materialization` may
+create synthesis artifacts.
 
 ## Physical Validation
 

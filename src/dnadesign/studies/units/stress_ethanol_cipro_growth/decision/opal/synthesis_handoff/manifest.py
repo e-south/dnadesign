@@ -21,7 +21,15 @@ import pandas as pd
 
 from dnadesign.opal import scan_restriction_sites
 
-from .contracts import CloningStrategy, SelectedCandidate, SelectionMembership, validate_promoter_core
+from .contracts import (
+    CloningStrategy,
+    SelectedCandidate,
+    SelectionMembership,
+    optional_nonnegative_integer,
+    require_nonnegative_integer,
+    require_positive_integer,
+    validate_promoter_core,
+)
 
 
 def _sha256_text(value: str) -> str:
@@ -37,16 +45,22 @@ def _candidate_from(value: SelectedCandidate | Mapping[str, Any]) -> SelectedCan
             selection_memberships=tuple(
                 SelectionMembership.from_mapping(row) for row in value["selection_memberships"]
             ),
-            as_of_round=int(value["as_of_round"]),
+            as_of_round=require_nonnegative_integer(value["as_of_round"], field="as_of_round"),
             run_id=str(value["run_id"]),
-            selection_rank=int(value["selection_rank"]),
+            selection_rank=require_positive_integer(value["selection_rank"], field="selection_rank"),
             id=str(value["id"]),
             sequence=str(value["sequence"]),
             synthesis_name=str(value["synthesis_name"]),
             selection_source=str(value.get("selection_source", "selected_csv")),
             selection_epoch=str(value.get("selection_epoch", "opal_model_round")),
-            assay_batch_index=_optional_int(value.get("assay_batch_index")),
-            model_as_of_round=_optional_int(value.get("model_as_of_round")),
+            assay_batch_index=optional_nonnegative_integer(
+                value.get("assay_batch_index"),
+                field="assay_batch_index",
+            ),
+            model_as_of_round=optional_nonnegative_integer(
+                value.get("model_as_of_round"),
+                field="model_as_of_round",
+            ),
         )
     if is_dataclass(value):
         return _candidate_from(asdict(value))
@@ -56,6 +70,7 @@ def _candidate_from(value: SelectedCandidate | Mapping[str, Any]) -> SelectedCan
 def _validate_uniqueness(candidates: list[SelectedCandidate]) -> None:
     seen_ids: set[str] = set()
     seen_aliases: set[str] = set()
+    seen_sequences: set[str] = set()
     for candidate in candidates:
         if candidate.id in seen_ids:
             raise ValueError(f"duplicate candidate id in synthesis batch: {candidate.id}")
@@ -63,16 +78,10 @@ def _validate_uniqueness(candidates: list[SelectedCandidate]) -> None:
         if candidate.synthesis_name in seen_aliases:
             raise ValueError(f"duplicate synthesis_name in synthesis batch: {candidate.synthesis_name}")
         seen_aliases.add(candidate.synthesis_name)
-
-
-def _optional_int(value: Any) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, str) and not value.strip():
-        return None
-    if pd.isna(value):
-        return None
-    return int(value)
+        sequence = candidate.sequence.upper()
+        if sequence in seen_sequences:
+            raise ValueError(f"duplicate promoter sequence in synthesis batch: {candidate.id}")
+        seen_sequences.add(sequence)
 
 
 def _restriction_site_summary(report: Any) -> str:

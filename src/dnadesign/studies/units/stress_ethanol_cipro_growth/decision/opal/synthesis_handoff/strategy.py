@@ -42,6 +42,6 @@ def load_cloning_strategy(path: str | Path) -> CloningStrategy:
         version=str(raw["version"]),
         left_flank=str(raw["left_flank"]),
         right_flank=str(raw["right_flank"]),
-        expected_core_length=int(raw["expected_core_length"]),
+        expected_core_length=raw["expected_core_length"],
         restriction_sites=_restriction_sites(raw.get("restriction_sites")),
     )

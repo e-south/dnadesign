@@ -55,16 +55,3 @@ def batch0_synthesis_name(campaign_slug: str, selection_rank: int) -> str:
         raise ValueError("selection_rank must be positive")
     view_id = sfxi_source_selection_view_id(campaign_slug)
     return f"{STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX}-B0-{stress_selection_view_code(view_id)}-{int(selection_rank):02d}"
-
-
-def opal_round_synthesis_name(selection_view_id: str, as_of_round: int, selection_rank: int) -> str:
-    """Return the deterministic measured-round synthesis alias for a view member."""
-
-    if int(as_of_round) < 0:
-        raise ValueError("as_of_round must be non-negative")
-    if int(selection_rank) <= 0:
-        raise ValueError("selection_rank must be positive")
-    return (
-        f"{STRESS_OPAL_SYNTHESIS_ALIAS_PREFIX}-R{int(as_of_round)}-"
-        f"{stress_selection_view_code(selection_view_id)}-{int(selection_rank):02d}"
-    )

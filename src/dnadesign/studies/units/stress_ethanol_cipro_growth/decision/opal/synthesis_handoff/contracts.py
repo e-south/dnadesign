@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from numbers import Integral
 from typing import Any, Mapping
 
 from dnadesign.opal import RestrictionSiteSpec
 
 _LOWER_DNA = re.compile(r"[acgt]+")
 _UPPER_DNA = re.compile(r"[ACGT]+")
+_INTEGER_TEXT = re.compile(r"[+-]?[0-9]+")
 
 
 def _require_non_empty_text(value: str, *, field: str) -> str:
@@ -26,6 +28,50 @@ def _require_non_empty_text(value: str, *, field: str) -> str:
     if not text:
         raise ValueError(f"{field} must be non-empty")
     return text
+
+
+def require_nonnegative_integer(value: object, *, field: str) -> int:
+    """Parse one exact integer without accepting booleans or lossy coercion."""
+
+    try:
+        parsed = _exact_integer(value)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be a non-negative integer") from exc
+    if parsed < 0:
+        raise ValueError(f"{field} must be a non-negative integer")
+    return parsed
+
+
+def require_positive_integer(value: object, *, field: str) -> int:
+    """Parse one exact positive integer without accepting lossy coercion."""
+
+    try:
+        parsed = _exact_integer(value)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be a positive integer") from exc
+    if parsed < 1:
+        raise ValueError(f"{field} must be a positive integer")
+    return parsed
+
+
+def optional_nonnegative_integer(value: object, *, field: str) -> int | None:
+    """Parse an optional exact non-negative integer; blank text means absent."""
+
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    return require_nonnegative_integer(value, field=field)
+
+
+def _exact_integer(value: object) -> int:
+    if isinstance(value, bool):
+        raise ValueError("boolean is not an integer value")
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if _INTEGER_TEXT.fullmatch(text) is not None:
+            return int(text)
+    raise ValueError("value is not an exact integer")
 
 
 @dataclass(frozen=True)
@@ -48,9 +94,11 @@ class CloningStrategy:
             raise ValueError("left_flank must be lowercase acgt")
         if not _LOWER_DNA.fullmatch(self.right_flank):
             raise ValueError("right_flank must be lowercase acgt")
-        if int(self.expected_core_length) <= 0:
-            raise ValueError("expected_core_length must be positive")
-        object.__setattr__(self, "expected_core_length", int(self.expected_core_length))
+        object.__setattr__(
+            self,
+            "expected_core_length",
+            require_positive_integer(self.expected_core_length, field="expected_core_length"),
+        )
         object.__setattr__(
             self,
             "restriction_sites",
@@ -84,9 +132,11 @@ class SelectionMembership:
             "selection_view_id",
             _require_non_empty_text(self.selection_view_id, field="selection_view_id"),
         )
-        if int(self.rank) <= 0:
-            raise ValueError("selection membership rank must be positive")
-        object.__setattr__(self, "rank", int(self.rank))
+        object.__setattr__(
+            self,
+            "rank",
+            require_positive_integer(self.rank, field="selection membership rank"),
+        )
         if self.score is not None:
             object.__setattr__(self, "score", float(self.score))
         if self.score_ref is not None:
@@ -96,7 +146,7 @@ class SelectionMembership:
     def from_mapping(cls, value: Mapping[str, Any]) -> SelectionMembership:
         return cls(
             selection_view_id=str(value["selection_view_id"]),
-            rank=int(value["rank"]),
+            rank=require_positive_integer(value["rank"], field="selection membership rank"),
             score=None if value.get("score") is None else float(value["score"]),
             score_ref=None if value.get("score_ref") is None else str(value["score_ref"]),
         )
@@ -145,22 +195,30 @@ class SelectedCandidate:
             _require_non_empty_text(self.selection_epoch, field="selection_epoch"),
         )
         object.__setattr__(self, "sequence", _require_non_empty_text(self.sequence, field="sequence"))
-        if int(self.as_of_round) < 0:
-            raise ValueError("as_of_round must be non-negative")
-        if int(self.selection_rank) <= 0:
-            raise ValueError("selection_rank must be positive")
-        object.__setattr__(self, "as_of_round", int(self.as_of_round))
-        object.__setattr__(self, "selection_rank", int(self.selection_rank))
+        object.__setattr__(
+            self,
+            "as_of_round",
+            require_nonnegative_integer(self.as_of_round, field="as_of_round"),
+        )
+        object.__setattr__(
+            self,
+            "selection_rank",
+            require_positive_integer(self.selection_rank, field="selection_rank"),
+        )
         if self.assay_batch_index is not None:
-            if int(self.assay_batch_index) < 0:
-                raise ValueError("assay_batch_index must be non-negative when provided")
-            object.__setattr__(self, "assay_batch_index", int(self.assay_batch_index))
+            object.__setattr__(
+                self,
+                "assay_batch_index",
+                require_nonnegative_integer(self.assay_batch_index, field="assay_batch_index"),
+            )
         if self.model_as_of_round is None and self.selection_epoch == "opal_model_round":
-            object.__setattr__(self, "model_as_of_round", int(self.as_of_round))
+            object.__setattr__(self, "model_as_of_round", self.as_of_round)
         elif self.model_as_of_round is not None:
-            if int(self.model_as_of_round) < 0:
-                raise ValueError("model_as_of_round must be non-negative when provided")
-            object.__setattr__(self, "model_as_of_round", int(self.model_as_of_round))
+            object.__setattr__(
+                self,
+                "model_as_of_round",
+                require_nonnegative_integer(self.model_as_of_round, field="model_as_of_round"),
+            )
 
     @property
     def selection_view_ids(self) -> tuple[str, ...]:

@@ -179,6 +179,61 @@ def test_public_baserender_contract_rejects_invalid_densegen_projection(mutation
         )
 
 
+@pytest.mark.parametrize("design_family", ["ethanol", "ciprofloxacin", "ethanol_ciprofloxacin", "future_family"])
+def test_regulator_bearing_densegen_family_requires_at_least_one_regulator(design_family: str) -> None:
+    candidate = densegen_candidate()
+    candidate["opal_candidate__design_family"] = design_family
+    candidate["densegen__required_regulators"] = []
+
+    with pytest.raises(PromoterCandidateBindingsError, match="requires at least one DenseGen regulator"):
+        preview_promoter_candidate_bindings(
+            alias_rows=aliases(),
+            candidate_records=pd.DataFrame([candidate]),
+            genbank_annotations=pd.DataFrame(),
+            candidate_table_id="candidate-table",
+            candidate_selection_sha256="b" * 64,
+            source_artifacts=(BindingSourceArtifact("source", "inputs/source.parquet", "a" * 64),),
+        )
+
+
+@pytest.mark.parametrize("design_family", ["background_only", "control"])
+def test_non_regulator_densegen_family_allows_an_empty_regulator_list(design_family: str) -> None:
+    candidate = densegen_candidate()
+    candidate["opal_candidate__design_family"] = design_family
+    candidate["densegen__required_regulators"] = []
+    candidate["densegen__used_tfbs_detail"] = [
+        annotation
+        for annotation in candidate["densegen__used_tfbs_detail"]
+        if annotation["part_kind"] == "fixed_element"
+    ]
+
+    resolved = preview_promoter_candidate_bindings(
+        alias_rows=aliases(),
+        candidate_records=pd.DataFrame([candidate]),
+        genbank_annotations=pd.DataFrame(),
+        candidate_table_id="candidate-table",
+        candidate_selection_sha256="b" * 64,
+        source_artifacts=(BindingSourceArtifact("source", "inputs/source.parquet", "a" * 64),),
+    )
+
+    assert resolved.bindings["densegen__required_regulators"].tolist() == [[], []]
+
+
+def test_densegen_required_regulators_must_be_unique() -> None:
+    candidate = densegen_candidate()
+    candidate["densegen__required_regulators"] = ["baeR", "baeR"]
+
+    with pytest.raises(PromoterCandidateBindingsError, match="duplicate DenseGen regulators"):
+        preview_promoter_candidate_bindings(
+            alias_rows=aliases(),
+            candidate_records=pd.DataFrame([candidate]),
+            genbank_annotations=pd.DataFrame(),
+            candidate_table_id="candidate-table",
+            candidate_selection_sha256="b" * 64,
+            source_artifacts=(BindingSourceArtifact("source", "inputs/source.parquet", "a" * 64),),
+        )
+
+
 def test_construct_candidate_uses_genbank_adapter() -> None:
     candidate = {
         **densegen_candidate(),

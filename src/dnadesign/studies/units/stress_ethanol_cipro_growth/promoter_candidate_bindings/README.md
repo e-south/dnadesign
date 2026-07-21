@@ -38,6 +38,38 @@ assay deliverable. Synthesis and source records use their own namespaces. The
 same binding artifact can therefore route study evidence that does not involve
 Reader or OPAL.
 
+## Stable SECG aliases
+
+`docs/studies/stress_ethanol_cipro_growth/record/promoter_aliases.yaml` is the
+append-only registry for concise study aliases. Each `SECG-NNN` value is bound
+once to one candidate ID and one sequence digest. Selection view, rank,
+objective, model round, and assay batch remain provenance and never enter the
+alias. A candidate selected again in a later round reuses its existing alias;
+a new candidate receives the next ordinal.
+
+`first_assignment.nomination_batch_index` records when the alias first entered
+a study candidate set. It is not a physical batch receipt. Ordered, received,
+and assayed membership is recorded separately by the synthesis and measurement
+lifecycle, at exact-alias granularity when those decisions are made.
+
+The registry projects one identity into the public namespaces used at each
+handoff:
+
+- `study.promoter_alias`: `SECG-019`
+- `synthesis.name`: `SECG-019`
+- `reader.design_id`: `pDual-10-SECG-019`
+
+Earlier `SECG-B0-*` names remain exact source aliases for their existing Reader
+and synthesis records. They are not reassigned or discarded. The current
+registry contains `SECG-001` through `SECG-036`; the next unassigned alias is
+`SECG-037`.
+
+The checked-in `latest` binding bundle remains the digest-pinned identity input
+used by the current labels and model run. A later coordinated materialization
+will add registry projections before new Reader measurements are published;
+that publication must update downstream digest pins atomically rather than
+silently rewriting frozen evidence.
+
 Python consumers use the public `load_promoter_candidate_bindings` function.
 It verifies the complete bundle before returning rows; consumers do not read
 the Parquet record through package-private helpers.

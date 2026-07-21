@@ -60,6 +60,7 @@ Before generation, add one row to
 - one `campaign_slug` and immutable `run_id`;
 - `model_as_of_round` and physical `assay_batch_index`;
 - one expected membership count per selection view;
+- the exact stable `SECG-NNN` aliases in the deduplicated batch;
 - one artifact set for the deduplicated batch.
 
 The intended greedy round declares six memberships per view and 18 unique
@@ -93,12 +94,32 @@ Draft mode accepts one campaign and one run:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
-  --source opal-round --round <as_of_round> --run-id <run_id> --json
+  --source opal-round --round <model_as_of_round> --run-id <run_id> \
+  --batch-id <physical_assay_batch_id> --json
 ```
 
-After a lifecycle decision explicitly grants synthesis authorization, the
-approved command can be rerun with `--write`. A completed OPAL round or valid
-preview is not that authorization.
+After a lifecycle decision explicitly grants artifact generation, add the
+measured-round row with `lifecycle_status: authorized_for_materialization`.
+Only that exact `--handoff-id` may be run once with `--write`. After generation
+and readback, change the status to `generated_pending_acceptance`; that state is
+not writable. Raw `--source opal-round` remains preview-only, and accepted or
+later artifact sets are immutable. A completed OPAL round or valid preview is
+not authorization.
+
+The stable `SECG-NNN` registry records candidate identity and nomination
+provenance. Alias assignment does not prove physical ordering or measurement.
+Before a future handoff is accepted for order, its exact aliases must be bound
+to that lifecycle event and checked against aliases already committed by an
+accepted, ordered, received, or assayed event. A pending preview does not make
+an alias unavailable for a later handoff.
+
+The frozen pre-assay SFXI exports retain their original digests and pass the
+current workbook and GenBank readback checks. They are historical source
+evidence, not current order files. Future reuse begins from the stable alias and
+candidate identity, then generates a new lifecycle-bound handoff.
+The legacy batch-level record cannot enter a committed state until actual
+physical inclusion is adjudicated per alias; absence from Reader is not proof
+that a sequence was never ordered.
 
 ### Evidence Boundary
 

@@ -21,15 +21,25 @@ from typing import Any
 import pandas as pd
 import yaml
 
-from .azenta import render_azenta_workbook, validate_azenta_workbook
+from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings import (
+    PROMOTER_ALIAS_REGISTRY_PATH,
+)
+
 from .batch0_source import (
     DEFAULT_BATCH0_BATCH_ID,
     DEFAULT_BATCH0_SELECTION_CONFIG,
     build_batch0_selected_candidates,
 )
 from .campaigns import DEFAULT_STRESS_OPAL_CAMPAIGN_CONFIG
-from .contracts import SelectedCandidate, SelectionMembership
+from .contracts import (
+    SelectedCandidate,
+    SelectionMembership,
+    optional_nonnegative_integer,
+    require_nonnegative_integer,
+    require_positive_integer,
+)
 from .exports import (
+    campaign_synthesis_artifact_paths,
     campaign_synthesis_output_dir,
     render_campaign_scoped_exports,
     source_evidence_synthesis_output_dir,
@@ -75,29 +85,25 @@ def _selected_from_csv(path: Path) -> list[SelectedCandidate]:
             SelectedCandidate(
                 campaign_slug=str(row["campaign_slug"]),
                 selection_memberships=tuple(SelectionMembership.from_mapping(item) for item in memberships_raw),
-                as_of_round=int(row["as_of_round"]),
+                as_of_round=require_nonnegative_integer(row["as_of_round"], field="as_of_round"),
                 run_id=str(row["run_id"]),
-                selection_rank=int(row["selection_rank"]),
+                selection_rank=require_positive_integer(row["selection_rank"], field="selection_rank"),
                 id=str(row["id"]),
                 sequence=str(row["sequence"]),
                 synthesis_name=str(row["synthesis_name"]),
                 selection_source=str(row.get("selection_source", "selected_csv")),
                 selection_epoch=str(row.get("selection_epoch", "external_selected_csv") or "external_selected_csv"),
-                assay_batch_index=_optional_int(row.get("assay_batch_index")),
-                model_as_of_round=_optional_int(row.get("model_as_of_round")),
+                assay_batch_index=optional_nonnegative_integer(
+                    row.get("assay_batch_index"),
+                    field="assay_batch_index",
+                ),
+                model_as_of_round=optional_nonnegative_integer(
+                    row.get("model_as_of_round"),
+                    field="model_as_of_round",
+                ),
             )
         )
     return selected
-
-
-def _optional_int(value: Any) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, str) and not value.strip():
-        return None
-    if pd.isna(value):
-        return None
-    return int(value)
 
 
 def _repo_root_from(path: Path) -> Path:
@@ -136,6 +142,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--campaign-config",
         type=Path,
         help=("Unified OPAL campaign config used when --source opal-round. Defaults to the active stress campaign."),
+    )
+    parser.add_argument(
+        "--promoter-alias-registry",
+        type=Path,
+        default=PROMOTER_ALIAS_REGISTRY_PATH,
+        help="Study-owned append-only promoter alias registry used by OPAL-round handoffs.",
     )
     parser.add_argument(
         "--round",
@@ -279,7 +291,12 @@ def _batch_id_from_source(
     if source == "opal-round":
         if as_of_round is None:
             raise ValueError("--round is required when --source opal-round")
-        return args_batch_id or f"stress-opal-r{int(as_of_round)}-msrb-v1"
+        if args_batch_id is None:
+            raise ValueError(
+                "A raw OPAL-round preview requires an explicit --batch-id; model round and physical assay batch "
+                "are separate identities."
+            )
+        return args_batch_id
     return args_batch_id or "stress-opal-synthesis-batch"
 
 
@@ -296,6 +313,59 @@ def _validate_record_manifest(
         handoff_record,
         strategy_id=strategy_id,
     )
+
+
+def _validate_record_write_paths(
+    *,
+    handoff_record: SynthesisHandoffRecord,
+    repo_root: Path,
+    batch_id: str,
+    output_dir: Path | None,
+) -> None:
+    if output_dir is not None:
+        raise ValueError(
+            "A lifecycle-bound OPAL handoff writes only to its recorded artifact paths; omit --output-dir."
+        )
+    assert handoff_record.campaign_slug is not None
+    assert handoff_record.expected_artifact is not None
+    export_dir = campaign_synthesis_output_dir(
+        repo_root,
+        campaign_slug=handoff_record.campaign_slug,
+        batch_id=batch_id,
+    )
+    generated = campaign_synthesis_artifact_paths(
+        export_dir,
+        batch_id=batch_id,
+        campaign_slug=handoff_record.campaign_slug,
+    )
+    expected = handoff_record.expected_artifact
+    declared = {
+        "manifest_path": expected.manifest_path,
+        "vendor_workbook_path": expected.vendor_workbook_path,
+        "genbank_dir_path": expected.genbank_dir_path,
+        "genbank_feature_table_path": expected.genbank_feature_table_path,
+    }
+    generated_by_field = {
+        "manifest_path": generated["manifest"],
+        "vendor_workbook_path": generated["azenta_workbook"],
+        "genbank_dir_path": generated["genbank_dir"],
+        "genbank_feature_table_path": generated["genbank_feature_table"],
+    }
+    mismatches: list[str] = []
+    for field, declared_value in declared.items():
+        declared_path = Path(declared_value)
+        if not declared_path.is_absolute():
+            declared_path = repo_root / declared_path
+        generated_path = generated_by_field[field]
+        if declared_path.resolve() != generated_path.resolve():
+            mismatches.append(f"{field} declared={declared_path} generated={generated_path}")
+    if mismatches:
+        raise ValueError(
+            "handoff record artifact paths do not match the campaign output contract: " + "; ".join(mismatches)
+        )
+    existing = [str(path) for path in generated_by_field.values() if path.exists()]
+    if existing:
+        raise ValueError("authorized handoff artifact paths must not already exist: " + ", ".join(existing))
 
 
 def _run_id_for_opal_round_source(
@@ -373,6 +443,36 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
+    if args.write and source == "batch0":
+        _parser_error(
+            parser,
+            args,
+            "Batch-zero synthesis artifacts are frozen source evidence and cannot be rewritten.",
+        )
+
+    if args.write and source == "selected-csv":
+        _parser_error(
+            parser,
+            args,
+            "selected-csv is preview-only and cannot write synthesis artifacts; materialization requires "
+            "an authorized checked-in OPAL handoff record.",
+        )
+
+    if args.write and source == "opal-round":
+        if handoff_record is None:
+            _parser_error(
+                parser,
+                args,
+                "Writing an OPAL-round handoff requires --handoff-id from the checked-in study lifecycle record.",
+            )
+        if handoff_record.lifecycle_status != "authorized_for_materialization":
+            _parser_error(
+                parser,
+                args,
+                "An OPAL-round handoff may be materialized only from lifecycle_status "
+                "authorized_for_materialization. Generated, accepted, or later artifacts are immutable.",
+            )
+
     try:
         batch_id = _batch_id_from_source(
             source=source,
@@ -382,6 +482,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     except ValueError as exc:
         _parser_error(parser, args, str(exc))
+
+    if args.write and source == "opal-round":
+        assert handoff_record is not None
+        try:
+            _validate_record_write_paths(
+                handoff_record=handoff_record,
+                repo_root=fallback_repo_root,
+                batch_id=batch_id,
+                output_dir=args.output_dir,
+            )
+        except ValueError as exc:
+            _parser_error(parser, args, str(exc))
 
     if _is_handoff_record_only_preview(args=args, handoff_record=handoff_record):
         root = args.repo_root or fallback_repo_root
@@ -430,7 +542,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 as_of_round=int(as_of_round),
                 run_id=run_id,
                 repo_root=repo_root,
+                alias_registry_path=args.promoter_alias_registry,
             )
+            candidate_records_path = Path(str(source_report["candidate_records_path"]))
         except ValueError as exc:
             _parser_error(parser, args, str(exc))
     else:
@@ -468,30 +582,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload["source_report"] = source_report
 
     if args.write:
-        if source in {"batch0", "opal-round"}:
-            output_owner = "source_evidence" if source == "batch0" else "campaign"
-            campaign_exports = render_campaign_scoped_exports(
-                manifest,
-                batch_id=batch_id,
-                output_owner=output_owner,
-                repo_root=repo_root,
-                output_root=args.output_dir,
-                candidate_records_path=candidate_records_path,
-            )
-            payload["mode"] = "written"
-            payload["campaign_exports"] = campaign_exports.to_dict("records")
-        elif args.output_dir is None:
-            _parser_error(parser, args, "--output-dir is required when --write is set")
-        else:
-            args.output_dir.mkdir(parents=True, exist_ok=True)
-            manifest_path = args.output_dir / "synthesis_manifest.csv"
-            workbook_path = args.output_dir / "azenta_gene_synthesis.xlsx"
-            manifest.to_csv(manifest_path, index=False)
-            render_azenta_workbook(manifest, workbook_path)
-            payload["mode"] = "written"
-            payload["manifest_path"] = str(manifest_path)
-            payload["azenta_workbook_path"] = str(workbook_path)
-            payload["azenta_validation"] = validate_azenta_workbook(manifest, workbook_path)
+        assert source == "opal-round"
+        campaign_exports = render_campaign_scoped_exports(
+            manifest,
+            batch_id=batch_id,
+            output_owner="campaign",
+            repo_root=repo_root,
+            output_root=args.output_dir,
+            candidate_records_path=candidate_records_path,
+        )
+        payload["mode"] = "written"
+        payload["campaign_exports"] = campaign_exports.to_dict("records")
     elif source in {"batch0", "opal-round"}:
         root = repo_root or args.repo_root or _repo_root_from(Path.cwd())
         output_dir_for = source_evidence_synthesis_output_dir if source == "batch0" else campaign_synthesis_output_dir

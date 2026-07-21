@@ -29,6 +29,7 @@ from .contracts import (
 from .values import required_sha256, required_text
 
 _IUPAC_DNA = re.compile(r"[ACGTRYSWKMBDHVN]+")
+_REGULATOR_OPTIONAL_DESIGN_FAMILIES = frozenset({"background_only", "control"})
 
 BINDING_COLUMNS: tuple[str, ...] = (
     "alias_namespace",
@@ -129,8 +130,13 @@ def _validate_densegen(row: pd.Series, *, sequence: str, identity: str) -> None:
         required_text(value, field="required regulator")
         for value in _sequence(row["densegen__required_regulators"], field="required regulators")
     ]
-    if not regulators or len(regulators) != len(set(regulators)):
-        raise PromoterCandidateBindingsError(f"Binding {identity!r} requires unique DenseGen regulators.")
+    design_family = str(row["design_family"]).strip()
+    if not regulators and design_family not in _REGULATOR_OPTIONAL_DESIGN_FAMILIES:
+        raise PromoterCandidateBindingsError(
+            f"Binding {identity!r} design family {design_family!r} requires at least one DenseGen regulator."
+        )
+    if len(regulators) != len(set(regulators)):
+        raise PromoterCandidateBindingsError(f"Binding {identity!r} contains duplicate DenseGen regulators.")
     annotations = _sequence(row["densegen__used_tfbs_detail"], field="DenseGen annotations")
     if not annotations:
         raise PromoterCandidateBindingsError(f"Binding {identity!r} requires DenseGen annotations.")

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -18,8 +19,11 @@ from typing import Any
 import pandas as pd
 
 from dnadesign.opal import load_config, load_selection_batch, load_selection_set
+from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings import (
+    PROMOTER_ALIAS_REGISTRY_PATH,
+    load_study_promoter_alias_registry,
+)
 
-from .campaigns import opal_round_synthesis_name
 from .contracts import SelectedCandidate, SelectionMembership
 
 OPAL_ROUND_SELECTION_SOURCE = "opal_selection_batch"
@@ -70,6 +74,25 @@ def _records_sequence_map(config_path: Path) -> dict[str, str]:
 
 def _membership_from(value: Mapping[str, Any]) -> SelectionMembership:
     return SelectionMembership.from_mapping(value)
+
+
+def _require_verified_selection_sets(selection_sets: Mapping[str, dict[str, Any]]) -> None:
+    for view_id, payload in selection_sets.items():
+        verification = payload.get("verification")
+        if not isinstance(verification, Mapping):
+            raise ValueError(f"selection replay verification missing for selection_view={view_id}")
+        mismatch_count = verification.get("mismatch_count")
+        if (
+            verification.get("status") != "pass"
+            or isinstance(mismatch_count, bool)
+            or not isinstance(mismatch_count, int)
+            or mismatch_count != 0
+        ):
+            raise ValueError(
+                "selection replay verification failed for "
+                f"selection_view={view_id}: status={verification.get('status')!r}, "
+                f"mismatch_count={mismatch_count!r}"
+            )
 
 
 def _validate_batch_memberships(
@@ -128,6 +151,7 @@ def selected_candidates_from_opal_round(
     as_of_round: int,
     run_id: str | None = None,
     repo_root: str | Path | None = None,
+    alias_registry_path: str | Path = PROMOTER_ALIAS_REGISTRY_PATH,
 ) -> tuple[list[SelectedCandidate], dict[str, Any]]:
     """Load one campaign run's verified logical selection batch."""
 
@@ -156,6 +180,7 @@ def selected_candidates_from_opal_round(
     except RuntimeError as exc:
         raise _study_value_error_from_opal(exc) from exc
 
+    _require_verified_selection_sets(selection_sets)
     batch_rows = list(batch["rows"])
     _validate_batch_memberships(batch_rows, selection_sets=selection_sets)
     records_by_id = _records_sequence_map(config_path)
@@ -168,6 +193,9 @@ def selected_candidates_from_opal_round(
                 f"OPAL selected sequence mismatch against records table for selection_view={view_id}: {mismatches[:10]}"
             )
     view_order = {view_id: index for index, view_id in enumerate(view_ids)}
+    if root is None:
+        root = _repo_root_from_config(config_path)
+    alias_registry = load_study_promoter_alias_registry(root, registry_path=alias_registry_path)
 
     def order_key(row: dict[str, Any]) -> tuple[int, int, str]:
         memberships = [_membership_from(item) for item in row["selection_memberships"]]
@@ -181,7 +209,6 @@ def selected_candidates_from_opal_round(
         if sequence is None:
             raise ValueError(f"OPAL selection batch id missing from records table: {candidate_id}")
         memberships = tuple(_membership_from(item) for item in row["selection_memberships"])
-        primary = min(memberships, key=lambda item: (view_order[item.selection_view_id], item.rank))
         candidates.append(
             SelectedCandidate(
                 campaign_slug=cfg.campaign.slug,
@@ -191,11 +218,7 @@ def selected_candidates_from_opal_round(
                 selection_rank=batch_rank,
                 id=candidate_id,
                 sequence=sequence,
-                synthesis_name=opal_round_synthesis_name(
-                    primary.selection_view_id,
-                    int(batch["as_of_round"]),
-                    primary.rank,
-                ),
+                synthesis_name=alias_registry.alias_for(candidate_id=candidate_id, sequence=sequence),
                 selection_source=OPAL_ROUND_SELECTION_SOURCE,
                 selection_epoch="opal_model_round",
                 assay_batch_index=None,
@@ -206,6 +229,10 @@ def selected_candidates_from_opal_round(
     selection_view_counts = {
         view_id: int(sum(view_id in row.selection_view_ids for row in candidates)) for view_id in view_ids
     }
+    study_aliases = [row.synthesis_name for row in candidates]
+    replay_mismatch_count = sum(
+        int(payload.get("verification", {}).get("mismatch_count", 0)) for payload in selection_sets.values()
+    )
     return candidates, {
         "source": OPAL_ROUND_SELECTION_SOURCE,
         "campaign_slug": cfg.campaign.slug,
@@ -214,9 +241,21 @@ def selected_candidates_from_opal_round(
         "as_of_round": int(batch["as_of_round"]),
         "run_id": str(batch["run_id"]),
         "row_count": int(len(candidates)),
+        "unique_candidate_count": len({row.id for row in candidates}),
+        "unique_sequence_count": len({row.sequence for row in candidates}),
+        "unique_study_alias_count": len(set(study_aliases)),
+        "study_aliases": study_aliases,
         "selection_view_counts": selection_view_counts,
+        "replay_mismatch_count": replay_mismatch_count,
         "selection_batch_schema_version": str(batch["schema_version"]),
         "selection_batch_path": str(batch["selection_batch_path"]),
+        "candidate_records_path": str(_records_path(config_path)),
+        "promoter_alias_registry": {
+            "path": str(root / alias_registry.path),
+            "sha256": hashlib.sha256((root / alias_registry.path).read_bytes()).hexdigest(),
+            "assignment_count": len(alias_registry.assignments),
+            "next_alias": alias_registry.alias_format.render(alias_registry.next_ordinal),
+        },
         "selection_sets": {
             view_id: {
                 "selected_count": int(payload["selected_count"]),
@@ -226,3 +265,10 @@ def selected_candidates_from_opal_round(
             for view_id, payload in selection_sets.items()
         },
     }
+
+
+def _repo_root_from_config(config_path: Path) -> Path:
+    for parent in (config_path.resolve(), *config_path.resolve().parents):
+        if (parent / "pyproject.toml").is_file():
+            return parent
+    raise ValueError("repo_root is required when the campaign config is outside a dnadesign checkout")

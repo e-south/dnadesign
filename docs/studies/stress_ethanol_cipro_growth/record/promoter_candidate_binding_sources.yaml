@@ -5,6 +5,17 @@ candidate_table:
   dataset_id: usr_prom_eth_cip_opal_candidates
   records_path: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/records.parquet
 alias_sources:
+  - source_id: study_promoter_aliases
+    adapter: study_promoter_alias_registry.v1
+    config:
+      registry_path: docs/studies/stress_ethanol_cipro_growth/record/promoter_aliases.yaml
+      aliases:
+        - namespace: study.promoter_alias
+          template: "{study_alias}"
+        - namespace: synthesis.name
+          template: "{study_alias}"
+        - namespace: reader.design_id
+          template: "pDual-10-{study_alias}"
   - source_id: reader_promoter_source_labels
     adapter: sequence_view_source_label.v1
     config:

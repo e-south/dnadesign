@@ -11,6 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
@@ -21,32 +24,30 @@ from .azenta import render_azenta_workbook, validate_azenta_workbook
 from .genbank import build_genbank_feature_table, render_genbank_record_set, validate_genbank_record_set
 
 CAMPAIGN_ROOT = Path("src/dnadesign/opal/campaigns")
+_SAFE_PATH_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
-_STALE_GENERIC_ARTIFACT_NAMES = (
-    "synthesis_manifest.csv",
-    "azenta_gene_synthesis.xlsx",
-)
+
+def _safe_path_component(value: object, *, label: str) -> str:
+    text = str(value).strip()
+    if _SAFE_PATH_COMPONENT.fullmatch(text) is None:
+        raise ValueError(f"{label} must be a non-empty safe path component: {text!r}")
+    return text
 
 
 def campaign_synthesis_output_dir(repo_root: str | Path, *, campaign_slug: str, batch_id: str) -> Path:
     """Return the default campaign-local synthesis handoff directory."""
 
-    slug = str(campaign_slug).strip()
-    batch = str(batch_id).strip()
-    if not slug:
-        raise ValueError("campaign_slug must be non-empty")
-    if not batch:
-        raise ValueError("batch_id must be non-empty")
+    slug = _safe_path_component(campaign_slug, label="campaign_slug")
+    batch = _safe_path_component(batch_id, label="batch_id")
     return Path(repo_root) / CAMPAIGN_ROOT / slug / "outputs" / "synthesis_handoff" / batch
 
 
 def source_evidence_synthesis_output_dir(repo_root: str | Path, *, campaign_slug: str, batch_id: str) -> Path:
     """Return the synthesis handoff directory owned by one SFXI source artifact."""
 
-    batch = str(batch_id).strip()
-    if not batch:
-        raise ValueError("batch_id must be non-empty")
-    source_dir = sfxi_round0_source_evidence_dir(repo_root, source_slug=campaign_slug)
+    campaign = _safe_path_component(campaign_slug, label="campaign_slug")
+    batch = _safe_path_component(batch_id, label="batch_id")
+    source_dir = sfxi_round0_source_evidence_dir(repo_root, source_slug=campaign)
     return source_dir / "outputs" / "synthesis_handoff" / batch
 
 
@@ -58,12 +59,8 @@ def campaign_synthesis_artifact_paths(
 ) -> dict[str, Path]:
     """Return detached-safe artifact paths for one campaign handoff export."""
 
-    batch = str(batch_id).strip()
-    campaign = str(campaign_slug).strip()
-    if not batch:
-        raise ValueError("batch_id must be non-empty")
-    if not campaign:
-        raise ValueError("campaign_slug must be non-empty")
+    batch = _safe_path_component(batch_id, label="batch_id")
+    campaign = _safe_path_component(campaign_slug, label="campaign_slug")
     prefix = f"{batch}__{campaign}"
     root = Path(export_dir)
     return {
@@ -91,6 +88,8 @@ def _export_dir_for(
     batch_id: str,
     output_owner: Literal["campaign", "source_evidence"],
 ) -> Path:
+    campaign_slug = _safe_path_component(campaign_slug, label="campaign_slug")
+    batch_id = _safe_path_component(batch_id, label="batch_id")
     if output_root is not None:
         return Path(output_root) / campaign_slug
     if repo_root is None:
@@ -119,62 +118,91 @@ def render_campaign_scoped_exports(
     output_root: str | Path | None = None,
     candidate_records_path: str | Path | None = None,
 ) -> pd.DataFrame:
-    """Write campaign-scoped synthesis handoff artifacts."""
+    """Validate then atomically publish campaign-scoped handoff artifacts."""
 
     _require_campaign_manifest_columns(manifest)
     feature_table = build_genbank_feature_table(manifest, candidate_records_path=candidate_records_path)
-    rows: list[dict[str, Any]] = []
-    for campaign_slug, campaign_manifest in manifest.groupby("campaign_slug", sort=False):
-        campaign = str(campaign_slug)
-        export_dir = _export_dir_for(
+    campaign_groups = [(str(slug), rows.copy()) for slug, rows in manifest.groupby("campaign_slug", sort=False)]
+    final_dirs = {
+        campaign: _export_dir_for(
             repo_root=repo_root,
             output_root=output_root,
             campaign_slug=campaign,
             batch_id=batch_id,
             output_owner=output_owner,
         )
-        export_dir.mkdir(parents=True, exist_ok=True)
-        for stale_name in _STALE_GENERIC_ARTIFACT_NAMES:
-            stale_path = export_dir / stale_name
-            if stale_path.exists():
-                stale_path.unlink()
-        artifact_paths = campaign_synthesis_artifact_paths(
-            export_dir,
-            batch_id=batch_id,
-            campaign_slug=campaign,
-        )
-        manifest_path = artifact_paths["manifest"]
-        workbook_path = artifact_paths["azenta_workbook"]
-        genbank_dir_path = artifact_paths["genbank_dir"]
-        feature_table_path = artifact_paths["genbank_feature_table"]
-        stale_genbank_aggregate_path = artifact_paths["stale_genbank_aggregate"]
-        if stale_genbank_aggregate_path.exists():
-            stale_genbank_aggregate_path.unlink()
-        campaign_feature_table = feature_table.loc[feature_table["campaign_slug"].astype(str) == campaign].reset_index(
-            drop=True
-        )
-        campaign_manifest.to_csv(manifest_path, index=False)
-        render_azenta_workbook(campaign_manifest, workbook_path)
-        campaign_feature_table.to_csv(feature_table_path, index=False)
-        render_genbank_record_set(campaign_manifest, campaign_feature_table, genbank_dir_path)
-        workbook_validation = validate_azenta_workbook(campaign_manifest, workbook_path)
-        genbank_validation = validate_genbank_record_set(campaign_manifest, genbank_dir_path)
-        rows.append(
-            {
-                "campaign_slug": campaign,
-                "batch_id": batch_id,
-                "row_count": int(len(campaign_manifest)),
-                "manifest_path": str(manifest_path),
-                "azenta_workbook_path": str(workbook_path),
-                "azenta_validation_status": workbook_validation["status"],
-                "genbank_dir_path": str(genbank_dir_path),
-                "genbank_feature_table_path": str(feature_table_path),
-                "genbank_validation_status": genbank_validation["status"],
-            }
-        )
+        for campaign, _ in campaign_groups
+    }
+    existing_dirs = [str(path) for path in final_dirs.values() if path.exists()]
+    if existing_dirs:
+        raise ValueError("synthesis handoff export directories already exist: " + ", ".join(existing_dirs))
+    final_index_path = None if output_root is None else Path(output_root) / "handoff_index.csv"
+    if final_index_path is not None and final_index_path.exists():
+        raise ValueError(f"synthesis handoff index already exists: {final_index_path}")
 
-    exports = pd.DataFrame(rows)
-    if output_root is not None:
-        index_path = Path(output_root) / "handoff_index.csv"
-        exports.to_csv(index_path, index=False)
-    return exports
+    staging_parent = Path(output_root) if output_root is not None else Path(repo_root or ".")
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(tempfile.mkdtemp(prefix=".synthesis-handoff-", dir=staging_parent))
+    published_dirs: list[Path] = []
+    try:
+        result_rows: list[dict[str, Any]] = []
+        staged_dirs: dict[str, Path] = {}
+        for campaign, campaign_manifest in campaign_groups:
+            stage_dir = staging_root / campaign
+            stage_dir.mkdir(parents=True)
+            staged_dirs[campaign] = stage_dir
+            staged_paths = campaign_synthesis_artifact_paths(
+                stage_dir,
+                batch_id=batch_id,
+                campaign_slug=campaign,
+            )
+            final_paths = campaign_synthesis_artifact_paths(
+                final_dirs[campaign],
+                batch_id=batch_id,
+                campaign_slug=campaign,
+            )
+            campaign_feature_table = feature_table.loc[
+                feature_table["campaign_slug"].astype(str) == campaign
+            ].reset_index(drop=True)
+            campaign_manifest.to_csv(staged_paths["manifest"], index=False)
+            render_azenta_workbook(campaign_manifest, staged_paths["azenta_workbook"])
+            campaign_feature_table.to_csv(staged_paths["genbank_feature_table"], index=False)
+            render_genbank_record_set(campaign_manifest, campaign_feature_table, staged_paths["genbank_dir"])
+            workbook_validation = validate_azenta_workbook(campaign_manifest, staged_paths["azenta_workbook"])
+            genbank_validation = validate_genbank_record_set(
+                campaign_manifest,
+                staged_paths["genbank_dir"],
+                feature_table=staged_paths["genbank_feature_table"],
+            )
+            result_rows.append(
+                {
+                    "campaign_slug": campaign,
+                    "batch_id": batch_id,
+                    "row_count": int(len(campaign_manifest)),
+                    "manifest_path": str(final_paths["manifest"]),
+                    "azenta_workbook_path": str(final_paths["azenta_workbook"]),
+                    "azenta_validation_status": workbook_validation["status"],
+                    "genbank_dir_path": str(final_paths["genbank_dir"]),
+                    "genbank_feature_table_path": str(final_paths["genbank_feature_table"]),
+                    "genbank_validation_status": genbank_validation["status"],
+                }
+            )
+
+        exports = pd.DataFrame(result_rows)
+        staged_index_path = staging_root / "handoff_index.csv"
+        if final_index_path is not None:
+            exports.to_csv(staged_index_path, index=False)
+        for campaign, _ in campaign_groups:
+            final_dir = final_dirs[campaign]
+            final_dir.parent.mkdir(parents=True, exist_ok=True)
+            staged_dirs[campaign].replace(final_dir)
+            published_dirs.append(final_dir)
+        if final_index_path is not None:
+            staged_index_path.replace(final_index_path)
+        return exports
+    except Exception:
+        for published_dir in reversed(published_dirs):
+            shutil.rmtree(published_dir, ignore_errors=True)
+        raise
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)

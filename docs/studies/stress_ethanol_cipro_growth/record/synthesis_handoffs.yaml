@@ -40,6 +40,7 @@ canonical_contract:
     - selection_view_ids
     - selection_memberships
     - expected_selection_views
+    - expected_study_aliases
     - expected_artifact
   measured_round_record_rules:
     - source_authority must be opal_selection_batch
@@ -48,13 +49,16 @@ canonical_contract:
     - assay_batch_index must be the physical order batch index
     - campaign_slug and run_id identify one unified OPAL learning lifecycle
     - expected_selection_views records each target view and its logical membership count
+    - expected_study_aliases binds the exact stable study aliases in the physical handoff
     - expected_artifact records the deduplicated selection-batch artifact set
     - operators should invoke measured rounds by --handoff-id after adding the record row
+    - alias assignment alone does not mean a sequence was accepted, ordered, received, or assayed
   pre_assay_seed_record_rules:
     - campaign_slug identifies the digest-pinned source directory for one SFXI selection view
     - source_campaign_slug is the exact campaign identity embedded in the digest-pinned manifest
     - neither source campaign slug is an executable OPAL campaign route
   lifecycle_status_values:
+    - authorized_for_materialization
     - generated_pending_acceptance
     - accepted_for_order
     - ordered

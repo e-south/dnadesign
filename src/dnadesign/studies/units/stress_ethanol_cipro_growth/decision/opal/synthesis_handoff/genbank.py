@@ -22,6 +22,8 @@ from Bio.Seq import Seq
 from Bio.SeqFeature import SeqFeature, SimpleLocation
 from Bio.SeqRecord import SeqRecord
 
+from .contracts import require_nonnegative_integer
+
 GENBANK_FEATURE_COLUMNS: tuple[str, ...] = (
     "batch_id",
     "campaign_slug",
@@ -201,7 +203,12 @@ def _detail_items(value: Any) -> list[dict[str, Any]]:
         return [value]
     if not isinstance(value, list):
         raise ValueError(f"DenseGen annotation detail must be a list, got {type(value).__name__}")
-    return [item for item in value if isinstance(item, dict)]
+    items: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"DenseGen annotation detail item {index} must be a mapping, got {type(item).__name__}")
+        items.append(item)
+    return items
 
 
 def _regulator_base(value: Any) -> str:
@@ -250,7 +257,10 @@ def _required_densegen_coordinate(item: dict[str, Any], *, key: str, candidate_i
     value = item.get(key)
     if value is None or pd.isna(value):
         raise ValueError(f"DenseGen annotation for {candidate_id} requires coordinate key {key}")
-    return int(value)
+    return require_nonnegative_integer(
+        value,
+        field=f"DenseGen annotation {key} for {candidate_id}",
+    )
 
 
 def _densegen_coordinate_metadata(item: dict[str, Any]) -> dict[str, Any]:
@@ -278,7 +288,10 @@ def _densegen_span(
             raise ValueError(
                 f"DenseGen annotation for {candidate_id} requires end with coordinate key {coordinate_key}"
             )
-        end = int(item["end"])
+        end = require_nonnegative_integer(
+            item["end"],
+            field=f"DenseGen annotation end for {candidate_id}",
+        )
         expected_end = start + len(expected_sequence)
         if end != expected_end:
             raise ValueError(
@@ -309,12 +322,15 @@ def _densegen_feature_rows(manifest_row: pd.Series, detail: Any) -> list[dict[st
     core_sequence = str(manifest_row["core_sequence"]).upper()
     core_start = int(manifest_row["core_start"])
     candidate_id = str(manifest_row["id"])
+    feature_prefix = str(manifest_row["synthesis_name"])
     rows: list[dict[str, Any]] = []
     for idx, item in enumerate(_detail_items(detail)):
         part_kind = str(item.get("part_kind") or "").strip()
         if part_kind == "tfbs":
             regulator = _regulator_base(item.get("regulator"))
-            if not regulator or regulator == "background":
+            if not regulator:
+                raise ValueError(f"DenseGen TFBS annotation for {candidate_id} requires a regulator")
+            if regulator == "background":
                 continue
             strand = _tfbs_strand_from_orientation(item.get("orientation"), candidate_id=candidate_id)
             start, end = _densegen_span(
@@ -329,7 +345,7 @@ def _densegen_feature_rows(manifest_row: pd.Series, detail: Any) -> list[dict[st
                 _feature_row(
                     manifest_row,
                     feature_type="misc_feature",
-                    feature_id=str(item.get("tfbs_id") or f"{candidate_id}:tfbs:{idx}"),
+                    feature_id=f"{feature_prefix}:tfbs:{idx}",
                     label=f"{_display_regulator(regulator)} TFBS",
                     start_0=core_start + start,
                     end_0=core_start + end,
@@ -346,8 +362,15 @@ def _densegen_feature_rows(manifest_row: pd.Series, detail: Any) -> list[dict[st
                 )
             )
             continue
-        if part_kind == "fixed_element" and str(item.get("constraint_name") or "") == "sigma70_core":
+        if part_kind == "fixed_element":
+            constraint_name = str(item.get("constraint_name") or "").strip()
+            if constraint_name != "sigma70_core":
+                raise ValueError(
+                    f"unsupported DenseGen fixed_element constraint for {candidate_id}: {constraint_name!r}"
+                )
             role = str(item.get("role") or "").strip()
+            if role not in {"upstream", "downstream"}:
+                raise ValueError(f"unsupported DenseGen sigma70_core role for {candidate_id}: {role!r}")
             variant_id = str(item.get("variant_id") or "").strip()
             if role == "upstream":
                 label = f"-35 ({variant_id})" if variant_id else "-35"
@@ -367,7 +390,7 @@ def _densegen_feature_rows(manifest_row: pd.Series, detail: Any) -> list[dict[st
                 _feature_row(
                     manifest_row,
                     feature_type="misc_feature",
-                    feature_id=f"{candidate_id}:sigma70:{role or idx}",
+                    feature_id=f"{feature_prefix}:sigma70:{role or idx}",
                     label=label,
                     start_0=core_start + start,
                     end_0=core_start + end,
@@ -381,6 +404,8 @@ def _densegen_feature_rows(manifest_row: pd.Series, detail: Any) -> list[dict[st
                     spacer_length=item.get("spacer_length", ""),
                 )
             )
+            continue
+        raise ValueError(f"unsupported DenseGen annotation part_kind for {candidate_id}: {part_kind!r}")
     return rows
 
 
@@ -398,12 +423,13 @@ def build_genbank_feature_table(
         core_start = int(manifest_row["core_start"])
         core_end = int(manifest_row["core_end"])
         final_length = len(str(manifest_row["final_sequence"]))
+        feature_prefix = str(manifest_row["synthesis_name"])
         rows.extend(
             [
                 _feature_row(
                     manifest_row,
                     feature_type="source",
-                    feature_id=f"{manifest_row['id']}:source",
+                    feature_id=f"{feature_prefix}:source",
                     label=str(manifest_row["synthesis_name"]),
                     start_0=0,
                     end_0=final_length,
@@ -412,7 +438,7 @@ def build_genbank_feature_table(
                 _feature_row(
                     manifest_row,
                     feature_type="misc_feature",
-                    feature_id=f"{manifest_row['id']}:left_flank",
+                    feature_id=f"{feature_prefix}:left_flank",
                     label="5' cloning flank",
                     start_0=0,
                     end_0=core_start,
@@ -421,7 +447,7 @@ def build_genbank_feature_table(
                 _feature_row(
                     manifest_row,
                     feature_type="promoter",
-                    feature_id=f"{manifest_row['id']}:promoter_core",
+                    feature_id=f"{feature_prefix}:promoter_core",
                     label="60 nt promoter core",
                     start_0=core_start,
                     end_0=core_end,
@@ -430,7 +456,7 @@ def build_genbank_feature_table(
                 _feature_row(
                     manifest_row,
                     feature_type="misc_feature",
-                    feature_id=f"{manifest_row['id']}:right_flank",
+                    feature_id=f"{feature_prefix}:right_flank",
                     label="3' cloning flank",
                     start_0=core_end,
                     end_0=final_length,
@@ -506,14 +532,15 @@ def _feature_qualifiers(manifest_row: pd.Series, feature_row: pd.Series) -> dict
         "synthesis_name": [str(manifest_row["synthesis_name"])],
         "canonical_id": [str(manifest_row["id"])],
         "strategy_id": [str(manifest_row.get("strategy_id", ""))],
-        "selection_epoch": [str(manifest_row.get("selection_epoch", ""))],
-        "assay_batch_index": [str(manifest_row.get("assay_batch_index", ""))],
-        "run_id": [str(manifest_row.get("run_id", ""))],
         "core_sha256": [str(manifest_row.get("core_sha256", ""))],
         "final_sha256": [str(manifest_row.get("final_sha256", ""))],
         "dnadesign_feature_id": [str(feature_row["feature_id"])],
         "dnadesign_source": [str(feature_row["source"])],
     }
+    for key in ("selection_epoch", "assay_batch_index", "model_as_of_round", "run_id"):
+        value = _optional_qualifier_text(manifest_row.get(key))
+        if value:
+            qualifiers[key] = [value]
     for key in (
         "densegen_coordinate_key",
         "densegen_offset",
@@ -531,7 +558,7 @@ def _feature_qualifiers(manifest_row: pd.Series, feature_row: pd.Series) -> dict
         "score_relative_to_theoretical_max",
         "tier",
     ):
-        value = str(feature_row.get(key, "") or "").strip()
+        value = _optional_qualifier_text(feature_row.get(key))
         if value:
             qualifier_key = {
                 "densegen_coordinate_key": "dg_coord_key",
@@ -592,6 +619,12 @@ def _record_from_manifest_row(manifest_row: pd.Series, feature_rows: pd.DataFram
     return record
 
 
+def _optional_qualifier_text(value: Any) -> str:
+    if value is None or (not isinstance(value, (list, tuple, dict)) and pd.isna(value)):
+        return ""
+    return str(value).strip()
+
+
 def render_genbank_record_set(
     manifest: pd.DataFrame,
     feature_table: pd.DataFrame,
@@ -636,7 +669,97 @@ def read_genbank_records(path: str | Path) -> list[SeqRecord]:
     return list(SeqIO.parse(genbank_path, "genbank"))
 
 
-def _validate_record_against_manifest_row(record: SeqRecord, expected: pd.Series) -> None:
+def _normalized_qualifier_values(values: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for value in values:
+        text = "".join(str(value).split())
+        integral_float = re.fullmatch(r"(-?\d+)\.0+", text)
+        normalized.append(integral_float.group(1) if integral_float else text)
+    return normalized
+
+
+def _validate_qualifier_values(
+    feature: SeqFeature,
+    *,
+    qualifier: str,
+    expected_values: list[str],
+    identity: str,
+) -> None:
+    observed_values = feature.qualifiers.get(qualifier) or []
+    if _normalized_qualifier_values(observed_values) != _normalized_qualifier_values(expected_values):
+        raise ValueError(
+            f"GenBank feature {qualifier} mismatch for {identity}: "
+            f"expected {expected_values!r}, observed {observed_values!r}"
+        )
+
+
+def _validate_feature_table_parity(
+    record: SeqRecord,
+    *,
+    expected: pd.Series,
+    expected_features: pd.DataFrame,
+) -> None:
+    identity = str(expected["synthesis_name"])
+    observed_by_id: dict[str, SeqFeature] = {}
+    for feature in record.features:
+        feature_ids = feature.qualifiers.get("dnadesign_feature_id") or []
+        if len(feature_ids) != 1:
+            raise ValueError(f"GenBank feature missing unique dnadesign_feature_id for {identity}")
+        feature_id = "".join(str(feature_ids[0]).split())
+        if feature_id in observed_by_id:
+            raise ValueError(f"GenBank record contains duplicate feature ID for {identity}: {feature_id}")
+        observed_by_id[feature_id] = feature
+    expected_ids = {"".join(str(value).split()) for value in expected_features["feature_id"].tolist()}
+    if len(expected_ids) != len(expected_features):
+        raise ValueError(f"GenBank feature table contains duplicate normalized feature IDs for {identity}")
+    if set(observed_by_id) != expected_ids:
+        missing = sorted(expected_ids.difference(observed_by_id))
+        extra = sorted(set(observed_by_id).difference(expected_ids))
+        raise ValueError(f"GenBank feature ID parity mismatch for {identity}: missing={missing[:5]}, extra={extra[:5]}")
+    for _, feature_row in expected_features.iterrows():
+        feature_id = str(feature_row["feature_id"])
+        feature = observed_by_id["".join(feature_id.split())]
+        if feature.type != str(feature_row["feature_type"]):
+            raise ValueError(f"GenBank feature type mismatch for {identity}/{feature_id}")
+        observed_location = (
+            int(feature.location.start),
+            int(feature.location.end),
+            int(feature.location.strand or 0),
+        )
+        expected_location = (
+            int(feature_row["start_0"]),
+            int(feature_row["end_0"]),
+            int(feature_row["strand"]),
+        )
+        if observed_location != expected_location:
+            raise ValueError(
+                f"GenBank feature location mismatch for {identity}/{feature_id}: "
+                f"expected {expected_location}, observed {observed_location}"
+            )
+        expected_qualifiers = _feature_qualifiers(expected, feature_row)
+        if set(feature.qualifiers) != set(expected_qualifiers):
+            raise ValueError(f"GenBank feature qualifier-key parity mismatch for {identity}/{feature_id}")
+        for qualifier, expected_values in expected_qualifiers.items():
+            _validate_qualifier_values(
+                feature,
+                qualifier=qualifier,
+                expected_values=expected_values,
+                identity=f"{identity}/{feature_id}",
+            )
+
+
+def _validate_record_against_manifest_row(
+    record: SeqRecord,
+    expected: pd.Series,
+    *,
+    expected_features: pd.DataFrame | None = None,
+) -> None:
+    expected_locus = _safe_locus(expected["synthesis_name"])
+    if record.id != expected_locus or record.name != expected_locus:
+        raise ValueError(
+            f"GenBank record identity mismatch for {expected['synthesis_name']}: "
+            f"expected {expected_locus!r}, observed id={record.id!r}, name={record.name!r}"
+        )
     source = next((feature for feature in record.features if feature.type == "source"), None)
     if source is None:
         raise ValueError(f"GenBank record missing source feature: {record.id}")
@@ -646,15 +769,26 @@ def _validate_record_against_manifest_row(record: SeqRecord, expected: pd.Series
             "GenBank record source feature synthesis_name mismatch: "
             f"expected {expected['synthesis_name']!r}, observed {aliases!r}"
         )
-    for qualifier, expected_values in _selection_qualifiers(expected).items():
-        observed_values = source.qualifiers.get(qualifier) or []
-        normalized_observed = ["".join(value.split()) for value in observed_values]
-        normalized_expected = ["".join(value.split()) for value in expected_values]
-        if normalized_observed != normalized_expected:
-            raise ValueError(
-                f"GenBank record source feature {qualifier} mismatch for {expected['synthesis_name']}: "
-                f"expected {expected_values!r}, observed {observed_values!r}"
-            )
+    if expected_features is None:
+        expected_source = pd.Series(
+            {
+                "feature_id": f"{expected['synthesis_name']}:source",
+                "source": "synthesis_handoff",
+                "label": str(expected["synthesis_name"]),
+            }
+        )
+    else:
+        source_rows = expected_features.loc[expected_features["feature_type"].astype(str) == "source"]
+        if len(source_rows) != 1:
+            raise ValueError(f"GenBank feature table must contain one source row for {expected['synthesis_name']}")
+        expected_source = source_rows.iloc[0]
+    for qualifier, expected_values in _feature_qualifiers(expected, expected_source).items():
+        _validate_qualifier_values(
+            source,
+            qualifier=qualifier,
+            expected_values=expected_values,
+            identity=str(expected["synthesis_name"]),
+        )
     if str(record.seq).upper() != str(expected["final_sequence"]).upper():
         raise ValueError(f"GenBank sequence mismatch for {expected['synthesis_name']}")
     labels = {str(value) for feature in record.features for value in feature.qualifiers.get("label", [])}
@@ -664,15 +798,39 @@ def _validate_record_against_manifest_row(record: SeqRecord, expected: pd.Series
         raise ValueError(
             f"GenBank record {expected['synthesis_name']} missing required feature labels: {', '.join(missing)}"
         )
+    if expected_features is not None:
+        _validate_feature_table_parity(record, expected=expected, expected_features=expected_features)
 
 
-def validate_genbank_record_set(manifest: pd.DataFrame, output_dir: str | Path) -> dict[str, Any]:
+def validate_genbank_record_set(
+    manifest: pd.DataFrame,
+    output_dir: str | Path,
+    *,
+    feature_table: pd.DataFrame | str | Path | None = None,
+) -> dict[str, Any]:
     """Validate the one-file-per-synthesis-insert GenBank directory."""
 
     _require_manifest_columns(manifest)
     genbank_dir = Path(output_dir)
     if not genbank_dir.is_dir():
         raise ValueError(f"GenBank record-set directory not found: {genbank_dir}")
+    expected_features: pd.DataFrame | None = None
+    if feature_table is not None:
+        if isinstance(feature_table, (str, Path)):
+            feature_table_path = Path(feature_table)
+            if not feature_table_path.is_file():
+                raise ValueError(f"GenBank feature table not found: {feature_table_path}")
+            try:
+                expected_features = pd.read_csv(
+                    feature_table_path,
+                    dtype=str,
+                    keep_default_na=False,
+                )
+            except OSError as exc:
+                raise ValueError(f"Could not read GenBank feature table: {feature_table_path}") from exc
+        else:
+            expected_features = feature_table.copy().fillna("")
+        _validate_feature_table_identity(manifest, expected_features)
     expected_filenames = [genbank_record_filename(row) for _, row in manifest.iterrows()]
     observed_filenames = sorted(path.name for path in genbank_dir.glob("*.gb"))
     if observed_filenames != sorted(expected_filenames):
@@ -689,5 +847,36 @@ def validate_genbank_record_set(manifest: pd.DataFrame, output_dir: str | Path) 
         records = read_genbank_records(path)
         if len(records) != 1:
             raise ValueError(f"GenBank file must contain exactly one record: {path}")
-        _validate_record_against_manifest_row(records[0], expected)
+        record_features = None
+        if expected_features is not None:
+            record_features = expected_features.loc[
+                expected_features["id"].astype(str).eq(str(expected["id"]))
+            ].reset_index(drop=True)
+            if record_features.empty:
+                raise ValueError(f"GenBank feature table has no rows for {expected['id']}")
+        _validate_record_against_manifest_row(records[0], expected, expected_features=record_features)
     return {"status": "pass", "row_count": int(len(manifest)), "genbank_dir_path": str(genbank_dir)}
+
+
+def _validate_feature_table_identity(manifest: pd.DataFrame, feature_table: pd.DataFrame) -> None:
+    missing_columns = sorted(set(GENBANK_FEATURE_COLUMNS).difference(feature_table.columns))
+    if missing_columns:
+        raise ValueError("GenBank feature table missing required columns: " + ", ".join(missing_columns))
+    if feature_table.duplicated(subset=["id", "feature_id"]).any():
+        raise ValueError("GenBank feature table contains duplicate candidate and feature IDs")
+    expected_ids = set(manifest["id"].astype(str))
+    observed_ids = set(feature_table["id"].astype(str))
+    if observed_ids != expected_ids:
+        missing = sorted(expected_ids.difference(observed_ids))
+        extra = sorted(observed_ids.difference(expected_ids))
+        raise ValueError(
+            f"GenBank feature table candidate ID parity mismatch: missing={missing[:5]}, extra={extra[:5]}"
+        )
+    manifest_by_id = manifest.set_index(manifest["id"].astype(str), drop=False)
+    for column in ("batch_id", "campaign_slug", "synthesis_name"):
+        expected_by_id = manifest_by_id[column].astype(str).to_dict()
+        expected_values = feature_table["id"].astype(str).map(expected_by_id)
+        observed_values = feature_table[column].astype(str)
+        mismatches = feature_table.loc[observed_values.ne(expected_values), ["id", column]]
+        if not mismatches.empty:
+            raise ValueError(f"GenBank feature table {column} mismatch: {mismatches.head(5).to_dict('records')}")

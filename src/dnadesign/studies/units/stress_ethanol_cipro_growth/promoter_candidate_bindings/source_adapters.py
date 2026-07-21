@@ -21,6 +21,7 @@ import pandas as pd
 from .contracts import BindingSourceArtifact, PromoterCandidateBindingsError
 from .source_io import file_sha256, read_parquet, source_artifact
 from .source_registry import AliasSource, relative_config_path
+from .study_alias_registry import load_study_promoter_alias_registry
 from .synthesis_alias_sources import load_synthesis_alias_sources
 from .values import require_columns, required_text
 
@@ -36,6 +37,7 @@ def load_alias_source(repo_root: Path, source: AliasSource) -> AliasSourceResult
     adapters = {
         "sequence_view_source_label.v1": _sequence_view_source_labels,
         "reference_label_aliases.v1": _reference_label_aliases,
+        "study_promoter_alias_registry.v1": _study_promoter_aliases,
         "synthesis_handoff.v1": _synthesis_handoff_aliases,
     }
     try:
@@ -154,7 +156,11 @@ def _synthesis_handoff_aliases(repo_root: Path, source: AliasSource) -> AliasSou
     record_path = relative_config_path(config["record_path"], context="record_path")
     handoff_id = required_text(config["handoff_id"], field="synthesis handoff ID")
     synthesis = load_synthesis_alias_sources(repo_root, record_path=record_path, handoff_id=handoff_id)
-    templates = _alias_templates(config["aliases"])
+    templates = _alias_templates(
+        config["aliases"],
+        field_name="synthesis_name",
+        context="synthesis aliases",
+    )
     rows: list[dict[str, str]] = []
     for record in synthesis.to_dict(orient="records"):
         synthesis_name = required_text(record["synthesis_name"], field="synthesis name")
@@ -183,18 +189,67 @@ def _synthesis_handoff_aliases(repo_root: Path, source: AliasSource) -> AliasSou
     return AliasSourceResult(tuple(rows), tuple(artifacts), pd.DataFrame())
 
 
-def _alias_templates(value: object) -> tuple[tuple[str, str], ...]:
+def _study_promoter_aliases(repo_root: Path, source: AliasSource) -> AliasSourceResult:
+    config = _config(source, fields={"registry_path", "aliases"})
+    registry_path = relative_config_path(config["registry_path"], context="registry_path")
+    registry = load_study_promoter_alias_registry(repo_root, registry_path=registry_path)
+    records_path = repo_root / registry.candidate_table_records_path
+    records = read_parquet(records_path)
+    require_columns(records, ("id", "sequence"), label=source.source_id)
+    records = records.copy()
+    records["id"] = records["id"].astype(str).str.strip()
+    if records["id"].duplicated().any():
+        raise PromoterCandidateBindingsError(f"Alias source {source.source_id!r} candidate IDs must be unique.")
+    by_id = records.set_index("id")
+    authority_sha256 = file_sha256(records_path)
+    templates = _alias_templates(
+        config["aliases"],
+        field_name="study_alias",
+        context="study promoter aliases",
+    )
+    rows: list[dict[str, str]] = []
+    for assignment in registry.assignments:
+        record = by_id.loc[assignment.candidate_id]
+        for namespace, template in templates:
+            rows.append(
+                _alias_row(
+                    namespace=namespace,
+                    alias=template.format(study_alias=assignment.alias),
+                    display_label=assignment.alias,
+                    candidate_id=assignment.candidate_id,
+                    sequence=record["sequence"],
+                    authority_dataset_id=registry.candidate_table_dataset_id,
+                    authority_id=assignment.candidate_id,
+                    authority_sha256=authority_sha256,
+                )
+            )
+    return AliasSourceResult(
+        alias_rows=tuple(rows),
+        source_artifacts=(
+            source_artifact(repo_root, f"{source.source_id}:registry", repo_root / registry.path),
+            source_artifact(repo_root, f"{source.source_id}:records", records_path),
+        ),
+        genbank_annotations=pd.DataFrame(),
+    )
+
+
+def _alias_templates(
+    value: object,
+    *,
+    field_name: str,
+    context: str,
+) -> tuple[tuple[str, str], ...]:
     templates: list[tuple[str, str]] = []
-    for index, raw in enumerate(_list(value, context="synthesis aliases")):
-        item = _mapping(raw, context=f"synthesis aliases[{index}]")
+    for index, raw in enumerate(_list(value, context=context)):
+        item = _mapping(raw, context=f"{context}[{index}]")
         if set(item) != {"namespace", "template"}:
-            raise PromoterCandidateBindingsError("Synthesis alias entries require namespace and template.")
+            raise PromoterCandidateBindingsError(f"{context.capitalize()} require namespace and template.")
         template = required_text(item["template"], field="synthesis alias template")
         fields = [field for _, field, spec, conversion in Formatter().parse(template) if field]
         has_format_options = any(spec or conversion for _, _, spec, conversion in Formatter().parse(template))
-        if fields != ["synthesis_name"] or has_format_options:
+        if fields != [field_name] or has_format_options:
             raise PromoterCandidateBindingsError(
-                "Synthesis alias template must contain exactly one unformatted {synthesis_name} field."
+                f"{context.capitalize()} template must contain exactly one unformatted {{{field_name}}} field."
             )
         templates.append((required_text(item["namespace"], field="alias namespace"), template))
     return tuple(templates)
