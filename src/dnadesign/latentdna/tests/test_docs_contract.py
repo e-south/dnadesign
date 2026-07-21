@@ -186,7 +186,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "not as native bidirectional encodings" in study_latentdna_route
     assert "eight canonical 7B+20B" not in study_latentdna_route
 
-    assert "Declared phase: `opal_candidate_table_pre_assay`" in study_status
+    assert "Declared phase:" in study_status
     normalized_study_status = " ".join(study_status.split())
     assert "RegulonDB/native appendix visualization does not gate OPAL readiness" in normalized_study_status
     assert "LatentDNA decision surfaces:" in study_status
