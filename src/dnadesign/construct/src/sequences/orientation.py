@@ -11,11 +11,18 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-_DNA_COMPLEMENT = str.maketrans("ACGTNacgtn", "TGCANtgcan")
+_IUPAC_DNA_COMPLEMENT = str.maketrans(
+    "ACGTRYSWKMBDHVNacgtryswkmbdhvn",  # pragma: allowlist secret
+    "TGCAYRSWMKVHDBNtgcayrswmkvhdbn",  # pragma: allowlist secret
+)
+
+
+def complement(sequence: str) -> str:
+    return sequence.translate(_IUPAC_DNA_COMPLEMENT)
 
 
 def reverse_complement(sequence: str) -> str:
-    return sequence.translate(_DNA_COMPLEMENT)[::-1]
+    return complement(sequence)[::-1]
 
 
 def reverse_complement_anchor_bounds(

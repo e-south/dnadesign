@@ -24,12 +24,12 @@ from dnadesign.contracts.visual.sequence_evidence_map_v1 import (
 )
 
 from ..contracts.errors import ValidationError
+from ..sequences.orientation import complement
 
 SEQUENCE_EVIDENCE_MAP_PATH = Path("visual/sequence_evidence_map_v1.json")
 CANONICAL_FOLDING_SEQUENCE_PATH = Path("folding/secondary_structure_input_sequence.json")
 DEPRECATED_VISUAL_ARTIFACT_PATHS = (Path("visual/contracts/component_span_qa_sequence_evidence_map_v1.json"),)
 
-_DNA_COMPLEMENT = str.maketrans("ACGTNacgtn", "TGCANtgcan")
 _DEFAULT_BACKDROP_STYLE = {"fill": "#CBD5E1", "alpha": 0.62, "edge_color": "#94A3B8"}
 _SEGMENT_LABEL_COLOR = "#334155"
 _ANNOTATION_LABEL_COLOR = "#475569"
@@ -44,7 +44,7 @@ def visual_contract_payload(composed: Any) -> dict[str, object]:
         topology_kind="linear_ssdna",
         alphabet="dna",
         primary_sequence=view["sequence"],
-        complement_sequence=_complement(str(view["sequence"])),
+        complement_sequence=complement(str(view["sequence"])),
         owners=[
             SequenceEvidenceOwnerSpanV1(
                 owner_id=f"{span.unit_id}.{span.segment_id}",
@@ -480,10 +480,6 @@ def _pretty_display_token(token: str) -> str:
     if token.isdigit():
         return token
     return token[:1].upper() + token[1:].lower()
-
-
-def _complement(sequence: str) -> str:
-    return sequence.translate(_DNA_COMPLEMENT)
 
 
 def _sha256_text(text: str) -> str:
