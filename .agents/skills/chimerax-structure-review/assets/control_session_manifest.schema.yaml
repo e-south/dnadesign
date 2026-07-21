@@ -25,6 +25,7 @@ allowed_pause_points:
   - stop-or-continue
 notes:
   - The control-session manifest is the shared handle for a live ChimeraX session.
+  - chimerax_pid is a positive process ID greater than 1 and must own the recorded REST port before GUI termination.
   - It records start-time state, not mutable current liveness.
   - Use chimerax-session-status.sh for current process and REST status.
   - Use chimerax-session-stop.sh to stop REST control after collaboration.

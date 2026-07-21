@@ -2,7 +2,7 @@
 name: chimerax-structure-review
 description: Operate ChimeraX GUI or REST sessions for molecular styling, pose review, electrostatic surfaces, and still or movie capture. Use for visible ChimeraX work. Do not use for py3Dmol views or structure prediction.
 metadata:
-  version: 0.4.4
+  version: 0.4.5
   category: workflow-automation
   tags: [chimerax, structure-review, visualization, rendering, pose-capture]
 ---

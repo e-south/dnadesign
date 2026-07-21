@@ -37,6 +37,8 @@ Default behavior should stop REST after capture while leaving the graphical wind
 
 Use an explicit `--keep-rest` option only when the user wants continued live control. Use an explicit `--close-after` option for automated checks where leaving a GUI window open would be noisy.
 
+Before `--close-gui` sends a signal, the stop helper verifies that the manifest PID is positive and live, names the declared ChimeraX executable, and owns the recorded REST listener. This verification requires `lsof` and happens before REST is stopped. Executable wrappers with a basename other than `ChimeraX` or `chimerax` can start a session but cannot use automatic GUI termination. If REST was already stopped, close the GUI manually rather than signaling from a stale manifest. A stale or hand-written manifest must fail without signaling another process.
+
 For multi-turn collaboration, use `chimerax-session-start.sh`, `chimerax-session-status.sh`, and `chimerax-session-stop.sh`. These scripts make the pause points explicit and avoid hiding a long-running REST endpoint.
 
 The control-session manifest records the session at start and follows `assets/control_session_manifest.schema.yaml`. Current state is established by the status or stop scripts.

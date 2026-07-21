@@ -111,6 +111,201 @@ else
   fail "control-session schema missing required collaboration fields"
 fi
 
+tmp_stop_dir="$(mktemp -d)"
+cleanup_stop_audit() {
+  if [[ -n "${foreign_pid:-}" ]] && kill -0 "$foreign_pid" >/dev/null 2>&1; then
+    kill "$foreign_pid" >/dev/null 2>&1 || true
+    wait "$foreign_pid" 2>/dev/null || true
+  fi
+  rm -rf "$tmp_stop_dir"
+}
+trap cleanup_stop_audit EXIT
+
+run_stop_isolated() {
+  local script_path="$1"
+  local manifest_path="$2"
+  local stdout_path="$3"
+  local stderr_path="$4"
+  python3 - "$script_path" "$manifest_path" "$stdout_path" "$stderr_path" <<'PY'
+from pathlib import Path
+import subprocess
+import sys
+
+script_path, manifest_path, stdout_path, stderr_path = sys.argv[1:]
+result = subprocess.run(
+    [script_path, "--session-manifest", manifest_path, "--close-gui"],
+    check=False,
+    capture_output=True,
+    start_new_session=True,
+    text=True,
+)
+Path(stdout_path).write_text(result.stdout, encoding="utf-8")
+Path(stderr_path).write_text(result.stderr, encoding="utf-8")
+raise SystemExit(0 if result.returncode == 0 else 1)
+PY
+}
+
+for invalid_pid in 0 1 -1 abc; do
+  cat > "$tmp_stop_dir/invalid-pid.yaml" <<YAML
+chimerax_executable: "/Applications/ChimeraX.app/Contents/MacOS/ChimeraX"
+chimerax_pid: $invalid_pid
+port: 65534
+YAML
+  if run_stop_isolated \
+    "$SCRIPT_DIR/chimerax-session-stop.sh" \
+    "$tmp_stop_dir/invalid-pid.yaml" \
+    "$tmp_stop_dir/invalid-pid.out" \
+    "$tmp_stop_dir/invalid-pid.err"; then
+    fail "session stop accepted unsafe pid=$invalid_pid"
+  elif grep -q 'positive process id greater than 1' "$tmp_stop_dir/invalid-pid.err" \
+    && ! grep -q 'requested GUI close' "$tmp_stop_dir/invalid-pid.out"; then
+    pass "session stop rejects unsafe pid=$invalid_pid before signaling"
+  else
+    fail "session stop rejected pid=$invalid_pid without the declared fail-fast reason"
+  fi
+done
+
+cat > "$tmp_stop_dir/dead-pid.yaml" <<'YAML'
+chimerax_executable: "/Applications/ChimeraX.app/Contents/MacOS/ChimeraX"
+chimerax_pid: 99999999
+port: 65534
+YAML
+if run_stop_isolated \
+  "$SCRIPT_DIR/chimerax-session-stop.sh" \
+  "$tmp_stop_dir/dead-pid.yaml" \
+  "$tmp_stop_dir/dead-pid.out" \
+  "$tmp_stop_dir/dead-pid.err"; then
+  fail "session stop accepted a dead process"
+elif grep -q 'process is not running' "$tmp_stop_dir/dead-pid.err" \
+  && ! grep -q 'requested GUI close' "$tmp_stop_dir/dead-pid.out"; then
+  pass "session stop rejects a dead process before signaling"
+else
+  fail "session stop rejected a dead process without the declared fail-fast reason"
+fi
+
+sleep 30 &
+foreign_pid=$!
+disown "$foreign_pid" 2>/dev/null || true
+cat > "$tmp_stop_dir/foreign-process.yaml" <<YAML
+chimerax_executable: "/Applications/ChimeraX.app/Contents/MacOS/ChimeraX"
+chimerax_pid: $foreign_pid
+port: 65534
+YAML
+if run_stop_isolated \
+  "$SCRIPT_DIR/chimerax-session-stop.sh" \
+  "$tmp_stop_dir/foreign-process.yaml" \
+  "$tmp_stop_dir/foreign-process.out" \
+  "$tmp_stop_dir/foreign-process.err"; then
+  fail "session stop accepted an unrelated live process"
+elif ! kill -0 "$foreign_pid" >/dev/null 2>&1; then
+  fail "session stop signaled an unrelated live process"
+elif grep -q 'does not identify the declared ChimeraX executable' "$tmp_stop_dir/foreign-process.err"; then
+  pass "session stop rejects a live non-ChimeraX process without signaling it"
+else
+  fail "session stop rejected a live non-ChimeraX process without the declared reason"
+fi
+kill "$foreign_pid" >/dev/null 2>&1 || true
+foreign_pid=""
+
+ln -s /bin/sleep "$tmp_stop_dir/ChimeraX"
+"$tmp_stop_dir/ChimeraX" 30 &
+foreign_pid=$!
+disown "$foreign_pid" 2>/dev/null || true
+cat > "$tmp_stop_dir/wrong-port.yaml" <<YAML
+chimerax_executable: "$tmp_stop_dir/ChimeraX"
+chimerax_pid: $foreign_pid
+port: 65534
+YAML
+if run_stop_isolated \
+  "$SCRIPT_DIR/chimerax-session-stop.sh" \
+  "$tmp_stop_dir/wrong-port.yaml" \
+  "$tmp_stop_dir/wrong-port.out" \
+  "$tmp_stop_dir/wrong-port.err"; then
+  fail "session stop accepted a ChimeraX-named process that did not own the REST port"
+elif ! kill -0 "$foreign_pid" >/dev/null 2>&1; then
+  fail "session stop signaled a ChimeraX-named process that did not own the REST port"
+elif grep -q 'does not own the recorded ChimeraX REST port' "$tmp_stop_dir/wrong-port.err"; then
+  pass "session stop rejects a process that does not own the recorded REST port"
+else
+  fail "session stop rejected a wrong-port process without the declared reason"
+fi
+kill "$foreign_pid" >/dev/null 2>&1 || true
+foreign_pid=""
+
+mkdir -p "$tmp_stop_dir/happy-bin"
+cp "$SCRIPT_DIR/chimerax-session-stop.sh" "$tmp_stop_dir/happy-bin/chimerax-session-stop.sh"
+cat > "$tmp_stop_dir/happy-bin/chimerax-send-command.py" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+cat > "$tmp_stop_dir/happy-bin/lsof" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$CHIMERAX_TEST_PID"
+SH
+chmod +x \
+  "$tmp_stop_dir/happy-bin/chimerax-session-stop.sh" \
+  "$tmp_stop_dir/happy-bin/chimerax-send-command.py" \
+  "$tmp_stop_dir/happy-bin/lsof"
+"$tmp_stop_dir/ChimeraX" 30 &
+foreign_pid=$!
+disown "$foreign_pid" 2>/dev/null || true
+cat > "$tmp_stop_dir/verified-process.yaml" <<YAML
+chimerax_executable: "$tmp_stop_dir/ChimeraX"
+chimerax_pid: $foreign_pid
+port: 65534
+YAML
+old_path="$PATH"
+export CHIMERAX_TEST_PID="$foreign_pid"
+export PATH="$tmp_stop_dir/happy-bin:$PATH"
+if run_stop_isolated \
+  "$tmp_stop_dir/happy-bin/chimerax-session-stop.sh" \
+  "$tmp_stop_dir/verified-process.yaml" \
+  "$tmp_stop_dir/verified-process.out" \
+  "$tmp_stop_dir/verified-process.err"; then
+  verified_status=0
+else
+  verified_status=$?
+fi
+PATH="$old_path"
+unset CHIMERAX_TEST_PID
+for _ in $(seq 1 20); do
+  if ! kill -0 "$foreign_pid" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.05
+done
+if [[ "$verified_status" -eq 0 ]] \
+  && ! kill -0 "$foreign_pid" >/dev/null 2>&1 \
+  && grep -q 'PASS: REST stop command sent' "$tmp_stop_dir/verified-process.out" \
+  && grep -q 'PASS: requested GUI close' "$tmp_stop_dir/verified-process.out"; then
+  pass "session stop signals one fully verified ChimeraX target"
+else
+  fail "session stop did not complete the fully verified close path"
+fi
+foreign_pid=""
+
+cat > "$tmp_stop_dir/happy-bin/chimerax-send-command.py" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+cat > "$tmp_stop_dir/rejected-rest.yaml" <<YAML
+chimerax_executable: "$tmp_stop_dir/ChimeraX"
+chimerax_pid: 99999999
+port: 65534
+YAML
+if "$tmp_stop_dir/happy-bin/chimerax-session-stop.sh" \
+  --session-manifest "$tmp_stop_dir/rejected-rest.yaml" \
+  >"$tmp_stop_dir/rejected-rest.out" 2>"$tmp_stop_dir/rejected-rest.err"; then
+  fail "session stop reported success after a rejected REST command"
+elif grep -q 'REST stop command was not accepted' "$tmp_stop_dir/rejected-rest.err" \
+  && ! grep -q 'PASS: REST stop command sent' "$tmp_stop_dir/rejected-rest.out"; then
+  pass "session stop reports a rejected REST command without false success"
+else
+  fail "session stop rejected the REST command without the declared fail-fast reason"
+fi
+trap - EXIT
+cleanup_stop_audit
+
 if grep -Eiq 'arbitrary|raw user prose|free-text' "$SKILL_FILE" "$SKILL_DIR/references/command-allowlist.md"; then
   pass "arbitrary command guardrails documented"
 else
