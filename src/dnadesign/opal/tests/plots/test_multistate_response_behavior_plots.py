@@ -621,9 +621,10 @@ def test_behavior_decomposition_is_k_state_and_marks_only_coordinate_bottlenecks
     assert coordinates.groupby("id").size().to_dict() == {"selected-a": 5, "selected-b": 5}
     assert coordinates.groupby("id")["limiting"].sum().to_dict() == {"selected-a": 1, "selected-b": 1}
     assert not tidy.loc[~tidy["component_kind"].eq("coordinate"), "limiting"].any()
+    assert HARD_BOTTLENECK_REF in set(tidy["component_id"])
 
 
-def test_behavior_decomposition_uses_msrb_symbols_and_compact_colorbar(
+def test_behavior_decomposition_uses_msrb_symbols_without_redundant_bottleneck_column(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -642,8 +643,9 @@ def test_behavior_decomposition_uses_msrb_symbols_and_compact_colorbar(
     figure = captured.pop()
     labels = [tick.get_text() for tick in figure.axes[0].get_xticklabels()]
     runtime = context.artifact_metadata["notebook_view"]
-    assert r"$x_{\min}$" in labels
+    assert r"$x_{\min}$" not in labels
     assert r"$S_{\mathrm{MSRB}}$" in labels
+    assert len(labels) == len(_plot_data().coordinate_labels) + 4
     assert figure.axes[-1].get_ylabel() == "Behavior evidence (input units)"
     assert runtime["score_units"] == "objective_input_units"
     assert runtime["softmin_scale"] == pytest.approx(SOFTMIN_SCALE)

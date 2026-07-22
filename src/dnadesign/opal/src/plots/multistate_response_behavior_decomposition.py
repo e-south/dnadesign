@@ -68,9 +68,10 @@ KIND = "multistate_response_behavior_selected_decomposition"
         ),
         alt_text=(
             "Heatmap with allocated candidates as rows. Columns contain every raw response-ordering, ON-signal, "
-            "and OFF-signal-suppression coordinate, followed by three family scores, the hard bottleneck, and the "
-            "smooth behavior score. All values retain the objective input units. An outline marks the lowest "
-            "state-level coordinate. Zero is a reference direction, not feasibility."
+            "and OFF-signal-suppression coordinate, followed by three family scores and the smooth behavior score. "
+            "All values retain the objective input units. An outline marks the lowest state-level coordinate, so "
+            "the same hard-bottleneck value is not repeated as a summary column. Zero is a reference direction, "
+            "not feasibility."
         ),
         non_claim_boundary=(
             "The decomposition is based on model predictions until measured; the behavior score is not a pass/fail "
@@ -154,7 +155,6 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         RESPONSE_FAMILY_REF,
         ON_SIGNAL_FAMILY_REF,
         OFF_SIGNAL_SUPPRESSION_FAMILY_REF,
-        HARD_BOTTLENECK_REF,
         BEHAVIOR_SCORE_REF,
     )
     matrix = np.concatenate((coordinate_matrix, selected.loc[:, summary_columns].to_numpy(dtype=float)), axis=1)
@@ -188,7 +188,6 @@ def render_selected_decomposition(context: Any, params: dict) -> None:
         r"$S_R$",
         r"$S_{\mathrm{ON}}$",
         r"$S_{\mathrm{OFF}}$",
-        r"$x_{\min}$",
         r"$S_{\mathrm{MSRB}}$",
     ]
     ax.set_xticks(np.arange(matrix.shape[1]), [*coordinate_tick_labels, *summary_tick_labels], rotation=45, ha="right")

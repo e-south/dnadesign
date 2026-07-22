@@ -1,7 +1,7 @@
 ## OPAL Plots
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-17
+**Last verified:** 2026-07-22
 
 
 Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
@@ -234,9 +234,9 @@ artifact. They do not read the mutable labels ledger or infer assay semantics.
   allocation, observed-batch, and label controls.
 - **`multistate_response_behavior_selected_decomposition`**: shows every
   K-state response, ON-signal, and OFF-signal-suppression coordinate for the
-  allocated candidates, followed by the three family scores, hard bottleneck,
-  and smooth behavior score. An outline marks the lowest state-level
-  coordinate.
+  allocated candidates, followed by the three family scores and smooth
+  behavior score. An outline marks the lowest state-level coordinate; the
+  same hard-bottleneck value is not repeated as a summary column.
 
 Neither plot draws or implies a feasibility boundary. Zero is a
 reference-direction value, not a pass threshold, and a positive score does not

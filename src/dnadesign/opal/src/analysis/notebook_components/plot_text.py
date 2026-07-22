@@ -154,9 +154,9 @@ def plot_math_description(kind: str, params: Mapping[str, Any] | None = None) ->
         "multistate_response_behavior_selected_decomposition": (
             "For each ledger-allocated candidate, OPAL replays every raw response, ON-signal, and "
             "OFF-signal-suppression coordinate in the objective input units. It appends the three family "
-            "smooth-bottleneck scores, the hard minimum coordinate, and the family-balanced behavior score in "
-            "those same units. The outlined state-level cell is the hard bottleneck; zero denotes the reference "
-            "direction, not feasibility."
+            "smooth-bottleneck scores and the family-balanced behavior score in those same units. The outlined "
+            "state-level cell is the hard bottleneck; its value is not repeated as a summary column. Zero denotes "
+            "the reference direction, not feasibility."
         ),
         "observed_objective_over_rounds": (
             "OPAL replays the configured pointwise objective once for each immutable observed candidate vector. "
