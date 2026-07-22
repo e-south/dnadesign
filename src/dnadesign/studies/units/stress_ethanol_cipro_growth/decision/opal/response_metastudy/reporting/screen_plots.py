@@ -24,33 +24,35 @@ from .plot_vocabulary import compact_policy_label
 
 def write_logic_effect_tradeoff_overlap(summary: pd.DataFrame, path: Path) -> None:
     sweep = _tradeoff_screen(summary)
-    fig = plt.figure(figsize=(7.8, 4.5))
-    sns.lineplot(data=sweep, x="logic_tradeoff_weight", y="unique_topk", marker="o", color="#2A6F97")
-    plt.title("Top-k uniqueness across the logic-effect tradeoff")
-    axis = plt.gca()
+    fig, axis = plt.subplots(figsize=(7.4, 5.0), constrained_layout=True)
+    sns.lineplot(
+        data=sweep,
+        x="logic_tradeoff_weight",
+        y="unique_topk",
+        marker="o",
+        color="#2A6F97",
+        ax=axis,
+    )
     axis.set_xlabel("Normalized logic weight")
-    axis.set_ylabel("Unique candidates across target-view selections")
-    axis.set_box_aspect(1)
-    plt.tight_layout()
+    axis.set_ylabel("Unique sequences across views")
+    axis.set_box_aspect(0.82)
     save_metastudy_figure(fig, path)
 
 
 def write_logic_effect_tradeoff_fidelity(summary: pd.DataFrame, path: Path) -> None:
     sweep = _tradeoff_screen(summary)
-    fig = plt.figure(figsize=(7.8, 4.5))
+    fig, axis = plt.subplots(figsize=(7.4, 5.0), constrained_layout=True)
     sns.lineplot(
         data=sweep,
         x="logic_tradeoff_weight",
         y="min_target_view_median_logic",
         marker="o",
         color="#B23A48",
+        ax=axis,
     )
-    plt.title("Selected target-shape fidelity across the logic-effect tradeoff")
-    axis = plt.gca()
     axis.set_xlabel("Normalized logic weight")
-    axis.set_ylabel("Weakest-target-view median logic fidelity")
-    axis.set_box_aspect(1)
-    plt.tight_layout()
+    axis.set_ylabel("Weakest-view median logic fidelity")
+    axis.set_box_aspect(0.82)
     save_metastudy_figure(fig, path)
 
 
@@ -83,7 +85,7 @@ def write_policy_overlap_summary(
             f"Pairwise reuse: {int(row['pairwise_overlap_total'])}",
             ha="center",
             va="bottom",
-            fontsize=8,
+            fontsize=10,
         )
     ax.set_ylim(0, 19)
     ax.set_xlabel("")
@@ -113,6 +115,6 @@ def write_topk_overlap_curve(
     ax.set_ylabel("Candidates shared by all target views")
     ax.set_title("All-target-view overlap across K")
     ax.set_box_aspect(1)
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=11)
     plt.tight_layout()
     save_metastudy_figure(fig, path)

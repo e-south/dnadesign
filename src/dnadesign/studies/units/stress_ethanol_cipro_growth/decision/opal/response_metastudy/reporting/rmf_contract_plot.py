@@ -30,14 +30,14 @@ def write_rmf_cardinality_pressure(frame: pd.DataFrame, path: Path) -> None:
     }
     require_columns(frame, required, context="RMF cardinality pressure plot")
     components = (
-        ("response_separation_bias", "Response separation bias"),
-        ("on_magnitude_floor_bias", "Minimum target-ON magnitude bias"),
-        ("off_magnitude_ceiling_bias", "Maximum target-OFF magnitude bias"),
+        ("response_separation_bias", "Response-ordering bias"),
+        ("on_magnitude_floor_bias", "ON-floor bias"),
+        ("off_magnitude_ceiling_bias", "OFF-ceiling bias"),
     )
     topology_order = ("one ON", "balanced", "one OFF")
     colors = {"one ON": "#2f5597", "balanced": "#548235", "one OFF": "#c55a11"}
     markers = {"one ON": "o", "balanced": "s", "one OFF": "^"}
-    fig, axes = plt.subplots(1, 3, figsize=(11.6, 4.1), sharex=True, constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(11.8, 4.7), sharex=True, constrained_layout=True)
     for axis, (column, label) in zip(axes, components, strict=True):
         for topology in topology_order:
             rows = frame.loc[frame["mask_topology"].eq(topology)].sort_values("state_count")
@@ -59,7 +59,13 @@ def write_rmf_cardinality_pressure(frame: pd.DataFrame, path: Path) -> None:
         axis.set_box_aspect(1.0)
     axes[0].set_ylabel("Mean bias from independent noise (log2 units)")
     handles, labels = axes[-1].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.1), title="Target mask")
+    fig.legend(
+        handles,
+        labels,
+        loc="outside lower center",
+        ncol=3,
+        title="Target-mask composition",
+    )
     save_metastudy_figure(fig, path)
 
 

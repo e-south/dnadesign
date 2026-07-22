@@ -44,6 +44,7 @@ class ReviewBundleEvidence:
     rmf_cardinality_pressure: pd.DataFrame
     observed_sfxi_components: pd.DataFrame
     observed_sfxi_robustness: pd.DataFrame
+    sfxi_greedy_replay: pd.DataFrame
     scored: dict[str, dict[str, pd.DataFrame]]
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...]
     thresholds: RecommendationThresholds
@@ -79,6 +80,7 @@ def materialize_review_bundle(
         rmf_cardinality_pressure=evidence.rmf_cardinality_pressure,
         observed_sfxi_components=evidence.observed_sfxi_components,
         observed_sfxi_robustness=evidence.observed_sfxi_robustness,
+        sfxi_greedy_replay=evidence.sfxi_greedy_replay,
         scored=evidence.scored,
         sfxi_evidence=evidence.sfxi_evidence,
         thresholds=evidence.thresholds,
@@ -100,6 +102,7 @@ def materialize_review_bundle(
         setpoint_support=evidence.setpoint_support,
         observed_sfxi_components=evidence.observed_sfxi_components,
         observed_sfxi_robustness=evidence.observed_sfxi_robustness,
+        sfxi_greedy_replay=evidence.sfxi_greedy_replay,
         response_screen=evidence.response_screen,
         pressure_tests=evidence.pressure_tests,
         plot_manifest=plot_manifest,
@@ -135,6 +138,7 @@ def _write_core_tables(tables_dir: Path, evidence: ReviewBundleEvidence) -> dict
         "rmf_cardinality_pressure": evidence.rmf_cardinality_pressure,
         "sfxi_round0_training_components": evidence.observed_sfxi_components,
         "sfxi_round0_training_robustness": evidence.observed_sfxi_robustness,
+        "sfxi_round0_greedy_replay": evidence.sfxi_greedy_replay,
     }
     paths: dict[str, Path] = {}
     for table_id, frame in frames.items():

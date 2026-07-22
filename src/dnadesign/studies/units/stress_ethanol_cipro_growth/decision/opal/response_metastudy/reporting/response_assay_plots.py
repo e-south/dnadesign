@@ -79,7 +79,7 @@ def write_reader_event_intervals(frame: pd.DataFrame, path: Path) -> None:
             bar.get_y() + bar.get_height() / 2.0,
             f"{float(coverage):.1f} h post-event coverage",
             va="center",
-            fontsize=8,
+            fontsize=10,
         )
     ax.set_xlim(0.0, max(0.8, float((2.0 * work["event_time_uncertainty_h"]).max()) + 0.35))
     fig.tight_layout()
@@ -107,7 +107,7 @@ def write_response_separation_stability(
     pivot = work.pivot(index="selection_view_id", columns="reduction_id", values="weakest_component_spearman")
     pivot = ordered_pivot(pivot, rows=_TARGET_VIEW_ORDER, columns=_REDUCTION_ORDER)
     values = pivot.to_numpy(dtype=float)
-    fig, ax = plt.subplots(figsize=(8.2, 5.6))
+    fig, ax = plt.subplots(figsize=(13.2, 7.0))
     image = ax.imshow(
         values,
         cmap="viridis",
@@ -125,7 +125,7 @@ def write_response_separation_stability(
                 f"{values[row, column]:.2f}",
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=10,
                 color=contrast_text_color(image, values[row, column]),
             )
     primary_label = representation_label(primary_reduction_id).replace("\n", " ")
@@ -177,9 +177,9 @@ def write_response_constraint_coverage(frame: pd.DataFrame, path: Path, *, prima
     ax.set_xlabel("Target mask")
     ax.set_axisbelow(True)
     ax.grid(axis="y", color="#e5e7eb", linewidth=0.7, zorder=0)
-    ax.bar_label(response_bars, padding=2, fontsize=8)
-    ax.bar_label(feasible_bars, padding=2, fontsize=8)
-    ax.legend(frameon=False, loc="upper right", fontsize=8)
+    ax.bar_label(response_bars, padding=2, fontsize=10)
+    ax.bar_label(feasible_bars, padding=2, fontsize=10)
+    ax.legend(frameon=False, loc="upper right", fontsize=11)
     fig.tight_layout()
     save_metastudy_figure(fig, path)
 
@@ -256,7 +256,7 @@ def write_repeated_design_agreement(frame: pd.DataFrame, path: Path) -> None:
                 f"{values[row, column]:.2f}",
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=9,
                 color=contrast_text_color(image, values[row, column]),
             )
     if image is None:
@@ -279,9 +279,9 @@ def _label_repeated_design_axis(
         [f"{value[:3]}\n{_STATE_TICK_LABELS[value[1:3]]}" for value in value_columns],
         rotation=90,
         ha="right",
-        fontsize=7,
+        fontsize=10,
     )
-    axis.set_yticks(np.arange(len(rows)), rows["design_id"].astype(str), fontsize=8)
+    axis.set_yticks(np.arange(len(rows)), rows["design_id"].astype(str), fontsize=11)
     axis.axvline(3.5, color="#d1d5db", linewidth=0.9, zorder=5)
     add_column_group_brackets(
         axis,

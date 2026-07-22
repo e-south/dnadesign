@@ -15,13 +15,14 @@ from pathlib import Path
 from textwrap import fill
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 
 from ..core.contracts import RecommendationThresholds
 from .plot_helpers import focus_policy_ids
 from .plot_style import save_metastudy_figure
-from .plot_vocabulary import policy_label, target_view_label
+from .plot_vocabulary import compact_policy_label, target_view_label
 
 
 def write_policy_guardrail_matrix(
@@ -95,7 +96,7 @@ def write_policy_decision_frontier(
         .map({True: "Full top-k", False: "Incomplete top-k"})
     )
     data["Shared by all target views"] = data["all_target_views_overlap"]
-    fig = plt.figure(figsize=(9.4, 5.2))
+    fig, ax = plt.subplots(figsize=(7.6, 6.4), layout="constrained")
     ax = sns.scatterplot(
         data=data,
         x="min_target_view_median_logic",
@@ -106,6 +107,7 @@ def write_policy_decision_frontier(
         palette="viridis_r",
         edgecolor="#333333",
         linewidth=0.4,
+        ax=ax,
     )
     ax.axvline(thresholds.min_target_view_median_logic, color="#b94a48", linestyle="--", linewidth=1.2)
     ax.text(
@@ -113,21 +115,30 @@ def write_policy_decision_frontier(
         float(data["mean_topk_effect"].max()) * 0.95,
         "logic guardrail",
         color="#8b2e2c",
-        fontsize=8,
+        fontsize=10,
     )
     for _, row in data[data["focus"] != ""].iterrows():
-        ax.text(
-            float(row["min_target_view_median_logic"]) + 0.003,
-            float(row["mean_topk_effect"]) + 0.003,
-            str(row["focus"]),
-            fontsize=7,
+        ax.annotate(
+            compact_policy_label(str(row["policy_id"])),
+            xy=(float(row["min_target_view_median_logic"]), float(row["mean_topk_effect"])),
+            xytext=(10, 10),
+            textcoords="offset points",
+            fontsize=11,
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.86, "pad": 1.5},
         )
     ax.set_xlabel("Weakest-target-view median top-k logic fidelity")
     ax.set_ylabel("Mean selected SFXI scaled effect")
-    ax.set_title("Policy decision frontier")
     ax.set_box_aspect(1)
-    ax.legend(fontsize=7, loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0.0)
-    plt.tight_layout()
+    handles, legend_labels = ax.get_legend_handles_labels()
+    ax.get_legend().remove()
+    fig.legend(
+        handles,
+        legend_labels,
+        loc="outside lower center",
+        ncols=3,
+        frameon=False,
+        fontsize=11,
+    )
     save_metastudy_figure(fig, path)
 
 
@@ -149,28 +160,55 @@ def write_score_component_dominance(
         {"logic_fidelity": "Score vs logic fidelity", "effect_scaled": "Score vs scaled effect"}
     )
     data["Target view"] = data["selection_view_id"].map(target_view_label)
-    data["Policy"] = data["policy_id"].map(policy_label)
+    data["Policy"] = data["policy_id"].map(compact_policy_label)
     data["Score component"] = data["component"]
-    grid = sns.catplot(
-        data=data,
-        x="Target view",
-        y="pearson",
-        hue="Score component",
-        col="Policy",
-        kind="bar",
-        height=3.5,
-        aspect=1.0,
-        palette=["#4f8a5b", "#b94a48"],
-    )
-    grid.set_axis_labels("Target view", "Pearson correlation")
-    grid.set_titles("{col_name}")
-    for ax in grid.axes.flat:
+    policies = list(dict.fromkeys(data["Policy"].astype(str)))
+    if len(policies) != 2:
+        raise ValueError(f"score-component coupling requires two policies, found {policies!r}.")
+    fig, axes = plt.subplots(1, 2, figsize=(9.6, 4.8), sharey=True, constrained_layout=True)
+    palette = {
+        "Score vs logic fidelity": "#4f8a5b",
+        "Score vs scaled effect": "#b94a48",
+    }
+    components = tuple(palette)
+    target_views = [target_view_label(value) for value in ("ethanol", "ciprofloxacin", "and")]
+    width = 0.34
+    x = np.arange(len(target_views), dtype=float)
+    for ax, policy in zip(axes, policies, strict=True):
+        rows = data.loc[data["Policy"].eq(policy)]
+        for offset, component in enumerate(components):
+            values = (
+                rows.loc[rows["Score component"].eq(component)]
+                .set_index("Target view")
+                .reindex(target_views)["pearson"]
+            )
+            if values.isna().any():
+                raise ValueError(f"score-component coupling is incomplete for policy {policy!r}.")
+            ax.bar(
+                x + (offset - 0.5) * width,
+                values.to_numpy(dtype=float),
+                width,
+                color=palette[component],
+                label=component,
+                zorder=3,
+            )
         ax.axhline(0.0, color="#444444", linewidth=0.8)
         ax.set_ylim(-0.7, 1.05)
         ax.set_box_aspect(1)
-        ax.tick_params(axis="x", rotation=25)
+        ax.set_title(policy)
+        ax.set_xlabel("Target view")
+        ax.set_xticks(x, target_views)
+        ax.tick_params(axis="x", rotation=18)
         for label in ax.get_xticklabels():
             label.set_horizontalalignment("right")
-    grid.fig.suptitle("Score component dominance", y=1.08)
-    grid.tight_layout()
-    save_metastudy_figure(grid.fig, path)
+    axes[0].set_ylabel("Pearson correlation")
+    handles, labels = axes[-1].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="outside lower center",
+        ncol=2,
+        title="Score component",
+        frameon=False,
+    )
+    save_metastudy_figure(fig, path)

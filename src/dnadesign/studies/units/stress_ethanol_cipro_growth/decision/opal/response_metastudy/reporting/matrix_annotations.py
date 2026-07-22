@@ -48,7 +48,7 @@ def add_column_group_brackets(
             label,
             ha="center",
             va="bottom",
-            fontsize=8,
+            fontsize=10,
             color="#111827",
             transform=transform,
             clip_on=False,
@@ -65,7 +65,7 @@ def label_representation_axis(axis: plt.Axes, columns: pd.Index) -> None:
         np.arange(len(column_ids)),
         [representation_label(value) for value in column_ids],
         ha="center",
-        fontsize=7,
+        fontsize=10,
     )
     role_order = list(dict.fromkeys(roles))
     groups = []

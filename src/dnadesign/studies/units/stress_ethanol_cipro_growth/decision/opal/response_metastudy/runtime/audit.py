@@ -43,6 +43,7 @@ from ..evaluation.recommendation import choose_recommendation
 from ..evaluation.recompute import assert_canonical_sfxi_recompute, validate_canonical_sfxi_recompute
 from ..evaluation.response_examples import build_response_example_rows
 from ..evaluation.scoring import score_sfxi_evidence
+from ..evaluation.sfxi_greedy_replay import build_historical_sfxi_greedy_replay
 from ..evaluation.summaries import summarize_policies
 from ..evaluation.support import build_setpoint_support
 from .campaign_calibration import compare_campaign_to_screen_calibration
@@ -268,18 +269,13 @@ def _materialize_metastudy(
         scored,
         k_values=(6, 10, 20, 50, 100, 500, 1000),
     )
-    canonical_sfxi_validation = validate_canonical_sfxi_recompute(
-        sfxi_evidence,
-        scored[CANONICAL_SFXI_POLICY_ID],
-    )
+    canonical_scored = scored[CANONICAL_SFXI_POLICY_ID]
+    canonical_sfxi_validation = validate_canonical_sfxi_recompute(sfxi_evidence, canonical_scored)
     assert_canonical_sfxi_recompute(canonical_sfxi_validation)
+    sfxi_greedy_replay = build_historical_sfxi_greedy_replay(sfxi_evidence, canonical_scored, top_k=top_k)
     thresholds = DEFAULT_RECOMMENDATION_THRESHOLDS
     support_thresholds = (0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65)
-    setpoint_support = build_setpoint_support(
-        sfxi_evidence,
-        scored[CANONICAL_SFXI_POLICY_ID],
-        thresholds=support_thresholds,
-    )
+    setpoint_support = build_setpoint_support(sfxi_evidence, canonical_scored, thresholds=support_thresholds)
     intrinsic_tests = build_metric_contract_tests(target_views)
     rmf_cardinality_pressure = build_rmf_cardinality_pressure()
     recommendation = choose_recommendation(
@@ -333,6 +329,7 @@ def _materialize_metastudy(
             rmf_cardinality_pressure=rmf_cardinality_pressure,
             observed_sfxi_components=observed_sfxi.components,
             observed_sfxi_robustness=observed_sfxi.robustness,
+            sfxi_greedy_replay=sfxi_greedy_replay,
             scored=scored,
             sfxi_evidence=sfxi_evidence,
             thresholds=thresholds,

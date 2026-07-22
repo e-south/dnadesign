@@ -64,7 +64,7 @@ def test_measured_response_examples_use_only_reader_values_and_rmf_components(
             + [text.get_text() for axis in axes for text in axis.texts]
         )
         assert "SFXI" not in visible_text
-        assert any(axis.get_ylabel().startswith("Unscaled RMF requirement") for axis in axes)
+        assert any(axis.get_ylabel().startswith("RMF requirement") for axis in axes)
         component_axes = [axis for axis in axes if not axis.images]
         assert len(component_axes) == 3
         assert all(axis.get_box_aspect() == 1.0 for axis in component_axes)

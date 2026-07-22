@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
@@ -28,7 +27,6 @@ _VIEW_LABELS = {
 }
 _LIMITS = (-0.025, 1.025)
 _TICKS = (0.0, 0.25, 0.5, 0.75, 1.0)
-_ISO_SCORES = (0.05, 0.10, 0.20, 0.40, 0.60)
 
 
 def write_historical_observed_sfxi_decomposition(
@@ -40,7 +38,11 @@ def write_historical_observed_sfxi_decomposition(
 
     _validate_inputs(components, robustness)
     fig, axes = plt.subplots(1, 3, figsize=(15.6, 5.8), sharex=True, sharey=True, layout="constrained")
-    fig.suptitle("Historical observed SFXI decomposition", fontsize=18, fontweight="semibold")
+    layout_engine = fig.get_layout_engine()
+    if layout_engine is None:
+        raise RuntimeError("Observed SFXI decomposition requires Matplotlib constrained layout.")
+    layout_engine.set(rect=(0.02, 0.03, 0.96, 0.86), w_pad=0.04, h_pad=0.03, wspace=0.05)
+    fig.suptitle("Observed SFXI component decomposition", fontsize=18, fontweight="semibold", y=0.995)
     for axis, view_id in zip(axes, _VIEW_ORDER, strict=True):
         view = components.loc[components["selection_view_id"].astype(str).eq(view_id)].copy()
         summary = robustness.loc[
@@ -49,7 +51,6 @@ def write_historical_observed_sfxi_decomposition(
         ]
         if len(summary) != 1:
             raise ValueError(f"Historical observed SFXI plot requires one full-corpus summary for {view_id!r}.")
-        _draw_iso_scores(axis)
         axis.scatter(
             view["logic_fidelity"],
             view["effect_scaled"],
@@ -73,20 +74,19 @@ def write_historical_observed_sfxi_decomposition(
         _annotate_controls(axis, view)
         row = summary.iloc[0]
         axis.text(
-            0.035,
-            0.965,
-            "Rank correlation with SFXI\n"
-            f"Logic fidelity: $\\rho$ = {float(row['sfxi_vs_logic_spearman']):.2f}\n"
-            rf"Scaled effect: $\rho$ = {float(row['sfxi_vs_effect_spearman']):.2f}",
+            0.5,
+            1.025,
+            "Rank agreement with SFXI\n"
+            f"Scaled effect: $\\rho$ = {float(row['sfxi_vs_effect_spearman']):.2f} · "
+            rf"Logic fidelity: $\rho$ = {float(row['sfxi_vs_logic_spearman']):.2f}",
             transform=axis.transAxes,
-            ha="left",
-            va="top",
-            fontsize=10.5,
-            linespacing=1.22,
-            bbox={"boxstyle": "round,pad=0.35", "facecolor": "white", "edgecolor": "#d1d5db", "alpha": 0.95},
+            ha="center",
+            va="bottom",
+            fontsize=11,
+            linespacing=1.08,
             zorder=6,
         )
-        axis.set_title(_VIEW_LABELS[view_id], fontsize=15, pad=10)
+        axis.set_title(_VIEW_LABELS[view_id], fontsize=15, pad=40)
         axis.set_box_aspect(1)
         axis.set_xlim(_LIMITS)
         axis.set_ylim(_LIMITS)
@@ -105,14 +105,6 @@ def write_historical_observed_sfxi_decomposition(
         columnspacing=1.7,
     )
     save_metastudy_figure(fig, path)
-
-
-def _draw_iso_scores(axis: plt.Axes) -> None:
-    logic = np.linspace(0.001, 1.0, 600)
-    for score in _ISO_SCORES:
-        effect = score / logic
-        visible = effect <= 1.0
-        axis.plot(logic[visible], effect[visible], color="#cbd5e1", linewidth=0.9, zorder=1)
 
 
 def _annotate_controls(axis: plt.Axes, view: pd.DataFrame) -> None:
@@ -163,7 +155,6 @@ def _legend_handles() -> list[Line2D]:
             markersize=10,
             label="Highest six measured SFXI scores",
         ),
-        Line2D([], [], color="#cbd5e1", linewidth=1.2, label="Equal SFXI score"),
     ]
 
 

@@ -25,6 +25,7 @@ def test_plot_vocabulary_names_every_visible_domain_value() -> None:
     assert plot_vocabulary.target_view_label("or") == "OR (pressure test)"
     assert plot_vocabulary.policy_label("sfxi_beta1_gamma1") == "Canonical SFXI beta=1 gamma=1"
     assert plot_vocabulary.compact_policy_label("sfxi_beta1_gamma1") == "Canonical SFXI"
+    assert plot_vocabulary.compact_policy_label("tradeoff_logic0p95") == "Logic weight 0.95"
     assert plot_vocabulary.panel_role_label("canonical_sfxi_shared_overlap") == "Canonical SFXI shared overlap"
     assert plot_vocabulary.model_metric_label("v01") == "Logic\nCiprofloxacin (v01)"
     assert plot_vocabulary.model_metric_label("y11_star") == "Fluorescence\nBoth stresses (y*11)"

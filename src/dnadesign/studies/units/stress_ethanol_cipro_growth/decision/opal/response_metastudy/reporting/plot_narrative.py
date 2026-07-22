@@ -10,6 +10,11 @@ Module Author(s): Eric J. South
 """
 
 PLOT_RATIONALES: dict[str, str] = {
+    "historical_sfxi_greedy_replay": (
+        "The recorded prediction and selection ledgers show how canonical SFXI ranked the eligible "
+        "candidate universe. Candidate reuse then tests whether the three target masks produced distinct greedy "
+        "lists rather than only renaming a shared high-effect preference."
+    ),
     "historical_observed_sfxi_decomposition": (
         "Replaying the canonical product on measured labels distinguishes scalarization behavior in the assay "
         "corpus from compression introduced by the sequence model."
@@ -35,8 +40,6 @@ PLOT_RATIONALES: dict[str, str] = {
     ),
     "score_correlation_matrix": "Target-view-specific objectives should not remain nearly rank-equivalent.",
     "selected_vec8_profiles": "Predicted profiles provide a direct check on whether selections differ by setpoint.",
-    "sfxi_score_contours": "The score surface makes exponent and clipping behavior inspectable before tuning.",
-    "target_view_pareto_fronts": "Pareto structure shows whether the candidate surface contains genuine tradeoffs.",
     "denominator_sensitivity": "A within-round scale constant should not silently determine candidate identity.",
     "policy_comparison_panel_roles": "The exported diagnostic panel must expose why each row was included.",
     "model_validation": "Selection is not actionable when the predictor cannot order held-out observations.",
@@ -71,6 +74,11 @@ PLOT_RATIONALES: dict[str, str] = {
 }
 
 PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
+    "historical_sfxi_greedy_replay": (
+        "This replay describes one fitted model and candidate pool. It does not show that SFXI is universally "
+        "invalid, that the nominated promoters have the predicted behavior, or that another selector would have "
+        "succeeded prospectively."
+    ),
     "historical_observed_sfxi_decomposition": (
         "This corpus-specific replay does not show that SFXI is universally invalid or prospectively inferior, "
         "and it does not score the active response-window phenotype."
@@ -90,8 +98,6 @@ PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
     "logic_effect_topk_scatter": "Top-k placement is model-derived and does not establish a responsive promoter.",
     "score_correlation_matrix": "Low correlation alone is not evidence that target-view selections are correct.",
     "selected_vec8_profiles": "Mean predicted profiles can hide candidate-level errors and assay variability.",
-    "sfxi_score_contours": "The contour is metric algebra, not an empirical response surface.",
-    "target_view_pareto_fronts": "The frontier is predicted and depends on the fitted model and X representation.",
     "denominator_sensitivity": "Within-round sensitivity does not make SFXI scores comparable across assay rounds.",
     "policy_comparison_panel_roles": "Panel membership is for calibration review, not synthesis authorization.",
     "model_validation": "Held-out association measures ranking support and does not prove causal biology.",
@@ -119,6 +125,7 @@ PLOT_NON_CLAIM_BOUNDARIES: dict[str, str] = {
 }
 
 PLOT_DATA_TABLES: dict[str, str] = {
+    "historical_sfxi_greedy_replay": "tables/sfxi_round0_greedy_replay.csv",
     "historical_observed_sfxi_decomposition": "tables/sfxi_round0_training_components.csv",
     "measured_response_examples": "tables/measured_response_examples.csv",
     "rmf_cardinality_pressure": "tables/rmf_cardinality_pressure.csv",
@@ -130,8 +137,6 @@ PLOT_DATA_TABLES: dict[str, str] = {
     "logic_effect_topk_scatter": "tables/top_candidates.csv",
     "score_correlation_matrix": "tables/score_correlations.csv",
     "selected_vec8_profiles": "tables/top_candidates.csv",
-    "sfxi_score_contours": "tables/policy_summary.csv",
-    "target_view_pareto_fronts": "tables/top_candidates.csv",
     "denominator_sensitivity": "tables/denominator_sensitivity.csv",
     "policy_comparison_panel_roles": "tables/policy_comparison_panel.csv",
     "model_validation": "tables/model_validation.csv",

@@ -29,6 +29,7 @@ POLICY_COMPACT_LABELS = {
     "logic_gate055_effect": "Logic gate 0.55",
     "lexicographic_logic_effect": "Lexicographic",
     "off_state_logic_eta2_beta2_gamma05": "OFF-state penalty",
+    "tradeoff_logic0p95": "Logic weight 0.95",
 }
 PANEL_ROLE_LABELS = {
     "canonical_sfxi_high_effect": "Canonical SFXI high effect",
@@ -94,10 +95,6 @@ PREDICTION_COMPONENT_LABELS = {
     "median_logic_fidelity": "Median logic fidelity",
     "median_effect_scaled": "Median scaled effect",
 }
-SELECTION_LAYER_LABELS = {
-    "candidate sample": "Candidate sample",
-    "selected top-6": "Selected top 6",
-}
 STATE_TICK_LABELS = {
     "00": "No stress",
     "10": "Ethanol",
@@ -148,10 +145,6 @@ def prediction_component_label(value: object) -> str:
     return _closed_label(PREDICTION_COMPONENT_LABELS, value, kind="prediction component")
 
 
-def selection_layer_label(value: object) -> str:
-    return _closed_label(SELECTION_LAYER_LABELS, value, kind="selection layer")
-
-
 def reader_experiment_label(value: object) -> str:
     return _closed_label(READER_EXPERIMENT_LABELS, value, kind="Reader experiment")
 
@@ -178,6 +171,5 @@ __all__ = [
     "reader_experiment_label",
     "representation_label",
     "representation_role",
-    "selection_layer_label",
     "target_view_label",
 ]

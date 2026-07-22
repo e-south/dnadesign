@@ -40,9 +40,7 @@ def test_plot_writer_owns_single_axis_title_and_grid_layer(tmp_path: Path) -> No
     plot_style.save_metastudy_figure(figure, tmp_path / "policy_guardrail_matrix.png")
 
     assert axis.get_title(loc="left") == ""
-    assert axis.get_title().replace("\n", " ") == (
-        "Policy promotion requires both metric guardrails and held-out predictor support"
-    )
+    assert axis.get_title().replace("\n", " ") == "SFXI policy guardrails"
     assert axis.title.get_ha() == "center"
     assert not axis.spines["top"].get_visible()
     assert not axis.spines["right"].get_visible()
@@ -50,6 +48,9 @@ def test_plot_writer_owns_single_axis_title_and_grid_layer(tmp_path: Path) -> No
     assert axis.spines["bottom"].get_visible()
     assert any(line.get_visible() for line in axis.get_ygridlines())
     assert max(line.get_zorder() for line in axis.get_ygridlines()) < min(bar.get_zorder() for bar in bars)
+    assert axis.title.get_fontsize() >= 18
+    assert axis.xaxis.label.get_fontsize() >= 13
+    assert min(tick.get_fontsize() for tick in axis.get_xticklabels()) >= 11
 
 
 def test_plot_writer_preserves_panel_titles_below_one_figure_premise(tmp_path: Path) -> None:
@@ -61,14 +62,14 @@ def test_plot_writer_preserves_panel_titles_below_one_figure_premise(tmp_path: P
     plot_style.save_metastudy_figure(figure, tmp_path / "measured_response_examples.png")
 
     assert figure._suptitle is not None
-    assert figure._suptitle.get_text().replace("\n", " ") == (
-        "The target mask changes which fixed Reader states define each RMF requirement"
-    )
+    assert figure._suptitle.get_text().replace("\n", " ") == "Measured responses under each target mask"
     assert figure._suptitle.get_ha() == "center"
     assert figure._suptitle.get_position()[0] == 0.5
     assert [axis.get_title() for axis in axes] == ["Ethanol", "Ciprofloxacin"]
     assert [axis.get_title(loc="left") for axis in axes] == ["", ""]
     assert all(axis.title.get_ha() == "center" for axis in axes)
+    assert figure._suptitle.get_fontsize() >= 18
+    assert all(axis.title.get_fontsize() >= 15 for axis in axes)
     figure.canvas.draw()
     renderer = figure.canvas.get_renderer()
     title_box = figure._suptitle.get_window_extent(renderer)

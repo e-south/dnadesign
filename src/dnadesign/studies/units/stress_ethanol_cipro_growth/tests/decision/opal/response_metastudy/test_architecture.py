@@ -130,6 +130,7 @@ def test_response_model_modules_stay_semantically_bounded() -> None:
         "reporting/notebook_summary.py": 120,
         "reporting/matrix_annotations.py": 120,
         "reporting/plot_style.py": 100,
+        "reporting/plot_style_primitives.py": 100,
         "reporting/plot_vocabulary.py": 180,
         "reporting/response_assay_plots.py": 300,
         "reporting/response_model_plots.py": 240,

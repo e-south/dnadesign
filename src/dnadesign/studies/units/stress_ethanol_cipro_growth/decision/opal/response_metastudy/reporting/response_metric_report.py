@@ -192,7 +192,7 @@ def response_metric_report_sections(
         "All three semantic thresholds are zero: ON response must exceed OFF response, ON fluorescence must be at "
         "least the same-state pDual-10 reference, and OFF fluorescence must not exceed it. Target-view review "
         "scales use the 90th percentile of replicate-bootstrap variation combined with event-bound sensitivity. "
-        "These values make the historical screen interpretable but are not biological laws.",
+        "These values make the comparator screen interpretable but are not biological laws.",
         "",
         _markdown_table(screen.calibration),
         "",

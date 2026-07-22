@@ -92,7 +92,7 @@ def _(Path, discover_current_campaign_navigation, pd, publication):
 def _(mo):
     section_options = {
         "Assay and labels": "assay_and_labels",
-        "Historical model screens": "historical_model_screens",
+        "Model screens": "historical_model_screens",
         "RMF comparator": "rmf_comparator",
         "SFXI comparator": "sfxi_comparator",
     }
@@ -172,7 +172,7 @@ def _(bundle_manifest, campaign_navigation, mo, response_metastudy):
     review_context = mo.accordion(
         {
             "Study context": study_context,
-            "Current OPAL review — outside this evidence bundle": campaign_review,
+            "Active OPAL campaign": campaign_review,
             "Objective comparators": mo.md(
                 """__COMPARATOR_GUIDE_MARKDOWN__"""
             ),
@@ -205,7 +205,7 @@ def _(Path, bundle_root, controls, deliverable, mo, pd, plot_catalog, review_con
     )
     details = mo.accordion(
         {
-            "Evidence contract": metadata,
+            "Interpretation and limits": metadata,
             f"Source table · {Path(table_path).name}": mo.ui.dataframe(evidence_table, page_size=12),
         }
     )

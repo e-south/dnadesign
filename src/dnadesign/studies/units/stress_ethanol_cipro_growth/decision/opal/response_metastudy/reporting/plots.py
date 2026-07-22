@@ -20,7 +20,7 @@ matplotlib.use("Agg")
 import pandas as pd
 
 from ..core.contracts import RecommendationThresholds, SfxiEvidenceFrame
-from ..core.policies import SCORE_SURFACE_POLICY_ID
+from ..core.policies import CANONICAL_SFXI_POLICY_ID
 from ..core.response_contracts import ResponseMetricScreen
 from .diagnostic_plots import (
     write_logic_effect_scatter,
@@ -32,8 +32,6 @@ from .diagnostic_plots import (
 from .metric_behavior_plots import (
     write_denominator_sensitivity,
     write_policy_comparison_panel_roles,
-    write_sfxi_score_contours,
-    write_target_view_pareto_fronts,
 )
 from .model_validation_plot import write_model_validation
 from .observed_sfxi_plot import write_historical_observed_sfxi_decomposition
@@ -63,6 +61,7 @@ from .screen_plots import (
     write_policy_overlap_summary,
     write_topk_overlap_curve,
 )
+from .sfxi_greedy_replay_plot import write_historical_sfxi_greedy_replay
 from .support_plot import write_candidate_logic_support
 
 
@@ -82,6 +81,7 @@ def write_visuals(
     rmf_cardinality_pressure: pd.DataFrame,
     observed_sfxi_components: pd.DataFrame,
     observed_sfxi_robustness: pd.DataFrame,
+    sfxi_greedy_replay: pd.DataFrame,
     scored: dict[str, dict[str, pd.DataFrame]],
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...],
     thresholds: RecommendationThresholds,
@@ -103,6 +103,11 @@ def write_visuals(
         observed_sfxi_components,
         observed_sfxi_robustness,
         paths["historical_observed_sfxi_decomposition"],
+    )
+    write_historical_sfxi_greedy_replay(
+        scored[CANONICAL_SFXI_POLICY_ID],
+        sfxi_greedy_replay,
+        paths["historical_sfxi_greedy_replay"],
     )
 
     write_policy_guardrail_matrix(
@@ -149,18 +154,6 @@ def write_visuals(
         summary,
         candidates,
         paths["selected_vec8_profiles"],
-        comparison_policy_id=comparison_policy_id,
-    )
-    write_sfxi_score_contours(
-        summary,
-        paths["sfxi_score_contours"],
-        score_surface_policy_id=SCORE_SURFACE_POLICY_ID,
-    )
-    write_target_view_pareto_fronts(
-        summary,
-        scored,
-        sfxi_evidence,
-        paths["target_view_pareto_fronts"],
         comparison_policy_id=comparison_policy_id,
     )
     write_denominator_sensitivity(denominator_sensitivity, paths["denominator_sensitivity"])

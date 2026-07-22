@@ -30,10 +30,9 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
         spec.tier for spec in plot_catalog.PLOT_SPECS
     }
     assert {
+        "historical_sfxi_greedy_replay",
         "historical_observed_sfxi_decomposition",
         "measured_response_examples",
-        "sfxi_score_contours",
-        "target_view_pareto_fronts",
         "denominator_sensitivity",
         "policy_comparison_panel_roles",
         "model_validation",
@@ -42,6 +41,8 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
         "metric_compensation_comparison",
         "sfxi_comparison_stability",
         "sfxi_comparison_target_coverage",
+        "target_view_pareto_fronts",
+        "sfxi_score_contours",
     }.isdisjoint(plot_ids)
     tiers = {spec.plot_id: spec.tier for spec in plot_catalog.PLOT_SPECS}
     assert tiers["selected_setpoint_residuals"] == "screen_appendix"
@@ -93,19 +94,39 @@ def test_plot_catalog_has_unique_semantic_deliverables() -> None:
     assert sections["label_model_screen"] == "historical_model_screens"
     assert sections["measured_response_examples"] == "rmf_comparator"
     assert sections["historical_observed_sfxi_decomposition"] == "sfxi_comparator"
-    assert orders["historical_observed_sfxi_decomposition"] == 1
-    assert orders["policy_guardrail_matrix"] == 2
-    assert sections["sfxi_score_contours"] == "sfxi_comparator"
+    assert sections["historical_sfxi_greedy_replay"] == "sfxi_comparator"
+    assert orders["historical_sfxi_greedy_replay"] == 1
+    assert orders["historical_observed_sfxi_decomposition"] == 2
+    assert orders["policy_guardrail_matrix"] == 3
     observed_sfxi = next(
         spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "historical_observed_sfxi_decomposition"
     )
     assert observed_sfxi.data_table == "tables/sfxi_round0_training_components.csv"
-    assert "measured corpus" in observed_sfxi.title.lower()
+    assert observed_sfxi.title == "Observed SFXI component decomposition"
+    assert "measured corpus" in observed_sfxi.premise.lower()
+    greedy_sfxi = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "historical_sfxi_greedy_replay")
+    assert greedy_sfxi.data_table == "tables/sfxi_round0_greedy_replay.csv"
+    assert "greedy" in greedy_sfxi.title.lower()
+    assert (
+        "historical"
+        not in " ".join(
+            (
+                greedy_sfxi.title,
+                greedy_sfxi.premise,
+                greedy_sfxi.decision_value,
+                greedy_sfxi.rationale,
+                greedy_sfxi.alt_text,
+            )
+        ).lower()
+    )
+    assert "predicted" in greedy_sfxi.alt_text.lower()
     measured = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "measured_response_examples")
-    assert measured.title == "The target mask changes which fixed Reader states define each RMF requirement"
+    assert measured.title == "Measured responses under each target mask"
+    assert measured.premise == "The target mask changes which fixed Reader states define each RMF requirement."
     assert "same measured SpyP and sulAp summaries" in measured.decision_value
     model_screen = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "label_model_screen")
-    assert "sequence features" in model_screen.title
+    assert model_screen.title == "Response-label model screen"
+    assert "sequence features" in model_screen.premise
     assert "configured campaign model, baseline, and fixed challengers remain separate" in model_screen.alt_text
     greedy = next(spec for spec in plot_catalog.PLOT_SPECS if spec.plot_id == "greedy_support_evidence")
     assert "configured campaign random forest" in greedy.alt_text

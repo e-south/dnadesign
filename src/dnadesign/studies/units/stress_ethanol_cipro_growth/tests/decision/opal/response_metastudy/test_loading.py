@@ -21,12 +21,14 @@ import yaml
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
     SFXI_SOURCE_PROVENANCE,
     MetastudyPaths,
+    SfxiEvidenceFrame,
     SfxiSourceProvenance,
     StressCampaignContract,
     StressTargetView,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime.loading import (
     assert_campaign_response_reduction,
+    assert_candidate_alignment,
     assert_sfxi_run_contract,
     assert_shared_observed_labels,
     load_candidate_matrix,
@@ -83,6 +85,14 @@ def test_shared_label_contract_rejects_source_drift() -> None:
 
     with pytest.raises(ValueError, match="observed label ledgers are not identical"):
         assert_shared_observed_labels((first, drifted))
+
+
+def test_candidate_alignment_rejects_same_id_with_different_sequence() -> None:
+    first = _candidate_evidence(pd.DataFrame({"id": ["a", "b"], "sequence": ["AAAA", "CCCC"]}))
+    drifted = _candidate_evidence(pd.DataFrame({"id": ["a", "b"], "sequence": ["TTTT", "CCCC"]}))
+
+    with pytest.raises(ValueError, match="id-to-sequence mapping"):
+        assert_candidate_alignment((first, drifted))
 
 
 def test_sfxi_run_contract_rejects_target_mask_drift() -> None:
@@ -365,6 +375,17 @@ def _sfxi_source() -> SfxiSourceProvenance:
 
 def _target_view() -> StressTargetView:
     return StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
+
+
+def _candidate_evidence(predictions: pd.DataFrame) -> SfxiEvidenceFrame:
+    return SfxiEvidenceFrame(
+        source=_sfxi_source(),
+        target_view=_target_view(),
+        predictions=predictions,
+        y_hat=np.zeros((len(predictions), 8), dtype=float),
+        denom=1.0,
+        run_id="r0",
+    )
 
 
 def _aligned_run() -> pd.Series:

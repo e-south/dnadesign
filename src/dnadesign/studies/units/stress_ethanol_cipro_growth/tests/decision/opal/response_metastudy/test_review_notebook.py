@@ -37,14 +37,15 @@ def test_review_notebook_has_one_deliverable_selector_and_one_viewport(tmp_path:
     assert "**Prospective hill climb:** {review_summary.prospective_hill_climb}" in source
     assert "review_summary.primary_assay_summary" in source
     assert "discover_current_campaign_navigation(bundle_root)" in source
-    assert "Current OPAL review — outside this evidence bundle" in source
+    assert "Active OPAL campaign" in source
+    assert "Interpretation and limits" in source
     assert "Current OPAL navigation is unavailable outside a source checkout" in source
     assert 'objective_label = "Objective" if len(campaign_navigation.objective_names) == 1 else "Objectives"' in source
     assert "**{objective_label}:**" in source
     assert "secg_msrb_greedy" not in source
     assert "publication.verify_bundle_artifacts(bundle_root)" in source
     assert 'label="Review section"' in source
-    assert '"Historical model screens": "historical_model_screens"' in source
+    assert '"Model screens": "historical_model_screens"' in source
     assert 'label="Figure"' in source
     assert "options=section_options" in source
     assert "value=next(iter(section_options))" in source

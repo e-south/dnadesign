@@ -178,7 +178,7 @@ reduced `log2(YFP/CFP)` response, while the `b` values are same-state
 pDual-10-relative `log2(YFP/OD600)` fluorescence. They are not SFXI vec8. The
 eight-component vector is response-window Y, not an RMF vec8. The primary
 reduction is the 4-8-hour post-event geometric log mean. Reader owns the
-reduction. This package applies RMF only as a historical comparator; the active
+reduction. This package applies RMF only as a retained comparator; the active
 OPAL campaign applies MSRB. Response-window labels enter OPAL only through the
 study's verified, manifest-pinned publication contract.
 
@@ -193,19 +193,20 @@ diagnostics and are not alternate names for RMF.
   provenance.
 - `report.md`: plain-language scientific interpretation and claim boundaries.
 - `review.py`: one-viewport Marimo review organized by assay and labels,
-  historical model screens, RMF comparator evidence, and SFXI comparator
+  model screens, RMF comparator evidence, and SFXI comparator
   evidence.
 - `plot_manifest.csv`: plot title, premise, value, rationale, alt text, review
   section, storage tier, and data source.
 - `tables/`: policy, label, model, uncertainty, repeated-measurement, and
-  greedy-support evidence, including the historical observed-SFXI component
-  replay and its source-deletion and ES-design sensitivity checks.
+  greedy-support evidence, including the exact SFXI greedy replay,
+  the observed-SFXI component replay, and its source-deletion and ES-design
+  sensitivity checks.
 - `plots/`: primary decision, metric diagnostic, and screen appendix figures.
 - `model_evidence/`: optional immutable checkpoints projected from verified
   metastudy bundles; see `model_evidence/README.md`.
 
 The default review section begins with response-window stability, followed by
-event timing and repeated-design agreement. Historical SFXI and response-window
+event timing and repeated-design agreement. SFXI and response-window
 model screens remain separate from RMF and SFXI comparator sections; they are
 not direct validation of the active MSRB campaign. Storage tiers continue to
 place files under primary, diagnostic, and appendix directories, but they are
@@ -215,10 +216,11 @@ not the user-facing navigation ontology.
 
 SFXI source evidence is evaluated only under its declared vec8 contract.
 Response-window evidence is evaluated only from its declared `r` and `b`
-fields; the study does not translate those fields into an SFXI vector. The SFXI
-replay shows that measured score ranks in this 35-label corpus followed scaled
-target-state effect much more closely than logic fidelity. This is historical
-comparator evidence, not a universal claim about SFXI. The Reader primary
+fields; the study does not translate those fields into an SFXI vector. Across
+the prediction pool, SFXI-effect Spearman correlation was 0.986-0.993, while 18
+Top-6 slots contained only 11 unique sequences. The separate 35-label replay
+shows the same direction in measured data. This is comparator evidence, not a
+universal claim about SFXI. The Reader primary
 response reduction is the duration-weighted mean log2 ratio from 4-8 hours
 after the intervention. The configured campaign random forest is evaluated as
 the campaign model. Fixed challengers and the mean baseline remain separate

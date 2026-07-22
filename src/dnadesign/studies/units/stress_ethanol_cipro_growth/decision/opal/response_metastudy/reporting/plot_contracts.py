@@ -33,6 +33,7 @@ class PlotSpec:
     review_section: ReviewSection
     section_order: int
     visual_type: str
+    display_title: str
     premise: str
     decision_value: str
     alt_text: str
@@ -40,7 +41,7 @@ class PlotSpec:
 
     @property
     def title(self) -> str:
-        return self.premise.rstrip(".")
+        return self.display_title.rstrip(".")
 
     @property
     def rationale(self) -> str:

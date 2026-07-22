@@ -41,6 +41,7 @@ from .observed_sfxi_replay import (
     build_observed_sfxi_decomposition,
     summarize_observed_sfxi_decomposition,
 )
+from .sfxi_greedy_replay import build_historical_sfxi_greedy_replay
 
 __all__ = [
     "CAMPAIGN_MODEL_SCREEN_ID",
@@ -56,6 +57,7 @@ __all__ = [
     "build_repeated_behavior_agreement",
     "build_multistate_behavior_shadow_evidence",
     "build_observed_sfxi_decomposition",
+    "build_historical_sfxi_greedy_replay",
     "build_bootstrap_rank_stability",
     "compare_hard_and_behavior_scores",
     "bootstrap_rows_with_identity",

@@ -77,12 +77,17 @@ def write_greedy_support_evidence(frame: pd.DataFrame, path: Path) -> None:
     ax.set_ylabel("Fraction of held-out Reader experiments")
     ax.set_box_aspect(1.0)
     for index, row in enumerate(work.itertuples()):
-        ax.text(
-            index,
-            min(1.02, float(row.fraction_ci_high) + 0.08),
+        anchor_y = min(1.0, float(row.fraction_ci_high))
+        near_top = anchor_y >= 0.90
+        horizontal_offset = 8 if index == 0 else -8 if index == len(work) - 1 else 0
+        ax.annotate(
             f"{int(row.groups_beating_median)}/{int(row.held_out_group_count)} groups",
-            ha="center",
-            fontsize=8,
+            (index, anchor_y),
+            xytext=(horizontal_offset, -8 if near_top else 8),
+            textcoords="offset points",
+            ha="left" if index == 0 else "right" if index == len(work) - 1 else "center",
+            va="top" if near_top else "bottom",
+            fontsize=11,
         )
     fig.tight_layout()
     save_metastudy_figure(fig, path)
@@ -105,7 +110,7 @@ def write_label_model_screen(frame: pd.DataFrame, path: Path) -> None:
     )
     pivot = ordered_pivot(pivot, rows=_MODEL_ORDER, columns=_REPRESENTATION_ORDER)
     values = pivot.to_numpy(dtype=float)
-    fig, ax = plt.subplots(figsize=(9.0, 8.0))
+    fig, ax = plt.subplots(figsize=(14.4, 9.6))
     image = ax.imshow(values, cmap="coolwarm", vmin=-0.4, vmax=0.4, aspect="equal")
     label_representation_axis(ax, pivot.columns)
     ax.set_yticks(np.arange(len(pivot.index)), [_MODEL_LABELS[str(value)] for value in pivot.index])
@@ -118,7 +123,7 @@ def write_label_model_screen(frame: pd.DataFrame, path: Path) -> None:
                 label,
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=9,
                 color=contrast_text_color(image, values[row, column]),
             )
     ax.set_title("Grouped model screen across response representations", pad=34)
@@ -169,7 +174,7 @@ def write_retrospective_enrichment(
     )
     pivot = ordered_pivot(pivot, rows=_TARGET_VIEW_ORDER, columns=_REPRESENTATION_ORDER)
     values = pivot.to_numpy(dtype=float)
-    fig, ax = plt.subplots(figsize=(8.8, 5.4))
+    fig, ax = plt.subplots(figsize=(13.2, 5.8))
     image = ax.imshow(values, cmap="viridis", vmin=0.0, vmax=1.0, aspect="equal")
     label_representation_axis(ax, pivot.columns)
     ax.set_yticks(np.arange(len(pivot.index)), [target_view_label(value) for value in pivot.index])
@@ -181,7 +186,7 @@ def write_retrospective_enrichment(
                 f"{values[row, column]:.2f}",
                 ha="center",
                 va="center",
-                fontsize=8,
+                fontsize=10,
                 color=contrast_text_color(image, values[row, column]),
             )
     ax.set_title("Retrospective held-out selection percentile for each label representation", pad=34)

@@ -24,7 +24,7 @@ from .response_metric_report import response_metric_report_sections
 
 EVIDENCE_SECTION_ORDER = (
     "Assay and label evidence",
-    "Historical model screens",
+    "Model screens",
     "RMF comparator",
     "SFXI comparator",
 )
@@ -43,6 +43,7 @@ def write_report(
     setpoint_support: pd.DataFrame,
     observed_sfxi_components: pd.DataFrame,
     observed_sfxi_robustness: pd.DataFrame,
+    sfxi_greedy_replay: pd.DataFrame,
     response_screen: ResponseMetricScreen,
     pressure_tests: pd.DataFrame,
     plot_manifest: pd.DataFrame,
@@ -88,6 +89,7 @@ def write_report(
         observed_sfxi_components,
         observed_sfxi_robustness,
     )
+    sfxi_greedy_summary, sfxi_greedy_overlap = _sfxi_greedy_report_evidence(sfxi_greedy_replay)
     primary_reduction_label = representation_label(primary_reduction_id).replace("\n", " ")
     label_truth_summary = (
         "The configured observed-label publication is verified."
@@ -101,7 +103,7 @@ def write_report(
     text = [
         "# Response Assay and Objective Comparison",
         "",
-        "This frozen evidence package records assay development, label construction, historical model screens, "
+        "This frozen evidence package records assay development, label construction, model screens, "
         "and objective comparisons. It does not contain active campaign state or choose a synthesis batch.",
         "",
         "## Premise",
@@ -130,7 +132,7 @@ def write_report(
         "- Objective-specific transforms do not change the Reader phenotype.",
         "",
         *response_sections.assay_and_labels,
-        "## Historical model screens",
+        "## Model screens",
         "",
         "These retrospective screens evaluate earlier response-window/RMF and SFXI predictor formulations. They "
         "do not validate the active MSRB selector; current MSRB evidence is maintained with its study protocol.",
@@ -138,15 +140,15 @@ def write_report(
         *response_sections.historical_model_screens,
         "### SFXI vec8 screen",
         "",
-        "Shuffled five-fold and leave-one-experiment-out retraining test whether the historical shared SFXI vec8 "
-        "predictor preserves observed ordering. Leave-one-experiment-out results governed the historical SFXI "
+        "Shuffled five-fold and leave-one-experiment-out retraining test whether the retained shared SFXI vec8 "
+        "predictor preserves observed ordering. Leave-one-experiment-out results governed the SFXI "
         "promotion decision; shuffled folds are descriptive interpolation checks.",
         "",
         _markdown_table(model_summary),
         "",
-        "### Historical SFXI setpoint support",
+        "### SFXI setpoint support",
         "",
-        "This table asks whether the fitted SFXI predictor produced candidate shapes near each historical setpoint. "
+        "This table asks whether the fitted SFXI predictor produced candidate shapes near each declared setpoint. "
         "It is not an MSRB support table.",
         "",
         _markdown_table(
@@ -162,7 +164,7 @@ def write_report(
         ),
         "",
         *response_sections.rmf_comparator,
-        "The RMF implementation and its historical screens remain comparator evidence. The active campaign uses "
+        "The RMF implementation and its retained screens remain comparator evidence. The active campaign uses "
         "`multistate_response_behavior_v1`; SFXI vec8 labels remain a separate assay contract.",
         "",
         "## SFXI comparator",
@@ -177,9 +179,28 @@ def write_report(
         "- Score: `logic_fidelity^beta * effect_scaled^gamma`.",
         "- Effect scaling: weighted target-state intensity divided by the source run's denominator.",
         "",
-        "### Historical observed-label decomposition",
+        "### SFXI greedy selection replay",
         "",
-        "This replay evaluates the 35 historical SFXI vec8 labels under each persisted target view. It does not "
+        "The same 35-label random forest scored the same candidate pool under each target view, then selected the "
+        "six highest SFXI scores. The replay uses those recorded predictions and selections; it does not fit a new "
+        "model.",
+        "",
+        "Spearman's rank correlation (rho) compares ordering, not numerical accuracy. Values near +1 mean the "
+        "SFXI rank follows that component, values near 0 indicate little consistent agreement, and negative "
+        "values mean candidates tend to move in opposite rank directions.",
+        "",
+        _markdown_table(sfxi_greedy_summary),
+        "",
+        sfxi_greedy_overlap,
+        "",
+        "The fitted SFXI score followed scaled effect much more closely than logic fidelity in every view. The "
+        "substantial candidate reuse shows that changing the target setpoint did not produce three well-separated "
+        "selection lists. This supports the study-specific conclusion that canonical SFXI was poorly aligned with "
+        "the desired combination of target pattern, ON signal, and OFF suppression.",
+        "",
+        "### Observed-label decomposition",
+        "",
+        "This replay evaluates the 35 SFXI vec8 labels under each persisted target view. It does not "
         "translate the active response-window phenotype into SFXI coordinates. Canonical SFXI is the product of "
         "logic fidelity and scaled target-state effect, so the component associations show which factor most "
         "closely followed the measured score ranks in this corpus.",
@@ -191,7 +212,7 @@ def write_report(
         "These are corpus-sensitivity checks, not cross-validation or evidence that SFXI is universally "
         "effect-dominated.",
         "",
-        "### Historical SFXI verdict",
+        "### SFXI verdict",
         "",
         f"- Recommendation: `{recommendation['verdict']}`.",
         f"- Policy promotion ready: `{recommendation['policy_promotion_ready']}`.",
@@ -224,13 +245,13 @@ def write_report(
         "",
         "### Candidate panel",
         "",
-        "`policy_comparison_panel.csv` compares historical SFXI scoring behavior; it is not a synthesis handoff.",
+        "`policy_comparison_panel.csv` compares SFXI scoring behavior; it is not a synthesis handoff.",
         "",
         _markdown_table(panel_summary),
         "",
         "### Denominator sensitivity",
         "",
-        "This probe rescales the historical SFXI denominator and recomputes top-k summaries to test whether "
+        "This probe rescales the SFXI denominator and recomputes top-k summaries to test whether "
         "intensity scaling drives candidate choice.",
         "",
         _markdown_table(
@@ -257,7 +278,7 @@ def write_report(
         "- Minimum weakest-view median held-out score Spearman correlation: "
         f"{thresholds.min_target_view_cv_score_spearman:.2f}.",
         "",
-        "These are historical metric-review guardrails, not biological thresholds.",
+        "These are metric-review guardrails, not biological thresholds.",
         "",
         _markdown_table(
             primary[
@@ -356,6 +377,58 @@ def _observed_sfxi_report_evidence(
     return full, sentence
 
 
+def _sfxi_greedy_report_evidence(replay: pd.DataFrame) -> tuple[pd.DataFrame, str]:
+    expected_views = {"ethanol", "ciprofloxacin", "and"}
+    required = {
+        "selection_view_id",
+        "rank",
+        "pool_candidate_count",
+        "score_vs_effect_spearman",
+        "score_vs_logic_spearman",
+        "top_k_effect_overlap",
+        "total_selection_slots",
+        "unique_selected_sequences",
+        "selected_in_all_views",
+        "pairwise_overlap_total",
+    }
+    missing = sorted(required - set(replay.columns))
+    if missing:
+        raise ValueError(f"Historical SFXI greedy report is missing columns: {missing}")
+    if set(replay["selection_view_id"].astype(str)) != expected_views:
+        raise ValueError("Historical SFXI greedy report requires all three target views.")
+    counts = replay.groupby("selection_view_id")["rank"].size()
+    if not counts.eq(6).all():
+        raise ValueError("Historical SFXI greedy report requires six persisted selections per target view.")
+    summary = (
+        replay.groupby("selection_view_id", sort=True)
+        .first()[
+            [
+                "pool_candidate_count",
+                "score_vs_effect_spearman",
+                "score_vs_logic_spearman",
+                "top_k_effect_overlap",
+            ]
+        ]
+        .reset_index()
+        .rename(
+            columns={
+                "selection_view_id": "target_view",
+                "pool_candidate_count": "predicted_candidates",
+                "score_vs_effect_spearman": "rank_rho_scaled_effect",
+                "score_vs_logic_spearman": "rank_rho_logic",
+                "top_k_effect_overlap": "sfxi_top6_in_effect_top6",
+            }
+        )
+    )
+    first = replay.iloc[0]
+    overlap = (
+        f"Across {int(first['total_selection_slots'])} target-view slots, the replay contains "
+        f"{int(first['unique_selected_sequences'])} unique sequences; "
+        f"{int(first['selected_in_all_views'])} sequences occur in all three lists."
+    )
+    return summary, overlap
+
+
 def _markdown_table(frame: pd.DataFrame) -> str:
     if frame.empty:
         return "_No rows._"
@@ -373,6 +446,12 @@ def _plot_manifest_tables(plot_manifest: pd.DataFrame) -> str:
     if plot_manifest.empty:
         return "_No plots rendered._"
     sections: list[str] = []
+    section_titles = {
+        "assay_and_labels": "Assay and label evidence",
+        "historical_model_screens": "Model screens",
+        "rmf_comparator": "RMF comparator",
+        "sfxi_comparator": "SFXI comparator",
+    }
     for review_section in (
         "assay_and_labels",
         "historical_model_screens",
@@ -384,7 +463,7 @@ def _plot_manifest_tables(plot_manifest: pd.DataFrame) -> str:
         )
         if section_rows.empty:
             continue
-        sections.append(f"### {review_section.replace('_', ' ').title()}")
+        sections.append(f"### {section_titles[review_section]}")
         sections.append(
             _markdown_table(
                 section_rows[

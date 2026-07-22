@@ -39,7 +39,14 @@ def write_model_validation(frame: pd.DataFrame, path: Path) -> None:
     if unknown_strategies:
         raise ValueError(f"model validation plot has unregistered split strategies: {unknown_strategies}")
     strategies = [strategy for strategy in _STRATEGY_ORDER if strategy in present_strategies]
-    fig, axes = plt.subplots(1, len(strategies), figsize=(6.2 * len(strategies), 6.2), sharey=True, squeeze=False)
+    fig, axes = plt.subplots(
+        1,
+        len(strategies),
+        figsize=(6.2 * len(strategies), 6.2),
+        sharey=True,
+        squeeze=False,
+        constrained_layout=True,
+    )
     for ax, strategy in zip(axes[0], strategies, strict=True):
         selected = frame.loc[frame["split_strategy"].astype(str).eq(strategy)]
         summary = (
@@ -64,7 +71,7 @@ def write_model_validation(frame: pd.DataFrame, path: Path) -> None:
         )
         ax.scatter(summary["median"], positions, c=colors, s=54, zorder=3)
         ax.axvline(0.0, color="#111827", linewidth=0.9)
-        ax.set_yticks(positions, labels, fontsize=8)
+        ax.set_yticks(positions, labels, fontsize=11)
         ax.set_xlabel("Held-out Spearman correlation")
         ax.set_title(_STRATEGY_LABELS[strategy])
     axes[0, 0].invert_yaxis()
@@ -77,11 +84,8 @@ def write_model_validation(frame: pd.DataFrame, path: Path) -> None:
                 ("Selection-view objective", _SCOPE_COLORS["selection_view_objective"]),
             )
         ],
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.88),
+        loc="outside lower center",
         ncols=2,
         frameon=False,
     )
-    fig.suptitle("Vec8 predictor validation by split strategy")
-    fig.tight_layout()
     save_metastudy_figure(fig, path)

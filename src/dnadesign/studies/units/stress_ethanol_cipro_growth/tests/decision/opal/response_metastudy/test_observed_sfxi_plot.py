@@ -49,7 +49,8 @@ def test_historical_observed_sfxi_plot_is_measured_square_and_colorbar_free(
         assert all(axis.get_xticks().tolist() == pytest.approx([0.0, 0.25, 0.5, 0.75, 1.0]) for axis in figure.axes)
         assert all(len(axis.collections[0].get_offsets()) == 35 for axis in figure.axes)
         assert all(len(axis.collections[1].get_offsets()) == 6 for axis in figure.axes)
-        assert figure._suptitle is not None and figure._suptitle.get_fontsize() >= 18
+        assert figure._suptitle is not None and figure._suptitle.get_text() == "Observed SFXI component decomposition"
+        assert figure._suptitle.get_fontsize() >= 18
         assert all(axis.title.get_fontsize() >= 15 for axis in figure.axes)
         assert all(axis.xaxis.label.get_fontsize() >= 13 for axis in figure.axes)
         assert all(min(tick.get_fontsize() for tick in axis.get_xticklabels()) >= 11 for axis in figure.axes)
@@ -62,9 +63,14 @@ def test_historical_observed_sfxi_plot_is_measured_square_and_colorbar_free(
         )
         assert "SpyP" in visible
         assert "sulAp" in visible
+        assert visible.count("Rank agreement with SFXI") == 3
+        assert "Rank correlation with SFXI" not in visible
         assert "Highest six measured SFXI scores" in visible
+        assert "Equal SFXI score" not in visible
+        assert all(not axis.lines for axis in figure.axes)
         assert "pDual-10-spyp" not in visible
         assert "selected top-6" not in visible.lower()
+        assert "historical" not in visible.lower()
         assert not any(axis.get_label() == "<colorbar>" for axis in figure.axes)
         figure.canvas.draw()
         renderer = figure.canvas.get_renderer()
@@ -72,6 +78,10 @@ def test_historical_observed_sfxi_plot_is_measured_square_and_colorbar_free(
             axes_box = axis.get_window_extent(renderer)
             for annotation in axis.texts:
                 box = annotation.get_window_extent(renderer)
+                if annotation.get_text().startswith("Rank agreement with SFXI"):
+                    assert annotation.get_bbox_patch() is None
+                    assert box.y0 >= axes_box.y1 - 1
+                    continue
                 assert box.x0 >= axes_box.x0 - 1
                 assert box.x1 <= axes_box.x1 + 1
                 assert box.y0 >= axes_box.y0 - 1

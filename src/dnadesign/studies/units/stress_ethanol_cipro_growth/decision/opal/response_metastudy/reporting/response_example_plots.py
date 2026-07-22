@@ -20,11 +20,15 @@ import pandas as pd
 from .plot_style import save_metastudy_figure
 
 _TARGET_VIEW_IDS = ("ethanol", "ciprofloxacin", "and")
-_TARGET_VIEW_LABELS = {"ethanol": "Ethanol", "ciprofloxacin": "Ciprofloxacin", "and": "AND"}
+_TARGET_VIEW_LABELS = {
+    "ethanol": "Ethanol-associated",
+    "ciprofloxacin": "Ciprofloxacin-associated",
+    "and": "Combined-state-only",
+}
 _TARGET_VIEW_ON_LABELS = {
-    "ethanol": "ON: ethanol; ethanol + ciprofloxacin",
-    "ciprofloxacin": "ON: ciprofloxacin; ethanol + ciprofloxacin",
-    "and": "ON: ethanol + ciprofloxacin only",
+    "ethanol": "ON 10, 11 · OFF 00, 01",
+    "ciprofloxacin": "ON 01, 11 · OFF 00, 10",
+    "and": "ON 11 · OFF 00, 10, 01",
 }
 _TARGET_VIEW_MASKS = {
     "ethanol": (0, 1, 0, 1),
@@ -42,8 +46,8 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
     labels = list(dict.fromkeys(frame["example_label"].astype(str)))
     if not labels:
         raise ValueError("measured response plot has no configured examples.")
-    figure = plt.figure(figsize=(12.6, 9.0), constrained_layout=True)
-    grid = figure.add_gridspec(2, 3, height_ratios=(1.08, 1.0))
+    figure = plt.figure(figsize=(12.8, 7.4), constrained_layout=True)
+    grid = figure.add_gridspec(2, 3, height_ratios=(1.12, 0.72))
     raw_axes: list[plt.Axes] = []
     component_axes: list[plt.Axes] = []
     width = 0.24
@@ -74,7 +78,9 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
         raw_axis.set_xticks(
             np.arange(4), [f"{state}\n{label}" for state, label in zip(_STATE_IDS, _STATE_LABELS, strict=True)]
         )
-        raw_axis.tick_params(axis="x", labelrotation=42, labelsize=7)
+        raw_axis.tick_params(axis="x", labelrotation=32, labelsize=10)
+        for tick in raw_axis.get_xticklabels():
+            tick.set_horizontalalignment("right")
         raw_axis.set_yticks(
             np.arange(len(labels) * 2),
             [
@@ -82,19 +88,21 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
                 for label in labels
                 for measurement in ("log2(YFP / CFP)", "relative fluorescence")
             ],
-            fontsize=7,
+            fontsize=10,
         )
+        if column_index:
+            raw_axis.tick_params(axis="y", labelleft=False)
         mask_axis = raw_axis.secondary_xaxis("top")
         mask = _TARGET_VIEW_MASKS[selection_view_id]
         mask_axis.set_xticks(np.arange(4), ["ON" if value else "OFF" for value in mask])
-        mask_axis.tick_params(axis="x", length=0, pad=4, labelsize=8)
+        mask_axis.tick_params(axis="x", length=0, pad=4, labelsize=11)
         for tick, value in zip(mask_axis.get_xticklabels(), mask, strict=True):
             tick.set_color("#047857" if value else "#6b7280")
             tick.set_fontweight("semibold")
         mask_axis.spines["top"].set_visible(False)
         raw_axis.set_title(
-            f"{_TARGET_VIEW_LABELS[selection_view_id]} mask {list(mask)}\n{_TARGET_VIEW_ON_LABELS[selection_view_id]}",
-            fontsize=9,
+            f"{_TARGET_VIEW_LABELS[selection_view_id]}\nmask {list(mask)}\n{_TARGET_VIEW_ON_LABELS[selection_view_id]}",
+            fontsize=12,
             pad=34,
         )
         for row_index, column in np.ndindex(raw_matrix.shape):
@@ -104,7 +112,7 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
                 f"{raw_matrix[row_index, column]:.1f}",
                 ha="center",
                 va="center",
-                fontsize=7,
+                fontsize=10,
                 color="white" if abs(raw_matrix[row_index, column]) > raw_limit * 0.55 else "#111827",
             )
 
@@ -115,9 +123,9 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
             zip(
                 ("response_separation", "on_magnitude_floor", "off_suppression"),
                 (
-                    "Response: min ON - max OFF",
-                    "ON fluorescence: min relative to pDual-10",
-                    "OFF fluorescence: -max relative to pDual-10",
+                    "Response ordering",
+                    "ON signal vs pDual-10",
+                    "OFF suppression vs pDual-10",
                 ),
                 colors,
                 strict=True,
@@ -131,9 +139,7 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
         axis.grid(axis="y", color="#e5e7eb", linewidth=0.7, zorder=0)
     if raw_image is None:
         raise RuntimeError("measured response plot did not render any target views.")
-    component_axes[0].set_ylabel(
-        "Unscaled RMF requirement (log2 units)\nHigher is better; 0 is the provisional boundary"
-    )
+    component_axes[0].set_ylabel("RMF requirement (log2 units)\nHigher is better")
     handles, legend_labels = component_axes[-1].get_legend_handles_labels()
     figure.colorbar(
         raw_image,
@@ -148,7 +154,6 @@ def write_measured_response_examples(frame: pd.DataFrame, path: Path) -> None:
         frameon=False,
         loc="outside lower center",
         ncols=3,
-        title="Reader values are fixed; the target-view mask changes the RMF components below",
     )
     save_metastudy_figure(figure, path)
 

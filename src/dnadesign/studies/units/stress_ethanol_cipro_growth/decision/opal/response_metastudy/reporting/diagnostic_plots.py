@@ -20,7 +20,7 @@ import seaborn as sns
 from ..core.contracts import RecommendationThresholds, StressTargetView
 from .plot_helpers import focus_policy_ids, target_view_mask_map
 from .plot_style import save_metastudy_figure
-from .plot_vocabulary import compact_policy_label, policy_label, target_view_label
+from .plot_vocabulary import compact_policy_label, target_view_label
 
 _SFXI_STATE_LABELS = ["v00\nNo stress", "v10\nEthanol", "v01\nCiprofloxacin", "v11\nBoth stresses"]
 
@@ -92,7 +92,7 @@ def write_logic_gate_feasibility(
     ax.set_ylabel("Smallest target-view top-k")
     ax.set_title("Logic gate feasibility")
     ax.set_box_aspect(1)
-    ax.legend(fontsize=7, loc="upper left", bbox_to_anchor=(1.02, 1.0), borderaxespad=0.0)
+    ax.legend(fontsize=11, loc="best")
     plt.tight_layout()
     save_metastudy_figure(fig, path)
 
@@ -107,7 +107,7 @@ def write_logic_effect_scatter(
     focus = focus_policy_ids(summary, comparison_policy_id=comparison_policy_id)[:2]
     data = candidates[candidates["policy_id"].isin(focus)].copy()
     data["Target view"] = data["selection_view_id"].map(target_view_label)
-    data["Policy"] = data["policy_id"].map(policy_label)
+    data["Policy"] = data["policy_id"].map(compact_policy_label)
     grid = sns.relplot(
         data=data,
         x="logic_fidelity",
@@ -123,15 +123,15 @@ def write_logic_effect_scatter(
     grid.set_titles("{col_name}")
     for axis in grid.axes.flat:
         axis.set_box_aspect(1)
+    grid.fig.set_layout_engine("constrained")
     sns.move_legend(
         grid,
-        "center left",
-        bbox_to_anchor=(1.0, 0.5),
+        "outside lower center",
+        ncol=2,
         title="Scoring policy",
         frameon=False,
     )
     grid.fig.suptitle("Top-k candidates: target fidelity versus effect", y=1.05)
-    grid.tight_layout()
     save_metastudy_figure(grid.fig, path)
 
 
@@ -154,7 +154,7 @@ def write_score_correlation_matrix(
     ]
     data["policy"] = data["policy_id"].map(compact_policy_label)
     pivot = data.pivot_table(index="policy", columns="pair", values="pearson", aggfunc="first")
-    fig = plt.figure(figsize=(7.8, 4.2))
+    fig, axis = plt.subplots(figsize=(8.8, 4.6), constrained_layout=True)
     sns.heatmap(
         pivot,
         annot=True,
@@ -164,12 +164,13 @@ def write_score_correlation_matrix(
         vmax=1.0,
         cbar_kws={"label": "Score Pearson correlation"},
         square=True,
+        ax=axis,
     )
-    plt.title("Campaign score coupling")
-    plt.xlabel("Campaign pair")
-    plt.ylabel("Scoring policy")
-    plt.xticks(rotation=0, fontsize=8)
-    plt.tight_layout()
+    axis.set_xlabel("Target-view pair")
+    axis.set_ylabel("Scoring policy")
+    axis.tick_params(axis="x", labelrotation=24)
+    for label in axis.get_xticklabels():
+        label.set_horizontalalignment("right")
     save_metastudy_figure(fig, path)
 
 
@@ -213,7 +214,7 @@ def _write_policy_target_view_heatmaps(
     center: float | None,
     colorbar_label: str,
 ) -> None:
-    figure = plt.figure(figsize=(9.8, 4.5), constrained_layout=True)
+    figure = plt.figure(figsize=(13.2, 5.4), constrained_layout=True)
     layout = figure.add_gridspec(1, len(policy_ids) + 1, width_ratios=[1.0] * len(policy_ids) + [0.06])
     axes = [figure.add_subplot(layout[0, index]) for index in range(len(policy_ids))]
     colorbar_axis = figure.add_subplot(layout[0, -1])
@@ -246,11 +247,11 @@ def _write_policy_target_view_heatmaps(
             square=True,
             ax=axis,
         )
-        axis.set_title(policy_label(policy_id))
+        axis.set_title(compact_policy_label(policy_id))
         axis.set_xlabel("SFXI logic state")
         axis.set_ylabel("Target view" if index == 0 else "")
-        axis.tick_params(axis="x", rotation=0, labelsize=8)
-        axis.tick_params(axis="y", rotation=0, labelsize=9)
+        axis.tick_params(axis="x", rotation=0, labelsize=11)
+        axis.tick_params(axis="y", rotation=0, labelsize=11)
     save_metastudy_figure(figure, path)
 
 

@@ -130,8 +130,8 @@ def test_score_component_facets_hide_policy_and_target_view_ids(
     )
 
     labels = _visible_text(captured_figures[0])
-    assert "Canonical SFXI beta=1 gamma=1" in labels
-    assert "Logic-weighted beta=4 gamma=0.5" in labels
+    assert "Canonical SFXI" in labels
+    assert "Logic-weighted" in labels
     assert "Ciprofloxacin" in labels
     assert "Score vs scaled effect" in labels
     assert CANONICAL not in labels
@@ -169,8 +169,8 @@ def test_selected_profile_heatmap_facets_policy_and_preserves_square_tiles(
     assert len(matrix_axes) == 2
     assert all(axis.get_aspect() == 1.0 for axis in matrix_axes)
     assert [axis.get_title() for axis in matrix_axes] == [
-        "Canonical SFXI beta=1 gamma=1",
-        "Logic-weighted beta=4 gamma=0.5",
+        "Canonical SFXI",
+        "Logic-weighted",
     ]
     assert [[tick.get_text() for tick in axis.get_yticklabels()] for axis in matrix_axes] == [
         ["Ethanol", "Ciprofloxacin", "AND"],

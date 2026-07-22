@@ -20,6 +20,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         tier="primary_decision",
         review_step=1,
         visual_type="measured-vector mask and component decomposition",
+        display_title="Measured responses under each target mask",
         premise="The target mask changes which fixed Reader states define each RMF requirement.",
         decision_value=(
             "Shows how the same measured SpyP and sulAp summaries produce different response and fluorescence "
@@ -39,6 +40,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="rmf_cardinality_pressure.png",
         tier="metric_diagnostic",
         visual_type="synthetic state-cardinality sensitivity",
+        display_title="RMF sensitivity to state-panel size",
         premise="Hard extrema become more noise-sensitive as the state panel grows.",
         decision_value=(
             "Shows when RMF's worst-state components need replicate-aware uncertainty or a prespecified robust "
@@ -52,31 +54,55 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ),
     ),
     PlotSpec(
-        plot_id="historical_observed_sfxi_decomposition",
+        plot_id="historical_sfxi_greedy_replay",
         review_section="sfxi_comparator",
         section_order=1,
+        filename="historical_sfxi_greedy_replay.png",
+        tier="metric_diagnostic",
+        visual_type="predicted-pool component scatter with exact greedy selections",
+        display_title="SFXI greedy selection replay",
+        premise="SFXI greedy selection followed predicted scaled effect more closely than logic fidelity.",
+        decision_value=(
+            "Places the exact Top-6 chosen in each SFXI run on every eligible prediction and shows "
+            "whether changing the target mask produced distinct nominations. Spearman rho measures rank agreement: "
+            "+1 means the SFXI ordering follows that component, 0 means little monotonic agreement, and negative "
+            "values mean candidates tend to move in opposite rank directions."
+        ),
+        alt_text=(
+            "Three square panels show the complete predicted candidate universe by SFXI logic fidelity and scaled "
+            "effect for the ethanol-associated, ciprofloxacin-associated, and combined-state-only target views. "
+            "The exact greedy Top-6 are numbered by rank; shared selections are highlighted. Rank correlations show "
+            "that the SFXI score followed scaled effect much more closely than logic "
+            "fidelity, and 18 target-view slots collapsed to 11 unique sequences."
+        ),
+    ),
+    PlotSpec(
+        plot_id="historical_observed_sfxi_decomposition",
+        review_section="sfxi_comparator",
+        section_order=2,
         filename="historical_observed_sfxi_decomposition.png",
         tier="metric_diagnostic",
         visual_type="measured component decomposition scatter",
+        display_title="Observed SFXI component decomposition",
         premise="In this measured corpus, observed SFXI ranks follow scaled effect more closely than logic fidelity.",
         decision_value=(
-            "Shows the two canonical SFXI factors for all 35 historical observed labels, with the six highest "
+            "Shows the two canonical SFXI factors for all 35 observed labels, with the six highest "
             "measured scores and the SpyP and sulAp controls identified in each target view."
         ),
         alt_text=(
             "Three square scatter panels show logic fidelity on the horizontal axis and scaled target-state effect "
-            "on the vertical axis for 35 historical observed SFXI labels. Dark rings identify the six highest "
-            "measured SFXI scores per view, light curves join equal product scores, and text reports rank "
-            "correlations between SFXI and each factor."
+            "on the vertical axis for 35 observed SFXI labels. Dark rings identify the six highest "
+            "measured SFXI scores per view, and text reports rank correlations between SFXI and each factor."
         ),
     ),
     PlotSpec(
         plot_id="policy_guardrail_matrix",
         review_section="sfxi_comparator",
-        section_order=2,
+        section_order=3,
         filename="policy_guardrail_matrix.png",
         tier="screen_appendix",
         visual_type="guardrail heatmap",
+        display_title="SFXI policy guardrails",
         premise="Policy promotion requires both metric guardrails and held-out predictor support.",
         decision_value=(
             "Shows which policies fail because of top-k feasibility, logic fidelity, overlap, score coupling, "
@@ -90,10 +116,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="policy_decision_frontier",
         review_section="sfxi_comparator",
-        section_order=3,
+        section_order=4,
         filename="policy_decision_frontier.png",
         tier="screen_appendix",
         visual_type="tradeoff scatter",
+        display_title="SFXI policy tradeoff frontier",
         premise="The sweep should be judged by target-shape fidelity and retained effect, not overlap alone.",
         decision_value="Shows whether any policy reaches the logic guardrail while retaining useful effect.",
         alt_text=(
@@ -105,10 +132,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="score_component_dominance",
         review_section="sfxi_comparator",
-        section_order=4,
+        section_order=5,
         filename="score_component_dominance.png",
         tier="metric_diagnostic",
         visual_type="correlation bars",
+        display_title="SFXI score-component coupling",
         premise="A setpoint-directed score should not be dominated by the effect term.",
         decision_value="Shows whether score tracks logic fidelity or scaled effect in each target view.",
         alt_text=(
@@ -119,10 +147,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="selected_setpoint_residuals",
         review_section="sfxi_comparator",
-        section_order=5,
+        section_order=6,
         filename="selected_setpoint_residuals.png",
         tier="screen_appendix",
         visual_type="residual heatmap",
+        display_title="Selected setpoint residuals",
         premise="Selected predicted logic profiles should move toward each target-view setpoint.",
         decision_value="Shows which SFXI states remain over- or under-predicted after selection.",
         alt_text=(
@@ -133,10 +162,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_gate_feasibility",
         review_section="sfxi_comparator",
-        section_order=6,
+        section_order=7,
         filename="logic_gate_feasibility.png",
         tier="metric_diagnostic",
         visual_type="gate sweep scatter",
+        display_title="Logic-gate candidate support",
         premise="Logic gates are only useful if each target view still has enough eligible candidates.",
         decision_value="Shows where stricter logic gates stop producing a full top-k.",
         alt_text=(
@@ -147,10 +177,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_effect_topk_scatter",
         review_section="sfxi_comparator",
-        section_order=7,
+        section_order=8,
         filename="logic_effect_topk_scatter.png",
         tier="metric_diagnostic",
         visual_type="component scatter",
+        display_title="Selected logic-effect tradeoffs",
         premise="Top-k candidates should be visible as both target-fidelity and effect tradeoffs.",
         decision_value="Separates high-effect candidates from candidates with stronger setpoint fidelity.",
         alt_text=(
@@ -161,10 +192,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="score_correlation_matrix",
         review_section="sfxi_comparator",
-        section_order=8,
+        section_order=9,
         filename="score_correlation_matrix.png",
         tier="metric_diagnostic",
         visual_type="correlation heatmap",
+        display_title="Cross-view score correlations",
         premise="Setpoint-specific policies should reduce cross-target-view score coupling.",
         decision_value="Shows whether policy changes actually separate target-view score surfaces.",
         alt_text=(
@@ -175,10 +207,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="selected_vec8_profiles",
         review_section="sfxi_comparator",
-        section_order=9,
+        section_order=10,
         filename="selected_vec8_profiles.png",
         tier="metric_diagnostic",
         visual_type="profile heatmap",
+        display_title="Selected SFXI vec8 profiles",
         premise="Selected candidates should show visibly different predicted logic profiles across setpoints.",
         decision_value="Shows mean selected vec8 logic profiles by policy and target view.",
         alt_text=(
@@ -187,42 +220,13 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ),
     ),
     PlotSpec(
-        plot_id="sfxi_score_contours",
-        review_section="sfxi_comparator",
-        section_order=10,
-        filename="sfxi_score_contours.png",
-        tier="metric_diagnostic",
-        visual_type="score-surface contour",
-        premise="SFXI policy changes should visibly alter how logic fidelity and effect trade off.",
-        decision_value="Shows why effect can dominate the score unless logic is weighted or gated.",
-        alt_text=(
-            "Contour plots of SFXI score over logic fidelity and scaled effect for canonical SFXI "
-            "and the declared normalized scalar tradeoff."
-        ),
-    ),
-    PlotSpec(
-        plot_id="target_view_pareto_fronts",
-        review_section="sfxi_comparator",
-        section_order=11,
-        filename="target_view_pareto_fronts.png",
-        tier="metric_diagnostic",
-        visual_type="Pareto scatter",
-        premise=(
-            "A target view should expose candidates that trade off logic fidelity and effect, not one scalar alone."
-        ),
-        decision_value="Shows selected candidates against the predicted candidate cloud for each stress setpoint.",
-        alt_text=(
-            "Scatter plots of sampled candidates by logic fidelity and scaled effect, faceted by target view, "
-            "with selected canonical SFXI and shape-ceiling comparison candidates overlaid."
-        ),
-    ),
-    PlotSpec(
         plot_id="denominator_sensitivity",
         review_section="sfxi_comparator",
-        section_order=12,
+        section_order=11,
         filename="denominator_sensitivity.png",
         tier="metric_diagnostic",
         visual_type="sensitivity line plot",
+        display_title="SFXI denominator sensitivity",
         premise="Intensity scaling should not be the hidden driver of setpoint-directed selection.",
         decision_value="Shows whether changing the SFXI denominator changes top-k logic or effect summaries.",
         alt_text=(
@@ -233,10 +237,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="policy_comparison_panel_roles",
         review_section="sfxi_comparator",
-        section_order=13,
+        section_order=12,
         filename="policy_comparison_panel_roles.png",
         tier="screen_appendix",
         visual_type="panel composition bars",
+        display_title="Policy-comparison panel coverage",
         premise="Policy review should compare declared diagnostic strata instead of presenting a winner list.",
         decision_value="Shows which metric-behavior strata are represented in policy_comparison_panel.csv.",
         alt_text=(
@@ -251,6 +256,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="model_validation.png",
         tier="metric_diagnostic",
         visual_type="held-out performance summary",
+        display_title="SFXI model validation",
         premise=(
             "A metric rerank is not actionable unless held-out vec8 predictions preserve observed response ordering."
         ),
@@ -264,10 +270,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="candidate_logic_support",
         review_section="sfxi_comparator",
-        section_order=14,
+        section_order=13,
         filename="candidate_logic_support.png",
         tier="metric_diagnostic",
         visual_type="threshold support curve",
+        display_title="Predicted logic-fidelity support",
         premise="A scalarizer cannot select response shapes absent from the predicted candidate surface.",
         decision_value="Shows how many candidates remain as the required setpoint fidelity increases.",
         alt_text=(
@@ -278,10 +285,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_effect_tradeoff_overlap",
         review_section="sfxi_comparator",
-        section_order=15,
+        section_order=14,
         filename="logic_effect_tradeoff_overlap.png",
         tier="screen_appendix",
         visual_type="tradeoff line plot",
+        display_title="Logic-effect tradeoff and cross-view overlap",
         premise="The normalized logic-effect tradeoff changes target-view overlap.",
         decision_value="Shows which identifiable tradeoff weights increase unique top-k selections.",
         alt_text=(
@@ -292,10 +300,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="logic_effect_tradeoff_fidelity",
         review_section="sfxi_comparator",
-        section_order=16,
+        section_order=15,
         filename="logic_effect_tradeoff_fidelity.png",
         tier="screen_appendix",
         visual_type="tradeoff line plot",
+        display_title="Logic-effect tradeoff and fidelity",
         premise="A logic-effect tradeoff should improve target-shape fidelity, not only candidate uniqueness.",
         decision_value="Shows the weakest target view's selected logic fidelity across identifiable tradeoff weights.",
         alt_text=(
@@ -306,10 +315,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="policy_overlap_summary",
         review_section="sfxi_comparator",
-        section_order=17,
+        section_order=16,
         filename="policy_overlap_summary.png",
         tier="screen_appendix",
         visual_type="overlap bar plot",
+        display_title="Top-K candidate reuse by policy",
         premise="Primary policy families differ in how much they reuse candidates across target views.",
         decision_value="Summarizes top-k uniqueness and overlap for canonical SFXI and candidate policy families.",
         alt_text="Bar plot of unique top-k sequences with overlap annotations for primary policy families.",
@@ -317,10 +327,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         plot_id="topk_overlap_curve",
         review_section="sfxi_comparator",
-        section_order=18,
+        section_order=17,
         filename="topk_overlap_curve.png",
         tier="screen_appendix",
         visual_type="overlap curve",
+        display_title="Cross-view overlap across K",
         premise="Target-view collapse should be checked beyond top-6.",
         decision_value="Shows whether shared candidates remain high as K increases.",
         alt_text="Line plot of observed all-three selected-candidate overlap across K for the focus policies.",
@@ -332,6 +343,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="reader_event_intervals.png",
         tier="metric_diagnostic",
         visual_type="event interval bars",
+        display_title="Recorded stress-addition intervals",
         premise="Recorded stress addition is bounded tightly enough to support an event-relative sensitivity screen.",
         decision_value="Shows the unresolved transition interval and available post-stress coverage for each source.",
         alt_text=(
@@ -347,6 +359,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         tier="primary_decision",
         review_step=2,
         visual_type="component stability heatmap",
+        display_title="Response-window ordering stability",
         premise=(
             "The primary reduction should preserve response and anchored fluorescence ordering across nearby summaries."
         ),
@@ -365,6 +378,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="response_constraint_coverage.png",
         tier="metric_diagnostic",
         visual_type="constraint support bars",
+        display_title="Observed RMF requirement support",
         premise="The same 35 observations provide uneven support for the campaign masks and the OR pressure test.",
         decision_value="Separates response ordering from all three response and fluorescence requirements by target.",
         alt_text=(
@@ -380,6 +394,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="response_uncertainty_sources.png",
         tier="metric_diagnostic",
         visual_type="uncertainty source bars",
+        display_title="Assay uncertainty by RMF component",
         premise="Metric scales should reflect the dominant measured uncertainty source.",
         decision_value="Compares replicate-bootstrap variation with event-time interval sensitivity by component.",
         alt_text=(
@@ -396,6 +411,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         tier="primary_decision",
         review_step=3,
         visual_type="grouped validation heatmap",
+        display_title="Response-label model screen",
         premise=(
             "A label representation is actionable only if sequence features preserve response-separation and "
             "feasibility ordering."
@@ -417,6 +433,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="retrospective_enrichment.png",
         tier="metric_diagnostic",
         visual_type="held-out enrichment heatmap",
+        display_title="Retrospective held-out enrichment",
         premise="A plausible active-learning direction should enrich held-out choices above random ordering.",
         decision_value="Shows the true within-experiment percentile selected by each representation's best challenger.",
         alt_text=(
@@ -433,6 +450,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         tier="primary_decision",
         review_step=4,
         visual_type="grouped evidence interval plot",
+        display_title="Grouped support for greedy selection",
         premise="Pure greedy selection requires grouped evidence that predicted leaders enrich held-out measurements.",
         decision_value=("Shows configured-campaign-model retrospective enrichment and its finite-sample uncertainty."),
         alt_text=(
@@ -448,6 +466,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         filename="repeated_design_agreement.png",
         tier="metric_diagnostic",
         visual_type="cross-experiment range heatmap",
+        display_title="Repeated-design agreement",
         premise="Repeated Reader experiments must agree well enough to justify one candidate-level label.",
         decision_value=(
             "Shows which response or anchored-fluorescence channels depend strongly on the selected experiment."

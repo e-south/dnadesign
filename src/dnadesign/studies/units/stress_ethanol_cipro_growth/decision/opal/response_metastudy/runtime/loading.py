@@ -382,11 +382,27 @@ def load_label_source_frame(
 
 
 def assert_candidate_alignment(runs: tuple[SfxiEvidenceFrame, ...]) -> None:
-    first = runs[0].predictions["id"].astype(str).tolist()
+    if not runs:
+        raise ValueError("at least one SFXI prediction ledger is required.")
+    first = _candidate_identity_sequence_keys(runs[0])
     for run in runs[1:]:
-        ids = run.predictions["id"].astype(str).tolist()
-        if ids != first:
-            raise ValueError(f"{run.source.source_id}: prediction ids are not aligned to {runs[0].source.source_id}.")
+        keys = _candidate_identity_sequence_keys(run)
+        if keys != first:
+            raise ValueError(
+                f"{run.source.source_id}: prediction id-to-sequence mapping is not aligned to "
+                f"{runs[0].source.source_id}."
+            )
+
+
+def _candidate_identity_sequence_keys(run: SfxiEvidenceFrame) -> list[tuple[str, str]]:
+    required = {"id", "sequence"}
+    missing = sorted(required - set(run.predictions.columns))
+    if missing:
+        raise ValueError(f"{run.source.source_id}: prediction ledger is missing candidate columns {missing}.")
+    keys = run.predictions.loc[:, ["id", "sequence"]].astype(str)
+    if keys["id"].duplicated().any():
+        raise ValueError(f"{run.source.source_id}: prediction ledger contains duplicate candidate ids.")
+    return list(keys.itertuples(index=False, name=None))
 
 
 def assert_shared_observed_labels(label_frames: tuple[pd.DataFrame, ...]) -> None:

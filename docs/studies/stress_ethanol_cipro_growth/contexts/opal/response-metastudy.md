@@ -34,7 +34,7 @@ The metastudy addresses three distinct questions:
 1. Which response window and label-source rules produce an auditable
    candidate-level phenotype?
 2. What do grouped model checks say about prediction and ranking support?
-3. What did the historical SFXI and RMF comparisons reveal about objective
+3. What did the SFXI and RMF comparisons reveal about objective
    behavior before MSRB became the executable selector?
 
 It is read-only with respect to Reader records, OPAL labels, campaign configs,
@@ -118,9 +118,10 @@ The response-metastudy publication schema is
    a prespecified coordinated six-slot policy.
 7. Verify the three immutable round-0 SFXI source ledgers, shared 35-row label
    pool, candidate IDs, and equivalent predictor surfaces. Recompute persisted
-   SFXI scores through the public OPAL API, decompose each measured score into
-   logic fidelity and scaled effect, and test the result after deleting each
-   source experiment and restricting the comparison to ES designs.
+   SFXI scores through the public OPAL API. Replay each exact predicted Top-6,
+   then decompose the measured scores into logic fidelity and scaled effect and
+   test that result after deleting each source experiment and restricting the
+   comparison to ES designs.
 8. Publish typed tables, a manifest-backed plot catalog, a report, and one
     Marimo review notebook.
 
@@ -183,7 +184,7 @@ observed Y; OPAL applies the configured objective and owns campaign scoring.
 
 ### Evidence Findings
 
-Canonical SFXI recomputes exactly on the 35 historical observed labels. Across
+Canonical SFXI recomputes exactly on the 35 observed labels. Across
 the ethanol-associated, ciprofloxacin-associated, and combined-state-only
 views, the rank correlations between SFXI and scaled effect are 0.967, 0.920,
 and 0.955. The corresponding correlations with logic fidelity are -0.209,
@@ -192,12 +193,29 @@ analysis to the 23 ES designs preserves the conclusion. These are
 corpus-sensitivity checks, not cross-validation or evidence that SFXI is
 universally effect-dominated.
 
-The persisted predicted top-six results show the related allocation pattern:
+Spearman's rank correlation, ρ, compares order rather than numerical
+accuracy. A value near +1 means that candidates ranked highly by one quantity
+also rank highly by the other; a value near 0 indicates little consistent rank
+agreement; negative values mean candidates tend to move in opposite rank
+directions, and -1 means exact reverse ordering.
+
+The 154,785 eligible predictions in each target view show a stronger version
+of the same pattern. The
+SFXI rank correlations with scaled effect are 0.986, 0.991, and 0.993 for the
+ethanol-associated, ciprofloxacin-associated, and combined-state-only views.
+The corresponding correlations with logic fidelity are -0.275, -0.447, and
+-0.490. Five, four, and five of the SFXI Top-6 candidates are also in the
+respective scaled-effect Top-6. The resulting allocation pattern is:
 
 - 18 target-view slots collapse to 11 unique sequences;
 - 2 candidates appear in all three target-view lists;
 - weakest median top-six logic fidelity is 0.258;
 - mean pairwise target-view score correlation is 0.968.
+
+Within this prediction pool, SFXI ranks aligned much more closely with
+scaled-effect ranks than with logic-fidelity ranks. It does not establish that
+SFXI is universally invalid or that another policy would have succeeded
+prospectively.
 
 The Reader bundle contains 8 experiments, 7 reductions, 413 design/reduction
 rows, 206,500 joint bootstrap rows, and 12 repeated design IDs. The primary
@@ -231,9 +249,9 @@ layout:
    prospective ordering visible.
 3. **RMF comparator** retains thresholded requirements, uncertainty, and
    retrospective greedy evidence as comparator material.
-4. **SFXI comparator** opens with the measured-label decomposition, then
-   retains predicted setpoint, score-coupling, overlap, and policy screens under
-   the distinct SFXI phenotype contract.
+4. **SFXI comparator** opens with the exact greedy replay, followed
+   by the measured-label decomposition. Setpoint, score-coupling, overlap, and
+   policy screens remain available under the distinct SFXI phenotype contract.
 
 The active `secg_msrb_greedy` campaign is reviewed in its own OPAL notebook.
 The metastudy does not reproduce active campaign state or use comparator plots

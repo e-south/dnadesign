@@ -60,6 +60,6 @@ def write_candidate_logic_support(
     ax.set_ylabel("Predicted candidates meeting threshold")
     ax.set_title("Candidate support for each stress-response shape")
     ax.set_box_aspect(1)
-    ax.legend(fontsize=8, loc="best")
+    ax.legend(fontsize=11, loc="best")
     plt.tight_layout()
     save_metastudy_figure(fig, path)
