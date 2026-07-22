@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-context-index
 title: Stress OPAL context
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-19
+last_verified: 2026-07-22
 audience:
   - operator
   - agent
@@ -27,6 +27,9 @@ verification](../../routes/decision/opal/campaign-commands.md#read-only-campaign
   [soft-min scale](multistate-response-behavior.md#what-the-soft-min-scale-changes),
   [uncertainty](multistate-response-behavior.md#uncertainty-and-censoring), and
   [claim limits](multistate-response-behavior.md#claim-boundaries).
+- [MSRB symbol walkthrough](multistate-response-behavior-walkthrough.html):
+  browser-native explanation of the symbols, behavior families, soft minimum,
+  and compensation scale.
 
 ### Comparator evidence
 

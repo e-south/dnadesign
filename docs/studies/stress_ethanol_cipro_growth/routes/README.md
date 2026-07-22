@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-routes
 surface: study-route-map
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-21
+last_verified: 2026-07-22
 entrypoint: self
 status_surface: studies.stress-ethanol-cipro-growth.status
 preflight_surface: studies.stress-ethanol-cipro-growth.preflight
@@ -13,7 +13,7 @@ preflight_surface: studies.stress-ethanol-cipro-growth.preflight
 
 **Owner:** dnadesign-maintainers
 
-**Last verified:** 2026-07-21
+**Last verified:** 2026-07-22
 
 Use this page after the checked-in study status tells you where the record stands. Keep this file as the one-hop handoff map; put downstream detail in focused files under this directory.
 
@@ -42,7 +42,7 @@ Use this page after the checked-in study status tells you where the record stand
 | Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
 | Reader observations and candidate identity | `stress study` | `label_truth_ready` | `src/dnadesign/studies/units/stress_ethanol_cipro_growth/{response_window_observations,promoter_candidate_bindings}/` |
 | OPAL campaigns and synthesis handoff | `opal` plus stress study | `opal_assay_b1_order_ready` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
-| Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | MSRB active learning probe; SFXI and RMF comparison evidence | [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), [RMF](../contexts/opal/response-magnitude-feasibility.md), and [Multistate Response Behavior](../contexts/opal/multistate-response-behavior.md) |
+| Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | MSRB active learning probe; SFXI and RMF comparison evidence | [MSRB symbol walkthrough](../contexts/opal/multistate-response-behavior-walkthrough.html), [MSRB study binding](../contexts/opal/multistate-response-behavior.md), [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), and [RMF](../contexts/opal/response-magnitude-feasibility.md) |
 
 ### Terminology Guardrails
 

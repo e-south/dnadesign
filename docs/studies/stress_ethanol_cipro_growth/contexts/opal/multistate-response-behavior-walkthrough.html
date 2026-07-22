@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A symbol-by-symbol, interactive explanation of the Multistate Response Behavior objective and its soft-min aggregation.">
+  <meta name="msrb-objective-id" content="multistate_response_behavior_v1">
+  <meta name="artifact-role" content="didactic-companion">
+  <title>How MSRB turns a binary target program into one score</title>
+  <style>
+    :root {
+      --ink: #18202b;
+      --muted: #566170;
+      --line: #d7dde5;
+      --paper: #ffffff;
+      --panel: #f5f7f9;
+      --response: #2f67ad;
+      --response-soft: #e8f0fb;
+      --on: #2f7d68;
+      --on-soft: #e7f3ef;
+      --off: #a74450;
+      --off-soft: #f7e9eb;
+      --accent: #5d4e8c;
+      --accent-soft: #efedf7;
+      --good: #256e56;
+      --shadow: 0 14px 36px rgba(27, 39, 55, 0.09);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      background: #eef1f4;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-width: 1080px;
+    }
+
+    button, input { font: inherit; }
+
+    .shell {
+      width: min(1500px, calc(100vw - 48px));
+      margin: 24px auto 48px;
+    }
+
+    .masthead {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 28px;
+      align-items: end;
+      padding: 30px 36px 28px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 18px 18px 0 0;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 750;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 1080px;
+      margin: 0;
+      font-size: clamp(34px, 3vw, 50px);
+      line-height: 1.06;
+      letter-spacing: -0.035em;
+    }
+
+    .scope-note {
+      width: 290px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.42;
+      text-align: right;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border-inline: 1px solid var(--line);
+    }
+
+    .pipeline > div {
+      min-height: 82px;
+      padding: 17px 20px;
+      background: #fbfcfd;
+    }
+
+    .pipeline strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
+
+    .pipeline span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .pipeline .active {
+      background: var(--accent-soft);
+      box-shadow: inset 0 -4px 0 var(--accent);
+    }
+
+    .tabs {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      gap: 8px;
+      padding: 13px 18px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid var(--line);
+      box-shadow: 0 9px 24px rgba(32, 42, 55, 0.06);
+      backdrop-filter: blur(12px);
+    }
+
+    .tab {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 10px 18px;
+      color: #364152;
+      background: transparent;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .tab:hover { background: var(--panel); }
+
+    .tab[aria-selected="true"] {
+      color: #fff;
+      background: var(--ink);
+    }
+
+    .key-hint {
+      margin-left: auto;
+      align-self: center;
+      color: #5e6875;
+      font-size: 13px;
+    }
+
+    main {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-top: 0;
+      border-radius: 0 0 18px 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel {
+      display: none;
+      min-height: 720px;
+      padding: 38px 42px 42px;
+    }
+
+    .panel.active { display: block; }
+    .panel:focus { outline: none; }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 34px;
+      align-items: end;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0;
+      max-width: 980px;
+      font-size: 33px;
+      line-height: 1.13;
+      letter-spacing: -0.025em;
+    }
+
+    .premise {
+      max-width: 430px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.48;
+    }
+
+    .symbol-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .symbol-card {
+      min-height: 154px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .symbol {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      margin-bottom: 7px;
+      color: #111923;
+      font-family: "STIX Two Math", "Times New Roman", serif;
+      font-size: 31px;
+    }
+
+    .symbol-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
+
+    .symbol-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .symbol-card.response { border-top: 5px solid var(--response); }
+    .symbol-card.on { border-top: 5px solid var(--on); }
+    .symbol-card.off { border-top: 5px solid var(--off); }
+    .symbol-card.operator { border-top: 5px solid var(--accent); }
+
+    .plain-callout {
+      margin-top: 20px;
+      padding: 16px 20px;
+      border-left: 5px solid var(--accent);
+      background: var(--accent-soft);
+      font-size: 16px;
+      line-height: 1.48;
+    }
+
+    .families {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .family-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 485px;
+      padding: 23px 24px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+    }
+
+    .family-card.response { background: var(--response-soft); border-top: 6px solid var(--response); }
+    .family-card.on { background: var(--on-soft); border-top: 6px solid var(--on); }
+    .family-card.off { background: var(--off-soft); border-top: 6px solid var(--off); }
+
+    .family-card h3 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    .question {
+      min-height: 52px;
+      margin: 0 0 16px;
+      color: #3d4856;
+      font-size: 16px;
+      line-height: 1.42;
+    }
+
+    .equation-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 116px;
+      margin: 8px 0 18px;
+      padding: 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.88);
+      border: 1px solid rgba(65,80,100,0.18);
+      overflow: hidden;
+    }
+
+    math {
+      font-family: "STIX Two Math", "Times New Roman", serif;
+      font-size: 1.75rem;
+    }
+
+    math[display="block"] { margin: 0; }
+
+    .reading {
+      margin: 0 0 12px;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .micro-example {
+      margin-top: auto;
+      padding: 14px 16px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.72);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .zero-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .zero-grid div {
+      padding: 13px 16px;
+      background: #fafbfc;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .score-layout {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 28px;
+    }
+
+    .score-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .score-stage {
+      padding: 19px 21px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .score-stage h3 {
+      margin: 0 0 6px;
+      font-size: 20px;
+    }
+
+    .score-stage p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.42;
+    }
+
+    .score-stage .equation-box {
+      min-height: 96px;
+      margin-bottom: 0;
+    }
+
+    .operator-map {
+      padding: 22px;
+      border-radius: 14px;
+      background: #f7f6fa;
+      border: 1px solid #d8d2e8;
+    }
+
+    .operator-map h3 {
+      margin: 0 0 15px;
+      font-size: 22px;
+    }
+
+    .operator-row {
+      display: grid;
+      grid-template-columns: 116px 1fr;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid #ddd8e9;
+    }
+
+    .operator-row:first-of-type { border-top: 0; }
+
+    .operator-row code {
+      align-self: start;
+      color: #33275f;
+      background: #e9e5f4;
+      border-radius: 7px;
+      padding: 5px 8px;
+      font-family: "STIX Two Math", "Times New Roman", serif;
+      font-size: 19px;
+      text-align: center;
+    }
+
+    .operator-row p {
+      margin: 0;
+      color: #4e5664;
+      font-size: 14px;
+      line-height: 1.42;
+    }
+
+    .weight-note {
+      margin-top: 16px;
+      padding: 15px 17px;
+      border-left: 5px solid var(--good);
+      background: #eaf4ef;
+      color: #294d40;
+      font-size: 15px;
+      line-height: 1.44;
+    }
+
+    .example-layout {
+      display: grid;
+      grid-template-columns: 0.78fr 1.22fr;
+      gap: 24px;
+    }
+
+    .control-panel {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #f8f9fb;
+    }
+
+    .control-panel h3 {
+      margin: 0 0 8px;
+      font-size: 23px;
+    }
+
+    .control-panel > p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.48;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .slider-label output {
+      color: var(--accent);
+      font-family: "STIX Two Math", "Times New Roman", serif;
+      font-size: 25px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .scale-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      color: #5e6875;
+      font-size: 12px;
+    }
+
+    .scale-explanation {
+      margin-top: 22px;
+      padding-top: 17px;
+      border-top: 1px solid var(--line);
+    }
+
+    .scale-explanation div {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      margin: 10px 0;
+      font-size: 14px;
+      line-height: 1.38;
+    }
+
+    .scale-explanation strong { min-width: 78px; }
+
+    .candidate-comparison {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .candidate {
+      padding: 23px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .candidate.winner {
+      border: 2px solid var(--good);
+      box-shadow: 0 10px 24px rgba(37, 110, 86, 0.11);
+    }
+
+    .candidate h3 {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: 0 0 13px;
+      font-size: 21px;
+    }
+
+    .badge {
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: var(--good);
+      background: #e6f2ed;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .family-values {
+      display: flex;
+      gap: 7px;
+      margin: 14px 0;
+    }
+
+    .family-values span {
+      flex: 1;
+      padding: 11px 8px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 750;
+    }
+
+    .family-values .r { background: var(--response-soft); color: #234d80; }
+    .family-values .on { background: var(--on-soft); color: #225d4e; }
+    .family-values .off { background: var(--off-soft); color: #7b303a; }
+
+    .result {
+      margin: 20px 0 9px;
+      font-family: "STIX Two Math", "Times New Roman", serif;
+      font-size: 30px;
+      text-align: center;
+    }
+
+    .candidate p {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.42;
+    }
+
+    .worked-line {
+      grid-column: 1 / -1;
+      margin-top: 4px;
+      padding: 18px 20px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      text-align: center;
+    }
+
+    .worked-line math { font-size: 1.48rem; }
+
+    .interpretation {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .interpretation div {
+      padding: 14px 16px;
+      border-top: 4px solid var(--ink);
+      background: #f6f7f9;
+      font-size: 14px;
+      line-height: 1.42;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 13px 20px;
+      color: #596472;
+      font-size: 12px;
+    }
+
+    footer a,
+    .scale-explanation a {
+      color: #3f356c;
+      font-weight: 700;
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.16em;
+    }
+
+    footer code {
+      color: #33275f;
+      font-size: 0.96em;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media print {
+      body { min-width: 0; background: #fff; }
+      .shell { width: auto; margin: 0; }
+      .tabs { display: none; }
+      .panel { display: block; min-height: auto; break-after: page; }
+      .masthead, main { border: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">Multistate Response Behavior · symbol-by-symbol walkthrough</p>
+        <h1>How a binary target program becomes one MSRB ranking score</h1>
+      </div>
+      <p class="scope-note">Study companion for MSRB v1. It ranks directional binary programs; it does not encode graded, exact, or don’t-care setpoints.</p>
+    </header>
+
+    <div class="pipeline" aria-label="MSRB lifecycle">
+      <div><strong>1 · Phenotype</strong><span>Reader produces ordered response and reference-relative signal values.</span></div>
+      <div><strong>2 · Target mask</strong><span>The study labels each measured state intended ON or intended OFF.</span></div>
+      <div class="active"><strong>3 · MSRB</strong><span>The objective rewrites desired behavior so every larger value is favorable.</span></div>
+      <div><strong>4 · Score</strong><span>A soft minimum combines the values into one within-view ranking score.</span></div>
+      <div><strong>5 · Selection</strong><span>A separate selector ranks candidates by decreasing score.</span></div>
+    </div>
+
+    <nav class="tabs" aria-label="Walkthrough sections" role="tablist">
+      <button class="tab" id="tab-symbols" type="button" role="tab" aria-controls="symbols" data-panel="symbols" aria-selected="true">1. Symbol dictionary</button>
+      <button class="tab" id="tab-coordinates" type="button" role="tab" aria-controls="coordinates" data-panel="coordinates" aria-selected="false" tabindex="-1">2. Three favorable values</button>
+      <button class="tab" id="tab-softmin" type="button" role="tab" aria-controls="softmin" data-panel="softmin" aria-selected="false" tabindex="-1">3. The soft minimum</button>
+      <button class="tab" id="tab-example" type="button" role="tab" aria-controls="example" data-panel="example" aria-selected="false" tabindex="-1">4. Worked comparison</button>
+      <span class="key-hint">With a section tab focused, use ← and → to move</span>
+    </nav>
+
+    <main>
+      <section class="panel active" id="symbols" role="tabpanel" aria-labelledby="tab-symbols" tabindex="-1">
+        <div class="panel-header">
+          <h2>Every symbol names either a measured value, a state group, or one step in the aggregation.</h2>
+          <p class="premise">The notation is dense because one equation spans several levels. Keeping those levels separate makes the calculation much easier to read.</p>
+        </div>
+
+        <div class="symbol-grid">
+          <article class="symbol-card response">
+            <div class="symbol">r<sub>i</sub></div>
+            <strong>Response in state <i>i</i></strong>
+            <p>Median across design wells of each well’s 4–8-hour mean log<sub>2</sub>(YFP/CFP); YFP and CFP are expressed from the same plasmid.</p>
+          </article>
+          <article class="symbol-card on">
+            <div class="symbol">b<sub>i</sub></div>
+            <strong>Reference-relative signal</strong>
+            <p>Median design-well 4–8-hour log<sub>2</sub>(YFP/OD600) minus the median pDual-10 value measured in the same state on the same plate.</p>
+          </article>
+          <article class="symbol-card response">
+            <div class="symbol">i, j</div>
+            <strong>State indices</strong>
+            <p><i>i</i> names one intended-ON state; <i>j</i> names one intended-OFF state in a response comparison.</p>
+          </article>
+          <article class="symbol-card operator">
+            <div class="symbol">p<sub>i</sub> ∈ {0,1}</div>
+            <strong>Binary target for state <i>i</i></strong>
+            <p>A value of 1 assigns the state to intended ON; 0 assigns it to intended OFF.</p>
+          </article>
+
+          <article class="symbol-card operator">
+            <div class="symbol">O, F</div>
+            <strong>Sets of states</strong>
+            <p><i>O</i> contains intended-ON states and <i>F</i> intended-OFF states; both must be nonempty. Here F does not mean fluorescence.</p>
+          </article>
+          <article class="symbol-card response">
+            <div class="symbol">d<sub>c</sub></div>
+            <strong>One favorable-direction value</strong>
+            <p>One state-level result rewritten so that larger is favorable. Superscripts R, ON, and OFF are family labels, not powers.</p>
+          </article>
+          <article class="symbol-card operator">
+            <div class="symbol">f ∈ {R, ON, OFF}</div>
+            <strong>One behavior family</strong>
+            <p><i>f</i> names response ordering, intended-ON signal, or intended-OFF suppression.</p>
+          </article>
+          <article class="symbol-card operator">
+            <div class="symbol">c ∈ C<sub>f</sub></div>
+            <strong>Coordinate inside family <i>f</i></strong>
+            <p><i>c</i> indexes one favorable value; C<sub>f</sub> is the set of all values in that family.</p>
+          </article>
+          <article class="symbol-card operator">
+            <div class="symbol">n<sub>f</sub> = |C<sub>f</sub>|</div>
+            <strong>Number of values in family <i>f</i></strong>
+            <p>It turns the sum into a family mean, so larger families do not count more merely because they have more comparisons.</p>
+          </article>
+
+          <article class="symbol-card operator">
+            <div class="symbol">τ</div>
+            <strong>Soft-min scale</strong>
+            <p>Controls how readily stronger behavior compensates for weaker behavior. It is not a pass threshold.</p>
+          </article>
+          <article class="symbol-card operator">
+            <div class="symbol">S<sub>f</sub></div>
+            <strong>One family score</strong>
+            <p>The soft minimum of every favorable-direction value in family <i>f</i>.</p>
+          </article>
+          <article class="symbol-card response">
+            <div class="symbol">S<sub>R</sub></div>
+            <strong>Response-ordering family score</strong>
+            <p>The soft minimum of every intended-ON minus intended-OFF response comparison.</p>
+          </article>
+          <article class="symbol-card on">
+            <div class="symbol">S<sub>ON</sub></div>
+            <strong>ON-signal family score</strong>
+            <p>The soft minimum of the reference-relative signals in intended-ON states.</p>
+          </article>
+          <article class="symbol-card off">
+            <div class="symbol">S<sub>OFF</sub></div>
+            <strong>OFF-suppression family score</strong>
+            <p>The soft minimum of the negated signal values in intended-OFF states.</p>
+          </article>
+          <article class="symbol-card operator">
+            <div class="symbol">S<sub>MSRB</sub></div>
+            <strong>Final ranking score</strong>
+            <p>The soft minimum of the three family scores. Higher is better only under one fixed mask and τ.</p>
+          </article>
+          <article class="symbol-card operator">
+            <div class="symbol">Σ, e, ln</div>
+            <strong>Sum, exponential, natural log</strong>
+            <p>These operations form the soft minimum. The next section explains the role of each one.</p>
+          </article>
+        </div>
+
+        <div class="plain-callout"><strong>The main ontology:</strong> measured values <i>r</i> and <i>b</i> → favorable-direction values <i>d</i> → family scores S<sub>R</sub>, S<sub>ON</sub>, and S<sub>OFF</sub> → final ranking score S<sub>MSRB</sub>. The mask p<sub>i</sub> determines only which states belong to <i>O</i> and <i>F</i>.</div>
+      </section>
+
+      <section class="panel" id="coordinates" role="tabpanel" aria-labelledby="tab-coordinates" tabindex="-1" hidden>
+        <div class="panel-header">
+          <h2>MSRB asks three biological questions and writes every answer so that a larger number is favorable.</h2>
+          <p class="premise">The sign convention makes each declared preference point upward. Holding the other phenotype values fixed, an intended improvement cannot lower MSRB; one wet-lab change may move several coordinates at once.</p>
+        </div>
+
+        <div class="families">
+          <article class="family-card response">
+            <h3>1 · Response ordering</h3>
+            <p class="question">Does every intended-ON state have a larger response than every intended-OFF state?</p>
+            <div class="equation-box">
+              <math display="block" aria-label="d response sub i j equals r sub i minus r sub j, where i is in O and j is in F">
+                <msubsup><mi>d</mi><mrow><mi>i</mi><mi>j</mi></mrow><mi>R</mi></msubsup>
+                <mo>=</mo><msub><mi>r</mi><mi>i</mi></msub><mo>−</mo><msub><mi>r</mi><mi>j</mi></msub>
+                <mspace width="1em"></mspace><mi>i</mi><mo>∈</mo><mi>O</mi><mo>,</mo><mspace width=".5em"></mspace><mi>j</mi><mo>∈</mo><mi>F</mi>
+              </math>
+            </div>
+            <p class="reading"><strong>Read aloud:</strong> “Response ordering equals an ON-state response minus an OFF-state response.”</p>
+            <p class="reading">Every ON/OFF pair is included. If either the ON response rises or the OFF response falls, this value improves.</p>
+            <div class="micro-example"><strong>Example:</strong> ON response 2.4 minus OFF response 0.9 gives <i>d</i><sup>R</sup> = 1.5. At zero the two responses are equal.</div>
+          </article>
+
+          <article class="family-card on">
+            <h3>2 · Intended-ON signal</h3>
+            <p class="question">Is each intended-ON state bright relative to the reference measured in that same state?</p>
+            <div class="equation-box">
+              <math display="block" aria-label="d ON sub i equals b sub i, where i is in O">
+                <msubsup><mi>d</mi><mi>i</mi><mtext>ON</mtext></msubsup>
+                <mo>=</mo><msub><mi>b</mi><mi>i</mi></msub>
+                <mspace width="1em"></mspace><mi>i</mi><mo>∈</mo><mi>O</mi>
+              </math>
+            </div>
+            <p class="reading"><strong>Read aloud:</strong> “ON signal is the design’s reference-relative signal in an intended-ON state.”</p>
+            <p class="reading">No sign change is needed: larger <i>b</i><sub>i</sub> already means brighter relative to the reference.</p>
+            <div class="micro-example"><strong>Example:</strong> <i>b</i><sub>i</sub> = 1 log<sub>2</sub> means the design is twice the reference signal in that state. At zero they are equal.</div>
+          </article>
+
+          <article class="family-card off">
+            <h3>3 · Intended-OFF suppression</h3>
+            <p class="question">Is each intended-OFF state dim relative to the reference measured in that same state?</p>
+            <div class="equation-box">
+              <math display="block" aria-label="d OFF sub j equals negative b sub j, where j is in F">
+                <msubsup><mi>d</mi><mi>j</mi><mtext>OFF</mtext></msubsup>
+                <mo>=</mo><mo>−</mo><msub><mi>b</mi><mi>j</mi></msub>
+                <mspace width="1em"></mspace><mi>j</mi><mo>∈</mo><mi>F</mi>
+              </math>
+            </div>
+            <p class="reading"><strong>Read aloud:</strong> “OFF suppression is the negative of the design’s reference-relative signal in an intended-OFF state.”</p>
+            <p class="reading">The minus sign reverses the direction: a lower original OFF signal becomes a larger, more favorable suppression value.</p>
+            <div class="micro-example"><strong>Example:</strong> <i>b</i><sub>j</sub> = −2 log<sub>2</sub> becomes <i>d</i><sup>OFF</sup> = 2: the design is fourfold dimmer than the reference. It does not mean absolute non-expression.</div>
+          </article>
+        </div>
+
+        <div class="zero-grid" aria-label="Meaning of zero in each family">
+          <div><strong>Response zero:</strong> the particular ON and OFF responses are equal.</div>
+          <div><strong>ON-signal zero:</strong> the intended-ON signal equals the same-state reference.</div>
+          <div><strong>OFF-suppression zero:</strong> the intended-OFF signal equals the same-state reference.</div>
+        </div>
+      </section>
+
+      <section class="panel" id="softmin" role="tabpanel" aria-labelledby="tab-softmin" tabindex="-1" hidden>
+        <div class="panel-header">
+          <h2>The soft minimum keeps weaker behavior influential without making every stronger value irrelevant.</h2>
+          <p class="premise">The same operator is applied twice: first inside each family, then across the three family scores. Algebraically this equals one weighted soft minimum over all state-level values.</p>
+        </div>
+
+        <div class="score-layout">
+          <div class="score-stack">
+            <article class="score-stage">
+              <h3>Stage 1 · Summarize each family</h3>
+              <div class="equation-box">
+                <math display="block" aria-label="S sub f equals negative tau times the natural log of one over n sub f times the sum over coordinates c in C sub f of e to the negative d sub c over tau">
+                  <msub><mi>S</mi><mi>f</mi></msub><mo>=</mo><mo>−</mo><mi>τ</mi><mo>ln</mo>
+                  <mo>(</mo><mrow>
+                    <mfrac><mn>1</mn><msub><mi>n</mi><mi>f</mi></msub></mfrac>
+                    <munder><mo>∑</mo><mrow><mi>c</mi><mo>∈</mo><msub><mi>C</mi><mi>f</mi></msub></mrow></munder>
+                    <msup><mi>e</mi><mrow><mo>−</mo><msub><mi>d</mi><mi>c</mi></msub><mo>/</mo><mi>τ</mi></mrow></msup>
+                  </mrow><mo>)</mo>
+                </math>
+              </div>
+              <p><i>f</i> is one family—R, ON, or OFF. C<sub>f</sub> is its coordinate set and n<sub>f</sub> = |C<sub>f</sub>| is its number of values. Dividing by n<sub>f</sub> prevents a family from counting more merely because it contains more comparisons.</p>
+            </article>
+
+            <article class="score-stage">
+              <h3>Stage 2 · Combine the three family scores</h3>
+              <div class="equation-box">
+                <math display="block" aria-label="S MSRB equals negative tau times the natural log of the mean of e to the negative response family score over tau, e to the negative ON family score over tau, and e to the negative OFF family score over tau">
+                  <msub><mi>S</mi><mtext>MSRB</mtext></msub><mo>=</mo><mo>−</mo><mi>τ</mi><mo>ln</mo>
+                  <mo>(</mo><mrow>
+                    <mfrac>
+                      <mrow>
+                        <msup><mi>e</mi><mrow><mo>−</mo><msub><mi>S</mi><mi>R</mi></msub><mo>/</mo><mi>τ</mi></mrow></msup>
+                        <mo>+</mo>
+                        <msup><mi>e</mi><mrow><mo>−</mo><msub><mi>S</mi><mtext>ON</mtext></msub><mo>/</mo><mi>τ</mi></mrow></msup>
+                        <mo>+</mo>
+                        <msup><mi>e</mi><mrow><mo>−</mo><msub><mi>S</mi><mtext>OFF</mtext></msub><mo>/</mo><mi>τ</mi></mrow></msup>
+                      </mrow>
+                      <mn>3</mn>
+                    </mfrac>
+                  </mrow><mo>)</mo>
+                </math>
+              </div>
+              <p>The denominator 3 gives the response, ON-signal, and OFF-suppression families equal <em>starting</em> weight. Their realized influence still depends on their values.</p>
+            </article>
+          </div>
+
+          <aside class="operator-map">
+            <h3>What each mathematical operation is doing</h3>
+            <div class="operator-row"><code>−d/τ</code><p>Reverses the scale inside the exponential, so smaller or negative behavior values receive more influence.</p></div>
+            <div class="operator-row"><code>e<sup>−d/τ</sup></code><p>Within one averaging stage, a smaller value produces a larger term and therefore greater local influence. Across state-level coordinates, influence also depends on the family’s starting weight.</p></div>
+            <div class="operator-row"><code>Σ</code><p>Adds the transformed evidence. The index underneath tells you exactly which values are included.</p></div>
+            <div class="operator-row"><code>1/n<sub>f</sub></code><p>Takes a mean inside a family. It solves the unequal-count problem; it is not an uncertainty correction.</p></div>
+            <div class="operator-row"><code>ln</code><p>Brings the exponential average back onto the original additive scale. It is the natural logarithm because the preceding exponential uses base e.</p></div>
+            <div class="operator-row"><code>−τ</code><p>Restores the original log<sub>2</sub>-clearance unit and makes larger final scores favorable.</p></div>
+            <div class="operator-row"><code>τ</code><p>Sets the compensation distance. Small τ is stricter; large τ is more mean-like. This campaign uses approximately 0.31 log<sub>2</sub>.</p></div>
+
+            <div class="weight-note"><strong>Equal starting weight is not equal final influence.</strong> Among the three equally weighted family scores, the lower family score has greater local influence. Positive MSRB is still not a pass criterion.</div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel" id="example" role="tabpanel" aria-labelledby="tab-example" tabindex="-1" hidden>
+        <div class="panel-header">
+          <h2>With the campaign’s τ, moderate behavior in all three families outranks a strong but lopsided profile.</h2>
+          <p class="premise">Move the scale to see what τ changes. It changes only the compensation rule—not the phenotype, target mask, or three family definitions.</p>
+        </div>
+
+        <div class="example-layout">
+          <aside class="control-panel">
+            <h3>Compensation scale</h3>
+            <p>Small values keep the result close to weak behavior. Larger values allow strong families to compensate more.</p>
+            <label class="slider-label" for="tau-slider"><span>τ</span><output id="tau-output" for="tau-slider" aria-live="polite">0.31</output></label>
+            <input id="tau-slider" type="range" min="0.10" max="2.00" step="0.01" value="0.31" aria-describedby="tau-description">
+            <div class="scale-labels"><span>stricter</span><span>more compensatory</span></div>
+            <div id="tau-description" class="scale-explanation">
+              <div><strong>τ → 0</strong><span>Approaches the exact minimum.</span></div>
+              <div><strong>τ ≈ 0.31</strong><span>Rounded display of the frozen study scale; the protocol keeps the full value. <a href="multistate-response-behavior.md#why-the-study-uses-approximately-031-log2">See its derivation.</a></span></div>
+              <div><strong>larger τ</strong><span>Moves toward mean-like ranking.</span></div>
+            </div>
+          </aside>
+
+          <div class="candidate-comparison">
+            <article class="candidate winner" id="balanced-card">
+              <h3><span>Balanced candidate</span><span class="badge" id="balanced-badge">Ranks higher</span></h3>
+              <div class="family-values" aria-label="Balanced candidate family scores">
+                <span class="r">R = 0.5</span><span class="on">ON = 0.5</span><span class="off">OFF = 0.5</span>
+              </div>
+              <div class="result">MSRB = <span id="balanced-score">0.50</span></div>
+              <p>When all three family values are identical, the soft minimum equals that common value for every τ.</p>
+            </article>
+
+            <article class="candidate" id="lopsided-card">
+              <h3><span>Lopsided candidate</span><span class="badge" id="lopsided-badge" hidden>Ranks higher</span></h3>
+              <div class="family-values" aria-label="Lopsided candidate family scores">
+                <span class="r">R = 0.0</span><span class="on">ON = 2.0</span><span class="off">OFF = 2.0</span>
+              </div>
+              <div class="result">MSRB = <span id="lopsided-score">0.34</span></div>
+              <p>Two strong families help, but the zero-valued response family receives much more local influence at small τ.</p>
+            </article>
+
+            <div class="worked-line">
+              <math aria-label="Worked MSRB calculation for family values zero, two, and two">
+                <msub><mi>S</mi><mtext>MSRB</mtext></msub><mo>=</mo><mo>−</mo><mi>τ</mi><mo>ln</mo>
+                <mo>(</mo><mrow>
+                  <mfrac>
+                    <mrow><msup><mi>e</mi><mrow><mo>−</mo><mn>0</mn><mo>/</mo><mi>τ</mi></mrow></msup><mo>+</mo><msup><mi>e</mi><mrow><mo>−</mo><mn>2</mn><mo>/</mo><mi>τ</mi></mrow></msup><mo>+</mo><msup><mi>e</mi><mrow><mo>−</mo><mn>2</mn><mo>/</mo><mi>τ</mi></mrow></msup></mrow>
+                    <mn>3</mn>
+                  </mfrac>
+                </mrow><mo>)</mo>
+                <mo>=</mo><mn id="worked-score">0.34</mn>
+              </math>
+            </div>
+          </div>
+        </div>
+
+        <div class="interpretation">
+          <div><strong>Monotone:</strong> improving any favorable-direction value increases MSRB in exact arithmetic.</div>
+          <div><strong>Compensatory:</strong> <i>m</i> = min<sub>c</sub> <i>d</i><sub>c</sub> is the hard bottleneck—the weakest state-level favorable value. MSRB can exceed <i>m</i>, so a high score is not a pass criterion.</div>
+          <div><strong>Within-protocol:</strong> compare scores only under the same state order, mask, reference semantics, objective version, and τ.</div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>This walkthrough explains the equations; executable parameters remain in the study protocol.</span>
+      <span><a href="../../../../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md">Generic objective definition</a> · <a href="multistate-response-behavior.md">Stress-study assay and protocol binding</a></span>
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const tabs = [...document.querySelectorAll('.tab')];
+      const tablist = document.querySelector('[role="tablist"]');
+      const panels = [...document.querySelectorAll('.panel')];
+
+      function selectPanel(id, updateHash = true) {
+        const next = panels.find(panel => panel.id === id) || panels[0];
+        panels.forEach(panel => {
+          const active = panel === next;
+          panel.classList.toggle('active', active);
+          panel.hidden = !active;
+        });
+        tabs.forEach(tab => {
+          const active = tab.dataset.panel === next.id;
+          tab.setAttribute('aria-selected', String(active));
+          tab.tabIndex = active ? 0 : -1;
+        });
+        if (updateHash) history.replaceState(null, '', `#${next.id}`);
+      }
+
+      tabs.forEach(tab => tab.addEventListener('click', () => selectPanel(tab.dataset.panel)));
+
+      tablist.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+        if (!tabs.includes(event.target)) return;
+        event.preventDefault();
+        const activeIndex = tabs.findIndex(tab => tab.getAttribute('aria-selected') === 'true');
+        const delta = event.key === 'ArrowRight' ? 1 : -1;
+        const nextIndex = (activeIndex + delta + tabs.length) % tabs.length;
+        selectPanel(tabs[nextIndex].dataset.panel);
+        tabs[nextIndex].focus();
+      });
+
+      const initial = location.hash.slice(1);
+      if (initial && panels.some(panel => panel.id === initial)) selectPanel(initial, false);
+      window.addEventListener('hashchange', () => {
+        const id = location.hash.slice(1);
+        if (panels.some(panel => panel.id === id)) selectPanel(id, false);
+      });
+
+      const slider = document.getElementById('tau-slider');
+      const output = document.getElementById('tau-output');
+      const balancedScore = document.getElementById('balanced-score');
+      const lopsidedScore = document.getElementById('lopsided-score');
+      const workedScore = document.getElementById('worked-score');
+      const balancedCard = document.getElementById('balanced-card');
+      const lopsidedCard = document.getElementById('lopsided-card');
+      const balancedBadge = document.getElementById('balanced-badge');
+      const lopsidedBadge = document.getElementById('lopsided-badge');
+
+      function softmin(values, tau) {
+        const m = Math.min(...values);
+        const meanShifted = values.reduce((sum, value) => sum + Math.exp(-(value - m) / tau), 0) / values.length;
+        return m - tau * Math.log(meanShifted);
+      }
+
+      function updateScores() {
+        const tau = Number(slider.value);
+        const balanced = softmin([0.5, 0.5, 0.5], tau);
+        const lopsided = softmin([0, 2, 2], tau);
+        output.textContent = tau.toFixed(2);
+        balancedScore.textContent = balanced.toFixed(2);
+        lopsidedScore.textContent = lopsided.toFixed(2);
+        workedScore.textContent = lopsided.toFixed(2);
+        const balancedWins = balanced >= lopsided;
+        balancedCard.classList.toggle('winner', balancedWins);
+        lopsidedCard.classList.toggle('winner', !balancedWins);
+        balancedBadge.hidden = !balancedWins;
+        lopsidedBadge.hidden = balancedWins;
+      }
+
+      slider.addEventListener('input', updateScores);
+      slider.value = '0.31';
+      updateScores();
+    })();
+  </script>
+</body>
+</html>
