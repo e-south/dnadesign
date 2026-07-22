@@ -245,6 +245,26 @@ def test_normalize_rejects_sparse_shape_drift() -> None:
         )
 
 
+def test_normalize_rejects_residue_activation_length_drift() -> None:
+    sequence = "ACDE"
+    response = _protein_response(sequence)
+    response["per_residue_activations"]["shape"] = [5, 16384]
+
+    with pytest.raises(ValueError, match="sequence length"):
+        normalize_protein_lookup_response(
+            candidate_id="candidate_a",
+            sequence=sequence,
+            sequence_hash=sequence_hash(sequence),
+            response=response,
+            source_request_hash=_SOURCE_REQUEST_HASH,
+            atlas_request_hash=_request_hash(("candidate_a",)),
+            atlas_query_hash=_query_hash(sequence),
+            atlas_api_base_url="https://biohub.ai",
+            atlas_api_version="v1alpha1",
+            retrieved_at=_RETRIEVED_AT,
+        )
+
+
 def test_client_rejects_unbounded_feature_request() -> None:
     client = AtlasClient()
 

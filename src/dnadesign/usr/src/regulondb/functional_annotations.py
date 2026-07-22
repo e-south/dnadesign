@@ -164,7 +164,7 @@ def build_regulondb_go_projection(
     usr_sets = _usr_ids_by_regulator(interactions)
     promoter_sets = _promoters_by_regulator(interactions)
     interaction_counts = _interaction_counts_by_regulator(interactions)
-    interacting_regulators = sorted(regulator_names)
+    interacting_regulators = sorted(usr_sets)
     missing_coverage = [
         regulator_id for regulator_id in interacting_regulators if regulator_id not in coverage_by_regulator
     ]

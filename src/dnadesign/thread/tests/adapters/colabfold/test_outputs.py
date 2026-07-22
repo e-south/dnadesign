@@ -47,6 +47,26 @@ def test_colabfold_output_parser_emits_accepted_rows_with_wt_baseline_rmsd(tmp_p
     assert rows[1]["runtime_parameters_hash"].startswith("sha256:")
 
 
+def test_colabfold_output_parser_measures_wt_against_explicit_reference(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    wt_model_path = output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb"
+    reference_path = tmp_path / "explicit_reference.pdb"
+    _write_ca_pdb(wt_model_path, bfactor=91.0)
+    _write_ca_pdb(reference_path, bfactor=95.0, y_offset=1.0)
+
+    rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=_request_manifest(["wild_type"]),
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+        reference_pdb_path=reference_path,
+    )
+
+    assert rows[0]["status"] == "accepted"
+    assert rows[0]["backbone_rmsd_to_reference"] > 0.0
+
+
 def test_colabfold_output_parser_turns_missing_candidate_output_into_failure_row(tmp_path: Path) -> None:
     output_root = tmp_path / "colabfold_outputs"
     output_root.mkdir()

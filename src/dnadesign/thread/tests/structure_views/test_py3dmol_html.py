@@ -126,7 +126,8 @@ def test_py3dmol_backend_renders_interactive_html() -> None:
     assert "Query" in html
     assert "<iframe" in html
     assert "srcdoc=" in html
-    assert "sandbox=" in html
+    assert 'sandbox="allow-scripts"' in html
+    assert "allow-same-origin" not in html
     assert "width:100%; max-width:100%" in html
     assert "height:500px" in html
     assert "height:512px" not in html

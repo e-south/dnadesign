@@ -89,6 +89,7 @@ def normalize_protein_lookup_response(
             candidate_id=candidate_id,
             sequence_hash=sequence_hash,
             payload=response.get("per_residue_activations"),
+            expected_residue_count=len(normalized_sequence),
         ),
         feature_catalog_rows=[
             {
@@ -185,6 +186,7 @@ def _residue_activation_rows(
     candidate_id: str,
     sequence_hash: str,
     payload: Any,
+    expected_residue_count: int,
 ) -> list[dict[str, object]]:
     if not isinstance(payload, Mapping):
         raise ValueError("per_residue_activations must be a sparse mapping")
@@ -203,6 +205,8 @@ def _residue_activation_rows(
     if len(residue_indices) != len(feature_indices) or len(residue_indices) != len(activation_values):
         raise ValueError("per_residue_activations sparse arrays must have equal length")
     residue_count, feature_count = int(shape[0]), int(shape[1])
+    if residue_count != expected_residue_count:
+        raise ValueError("per_residue_activations residue count must match sequence length")
     if feature_count != 16384:
         raise ValueError("per_residue_activations must use the 16,384-feature Atlas dictionary")
     rows: list[dict[str, object]] = []

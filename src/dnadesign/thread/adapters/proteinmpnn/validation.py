@@ -24,6 +24,12 @@ from dnadesign.thread.adapters.proteinmpnn.models import ProteinMpnnRequestIssue
 from dnadesign.thread.adapters.proteinmpnn.sidecars import resolve_manifest_sidecar_path
 
 _PROTEINMPNN_AMINO_ACIDS = frozenset("ACDEFGHIKLMNPQRSTVWYX")
+_REQUIRED_SIDECAR_NAMES = (
+    "chain_a_backbone_pdb",
+    "parsed_pdbs_jsonl",
+    "assigned_chains_jsonl",
+    "fixed_positions_jsonl",
+)
 
 
 def validate_request_manifest(path: Path) -> list[ProteinMpnnRequestIssue]:
@@ -126,6 +132,15 @@ def _validate_sidecars(issues: list[ProteinMpnnRequestIssue], *, manifest: Mappi
             )
         )
         return
+    for name in _REQUIRED_SIDECAR_NAMES:
+        if name not in sidecar_paths:
+            issues.append(
+                ProteinMpnnRequestIssue(
+                    check_id="thread.proteinmpnn.missing_required_sidecar",
+                    message=f"ProteinMPNN request must declare sidecar path {name!r}",
+                    path=f"{path}:sidecar_paths.{name}",
+                )
+            )
     for name, sidecar in sidecar_paths.items():
         sidecar_path = resolve_manifest_sidecar_path(path, sidecar)
         if not sidecar_path.exists():

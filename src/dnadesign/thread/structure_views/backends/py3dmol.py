@@ -481,7 +481,7 @@ def _wrap_view_html(spec: StructureViewSpec, viewer_html: str, *, scene_audit: d
         {subtitle_html}
         {metadata_html}
         <iframe title="{iframe_title}"{described_by} srcdoc="{srcdoc}"
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts"
                 referrerpolicy="no-referrer"
                 style="display:block; width:100%; height:{int(spec.height)}px;
                        border:0; background:#ffffff;"></iframe>

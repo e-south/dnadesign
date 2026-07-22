@@ -63,7 +63,7 @@ def build_colabfold_foldcheck_rows(
         mobile_coords = ca_coordinates(model_path)
         rmsd = (
             0.0
-            if candidate_id == wt_sequence_id
+            if candidate_id == wt_sequence_id and reference_pdb_path is None
             else (ca_rmsd(mobile_coords, reference_coords) if reference_coords is not None else None)
         )
         if plddt is None or rmsd is None:

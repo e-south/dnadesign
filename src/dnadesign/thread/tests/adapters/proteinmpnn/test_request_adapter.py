@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.thread.adapters.proteinmpnn import (
@@ -131,6 +132,26 @@ def test_proteinmpnn_manifest_validator_accepts_colocated_sidecars_from_another_
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
 
     assert validate_request_manifest(manifest_path) == []
+
+
+@pytest.mark.parametrize(
+    "sidecar_name",
+    ("chain_a_backbone_pdb", "parsed_pdbs_jsonl", "assigned_chains_jsonl", "fixed_positions_jsonl"),
+)
+def test_proteinmpnn_manifest_validator_requires_runtime_sidecars(
+    tmp_path: Path,
+    sidecar_name: str,
+) -> None:
+    manifest_without_hash = _minimal_request_manifest(tmp_path)
+    manifest_without_hash["sidecar_paths"].pop(sidecar_name)
+    manifest_without_hash["sidecar_hashes"].pop(sidecar_name)
+    manifest = {"request_hash": request_hash(manifest_without_hash), **manifest_without_hash}
+    manifest_path = tmp_path / "request_manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+    issues = validate_request_manifest(manifest_path)
+
+    assert "thread.proteinmpnn.missing_required_sidecar" in {issue.check_id for issue in issues}
 
 
 def test_proteinmpnn_manifest_validator_rejects_rehashed_wrong_fixed_sidecar(tmp_path: Path) -> None:

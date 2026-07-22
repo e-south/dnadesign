@@ -181,6 +181,28 @@ def test_regulondb_go_projection_collapses_duplicate_regulator_aliases(
     assert hns_rows[0]["mapping_status"] == "matched"
 
 
+def test_regulondb_go_projection_keeps_regulators_with_blank_names(tmp_path: Path) -> None:
+    dataset = _dataset_root(tmp_path)
+    interactions_path = dataset / "_relations/regulatory_interactions.parquet"
+    interaction_rows = pq.read_table(interactions_path).to_pylist()
+    for row in interaction_rows:
+        if row["regulator_id"] == "R2":
+            row["regulator_name"] = ""
+    _write_table(interactions_path, interaction_rows)
+    terms, coverage = _terms_root(tmp_path)
+
+    projection = build_regulondb_go_projection(
+        dataset_root=dataset,
+        terms_path=terms,
+        coverage_path=coverage,
+        min_covered_regulator_fraction=1.0,
+    )
+
+    assert projection.summary["interacting_regulator_count"] == 2
+    lex_a_row = next(row for row in projection.regulator_go_coverage_rows if row["regulator_id"] == "R2")
+    assert lex_a_row["regulator_name"] == "LexA"
+
+
 def test_regulondb_go_projection_fails_when_coverage_is_too_sparse(
     tmp_path: Path,
 ) -> None:
