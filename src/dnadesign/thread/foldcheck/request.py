@@ -17,6 +17,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from dnadesign.thread.foldcheck.hashes import sequence_hash
 from dnadesign.thread.foldcheck.models import FoldCheckSequenceRecord
 
 FOLDCHECK_REQUEST_SCHEMA_ID = "thread.foldcheck_request"
@@ -29,14 +30,8 @@ def write_foldcheck_fasta(path: Path, records: Sequence[FoldCheckSequenceRecord]
 
     if not records:
         raise ValueError("fold-check FASTA requires at least one sequence record")
-    seen: set[str] = set()
     lines: list[str] = []
-    for record in records:
-        sequence_id = _require_identifier(record.sequence_id)
-        if sequence_id in seen:
-            raise ValueError(f"duplicate fold-check sequence id {sequence_id!r}")
-        seen.add(sequence_id)
-        sequence = _require_sequence(record.sequence, sequence_id)
+    for _, sequence_id, sequence in _normalize_sequence_records(records):
         lines.append(f">{sequence_id}")
         lines.extend(sequence[index : index + 80] for index in range(0, len(sequence), 80))
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -68,12 +63,13 @@ def build_foldcheck_request_manifest(
     _require_identifier(backend_kind)
     _require_identifier(runtime_kind)
     _require_identifier(execution_status)
-    _require_identifier(wt_sequence_id)
+    wt_sequence_id = _require_identifier(wt_sequence_id)
     _require_identifier(reference_structure_id)
     _require_identifier(threshold_policy_id)
     if not sequence_records:
         raise ValueError("fold-check request requires at least one sequence record")
-    if wt_sequence_id not in {record.sequence_id for record in sequence_records}:
+    normalized_records = _normalize_sequence_records(sequence_records)
+    if wt_sequence_id not in {sequence_id for _, sequence_id, _ in normalized_records}:
         raise ValueError("fold-check request must include the declared WT baseline sequence id")
     if not threshold_values:
         raise ValueError("fold-check request requires explicit threshold values")
@@ -99,12 +95,12 @@ def build_foldcheck_request_manifest(
         "threshold_values": dict(threshold_values),
         "sequences": [
             {
-                "sequence_id": record.sequence_id,
-                "sequence_hash": record.sequence_hash,
+                "sequence_id": sequence_id,
+                "sequence_hash": sequence_hash(sequence),
                 "source_kind": record.source_kind,
-                "length": len(record.sequence),
+                "length": len(sequence),
             }
-            for record in sequence_records
+            for record, sequence_id, sequence in normalized_records
         ],
         "upstream_artifact_hashes": dict(upstream_artifact_hashes),
         "storage_policy": dict(storage_policy),
@@ -139,3 +135,18 @@ def _require_sequence(sequence: str, sequence_id: str) -> str:
     if invalid:
         raise ValueError(f"fold-check sequence {sequence_id!r} has unsupported residues: {invalid}")
     return normalized
+
+
+def _normalize_sequence_records(
+    records: Sequence[FoldCheckSequenceRecord],
+) -> list[tuple[FoldCheckSequenceRecord, str, str]]:
+    normalized_records: list[tuple[FoldCheckSequenceRecord, str, str]] = []
+    seen: set[str] = set()
+    for record in records:
+        sequence_id = _require_identifier(record.sequence_id)
+        if sequence_id in seen:
+            raise ValueError(f"duplicate fold-check sequence id {sequence_id!r}")
+        seen.add(sequence_id)
+        sequence = _require_sequence(record.sequence, sequence_id)
+        normalized_records.append((record, sequence_id, sequence))
+    return normalized_records
