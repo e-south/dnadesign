@@ -72,6 +72,10 @@ def write_structure_overlay_plot_row(
     png_path = plot_root / _OVERLAY_IMAGE_NAME
     panel_png_root = plot_root / "structure_overlay_panels"
     panel_script_root = chimerax_root / "structure_overlay_panels"
+    png_path.unlink(missing_ok=True)
+    if panel_png_root.exists():
+        for stale_panel in panel_png_root.glob("*.png"):
+            stale_panel.unlink()
     selected_entries = _select_overlay_entries(entries)
     aligned_entries = _align_overlay_entries(
         selected_entries,
@@ -101,12 +105,8 @@ def write_structure_overlay_plot_row(
         status = "skipped_missing_input"
         skip_reason = "Fewer than two local fold-check structures are available for an overlay."
     elif not render_png:
-        if png_path.exists():
-            status = "rendered"
-            skip_reason = "Using an existing ChimeraX PNG; rendering was disabled for this materialization run."
-        else:
-            status = "skipped_optional_render_disabled"
-            skip_reason = "ChimeraX overlay rendering was disabled for this materialization run."
+        status = "skipped_optional_render_disabled"
+        skip_reason = "ChimeraX overlay rendering was disabled for this materialization run."
     else:
         executable = _find_chimerax()
         if not executable:

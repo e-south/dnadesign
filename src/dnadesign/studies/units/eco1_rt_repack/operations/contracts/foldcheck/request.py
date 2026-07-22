@@ -27,7 +27,7 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck
     WT_SEQUENCE_ID,
 )
 from dnadesign.thread.adapters.proteinmpnn.hashing import sha256_uri
-from dnadesign.thread.foldcheck import FOLDCHECK_REQUEST_SCHEMA_ID, request_hash
+from dnadesign.thread.foldcheck import FOLDCHECK_REQUEST_SCHEMA_ID, request_hash, sequence_hash
 
 
 def validate_foldcheck_request_content(path: Path, *, output_root: Path) -> list[ContractIssue]:
@@ -84,6 +84,19 @@ def validate_foldcheck_request_content(path: Path, *, output_root: Path) -> list
                 check_id="eco1_rt.foldcheck_request.sequence_id_mismatch",
                 message="fold-check FASTA ids must match manifest sequence ids",
                 path=str(path),
+            )
+        )
+    hash_mismatches = sorted(
+        sequence_id
+        for sequence_id in fasta_sequences.keys() & manifest_sequences.keys()
+        if sequence_hash(fasta_sequences[sequence_id]) != manifest_sequences[sequence_id]
+    )
+    if hash_mismatches:
+        issues.append(
+            ContractIssue(
+                check_id="eco1_rt.foldcheck_request.sequence_hash_mismatch",
+                message=f"fold-check FASTA sequences must match manifest sequence hashes: {hash_mismatches}",
+                path=str(fasta_path),
             )
         )
     bad_lengths = [sequence_id for sequence_id, sequence in fasta_sequences.items() if len(sequence) != 320]
