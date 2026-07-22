@@ -220,7 +220,7 @@
       {
         "role": "active_campaign_plot_config",
         "path": "src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/plots.yaml",
-        "sha256": "55b22a11b57bd04a21d0cc4340ab2dccdb2f42b94663d994be839b7f243d7413"
+        "sha256": "a4113725bf3a6ae90c34087e62dfc279fe7a5d30e49994539ab453299ff7ac30"
       },
       {
         "role": "activation_receipt_verifier",
