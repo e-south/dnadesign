@@ -13,9 +13,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pyarrow.parquet as pq
+import pytest
+
 from dnadesign.thread.adapters.colabfold.index import ColabFoldOutputIndex
 from dnadesign.thread.adapters.colabfold.outputs import build_colabfold_foldcheck_rows
-from dnadesign.thread.foldcheck.hashes import sequence_hash
+from dnadesign.thread.foldcheck import sequence_hash, write_foldcheck_report
 
 
 def test_colabfold_output_parser_emits_accepted_rows_with_wt_baseline_rmsd(tmp_path: Path) -> None:
@@ -65,6 +68,118 @@ def test_colabfold_output_parser_measures_wt_against_explicit_reference(tmp_path
 
     assert rows[0]["status"] == "accepted"
     assert rows[0]["backbone_rmsd_to_reference"] > 0.0
+    assert rows[0]["backbone_rmsd_to_wt_baseline"] == 0.0
+
+
+def test_colabfold_output_parser_maps_mobile_positions_to_explicit_reference(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    wt_model_path = output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb"
+    reference_path = tmp_path / "explicit_reference.pdb"
+    _write_ca_pdb(wt_model_path, bfactor=91.0, residue_count=5, y_offset=1.0)
+    _write_ca_pdb(reference_path, bfactor=95.0, residue_count=4, y_offset=1.0)
+
+    rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=_request_manifest(["wild_type"], length=5),
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+        reference_pdb_path=reference_path,
+        reference_mobile_positions=(2, 3, 4, 5),
+    )
+
+    assert rows[0]["status"] == "accepted"
+    assert rows[0]["backbone_rmsd_to_reference"] == 0.0
+    assert rows[0]["backbone_rmsd_to_wt_baseline"] == 0.0
+
+    wrong_rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=_request_manifest(["wild_type"], length=5),
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+        reference_pdb_path=reference_path,
+        reference_mobile_positions=(1, 2, 3, 4),
+    )
+    assert wrong_rows[0]["backbone_rmsd_to_reference"] > 0.0
+
+
+def test_colabfold_output_parser_does_not_truncate_without_an_explicit_mapping(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    wt_model_path = output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb"
+    reference_path = tmp_path / "explicit_reference.pdb"
+    _write_ca_pdb(wt_model_path, bfactor=91.0, residue_count=5)
+    _write_ca_pdb(reference_path, bfactor=95.0, residue_count=4)
+
+    rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=_request_manifest(["wild_type"], length=5),
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+        reference_pdb_path=reference_path,
+    )
+
+    assert rows[0]["status"] == "errored"
+    assert rows[0]["missing_metric_reason"] == "colabfold_required_metric_missing"
+
+
+def test_colabfold_output_parser_rejects_truncated_mobile_model_in_mapped_mode(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    wt_model_path = output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb"
+    reference_path = tmp_path / "explicit_reference.pdb"
+    _write_ca_pdb(wt_model_path, bfactor=91.0, residue_count=4)
+    _write_ca_pdb(reference_path, bfactor=95.0, residue_count=4)
+
+    rows = build_colabfold_foldcheck_rows(
+        output_root=output_root,
+        request_manifest=_request_manifest(["wild_type"], length=5),
+        runtime_version="colabfold-test",
+        runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+        reference_pdb_path=reference_path,
+        reference_mobile_positions=(1, 2, 3, 4),
+    )
+
+    assert rows[0]["status"] == "errored"
+    assert rows[0]["missing_metric_reason"] == "colabfold_ca_count_mismatch"
+
+
+def test_colabfold_output_parser_rejects_reference_position_cardinality_mismatch(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    wt_model_path = output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb"
+    reference_path = tmp_path / "explicit_reference.pdb"
+    _write_ca_pdb(wt_model_path, bfactor=91.0, residue_count=5)
+    _write_ca_pdb(reference_path, bfactor=95.0, residue_count=4)
+
+    with pytest.raises(ValueError, match="reference mobile position count"):
+        build_colabfold_foldcheck_rows(
+            output_root=output_root,
+            request_manifest=_request_manifest(["wild_type"], length=5),
+            runtime_version="colabfold-test",
+            runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+            reference_pdb_path=reference_path,
+            reference_mobile_positions=(2, 3, 4),
+        )
+
+
+def test_colabfold_output_parser_rejects_reference_position_outside_mobile_model(tmp_path: Path) -> None:
+    output_root = tmp_path / "colabfold_outputs"
+    output_root.mkdir()
+    wt_model_path = output_root / "wild_type_unrelaxed_rank_001_alphafold2_model_1_seed_000.pdb"
+    reference_path = tmp_path / "explicit_reference.pdb"
+    _write_ca_pdb(wt_model_path, bfactor=91.0, residue_count=5)
+    _write_ca_pdb(reference_path, bfactor=95.0, residue_count=4)
+
+    with pytest.raises(ValueError, match="outside candidate 'wild_type' C-alpha coordinate range"):
+        build_colabfold_foldcheck_rows(
+            output_root=output_root,
+            request_manifest=_request_manifest(["wild_type"], length=5),
+            runtime_version="colabfold-test",
+            runtime_parameters={"command": "colabfold_batch", "mode": "smoke"},
+            reference_pdb_path=reference_path,
+            reference_mobile_positions=(2, 3, 4, 6),
+        )
 
 
 def test_colabfold_output_parser_turns_missing_candidate_output_into_failure_row(tmp_path: Path) -> None:
@@ -85,6 +200,10 @@ def test_colabfold_output_parser_turns_missing_candidate_output_into_failure_row
     assert missing["status"] == "errored"
     assert missing["missing_metric_reason"] == "colabfold_output_missing"
     assert missing["rejection_reason"] == "colabfold_output_missing"
+    assert all("backbone_rmsd_to_wt_baseline" not in row for row in rows)
+    report_path = tmp_path / "foldcheck_report.parquet"
+    write_foldcheck_report(report_path, rows, request_hash=str(manifest["request_hash"]))
+    assert pq.read_schema(report_path).metadata[b"schema_version"] == b"1"
 
 
 def test_colabfold_output_parser_ignores_numeric_candidate_id_when_selecting_rank(tmp_path: Path) -> None:
@@ -175,7 +294,7 @@ def test_colabfold_output_parser_requires_colabfold_suffix_boundary_for_prefixed
     assert output_index.select_model_pdb(longer_id) is not None
 
 
-def _request_manifest(sequence_ids: list[str]) -> dict[str, object]:
+def _request_manifest(sequence_ids: list[str], *, length: int = 4) -> dict[str, object]:
     return {
         "request_hash": "sha256:" + "1" * 64,
         "runtime_kind": "alphafold_family_colabfold",
@@ -186,18 +305,26 @@ def _request_manifest(sequence_ids: list[str]) -> dict[str, object]:
         "sequences": [
             {
                 "sequence_id": sequence_id,
-                "sequence_hash": sequence_hash("A" * 4),
+                "sequence_hash": sequence_hash("A" * length),
                 "source_kind": "wild_type_baseline" if sequence_id == "wild_type" else "proteinmpnn_candidate",
-                "length": 4,
+                "length": length,
             }
             for sequence_id in sequence_ids
         ],
     }
 
 
-def _write_ca_pdb(path: Path, *, bfactor: float, y_offset: float = 0.0) -> None:
+def _write_ca_pdb(
+    path: Path,
+    *,
+    bfactor: float,
+    y_offset: float = 0.0,
+    residue_count: int = 4,
+) -> None:
     bend = 0.4 if y_offset == 0.0 else 0.8
-    coords = [(0.0, y_offset, 0.0), (1.0, y_offset, 0.0), (2.0, y_offset, 0.0), (3.0, y_offset + bend, 0.0)]
+    coords = [
+        (float(index), y_offset + (bend if index == residue_count - 1 else 0.0), 0.0) for index in range(residue_count)
+    ]
     lines = []
     for index, (x_coord, y_coord, z_coord) in enumerate(coords, start=1):
         lines.append(

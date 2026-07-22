@@ -51,6 +51,12 @@ repository.
 6. Keep candidates at or below the declared `2.5 A` cutoff in every non-distal
    review region.
 
+The normalized v2 report keeps the two global comparisons separate. It records
+candidate-to-reference RMSD over the residue-map correspondence and
+candidate-to-same-run-WT RMSD as independent fields. The report also binds the
+reference PDB hash, the ordered correspondence hash, and the coordinate basis;
+review rejects drift instead of reinterpreting one RMSD as the other.
+
 The non-distal regions are:
 
 - catalytic YADD context;

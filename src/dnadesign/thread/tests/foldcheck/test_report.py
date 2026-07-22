@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pyarrow.parquet as pq
+
 from dnadesign.thread.foldcheck import validate_foldcheck_report, write_foldcheck_report
 
 _REQUEST_HASH = "sha256:" + "1" * 64
@@ -113,6 +115,55 @@ def test_foldcheck_report_validator_requires_selected_candidate_acceptance(tmp_p
     assert [issue.check_id for issue in issues] == ["thread.foldcheck_report.selected_candidates_not_accepted"]
 
 
+def test_foldcheck_report_validator_treats_missing_schema_version_as_v1(tmp_path: Path) -> None:
+    report = tmp_path / "foldcheck_report.parquet"
+    write_foldcheck_report(report, [_accepted_row("wild_type")], request_hash=_REQUEST_HASH)
+    table = pq.read_table(report)
+    metadata = dict(table.schema.metadata or {})
+    metadata.pop(b"schema_version")
+    pq.write_table(table.replace_schema_metadata(metadata), report)
+
+    assert validate_foldcheck_report(report, request_hash=_REQUEST_HASH) == []
+
+
+def test_foldcheck_report_validator_rejects_unknown_schema_version(tmp_path: Path) -> None:
+    report = tmp_path / "foldcheck_report.parquet"
+    write_foldcheck_report(report, [_accepted_row("wild_type")], request_hash=_REQUEST_HASH)
+    table = pq.read_table(report)
+    metadata = dict(table.schema.metadata or {})
+    metadata[b"schema_version"] = b"3"
+    pq.write_table(table.replace_schema_metadata(metadata), report)
+
+    issues = validate_foldcheck_report(report, request_hash=_REQUEST_HASH)
+
+    assert [issue.check_id for issue in issues] == ["thread.foldcheck_report.unsupported_schema_version"]
+
+
+def test_foldcheck_report_validator_rejects_v2_columns_without_v2_metadata(tmp_path: Path) -> None:
+    report = tmp_path / "foldcheck_report.parquet"
+    write_foldcheck_report(report, [_v2_accepted_row("wild_type")], request_hash=_REQUEST_HASH)
+    table = pq.read_table(report)
+    metadata = dict(table.schema.metadata or {})
+    metadata.pop(b"schema_version")
+    pq.write_table(table.replace_schema_metadata(metadata), report)
+
+    issues = validate_foldcheck_report(report, request_hash=_REQUEST_HASH)
+
+    assert [issue.check_id for issue in issues] == ["thread.foldcheck_report.schema_version_column_mismatch"]
+
+
+def test_foldcheck_report_validator_rejects_mixed_v2_reference_lineage(tmp_path: Path) -> None:
+    report = tmp_path / "foldcheck_report.parquet"
+    wt = _v2_accepted_row("wild_type")
+    candidate = _v2_accepted_row("candidate_a")
+    candidate["reference_structure_hash"] = "sha256:" + "9" * 64
+    write_foldcheck_report(report, [wt, candidate], request_hash=_REQUEST_HASH)
+
+    issues = validate_foldcheck_report(report, request_hash=_REQUEST_HASH)
+
+    assert "thread.foldcheck_report.inconsistent_reference_lineage" in {issue.check_id for issue in issues}
+
+
 def _accepted_row(candidate_id: str) -> dict[str, object]:
     return {
         "candidate_id": candidate_id,
@@ -131,4 +182,14 @@ def _accepted_row(candidate_id: str) -> dict[str, object]:
         "status": "accepted",
         "rejection_reason": "",
         "missing_metric_reason": "",
+    }
+
+
+def _v2_accepted_row(candidate_id: str) -> dict[str, object]:
+    return {
+        **_accepted_row(candidate_id),
+        "backbone_rmsd_to_wt_baseline": 0.0 if candidate_id == "wild_type" else 0.8,
+        "reference_structure_hash": "sha256:" + "4" * 64,
+        "reference_mobile_positions_hash": "sha256:" + "5" * 64,
+        "reference_coordinate_basis": "reference_ca_order_to_one_based_mobile_sequence_position",
     }

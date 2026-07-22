@@ -58,7 +58,14 @@ _FOLDCHECK_REQUEST_ROOT_FILES = {
     "pipeline.py",
     "sequences.py",
 }
-_FOLDCHECK_REPORT_ROOT_FILES = {"__init__.py", "__main__.py", "cli.py", "constants.py", "pipeline.py"}
+_FOLDCHECK_REPORT_ROOT_FILES = {
+    "__init__.py",
+    "__main__.py",
+    "cli.py",
+    "constants.py",
+    "pipeline.py",
+    "reference.py",
+}
 _FOLDCHECK_REVIEW_ROOT_FILES = {
     "__init__.py",
     "__main__.py",

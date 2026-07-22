@@ -120,7 +120,13 @@ def validate_sampling_artifacts(
                 )
             )
         else:
-            issues.extend(validate_foldcheck_report_content(foldcheck_report, output_root=structure_root))
+            issues.extend(
+                validate_foldcheck_report_content(
+                    foldcheck_report,
+                    repo_root=repo_root,
+                    output_root=structure_root,
+                )
+            )
     if _phase_rank(phase) >= _phase_rank("phase4_downstream_promotion"):
         if not candidate_handoff.exists():
             issues.append(

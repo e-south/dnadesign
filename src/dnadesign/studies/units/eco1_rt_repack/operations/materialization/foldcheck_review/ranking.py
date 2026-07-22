@@ -24,7 +24,9 @@ from dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck
     STRONG_FOLD_REVIEW_CLASS,
     WT_SEQUENCE_ID,
 )
+from dnadesign.thread.adapters.colabfold.manifest import file_sha256_uri, ordered_positions_hash
 from dnadesign.thread.adapters.colabfold.metrics import ca_coordinates, ca_rmsd
+from dnadesign.thread.adapters.colabfold.outputs import MAPPED_REFERENCE_COORDINATE_BASIS
 
 _RANKING_SCHEMA = pa.schema(
     [
@@ -52,6 +54,14 @@ _RANKING_SCHEMA = pa.schema(
         ("score_artifact_path", pa.string()),
     ]
 )
+_V2_FOLD_METRIC_FIELDS = {
+    "backbone_rmsd_to_reference",
+    "backbone_rmsd_to_wt_baseline",
+    "reference_structure_hash",
+    "reference_mobile_positions_hash",
+    "reference_coordinate_basis",
+}
+_V2_ONLY_FOLD_METRIC_FIELDS = _V2_FOLD_METRIC_FIELDS - {"backbone_rmsd_to_reference"}
 
 
 def build_foldcheck_ranking_rows(
@@ -67,9 +77,20 @@ def build_foldcheck_ranking_rows(
     candidate_rows = [
         row for row in pq.read_table(candidate_table_path).to_pylist() if str(row.get("status")) == "accepted"
     ]
+    foldcheck_schema_version = (pq.read_schema(foldcheck_report_path).metadata or {}).get(b"schema_version", b"1")
+    if foldcheck_schema_version not in {b"1", b"2"}:
+        raise ValueError(f"unsupported foldcheck report schema version: {foldcheck_schema_version!r}")
     fold_rows = _fold_rows_by_candidate_id(foldcheck_report_path)
+    if foldcheck_schema_version == b"1" and any(_V2_ONLY_FOLD_METRIC_FIELDS & set(row) for row in fold_rows.values()):
+        raise ValueError("v1 foldcheck report contains v2-only RMSD or reference-lineage fields")
     mapped_positions = _mapped_canonical_positions(residue_map_path)
     reference_coords = _reference_coordinates(reference_backbone_path, mapped_position_count=len(mapped_positions))
+    if foldcheck_schema_version == b"2":
+        _validate_v2_reference_lineage(
+            fold_rows,
+            reference_backbone_path=reference_backbone_path,
+            mapped_positions=mapped_positions,
+        )
 
     ranking_rows: list[dict[str, Any]] = []
     for candidate in sorted(candidate_rows, key=lambda row: (int(row["rank"]), str(row["candidate_id"]))):
@@ -77,13 +98,22 @@ def build_foldcheck_ranking_rows(
         fold = fold_rows.get(candidate_id)
         if fold is None:
             raise ValueError(f"foldcheck_report.parquet is missing candidate {candidate_id!r}")
-        cryoem_rmsd, cryoem_status = _cryoem_mapped_rmsd(
-            candidate_id=candidate_id,
-            model_artifact_path=_optional_model_artifact_path(fold.get("model_artifact_path")),
-            mapped_positions=mapped_positions,
-            reference_coords=reference_coords,
-            local_model_root=local_model_root,
-        )
+        if foldcheck_schema_version == b"2":
+            missing_v2_fields = sorted(_V2_FOLD_METRIC_FIELDS - set(fold))
+            if missing_v2_fields:
+                raise ValueError(f"v2 foldcheck report row is missing fields: {missing_v2_fields}")
+            wt_runtime_rmsd = _optional_float(fold.get("backbone_rmsd_to_wt_baseline"))
+            cryoem_rmsd = _optional_float(fold.get("backbone_rmsd_to_reference"))
+            cryoem_status = "available" if cryoem_rmsd is not None else "foldcheck_reference_metric_missing"
+        else:
+            wt_runtime_rmsd = _optional_float(fold.get("backbone_rmsd_to_reference"))
+            cryoem_rmsd, cryoem_status = _cryoem_mapped_rmsd(
+                candidate_id=candidate_id,
+                model_artifact_path=_optional_model_artifact_path(fold.get("model_artifact_path")),
+                mapped_positions=mapped_positions,
+                reference_coords=reference_coords,
+                local_model_root=local_model_root,
+            )
         row = {
             "candidate_id": candidate_id,
             "source_sample_id": str(candidate.get("source_sample_id", "")),
@@ -100,12 +130,12 @@ def build_foldcheck_ranking_rows(
             "plddt": _optional_float(fold.get("plddt")),
             "pae_mean": _pae_value(fold.get("pae_summary"), "mean"),
             "pae_max": _pae_value(fold.get("pae_summary"), "max"),
-            "wt_runtime_ca_rmsd": _optional_float(fold.get("backbone_rmsd_to_reference")),
+            "wt_runtime_ca_rmsd": wt_runtime_rmsd,
             "cryoem_mapped_ca_rmsd": cryoem_rmsd,
             "cryoem_mapped_ca_rmsd_status": cryoem_status,
             "review_class": _review_class(
                 plddt=_optional_float(fold.get("plddt")),
-                wt_runtime_ca_rmsd=_optional_float(fold.get("backbone_rmsd_to_reference")),
+                wt_runtime_ca_rmsd=wt_runtime_rmsd,
             ),
             "review_rank": 0,
             "model_artifact_path": str(fold.get("model_artifact_path", "")),
@@ -126,6 +156,26 @@ def build_foldcheck_ranking_rows(
     return ranking_rows
 
 
+def _validate_v2_reference_lineage(
+    fold_rows: dict[str, dict[str, Any]],
+    *,
+    reference_backbone_path: Path,
+    mapped_positions: list[int],
+) -> None:
+    expected = {
+        "reference_structure_hash": file_sha256_uri(reference_backbone_path),
+        "reference_mobile_positions_hash": ordered_positions_hash(mapped_positions),
+        "reference_coordinate_basis": MAPPED_REFERENCE_COORDINATE_BASIS,
+    }
+    for candidate_id, row in fold_rows.items():
+        mismatches = [field for field, value in expected.items() if row.get(field) != value]
+        if mismatches:
+            raise ValueError(
+                f"v2 foldcheck report reference lineage for {candidate_id!r} does not match "
+                f"the current Eco1 authority: {mismatches}"
+            )
+
+
 def write_foldcheck_ranking(path: Path, rows: list[dict[str, Any]], *, source_request_hash: str) -> None:
     """Write review-ranking rows to Parquet."""
 
@@ -136,8 +186,8 @@ def write_foldcheck_ranking(path: Path, rows: list[dict[str, Any]], *, source_re
         b"status": b"materialized",
         b"source_request_hash": source_request_hash.encode("utf-8"),
         b"rmsd_semantics": (
-            b"wt_runtime_ca_rmsd is from foldcheck_report; "
-            b"cryoem_mapped_ca_rmsd is explicit ec86kit-reference comparison when available"
+            b"wt_runtime_ca_rmsd is candidate-to-same-run-WT; "
+            b"cryoem_mapped_ca_rmsd is candidate-to-declared-ec86kit-reference over mapped positions"
         ),
     }
     table = pa.Table.from_pylist(rows, schema=_RANKING_SCHEMA)

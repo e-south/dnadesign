@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Materialize Eco1 foldcheck_report.parquet from ColabFold outputs.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--output-root", type=Path, default=None)
+    parser.add_argument("--source-output-root", type=Path, default=None)
     parser.add_argument("--colabfold-output-root", type=Path, required=True)
     parser.add_argument("--runtime-version", required=True)
     parser.add_argument("--runtime-parameter", action="append", default=[], metavar="KEY=VALUE")
@@ -34,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     result = materialize_foldcheck_report(
         repo_root=args.repo_root,
         output_root=args.output_root,
+        source_output_root=args.source_output_root,
         colabfold_output_root=args.colabfold_output_root,
         runtime_version=args.runtime_version,
         runtime_parameters=_parse_runtime_parameters(args.runtime_parameter),
