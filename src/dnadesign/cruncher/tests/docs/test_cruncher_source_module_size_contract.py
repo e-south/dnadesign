@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-cruncher project
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_cruncher_source_module_size_contract.py
 
 Contract checks that Cruncher source modules stay below the monolith threshold.

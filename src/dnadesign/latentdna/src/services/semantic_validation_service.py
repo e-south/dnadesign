@@ -1,4 +1,13 @@
-"""Static semantic validation for LatentDNA workspace sequence contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/semantic_validation_service.py
+
+Static semantic validation for LatentDNA workspace sequence contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -22,11 +31,14 @@ from ..workspaces.loader import WorkspaceContext
 _FIXED_60_LABEL_RE = re.compile(r"(?<!\d)60\s*bp\b|(?<!\d)60bp\b", re.IGNORECASE)
 _INFER_SOURCE_TYPES = (InferFeatureSidecarSourceConfig, InferFeatureScalarSidecarSourceConfig)
 _POOLING_COLUMNS = ("pooling_start_0", "pooling_end_0")
+_OPTIONAL_EMPTY_SOURCE_ROLES = {"planned", "retired"}
 
 
 @dataclass(slots=True)
 class SourceSemanticProfile:
     source_id: str
+    role: str | None
+    row_count: int
     sequence_scope: str | None
     emitted_length_bp: int | None
     source_interval_length_bp: int | str | None
@@ -53,6 +65,9 @@ class SourceSemanticProfile:
     def to_detail(self) -> dict[str, object]:
         return {
             "source_id": self.source_id,
+            "role": self.role,
+            "row_count": self.row_count,
+            "materialization_status": self.materialization_status,
             "sequence_scope": self.sequence_scope,
             "emitted_length_bp": self.emitted_length_bp,
             "source_interval_length_bp": self.source_interval_length_bp,
@@ -62,6 +77,14 @@ class SourceSemanticProfile:
             "length_counts": dict(sorted(self.length_counts.items())),
             "pooling_span_counts": dict(sorted(self.pooling_span_counts.items())),
         }
+
+    @property
+    def materialization_status(self) -> str:
+        if self.row_count == 0 and self.role in _OPTIONAL_EMPTY_SOURCE_ROLES:
+            return f"{self.role}_empty"
+        if self.row_count == 0:
+            return "empty"
+        return "materialized"
 
 
 def _claims_fixed_60bp(value: object) -> bool:
@@ -179,8 +202,12 @@ def _build_source_profiles(
             if needs_infer_pooling_check
             else Counter()
         )
+        source_role = str(getattr(source, "role", "") or "").strip().lower() or None
+        source_row_count = int(source_schemas.get(source_id, {}).get("row_count") or 0)
         profile = SourceSemanticProfile(
             source_id=source_id,
+            role=source_role,
+            row_count=source_row_count,
             sequence_scope=getattr(source, "sequence_scope", None),
             emitted_length_bp=getattr(source, "emitted_length_bp", None),
             source_interval_length_bp=getattr(source, "source_interval_length_bp", None),
@@ -190,9 +217,9 @@ def _build_source_profiles(
             length_counts=dict(length_counts),
             pooling_span_counts=dict(span_counts),
         )
-        source_row_count = int(source_schemas.get(source_id, {}).get("row_count") or 0)
+        skip_observed_semantics = source_row_count == 0 and source_role in _OPTIONAL_EMPTY_SOURCE_ROLES
         expected_length = profile.emitted_length_bp
-        if expected_length is not None:
+        if expected_length is not None and not skip_observed_semantics:
             if not profile.observed_lengths and source_row_count > 0:
                 raise WorkspaceValidationError(
                     f"source {source_id} declares emitted_length_bp={expected_length} "
@@ -204,7 +231,7 @@ def _build_source_profiles(
                     f"{_counter_to_preview(length_counts)}"
                 )
         expected_span = profile.pooling_span_bp
-        if isinstance(expected_span, int) and needs_infer_pooling_check:
+        if isinstance(expected_span, int) and needs_infer_pooling_check and not skip_observed_semantics:
             if not profile.observed_pooling_spans and source_row_count > 0:
                 raise WorkspaceValidationError(
                     f"infer source {source_id} declares pooling_span_bp={expected_span} but exposes no pooling bounds"

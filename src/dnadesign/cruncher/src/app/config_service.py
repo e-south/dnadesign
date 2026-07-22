@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/config_service.py
 
 Load and summarize resolved Cruncher configurations.

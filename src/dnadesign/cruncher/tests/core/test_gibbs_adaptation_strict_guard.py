@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_gibbs_adaptation_strict_guard.py
 
 Ensures gibbs annealing does not run replica-exchange adaptation logic.

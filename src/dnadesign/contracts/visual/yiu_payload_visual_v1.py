@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/yiu_payload_visual_v1.py
 
 Shared YIU payload visual contract with optional PWM motif layers.

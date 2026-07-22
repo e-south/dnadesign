@@ -1,7 +1,7 @@
 ## Execution Plans
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 ### At a glance
 Execution plans turn approved intent into checklisted implementation steps.
@@ -11,7 +11,7 @@ Plans are living documents: update progress, discoveries, and decisions while wo
 ### Contents
 - [Active plans](active/README.md)
 - [Completed plans](completed/README.md)
-- [Plan template](../templates/exec-plan.md)
+- [Plan template](../templates/plans/exec-plan.md)
 - [Planning map](../../PLANS.md)
 - [Design proposals](../dev/plans)
 
@@ -33,6 +33,6 @@ Plans are living documents: update progress, discoveries, and decisions while wo
 - `## Concrete Steps`
 - `## Validation and Acceptance`
 
-Use `../templates/exec-plan.md` as the authoritative scaffold.
+Use `../templates/plans/exec-plan.md` as the authoritative scaffold.
 Checklist items are reserved for `## Progress` so status is machine-checkable and easy to scan.
 Every `Progress` checklist item must include a UTC timestamp in `(YYYY-MM-DD HH:MMZ)` format.

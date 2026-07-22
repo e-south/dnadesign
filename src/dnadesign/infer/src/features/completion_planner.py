@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable, MutableMapping
 from dataclasses import asdict, dataclass, field
 
 import pyarrow.parquet as pq
@@ -20,9 +21,9 @@ from dnadesign.usr import Dataset, sequence_views_path
 
 from .aliases import (
     load_feature_alias_ids,
-    load_feature_alias_rows,
+    load_feature_alias_inventory_rows,
     load_feature_scalar_alias_ids,
-    load_feature_scalar_alias_rows,
+    load_feature_scalar_alias_inventory_rows,
     load_feature_scalar_keys,
     load_feature_vector_keys,
 )
@@ -45,6 +46,8 @@ from .shard_ledger import (
     SHARD_LEDGER_SCHEMA_VERSION,
     SHARD_RESUME_POLICY,
 )
+
+FeatureInventoryCache = MutableMapping[tuple[str, ...], object]
 
 
 @dataclass(frozen=True)
@@ -247,6 +250,52 @@ def _load_feature_scalar_key_inventory(
     return load_feature_scalar_keys(dataset_root=dataset_root, dataset_id=dataset_id, keys=keys)
 
 
+def _cached_alias_rows(
+    *,
+    inventory_cache: FeatureInventoryCache | None,
+    cache_kind: str,
+    dataset_root: str,
+    dataset_id: str,
+    loader: Callable[..., list[dict[str, object]]],
+) -> list[dict[str, object]]:
+    if inventory_cache is None:
+        return loader(dataset_root=dataset_root, dataset_id=dataset_id)
+    cache_key = (cache_kind, dataset_root, dataset_id)
+    cached = inventory_cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    rows = loader(dataset_root=dataset_root, dataset_id=dataset_id)
+    inventory_cache[cache_key] = rows
+    return rows
+
+
+def _cached_feature_keys(
+    *,
+    inventory_cache: FeatureInventoryCache | None,
+    cache_kind: str,
+    dataset_root: str,
+    dataset_id: str,
+    keys: set[str],
+    loader: Callable[..., set[str]],
+) -> set[str]:
+    wanted = {str(key) for key in keys if str(key).strip()}
+    if not wanted:
+        return set()
+    if inventory_cache is None:
+        return loader(dataset_root=dataset_root, dataset_id=dataset_id, keys=wanted)
+    cache_key = (cache_kind, dataset_root, dataset_id)
+    cached = inventory_cache.get(cache_key)
+    if isinstance(cached, tuple) and len(cached) == 2:
+        requested, observed = cached
+        if isinstance(requested, set) and isinstance(observed, set) and wanted.issubset(requested):
+            return {key for key in observed if key in wanted}
+        if isinstance(requested, set):
+            wanted.update(str(key) for key in requested if str(key).strip())
+    observed = loader(dataset_root=dataset_root, dataset_id=dataset_id, keys=wanted)
+    inventory_cache[cache_key] = (set(wanted), set(observed))
+    return observed
+
+
 def _alias_row_vector_identity(row: dict[str, object]) -> tuple[str, str, str | None, str, str]:
     return (
         str(row.get("view_id") or ""),
@@ -294,6 +343,7 @@ def plan_sequence_view_feature_inventory_completion(
     bundle_id: str | None = None,
     infer_command: str | None = None,
     runtime_fingerprint: dict[str, object] | None = None,
+    inventory_cache: FeatureInventoryCache | None = None,
 ) -> FeatureCompletionPlan:
     """Plan completion from sequence-view and alias inventories only.
 
@@ -390,17 +440,26 @@ def plan_sequence_view_feature_inventory_completion(
 
     for dataset_key, expected_vectors in expected_vectors_by_dataset.items():
         dataset_root, dataset_id = dataset_key
-        alias_rows = load_feature_alias_rows(dataset_root=dataset_root, dataset_id=dataset_id)
+        alias_rows = _cached_alias_rows(
+            inventory_cache=inventory_cache,
+            cache_kind="feature_alias_inventory_rows",
+            dataset_root=dataset_root,
+            dataset_id=dataset_id,
+            loader=load_feature_alias_inventory_rows,
+        )
         existing_aliases += len(alias_rows)
         alias_keys = {
             str(row.get("feature_vector_key") or "")
             for row in alias_rows
             if str(row.get("feature_vector_key") or "").strip()
         }
-        payload_keys = _load_feature_vector_key_inventory(
+        payload_keys = _cached_feature_keys(
+            inventory_cache=inventory_cache,
+            cache_kind="feature_vector_keys",
             dataset_root=dataset_root,
             dataset_id=dataset_id,
             keys=alias_keys,
+            loader=_load_feature_vector_key_inventory,
         )
         state_by_slot: dict[tuple[object, ...], str] = {}
         for row in alias_rows:
@@ -424,17 +483,26 @@ def plan_sequence_view_feature_inventory_completion(
 
     for dataset_key, expected_scalars in expected_scalars_by_dataset.items():
         dataset_root, dataset_id = dataset_key
-        alias_rows = load_feature_scalar_alias_rows(dataset_root=dataset_root, dataset_id=dataset_id)
+        alias_rows = _cached_alias_rows(
+            inventory_cache=inventory_cache,
+            cache_kind="feature_scalar_alias_inventory_rows",
+            dataset_root=dataset_root,
+            dataset_id=dataset_id,
+            loader=load_feature_scalar_alias_inventory_rows,
+        )
         existing_scalar_aliases += len(alias_rows)
         alias_keys = {
             str(row.get("feature_scalar_key") or "")
             for row in alias_rows
             if str(row.get("feature_scalar_key") or "").strip()
         }
-        payload_keys = _load_feature_scalar_key_inventory(
+        payload_keys = _cached_feature_keys(
+            inventory_cache=inventory_cache,
+            cache_kind="feature_scalar_keys",
             dataset_root=dataset_root,
             dataset_id=dataset_id,
             keys=alias_keys,
+            loader=_load_feature_scalar_key_inventory,
         )
         state_by_slot: dict[tuple[object, ...], str] = {}
         for row in alias_rows:

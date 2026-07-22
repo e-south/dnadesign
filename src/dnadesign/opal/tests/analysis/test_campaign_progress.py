@@ -1,0 +1,204 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/analysis/test_campaign_progress.py
+
+Regression tests for campaign progress OPAL analysis.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import polars as pl
+
+from dnadesign.opal.src.analysis.campaign_progress import (
+    active_record_rows,
+    assess_records_contract,
+    assess_records_contract_for_schema,
+    build_ledger_status_table,
+    build_records_preview,
+    campaign_contract_rows,
+    cli_handoff_lines,
+    read_optional_table,
+    table_status_lines,
+    x_provenance_status_lines,
+    x_provenance_status_rows,
+)
+from dnadesign.opal.src.analysis.dashboard.datasets import CampaignInfo, CampaignSelectionViewInfo
+
+
+def _campaign_info() -> CampaignInfo:
+    return CampaignInfo(
+        label="demo",
+        path=Path("campaign.yaml"),
+        workdir=None,
+        slug="demo",
+        owner_scope="opal_demo",
+        study_id=None,
+        portable=True,
+        x_column="opal__view__x",
+        y_column="opal__view__y",
+        y_expected_length=8,
+        model_name="random_forest",
+        model_params={},
+        selection_views=(
+            CampaignSelectionViewInfo(
+                id="primary",
+                objective_name="sfxi_v1",
+                objective_params={},
+                selection_name="top_n",
+                selection_params={},
+            ),
+        ),
+        training_policy={},
+        y_ops=[],
+    )
+
+
+def test_records_contract_ready_with_configured_x_column() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["rec-1"],
+            "bio_type": ["promoter"],
+            "sequence": ["ACGT"],
+            "alphabet": ["DNA"],
+            "opal__view__x": [[0.1, 0.2, 0.3]],
+        }
+    )
+
+    report = assess_records_contract(df, _campaign_info())
+
+    assert report.ready
+    assert report.missing_required_columns == ()
+    assert "does not inspect producer geometry" in "\n".join(x_provenance_status_lines(report))
+    rows = {row["field"]: row["value"] for row in x_provenance_status_rows(report)}
+    assert rows["X column"] == "opal__view__x"
+    assert rows["X state"] == "present"
+
+
+def test_records_contract_requires_configured_x_column() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["rec-1"],
+            "bio_type": ["promoter"],
+            "sequence": ["ACGT"],
+            "alphabet": ["DNA"],
+        }
+    )
+
+    report = assess_records_contract(df, _campaign_info())
+
+    assert not report.ready
+    assert report.missing_required_columns == ("opal__view__x",)
+
+
+def test_records_contract_schema_mode_does_not_load_x_values() -> None:
+    report = assess_records_contract_for_schema(
+        row_count=157_160,
+        schema_columns=("id", "bio_type", "sequence", "alphabet", "opal__view__x"),
+        campaign_slug="demo",
+        x_column="opal__view__x",
+        loaded_columns=("id", "bio_type", "sequence", "alphabet"),
+    )
+
+    assert report.ready
+    assert not report.x_values_loaded
+    status = "\n".join(x_provenance_status_lines(report)).lower()
+    assert "present in records schema" in status
+    assert "not loaded" in status
+
+
+def test_records_preview_hides_vector_but_marks_presence() -> None:
+    df = pl.DataFrame(
+        {
+            "id": ["rec-1"],
+            "bio_type": ["promoter"],
+            "sequence": ["ACGT" * 40],
+            "alphabet": ["DNA"],
+            "opal__view__x": [[0.1, 0.2, 0.3]],
+            "opal__demo__label_hist": [[1.0, None]],
+        }
+    )
+    report = assess_records_contract(df, _campaign_info())
+
+    preview = build_records_preview(df, report)
+
+    assert "opal__view__x" not in preview.columns
+    assert preview.get_column("x_present").to_list() == [True]
+    assert preview.get_column("label_hist_present").to_list() == [True]
+    assert preview.get_column("sequence_length").to_list() == [160]
+    row = df.to_dicts()[0]
+    status_rows = {item["field"]: item["value"] for item in active_record_rows(row, report)}
+    assert status_rows["id"] == "rec-1"
+    assert status_rows["X present"] is True
+    assert status_rows["label history present"] is True
+
+
+def test_campaign_contract_rows_are_table_ready() -> None:
+    report = assess_records_contract(
+        pl.DataFrame(
+            {
+                "id": ["rec-1"],
+                "bio_type": ["promoter"],
+                "sequence": ["ACGT"],
+                "alphabet": ["DNA"],
+                "opal__view__x": [[0.1, 0.2, 0.3]],
+            }
+        ),
+        _campaign_info(),
+    )
+
+    rows = campaign_contract_rows(
+        _campaign_info(),
+        config_path=Path("campaign.yaml"),
+        records_path=Path("records.parquet"),
+        records_report=report,
+    )
+    keyed = {row["field"]: row["value"] for row in rows}
+
+    assert keyed["campaign"] == "demo"
+    assert keyed["ownership"] == "opal_demo"
+    assert "study" not in keyed
+    assert keyed["selection views"] == "primary: sfxi_v1 -> top_n"
+    assert keyed["config"] == "campaign.yaml"
+    assert keyed["records"] == "records.parquet"
+    assert keyed["records contract"] == "ready"
+
+
+def test_ledger_status_table_is_structured_when_workdir_missing() -> None:
+    table = build_ledger_status_table(None)
+
+    assert table.get_column("artifact").to_list() == ["state", "labels", "runs", "predictions"]
+    assert set(table.get_column("status").to_list()) == {"missing workdir"}
+
+
+def test_optional_table_reports_unavailable_without_raising() -> None:
+    def _loader() -> pl.DataFrame:
+        raise RuntimeError("missing runs sink")
+
+    table = read_optional_table("runs", Path("outputs/ledger/runs.parquet"), _loader)
+
+    assert not table.available
+    assert table.df.is_empty()
+    assert table.status == "unavailable"
+    assert "missing runs sink" in table.message
+    assert "runs: **unavailable**" in "\n".join(table_status_lines(table))
+
+
+def test_cli_handoff_lines_keep_notebook_generation_in_canonical_path() -> None:
+    text = "\n".join(cli_handoff_lines("campaign.yaml"))
+
+    assert "Pre-run campaign viewer generation (writes notebook)" in text
+    assert "Post-run ledger inspection" in text
+    assert "uv run opal validate -c campaign.yaml" in text
+    assert "uv run opal status -c campaign.yaml --with-ledger" in text
+    assert "uv run opal runs list -c campaign.yaml" in text
+    assert "uv run opal record-show -c campaign.yaml" in text
+    assert "uv run opal verify-outputs -c campaign.yaml --view <selection-view-id> --round latest" in text
+    assert "uv run opal plot -c campaign.yaml --view <selection-view-id>" in text
+    assert "uv run opal notebook generate -c campaign.yaml --round latest --force" in text
+    assert "uv run opal notebook run -c campaign.yaml" in text

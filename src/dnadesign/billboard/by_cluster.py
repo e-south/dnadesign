@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-billboard/by_cluster.py
+dnadesign
+src/dnadesign/billboard/by_cluster.py
+
+Focused helpers for by cluster billboard.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

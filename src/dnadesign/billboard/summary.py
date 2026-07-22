@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-billboard/summary.py
+dnadesign
+src/dnadesign/billboard/summary.py
+
+Focused helpers for summary billboard.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

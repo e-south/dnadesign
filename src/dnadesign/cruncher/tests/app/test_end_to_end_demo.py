@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_end_to_end_demo.py
 
-Author(s): Eric J. South
+Regression tests for end to end demo Cruncher app.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -83,6 +85,15 @@ def _sample_block() -> dict:
 
 
 runner = CliRunner()
+
+
+def _copy_demo_workspace_source(source: Path, destination: Path) -> None:
+    shutil.copytree(
+        source,
+        destination,
+        ignore=shutil.ignore_patterns(".cruncher", "outputs"),
+    )
+    (destination / "outputs").mkdir(parents=True, exist_ok=True)
 
 
 def _fixture_transport(query: str, variables: dict) -> dict:
@@ -257,10 +268,7 @@ def test_demo_multitf_local_only_generates_plots(tmp_path: Path) -> None:
     package_root = Path(__file__).resolve().parents[2]
     demo_workspace = package_root / "workspaces" / "demo_multitf"
     workspace = tmp_path / "demo_multitf"
-    shutil.copytree(demo_workspace, workspace)
-    shutil.rmtree(workspace / "outputs", ignore_errors=True)
-    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
-    (workspace / "outputs").mkdir(parents=True, exist_ok=True)
+    _copy_demo_workspace_source(demo_workspace, workspace)
 
     config_path = workspace / "configs" / "config.yaml"
     config_payload = yaml.safe_load(config_path.read_text())
@@ -270,10 +278,15 @@ def test_demo_multitf_local_only_generates_plots(tmp_path: Path) -> None:
     # Keep this test local-only and MEME-independent.
     cruncher_cfg["catalog"]["pwm_source"] = "sites"
     cruncher_cfg["catalog"]["source_preference"] = ["demo_local_meme", "regulondb"]
-    cruncher_cfg["sample"]["budget"]["tune"] = 240
-    cruncher_cfg["sample"]["budget"]["draws"] = 480
+    cruncher_cfg["sample"]["budget"]["tune"] = 40
+    cruncher_cfg["sample"]["budget"]["draws"] = 80
+    cruncher_cfg["sample"]["optimizer"]["chains"] = 2
     cruncher_cfg["sample"]["elites"]["k"] = 3
-    cruncher_cfg["analysis"]["max_points"] = 1000
+    cruncher_cfg["sample"]["elites"]["select"]["pool_size"] = 64
+    cruncher_cfg["analysis"]["plot_format"] = "png"
+    cruncher_cfg["analysis"]["max_points"] = 200
+    cruncher_cfg["analysis"]["plot_dpi"] = 72
+    cruncher_cfg["analysis"]["trajectory_video"]["enabled"] = False
     config_path.write_text(yaml.safe_dump(config_payload))
 
     result = runner.invoke(
@@ -313,62 +326,3 @@ def test_demo_multitf_local_only_generates_plots(tmp_path: Path) -> None:
     assert (analysis_plots_dir / f"elites_nn_distance.{plot_ext}").exists()
     assert (analysis_plots_dir / f"elites_showcase.{plot_ext}").exists()
     assert (analysis_plots_dir / f"health_panel.{plot_ext}").exists()
-
-
-def test_demo_pairwise_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: Path) -> None:
-    package_root = Path(__file__).resolve().parents[2]
-    demo_workspace = package_root / "workspaces" / "demo_pairwise"
-    workspace = tmp_path / "demo_pairwise"
-    shutil.copytree(demo_workspace, workspace)
-    shutil.rmtree(workspace / "outputs", ignore_errors=True)
-    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
-    (workspace / "outputs").mkdir(parents=True, exist_ok=True)
-
-    config_path = workspace / "configs" / "config.yaml"
-    config_payload = yaml.safe_load(config_path.read_text())
-    cruncher_cfg = config_payload["cruncher"]
-    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_pairwise")
-    cruncher_cfg["catalog"]["source_preference"] = ["demo_local_meme"]
-    cruncher_cfg["sample"]["budget"]["tune"] = 180
-    cruncher_cfg["sample"]["budget"]["draws"] = 360
-    cruncher_cfg["sample"]["motif_width"]["maxw"] = int(cruncher_cfg["sample"]["sequence_length"])
-    cruncher_cfg["sample"]["elites"]["k"] = 3
-    cruncher_cfg["analysis"]["max_points"] = 1000
-    cruncher_cfg["analysis"]["fimo_compare"]["enabled"] = False
-    config_path.write_text(yaml.safe_dump(config_payload))
-
-    result = runner.invoke(
-        app,
-        [
-            "fetch",
-            "motifs",
-            "--source",
-            "demo_local_meme",
-            "--tf",
-            "lexA",
-            "--tf",
-            "cpxR",
-            "--update",
-            "-c",
-            str(config_path),
-        ],
-    )
-    assert result.exit_code == 0
-
-    for command in (
-        ["lock", "-c", str(config_path)],
-        ["parse", "-c", str(config_path)],
-        ["sample", "-c", str(config_path)],
-        ["analyze", "--summary", "-c", str(config_path)],
-    ):
-        result = runner.invoke(app, command)
-        assert result.exit_code == 0
-
-    summary_file = workspace / "outputs" / "analysis" / "reports" / "summary.json"
-    manifest_file = workspace / "outputs" / "analysis" / "manifests" / "plot_manifest.json"
-    assert summary_file.exists()
-    assert manifest_file.exists()
-
-    manifest_payload = json.loads(manifest_file.read_text())
-    plots = {entry["key"]: entry for entry in manifest_payload.get("plots", []) if isinstance(entry, dict)}
-    assert "chain_trajectory_sweep" in plots

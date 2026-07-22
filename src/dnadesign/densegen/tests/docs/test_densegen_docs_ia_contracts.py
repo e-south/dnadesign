@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<densegen project>
+dnadesign
 src/dnadesign/densegen/tests/docs/test_densegen_docs_ia_contracts.py
 
 Contract checks for DenseGen docs navigation and workspace runbook discoverability.
@@ -137,21 +137,34 @@ def test_densegen_top_level_readme_has_banner_and_ordered_documentation_map() ->
         [
             "docs/README.md",
             "workspaces/README.md",
-            "docs/tutorials/demo_tfbs_baseline.md",
-            "docs/tutorials/demo_sampling_baseline.md",
-            "docs/tutorials/study_constitutive_sigma_panel.md",
-            "docs/tutorials/study_stress_ethanol_cipro.md",
-            "docs/tutorials/demo_usr_notify.md",
-            "docs/concepts/quick-checklist.md",
             "docs/reference/cli.md",
-            "docs/reference/config.md",
-            "docs/reference/outputs.md",
-            "docs/howto/hpc.md",
-            "docs/howto/bu-scc.md",
-            "docs/dev/architecture.md",
-            "docs/dev/journal.md",
+            "../../../docs/README.md",
         ],
         label="densegen/README.md doc map",
+    )
+    assert len(content.splitlines()) <= 35
+
+
+def test_densegen_docs_entry_has_ordered_documentation_map() -> None:
+    content = _read(DOCS_ROOT / "README.md")
+    _assert_token_order(
+        content,
+        [
+            "tutorials/demo_tfbs_baseline.md",
+            "tutorials/demo_sampling_baseline.md",
+            "tutorials/study_constitutive_sigma_panel.md",
+            "tutorials/study_stress_ethanol_cipro.md",
+            "tutorials/demo_usr_notify.md",
+            "concepts/checklists/quick-checklist.md",
+            "reference/outputs.md",
+            "reference/cli.md",
+            "reference/config.md",
+            "howto/hpc.md",
+            "howto/bu-scc.md",
+            "dev/architecture.md",
+            "dev/journal.md",
+        ],
+        label="densegen/docs/README.md doc map",
     )
 
 

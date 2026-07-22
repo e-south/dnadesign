@@ -1,8 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/build_reader_sfxi_reference_overlay.py
+
 Build a provenance-aware USR SFXI reference metric overlay from Reader vec8 outputs.
 
-The default CLI mode is a dry run. Writing the additive ``sfxi_ref`` overlay requires
-``--write`` and refuses to append over an existing overlay namespace.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -426,6 +430,8 @@ def build_overlay_from_reader(
     setpoint_name: str = DEFAULT_SETPOINT_NAME,
     setpoint_vector: Sequence[float] = DEFAULT_SETPOINT_VECTOR,
 ) -> pd.DataFrame:
+    reader_root = reader_root.expanduser().resolve()
+    vec8_path = vec8_path.expanduser().resolve()
     base_records = read_usr_base_records(usr_root, dataset_name)
     vec8 = read_reader_vec8(vec8_path)
     scored = score_reader_vec8(

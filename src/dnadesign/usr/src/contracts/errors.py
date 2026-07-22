@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/src/contracts/errors.py
+
+Contract definitions for errors USR.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

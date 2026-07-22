@@ -1,11 +1,14 @@
 # USR Python API quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-23
+**Last verified:** 2026-07-14
 
 Public import surface: `dnadesign.usr`
 
 Mutation methods require a registry at the dataset root.
+Registry namespace setup is part of the public library surface via
+`parse_columns_spec` and `register_namespace`; cross-tool tests and operators
+should not import `dnadesign.usr.src.registry` directly.
 
 Internal modules under `dnadesign.usr.src.*` are implementation details. Cross-tool callers should
 import from `dnadesign.usr`; the old sibling root modules such as `dnadesign.usr.dataset` and
@@ -13,7 +16,7 @@ import from `dnadesign.usr`; the old sibling root modules such as `dnadesign.usr
 
 Within `dnadesign.usr.src`, root packages are reserved for coordinators. Helper families now live
 under `cli/support/`, `contracts/`, `datasets/`, `events/`, `legacy/`, `overlays/support/`,
-`overlays/`, `sync/remote/`, `registry/`, `runtime/`, and `storage/`.
+`overlays/`, `regulondb/`, `sync/remote/`, `registry/`, `runtime/`, and `storage/`.
 `usr/src` root should contain package directories only plus `__init__.py`; flat implementation
 files at that level are considered an architecture regression.
 Shared error/schema/type/sequence contracts now live under `contracts/`.
@@ -76,4 +79,4 @@ print(ds.head(3))
 ## Next steps
 
 - Schema and registry contracts: [schema-contract.md](schema-contract.md), [overlay-and-registry.md](overlay-and-registry.md)
-- Sync for cross-machine loops: [../operations/sync.md](../operations/sync.md)
+- Sync for cross-machine loops: [USR sync operations](../operations/sync/README.md)

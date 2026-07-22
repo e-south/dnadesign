@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/plotting_trajectory.py
 
 Render trajectory analysis plots and optional trajectory video output.

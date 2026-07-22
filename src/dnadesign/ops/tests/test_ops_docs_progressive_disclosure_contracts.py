@@ -42,26 +42,19 @@ def test_ops_module_readme_has_banner_narrative_and_doc_map() -> None:
         text,
         [
             "![Ops banner](assets/ops-banner.svg)",
-            "## Common entrypoints",
             "## Documentation",
+            "docs/README.md",
+            "docs/how-to-use-ops.md",
+            "../../../docs/runbooks/README.md",
+            "../../../docs/README.md",
         ],
         label="src/dnadesign/ops/README.md",
     )
-    assert "Ops manages batch orchestration across tools." in text
-    assert "Use Ops when:" in text
-    assert "Do not use Ops when:" in text
-    assert "shared command index" in text
-    assert "uv run ops catalog list" in text
-    assert "shared command entrypoints below" in text
-    assert "uv run ops catalog show <registry-id>" in text
-    assert "uv run ops progress explain <registry-id>" in text
-    assert "docs/README.md" in text
-    assert "docs/how-to-use-ops.md" in text
-    assert "../../../docs/runbooks/README.md" in text
-    assert "../../../docs/operations/README.md" in text
-    assert "../../../docs/operations/orchestration-runbooks.md" in text
-    assert "runbooks/presets" in text
-    assert "../../../docs/README.md" in text
+    assert "Ops provides the shared command surface" in text
+    assert "uv run ops catalog list" not in text
+    assert "Use Ops when:" not in text
+    assert "Do not use Ops when:" not in text
+    assert len(text.splitlines()) <= 35
     assert "## Entrypoint contract" not in text
     assert "## Boundary reminder" not in text
     assert "progressive disclosure" not in text.lower()
@@ -73,20 +66,26 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
         text,
         [
             "### Start here",
+            "### Operator overlays",
             "### Package-local surfaces",
             "### Boundary reminders",
         ],
         label="src/dnadesign/ops/docs/README.md",
     )
     assert "../../../../docs/runbooks/README.md" in text
-    assert "full command list" in text
+    assert "repo-wide" in text
+    assert "command list lives in `docs/runbooks/README.md`" in text
     assert "how-to-use-ops.md" in text
     assert "../../../../docs/operations/README.md" in text
-    assert "../../../../docs/operations/orchestration-runbooks.md" in text
+    assert "../../../../docs/operations/orchestration/runbooks.md" in text
     assert "../runbooks/presets" in text
     assert "../../../../docs/README.md" in text
     assert "uv run ops catalog list --simple" in text
     assert "How to use Ops" in text
+    assert "../../../../.agents/skills/sge-hpc-ops/SKILL.md" in text
+    assert "../../../../.agents/skills/notify-ops/SKILL.md" in text
+    assert "../../../../.agents/skills/bu-scc-usr-sync/SKILL.md" in text
+    assert "scheduler-shaped" in text
     assert "prints YAML to stdout unless you pass `--out`" in text
 
 
@@ -125,7 +124,7 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
     assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "../../../../docs/runbooks/README.md" in text
     assert "../../../../docs/operations/README.md" in text
-    assert "../../../../docs/operations/orchestration-runbooks.md" in text
+    assert "../../../../docs/operations/orchestration/runbooks.md" in text
 
 
 def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
@@ -179,16 +178,16 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>" in text
     assert "--project <project>" in text
     assert "--preset bu-scc-dunlop" in text
-    assert "ops-runtime-visibility.md" in text
+    assert "status/runtime-visibility.md" in text
     assert "project dunlop" not in text
-    assert "orchestration-runbooks.md" in text
+    assert "orchestration/runbooks.md" in text
     assert "../runbooks/README.md" in text
-    assert "multi-source-shared-dataset-assembly.md" in text
+    assert "assembly/multi-source-shared-dataset.md" in text
     assert "progressive disclosure" not in text.lower()
 
 
 def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> None:
-    text = _read(_repo_root() / "docs" / "operations" / "orchestration-runbooks.md")
+    text = _read(_repo_root() / "docs" / "operations" / "orchestration/runbooks.md")
     _assert_token_order(
         text,
         [
@@ -200,7 +199,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
             "### Planner and executor commands",
             "### Contract rules",
         ],
-        label="docs/operations/orchestration-runbooks.md",
+        label="docs/operations/orchestration/runbooks.md",
     )
     assert "uv run ops runbook init" in text
     assert "--project <project>" in text
@@ -284,7 +283,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     text = _read(_repo_root() / "docs" / "runbooks" / "README.md")
 
     assert "## Runbook Catalog" in text
-    assert "Use this page when you want a command first." in text
+    assert "For command-first routing, start with `uv run ops catalog list --simple`" in text
     assert "uv run ops catalog list" in text
     assert "uv run ops catalog list --simple" in text
     assert "### Command lookup" in text
@@ -316,8 +315,8 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "usr.data-plane.promoter-feature-matrix" in text
     assert "cluster.downstream.exploratory-clustering" in text
     assert "opal.downstream.usr-infer-x-active-learning" in text
-    assert "../operations/orchestration-runbooks.md" in text
-    assert "../../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in text
+    assert "../operations/orchestration/runbooks.md" in text
+    assert "../../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md" in text
     assert "../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md" in text
     assert "../../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md" in text
     assert "../../src/dnadesign/densegen/docs/README.md" in text
@@ -410,7 +409,7 @@ def test_core_docs_avoid_contrived_doc_language() -> None:
 def test_ops_docs_remove_legacy_presets_and_workflow_alias_terms() -> None:
     docs_targets = [
         _repo_root() / "docs" / "operations" / "README.md",
-        _repo_root() / "docs" / "operations" / "orchestration-runbooks.md",
+        _repo_root() / "docs" / "operations" / "orchestration/runbooks.md",
         _repo_root() / "src" / "dnadesign" / "ops" / "README.md",
         _repo_root() / "src" / "dnadesign" / "ops" / "docs" / "README.md",
     ]

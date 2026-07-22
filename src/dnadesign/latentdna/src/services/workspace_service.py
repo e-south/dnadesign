@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/workspace_service.py
+
 Workspace services for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

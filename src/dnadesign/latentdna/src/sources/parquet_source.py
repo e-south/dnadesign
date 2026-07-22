@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/sources/parquet_source.py
+
 Parquet source helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

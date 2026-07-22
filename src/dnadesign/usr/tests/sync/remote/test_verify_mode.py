@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/usr/tests/sync/test_verify_mode.py
+src/dnadesign/usr/tests/sync/remote/test_verify_mode.py
 
 Tests for verification mode resolution and strictness.
 

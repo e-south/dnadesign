@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/optimizers/gibbs_anneal.py
 
 Gibbs annealing optimizer for sequence design.
 
-Author(s): Eric J. South
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

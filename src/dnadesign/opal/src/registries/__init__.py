@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/__init__.py
+
+Package exports for OPAL registries.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,7 +13,13 @@ Module Author(s): Eric J. South
 from .models import get_model, list_models, register_model
 
 # Objectives
-from .objectives import get_objective, list_objectives, register_objective
+from .objectives import (
+    get_objective,
+    get_objective_family,
+    get_objective_observed_replay_contract,
+    list_objectives,
+    register_objective,
+)
 
 # Plots
 from .plots import get_plot, list_plots, register_plot
@@ -52,6 +60,8 @@ __all__ = [
     # Objectives
     "register_objective",
     "get_objective",
+    "get_objective_family",
+    "get_objective_observed_replay_contract",
     "list_objectives",
     # Selections
     "register_selection",

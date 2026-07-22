@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/infer/contracts.py
 
-Public infer contracts for USR write-back destination resolution and default
-notify profile path derivation.
+Public infer contracts for USR write-back destination resolution and default.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -414,6 +413,7 @@ def plan_sequence_view_feature_inventory_completion_from_config(
         raise ValueError("No jobs selected. Check the job id or the config file.")
 
     plans: list[dict[str, object]] = []
+    inventory_cache: dict[tuple[str, ...], object] = {}
     runtime_fingerprint = build_runtime_fingerprint(
         model_name=root.model.id,
         precision=root.model.precision,
@@ -432,6 +432,7 @@ def plan_sequence_view_feature_inventory_completion_from_config(
                 bundle_id=selected_job.id,
                 infer_command=command,
                 runtime_fingerprint=runtime_fingerprint,
+                inventory_cache=inventory_cache,
             ).to_dict()
         )
 

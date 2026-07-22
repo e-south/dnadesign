@@ -1,7 +1,7 @@
 ## DenseGen dense array showcase tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-27
+**Last verified:** 2026-07-14
 
 Use this tutorial to run the local dense-array showcase. The workspace uses toy `binding_sites` input, CBC, parquet-only output, and fixed-length 100 bp sequences.
 
@@ -62,6 +62,6 @@ uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 
 ### Related docs
 
-- [Generation concept](../concepts/generation.md)
+- [Generation concept](../concepts/generation/model.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)

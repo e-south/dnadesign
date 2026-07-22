@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/viz/pwm.py
 
-Author(s): Eric J. South
+Visualization helpers for PWM Cruncher viz.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

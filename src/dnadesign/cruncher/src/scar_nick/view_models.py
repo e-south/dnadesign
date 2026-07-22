@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/view_models.py
 
 Producer-owned QA view contracts for scar-nick visual artifacts.

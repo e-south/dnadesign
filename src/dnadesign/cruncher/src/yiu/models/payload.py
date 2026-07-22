@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/models/payload.py
 
 Compatibility re-exports for YIU payload and spec models.
-Prefer `dnadesign.cruncher.yiu.domain_models` and
-`dnadesign.cruncher.yiu.spec_models`.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

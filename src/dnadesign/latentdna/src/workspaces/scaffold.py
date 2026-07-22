@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/workspaces/scaffold.py
+
 Workspace template hydration and scaffolding for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -16,20 +23,26 @@ from .paths import builtin_templates_dir, resolve_repo_path
 
 
 def _read_study_datasets(study_dir: Path) -> dict[str, dict[str, Any]]:
-    required_files = ["campaign.yaml", "datasets.yaml", "status.md", "ops.study.yaml"]
+    required_files = [
+        "record/campaign.yaml",
+        "record/datasets.yaml",
+        "record/status.md",
+        "operations/ops.study.yaml",
+    ]
     missing = [name for name in required_files if not (study_dir / name).exists()]
     if missing:
         raise WorkspaceValidationError(
             f"study record is missing required files in {study_dir}: {', '.join(sorted(missing))}"
         )
-    payload = yaml.safe_load((study_dir / "datasets.yaml").read_text(encoding="utf-8")) or {}
+    datasets_path = study_dir / "record" / "datasets.yaml"
+    payload = yaml.safe_load(datasets_path.read_text(encoding="utf-8")) or {}
     datasets = payload.get("datasets")
     if not isinstance(datasets, list) or not datasets:
-        raise WorkspaceValidationError(f"study datasets registry is empty: {study_dir / 'datasets.yaml'}")
+        raise WorkspaceValidationError(f"study datasets registry is empty: {datasets_path}")
     by_role: dict[str, dict[str, Any]] = {}
     for entry in datasets:
         if not isinstance(entry, dict):
-            raise WorkspaceValidationError(f"study dataset entries must be mappings: {study_dir / 'datasets.yaml'}")
+            raise WorkspaceValidationError(f"study dataset entries must be mappings: {datasets_path}")
         role = entry.get("role")
         if not isinstance(role, str) or not role:
             raise WorkspaceValidationError(f"study dataset entry is missing role: {entry!r}")
@@ -65,8 +78,16 @@ def _hydrate_template_from_study(payload: dict[str, Any], *, study_dir: Path, wo
     payload["study_binding"] = {
         "study_id": study_dir.name,
         "record_root": study_dir.resolve().as_posix(),
-        "deliverable_docs_root": f"src/dnadesign/studies/{study_dir.name}",
+        "deliverable_docs_root": _deliverable_docs_root_for_study(study_dir.name).as_posix(),
     }
+
+
+def _deliverable_docs_root_for_study(study_id: str) -> Path:
+    source_root = Path("src") / "dnadesign" / "studies" / "units" / study_id
+    workbench_root = source_root / "workbench"
+    if (resolve_repo_path(workbench_root) / "study.yaml").is_file():
+        return workbench_root
+    return source_root
 
 
 def scaffold_workspace(*, workspace_dir: Path, template: str, from_study_dir: str | Path | None = None) -> Path:

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/nickases/catalog.py
 
-Nickase catalog loading and normalization shared across Cruncher workflow
-families.
+Nickase catalog loading and normalization shared across Cruncher workflow.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

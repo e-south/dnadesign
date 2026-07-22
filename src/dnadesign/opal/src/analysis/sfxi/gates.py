@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/sfxi/gates.py
 
 Truth-table library and nearest-gate assignment for SFXI logic vectors.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_demo_configs_optimizer_surface.py
 
 Validate that all demo configs expose the gibbs annealing optimizer surface.

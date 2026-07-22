@@ -1,30 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/position_scatter_and_heatmap.py
 
-Combined figure with shared X:
-  • Top: round-1 scatter (mean±SD) with optional baseline
-  • Middle: reference sequence strip (monospace), one char per position
-  • Bottom: heatmap (mutated residue x position) with 1:1 squares
-  • Colorbar spans the full height of the superplot (right side, extra narrow)
-  • Subtitle shows evaluator(s)
-
-Baselines:
-  • 'log_likelihood' → y=0 (gray line)
-  • 'log_likelihood_ratio' or 'llr' → y=1 (gray line)
-
-Single metric → axis label = that metric; multi-metric → 'Objective'.
-
-AA-aware:
-  • If AA signals are present (aa_pos/aa_alt or 'aa pos=.. wt=X alt=Y' tokens),
-    the plot switches to amino-acid mode:
-      - X axis indexes amino-acid positions.
-      - Middle strip shows the protein sequence (translated from ref DNA).
-      - Heatmap rows are amino acids.
+--------------------------------------------------------------------------------.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -41,6 +22,8 @@ import pandas as pd
 from matplotlib.ticker import NullLocator
 from matplotlib.transforms import blended_transform_factory
 from numpy import ndarray
+
+from dnadesign.permuter.src.contracts.metrics import observed_metric_column
 
 # Short → pretty mapping for axis/labels
 _METRIC_LABELS = {
@@ -189,19 +172,13 @@ def _pretty_metric(mid: str | None, fallback: str) -> str:
 
 def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     """
-    Native path: a single scalar column named `permuter__metric__<id>`.
+    Native path: a single scalar column named `permuter__observed__<id>`.
     """
     if not metric_id:
-        raise RuntimeError("metric_id must be provided to select a `permuter__metric__<id>` column")
-    col = f"permuter__metric__{metric_id}"
+        raise RuntimeError("metric_id must be provided to select a `permuter__observed__<id>` column")
+    col = observed_metric_column(metric_id)
     if col not in df.columns:
-        # User might have passed the pretty name ("llr") while column is long ("log_likelihood_ratio") or vice versa.
-        # Fall back to scanning for suffix matches.
-        cand = [c for c in df.columns if c.startswith("permuter__metric__") and c.split("__", 2)[-1] == str(metric_id)]
-        if len(cand) == 1:
-            col = cand[0]
-        else:
-            raise RuntimeError(f"Metric column not found: {col}")
+        raise RuntimeError(f"Metric column not found: {col}")
     s = df[col].astype("float64")
     return s, _pretty_metric(metric_id, str(metric_id))
 
@@ -351,7 +328,7 @@ def plot(
     elite_df: pd.DataFrame,
     all_df: pd.DataFrame,
     output_path: Path,
-    job_name: str,
+    scope_name: str,
     ref_sequence: Optional[str] = None,
     ref_aa_sequence: Optional[str] = None,
     metric_id: Optional[str] = None,
@@ -364,7 +341,7 @@ def plot(
     df_all = all_df.copy()
     df1 = df_all[df_all["permuter__round"] == 1].copy()
     if df1.empty:
-        raise RuntimeError(f"{job_name}: no round-1 variants to plot")
+        raise RuntimeError(f"{scope_name}: no round-1 variants to plot")
 
     y1, y_label = _series_for_metric(df1, metric_id)
     y_label = _pretty_metric(metric_id, y_label)
@@ -406,7 +383,7 @@ def plot(
     df1 = df1[df1["position"] > 0]  # drop seeds/invalids
 
     if df1.empty:
-        raise RuntimeError(f"{job_name}: no round-1 {'AA' if aa_mode else 'single-nt'} edits to plot")
+        raise RuntimeError(f"{scope_name}: no round-1 {'AA' if aa_mode else 'single-nt'} edits to plot")
 
     stats = df1.groupby("position")["_y"].agg(mean="mean", sd="std").reset_index().sort_values("position")
 
@@ -436,10 +413,10 @@ def plot(
         elif ref_dna:
             ref_strip = _translate_dna(ref_dna)
         else:
-            raise RuntimeError(f"{job_name}: no reference DNA or protein available.")
+            raise RuntimeError(f"{scope_name}: no reference DNA or protein available.")
     else:
         if not ref_dna:
-            raise RuntimeError(f"{job_name}: reference DNA unavailable.")
+            raise RuntimeError(f"{scope_name}: reference DNA unavailable.")
         ref_strip = ref_dna
 
     # If we’re in AA mode, verify positions fit within the reference protein.
@@ -447,8 +424,8 @@ def plot(
         max_pos = int(pd.to_numeric(df_all["permuter__aa_pos"], errors="coerce").max())
         if max_pos > len(ref_strip):
             raise RuntimeError(
-                f"{job_name}: aa positions (max={max_pos}) exceed reference protein length ({len(ref_strip)}). "
-                "Provide an authoritative protein via (a) job.input.aa_col in your job YAML, or (b) a "
+                f"{scope_name}: aa positions (max={max_pos}) exceed reference protein length ({len(ref_strip)}). "
+                "Provide an authoritative protein via (a) input.aa_col in the workspace config, or (b) a "
                 "REF_AA.fa sidecar in the dataset directory."
             )
 
@@ -525,7 +502,7 @@ def plot(
 
     if not records:
         raise RuntimeError(
-            f"{job_name}: no {'amino-acid' if aa_mode else 'single-nucleotide'} edits recognized. "
+            f"{scope_name}: no {'amino-acid' if aa_mode else 'single-nucleotide'} edits recognized. "
             f"Expected {'K12D or aa pos=.. wt=X alt=Y' if aa_mode else 'A12T or nt pos=.. wt=X alt=Y'}."
         )
 
@@ -641,7 +618,7 @@ def plot(
 
     ref_name = df1["permuter__ref"].iloc[0] if "permuter__ref" in df1.columns and not df1.empty else ""
 
-    title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
+    title = f"{scope_name}{f' ({ref_name})' if ref_name else ''}"
     fig.suptitle(title, fontsize=int(round(12 * fs * TITLE_BOOST)), y=0.94)
 
     if evaluators:

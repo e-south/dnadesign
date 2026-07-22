@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/pipeline/transforms.py
 
 Record transform/plugin loading.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/ranking.py
 
 Ranking and profile-bucket selection for scar-nick candidates.

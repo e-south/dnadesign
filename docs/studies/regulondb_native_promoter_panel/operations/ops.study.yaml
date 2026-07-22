@@ -1,0 +1,33 @@
+version: 2
+study_id: regulondb_native_promoter_panel
+title: RegulonDB native promoter panel
+record_sources:
+  narrative_ref: manifest:record/status.md
+  datasets_ref: manifest:record/datasets.yaml
+  pipeline_ref: manifest:operations/runtime/command-groups/pipeline.yaml
+  routes_ref: manifest:routes/README.md
+parts:
+  lifecycle: contract/lifecycle/mode.yaml
+  phases: contract/lifecycle/phases.yaml
+  artifacts: contract/surfaces/artifacts.yaml
+  execution_surfaces:
+  - contract/surfaces/execution/workspaces.yaml
+  - contract/surfaces/execution/runbooks/infer-7b.yaml
+  - contract/surfaces/execution/commands/ops-fill.yaml
+  - contract/surfaces/execution/commands/usr.yaml
+  - contract/surfaces/execution/commands/construct.yaml
+  - contract/surfaces/execution/commands/infer-validation.yaml
+  - contract/surfaces/execution/commands/infer-completion.yaml
+  - contract/surfaces/execution/commands/notify.yaml
+  - contract/surfaces/execution/commands/latentdna.yaml
+  snapshot: contract/status/snapshot.yaml
+  preflight:
+  - contract/readiness/scope.yaml
+  - contract/readiness/group-bindings.yaml
+  - contract/readiness/next-scope.yaml
+  - contract/readiness/checks/regulondb_source_inventory.yaml
+  - contract/readiness/checks/metadata_overlay_validation.yaml
+  - contract/readiness/checks/native_full_infer_7b.yaml
+  - contract/readiness/checks/core60_infer_7b.yaml
+  - contract/readiness/checks/core60_view_definition.yaml
+  - contract/readiness/checks/latentdna_native_audit.yaml

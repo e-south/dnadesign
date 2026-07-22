@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_pressure_edge_matrix.py
+
+Regression tests for CLI pressure edge matrix OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -173,7 +175,7 @@ def test_cli_pressure_unknown_sequences_drop_skips_rows(tmp_path: Path) -> None:
     assert "EEE" not in df["sequence"].astype(str).tolist()
 
 
-def test_cli_pressure_unknown_sequences_missing_x_auto_drop(tmp_path: Path) -> None:
+def test_cli_pressure_unknown_sequences_missing_x_requires_explicit_drop(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
     records = workdir / "records.parquet"
@@ -215,7 +217,8 @@ def test_cli_pressure_unknown_sequences_missing_x_auto_drop(tmp_path: Path) -> N
             "--apply",
         ],
     )
-    assert res.exit_code == 0, res.stdout
+    assert res.exit_code != 0, res.stdout
+    assert "missing required X column 'X'" in res.output
 
     df = pd.read_parquet(records)
     assert "EEE" not in df["sequence"].astype(str).tolist()

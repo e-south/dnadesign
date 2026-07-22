@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_setpoint_sweep.py
 
 Setpoint sweep diagnostics for SFXI objectives (labels-only).
@@ -15,18 +15,18 @@ import polars as pl
 
 from ..analysis.dashboard.charts import sfxi_setpoint_sweep
 from ..analysis.dashboard.util import list_series_to_numpy
-from ..analysis.facade import read_labels, read_runs
+from ..analysis.ledger import read_labels, read_runs
 from ..analysis.sfxi.setpoint_sweep import sweep_setpoints
 from ..analysis.sfxi.state_order import STATE_ORDER
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_float, get_int, get_str
+from ._run_resolution import resolve_single_round
 from .sfxi_diag_data import (
     labels_current_round,
     parse_exponents_from_runs,
     parse_setpoint_from_runs,
-    resolve_single_round,
 )
 
 
@@ -43,6 +43,17 @@ from .sfxi_diag_data import (
         },
         requires=["labels.parquet", "runs.parquet"],
         notes=["Uses current-round labels for denom/logic metrics (objective-consistent)."],
+        data_shape="objective setpoint matrix",
+        objective_family="sfxi",
+        data_layer="labels_objective",
+        round_scope="single_round",
+        label_requirement="required",
+        failure_modes=[
+            "missing labels or runs ledger",
+            "invalid length-8 label vectors",
+            "insufficient labels for denominator percentile",
+            "missing objective setpoint metadata",
+        ],
     ),
 )
 def render(context, params: dict) -> None:
@@ -55,6 +66,7 @@ def render(context, params: dict) -> None:
     min_n = get_int(params, ["min_n"], 5)
     eps = get_float(params, ["eps"], 1.0e-8)
     delta = get_float(params, ["delta", "intensity_log2_offset_delta"], 0.0)
+    title = get_str(params, ["title"], "SFXI setpoint sweep")
 
     labels_df = read_labels(outputs_dir / "ledger" / "labels.parquet")
     labels_df = labels_current_round(labels_df, round_k=round_k)
@@ -67,8 +79,9 @@ def render(context, params: dict) -> None:
     if labels_vec is None:
         raise OpalError("Invalid label vectors (expected length-8 values).", ExitCodes.CONTRACT_VIOLATION)
 
-    setpoint = parse_setpoint_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
-    beta, gamma = parse_exponents_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
+    run_rows = runs_df.filter(pl.col("as_of_round") == int(round_k))
+    setpoint = parse_setpoint_from_runs(run_rows, selection_view_id=context.selection_view_id)
+    beta, gamma = parse_exponents_from_runs(run_rows, selection_view_id=context.selection_view_id)
 
     sweep_df = sweep_setpoints(
         labels_vec8=labels_vec,
@@ -82,7 +95,7 @@ def render(context, params: dict) -> None:
         state_order=STATE_ORDER,
     )
 
-    denom_note = f"denom={percentile}th pct E_raw (min_n={min_n})"
+    denom_note = f"denom=p{percentile} E_raw (min n={min_n})"
     fig = sfxi_setpoint_sweep.make_setpoint_sweep_figure(
         sweep_df,
         metrics=[
@@ -90,8 +103,12 @@ def render(context, params: dict) -> None:
             "effect_scaled",
             "score",
         ],
+        title=str(title),
         subtitle=f"R={round_k} · labels={labels_vec.shape[0]} · {denom_note}",
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_dir / context.filename, dpi=context.dpi, format=context.format)
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)

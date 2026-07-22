@@ -21,6 +21,7 @@ ROOT_TEST_MODULES = {
     "test_module_layout.py",
     "test_public_api_imports.py",
     "test_root_resolution_contract.py",
+    "test_regulondb_functional_annotations.py",
     "test_tests_layout.py",
     "test_usr_harness_script.py",
     "test_usr_sync_audit_drill_script.py",
@@ -262,6 +263,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_dataset_reporting_module.py",
         "test_dataset_scan_projection.py",
         "test_dataset_views_module.py",
+        "test_sequence_view_alias_repair.py",
         "test_sequence_views.py",
     },
 }

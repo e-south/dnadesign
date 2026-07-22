@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/pwm/test_binding_sites_xlsx.py
 
 Binding-sites XLSX ingest tests.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

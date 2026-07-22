@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/base.py
+
+Permutation protocol logic for base Permuter protocols.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

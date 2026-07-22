@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/released_snapback/test_target_search.py
 
 Target-search tests for released-product snapback workflows.

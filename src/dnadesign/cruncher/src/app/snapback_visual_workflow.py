@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/app/snapback_visual_workflow.py
+
 Application orchestration for visual-only Snapback examples.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

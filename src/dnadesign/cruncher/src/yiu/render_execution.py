@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/render_execution.py
 
 Panel execution and output publication helpers for payload-centric YIU bundles.

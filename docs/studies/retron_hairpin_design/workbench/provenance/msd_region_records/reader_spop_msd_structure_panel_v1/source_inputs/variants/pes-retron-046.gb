@@ -1,0 +1,87 @@
+LOCUS       msd-retron-46            112 bp    ds-DNA  linear   UNK 08-JUL-2026
+DEFINITION  .
+ACCESSION   msd-retron-46
+VERSION     msd-retron-46
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    complement(1..112)
+                     /label="msd[tetO]"
+                     /ApEinfo_revcolor="#faac61"
+                     /ApEinfo_fwdcolor="#faac61"
+     misc_feature    1..17
+                     /label="3' Flanking"
+                     /ApEinfo_revcolor="#ff9ccd"
+                     /ApEinfo_fwdcolor="#ff9ccd"
+     misc_feature    14..17
+                     /label="Right base"
+                     /ApEinfo_revcolor="#ffef86"
+                     /ApEinfo_fwdcolor="#ffef86"
+     misc_feature    18..21
+                     /label="WT stem"
+                     /ApEinfo_revcolor="#7ea7d8"
+                     /ApEinfo_fwdcolor="#7ea7d8"
+     misc_feature    22..25
+                     /label="Bulge"
+                     /ApEinfo_revcolor="#7ea7d8"
+                     /ApEinfo_fwdcolor="#7ea7d8"
+     misc_feature    27
+                     /label="G-T mismatch"
+                     /ApEinfo_revcolor="#ff9ccd"
+                     /ApEinfo_fwdcolor="#ff9ccd"
+     protein_bind    30..48
+                     /label="tet operator"
+                     /ApEinfo_revcolor="#75c6a9"
+                     /ApEinfo_fwdcolor="#75c6a9"
+                     /note="bacterial operator O2 for the tetR and tetA genes"
+                     /gene="tetO"
+                     /bound_moiety="tetracycline repressor TetR"
+     misc_feature    50..55
+                     /label="Foldback return"
+                     /ApEinfo_revcolor="#c7b0e3"
+                     /ApEinfo_fwdcolor="#c7b0e3"
+     misc_feature    50..65
+                     /label="Foldback"
+                     /ApEinfo_revcolor="#f8d3a9"
+                     /ApEinfo_fwdcolor="#f8d3a9"
+     misc_feature    56..59
+                     /label="Cap"
+                     /ApEinfo_revcolor="#ffef86"
+                     /ApEinfo_fwdcolor="#ffef86"
+     misc_feature    complement(60..65)
+                     /label="Foldback stem"
+                     /ApEinfo_revcolor="#f58a5e"
+                     /ApEinfo_fwdcolor="#f58a5e"
+     protein_bind    complement(67..85)
+                     /label="tet operator"
+                     /ApEinfo_revcolor="#75c6a9"
+                     /ApEinfo_fwdcolor="#75c6a9"
+                     /note="bacterial operator O2 for the tetR and tetA genes"
+                     /gene="tetO"
+                     /bound_moiety="tetracycline repressor TetR"
+     misc_feature    88
+                     /label="G-T mismatch"
+                     /ApEinfo_revcolor="#d6b295"
+                     /ApEinfo_fwdcolor="#d6b295"
+     misc_feature    90..93
+                     /label="Bulge"
+                     /ApEinfo_revcolor="#7ea7d8"
+                     /ApEinfo_fwdcolor="#7ea7d8"
+     misc_feature    94..97
+                     /label="WT stem"
+                     /ApEinfo_revcolor="#7ea7d8"
+                     /ApEinfo_fwdcolor="#7ea7d8"
+     misc_feature    complement(98..112)
+                     /label="5' Flanking"
+                     /ApEinfo_revcolor="#b1ff67"
+                     /ApEinfo_fwdcolor="#b1ff67"
+     misc_feature    complement(98..101)
+                     /label="Left base"
+                     /ApEinfo_revcolor="#faac61"
+                     /ApEinfo_fwdcolor="#faac61"
+ORIGIN
+        1 tctgagttac tgtctgtttt catctcgagt ccctatcagt gatagagatc ctcagcgggc
+       61 tgaggatctc tatcactgat agggacttga tctgaaaccc gttttttctg ac
+//

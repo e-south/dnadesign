@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/pwm/test_pwm_sampling_mining.py
 
 FIMO mining behavior for Stage-A PWM sampling.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

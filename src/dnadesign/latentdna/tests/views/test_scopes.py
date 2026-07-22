@@ -1,4 +1,13 @@
-"""Scoped matrix access tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/views/test_scopes.py
+
+Scoped matrix access tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

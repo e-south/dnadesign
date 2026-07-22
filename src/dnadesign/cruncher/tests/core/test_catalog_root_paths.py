@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_catalog_root_paths.py
 
 Validate catalog root path resolution contracts.

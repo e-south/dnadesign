@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_workspace_configs_layout.py
 
 Contracts for the workspace configs/ layout and strict config discovery.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/tests/cli/test_builders.py
 
 Characterization tests for shared infer CLI helper functions.

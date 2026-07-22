@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/spec_pwm_models.py
 
 PWM-facing YIU spec models and validation rules.

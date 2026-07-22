@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/planner.py
 
 Deterministic validation/report planning for dual-context cassette specs.

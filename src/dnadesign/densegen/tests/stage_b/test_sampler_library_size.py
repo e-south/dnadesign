@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/stage_b/test_sampler_library_size.py
+
+Regression tests for sampler library size DenseGen stage b.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import numpy as np

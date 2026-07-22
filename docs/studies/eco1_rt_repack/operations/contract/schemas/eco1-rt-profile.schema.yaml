@@ -1,0 +1,79 @@
+version: 1
+schema_id: eco1_rt_profile_v1
+status: scaffold
+required_fields:
+  - version
+  - profile_id
+  - study_id
+  - kind
+  - reference
+  - conservative_policy
+  - sampling_policy
+  - fold_validation_policy
+  - assembly_policy
+field_contract:
+  reference:
+    required:
+      - protein_name
+      - sequence_authority
+      - structure_authority
+      - structure_chain_id
+      - retained_context_policy
+      - residue_numbering_origin
+      - reference_sequence_hash
+    pending_allowed_through: phase0_scaffold
+    pending_forbidden_from: phase1_thread_contract
+  conservative_policy:
+    required:
+      - status
+      - mask_policy_id
+      - manual_mask_groups
+      - direct_contact_threshold_angstrom
+      - conservation_threshold
+      - conservation_profiles
+      - conservation_rule
+      - cysteine_policy
+      - unresolved_residue_policy
+      - designable_rule
+    invariants:
+      - mask_policy_id_must_match_current_simple_policy
+      - direct_contact_threshold_must_be_five_angstrom
+      - conservation_threshold_must_be_between_zero_and_one
+      - manual_mask_groups_must_have_id_status_policy
+      - designable_rule_must_not_treat_missing_evidence_as_designable
+  sampling_policy:
+    required:
+      - status
+      - backends_allowed
+      - selected_backend
+      - backend_selection_policy
+      - temperatures
+      - seed_policy
+      - seed_set
+      - batch_id
+      - num_seq_per_target
+      - batch_size
+    invariants:
+      - selected_backend_must_be_listed_in_backends_allowed
+      - backend_selection_policy_must_be_explicit_no_fallback
+      - temperatures_must_be_positive_numbers
+      - seed_policy_requires_explicit_seed_set
+      - batch_id_must_be_explicit
+      - num_seq_per_target_must_be_positive
+      - batch_size_must_divide_num_seq_per_target
+  fold_validation_policy:
+    required:
+      - status
+      - wild_type_baseline_required
+      - fixture_rows_do_not_satisfy_materialized_handoff
+  assembly_policy:
+    required:
+      - status
+      - first_tier
+      - bounded_window_requires_parent_haplotype_trace
+forbidden_fields:
+  - permuter__var_id
+  - construct_subject_id
+notes:
+  - This schema is study-owned and may not become a generic thread schema without removing Eco1-specific fields.
+  - Pending reference authority is allowed in Phase 0 only; Phase 1 contract validation and all sampling must fail until authority fields resolve.

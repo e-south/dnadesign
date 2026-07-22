@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/filters.py
 
 Filtering utilities for dashboard views.

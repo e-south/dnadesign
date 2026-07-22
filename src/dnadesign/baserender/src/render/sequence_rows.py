@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/sequence_rows.py
 
 Sequence-row renderer for Record v1 with kmer features, effects, overlays, and legend.
@@ -33,6 +33,13 @@ from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect
 from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
 from .palette import Palette
+
+
+def _add_fixed_layout_patch(ax, patch):
+    """Add a patch without autoscale work; this renderer sets layout-derived limits explicitly."""
+    ax.add_artist(patch)
+    return patch
+
 
 _NEAR_FEATURE_ANNOTATION_SOURCES = frozenset(
     {
@@ -133,6 +140,8 @@ class SequenceRowsRenderer:
         hidden_base_indices: Mapping[str, Sequence[int]] = {}
         span_backdrops: Sequence[Mapping[str, object]] = ()
         span_edge_markers: Sequence[Mapping[str, object]] = ()
+        boundary_ticks: Sequence[Mapping[str, object]] = ()
+        span_brackets: Sequence[Mapping[str, object]] = ()
         panel_transition_arrows: Sequence[Mapping[str, object]] = ()
         if isinstance(record.meta, Mapping):
             raw_complement = record.meta.get("complement_sequence")
@@ -162,6 +171,12 @@ class SequenceRowsRenderer:
             raw_span_edge_markers = record.meta.get("span_edge_markers")
             if isinstance(raw_span_edge_markers, Sequence) and not isinstance(raw_span_edge_markers, (str, bytes)):
                 span_edge_markers = raw_span_edge_markers
+            raw_boundary_ticks = record.meta.get("boundary_ticks")
+            if isinstance(raw_boundary_ticks, Sequence) and not isinstance(raw_boundary_ticks, (str, bytes)):
+                boundary_ticks = raw_boundary_ticks
+            raw_span_brackets = record.meta.get("span_brackets")
+            if isinstance(raw_span_brackets, Sequence) and not isinstance(raw_span_brackets, (str, bytes)):
+                span_brackets = raw_span_brackets
             raw_panel_transition_arrows = record.meta.get("panel_transition_arrows")
             if isinstance(raw_panel_transition_arrows, Sequence) and not isinstance(
                 raw_panel_transition_arrows, (str, bytes)
@@ -218,10 +233,11 @@ class SequenceRowsRenderer:
             ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
         ax._dnadesign_record_meta = record.meta
+        ax._dnadesign_sequence_center_y = (float(layout.y_forward) + float(layout.y_reverse)) / 2.0
 
         x0 = layout.x_left
         _draw_span_backdrops(ax, layout, span_backdrops, show_two=show_two)
-        _draw_span_edge_markers(ax, layout, span_edge_markers, show_two=show_two)
+        _draw_span_edge_markers(ax, layout, span_edge_markers, show_two=show_two, motif_geometries=motif_geometries)
         _draw_panel_transition_arrows(ax, layout, panel_transition_arrows, show_two=show_two)
         _draw_sequence(
             ax,
@@ -264,7 +280,10 @@ class SequenceRowsRenderer:
         _draw_row_labels(ax, record, layout, style)
         _draw_segment_labels(ax, record, layout, style)
         if bool(style.show_coordinate_ticks):
-            _draw_coordinate_ticks(ax, record, layout, style)
+            if boundary_ticks:
+                _draw_boundary_ticks(ax, boundary_ticks, layout, style, show_two=show_two)
+            else:
+                _draw_coordinate_ticks(ax, record, layout, style)
 
         feature_boxes = dict(layout.feature_boxes)
         feature_box_pad = float(style.kmer.pad_x_px)
@@ -358,6 +377,7 @@ class SequenceRowsRenderer:
         for effect in record.effects:
             draw_effect(ax, effect, record, layout, style, palette, feature_boxes)
 
+        _draw_span_brackets(ax, feature_boxes, span_brackets, style)
         _draw_fixed_element_annotations(ax, record, layout, palette, style)
 
         legend_mode = str(style.legend_mode).lower()
@@ -369,7 +389,7 @@ class SequenceRowsRenderer:
         if style.legend and legend_mode == "bottom":
             from .legend import legend_entries_for_record
 
-            _draw_legend(ax, legend_entries_for_record(record), palette, style, layout.width)
+            _draw_legend(ax, legend_entries_for_record(record), palette, style, layout)
 
         if record.display.overlay_text:
             _draw_overlay(ax, layout, style, record.display.overlay_text)
@@ -738,18 +758,31 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
     x_max = float(layout.width - style.padding_x)
 
     feature_box_pad = float(style.kmer.pad_x_px)
+    coordinate_scale = max(1.0e-6, float(style.figure_scale))
+    annotation_font_height_px = (_fixed_element_annotation_font_size(style) / 72.0) * float(style.dpi)
+    feature_label_clearance = max(
+        max(0.0, margin - feature_box_pad),
+        max(8.0, annotation_font_height_px * 0.2) / coordinate_scale,
+    )
     occupied_boxes: list[tuple[float, float, float, float]] = []
     for placement in layout.placements:
         occupied_boxes.append(
             (
-                placement.x - feature_box_pad,
+                placement.x - feature_box_pad - feature_label_clearance,
                 placement.y - placement.h / 2.0,
-                placement.x + placement.w + feature_box_pad,
+                placement.x + placement.w + feature_box_pad + feature_label_clearance,
                 placement.y + placement.h / 2.0,
             )
         )
     occupied_boxes.extend(_sequence_strand_occupied_boxes(layout, style))
     occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
+    if record.display.overlay_text:
+        _x, _y, _ha, _title_size, overlay_box = _overlay_layout(
+            layout,
+            style,
+            record.display.overlay_text,
+        )
+        occupied_boxes.append(overlay_box)
 
     placed_label_boxes: list[tuple[float, float, float, float]] = []
 
@@ -791,16 +824,17 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
         if not text:
             return None
         text_size = _fixed_element_annotation_font_size(style)
-        text_w = _text_px_width(text, style.font_label, text_size, style.dpi)
-        text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi))
+        coordinate_scale = max(1.0e-6, float(style.figure_scale))
+        text_w = _text_px_width(text, style.font_label, text_size, style.dpi) / coordinate_scale
+        text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi)) / coordinate_scale
         center_x = placement.x + placement.w / 2.0
         label_gap = max(4.0, feature_box_pad + text_h * 0.25)
         if placement.above:
             away_y = placement.y + placement.h / 2.0 + label_gap + text_h / 2.0
         else:
             away_y = placement.y - placement.h / 2.0 - label_gap - text_h / 2.0
-        right_x = placement.x + placement.w + margin
-        left_x = placement.x - margin
+        right_x = placement.x + placement.w + feature_box_pad + feature_label_clearance
+        left_x = placement.x - feature_box_pad - feature_label_clearance
         return text, text_size, text_w, text_h, center_x, away_y, right_x, left_x
 
     def _candidate_fits(
@@ -861,18 +895,29 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
             continue
         text, text_size, text_w, text_h, center_x, top_y, right_x, left_x = geometry
 
+        lateral_step = max(8.0, feature_box_pad + text_h * 0.75)
+        max_lateral_steps = 6
+        side_candidates: list[tuple[float, float, str]] = []
+        top_candidates: list[tuple[float, float, str]] = [(center_x, top_y, "center")]
+        for step in range(max_lateral_steps + 1):
+            delta = lateral_step * float(step)
+            side_candidates.extend(
+                (
+                    (right_x + delta, placement.y, "left"),
+                    (left_x - delta, placement.y, "right"),
+                )
+            )
+            if step > 0:
+                top_candidates.extend(
+                    (
+                        (center_x + delta, top_y, "center"),
+                        (center_x - delta, top_y, "center"),
+                    )
+                )
         if placement.feature_id in force_baseline_label_ids:
-            candidates = (
-                (right_x, placement.y, "left"),
-                (left_x, placement.y, "right"),
-                (center_x, top_y, "center"),
-            )
+            candidates = (*side_candidates, *top_candidates)
         else:
-            candidates = (
-                (center_x, top_y, "center"),
-                (right_x, placement.y, "left"),
-                (left_x, placement.y, "right"),
-            )
+            candidates = (*top_candidates, *side_candidates)
 
         selected: tuple[float, float, str, tuple[float, float, float, float]] | None = None
         for x_anchor, y_anchor, ha in candidates:
@@ -1075,7 +1120,23 @@ def _actual_content_top(layout: LayoutContext) -> float:
     return float(top)
 
 
-def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
+def _actual_content_bottom(layout: LayoutContext) -> float:
+    bottom = min(
+        float(layout.y_forward - layout.sequence_extent_down),
+        float(layout.y_reverse - layout.sequence_extent_down),
+    )
+    for placement in layout.placements:
+        bottom = min(bottom, float(placement.y - (placement.h / 2.0)))
+    for y0 in layout.motif_logo_y0_by_effect.values():
+        bottom = min(bottom, float(y0))
+    return float(bottom)
+
+
+def _overlay_layout(
+    layout: LayoutContext,
+    style: Style,
+    text: str,
+) -> tuple[float, float, str, float, tuple[float, float, float, float]]:
     align = str(style.overlay_align).lower()
     if align == "center":
         x = layout.width / 2.0
@@ -1093,16 +1154,56 @@ def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
         else max(float(style.font_size_label), float(style.font_size_seq))
     )
     title_lines = max(1, len([line for line in str(text).splitlines() if line.strip()]))
-    title_line_height = max((title_size / 72.0 * style.dpi) * 1.05, layout.ch * 0.5)
-    title_block_height = title_line_height * title_lines
-    min_overlay_y = _actual_content_top(layout) + title_block_height + max(4.0, style.font_size_label * 0.25)
-    overlay_y = (
-        layout.height
-        - max(4.0, style.padding_y * 0.5)
-        - synthetic_top_pad
-        - max(0.0, float(style.overlay_title_gap_reduction_px))
+    coordinate_scale = max(1.0e-6, float(style.figure_scale))
+    title_line_height = max(
+        ((title_size / 72.0 * style.dpi) * 1.05) / coordinate_scale,
+        layout.ch * 0.5,
     )
-    overlay_y = max(min_overlay_y, overlay_y)
+    title_block_height = title_line_height * title_lines
+    title_gap = max(4.0, style.font_size_label * 0.25) / coordinate_scale
+    min_overlay_y = _actual_content_top(layout) + title_block_height + title_gap
+    if str(style.overlay_vertical_anchor).lower() == "content_top":
+        overlay_y = min_overlay_y
+    else:
+        overlay_y = (
+            layout.height
+            - max(4.0, style.padding_y * 0.5)
+            - synthetic_top_pad
+            - max(0.0, float(style.overlay_title_gap_reduction_px))
+        )
+        overlay_y = max(min_overlay_y, overlay_y)
+
+    text_width = (
+        max(
+            (
+                _text_px_width(line, style.font_label, int(round(title_size)), style.dpi)
+                for line in str(text).splitlines()
+            ),
+            default=0.0,
+        )
+        / coordinate_scale
+    )
+    if ha == "center":
+        x0 = x - text_width / 2.0
+        x1 = x + text_width / 2.0
+    elif ha == "right":
+        x0 = x - text_width
+        x1 = x
+    else:
+        x0 = x
+        x1 = x + text_width
+    collision_pad = max(2.0, title_gap * 0.5)
+    overlay_box = (
+        x0 - collision_pad,
+        overlay_y - title_block_height - collision_pad,
+        x1 + collision_pad,
+        overlay_y + collision_pad,
+    )
+    return x, overlay_y, ha, title_size, overlay_box
+
+
+def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
+    x, overlay_y, ha, title_size, _overlay_box = _overlay_layout(layout, style, text)
     ax.text(
         x,
         overlay_y,
@@ -1399,7 +1500,7 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
         x = x0 + i * cw + cw / 2.0
         if i in cross_indices:
             dx = max(2.1, cw * 0.20)
-            ax.plot(
+            (cross_a,) = ax.plot(
                 [x - dx, x + dx],
                 [y1, y2],
                 color=cross_color,
@@ -1407,7 +1508,8 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
                 alpha=cross_alpha,
                 zorder=1.6,
             )
-            ax.plot(
+            cross_a.set_gid(f"sequence_pair_connector_cross:{i}:a")
+            (cross_b,) = ax.plot(
                 [x - dx, x + dx],
                 [y2, y1],
                 color=cross_color,
@@ -1415,9 +1517,10 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
                 alpha=cross_alpha,
                 zorder=1.6,
             )
+            cross_b.set_gid(f"sequence_pair_connector_cross:{i}:b")
             continue
         if i in emphasis_indices:
-            ax.plot(
+            (emphasis_line,) = ax.plot(
                 [x, x],
                 [y1, y2],
                 color=emphasis_color,
@@ -1425,6 +1528,7 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
                 alpha=0.98,
                 zorder=1.8,
             )
+            emphasis_line.set_gid(f"sequence_pair_connector_emphasis:{i}")
             continue
         (ln,) = ax.plot(
             [x, x],
@@ -1434,6 +1538,7 @@ def _draw_connectors(ax, n: int, x0: float, cw: float, layout: LayoutContext, st
             alpha=style.connector_alpha,
             zorder=1,
         )
+        ln.set_gid(f"sequence_pair_connector:{i}")
         if dash_pattern:
             ln.set_dashes(dash_pattern)
     if overhang_spans:
@@ -1509,7 +1614,8 @@ def _draw_span_backdrops(
         x = layout.x_left + start * layout.cw
         y0 = min(bound[0] for bound in row_bounds)
         y1 = max(bound[1] for bound in row_bounds)
-        ax.add_patch(
+        _add_fixed_layout_patch(
+            ax,
             FancyBboxPatch(
                 (x, y0),
                 (end - start) * layout.cw,
@@ -1521,7 +1627,7 @@ def _draw_span_backdrops(
                 zorder=0.6,
                 clip_on=False,
                 gid=f"sequence_backdrop:{index}",
-            )
+            ),
         )
 
 
@@ -1531,6 +1637,7 @@ def _draw_span_edge_markers(
     span_edge_markers: Sequence[Mapping[str, object]],
     *,
     show_two: bool,
+    motif_geometries: Sequence[MotifLogoGeometry],
 ) -> None:
     for index, raw in enumerate(span_edge_markers):
         if not isinstance(raw, Mapping):
@@ -1547,19 +1654,23 @@ def _draw_span_edge_markers(
         color = str(raw.get("color", "#111827")).strip() or "#111827"
         cover_rows = str(raw.get("cover_rows", "both")).strip().lower()
         row_bounds: list[tuple[float, float]] = []
-        if cover_rows in {"primary", "both"}:
+        if cover_rows in {"primary", "both", "all"}:
             row_bounds.append(
                 (
                     float(layout.y_forward - layout.sequence_extent_down),
                     float(layout.y_forward + layout.sequence_extent_up),
                 )
             )
-        if show_two and cover_rows in {"complement", "both"}:
+        if show_two and cover_rows in {"complement", "both", "all"}:
             row_bounds.append(
                 (
                     float(layout.y_reverse - layout.sequence_extent_down),
                     float(layout.y_reverse + layout.sequence_extent_up),
                 )
+            )
+        if cover_rows == "all" and motif_geometries:
+            row_bounds.extend(
+                (float(geometry.y0), float(geometry.y0 + geometry.height)) for geometry in motif_geometries
             )
         elif not row_bounds and cover_rows == "complement":
             row_bounds.append(
@@ -1585,6 +1696,117 @@ def _draw_span_edge_markers(
                 clip_on=False,
                 gid=f"sequence_span_edge:{index}:{boundary}",
             )
+
+
+def _draw_boundary_ticks(
+    ax,
+    boundary_ticks: Sequence[Mapping[str, object]],
+    layout: LayoutContext,
+    style: Style,
+    *,
+    show_two: bool,
+) -> None:
+    default_font_size = (
+        style.display_font_size() if bool(style.uniform_display_font_size) else max(16, style.font_size_label)
+    )
+    y = (
+        layout.y_reverse - max(20.0, style.font_size_label * 1.8)
+        if show_two
+        else layout.y_forward - max(20.0, style.font_size_label * 1.8)
+    )
+    for index, raw in enumerate(boundary_ticks):
+        if not isinstance(raw, Mapping):
+            continue
+        try:
+            position = int(raw.get("position"))
+        except Exception:
+            continue
+        label = str(raw.get("label", position)).strip() or str(position)
+        emphasis = str(raw.get("emphasis", "active")).strip().lower()
+        color = str(raw.get("color", style.color_ticks)).strip() or style.color_ticks
+        if emphasis == "context":
+            color = str(raw.get("color", "#A7AFBD")).strip() or "#A7AFBD"
+        try:
+            linewidth = float(raw.get("linewidth", 1.05 if emphasis == "active" else 0.8))
+            font_size = float(raw.get("font_size", default_font_size if emphasis == "active" else 14))
+        except Exception:
+            linewidth = 1.05
+            font_size = default_font_size
+        x = layout.x_left + position * layout.cw
+        ax.plot(
+            [x, x],
+            [y + 2.0, y + 9.0],
+            color=color,
+            linewidth=linewidth,
+            zorder=1.35,
+            clip_on=False,
+            gid=f"sequence_boundary_tick:{index}:{position}",
+        )
+        text = ax.text(
+            x,
+            y,
+            label,
+            ha="center",
+            va="top",
+            fontsize=font_size,
+            family=style.font_label,
+            color=color,
+            zorder=1.45,
+            clip_on=False,
+        )
+        text.set_gid(f"sequence_boundary_tick_label:{index}:{position}")
+
+
+def _draw_span_brackets(
+    ax,
+    feature_boxes: Mapping[str, tuple[float, float, float, float]],
+    span_brackets: Sequence[Mapping[str, object]],
+    style: Style,
+) -> None:
+    for index, raw in enumerate(span_brackets):
+        if not isinstance(raw, Mapping):
+            continue
+        feature_id = str(raw.get("target_feature_id", "")).strip()
+        if not feature_id or feature_id not in feature_boxes:
+            continue
+        x0, _y0, x1, y1 = feature_boxes[feature_id]
+        label = str(raw.get("label", "")).strip()
+        color = str(raw.get("color", "#111827")).strip() or "#111827"
+        try:
+            offset = float(raw.get("offset_px", 4.0))
+            height = float(raw.get("height_px", 6.0))
+            linewidth = float(raw.get("linewidth", 1.15))
+            font_size = float(raw.get("font_size", max(13, style.font_size_label)))
+        except Exception:
+            offset = 4.0
+            height = 6.0
+            linewidth = 1.15
+            font_size = max(13, style.font_size_label)
+        y = y1 + offset
+        ax.plot(
+            [x0, x0, x1, x1],
+            [y, y + height, y + height, y],
+            color=color,
+            linewidth=linewidth,
+            zorder=8.6,
+            solid_capstyle="butt",
+            clip_on=False,
+            gid=f"sequence_span_bracket:{index}:{feature_id}",
+        )
+        if label:
+            text = ax.text(
+                (x0 + x1) / 2.0,
+                y + height + max(2.0, font_size * 0.10),
+                label,
+                ha="center",
+                va="bottom",
+                fontsize=font_size,
+                family=style.font_label,
+                color=color,
+                zorder=8.7,
+                clip_on=False,
+            )
+            text.set_gid(f"sequence_span_bracket_label:{index}:{feature_id}")
 
 
 def _draw_panel_transition_arrows(
@@ -1673,12 +1895,27 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
         )
 
 
+def _meta_float(meta: Mapping[str, object], key: str, *, default: float | None) -> float | None:
+    raw = meta.get(key)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except Exception:
+        return default
+    if not math.isfinite(value):
+        return default
+    return value
+
+
 def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style) -> None:
     segment_labels = record.meta.get("segment_labels") if isinstance(record.meta, Mapping) else None
     if not isinstance(segment_labels, Sequence) or isinstance(segment_labels, (str, bytes)):
         return
     font_size = style.display_font_size() if bool(style.uniform_display_font_size) else max(9, style.font_size_label)
     line_height = max(10.0, (float(font_size) / 72.0) * float(style.dpi))
+    label_gap = _meta_float(record.meta, "segment_label_gap_px", default=None)
+    tier_gap = _meta_float(record.meta, "segment_label_tier_gap_px", default=None)
     horizontal_gap = max(6.0, layout.cw * 0.25)
     top_tiers: list[list[tuple[float, float]]] = []
     bottom_tiers: list[list[tuple[float, float]]] = []
@@ -1722,15 +1959,19 @@ def _draw_segment_labels(ax, record: Record, layout: LayoutContext, style: Style
             tiers.append([(x0, x1)])
         placements.append((side, text, x, tier_index, color, label_offset_px))
 
-    top_base_y = layout.y_forward + layout.sequence_extent_up + max(18.0, style.font_size_label * 1.4)
-    bottom_base_y = layout.y_reverse - layout.sequence_extent_down - max(16.0, style.font_size_label * 1.2)
+    top_gap = max(0.0, label_gap if label_gap is not None else max(18.0, style.font_size_label * 1.4))
+    bottom_gap = max(0.0, label_gap if label_gap is not None else max(16.0, style.font_size_label * 1.2))
+    requested_tier_step = tier_gap if tier_gap is not None else line_height * 1.05
+    tier_step = max(line_height * 1.05, requested_tier_step)
+    top_base_y = layout.y_forward + layout.sequence_extent_up + top_gap
+    bottom_base_y = layout.y_reverse - layout.sequence_extent_down - bottom_gap
     show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
     for side, text, x, tier_index, color, label_offset_px in placements:
         if side == "below" and show_two:
-            y = bottom_base_y - tier_index * line_height * 1.05 + label_offset_px
+            y = bottom_base_y - tier_index * tier_step + label_offset_px
             va = "top"
         else:
-            y = top_base_y + tier_index * line_height * 1.05 + label_offset_px
+            y = top_base_y + tier_index * tier_step + label_offset_px
             va = "bottom"
         ax.text(
             x,
@@ -1860,7 +2101,7 @@ def _draw_sequence(
         if is_highlighted:
             gid = f"{gid}:highlight"
         patch.set_gid(gid)
-        ax.add_patch(patch)
+        _add_fixed_layout_patch(ax, patch)
         x += cw
 
 
@@ -1882,7 +2123,8 @@ def _draw_feature_box(
     pad_x = float(style.kmer.pad_x_px)
     edge_color = _darken_rgb(facecolor, factor=0.78)
 
-    ax.add_patch(
+    _add_fixed_layout_patch(
+        ax,
         FancyBboxPatch(
             (x - pad_x, y - h / 2),
             w + 2 * pad_x,
@@ -1894,7 +2136,7 @@ def _draw_feature_box(
             edgecolor=edge_color,
             zorder=3,
             clip_on=False,
-        )
+        ),
     )
 
     if not draw_label or not label:
@@ -1913,7 +2155,8 @@ def _draw_feature_box(
         gy = ((gb.y0 + gb.y1) / 2.0) * px_per_pt
         x_center = x + (idx + 0.5) * cw
         trans = Affine2D().scale(px_per_pt).translate(x_center - gx, y_text_center - gy) + ax.transData
-        ax.add_patch(
+        _add_fixed_layout_patch(
+            ax,
             PathPatch(
                 tp,
                 transform=trans,
@@ -1922,7 +2165,7 @@ def _draw_feature_box(
                 linewidth=0.0,
                 zorder=4,
                 clip_on=False,
-            )
+            ),
         )
 
 
@@ -2128,13 +2371,20 @@ def _draw_motif_scale_bar(
     _draw_bar(x=x, y0=ref.y0, y1=ref.y0 + ref.height, baseline=ref.baseline)
 
 
+@lru_cache(maxsize=4096)
 def _text_px_width(text: str, family: str, size_pt: int, dpi: int) -> float:
     prop = FontProperties(family=family, size=size_pt)
     bbox = TextPath((0, 0), text, prop=prop).get_extents()
     return bbox.width / 72.0 * dpi
 
 
-def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style: Style, total_width: float) -> None:
+def _draw_legend(
+    ax,
+    legend: Sequence[tuple[str, str]],
+    palette: Palette,
+    style: Style,
+    layout: LayoutContext,
+) -> None:
     if not legend:
         return
 
@@ -2149,7 +2399,8 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         if bool(style.uniform_display_font_size)
         else float(style.padding_x)
     )
-    available_width = max(0.0, float(total_width) - (2.0 * side_pad))
+    total_width = float(layout.width)
+    available_width = max(0.0, total_width - (2.0 * side_pad))
     if available_width <= 0.0:
         return
 
@@ -2336,7 +2587,12 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
         ) = selected_layout
 
     total_rows_height = (len(rows) * row_height) + (max(0, len(rows) - 1) * row_gap_y)
-    y = style.legend_origin_y(total_rows_height=total_rows_height)
+    if style.legend_content_gap_px is None:
+        y = style.legend_origin_y(total_rows_height=total_rows_height)
+    else:
+        content_gap = _to_layout_units(float(style.legend_content_gap_px))
+        minimum_y = _to_layout_units(max(4.0, float(style.legend_pad_px)))
+        y = max(minimum_y, _actual_content_bottom(layout) - content_gap - total_rows_height)
     for row in rows:
         row_total = sum(entry_widths[idx] for idx in row)
         if len(row) > 1:
@@ -2347,7 +2603,8 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
             tag, label = legend[idx]
             color = palette.color_for(tag)
             edge_color = _darken_rgb(color, factor=0.76)
-            ax.add_patch(
+            _add_fixed_layout_patch(
+                ax,
                 FancyBboxPatch(
                     (x, y),
                     patch_w,
@@ -2359,7 +2616,7 @@ def _draw_legend(ax, legend: Sequence[tuple[str, str]], palette: Palette, style:
                     edgecolor=edge_color,
                     zorder=10,
                     clip_on=False,
-                )
+                ),
             )
             ax.text(
                 x + patch_w + gap_patch_text,

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/transforms_x/identity.py
+
+Feature-transform plugin logic for identity OPAL transforms x.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -9,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -27,11 +28,9 @@ from ..registries.transforms_x import register_transform_x
 @register_transform_x("identity")
 def _factory(params: Optional[Dict[str, Any]] = None):
     """
-    Identity transform — pass-through with robust parsing.
-    Inputs per cell may be:
-      * scalar number
+    Identity transform for canonical vector cells.
+    Inputs per cell must already be vector-like:
       * list/tuple/ndarray/pandas.Series of numbers
-      * JSON string "[...]" of numbers
     Output:
       * np.ndarray shape (N,F) with dtype=float
     Optional params:
@@ -46,21 +45,20 @@ def _factory(params: Optional[Dict[str, Any]] = None):
     def _parse_cell(v: Any) -> np.ndarray:
         if v is None or (isinstance(v, float) and np.isnan(v)):
             raise ValueError("X cell is null/NaN")
+        as_py = getattr(v, "as_py", None)
+        if callable(as_py):
+            v = as_py()
+        to_pylist = getattr(v, "to_pylist", None)
+        if callable(to_pylist):
+            v = to_pylist()
         if isinstance(v, (list, tuple, np.ndarray, pd.Series)):
             arr = np.asarray(v, dtype=float).ravel()
+            if arr.size == 0:
+                raise ValueError("identity transform requires non-empty vector cells")
             return arr
-        if isinstance(v, str):
-            s = v.strip()
-            if s.startswith("[") and s.endswith("]"):
-                try:
-                    arr = np.asarray(json.loads(s), dtype=float).ravel()
-                except Exception as e:
-                    raise ValueError(f"Invalid JSON array in X cell: {s[:48]}…") from e
-                return arr
-            # scalar-like string
-            return np.asarray([float(s)], dtype=float)
-        # numeric scalar
-        return np.asarray([float(v)], dtype=float)
+        raise ValueError(
+            "identity transform requires vector cells; normalize scalar or JSON-string X before campaign execution"
+        )
 
     def _transform(series: pd.Series, ctx: Optional[PluginCtx] = None) -> np.ndarray:
         rows = [_parse_cell(v) for v in series.tolist()]

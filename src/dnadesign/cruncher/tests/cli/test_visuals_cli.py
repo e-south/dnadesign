@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_visuals_cli.py
 
 CLI contract tests for the generic Cruncher visual wrapper over BaseRender.

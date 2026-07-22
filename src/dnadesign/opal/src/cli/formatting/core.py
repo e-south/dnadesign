@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/core.py
 
-Core formatting helpers for OPAL CLI output. Provides markup-aware formatting
-utilities and shared helpers.
+Core formatting helpers for OPAL CLI output. Provides markup-aware formatting.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

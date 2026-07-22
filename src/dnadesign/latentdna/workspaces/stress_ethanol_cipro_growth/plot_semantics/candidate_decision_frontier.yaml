@@ -1,7 +1,7 @@
 plot_id: candidate_decision_frontier
 question: Which candidate best balances design structure and ordered Sigma-35 signal after the health and context checks?
 decision_role: primary
-encoding: Single-panel representation tradeoff plot over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects retained-component effective rank, and shape indicates the candidate family.
+encoding: Single-panel representation tradeoff plot over the healthy 7B study-facing candidates, where x is balanced design-family separation, y is Sigma-35 ordinal Spearman, point size reflects retained-component effective rank, and shape identifies the candidate view.
 scope: >-
   The healthy 7B study-facing candidates summarized from the persisted health,
   design-structure, and Sigma-35 scalar tables. The plotted candidates are
@@ -10,7 +10,9 @@ scope: >-
   context `anchor_mean` concat. Context rows are joined for provenance in the
   scalar artifact, but context retention is not a visible encoding in this
   two-axis plot. Gate-failed output-layer-mean candidates are adjudicated in the
-  preceding health gate rather than repeated here.
+  preceding health gate rather than repeated here. Context robustness is not a
+  plotted axis here, so a high point can still be weak in the direct
+  anchor-versus-context shift plots.
 guardrails:
   - Read this figure as a synthesis of the healthy-candidate review path, not a replacement for the health gate or the direct context comparison.
   - Read the row-level bridge plots before treating small point-to-point differences as meaningful.
@@ -55,7 +57,13 @@ math_md: |
   $$
   the rank correlation between the expected Sigma-35 ladder gaps and the observed centroid-distance gaps in the embedding. In plain language: higher means the space preserves the intended $f \gt e \gt d \gt c \gt b$ ordering more faithfully; values near 0 mean weak ordinal structure, and negative values would mean the ordering is inverted or confused.
 rationale_md: |
-  This plot is a synthesis, not a new selector. A candidate is more attractive when it sits farther right and higher up without having failed the prior health gate, because that means it preserves both balanced design-family structure and the intended Sigma-35 order.
+  This plot is a synthesis, not a new selector. A candidate is more attractive
+  when it sits farther right and higher up without having failed the prior
+  health gate, because that means it preserves both balanced design-family
+  structure and the intended Sigma-35 order. It does not say whether the
+  representation is stable after the 60 bp insert is placed inside the 1 kb
+  pDual10 context; that claim comes from the context robustness and
+  anchor-versus-1 kb shift panels.
 
   Effective rank is kept as point size rather than a third axis. It is a secondary tie-breaker: among candidates that already look good on the two main decision axes, a larger point suggests the representation is less collapsed and spreads variance across more usable directions.
 plot_details_md: |
@@ -65,6 +73,10 @@ plot_details_md: |
   - **Sigma-35 ordinal Spearman:** how faithfully the candidate respects the intended Sigma-35 strength ladder.
   - **Effective-rank point size:** how distributed the retained PCA variance remains once the space is centered.
 
-  A point is not “better” just because it is larger. Larger size only strengthens the case when the candidate is already competitive on the x and y axes.
+  A point is not “better” just because it is larger, and a point is not final
+  just because it is far up and right. Larger size only strengthens the case
+  when the candidate is already competitive on the x and y axes, and the
+  context-shift panels must still agree before using it as the study-facing
+  representation.
 limitations_md: A two-axis synthesis still compresses a multi-panel decision process and cannot express every tradeoff, uncertainty interval, or context-specific caveat.
 failure_modes_md: If the bridge plots and direct context comparison are skipped, the healthy candidates can still look closer than they really are for the actual decision.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/effects/__init__.py
 
 Effect drawer exports and registration helper.

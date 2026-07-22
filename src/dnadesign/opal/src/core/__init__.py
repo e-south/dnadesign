@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/__init__.py
 
 Core utilities and runtime contracts for OPAL.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/plot_resolver.py
 
 Resolve analysis plot callables lazily after plotting cache initialization.

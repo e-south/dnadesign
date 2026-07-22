@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/data_access.py
+
+Storage helpers for data access OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,16 +13,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Tuple
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from ..core.round_context import PluginCtx
 from ..core.utils import OpalError
 from ..registries.transforms_x import get_transform_x
 from .label_history import LabelHistory
 from .records_io import RecordsIO
+from .x_lookup import transform_rows_from_matching_row_groups
 
 ESSENTIAL_COLS = [
     "id",
@@ -50,8 +55,51 @@ class RecordsStore:
     def load(self) -> pd.DataFrame:
         return self._io.load()
 
+    def load_columns(self, columns: Iterable[str]) -> pd.DataFrame:
+        return self._io.load_columns(list(columns))
+
+    def load_runtime_frame(
+        self,
+        *,
+        include_x: bool,
+        required_columns: Iterable[str] = (),
+    ) -> pd.DataFrame:
+        required = tuple(dict.fromkeys(str(column) for column in required_columns))
+        if not include_x and self.x_col in required:
+            raise OpalError(
+                f"Configured candidate metadata cannot use feature column {self.x_col!r}; "
+                "streamed X remains outside the runtime metadata frame."
+            )
+        columns = [*ESSENTIAL_COLS, self.y_col, self.label_hist_col(), *required]
+        if include_x:
+            columns.append(self.x_col)
+        frame = self.load_columns(columns)
+        missing = sorted(set(required).difference(frame.columns))
+        if missing:
+            raise OpalError(f"records.parquet missing configured candidate column(s): {missing}.")
+        return frame
+
+    def load_ingest_identity_frame(self) -> pd.DataFrame:
+        frame = self.load_columns(["id", "sequence"])
+        missing = [column for column in ("id", "sequence") if column not in frame.columns]
+        if missing:
+            raise OpalError(f"records.parquet missing required ingest identity column(s): {missing}.")
+        return frame
+
+    def load_label_status_frame(self) -> pd.DataFrame:
+        return self.load_columns(["id", self.y_col, self.label_hist_col()])
+
+    def row_count(self) -> int:
+        return self._io.row_count()
+
+    def schema_columns(self) -> list[str]:
+        return self._io.schema_columns()
+
     def save_atomic(self, df: pd.DataFrame) -> None:
         self._io.save_atomic(df)
+
+    def append_null_column_atomic(self, column_name: str, *, batch_size: int = 512) -> bool:
+        return self._io.append_null_column_atomic(column_name, batch_size=batch_size)
 
     def assert_unique_ids(self, df: pd.DataFrame) -> None:
         if "id" not in df.columns:
@@ -144,33 +192,6 @@ class RecordsStore:
             if_exists=if_exists,
         )
 
-    def append_predictions_from_arrays(
-        self,
-        df: pd.DataFrame,
-        *,
-        ids: List[str],
-        y_hat: np.ndarray,
-        as_of_round: int,
-        run_id: str,
-        objective: Dict[str, Any],
-        metrics_by_name: Dict[str, List[float]],
-        selection_rank: np.ndarray,
-        selection_top_k: np.ndarray,
-        ts: str | None = None,
-    ) -> pd.DataFrame:
-        return self._label_hist.append_predictions_from_arrays(
-            df,
-            ids=ids,
-            y_hat=y_hat,
-            as_of_round=as_of_round,
-            run_id=run_id,
-            objective=objective,
-            metrics_by_name=metrics_by_name,
-            selection_rank=selection_rank,
-            selection_top_k=selection_top_k,
-            ts=ts,
-        )
-
     def training_labels_from_y(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
         return self._label_hist.training_labels_from_y(df, as_of_round)
 
@@ -190,17 +211,62 @@ class RecordsStore:
         )
 
     # --------------- candidate universe & transforms ---------------
-    def candidate_universe(self, df: pd.DataFrame, as_of_round: int) -> pd.DataFrame:
+    def candidate_universe(
+        self,
+        df: pd.DataFrame,
+        as_of_round: int,
+        *,
+        required_columns: Iterable[str] = (),
+    ) -> pd.DataFrame:
         """
         Return a DataFrame with at least 'id' and 'sequence' for all rows with X present.
         We do not exclude labeled rows from scoring; selection policy can decide.
         """
-        if self.x_col not in df.columns:
-            raise OpalError(f"Candidate universe requires X column '{self.x_col}'.")
-        keep = df[self.x_col].notna()
-        cols = ["id", "sequence", self.x_col]
-        cols = [c for c in cols if c in df.columns]
+        if self.x_col in df.columns:
+            keep = df[self.x_col].notna()
+        else:
+            keep = self._x_presence_mask_for_runtime_frame(df)
+        required = tuple(dict.fromkeys(str(column) for column in required_columns))
+        missing = sorted(set(required).difference(df.columns))
+        if missing:
+            raise OpalError(f"Candidate universe is missing configured candidate column(s): {missing}.")
+        cols = [column for column in dict.fromkeys(["id", "sequence", *required, self.x_col]) if column in df.columns]
         return df.loc[keep, cols].copy()
+
+    def _x_presence_mask_for_runtime_frame(self, df: pd.DataFrame, *, batch_size: int = 2048) -> pd.Series:
+        """Return a runtime-frame-aligned mask from records.parquet X-column nullness."""
+
+        if "id" not in df.columns:
+            raise OpalError("Candidate universe requires column 'id' when runtime frame omits X.")
+        if self.x_col not in self.schema_columns():
+            raise OpalError(f"Candidate universe requires X column '{self.x_col}'.")
+        if int(batch_size) <= 0:
+            raise OpalError("X presence batch_size must be positive.")
+
+        runtime_ids = df["id"].astype(str)
+        wanted = set(runtime_ids)
+        presence_by_id: dict[str, bool] = {}
+        try:
+            parquet = pq.ParquetFile(self.records_path)
+        except Exception as exc:
+            raise OpalError(f"Failed to read records.parquet for X presence: {self.records_path}: {exc}") from exc
+
+        for batch in parquet.iter_batches(columns=["id", self.x_col], batch_size=int(batch_size)):
+            id_index = batch.schema.get_field_index("id")
+            x_index = batch.schema.get_field_index(self.x_col)
+            if id_index < 0 or x_index < 0:
+                raise OpalError(f"records.parquet missing id or X column '{self.x_col}'.")
+            ids = batch.column(id_index).to_pylist()
+            x_present = batch.column(x_index).is_valid().to_pylist()
+            for row_id_value, is_present in zip(ids, x_present):
+                row_id = str(row_id_value)
+                if row_id not in wanted:
+                    continue
+                if row_id in presence_by_id:
+                    raise OpalError(f"records.parquet contains duplicate ids (sample={[row_id]}).")
+                presence_by_id[row_id] = bool(is_present)
+
+        return runtime_ids.map(presence_by_id).fillna(False).astype(bool)
 
     def transform_matrix(self, df: pd.DataFrame, ids: Iterable[str], *, ctx: PluginCtx) -> Tuple[np.ndarray, List[str]]:
         """
@@ -238,6 +304,112 @@ class RecordsStore:
         if X.shape[0] != len(id_list):
             raise OpalError(f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(id_list)} ids.")
         return np.asarray(X), id_list
+
+    def transform_matrix_from_records(
+        self,
+        ids: Iterable[str],
+        *,
+        ctx: PluginCtx,
+        batch_size: int = 2048,
+    ) -> Tuple[np.ndarray, List[str]]:
+        id_list = [str(i) for i in ids]
+        if len(id_list) != len(set(id_list)):
+            raise OpalError("transform_matrix_from_records received duplicate ids.")
+        rows = transform_rows_from_matching_row_groups(
+            records_path=self.records_path,
+            id_list=id_list,
+            x_col=self.x_col,
+            x_transform_name=self.x_transform_name,
+            x_transform_params=self.x_transform_params,
+            ctx=ctx,
+        )
+        X = np.vstack([rows[row_id] for row_id in id_list])
+        return np.asarray(X, dtype=float), id_list
+
+    def iter_transform_matrix_batches(
+        self,
+        ids: Iterable[str],
+        *,
+        ctx: PluginCtx,
+        batch_size: int,
+    ) -> Iterator[Tuple[np.ndarray, List[str]]]:
+        if ctx is None:
+            raise OpalError("iter_transform_matrix_batches requires a PluginCtx for transform_x.")
+        if int(batch_size) <= 0:
+            raise OpalError("iter_transform_matrix_batches batch_size must be positive.")
+        id_list = [str(i) for i in ids]
+        if len(id_list) != len(set(id_list)):
+            raise OpalError("iter_transform_matrix_batches received duplicate ids.")
+        if not id_list:
+            return
+        wanted = set(id_list)
+        found: set[str] = set()
+        try:
+            parquet = pq.ParquetFile(self.records_path)
+        except Exception as exc:
+            raise OpalError(f"Failed to read records.parquet for X batches: {self.records_path}: {exc}") from exc
+        schema_names = set(parquet.schema_arrow.names)
+        missing_cols = [column for column in ("id", self.x_col) if column not in schema_names]
+        if missing_cols:
+            raise OpalError(f"records.parquet missing required column(s) for X batches: {missing_cols}")
+
+        tx = get_transform_x(self.x_transform_name, self.x_transform_params)
+        try:
+            pending_frames: list[pd.DataFrame] = []
+            pending_rows = 0
+            batches = parquet.iter_batches(columns=["id", self.x_col], batch_size=int(batch_size))
+            for batch in batches:
+                id_values = [str(value) for value in batch.column("id").to_pylist()]
+                mask = [value in wanted for value in id_values]
+                if not any(mask):
+                    continue
+                indices = [index for index, keep in enumerate(mask) if keep]
+                filtered = batch.take(pa.array(indices, type=pa.int64()))
+                frame = filtered.to_pandas()
+                frame["id"] = frame["id"].astype(str)
+                batch_ids = frame["id"].tolist()
+                if len(batch_ids) != len(set(batch_ids)):
+                    raise OpalError("records.parquet contains duplicate ids inside an X batch.")
+                repeated = sorted(set(batch_ids) & found)
+                if repeated:
+                    raise OpalError(
+                        f"records.parquet contains duplicate ids inside X batches (sample={repeated[:10]})."
+                    )
+                found.update(batch_ids)
+                pending_frames.append(frame)
+                pending_rows += len(frame)
+                while pending_rows >= int(batch_size):
+                    frame_out = pd.concat(pending_frames, ignore_index=True)
+                    ready_frame = frame_out.iloc[: int(batch_size)].copy()
+                    remaining_frame = frame_out.iloc[int(batch_size) :].copy()
+                    pending_frames = [] if remaining_frame.empty else [remaining_frame]
+                    pending_rows = len(remaining_frame)
+                    yield self._transform_x_batch_frame(ready_frame, tx=tx, ctx=ctx)
+            if pending_frames:
+                frame_out = pd.concat(pending_frames, ignore_index=True)
+                yield self._transform_x_batch_frame(frame_out, tx=tx, ctx=ctx)
+        except OpalError:
+            raise
+        except Exception as exc:
+            raise OpalError(f"Failed to stream X batches from records.parquet: {exc}") from exc
+
+        missing = sorted(wanted - found)
+        if missing:
+            raise OpalError(f"Missing ids in records.parquet for transform_matrix (sample={missing[:10]}).")
+
+    def _transform_x_batch_frame(self, frame: pd.DataFrame, *, tx: Any, ctx: PluginCtx) -> tuple[np.ndarray, list[str]]:
+        batch_ids = frame["id"].astype(str).tolist()
+        series = frame[self.x_col]
+        null_mask = series.isna()
+        if null_mask.any():
+            bad_ids = frame.loc[null_mask, "id"].tolist()[:10]
+            raise OpalError(f"X column '{self.x_col}' is null for ids (sample={bad_ids}).")
+        X = tx(series, ctx=ctx)
+        if X.shape[0] != len(batch_ids):
+            raise OpalError(
+                f"transform_x[{self.x_transform_name}] returned {X.shape[0]} rows for {len(batch_ids)} ids."
+            )
+        return np.asarray(X, dtype=float), batch_ids
 
     # --------------- ensure rows exist for ingest ---------------
     def ensure_rows_exist(
@@ -320,9 +492,11 @@ class RecordsStore:
         # a) rows WITH a real id → ensure that id exists (attach sequence if provided)
         if have_id_col:
             rows_with_id = labels_df.loc[labels_df["id"].notna()]
-            for _id, seq in rows_with_id[["id", "sequence"]].itertuples(index=False, name=None):
-                _id = str(_id)
-                seq_val = None if not have_seq_col else (None if pd.isna(seq) else str(seq))
+            row_cols = ["id", "sequence"] if have_seq_col else ["id"]
+            for row_values in rows_with_id[row_cols].itertuples(index=False, name=None):
+                _id = str(row_values[0])
+                seq = row_values[1] if have_seq_col else None
+                seq_val = None if seq is None or pd.isna(seq) else str(seq)
                 if _id in known_ids:
                     row = out.loc[out["id"].astype(str) == _id].iloc[0]
                     csv_row = _csv_row_for(_id, seq_val) if (csv_by_id or csv_by_seq) else {}

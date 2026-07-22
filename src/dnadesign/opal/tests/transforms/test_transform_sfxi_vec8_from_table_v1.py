@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/transforms/test_transform_sfxi_vec8_from_table_v1.py
+
+Regression tests for transform SFXI vec8 from table v1 OPAL transforms.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

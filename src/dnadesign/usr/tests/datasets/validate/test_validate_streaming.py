@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/validate/test_validate_streaming.py
 
 Tests streaming validation without full-table reads.

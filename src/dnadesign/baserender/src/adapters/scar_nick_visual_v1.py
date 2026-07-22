@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/scar_nick_visual_v1.py
 
 Adapter from scar-nick visual contracts to baserender Record v1.

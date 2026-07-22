@@ -1,7 +1,7 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-05
+**Last verified:** 2026-07-14
 
 `latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
 Flattened artifact namespaces now live directly under `outputs/`, including
@@ -60,7 +60,7 @@ Implemented schema slices:
   definition, metric family, evidence tier, unit, direction, aggregation level,
   and optional task id. Workspaces use this for study-facing metric vocabulary
   that is not part of the LatentDNA global registry.
-- Study binding: optional read-only link to one checked-in dnadesign study through explicit `study_id`, `record_root`, and `deliverable_docs_root` fields. `record_root` points at the promoter-study status record under `docs/studies/<study-id>` and must contain `campaign.yaml`, `datasets.yaml`, `ops.study.yaml`, and `status.md`; `deliverable_docs_root` points at study-facing LatentDNA deliverable prose with `study.yaml`.
+- Study binding: optional read-only link to one checked-in dnadesign study through explicit `study_id`, `record_root`, and `deliverable_docs_root` fields. `record_root` points at the study directory under `docs/studies/<study-id>` and must contain `record/campaign.yaml`, `record/datasets.yaml`, `record/status.md`, and `operations/ops.study.yaml`; `deliverable_docs_root` points at study-facing LatentDNA deliverable prose with `study.yaml`.
 - Output root: `workspace.output_root` must resolve to `<workspace>/outputs`
 
 Current runtime limits:
@@ -261,11 +261,12 @@ Current runtime limits:
   is a visible degraded contract for upstream feature gaps; planned or retired
   views must not be treated as materialized evidence until their source sidecars
   contain matching rows.
-- When a materialized view artifact was built from an older source/vector
+- When a materialized view artifact was built from a different source/vector
   declaration, deep validation reports `materialized_contract_status:
   stale_source_contract` instead of silently accepting the old rows as current.
   Refresh the view artifact before using downstream plots as current evidence.
 - Deliverable loading now rejects declared outputs that the linked recipe does not actually produce, including config-backed outputs such as `views`, `scalars`, `reducers`, `reduced_views`, and `exports`.
-- Deliverables must now declare explicit semantic fields in config. The runtime no longer hydrates missing `title`, `summary`, `question`, or `section` from legacy `description` and `kind` fields.
+- Deliverables declare `title`, `summary`, `question`, and `section` explicitly;
+  `description` and `kind` do not populate missing semantic fields.
 - Deliverable status and run inventory now use recorded input and source digests where available, including export and alignment manifests with explicit path-backed provenance.
 - Fixture-scale contract coverage now lives under the checked-in contract and CLI tests for the promoter-study pre-assay template; these are smoke checks, not a replacement for live promoter-study pressure runs.

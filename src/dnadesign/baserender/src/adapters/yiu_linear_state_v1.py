@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/yiu_linear_state_v1.py
 
 Adapter from YIU linear-state contracts to baserender Record v1.

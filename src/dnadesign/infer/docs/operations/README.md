@@ -1,7 +1,7 @@
 ## infer operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-07-14
 
 ### Start path
 
@@ -18,7 +18,7 @@
 - [Agnostic model + USR pressure test](pressure-test-agnostic-models.md): standalone and ops-runbook paths.
 - [SCC Evo2 GPU environment runbook (UV + infer)](scc-evo2-gpu-uv-runbook.md): deterministic environment build + infer capability checks.
 - [End-to-end pressure-test demo](../tutorials/demo_pressure_test_usr_ops_notify.md): infer + usr + ops + notify full walkthrough.
-- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md): construct-led data-plane handoff into infer.
+- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): construct-led data-plane handoff into infer.
 
 ### Integration boundary
 

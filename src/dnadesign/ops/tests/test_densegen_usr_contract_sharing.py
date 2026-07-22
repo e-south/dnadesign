@@ -15,7 +15,7 @@ import textwrap
 from pathlib import Path
 
 import dnadesign.usr as usr_roots
-from dnadesign.construct.contracts import resolve_construct_usr_output_contract
+from dnadesign.construct import resolve_construct_usr_output_contract
 from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
 from dnadesign.infer.contracts import resolve_infer_usr_output_contract
 from dnadesign.notify.events.source_builtin import (

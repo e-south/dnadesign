@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_adapter_dispatch.py
+dnadesign
+src/dnadesign/infer/tests/runtime/test_adapter_dispatch.py
 
 Unit tests for infer adapter dispatch invariants.
 

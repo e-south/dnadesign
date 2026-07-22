@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_target_search.py
 
-Target-first paired nickase plus release-enzyme search for released-product
-snapback designs.
+Target-first paired nickase plus release-enzyme search for released-product.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

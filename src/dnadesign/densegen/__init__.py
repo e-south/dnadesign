@@ -25,11 +25,13 @@ from .src.cli.main import app
 from .src.cli.notebook_template_cells import build_run_summary_tables
 from .src.config import ConfigError, LoadedConfig, load_config, resolve_outputs_scoped_path, resolve_run_root
 from .src.integrations.baserender.notebook_contract import densegen_notebook_render_contract
+from .src.viz.plot_inventory import CURRENT_INVENTORY_SCHEMA_VERSION, required_notebook_plot_ids
 from .src.viz.plot_registry import PLOT_SPECS
 
 __all__ = [
     "ArtifactRecord",
     "ConfigError",
+    "CURRENT_INVENTORY_SCHEMA_VERSION",
     "DenseGenAnalysisSurface",
     "Diagnostic",
     "FreshnessSummary",
@@ -43,6 +45,7 @@ __all__ = [
     "densegen_notebook_render_contract",
     "inspect_analysis_surface",
     "load_config",
+    "required_notebook_plot_ids",
     "resolve_outputs_scoped_path",
     "resolve_run_root",
 ]

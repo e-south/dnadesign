@@ -1,0 +1,18 @@
+checks:
+  phase4_downstream_promotion:
+    - kind: path_exists
+      check_id: eco1_rt.downstream.rt_lnrna_route
+      check_group: downstream_rt_lnrna_handoff
+      summary: RT-lnRNA route map exists for downstream promotion questions.
+      required: true
+      artifact: rt_lnrna_route_map
+    - kind: path_exists
+      check_id: eco1_rt.downstream.acceptance_schema
+      check_group: downstream_rt_lnrna_handoff
+      summary: RT-only candidate promotion requires an explicit downstream accept/reject schema.
+      required: true
+      artifact: rt_lnrna_candidate_acceptance_schema
+      validator_intent:
+        rejects_construct_subject_preclaim: true
+        accepted_ids_partition_handoff_candidate_ids: true
+        candidate_id_source: candidate_handoff.candidates[].candidate_id

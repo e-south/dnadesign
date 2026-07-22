@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_yiu_reference_docs.py
 
 Reference-page contracts for payload-centric YIU docs surfaces.

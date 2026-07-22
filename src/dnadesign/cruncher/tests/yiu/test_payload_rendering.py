@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/yiu/test_payload_rendering.py
 
 Runtime contracts for the payload-centric YIU v4 lane.

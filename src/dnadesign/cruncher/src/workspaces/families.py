@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/workspaces/families.py
 
 Typed workflow-family registration for family-aware workspace discovery and docs.
@@ -71,6 +71,15 @@ _WORKFLOW_FAMILIES: tuple[WorkflowFamilyDescriptor, ...] = (
         ),
         default_output_root="outputs",
         docs_section_id="snapback",
+    ),
+    WorkflowFamilyDescriptor(
+        id="scar_nick",
+        display_name="retained-scar terminal-nick workflow",
+        workspace_kind="runbook_family",
+        runbook_command_roots=("scar-nick",),
+        spec_globs=("configs/scar_nick/*.scar_nick.yaml",),
+        default_output_root="outputs/scar_nick",
+        docs_section_id="scar_nick",
     ),
     WorkflowFamilyDescriptor(
         id="study",

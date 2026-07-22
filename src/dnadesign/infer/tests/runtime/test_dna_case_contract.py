@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/infer/tests/runtime/test_dna_case_contract.py
+
+Regression tests for DNA case infer runtime.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from types import SimpleNamespace

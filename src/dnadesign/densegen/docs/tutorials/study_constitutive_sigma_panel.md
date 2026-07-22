@@ -1,7 +1,7 @@
 ## Constitutive sigma70 panel tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 Use this tutorial to build a constitutive σ70 promoter panel. The workflow pairs fixed RNAP -35 and -10 hexamer motifs, then embeds each pair in filtered background sequence.
@@ -144,6 +144,6 @@ uv run cruncher catalog export-densegen --set 1 --densegen-workspace "$PWD" -c "
 
 ### Related docs
 
-- [Generation concept](../concepts/generation.md)
+- [Generation concept](../concepts/generation/model.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)

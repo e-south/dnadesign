@@ -1,7 +1,7 @@
 ## DenseGen to USR to Notify tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 This tutorial shows the full event-driven operator path from DenseGen generation to USR mutation events to Notify webhook delivery. Read it when you need to verify watcher behavior end-to-end and avoid mixing DenseGen diagnostics with USR event streams; for campaign-scale runs use the stress-study workspace and apply the same watcher flow.
@@ -153,4 +153,4 @@ uv run dense run --resume --extend-quota 2 --no-plot -c "$CONFIG"
 - No webhook posts appear: confirm terminal A receiver is running and `NOTIFY_WEBHOOK` is exported.
 - `notify profile doctor` fails against a localhost URL: that path only works with a real Slack webhook host; use the generic `notify usr-events watch --provider generic --url "$NOTIFY_WEBHOOK"` path for local receiver drills.
 - Watcher sees no events: rerun `uv run notify setup resolve-events --tool densegen --config "$CONFIG"` and verify it matches the active dataset `.events.log`.
-- Confusing event sources: use **[observability and events](../concepts/observability_and_events.md)** as the boundary definition.
+- Confusing event sources: use **[observability and events](../concepts/runtime/observability-and-events.md)** as the boundary definition.

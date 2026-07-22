@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/config_resolver.py
 
-Author(s): Eric J. South
+CLI wiring for config resolver Cruncher CLI.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

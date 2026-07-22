@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_cli_coupling.py
 
 Regression tests keeping CLI free from plotting/runtime rendering dependencies.

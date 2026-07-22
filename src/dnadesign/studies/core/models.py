@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/core/models.py
 
-Generic study-family adapter contracts for OPS.
+Generic study status service contracts for OPS.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,12 +16,14 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 StudyPhaseStatus = Literal["planned", "ready", "in_progress", "complete", "blocked", "blocked_gpu", "parallel_optional"]
+StudyLifecycleMode = Literal["sequential", "tracks"]
 StudySummaryScope = Literal["repo", "workspace", "host", "cluster"]
 StudyPreflightScope = Literal["next", "full"]
 
 STUDY_PHASE_STATUSES = frozenset(
     {"planned", "ready", "in_progress", "complete", "blocked", "blocked_gpu", "parallel_optional"}
 )
+STUDY_LIFECYCLE_MODES = frozenset({"sequential", "tracks"})
 STUDY_SUMMARY_SCOPES = frozenset({"repo", "workspace", "host", "cluster"})
 STUDY_PREFLIGHT_SCOPES = frozenset({"next", "full"})
 
@@ -93,10 +95,13 @@ class StudyPhaseContract:
 @dataclass(frozen=True)
 class StudyOpsContract:
     study_id: str
-    family: str
+    status_kind: str | None
+    preflight_kind: str | None
     phase_order: tuple[str, ...]
     snapshot_summary_scope: StudySummaryScope
     preflight: StudyPreflightContract
+    lifecycle_mode: StudyLifecycleMode = "sequential"
+    lifecycle_item_label: str = "phase"
     title: str | None = None
     record_sources: dict[str, str] = field(default_factory=dict)
     artifacts: dict[str, dict[str, object]] = field(default_factory=dict)
@@ -119,11 +124,11 @@ class StudyStatusContext:
     repo_root: Path
     study_root: Path
     contract: StudyOpsContract
-    family_context: object
+    service_context: object
 
 
-class StudyFamilyAdapter(Protocol):
-    family_id: str
+class StudyStatusService(Protocol):
+    status_kind: str
 
     def load_context(self, *, repo_root: Path | None, study_root: Path | None) -> StudyStatusContext: ...
 
@@ -138,10 +143,11 @@ class StudyFamilyAdapter(Protocol):
 
 
 __all__ = [
+    "STUDY_LIFECYCLE_MODES",
     "STUDY_PHASE_STATUSES",
     "STUDY_PREFLIGHT_SCOPES",
     "STUDY_SUMMARY_SCOPES",
-    "StudyFamilyAdapter",
+    "StudyLifecycleMode",
     "StudyOpsContract",
     "StudyPhaseContract",
     "StudyPhaseStatus",
@@ -149,5 +155,6 @@ __all__ = [
     "StudyPreflightNextScopeContract",
     "StudyPreflightScope",
     "StudySummaryScope",
+    "StudyStatusService",
     "StudyStatusContext",
 ]

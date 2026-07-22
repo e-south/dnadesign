@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_progress_handles.py
+dnadesign
+src/dnadesign/infer/tests/runtime/test_progress_handles.py
 
 Tests for infer progress handle creation and lifecycle contracts.
 

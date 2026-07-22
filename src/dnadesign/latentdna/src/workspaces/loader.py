@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/workspaces/loader.py
+
 Workspace loading and validation for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

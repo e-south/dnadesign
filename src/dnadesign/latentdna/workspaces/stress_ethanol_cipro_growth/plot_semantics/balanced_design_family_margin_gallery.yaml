@@ -42,4 +42,4 @@ plot_details_md: |
 limitations_md: This gallery is still a two-axis projection of higher-dimensional geometry. The balanced centroid directions make the axes fairer, but the scalar metric still governs adjudication.
 failure_modes_md: If balanced-centroid construction or leave-one-out handling regresses, the family quadrants can look cleaner than they really are.
 docs_refs:
-  - src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md
+  - src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/notes/rationale/2026-05-10-candidate-x-story-surfaces.md

@@ -1,0 +1,51 @@
+version: 2
+study_id: stress_ethanol_cipro_growth
+title: Stress / ethanol / ciprofloxacin growth study
+ops_surfaces:
+  status_kind: stress-ethanol-cipro-growth-status
+  preflight_kind: stress-ethanol-cipro-growth-preflight
+record_sources:
+  narrative_ref: manifest:record/status.md
+  datasets_ref: manifest:record/datasets.yaml
+  synthesis_handoffs_ref: manifest:record/synthesis_handoffs.yaml
+  pipeline_ref: manifest:operations/runtime/command-groups/pipeline.yaml
+  campaign_ref: manifest:record/campaign.yaml
+parts:
+  lifecycle: contract/lifecycle/mode.yaml
+  phases: contract/lifecycle/phases.yaml
+  artifacts: contract/surfaces/artifacts.yaml
+  execution_surfaces:
+  - contract/surfaces/execution/workspaces.yaml
+  - contract/surfaces/execution/runbooks/densegen.yaml
+  - contract/surfaces/execution/runbooks/infer-20b.yaml
+  - contract/surfaces/execution/runbooks/infer-7b-sequence-views.yaml
+  - contract/surfaces/execution/commands/densegen.yaml
+  - contract/surfaces/execution/commands/construct.yaml
+  - contract/surfaces/execution/commands/infer-validation.yaml
+  - contract/surfaces/execution/commands/infer-dry-run.yaml
+  - contract/surfaces/execution/commands/infer-completion.yaml
+  - contract/surfaces/execution/commands/notify/profile-doctor.yaml
+  - contract/surfaces/execution/commands/notify/resolve-events.yaml
+  - contract/surfaces/execution/commands/latentdna.yaml
+  - contract/surfaces/execution/commands/opal/candidate-table.yaml
+  - contract/surfaces/execution/commands/opal/round0-review.yaml
+  - contract/surfaces/execution/commands/opal/campaign-inspection.yaml
+  - contract/surfaces/execution/commands/opal/synthesis-handoffs.yaml
+  - contract/surfaces/execution/commands/opal/densegen-axis-probe.yaml
+  snapshot: contract/status/snapshot.yaml
+  preflight:
+  - contract/readiness/scope.yaml
+  - contract/readiness/group-bindings.yaml
+  - contract/readiness/next-scope.yaml
+  - contract/readiness/checks/densegen_growth.yaml
+  - contract/readiness/checks/construct_context_expansion.yaml
+  - contract/readiness/checks/infer_batch_preparation/sequence-views.yaml
+  - contract/readiness/checks/infer_batch_preparation/completion.yaml
+  - contract/readiness/checks/infer_batch_preparation/runtime-environment.yaml
+  - contract/readiness/checks/infer_batch_preparation/config-validation.yaml
+  - contract/readiness/checks/infer_batch_preparation/dry-run.yaml
+  - contract/readiness/checks/infer_batch_preparation/notify.yaml
+  - contract/readiness/checks/infer_batch_preparation/batch-runbooks.yaml
+  - contract/readiness/checks/latentdna_reference_normalization_audit.yaml
+  - contract/readiness/checks/opal_candidate_table_pre_assay.yaml
+  - contract/readiness/checks/opal_assay_b1_order_ready.yaml

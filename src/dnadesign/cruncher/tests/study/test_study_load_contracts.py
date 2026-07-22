@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_load_contracts.py
 
 Validate Study spec load-time error formatting and path contracts.

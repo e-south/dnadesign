@@ -1,6 +1,17 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_annotation_layout.py
+
+Regression tests for annotation LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from matplotlib.transforms import Bbox
 
-from dnadesign.latentdna.src.annotation_layout import choose_annotation_placement
+from dnadesign.latentdna.src.presentation.annotation_layout import choose_annotation_placement
 
 
 def _boxes_overlap(left: tuple[float, float, float, float], right: tuple[float, float, float, float]) -> bool:

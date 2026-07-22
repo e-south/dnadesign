@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/sources/infer_sidecar_common.py
+
 Shared contracts for Infer vector and scalar sidecar source adapters.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

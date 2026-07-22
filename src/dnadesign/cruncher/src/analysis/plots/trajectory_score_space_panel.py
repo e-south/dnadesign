@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/trajectory_score_space_panel.py
 
 Shared panel rendering helpers for trajectory score-space plots.

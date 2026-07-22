@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/densegen/src/core/record_metadata_recovery.py
 
-Recover DenseGen record metadata from stable source labels when older record
-cohorts are missing overlay-backed plan/input fields.
+Recover DenseGen record metadata from stable source labels when older record.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

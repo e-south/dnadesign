@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/workspaces/__init__.py
 
 Workspace-level runbook contracts and execution helpers.

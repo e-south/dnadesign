@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/round_context.py
+
+Core runtime primitives for round context OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

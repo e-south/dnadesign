@@ -1,0 +1,16 @@
+fixture_id: crawford-overlay-minimal
+fixture_status: source_inventory_pinned
+reference_overlay_id: crawford_eco1_lnrna_msd_abundance_v1
+source_path: ../dnadesign-data/sources/literature/Crawford_et_al_2025_retron_ncRNA_ML/processed/overlays/eco1_ncrna_abundance_observations.tsv
+row_count: 4174
+required_fields:
+  - observation_id
+  - reference_overlay_id
+  - lnrna_sequence
+  - raw_value
+  - normalized_value
+  - canonical_lnrna_sequence_id
+rules:
+  - Preserve raw_value and normalized_value from source.
+  - Treat these rows as abundance priors, not TF-sponging labels.
+  - Require construct projection before any row is promoted to a construct subject.

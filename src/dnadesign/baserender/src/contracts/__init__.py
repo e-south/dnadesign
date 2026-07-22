@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/contracts/__init__.py
 
 Public contract constants for adapter integration boundaries.

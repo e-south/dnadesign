@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_demo_study_runtime_contracts.py
 
 Enforce bounded runtime knobs in workspace length-sweep study grids.

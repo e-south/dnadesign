@@ -1,21 +1,28 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-aligner/__init__.py
+dnadesign
+src/dnadesign/aligner/__init__.py
 
-Provides high-level functions for computing Needleman-Wunsch alignment scores.
+Public API for pairwise and multiple sequence alignment utilities.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
-from .metrics import (
-    compute_alignment_scores as compute_alignment_scores,
+from dnadesign.aligner.pairwise import (
+    build_score_matrix,
+    compute_alignment_scores,
+    global_alignment,
+    matrix_to_condensed,
+    mean_pairwise,
+    score_pairwise,
 )
-from .metrics import (
-    mean_pairwise as mean_pairwise,
-)
-from .metrics import (
-    score_pairwise as score_pairwise,
-)
+
+__all__ = [
+    "build_score_matrix",
+    "compute_alignment_scores",
+    "global_alignment",
+    "matrix_to_condensed",
+    "mean_pairwise",
+    "score_pairwise",
+]

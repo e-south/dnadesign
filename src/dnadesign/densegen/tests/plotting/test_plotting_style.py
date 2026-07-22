@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/plotting/test_plotting_style.py
+
+Regression tests for plotting style DenseGen plotting.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import matplotlib.pyplot as plt

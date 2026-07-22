@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/adapter_contracts.py
 
-Canonical adapter descriptor registry used by job parsing, public inspection,
-and runtime adapter construction.
+Canonical adapter descriptor registry used by job parsing, public inspection,.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

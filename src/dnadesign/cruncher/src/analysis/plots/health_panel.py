@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/health_panel.py
 
 Render optimizer move diagnostics with MH acceptance and move-mix panels.

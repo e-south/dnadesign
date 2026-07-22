@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/plots.py
+dnadesign
+src/dnadesign/densegen/src/cli/plots.py
 
 Plotting CLI command registration.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

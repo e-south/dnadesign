@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_outputs_explicit.py
 
 Tests that only explicitly declared outputs are produced.

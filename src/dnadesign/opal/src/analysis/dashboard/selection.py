@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/selection.py
 
 Selection helpers for dashboard comparisons.

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/event_log.py
+dnadesign
+src/dnadesign/densegen/src/core/event_log.py
 
 Event log parsing helpers for DenseGen runs.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

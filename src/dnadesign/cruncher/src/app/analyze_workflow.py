@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze_workflow.py
 
 Analyze sampling runs and produce summary reports.

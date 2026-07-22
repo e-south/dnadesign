@@ -1,13 +1,22 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/notebook_service.py
+
 Workspace notebook scaffold services for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
+import hashlib
 import runpy
 import subprocess
 import sys
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from ..contracts.deliverable import DeliverableStatusResult
@@ -47,6 +56,22 @@ def _notebook_generation_artifact_exists(context, notebook_id: str) -> bool:
 
 def _notebook_health_path(context, notebook_id: str) -> Path:
     return _workspace_notebook_dir(context, notebook_id) / "health.json"
+
+
+def _notebook_source_digest(notebook_path: Path) -> str:
+    return hashlib.sha256(notebook_path.read_bytes()).hexdigest()
+
+
+@lru_cache(maxsize=64)
+def _marimo_check_result(notebook_path: str, source_digest: str) -> tuple[int, str, str]:
+    del source_digest
+    result = subprocess.run(
+        [sys.executable, "-m", "marimo", "check", notebook_path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode, result.stdout, result.stderr
 
 
 def _write_notebook_health(
@@ -612,15 +637,13 @@ def smoke_workspace_notebook(workspace: str | Path, *, notebook_id: str | None =
             checks["imports_resolve"] = True
         except Exception as exc:  # pragma: no cover - surfaced in health payload
             warnings.append(f"imports_resolve failed: {exc}")
-        marimo_check = subprocess.run(
-            [sys.executable, "-m", "marimo", "check", notebook_path.as_posix()],
-            capture_output=True,
-            text=True,
-            check=False,
+        marimo_returncode, marimo_stdout, marimo_stderr = _marimo_check_result(
+            notebook_path.as_posix(),
+            _notebook_source_digest(notebook_path),
         )
-        checks["marimo_check_passes"] = marimo_check.returncode == 0
+        checks["marimo_check_passes"] = marimo_returncode == 0
         if not checks["marimo_check_passes"]:
-            detail = (marimo_check.stderr or marimo_check.stdout or "").strip()
+            detail = (marimo_stderr or marimo_stdout or "").strip()
             warnings.append(f"marimo_check_passes failed: {detail or 'marimo check returned nonzero'}")
     if controls_path.is_file():
         try:

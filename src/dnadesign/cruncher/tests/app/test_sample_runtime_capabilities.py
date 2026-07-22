@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_sample_runtime_capabilities.py
+
+Regression tests for sample runtime capabilities Cruncher app.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/diagnostics.py
+
+Plot builders for diagnostics Permuter plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

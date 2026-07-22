@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_scoring_logp.py
 
-Author(s): Eric J. South
+Regression tests for scoring logp Cruncher core.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

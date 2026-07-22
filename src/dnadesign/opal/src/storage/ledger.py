@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/ledger.py
 
-Handles append-only ledger sinks and schema validation for OPAL. Reads/writes
-run metadata, predictions, and label events.
+Handles append-only ledger sinks and schema validation for OPAL. Reads/writes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -34,7 +33,7 @@ from .parquet_io import (
 )
 from .workspace import CampaignWorkspace
 
-# ---- schema allow-lists (Ledger v1.1) ----
+# ---- schema allow-lists (Ledger v2.0) ----
 ALLOW: dict[str, set[str]] = {
     "run_pred": {
         "event",
@@ -44,21 +43,9 @@ ALLOW: dict[str, set[str]] = {
         "sequence",
         "pred__y_dim",
         "pred__y_hat_model",
-        "pred__score_selected",
-        "pred__score_ref",
-        "pred__selection_score",
-        "sel__rank_competition",
-        "sel__is_selected",
-        "pred__uncertainty_selected",
-        "pred__uncertainty_ref",
         "pred__score_channels",
         "pred__uncertainty_channels",
-        # row-level objective diagnostics only
-        "obj__logic_fidelity",
-        "obj__effect_raw",
-        "obj__effect_scaled",
-        "obj__clip_lo_mask",
-        "obj__clip_hi_mask",
+        "pred__selection_views",
     },
     "run_meta": {
         "event",
@@ -71,21 +58,10 @@ ALLOW: dict[str, set[str]] = {
         "x_transform__params",
         "y_ingest__name",
         "y_ingest__params",
-        "objective__name",
-        "objective__params",
         "objective__defs_json",
-        "objective__summary_stats",
-        "objective__denom_value",
-        "objective__denom_percentile",
-        "selection__name",
-        "selection__params",
-        "selection__score_ref",
-        "selection__uncertainty_ref",
-        "selection__objective",
-        "selection__tie_handling",
+        "selection_views__defs_json",
         "stats__n_train",
         "stats__n_scored",
-        "stats__unc_mean_sd_targets",
         "artifacts",
         "pred__preview",
         "schema__version",
@@ -110,9 +86,7 @@ REQUIRED: dict[str, set[str]] = {
         "id",
         "pred__y_dim",
         "pred__y_hat_model",
-        "pred__score_selected",
-        "sel__rank_competition",
-        "sel__is_selected",
+        "pred__selection_views",
     },
     "run_meta": {
         "event",
@@ -120,9 +94,8 @@ REQUIRED: dict[str, set[str]] = {
         "as_of_round",
         "model__name",
         "model__params",
-        "objective__name",
-        "selection__name",
-        "selection__params",
+        "objective__defs_json",
+        "selection_views__defs_json",
         "schema__version",
         "opal__version",
     },
@@ -223,19 +196,54 @@ def _dedupe_labels_frame(df: pd.DataFrame) -> pd.DataFrame:
 def _append_run_meta_dataset(path: Path, df: pd.DataFrame) -> None:
     ctx = "[ledger:run_meta]"
     _ensure_dataset_dir(path, ctx=ctx)
+    if df["run_id"].astype(str).duplicated().any():
+        raise LedgerError(f"{ctx} duplicate run_id rows are not allowed.")
     run_ids = set(df["run_id"].astype(str).tolist())
+    _reject_existing_run_ids(path, run_ids=run_ids, ctx=ctx)
     schema = _dataset_schema(path)
+    if schema is not None:
+        artifact_type = schema.field("artifacts").type
+        existing_artifact_keys = {
+            str(artifact_type.field(index).name) for index in range(int(getattr(artifact_type, "num_fields", 0)))
+        }
+        incoming_artifact_keys = _artifact_map_keys(df["artifacts"])
+        if not incoming_artifact_keys.issubset(existing_artifact_keys):
+            existing = read_parquet_df(path)
+            all_artifact_keys = sorted(existing_artifact_keys | incoming_artifact_keys)
+            existing = _with_artifact_keys(existing, keys=all_artifact_keys)
+            incoming = _with_artifact_keys(df, keys=all_artifact_keys)
+            out = pd.concat([existing, incoming], ignore_index=True)
+            _rewrite_dataset(path, out)
+            return
     table = table_from_pandas(df, schema=schema) if schema is not None else table_from_pandas(df)
     if schema is not None:
         _assert_schema_match(schema, table.schema, ctx=ctx)
-        existing_ids = set(read_parquet_df(path, columns=["run_id"])["run_id"].astype(str).tolist())
-        if run_ids & existing_ids:
-            existing = read_parquet_df(path)
-            out = pd.concat([existing, df], ignore_index=True)
-            out = out.drop_duplicates(subset=["run_id"], keep="last")
-            _rewrite_dataset(path, out)
-            return
     _append_dataset_table(path, table, ctx=ctx)
+
+
+def _existing_run_ids(path: Path) -> set[str]:
+    if _dataset_schema(path) is None:
+        return set()
+    return set(read_parquet_df(path, columns=["run_id"])["run_id"].astype(str).tolist())
+
+
+def _reject_existing_run_ids(path: Path, *, run_ids: set[str], ctx: str) -> None:
+    collisions = sorted(run_ids & _existing_run_ids(path))
+    if collisions:
+        raise LedgerError(f"{ctx} run_id already exists and cannot be replaced (sample={collisions[:10]}).")
+
+
+def _artifact_map_keys(values: pd.Series) -> set[str]:
+    return {str(key) for value in values.tolist() if isinstance(value, dict) for key in value}
+
+
+def _with_artifact_keys(frame: pd.DataFrame, *, keys: list[str]) -> pd.DataFrame:
+    out = frame.copy()
+    out["artifacts"] = [
+        {key: value.get(key) for key in keys} if isinstance(value, dict) else {key: None for key in keys}
+        for value in out["artifacts"].tolist()
+    ]
+    return out
 
 
 def compact_runs_ledger(path: Path) -> dict[str, int]:
@@ -302,6 +310,7 @@ class LedgerWriter:
             dup = df.duplicated(subset=["run_id", "id"]).any()
             if dup:
                 raise LedgerError("[ledger:run_pred] duplicate (run_id, id) rows are not allowed.")
+        self.require_run_id_available(str(df["run_id"].iloc[0]))
         tbl = table_from_pandas(df)
         _append_dataset_table(self._paths.predictions_dir, tbl, ctx="[ledger:run_pred]")
 
@@ -309,6 +318,16 @@ class LedgerWriter:
         _ensure_event_value(df, "run_meta")
         _validate_columns(df, "run_meta")
         _append_run_meta_dataset(self._paths.runs_path, df)
+
+    def require_run_id_available(self, run_id: str) -> None:
+        """Reject a run identity already committed to either run ledger."""
+
+        canonical_run_id = str(run_id)
+        if not canonical_run_id or canonical_run_id != canonical_run_id.strip():
+            raise LedgerError("Run ledger availability checks require a canonical, non-blank run_id.")
+        run_ids = {canonical_run_id}
+        _reject_existing_run_ids(self._paths.predictions_dir, run_ids=run_ids, ctx="[ledger:run_pred]")
+        _reject_existing_run_ids(self._paths.runs_path, run_ids=run_ids, ctx="[ledger:run_meta]")
 
     def append_label(self, df: pd.DataFrame) -> None:
         _ensure_event_value(df, "label")

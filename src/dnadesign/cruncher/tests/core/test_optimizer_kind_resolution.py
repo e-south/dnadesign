@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_optimizer_kind_resolution.py
 
 Validate strict optimizer-kind resolution contracts.

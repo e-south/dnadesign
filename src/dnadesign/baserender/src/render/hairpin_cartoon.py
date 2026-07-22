@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/hairpin_cartoon.py
 
 Folded ssDNA hairpin renderer for topology-first cassette QA views.

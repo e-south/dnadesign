@@ -18,7 +18,7 @@ defaults:
 study_binding:
   study_id: regulondb_native_promoter_panel
   record_root: docs/studies/regulondb_native_promoter_panel
-  deliverable_docs_root: src/dnadesign/studies/regulondb_native_promoter_panel
+  deliverable_docs_root: src/dnadesign/studies/units/regulondb_native_promoter_panel
 sources:
   native_records:
     kind: usr
@@ -634,7 +634,7 @@ deliverables:
       notebooks:
         - latent_geometry_browser
     docs_refs:
-      - study:regulondb_native_promoter_panel/deliverables/representation_health_summary
+      - study:regulondb_native_promoter_panel/deliverables/review/representation_health_summary
     acceptance_checks: []
   native_core60_shift_summary:
     title: Native/core60 shift summary
@@ -655,7 +655,7 @@ deliverables:
       plots:
         - native_core60_shift_summary
     docs_refs:
-      - study:regulondb_native_promoter_panel/deliverables/native_core60_shift_summary
+      - study:regulondb_native_promoter_panel/deliverables/review/native_core60_shift_summary
     acceptance_checks: []
   sigma_factor_structure_summary:
     title: Sigma-factor structure summary
@@ -673,7 +673,7 @@ deliverables:
       plots:
         - sigma_factor_structure_summary
     docs_refs:
-      - study:regulondb_native_promoter_panel/deliverables/sigma_factor_structure_summary
+      - study:regulondb_native_promoter_panel/deliverables/review/sigma_factor_structure_summary
     acceptance_checks: []
   sigma_umap_panel:
     title: Sigma-factor UMAP panel
@@ -692,5 +692,5 @@ deliverables:
       notebooks:
         - latent_geometry_browser
     docs_refs:
-      - study:regulondb_native_promoter_panel/deliverables/sigma_umap_panel
+      - study:regulondb_native_promoter_panel/deliverables/appendix/sigma_umap_panel
     acceptance_checks: []

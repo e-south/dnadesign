@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/tests/ingest/test_meme_suite.py
+
+Regression tests for meme suite Cruncher ingest.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/orchestrator/plan_tools.py
 
-Plan-tool adapter contracts for workflow-specific preflight, submit, and notify
-planning behavior.
+Plan-tool adapter contracts for workflow-specific preflight, submit, and notify.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

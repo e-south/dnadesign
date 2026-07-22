@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/export_genbank_baserender_projection.py
+
 Export a USR GenBank annotation projection for BaseRender.
 
-This helper is USR-owned on purpose: it reads datasets through the canonical
-Dataset API and writes a plain file-contract parquet that BaseRender can render
-without importing USR internals or inspecting overlay directories.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

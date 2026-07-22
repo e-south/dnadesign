@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/_helpers.py
 
 Shared fixtures and setup helpers for Study workflow tests.

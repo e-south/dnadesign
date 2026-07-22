@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_move_plots.py
 
-Author(s): Eric J. South
+Regression tests for move plots Cruncher analysis.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,7 +1,7 @@
 ## infer docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-07-14
 
 Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a compact by-type index.
 
@@ -16,9 +16,9 @@ Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a
 
 ### Cross-tool handoff routes
 
-- [Multi-source shared dataset assembly](../../usr/docs/operations/multi-source-shared-dataset-assembly.md)
-- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/construct-infer-shared-dataset-runbook.md)
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- [Multi-source shared dataset assembly](../../usr/docs/operations/assembly/multi-source-shared-dataset.md)
+- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- [Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md)
 - [cluster exploratory workflow](../../cluster/docs/workflows/exploratory-clustering.md)
 - [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md)
 

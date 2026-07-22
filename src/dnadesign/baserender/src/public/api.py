@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/public/api.py
 
 Baserender vNext public API for job execution and record rendering helpers.
@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Iterable, Mapping
 
 from ..adapters import build_adapter, list_adapter_descriptors, required_source_columns
 from ..adapters import get_adapter_descriptor as _get_adapter_descriptor
@@ -51,59 +51,7 @@ from .sequence_panel import (
     SequencePanelImage,
     sequence_panel_config_for_adapter,
 )
-
-
-def _normalize_panel_image(
-    image: Any,
-    *,
-    target_width_px: int,
-    target_height_px: int,
-    vertical_anchor: str,
-    canvas_top_pad_px: int,
-) -> Any:
-    import numpy as np
-    from PIL import Image
-
-    if int(target_width_px) <= 0 or int(target_height_px) <= 0:
-        raise SchemaError("sequence panel target dimensions must be positive")
-
-    rgba = np.asarray(image)
-    ensure(rgba.ndim == 3 and rgba.shape[2] in {3, 4}, "sequence panel image must be RGB/RGBA", SchemaError)
-    if rgba.shape[2] == 3:
-        alpha = np.full(rgba.shape[:2], 255, dtype=np.uint8)
-        rgba = np.dstack([rgba[:, :, :3], alpha])
-
-    alpha = rgba[:, :, 3]
-    rgb = rgba[:, :, :3]
-    content_mask = ((rgb < 245).any(axis=2)) & (alpha > 0)
-    if content_mask.any():
-        ys, xs = np.where(content_mask)
-        pad = 8
-        y0 = max(0, int(ys.min()) - pad)
-        y1 = min(rgba.shape[0], int(ys.max()) + pad + 1)
-        x0 = max(0, int(xs.min()) - pad)
-        x1 = min(rgba.shape[1], int(xs.max()) + pad + 1)
-        rgba = rgba[y0:y1, x0:x1, :]
-
-    source = Image.fromarray(rgba.astype(np.uint8, copy=False))
-    scale = min(int(target_width_px) / max(source.width, 1), int(target_height_px) / max(source.height, 1))
-    resized = source.resize(
-        (max(1, int(source.width * scale)), max(1, int(source.height * scale))),
-        Image.Resampling.LANCZOS,
-    )
-    canvas = Image.new("RGBA", (int(target_width_px), int(target_height_px)), (255, 255, 255, 255))
-    x = (canvas.width - resized.width) // 2
-    anchor = str(vertical_anchor).strip().lower()
-    if anchor == "top":
-        y = min(max(0, int(canvas_top_pad_px)), max(0, canvas.height - resized.height))
-    elif anchor == "bottom":
-        y = max(0, canvas.height - resized.height)
-    elif anchor == "center":
-        y = (canvas.height - resized.height) // 2
-    else:
-        raise SchemaError("sequence panel vertical_anchor must be 'top', 'center', or 'bottom'")
-    canvas.alpha_composite(resized, dest=(x, y))
-    return np.asarray(canvas)
+from .sequence_panel_layout import normalize_panel_image, sequence_center_y_px
 
 
 def _legend_tags(record: Record) -> tuple[str, ...]:
@@ -126,10 +74,16 @@ def render_sequence_panel_image(
     adapter_policies: Mapping[str, object] | None = None,
     style_overrides: Mapping[str, object] | None = None,
     target_width_px: int = 2200,
-    target_height_px: int = 310,
+    target_height_px: int = 430,
     vertical_anchor: str = "center",
     canvas_top_pad_px: int = 0,
+    title: str | None = None,
 ) -> SequencePanelImage:
+    """Render one adapter row into a fixed-size sequence panel.
+
+    ``title`` is caller-owned display text. Any adapter-provided record label is
+    preserved as a second header line; BaseRender does not interpret either value.
+    """
     import matplotlib.pyplot as plt
 
     if config is None:
@@ -153,20 +107,32 @@ def render_sequence_panel_image(
         adapter_policies=config.adapter_policies,
         alphabet=config.alphabet,
     )
+    record_label = record.display.overlay_text
+    normalized_title: str | None = None
+    if title is not None:
+        ensure(isinstance(title, str) and title.strip() != "", "sequence panel title must be non-empty", SchemaError)
+        normalized_title = title.strip()
+        header_lines = [normalized_title]
+        if record_label is not None and record_label.strip() and record_label.strip() != normalized_title:
+            header_lines.append(record_label.strip())
+        record = replace(record, display=replace(record.display, overlay_text="\n".join(header_lines)))
     fig = render_record_figure(
         record,
         renderer_name=config.renderer_name,
         style_preset=config.style_preset,
         style_overrides=config.style_overrides,
     )
+    _force_opaque_white_figure(fig)
     image = _figure_rgba(fig)
+    source_strand_center_y_px = sequence_center_y_px(fig)
     plt.close(fig)
-    image = _normalize_panel_image(
+    image, strand_center_y_px = normalize_panel_image(
         image,
         target_width_px=config.target_width_px,
         target_height_px=config.target_height_px,
         vertical_anchor=config.vertical_anchor,
         canvas_top_pad_px=config.canvas_top_pad_px,
+        source_anchor_y_px=source_strand_center_y_px,
     )
     diagnostics = SequencePanelDiagnostics(
         contract_id=BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
@@ -181,6 +147,9 @@ def render_sequence_panel_image(
         legend_entries=_legend_tags(record),
         image_width_px=int(image.shape[1]),
         image_height_px=int(image.shape[0]),
+        strand_center_y_px=float(strand_center_y_px),
+        title=normalized_title,
+        record_label=record_label,
     )
     return SequencePanelImage(image=image, diagnostics=diagnostics)
 
@@ -381,6 +350,14 @@ def render_record_figure(
     from ..render import render_record
 
     return render_record(record, renderer_name=renderer_name, style=style, palette=palette)
+
+
+def _force_opaque_white_figure(fig) -> None:
+    fig.patch.set_facecolor("white")
+    fig.patch.set_alpha(1.0)
+    for axis in fig.axes:
+        axis.set_facecolor("white")
+        axis.patch.set_alpha(1.0)
 
 
 def _figure_rgba(fig):

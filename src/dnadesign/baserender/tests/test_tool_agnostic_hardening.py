@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_tool_agnostic_hardening.py
 
 Static hardening tests that enforce tool-agnostic API and contract-driven parsing.

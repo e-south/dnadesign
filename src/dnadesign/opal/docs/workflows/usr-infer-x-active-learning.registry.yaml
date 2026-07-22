@@ -6,7 +6,7 @@ plane: downstream-tool
 owner_boundary: opal
 entry_artifact: USR dataset plus one explicit infer-derived X column
 exit_artifact: initialized OPAL campaign state plus round outputs and selection ledgers
-summary: Start the label, train, and select loop once one explicit infer-derived X column or exported matrix already exists.
+summary: Start the label, train, and select loop once one OPAL-ready candidate table with an explicit infer-derived X column exists.
 execution_kind: round-loop
 status_kind: opal-campaign-state
 related_tools:

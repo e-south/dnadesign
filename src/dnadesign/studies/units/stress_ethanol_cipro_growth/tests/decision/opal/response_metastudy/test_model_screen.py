@@ -1,0 +1,278 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/response_metastudy/test_model_screen.py
+
+Tests for the grouped response-label model screen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy import evaluation
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
+    StressTargetView,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.evaluation import (
+    grouped_models,
+    model_screen,
+)
+
+
+def test_fixed_screen_includes_exact_campaign_random_forest_target_treatment() -> None:
+    specs = {spec.id: spec for spec in evaluation.DEFAULT_MODEL_SCREEN_SPECS}
+
+    assert specs["campaign_random_forest"].kind == "random_forest"
+    assert specs["campaign_random_forest"].role == "campaign_model"
+    assert specs["campaign_random_forest"].target_transform == "none"
+    assert specs["mean_baseline"].role == "baseline"
+    assert specs["pls4"].role == "fixed_challenger"
+    assert specs["robust_target_random_forest"].target_transform == "robust_magnitude"
+
+
+def test_campaign_screen_preserves_configured_random_forest_fit_parameters() -> None:
+    spec = next(spec for spec in evaluation.DEFAULT_MODEL_SCREEN_SPECS if spec.id == "campaign_random_forest")
+
+    model = grouped_models._build_model(
+        spec,
+        train_rows=20,
+        random_forest_params={
+            "n_estimators": 100,
+            "criterion": "friedman_mse",
+            "bootstrap": True,
+            "oob_score": True,
+            "random_state": 7,
+            "n_jobs": -1,
+            "emit_feature_importance": True,
+        },
+    )
+
+    fitted_params = model.get_params(deep=False)
+    assert fitted_params["n_estimators"] == 100
+    assert fitted_params["criterion"] == "friedman_mse"
+    assert fitted_params["bootstrap"] is True
+    assert fitted_params["oob_score"] is True
+    assert fitted_params["random_state"] == 7
+    assert fitted_params["n_jobs"] == -1
+
+
+@pytest.mark.parametrize(
+    "model_spec",
+    (
+        grouped_models.ModelScreenSpec(
+            id="campaign_random_forest",
+            kind="random_forest",
+            role="campaign_model",
+        ),
+        grouped_models.ModelScreenSpec(id="pls4", kind="pls", components=4),
+    ),
+    ids=("campaign_random_forest", "pls4"),
+)
+def test_grouped_predictions_do_not_learn_from_held_out_labels(
+    model_spec: grouped_models.ModelScreenSpec,
+) -> None:
+    rng = np.random.default_rng(17)
+    x = rng.normal(size=(15, 8))
+    y = rng.normal(size=(15, 8))
+    groups = np.repeat(np.asarray(["experiment-1", "experiment-2", "experiment-3"], dtype=object), 5)
+    held_out = groups == "experiment-2"
+    perturbed_y = y.copy()
+    perturbed_y[held_out] += 1_000.0
+    kwargs = {
+        "groups": groups,
+        "model_spec": model_spec,
+        "random_forest_params": {"n_estimators": 16, "random_state": 7, "n_jobs": 1},
+        "magnitude_start": 4,
+    }
+
+    baseline = grouped_models.grouped_predictions(x, y, pca_cache={}, **kwargs)
+    perturbed = grouped_models.grouped_predictions(x, perturbed_y, pca_cache={}, **kwargs)
+
+    np.testing.assert_array_equal(perturbed[held_out], baseline[held_out])
+    assert not np.allclose(perturbed[~held_out], baseline[~held_out])
+
+
+def test_factorial_contrast_preserves_all_response_separations() -> None:
+    response_magnitude = np.asarray(
+        [
+            [1.0, 3.0, 2.0, 5.0, -1.0, 0.5, -0.5, 1.0],
+            [2.0, 1.0, 4.0, 3.0, -0.2, 0.1, 0.4, 0.8],
+        ]
+    )
+    decoded = evaluation.decode_to_response_magnitude(
+        evaluation.response_magnitude_to_factorial_contrast7(response_magnitude),
+        decoder="factorial_contrast7",
+    )
+
+    for target in ((0, 1, 0, 1), (0, 0, 1, 1), (0, 0, 0, 1), (0, 1, 1, 1)):
+        on = np.asarray(target, dtype=bool)
+        expected = response_magnitude[:, :4][:, on].min(axis=1) - response_magnitude[:, :4][:, ~on].max(axis=1)
+        actual = decoded[:, :4][:, on].min(axis=1) - decoded[:, :4][:, ~on].max(axis=1)
+        assert np.allclose(actual, expected)
+    assert np.allclose(decoded[:, 4:], response_magnitude[:, 4:])
+
+
+def test_only_declared_reduction_and_its_contrast_are_promotion_eligible() -> None:
+    response_magnitude = np.arange(24, dtype=float).reshape(3, 8)
+    ids = ["a", "b", "c"]
+    base = pd.DataFrame(
+        response_magnitude,
+        columns=["r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11"],
+    )
+    base.insert(0, "id", ids)
+    primary = base.assign(reduction_id="primary")
+    sensitivity = base.assign(reduction_id="sensitivity")
+
+    representations = evaluation.build_label_representations(
+        ids=ids,
+        response_summaries=pd.concat((primary, sensitivity), ignore_index=True),
+        primary_reduction_id="primary",
+        promotion_reduction_ids=frozenset({"primary"}),
+    )
+
+    eligibility = {value.id: value.promotion_eligible for value in representations}
+    assert eligibility == {
+        "primary": True,
+        "primary__factorial_contrast7": True,
+        "sensitivity": False,
+    }
+    campaign_spec = next(spec for spec in evaluation.DEFAULT_MODEL_SCREEN_SPECS if spec.id == "campaign_random_forest")
+    assert {
+        representation.id: model_screen._model_evidence_role(representation, campaign_spec)
+        for representation in representations
+    } == {
+        "primary": "campaign_model",
+        "primary__factorial_contrast7": "fixed_challenger",
+        "sensitivity": "fixed_challenger",
+    }
+
+
+def test_grouped_model_screen_returns_margin_and_enrichment_evidence() -> None:
+    rng = np.random.default_rng(7)
+    x = rng.normal(size=(24, 4))
+    response = np.column_stack((x[:, 0], x[:, 0] + x[:, 1], x[:, 2], x[:, 1] + x[:, 2]))
+    brightness = np.column_stack((x[:, 3] - 1.0, x[:, 3] + 0.5, x[:, 3] - 0.5, x[:, 3] + 1.0))
+    response_magnitude = np.column_stack((response, brightness))
+    ids = [f"id-{index}" for index in range(len(x))]
+    summaries = pd.DataFrame(response_magnitude, columns=["r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11"])
+    summaries.insert(0, "reduction_id", "primary")
+    summaries.insert(0, "id", ids)
+    representations = evaluation.build_label_representations(
+        ids=ids,
+        response_summaries=summaries,
+        primary_reduction_id="primary",
+        promotion_reduction_ids=frozenset({"primary"}),
+    )
+    ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
+
+    groups = np.repeat(["g1", "g2", "g3", "g4"], 6)
+    summary, group_metrics, enrichment = evaluation.screen_label_models(
+        x,
+        groups=groups,
+        candidate_ids=ids,
+        representations=representations,
+        target_views=(ethanol,),
+        uncertainty_rows=_uncertainty_rows(ids, groups, selection_view_id="ethanol"),
+        scale_quantile=0.9,
+        bootstrap_samples=100,
+        random_forest_params={"n_estimators": 10, "random_state": 7, "n_jobs": 1},
+        model_specs=(evaluation.ModelScreenSpec(id="pls2", kind="pls", components=2),),
+    )
+
+    assert set(summary["representation_id"]) == {
+        "primary",
+        "primary__factorial_contrast7",
+    }
+    assert (summary["model_id"] == "pls2").all()
+    assert (summary["model_role"] == "fixed_challenger").all()
+    assert (group_metrics["model_role"] == "fixed_challenger").all()
+    assert (enrichment["model_role"] == "fixed_challenger").all()
+    assert summary["ethanol__response_separation_spearman"].notna().all()
+    assert np.allclose(
+        summary["weakest_required_ordering_spearman"],
+        summary[["weakest_target_view_response_separation_spearman", "weakest_target_view_feasibility_spearman"]].min(
+            axis=1
+        ),
+    )
+    assert not group_metrics.empty
+    assert not enrichment.empty
+    assert enrichment["selection_defined"].all()
+    assert enrichment["selected_true_percentile"].between(0.0, 1.0).all()
+
+
+def test_retrospective_enrichment_rejects_tied_mean_predictions() -> None:
+    rng = np.random.default_rng(11)
+    x = rng.normal(size=(18, 3))
+    response_magnitude = rng.normal(size=(18, 8))
+    ids = [f"id-{index}" for index in range(len(x))]
+    summaries = pd.DataFrame(response_magnitude, columns=["r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11"])
+    summaries.insert(0, "reduction_id", "primary")
+    summaries.insert(0, "id", ids)
+    representations = evaluation.build_label_representations(
+        ids=ids,
+        response_summaries=summaries,
+        primary_reduction_id="primary",
+        promotion_reduction_ids=frozenset({"primary"}),
+    )
+    ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
+
+    groups = np.repeat(["g1", "g2", "g3"], 6)
+    _, _, enrichment = evaluation.screen_label_models(
+        x,
+        groups=groups,
+        candidate_ids=ids,
+        representations=(representations[0],),
+        target_views=(ethanol,),
+        uncertainty_rows=_uncertainty_rows(ids, groups, selection_view_id="ethanol"),
+        scale_quantile=0.9,
+        bootstrap_samples=100,
+        random_forest_params={"n_estimators": 10, "random_state": 7, "n_jobs": 1},
+        model_specs=(evaluation.ModelScreenSpec(id="mean", kind="mean"),),
+    )
+
+    assert not enrichment["selection_defined"].any()
+    assert enrichment["selected_true_percentile"].isna().all()
+
+
+def test_sfxi_vec8_cannot_enter_response_label_representations() -> None:
+    sfxi = pd.DataFrame(
+        {
+            "id": ["candidate"],
+            "reduction_id": ["snapshot"],
+            "v00": [0.0],
+            "v10": [1.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.0],
+            "y10_star": [1.0],
+            "y01_star": [0.0],
+            "y11_star": [1.0],
+        }
+    )
+
+    with pytest.raises(ValueError, match="response summary missing columns"):
+        evaluation.build_label_representations(
+            ids=["candidate"],
+            response_summaries=sfxi,
+            primary_reduction_id="snapshot",
+            promotion_reduction_ids=frozenset({"snapshot"}),
+        )
+
+
+def _uncertainty_rows(ids: list[str], groups: np.ndarray, *, selection_view_id: str) -> pd.DataFrame:
+    rows = pd.DataFrame(
+        {
+            "id": ids,
+            "selection_view_id": [selection_view_id] * len(ids),
+            "reader_experiment_id": groups,
+        }
+    )
+    for component in ("response_separation", "on_magnitude_floor", "off_magnitude_ceiling"):
+        rows[f"{component}__combined_sd"] = np.linspace(0.1, 0.3, len(ids))
+    return rows

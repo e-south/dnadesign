@@ -1,7 +1,7 @@
 ## YIU Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-08
+**Last verified:** 2026-07-08
 **Last updated by:** cruncher-maintainers on 2026-04-08
 
 YIU turns one payload sequence into a checked junction-mismatch bundle. It accepts either an exact `user_sequence` or a `sample_hit` resolved from public Cruncher Sample outputs, searches valid 4 nt internal junction plans plus one or two mismatches, optionally scores those candidates against PWM context, and publishes three BaseRender-ready views.

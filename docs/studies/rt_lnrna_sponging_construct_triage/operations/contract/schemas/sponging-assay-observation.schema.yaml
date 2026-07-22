@@ -1,0 +1,85 @@
+schema_id: sponging_assay_observation_v1
+study_id: rt_lnrna_sponging_construct_triage
+status: reader_label_tables_materialized_for_latentdna_overlay
+label_contract:
+  metric_id: reader_spop_endpoint_dose_mean_v1
+  metric_family: sponging_percent_of_positive
+  score_direction: maximize
+  numeric_scope: reader_experiment_normalized_tf_sponging
+  ordinal_audit_scope: source_local_reader_spop
+  scale_compatibility: source_scoped_not_comparable_to_khan_or_crawford_abundance
+  y_expected_length: 1
+  allowed_as_opal_y: true
+  allowed_as_latentdna_overlay: true
+  opal_objective: spop_v1/spop
+  source_owner: reader
+  source_of_truth_doc: reader/docs/lib/spop_endpoint_in_reader.md
+  source_of_truth_api: reader.domains.plate_reader.analysis.spop.score_spop_endpoint
+  materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan
+  reporter_plasmid_id: pBbS2c-RFP
+  reporter_design_id: pBbS2c-rfp
+  reporter_readout: RFP/OD600
+  positive_control_condition_policy: aTc_nM > 0 and IPTG_uM == 0
+  positive_control_condition_examples:
+    - 200 nm aTc; 0 uM IPTG
+  positive_control_atc_nM: recorded_per_observation
+  baseline_condition: 0 nm aTc; 0 uM IPTG
+  iptg_scoring_policy: nonzero_iptg_only
+  default_lambda_viability: 0.5
+  scalar_definition: >-
+    Reader owns the numeric SPOP scoring definition in
+    reader.domains.plate_reader.analysis.spop.score_spop_endpoint. The
+    dnadesign study bridge must parse Reader evidence, pass endpoint dose values
+    to that API, and persist the scorer output without reimplementing the SPOP
+    equation.
+required_fields:
+  observation_id: string
+  assay_subject_key: string
+  proposed_construct_subject_id: string
+  construct_subject_id: string_or_null
+  construct_subject_bridge_status: string
+  reader_design_id: string
+  reader_experiment_id: string
+  reader_artifact_ref: string
+  reader_artifact_record_id: string
+  reader_artifact_content_digest: string
+  metric_id: string
+  payload_program_id: string
+  assay_id: string
+  batch_id: string
+  readout_kind: string
+  reporter_plasmid_id: string
+  report_time_h: numeric
+  endpoint_time_h: numeric
+  iptg_doses_uM: numeric_list
+  raw_value: numeric
+  normalized_value: numeric_or_null
+  normalization_basis: string_or_null
+  replicate_count: integer_or_null
+  uncertainty: numeric_or_struct_or_null
+  assay_metadata: mapping
+derived_fields:
+  spop_score_raw: numeric
+  spop_score_calibrated: numeric_or_null
+  spop_potency: numeric
+  spop_viability: numeric
+  y_derepression_by_dose: numeric_list
+  viability_by_dose: numeric_list
+  rfp_over_od600_baseline: numeric
+  rfp_over_od600_positive: numeric
+  qc_flags: string_list
+construct_subject_bridge_status_values:
+  - resolved_construct_sequence_authority
+  - missing_construct_sequence_authority
+  - unresolved_reader_design_id
+validation_rules:
+  - Reader rows must parse treatment strings into explicit aTc nM and IPTG uM values.
+  - The zero-inducer baseline and aTc positive-control rows are required before scoring.
+  - Positive-control rows must have positive aTc and zero IPTG; the actual aTc nM value must be recorded per observation rather than normalized to 200 nM.
+  - At least one nonzero IPTG condition is required before emitting a scalar label.
+  - Wider retron variants may receive Reader SPOP labels before Construct promotion, but must carry missing_construct_sequence_authority until explicit RT plus lnRNA authority exists.
+  - OPAL SPOP campaigns receive this scalar through spop_v1/spop after a selected fixed-size X and real Reader labels exist; OPAL remains blocked before then.
+validation_notes:
+  - This is the only planned source for OPAL TF-sponging Y values.
+  - Literature abundance priors must not be converted into this schema.
+  - SPOP-derived categorical hues or ordinal bins are metadata views over this Reader metric, not replacements for raw_value or normalized_value.

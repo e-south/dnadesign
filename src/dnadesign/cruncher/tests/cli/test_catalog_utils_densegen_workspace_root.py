@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_catalog_utils_densegen_workspace_root.py
 
 Tests for DenseGen workspace-root discovery used by catalog export commands.

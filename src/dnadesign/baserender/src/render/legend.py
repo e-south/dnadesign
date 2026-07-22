@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/legend.py
 
 Legend construction from feature tags and record-level display tag label metadata.

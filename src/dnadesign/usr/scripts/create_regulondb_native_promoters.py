@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/create_regulondb_native_promoters.py
+
 Create a native RegulonDB promoter USR dataset from a Cruncher promoter export.
 
-The script is dry-run by default and never fetches RegulonDB directly. Cruncher
-owns source access and normalized exports; this script owns USR sequence
-identity, dense overlays, relation sidecars, validation, and committed writes.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

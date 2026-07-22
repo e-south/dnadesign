@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_diagnostics_overlap.py
 
-Author(s): Eric J. South
+Regression tests for diagnostics overlap Cruncher analysis.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

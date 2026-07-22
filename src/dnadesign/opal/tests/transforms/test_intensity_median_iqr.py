@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/transforms/test_intensity_median_iqr.py
 
 Tests intensity_median_iqr Y-op transform and uncertainty inversion semantics.

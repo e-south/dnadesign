@@ -15,9 +15,11 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dnadesign.ops.catalog import CatalogQuery, filter_runbook_catalog, load_runbook_catalog
+from dnadesign.ops.catalog.metadata import _load_registry_metadata_file, _load_tool_source_metadata_file
 from dnadesign.ops.cli import app
 
 
@@ -32,6 +34,11 @@ def _repo_root() -> Path:
 _ANSI_ESCAPE_RE = re.compile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
 def test_load_runbook_catalog_reads_shared_registry() -> None:
     catalog = load_runbook_catalog(repo_root=_repo_root())
 
@@ -43,10 +50,100 @@ def test_load_runbook_catalog_reads_shared_registry() -> None:
     assert catalog.find_tool_source("latentdna") is not None
 
 
+def test_catalog_registry_metadata_rejects_unknown_top_level_keys(tmp_path: Path) -> None:
+    doc_path = tmp_path / "docs" / "operations" / "demo.md"
+    metadata_path = doc_path.with_name("demo.registry.yaml")
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Procedure\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+registry_id: demo.procedure
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: demo.yaml
+exit_artifact: audit.json
+execution_kind: executable
+status_kind: ops-audit-json
+summary: Demo procedure.
+legacy_alias: stale
+""",
+    )
+
+    with pytest.raises(ValueError, match="registry metadata has unknown key\\(s\\): legacy_alias"):
+        _load_registry_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
+
+
+def test_catalog_registry_metadata_can_live_under_operations_catalog_contracts_directory(tmp_path: Path) -> None:
+    doc_path = tmp_path / "docs" / "studies" / "demo_study" / "operations" / "catalog" / "contracts" / "preflight.md"
+    metadata_path = doc_path.parent / "registry" / "preflight.registry.yaml"
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Preflight\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+registry_id: studies.demo.preflight
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: demo study record
+exit_artifact: demo preflight summary
+execution_kind: iterative
+status_kind: demo-preflight
+summary: Demo preflight contract.
+""",
+    )
+
+    entry, relations = _load_registry_metadata_file(
+        metadata_path=metadata_path,
+        repo_root=tmp_path,
+        catalog_path=catalog_path,
+    )
+
+    assert entry.title == "Demo Preflight"
+    assert entry.doc_path == "../studies/demo_study/operations/catalog/contracts/preflight.md"
+    assert relations == ()
+
+
+def test_catalog_tool_source_metadata_rejects_unknown_route_keys(tmp_path: Path) -> None:
+    doc_path = tmp_path / "src" / "dnadesign" / "demo" / "docs" / "README.md"
+    route_path = doc_path.with_name("workflow.md")
+    metadata_path = doc_path.with_suffix(".tool-source.yaml")
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Tool\n")
+    _write(route_path, "# Demo Workflow\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+tool: demo
+summary: Demo docs.
+routes:
+  - id: workflow
+    path: workflow.md
+    summary: Demo workflow.
+    legacy: stale
+""",
+    )
+
+    with pytest.raises(ValueError, match="route 1 has unknown key\\(s\\): legacy"):
+        _load_tool_source_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
+
+
 def test_ops_package_data_declares_packaged_runbook_presets() -> None:
     pyproject = (_repo_root() / "pyproject.toml").read_text(encoding="utf-8")
 
     assert '"dnadesign.ops"' in pyproject
+    assert "providers/*/status.registry.yaml" in pyproject
     assert "runbooks/presets/*.yaml" in pyproject
     assert "runbooks/templates/*.qsub" in pyproject
 
@@ -256,7 +353,7 @@ def test_cli_catalog_list_supports_related_tool_sources() -> None:
     assert "procedures" not in payload
 
 
-def test_cli_catalog_list_supports_related_tool_sources_for_promoter_study_status() -> None:
+def test_cli_catalog_list_supports_related_tool_sources_for_stress_ethanol_cipro_growth_status() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -269,14 +366,14 @@ def test_cli_catalog_list_supports_related_tool_sources_for_promoter_study_statu
             "--section",
             "tool-sources",
             "--related-to",
-            "usr.data-plane.promoter-study-status",
+            "studies.stress-ethanol-cipro-growth.status",
             "--json",
         ],
     )
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-study-status"}
+    assert payload["filters"] == {"related_to": "studies.stress-ethanol-cipro-growth.status"}
     assert payload["counts"] == {"tool_sources": 8}
     assert [entry["tool"] for entry in payload["tool_sources"]] == [
         "densegen",
@@ -322,7 +419,7 @@ def test_cli_catalog_list_supports_related_to_filter() -> None:
     assert "tool_sources" not in payload
 
 
-def test_cli_catalog_list_supports_related_to_filter_for_promoter_study_status() -> None:
+def test_cli_catalog_list_supports_related_to_filter_for_stress_ethanol_cipro_growth_status() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -335,20 +432,20 @@ def test_cli_catalog_list_supports_related_to_filter_for_promoter_study_status()
             "--section",
             "procedures",
             "--related-to",
-            "usr.data-plane.promoter-study-status",
+            "studies.stress-ethanol-cipro-growth.status",
             "--json",
         ],
     )
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-study-status"}
+    assert payload["filters"] == {"related_to": "studies.stress-ethanol-cipro-growth.status"}
     assert payload["counts"] == {"procedures": 4}
     assert {entry["registry_id"] for entry in payload["procedures"]} == {
-        "usr.data-plane.promoter-study-preflight",
+        "studies.stress-ethanol-cipro-growth.preflight",
         "usr.data-plane.multi-source-source-of-truth",
         "usr.data-plane.construct-infer-source-of-truth",
-        "usr.data-plane.promoter-feature-matrix",
+        "opal.downstream.usr-infer-x-active-learning",
     }
     assert "tool_sources" not in payload
 
@@ -520,7 +617,7 @@ def test_cli_catalog_show_json_includes_related_procedures() -> None:
     ]
 
 
-def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_status() -> None:
+def test_cli_catalog_show_json_exposes_latentdna_route_from_stress_ethanol_cipro_growth_status() -> None:
     runner = CliRunner()
 
     result = runner.invoke(
@@ -528,7 +625,7 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
         [
             "catalog",
             "show",
-            "usr.data-plane.promoter-study-status",
+            "studies.stress-ethanol-cipro-growth.status",
             "--repo-root",
             str(_repo_root()),
             "--json",
@@ -537,7 +634,7 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["owner_boundary"] == "usr"
+    assert payload["owner_boundary"] == "studies"
     assert [entry["tool"] for entry in payload["related_tool_sources"]] == [
         "densegen",
         "construct",
@@ -548,10 +645,10 @@ def test_cli_catalog_show_json_exposes_latentdna_route_from_promoter_study_statu
         "notify",
         "ops",
     ]
-    assert ("latentdna", "promoter-study-representation-comparison") in [
+    assert ("latentdna", "stress-ethanol-cipro-representation-comparison") in [
         (entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]
     ]
-    assert ("handoff-to", "usr.data-plane.promoter-study-preflight") in [
+    assert ("handoff-to", "studies.stress-ethanol-cipro-growth.preflight") in [
         (entry["relation_type"], entry["registry_id"]) for entry in payload["related_procedures"]
     ]
 

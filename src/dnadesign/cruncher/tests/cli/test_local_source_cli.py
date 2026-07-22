@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_local_source_cli.py
 
-Author(s): Eric J. South
+Regression tests for local source CLI Cruncher CLI.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

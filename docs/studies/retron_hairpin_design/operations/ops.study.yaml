@@ -1,0 +1,32 @@
+version: 2
+study_id: retron_hairpin_design
+title: Retron hairpin design effort
+ops_surfaces:
+  status_kind: retron-hairpin-design-status
+  preflight_kind: retron-hairpin-design-preflight
+record_sources:
+  narrative_ref: manifest:record/status.md
+  datasets_ref: manifest:record/datasets.yaml
+  pipeline_ref: manifest:operations/runtime/command-groups/pipeline.yaml
+  campaign_ref: manifest:record/campaign.yaml
+  routes_ref: manifest:routes/README.md
+parts:
+  lifecycle: contract/lifecycle/mode.yaml
+  tracks: contract/lifecycle/tracks.yaml
+  artifacts: contract/surfaces/artifacts.yaml
+  execution_surfaces:
+  - contract/surfaces/execution/workspaces.yaml
+  - contract/surfaces/execution/commands/snapback.yaml
+  - contract/surfaces/execution/commands/yiu.yaml
+  - contract/surfaces/execution/commands/compiler.yaml
+  - contract/surfaces/execution/commands/materialize.yaml
+  snapshot: contract/status/snapshot.yaml
+  preflight:
+  - contract/readiness/scope.yaml
+  - contract/readiness/group-bindings.yaml
+  - contract/readiness/next-scope.yaml
+  - contract/readiness/checks/context_consolidation.yaml
+  - contract/readiness/checks/msd_design_reference_catalog.yaml
+  - contract/readiness/checks/msd_single_unit_materialize.yaml
+  - contract/readiness/checks/snapback_released_probe.yaml
+  - contract/readiness/checks/yiu_boundary_check.yaml

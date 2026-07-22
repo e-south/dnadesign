@@ -1,0 +1,91 @@
+contract: retron_msd_materialization_record_v1
+schema_version: 1
+study_id: retron_hairpin_design
+materialization_id: 2026-05-18-msd-177-194.single-unit
+run_kind: materialize
+status: verified_checked_in_full_cohort
+design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
+compiler_run_ref: docs/studies/retron_hairpin_design/workbench/provenance/compiler_runs/2026-05-18-msd-177-194.compile.yaml
+reason: The checked-in 177-194 cohort materializes from a typed spec because TetR, C172, and C26 are explicit user/source-selected sequences. The first record preserves the operator-specified pES-retron-177 C172/LCGGG/RACAG/MXMX control with an explicit non-ligatable-S0 opt-in; C26 topology is not required for literal cap/foldback segment assembly or cap-right plot orientation.
+validated_at: 2026-05-19
+validated_request:
+  requested_label_count: 18
+  checked_in_label_count: 18
+  allow_non_ligatable_s0: true
+  preserved_operator_labels:
+    - label: "pES-retron-177-msd[TetR]; C172-LCGGG-RACAG-MXMX"
+      msd_design_id: msd-tetr-C172-LCGGG-RACAG-MXMX
+      profile_s3s2s1s0: MXMX
+      s0_match_required: false
+  invalid_requested_labels: []
+  valid_checked_in_label_input: docs/studies/retron_hairpin_design/compiler/inputs/msd_design_hit_labels.txt
+  fail_fast_invariant: do not alter user-provided labels to satisfy scar compatibility; profile drift still blocks sequence, GenBank, and plot deliverables
+command_template:
+  cwd: repo:.
+  argv:
+    - uv
+    - run
+    - python
+    - -m
+    - dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app
+    - materialize
+    - --spec
+    - docs/studies/retron_hairpin_design/compiler/inputs/msd_design_177_194_cap_sources_spec.yaml
+    - --out-dir
+    - /tmp/dnadesign_retron_msd_sequences_177_194_cap_sources
+    - --render-format
+    - png
+    - --format
+    - json
+required_inputs:
+  payload_sequences: [TetR]
+  cap_sequences: [C172, C26]
+selected_sequence_sources:
+  payload:
+    id: TetR
+    kind: literal_sequence
+    sequence: TCCCTATCAGTGATAGAGA
+    source: src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/configs/yiu/tetr_teto2_wt_direct.yiu.yaml
+  caps:
+    C172:
+      kind: literal_cap_foldback_segment
+      source: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml#sources.C172.sequence_5to3
+      source_label: pES-retron-172-msd[TetR]; 033-GAG-AGA-CTC
+      sequence: GAGAGACTC
+      topology_status: supplied
+    C26:
+      kind: literal_cap_foldback_segment
+      source: docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml#sources.C26.sequence_5to3
+      source_label: retron-26-msd[TetR]; full-AGGC
+      sequence: AGGC
+      topology_status: absent_subsection_labels_omitted
+      visual_orientation_status: whole_foldback_segment_anchors_cap_right
+observed_output:
+  output_policy: transient_not_checked_in
+  output_dir: docs/studies/retron_hairpin_design/workbench/outputs/retron-msd-177-194-user-fidelity-20260519  # pragma: allowlist secret
+  record_count: 18
+  folding_status: ok
+  visual_orientation:
+    secondary_structure_orientation: all_variants_cap_right
+    c26_orientation_anchor: whole_foldback_segment
+    c26_anchor_section_kind: cap_foldback
+  emitted_deliverables:
+    - sequences/forward.gb
+    - sequences/reverse_complement.gb
+    - plots/secondary_structure.native.png
+    - plots/composition_overview.svg
+    - plots/composition_overview.png
+missing_sequence_subcomponents: []
+topology_blockers: []
+expected_output:
+  output_policy: transient_or_reader_snapshot
+  bundle_contract: msd_single_unit_sequence_bundle_v1
+  required_manifest: manifest/bundle/sequence_manifest.json
+  required_index: manifest/indexes/sequence_index.tsv
+  per_design_deliverables:
+    - sequences/forward.gb
+    - sequences/reverse_complement.gb
+    - plots/secondary_structure.native.png
+    - plots/composition_overview.svg
+    - plots/composition_overview.png
+  folding_requirement: status ok before plot deliverables are reported as complete

@@ -1,0 +1,111 @@
+#!/bin/bash -l
+#$ -N eco1_colabfold_foldcheck
+#$ -P dunlop
+#$ -l h_rt=04:00:00
+#$ -pe omp 4
+#$ -l mem_per_core=8G
+#$ -l gpus=1
+#$ -l gpu_compute_capability=6.0
+#$ -j y
+#$ -o /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
+
+set -euo pipefail
+
+# Eco1 fold-check runtime lane.
+# This job consumes a materialized foldcheck_request manifest and runs the
+# external ColabFold CLI. It does not normalize results into dnadesign contracts.
+
+module purge
+
+export OMP_NUM_THREADS="${NSLOTS:-4}"
+
+if [[ -n "${CUDA_MODULE:-}" ]]; then
+  module load "$CUDA_MODULE"
+fi
+
+if [[ -n "${GCC_MODULE:-}" ]]; then
+  module load "$GCC_MODULE"
+fi
+
+repo_root="${DNADESIGN_REPO:-$PWD}"
+cd "$repo_root"
+
+request_manifest="${FOLDCHECK_REQUEST_MANIFEST:-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml}"
+sequence_limit="${FOLDCHECK_SEQUENCE_LIMIT:-6}"
+sequence_start="${FOLDCHECK_SEQUENCE_START:-1}"
+shard_size="${FOLDCHECK_SHARD_SIZE:-}"
+run_root_base="${FOLDCHECK_RUN_ROOT:-/project/dunlop/esouth/foldcheck/eco1_rt/${JOB_NAME}.${JOB_ID:-manual}}"
+subset_args=()
+
+if [[ -n "$shard_size" ]]; then
+  if [[ -z "${SGE_TASK_ID:-}" ]]; then
+    echo "FOLDCHECK_SHARD_SIZE requires SGE_TASK_ID from an array job." >&2
+    exit 2
+  fi
+  if [[ ! "$shard_size" =~ ^[0-9]+$ || "$shard_size" -lt 1 ]]; then
+    echo "FOLDCHECK_SHARD_SIZE must be a positive integer." >&2
+    exit 2
+  fi
+  sequence_start=$(( (SGE_TASK_ID - 1) * shard_size + 1 ))
+  sequence_limit="$shard_size"
+  subset_args+=(--allow-short-final-shard)
+  run_root="${run_root_base}/shard_${SGE_TASK_ID}"
+else
+  run_root="$run_root_base"
+fi
+
+input_fasta="$run_root/input_sequences.fasta"
+output_dir="$run_root/colabfold_outputs"
+run_manifest="$run_root/colabfold_run_manifest.yaml"
+
+if [[ ! -f "$request_manifest" ]]; then
+  echo "FOLDCHECK_REQUEST_MANIFEST does not exist: $request_manifest" >&2
+  exit 2
+fi
+
+mkdir -p "$run_root" "$output_dir"
+
+if [[ -n "$(find "$output_dir" -mindepth 1 -maxdepth 1 -print -quit)" && "${FOLDCHECK_ALLOW_EXISTING_OUTPUT:-0}" != "1" ]]; then
+  echo "Refusing to write into non-empty ColabFold output directory: $output_dir" >&2
+  exit 2
+fi
+
+uv run python -m dnadesign.thread.foldcheck.subset \
+  --request-manifest "$request_manifest" \
+  --sequence-limit "$sequence_limit" \
+  --sequence-start "$sequence_start" \
+  "${subset_args[@]}" \
+  --input-fasta "$input_fasta" \
+  --run-manifest "$run_manifest" \
+  --output-dir "$output_dir" \
+  --schema-id eco1_rt.colabfold_scc_run_manifest \
+  --execution-status submitted_to_external_colabfold_cli
+
+if [[ -n "${COLABFOLD_ENV_ACTIVATE:-}" ]]; then
+  # shellcheck disable=SC1090
+  source "$COLABFOLD_ENV_ACTIVATE"
+fi
+
+colabfold_batch_bin="${COLABFOLD_BATCH:-colabfold_batch}"
+if [[ -n "${COLABFOLD_LD_LIBRARY_PATH:-}" ]]; then
+  export LD_LIBRARY_PATH="${COLABFOLD_LD_LIBRARY_PATH}:${LD_LIBRARY_PATH:-}"
+fi
+if [[ "$colabfold_batch_bin" = /* && -x "$colabfold_batch_bin" ]]; then
+  colabfold_env_root="$(dirname "$(dirname "$colabfold_batch_bin")")"
+  if [[ -d "$colabfold_env_root/lib" ]]; then
+    export LD_LIBRARY_PATH="$colabfold_env_root/lib:${LD_LIBRARY_PATH:-}"
+  fi
+fi
+if ! command -v "$colabfold_batch_bin" >/dev/null 2>&1; then
+  echo "colabfold_batch command not found. Set COLABFOLD_BATCH, COLABFOLD_ENV_ACTIVATE, or COLABFOLD_LD_LIBRARY_PATH." >&2
+  exit 2
+fi
+
+colabfold_args=()
+if [[ -n "${COLABFOLD_EXTRA_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206
+  colabfold_args=($COLABFOLD_EXTRA_ARGS)
+fi
+
+echo "Running $colabfold_batch_bin ${colabfold_args[*]} $input_fasta $output_dir"
+"$colabfold_batch_bin" "${colabfold_args[@]}" "$input_fasta" "$output_dir"

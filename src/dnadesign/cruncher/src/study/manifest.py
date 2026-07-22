@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/study/manifest.py
 
 Manifest and status models for Study runs with atomic persistence helpers.

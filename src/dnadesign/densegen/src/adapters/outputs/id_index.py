@@ -1,5 +1,12 @@
 """
-DenseGen output ID index (SQLite-backed) for fast dedup + alignment checks.
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/id_index.py
+
+Maintains SQLite-backed DenseGen output ID indexes.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

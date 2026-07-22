@@ -21,7 +21,7 @@ dependencies = [
   "openpyxl",
   "ortools>=9.9,<9.10",
   "pandas",
-  "pyarrow>=16",
+  "pyarrow>=23.0.1",
   "pydantic",
   "pygments>=2.20.0",
   "pymc",
@@ -29,13 +29,15 @@ dependencies = [
   "pyyaml",
   "rich",
   "scanpy==1.10.3",
+  "scipy>=1.17.0",
   "seaborn",
   "tqdm",
   "typer",
+  "umap-learn>=0.5.11",
   "duckdb>=0.10.0",
   "xlrd",
-  # Torch 2.8 includes the CVE-2025-3730 fix.
-  "torch>=2.8,<2.9; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # Torch 2.10 is the current patched floor for active PyTorch advisories with fixed releases.
+  "torch>=2.10,<2.11; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "dense-arrays",
   "polars>=1.36.1",
   "altair>=6.0.0",
@@ -46,21 +48,26 @@ dependencies = [
   "certifi>=2025.11.12",
   "keyring>=25.6.0",
   "fastparquet>=2025.12.0",
-  "marimo>=0.23.0",
+  "marimo>=0.23.9",
   "openai>=2.14.0",
+  "viennarna>=2.7.2",
+  "zstd>=1.5",
+  "py3dmol==2.5.5",
+  "plotly>=6.9.0",
 ]
 
 [project.scripts]
 usr        = "dnadesign.usr:main"
 usr-sync-audit-drill = "dnadesign.usr.ops.sync_audit_drill:main"
-opal       = "dnadesign.opal.cli:main"
+opal       = "dnadesign.opal:main"
 dense      = "dnadesign.densegen:app"
 notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
-construct  = "dnadesign.construct.cli:main"
+construct  = "dnadesign.construct:main"
+folding    = "dnadesign.folding.cli:main"
 cluster    = "dnadesign.cluster.cli:main"
 latentdna  = "dnadesign.latentdna.src:main"
-permuter   = "dnadesign.permuter.cli:main"
+permuter   = "dnadesign.permuter:main"
 baserender = "dnadesign.baserender:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
 ops        = "dnadesign.ops.cli:main"
@@ -69,9 +76,9 @@ ops        = "dnadesign.ops.cli:main"
 # GPU stack (Linux x86_64 only)
 infer-evo2 = [
   # --- torch (GPU wheels via uv sources below)
-  "torch>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchvision>=0.23,<0.24; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchaudio>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torch>=2.10,<2.11; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision>=0.25,<0.26; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio>=2.10,<2.11; sys_platform == 'linux' and platform_machine == 'x86_64'",
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
   "pip>=26.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -102,6 +109,7 @@ where = ["src"]
   "resources/cassette/catalogs/*.yaml",
 ]
 "dnadesign.cluster" = [
+  "ops/status.registry.yaml",
   "presets/*/*.yaml",
   "workspaces/*/config.yaml",
 ]
@@ -128,8 +136,17 @@ where = ["src"]
   "workspaces/*/inputs/*",
 ]
 "dnadesign.latentdna" = [
+  "ops/status.registry.yaml",
   "workspaces/templates/*/*.yaml",
   "workspaces/templates/*/*.md",
+]
+"dnadesign.opal" = [
+  "src/ops/status.registry.yaml",
+]
+"dnadesign.permuter" = [
+  "src/resources/codon_tables/*.csv",
+  "workspaces/_shared/inputs/*.csv",
+  "workspaces/*/config.yaml",
 ]
 "dnadesign.ops" = [
   "providers/*/status.registry.yaml",
@@ -138,7 +155,20 @@ where = ["src"]
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.studies" = [
-  "families/*/ops/status.registry.yaml",
+  "units/eco1_rt_repack/operations/materialization/review_deliverables/notebook_template.py.txt",
+  "units/retron_hairpin_design/status/ops/status.registry.yaml",
+  "units/stress_ethanol_cipro_growth/operations/status/ops/status.registry.yaml",
+  "units/stress_ethanol_cipro_growth/decision/opal/batch0/sampling.yaml",
+  "units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/*.yaml",
+  "units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/*.json",
+  "units/stress_ethanol_cipro_growth/response_window_observations/config/*.yaml",
+  "units/stress_ethanol_cipro_growth/response_window_observations/config/evidence/*.json",
+  "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.yaml",
+  "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.json",
+  "units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/*.yaml",
+]
+"dnadesign.usr" = [
+  "ops/status.registry.yaml",
 ]
 
 [tool.pytest.ini_options]
@@ -191,9 +221,12 @@ environments = [
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 constraint-dependencies = [
-  "cryptography>=46.0.7",
+  "cryptography>=48.0.1",
+  "idna>=3.15",
   "onnx>=1.21.0",
   "pillow>=12.2.0",
+  "pymdown-extensions>=10.21.3",
+  "starlette>=1.3.1",
 ]
 
 # flash-attn + TE-torch must build against the same torch as the runtime env

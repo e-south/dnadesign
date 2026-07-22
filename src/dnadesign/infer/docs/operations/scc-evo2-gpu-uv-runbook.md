@@ -1,11 +1,11 @@
 ## SCC Evo2 GPU Environment Runbook (UV + infer)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-07-14
 
 Use this page when you need a deterministic SCC GPU environment build for infer.
 
-For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap](../../../../../docs/bu-scc/install.md).
+For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap](../../../../../docs/bu-scc/setup/install.md).
 
 ### DNA input contract
 
@@ -301,8 +301,8 @@ Treat live study collection as four explicit gates:
 For study-owned USR write-back lanes, run:
 
 ```bash
-uv run ops progress show usr.data-plane.promoter-study-status --json # Confirm the checked-in study snapshot is current.
-NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json # Confirm the current host is execution-ready.
+uv run ops progress show studies.stress-ethanol-cipro-growth.status --json # Confirm the checked-in study snapshot is current.
+NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json # Confirm the current host is execution-ready.
 uv run infer validate usr-registry --config <lane-config> # Derive the canonical infer namespace registration contract.
 uv run usr --root src/dnadesign/usr/datasets namespace show infer # Confirm the shared USR root already knows the infer namespace.
 ```
@@ -464,4 +464,4 @@ export OMP_NUM_THREADS=1 # Limit OpenMP thread usage.
 
 - For scheduler-managed pressure tests, continue with:
   - [Agnostic model + USR pressure test](pressure-test-agnostic-models.md)
-  - [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/batch-notify.md)
+  - [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/runbooks/batch-notify.md)

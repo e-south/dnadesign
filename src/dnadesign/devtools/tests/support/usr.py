@@ -13,10 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.usr.src.registry import (
-    USR_STATE_COLUMNS,
-    USR_STATE_NAMESPACE,
-    load_registry,
+from dnadesign.usr import (
+    SchemaError,
     parse_columns_spec,
     register_namespace,
 )
@@ -31,16 +29,6 @@ def register_test_namespace(
     description: str | None = "test namespace",
     overwrite: bool = True,
 ) -> Path:
-    entries = load_registry(root, required=False)
-    if USR_STATE_NAMESPACE not in entries:
-        register_namespace(
-            root,
-            namespace=USR_STATE_NAMESPACE,
-            columns=USR_STATE_COLUMNS,
-            owner="usr",
-            description="Reserved record-state overlay (tests).",
-            overwrite=False,
-        )
     cols = parse_columns_spec(columns_spec, namespace=namespace)
     return register_namespace(
         root,
@@ -53,10 +41,11 @@ def register_test_namespace(
 
 
 def ensure_registry(root: Path) -> None:
-    entries = load_registry(root, required=False)
-    if "mock" in entries:
-        return
-    register_test_namespace(root, namespace="mock", columns_spec="mock__score:float64", overwrite=False)
+    try:
+        register_test_namespace(root, namespace="mock", columns_spec="mock__score:float64", overwrite=False)
+    except SchemaError as exc:
+        if "already registered" not in str(exc):
+            raise
 
 
 __all__ = ["ensure_registry", "register_test_namespace"]

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180" role="img" aria-labelledby="title desc">
+  <title id="title">dnadesign thread banner</title>
+  <desc id="desc">A restrained fixed-backbone design request banner with chain, mask, and backend adapter lanes.</desc>
+  <rect width="1200" height="180" fill="#f6f8fa"/>
+  <g fill="none" stroke="#1f2937" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M360 98 C450 48 540 148 630 98 C720 48 810 148 900 98 C975 58 1035 118 1090 98"/>
+    <path d="M360 124 C450 74 540 174 630 124 C720 74 810 174 900 124 C975 84 1035 144 1090 124" opacity="0.35"/>
+  </g>
+  <g font-family="Inter, Arial, sans-serif" fill="#111827">
+    <text x="90" y="78" font-size="44" font-weight="700">thread</text>
+    <text x="90" y="112" font-size="22">fixed-backbone request artifacts</text>
+  </g>
+  <g fill="#2563eb">
+    <circle cx="630" cy="98" r="10"/>
+    <circle cx="900" cy="98" r="10"/>
+  </g>
+  <g fill="#dc2626">
+    <circle cx="540" cy="124" r="8"/>
+    <circle cx="1035" cy="124" r="8"/>
+  </g>
+</svg>

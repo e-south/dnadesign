@@ -1,9 +1,21 @@
-"""Contracts for the checked-in promoter-study pre-assay workspace surface."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_study_workspace_contracts.py
+
+Contracts for the checked-in promoter-study pre-assay workspace surface.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
+
+import pytest
 
 from dnadesign.latentdna.src.notebooks.browser_runtime import _parse_deliverable_markdown
 from dnadesign.latentdna.src.services.catalog_service import workspace_catalog_from_context
@@ -26,6 +38,45 @@ def _live_workspace() -> Path:
 
 def _regulondb_workspace() -> Path:
     return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "regulondb_native_promoter_panel"
+
+
+def _rt_lnrna_workspace() -> Path:
+    return _repo_root() / "src" / "dnadesign" / "latentdna" / "workspaces" / "rt_lnrna_sponging_construct_triage"
+
+
+def _study_unit(study_id: str) -> Path:
+    return _repo_root() / "src" / "dnadesign" / "studies" / "units" / study_id
+
+
+@lru_cache(maxsize=None)
+def _workspace_context(workspace: Path):
+    return load_workspace_config(workspace)
+
+
+@lru_cache(maxsize=None)
+def _workspace_catalog_payload(workspace: Path) -> dict[str, object] | None:
+    return workspace_catalog_from_context(_workspace_context(workspace))
+
+
+@lru_cache(maxsize=None)
+def _notebook_controls(workspace: Path, notebook_id: str = "latent_geometry_browser"):
+    return build_workspace_notebook_controls_payload(
+        _workspace_context(workspace),
+        notebook_id=notebook_id,
+        catalog_payload=_workspace_catalog_payload(workspace),
+    )
+
+
+def _study_deliverable_docs_root(study_id: str) -> Path:
+    if study_id == "stress_ethanol_cipro_growth":
+        context = _workspace_context(_live_workspace())
+        assert context.config.study_binding is not None
+        return _repo_root() / context.config.study_binding.deliverable_docs_root
+    return _study_unit(study_id)
+
+
+def _study_deliverable_doc(study_id: str, section: str, filename: str) -> str:
+    return (_study_deliverable_docs_root(study_id) / "deliverables" / section / filename).read_text(encoding="utf-8")
 
 
 def _recipe_steps(context, recipe_id: str) -> list[object]:
@@ -85,6 +136,39 @@ _BROWSER_GEOMETRY_VIEWS = [
 _FULL_POPULATION_UMAP_VIEWS = [*_BROWSER_GEOMETRY_VIEWS, *_FIRST_CLASS_OUTPUT_VIEWS]
 
 
+_RT_LNRNA_SOURCE_VIEW_SELECTORS = {
+    "dual_cassette_2000bp_seq_mean": "dual_cassette_2000bp_seq_mean",
+    "dual_cassette_2000bp_reverse_complement_seq_mean": "dual_cassette_2000bp_reverse_complement_seq_mean",
+    "lnrna_fixed_384bp_window_in_construct_anchor_mean": "lnrna_fixed_384bp_window_in_construct_anchor_mean",
+    "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean": (
+        "lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean"
+    ),
+    "rt_cds_fixed_1600bp_window_in_construct_anchor_mean": "rt_cds_fixed_1600bp_window_in_construct_anchor_mean",
+    "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean": (
+        "rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean"
+    ),
+}
+
+
+_RT_LNRNA_INTERMEDIATE_GALLERY_VIEWS = [
+    "intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat",
+    "intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat",
+    "intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat",
+]
+
+
+_RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS = [
+    "output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat",
+    "output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat",
+    "output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat",
+]
+
+
+_RT_LNRNA_GALLERY_VIEWS = [*_RT_LNRNA_INTERMEDIATE_GALLERY_VIEWS, *_RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS]
+
+
 def _candidate_grid_layout(controls):
     return next(
         (row for row in controls.geometry_controls.layout_presets if row.id == "candidate_grid"),
@@ -98,8 +182,8 @@ def _expected_browser_default_layout(controls) -> str:
 
 def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    context = _workspace_context(workspace)
+    controls = _notebook_controls(workspace)
     snapshot = json.loads((workspace / "outputs" / "status" / "workspace_snapshot.json").read_text(encoding="utf-8"))
 
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
@@ -126,6 +210,8 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
         "reference_to_plan_centroid_heatmap",
         "reference_standard_strength_audit",
         "native_tf_axis_orientation_audit",
+        "native_regulator_plan_margin_enrichment",
+        "native_regulator_go_bp_plan_margin_enrichment",
         "sigma35_centroid_distance_gallery",
         "design_centroid_margin_gallery",
         "reference_alignment_summary",
@@ -199,8 +285,7 @@ def test_live_study_browser_controls_expose_sidecar_geometry_inventory() -> None
 
 def test_live_projection_browser_fixed_grid_layouts_are_projection_backed() -> None:
     for workspace in [_live_workspace(), _regulondb_workspace()]:
-        context = load_workspace_config(workspace)
-        controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+        controls = _notebook_controls(workspace)
         projections_by_view = {row.view_id: list(row.projection_ids) for row in controls.geometry_controls.geometries}
 
         for layout in controls.geometry_controls.layout_presets:
@@ -211,8 +296,7 @@ def test_live_projection_browser_fixed_grid_layouts_are_projection_backed() -> N
 
 
 def test_live_stress_reference_diagnostics_do_not_become_projection_browser_panels() -> None:
-    context = load_workspace_config(_live_workspace())
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    controls = _notebook_controls(_live_workspace())
     browser_view_ids = {row.view_id for row in controls.geometry_controls.geometries}
     layout_view_ids = {
         view_id
@@ -228,7 +312,7 @@ def test_live_stress_reference_diagnostics_do_not_become_projection_browser_pane
 
 
 def test_live_stress_reference_context_umaps_are_not_browser_prerequisites() -> None:
-    context = load_workspace_config(_live_workspace())
+    context = _workspace_context(_live_workspace())
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
     generate_step = appendix_steps["generate_latent_geometry_browser"]
     reference_context_umap_steps = {
@@ -243,8 +327,7 @@ def test_live_stress_reference_context_umaps_are_not_browser_prerequisites() -> 
 
 
 def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fixed_grids() -> None:
-    context = load_workspace_config(_regulondb_workspace())
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    controls = _notebook_controls(_regulondb_workspace())
     geometry_ids = [row.view_id for row in controls.geometry_controls.geometries]
     projection_grid_views = [
         "intermediate_embedding_7b_native_source_record_seq_mean",
@@ -278,7 +361,7 @@ def test_regulondb_projection_browser_keeps_unprojected_output_layers_out_of_fix
 
 def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
     workspace = _regulondb_workspace()
-    context = load_workspace_config(workspace)
+    context = _workspace_context(workspace)
     notebook = context.require_notebook("latent_geometry_browser")
     ordered_plot_ids = set(notebook.ordered_plots)
     covered_plot_ids: set[str] = set()
@@ -299,7 +382,7 @@ def test_regulondb_deliverable_docs_cover_notebook_visible_plots() -> None:
 
 
 def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
-    context = load_workspace_config(_regulondb_workspace())
+    context = _workspace_context(_regulondb_workspace())
     expected_hues = [
         "gc_fraction",
         "regulondb__sigma_factor_set",
@@ -322,16 +405,291 @@ def test_regulondb_umap_plots_expose_metadata_hue_contract() -> None:
         assert plot.hue_options[-1].type == "ordinal"
 
 
+def test_rt_lnrna_workspace_declares_full_infer_sidecar_surface() -> None:
+    context = _workspace_context(_rt_lnrna_workspace())
+
+    for source_base, view_name in _RT_LNRNA_SOURCE_VIEW_SELECTORS.items():
+        intermediate_source = context.config.sources[f"{source_base}_intermediate"]
+        output_layer_source = context.config.sources[f"{source_base}_output_layer"]
+        assert intermediate_source.role == "primary"
+        assert output_layer_source.role == "primary"
+        assert intermediate_source.where["view_name"] == view_name
+        assert output_layer_source.where["view_name"] == view_name
+        assert intermediate_source.where["representation_kind"] == "intermediate_embedding"
+        assert output_layer_source.where["representation_kind"] == "output_layer_mean"
+
+        for scalar_suffix, scalar_kind in [
+            ("log_likelihood_total", "log_likelihood__total"),
+            ("log_likelihood_mean_per_token", "log_likelihood__mean_per_token"),
+        ]:
+            source = context.config.sources[f"{source_base}_{scalar_suffix}"]
+            assert source.kind == "infer_feature_scalar_sidecar"
+            assert source.role == "primary"
+            assert source.where["view_name"] == view_name
+            assert source.where["scalar_kind"] == scalar_kind
+
+
+def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views() -> None:
+    context = _workspace_context(_rt_lnrna_workspace())
+    gallery = context.config.candidate_sets["rt_lnrna_construct_gallery_v1"]
+    output_layer_diagnostics = context.config.candidate_sets["rt_lnrna_output_layer_diagnostics_v1"]
+    opal_gate = context.config.candidate_sets["rt_lnrna_opal_x_review_v1"]
+    notebook = context.config.notebooks["latent_geometry_browser"]
+
+    assert list(gallery.views) == _RT_LNRNA_GALLERY_VIEWS
+    assert list(output_layer_diagnostics.views) == _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS
+    assert list(opal_gate.views) == _RT_LNRNA_INTERMEDIATE_GALLERY_VIEWS
+    assert list(notebook.geometry_order) == _RT_LNRNA_GALLERY_VIEWS
+    assert list(notebook.candidate_grid_views) == _RT_LNRNA_GALLERY_VIEWS
+    assert notebook.default_candidate_set == "rt_lnrna_construct_gallery_v1"
+    assert notebook.default_reference_set == "reference_genbank_catalog_rows"
+    assert notebook.default_layout == "candidate_grid"
+    assert "rt_lnrna_slot_context_robustness_summary_metrics" in notebook.context_audit_scalar_ids
+    assert notebook.preferred_hue_kinds["khan_abundance_ordinal_bin"] == "ordinal"
+    assert notebook.preferred_hue_kinds["crawford_abundance_ordinal_bin"] == "ordinal"
+    assert notebook.preferred_hue_kinds["reader_spop_score_median"] == "continuous"
+    assert "crawford_abundance_normalized_value" not in notebook.preferred_hue_kinds
+
+    for view_id in _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS:
+        view = context.config.views[view_id]
+        assert view.tags["family"] == "output_layer_mean"
+        assert view.role == "appendix"
+
+
+def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> None:
+    context = _workspace_context(_rt_lnrna_workspace())
+    umap_gallery = context.config.plots["appendix_umap_gallery"]
+    dataset_overview = context.config.plots["rt_lnrna_dataset_overview"]
+    source_structure = context.config.plots["rt_lnrna_source_structure_summary"]
+    ordinal_audit = context.config.plots["rt_lnrna_overlay_ordinal_audit"]
+    abundance_ladder = context.config.plots["rt_lnrna_abundance_margin_ladder_gallery"]
+    abundance_scatter = context.config.plots["rt_lnrna_abundance_margin_scatter_gallery"]
+    trait_axis_existence = context.config.plots["rt_lnrna_trait_axis_existence"]
+    trait_axis_agreement = context.config.plots["rt_lnrna_crawford_khan_axis_agreement"]
+    trait_axis_endpoint_sensitivity = context.config.plots["rt_lnrna_trait_axis_endpoint_sensitivity"]
+    trait_axis_view_scorecard = context.config.plots["rt_lnrna_trait_axis_view_scorecard"]
+    reference_compiler_projection = context.config.plots["rt_lnrna_reference_compiler_axis_projection"]
+    context_summary = context.config.plots["rt_lnrna_slot_context_robustness_summary"]
+    slot_scatter = context.config.plots["rt_lnrna_slot_geometry_scatter_gallery"]
+    candidate_frontier = context.config.plots["rt_lnrna_candidate_decision_frontier"]
+    candidate_scorecard = context.config.plots["rt_lnrna_candidate_x_scorecard"]
+    scree_diagnostic = context.config.plots["representation_scree_diagnostic"]
+    notebook = context.config.notebooks["latent_geometry_browser"]
+    scree_deliverable = context.config.deliverables["representation_scree_diagnostic"]
+    ordinal_deliverable = context.config.deliverables["rt_lnrna_overlay_ordinal_audit"]
+    trait_axis_deliverable = context.config.deliverables["rt_lnrna_trait_axis_projection"]
+    recipe_steps = {step.id: step for step in _recipe_steps(context, "rt_lnrna_representation_review_recipe")}
+    expected_overlay_hues = [
+        "candidate_source",
+        "source_family",
+        "source_literature_id",
+        "source_regime",
+        "abundance_affiliation",
+        "construct_projection_status",
+        "rt_variant_class",
+        "rt_dms_mutation_class",
+        "template_name",
+        "reader_spop_score_median",
+        "reader_spop_overlay_status",
+        "khan_abundance_normalized_value",
+        "khan_abundance_ordinal_bin",
+        "crawford_abundance_raw_value",
+        "crawford_abundance_ordinal_bin",
+        "crawford_design_reference_status",
+    ]
+
+    assert sorted(context.config.reference_sets) == [
+        "reference_crawford_design_affiliated_rows",
+        "reference_crawford_high_abundance_examples",
+        "reference_crawford_low_abundance_examples",
+        "reference_genbank_catalog_rows",
+        "reference_khan_abundance_rows",
+        "reference_msd_compiler_landmarks",
+        "reference_reader_spop_assayed_genbank_rows",
+        "reference_source_family_anchors",
+    ]
+    assert context.config.study_binding is not None
+    assert context.config.study_binding.study_id == "rt_lnrna_sponging_construct_triage"
+
+    assert umap_gallery.kind == "projection_grid"
+    assert umap_gallery.visibility_tier == "appendix"
+    assert umap_gallery.default_hue == "candidate_source"
+    assert list(umap_gallery.projections) == [f"umap_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
+    assert [option.column for option in umap_gallery.hue_options] == expected_overlay_hues
+    assert umap_gallery.hue_options[9].type == "continuous"
+    assert umap_gallery.hue_options[10].type == "categorical"
+    assert umap_gallery.hue_options[11].type == "continuous"
+    assert umap_gallery.hue_options[12].type == "ordinal"
+    assert umap_gallery.hue_options[13].type == "continuous"
+    assert umap_gallery.hue_options[14].type == "ordinal"
+
+    assert dataset_overview.kind == "categorical_count"
+    assert dataset_overview.scalar == "rt_lnrna_dataset_overview_counts"
+    assert source_structure.kind == "metric_panel_grid"
+    assert source_structure.scalar == "rt_lnrna_source_structure_summary_metrics"
+
+    assert ordinal_audit.kind == "metric_panel_grid"
+    assert ordinal_audit.visibility_tier == "primary"
+    assert ordinal_audit.scalar == "rt_lnrna_overlay_ordinal_audit_metrics"
+    assert ordinal_audit.facet_column == "ordinal_metric_role"
+    assert ordinal_audit.panel_title_column == "ordinal_metric_label"
+    assert ordinal_audit.color_column == "ordinal_axis_id"
+    assert ordinal_audit.bar_orientation == "horizontal"
+    assert ordinal_audit.show_uncertainty_note is False
+    assert ordinal_audit.panel_width == pytest.approx(5.2)
+    assert ordinal_audit.panel_height == pytest.approx(5.25)
+    assert ordinal_audit.tight_layout_h_pad == pytest.approx(1.6)
+    assert ordinal_audit.tight_layout_w_pad == pytest.approx(1.75)
+    assert (
+        context.config.metadata.axes["candidate_source"].display_labels["khan_abundance_affiliated_rt_lnrna_reference"]
+        == "Khan RT-lnRNA abundance reference"
+    )
+    assert context.config.metadata.axes["axis_id"].display_labels["crawford_eco1_msdna_abundance_axis"] == (
+        "Crawford Eco1 msDNA abundance"
+    )
+    assert abundance_ladder.kind == "distribution_grid"
+    assert abundance_ladder.visibility_tier == "primary"
+    assert list(abundance_ladder.scalars) == [
+        f"rt_lnrna_abundance_ladder_rows_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert [option.column for option in abundance_ladder.filter_options] == ["ordinal_group_id"]
+    assert [row.value for row in abundance_ladder.filter_options[0].values] == [
+        "khan_abundance",
+        "crawford_abundance",
+    ]
+    assert abundance_scatter.kind == "xy_scatter_grid"
+    assert list(abundance_scatter.scalars) == [
+        f"rt_lnrna_abundance_ladder_rows_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert abundance_scatter.x_column == "ordinal_source_value"
+    assert [option.column for option in abundance_scatter.filter_options] == ["ordinal_group_id"]
+    assert trait_axis_existence.kind == "xy_scatter"
+    assert trait_axis_existence.scalar == "rt_lnrna_trait_axis_projection_rows"
+    assert trait_axis_existence.x_column == "source_value"
+    assert trait_axis_existence.y_column == "axis_projection"
+    assert trait_axis_existence.render_mode == "density_contour"
+    assert [option.column for option in trait_axis_existence.filter_options] == ["axis_id"]
+    assert [row.value for row in trait_axis_existence.filter_options[0].values] == [
+        "crawford_eco1_msdna_abundance_axis",
+        "khan_rt_dna_abundance_axis",
+    ]
+    assert trait_axis_agreement.kind == "metric_panel_grid"
+    assert trait_axis_agreement.scalar == "rt_lnrna_trait_axis_projection_concordance"
+    assert trait_axis_agreement.value_column == "axis_concordance"
+    assert trait_axis_endpoint_sensitivity.kind == "metric_panel_grid"
+    assert trait_axis_endpoint_sensitivity.scalar == "rt_lnrna_trait_axis_projection_summary"
+    assert trait_axis_endpoint_sensitivity.value_column == "axis_vector_primary_concordance"
+    assert trait_axis_view_scorecard.kind == "metric_panel_grid"
+    assert trait_axis_view_scorecard.scalar == "rt_lnrna_trait_axis_projection_summary"
+    assert trait_axis_view_scorecard.panel_title_column == "view_id"
+    assert trait_axis_view_scorecard.label_column == "endpoint_definition_id"
+    assert trait_axis_view_scorecard.value_column == "axis_projection_spearman"
+    assert reference_compiler_projection.kind == "distribution_grid"
+    assert list(reference_compiler_projection.scalars) == ["rt_lnrna_trait_axis_projection_rows"]
+    assert list(reference_compiler_projection.metric_columns) == ["axis_projection", "endpoint_margin"]
+    assert [option.column for option in reference_compiler_projection.filter_options] == ["axis_id"]
+    assert context_summary.kind == "metric_panel_grid"
+    assert context_summary.scalar == "rt_lnrna_slot_context_robustness_summary_metrics"
+    assert slot_scatter.kind == "xy_scatter_grid"
+    assert list(slot_scatter.scalars) == [
+        "rt_lnrna_slot_delta_intermediate_full_lnrna",
+        "rt_lnrna_slot_delta_intermediate_full_rt",
+        "rt_lnrna_slot_delta_intermediate_lnrna_rt",
+        "rt_lnrna_slot_delta_intermediate_full_fwd_rc",
+    ]
+    assert candidate_frontier.kind == "xy_scatter"
+    assert candidate_frontier.scalar == "rt_lnrna_candidate_decision_frontier_metrics"
+    assert candidate_frontier.x_column == "source_family_separation_ratio"
+    assert candidate_scorecard.kind == "metric_panel_grid"
+    assert resolve_plot_semantics(context, plot_id="appendix_umap_gallery").decision_role == "appendix"
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_dataset_overview").decision_role == "primary"
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_overlay_ordinal_audit").decision_role == "primary"
+    assert (
+        resolve_plot_semantics(context, plot_id="rt_lnrna_abundance_margin_ladder_gallery").decision_role == "primary"
+    )
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_trait_axis_existence").decision_role == "primary"
+    assert resolve_plot_semantics(context, plot_id="rt_lnrna_crawford_khan_axis_agreement").decision_role == "primary"
+
+    assert scree_diagnostic.kind == "curve_grid"
+    assert scree_diagnostic.visibility_tier == "appendix"
+    assert list(scree_diagnostic.reducers) == [f"pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
+    assert resolve_plot_semantics(context, plot_id="representation_scree_diagnostic").decision_role == "appendix"
+    assert all("1.6 kb" not in title for title in notebook.candidate_grid_panel_titles)
+    assert notebook.default_deliverable == "rt_lnrna_trait_axis_projection"
+    assert list(notebook.ordered_plots) == [
+        "rt_lnrna_dataset_overview",
+        "rt_lnrna_trait_axis_existence",
+        "rt_lnrna_crawford_khan_axis_agreement",
+        "rt_lnrna_trait_axis_endpoint_sensitivity",
+        "rt_lnrna_trait_axis_view_scorecard",
+        "rt_lnrna_reference_compiler_axis_projection",
+        "representation_health_summary",
+        "rt_lnrna_source_structure_summary",
+        "rt_lnrna_overlay_ordinal_audit",
+        "rt_lnrna_abundance_margin_ladder_gallery",
+        "rt_lnrna_abundance_margin_scatter_gallery",
+        "rt_lnrna_slot_context_robustness_summary",
+        "rt_lnrna_slot_geometry_scatter_gallery",
+        "rt_lnrna_candidate_decision_frontier",
+        "rt_lnrna_candidate_x_scorecard",
+        "appendix_umap_gallery",
+        "representation_scree_diagnostic",
+    ]
+    assert "build_rt_lnrna_dataset_overview_counts" in recipe_steps
+    assert "build_rt_lnrna_source_structure_summary_metrics" in recipe_steps
+    assert "build_rt_lnrna_slot_context_robustness_summary_metrics" in recipe_steps
+    assert "build_rt_lnrna_trait_axis_projection_rows" in recipe_steps
+    assert "build_rt_lnrna_trait_axis_projection_summary" in recipe_steps
+    assert "build_rt_lnrna_trait_axis_projection_concordance" in recipe_steps
+    assert recipe_steps["build_rt_lnrna_trait_axis_projection_concordance"].depends_on == [
+        "build_rt_lnrna_trait_axis_projection_summary"
+    ]
+    assert recipe_steps["build_rt_lnrna_trait_axis_projection_concordance"].params["kind"] == "scalar_sidecar_table"
+    assert "build_rt_lnrna_candidate_decision_frontier_metrics" in recipe_steps
+    assert "build_rt_lnrna_candidate_x_scorecard_metrics" in recipe_steps
+    assert "render_rt_lnrna_abundance_margin_ladder_gallery" in recipe_steps
+    assert recipe_steps["render_rt_lnrna_abundance_margin_ladder_gallery"].depends_on == [
+        f"build_rt_lnrna_abundance_ladder_rows_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert "generate_latent_geometry_browser" in recipe_steps
+    assert (
+        "render_rt_lnrna_abundance_margin_ladder_gallery" in recipe_steps["generate_latent_geometry_browser"].depends_on
+    )
+    assert "render_rt_lnrna_trait_axis_existence" in recipe_steps
+    assert "render_rt_lnrna_crawford_khan_axis_agreement" in recipe_steps
+    assert "render_rt_lnrna_reference_compiler_axis_projection" in recipe_steps
+    assert "render_rt_lnrna_trait_axis_view_scorecard" in recipe_steps["generate_latent_geometry_browser"].depends_on
+    assert "render_representation_scree_diagnostic" in recipe_steps
+    assert recipe_steps["render_representation_scree_diagnostic"].depends_on == [
+        f"reduce_pca_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS
+    ]
+    assert scree_deliverable.outputs["plots"] == ["representation_scree_diagnostic"]
+    assert scree_deliverable.requires["views"] == _RT_LNRNA_GALLERY_VIEWS
+    assert ordinal_deliverable.outputs["plots"] == [
+        "rt_lnrna_overlay_ordinal_audit",
+        "rt_lnrna_abundance_margin_ladder_gallery",
+        "rt_lnrna_abundance_margin_scatter_gallery",
+    ]
+    assert trait_axis_deliverable.outputs["plots"] == [
+        "rt_lnrna_trait_axis_existence",
+        "rt_lnrna_crawford_khan_axis_agreement",
+        "rt_lnrna_trait_axis_endpoint_sensitivity",
+        "rt_lnrna_trait_axis_view_scorecard",
+        "rt_lnrna_reference_compiler_axis_projection",
+    ]
+    assert trait_axis_deliverable.outputs["scalars"] == [
+        "rt_lnrna_trait_axis_projection_rows",
+        "rt_lnrna_trait_axis_projection_summary",
+        "rt_lnrna_trait_axis_projection_concordance",
+    ]
+
+
 def test_regulondb_umap_deliverable_doc_matches_persisted_notebook_controls() -> None:
-    doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "regulondb_native_promoter_panel"
-        / "deliverables"
-        / "sigma_umap_panel.md"
-    ).read_text(encoding="utf-8")
+    doc = _study_deliverable_doc(
+        "regulondb_native_promoter_panel",
+        "appendix",
+        "sigma_umap_panel.md",
+    )
 
     assert "notebook hue dropdown" not in doc
     assert "fixed sigma-factor overlay" in doc
@@ -353,7 +711,7 @@ def test_notebook_plot_semantics_name_screen_encoding_contracts() -> None:
     }
 
     for (workspace, plot_id), phrases in requirements.items():
-        context = load_workspace_config(workspace)
+        context = _workspace_context(workspace)
         semantics = resolve_plot_semantics(context, plot_id=plot_id)
         visible_text = "\n".join(
             [
@@ -372,7 +730,7 @@ def test_notebook_plot_semantics_name_screen_encoding_contracts() -> None:
 
 
 def test_live_study_representation_health_compares_first_class_intermediate_and_output_layer_views() -> None:
-    context = load_workspace_config(_live_workspace())
+    context = _workspace_context(_live_workspace())
     recipe = context.config.recipes["pre_assay_representation_triage_recipe"]
     health_step = next(step for step in recipe.steps if step.id == "build_representation_health_summary_metrics")
     candidates = {str(row["view_id"]) for row in health_step.params["candidates"]}
@@ -394,7 +752,7 @@ def test_live_study_representation_health_compares_first_class_intermediate_and_
 
 
 def test_live_study_reference_context_sources_do_not_inherit_promoter_metadata_derivations() -> None:
-    context = load_workspace_config(_live_workspace())
+    context = _workspace_context(_live_workspace())
     source_ids = [source_id for source_id in context.config.sources if source_id.startswith("reference_context_7b_")]
 
     assert source_ids
@@ -406,9 +764,9 @@ def test_live_study_reference_context_sources_do_not_inherit_promoter_metadata_d
 
 def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
+    context = _workspace_context(workspace)
     snapshot = json.loads((workspace / "outputs" / "status" / "workspace_snapshot.json").read_text(encoding="utf-8"))
-    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+    controls = _notebook_controls(workspace)
 
     assert snapshot["schema_version"] == "latentdna.workspace_snapshot.v1"
     assert snapshot["workspace_id"] == "stress_ethanol_cipro_growth"
@@ -624,6 +982,22 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert native_tf_audit.x_column == "ethanolness"
     assert native_tf_audit.y_column == "ciproness"
     assert native_tf_audit.default_hue == "tf_bin"
+    regulator_margin_plot = context.config.plots["native_regulator_plan_margin_enrichment"]
+    assert regulator_margin_plot.kind == "categorical_enrichment_summary"
+    assert regulator_margin_plot.scalar == "native_regulator_plan_margin_enrichment"
+    assert regulator_margin_plot.group_column == "plan"
+    assert regulator_margin_plot.feature_column == "regulator_abbrev"
+    assert regulator_margin_plot.value_column == "enrichment_ratio"
+    assert regulator_margin_plot.static_filters[0].column == "threshold"
+    assert regulator_margin_plot.static_filters[0].equals == 0.10
+    assert [group for group in regulator_margin_plot.group_order] == ["background", "ethanol", "cipro", "dual"]
+    go_bp_plot = context.config.plots["native_regulator_go_bp_plan_margin_enrichment"]
+    assert go_bp_plot.kind == "categorical_enrichment_summary"
+    assert go_bp_plot.scalar == "native_regulator_go_bp_plan_margin_enrichment"
+    assert go_bp_plot.feature_column == "feature_label"
+    assert go_bp_plot.count_column == "n_feature_tail"
+    assert go_bp_plot.total_column == "n_feature_total"
+    assert [group for group in go_bp_plot.group_order] == ["background", "ethanol", "cipro", "dual"]
     assert "native_tf_context_1kb" not in context.config.sources
     assert {
         source.dataset
@@ -657,19 +1031,19 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
     assert all(getattr(plot, "semantics_ref", None) for plot in context.config.plots.values())
 
     assert context.config.deliverables["representation_health_summary"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/representation_health_summary"
+        "study:stress_ethanol_cipro_growth/deliverables/gates/representation_health_summary"
     ]
     assert context.config.deliverables["design_structure_summary"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/design_structure_summary"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/design_structure_summary"
     ]
     assert context.config.deliverables["sigma35_ordinal_audit"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/sigma35_ordinal_audit"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/sigma35_ordinal_audit"
     ]
     assert context.config.deliverables["context_robustness_summary"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/context_robustness_summary"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/context_robustness_summary"
     ]
     assert context.config.deliverables["candidate_decision_frontier"].docs_refs == [
-        "study:stress_ethanol_cipro_growth/deliverables/candidate_decision_frontier"
+        "study:stress_ethanol_cipro_growth/deliverables/primary/candidate_decision_frontier"
     ]
     assert context.config.deliverables["design_structure_summary"].outputs["plots"] == [
         "design_structure_summary",
@@ -709,15 +1083,29 @@ def test_live_study_snapshot_and_deliverables_follow_pre_assay_contract() -> Non
         "native_tf_axis_orientation_audit",
         "native_tf_axis_orientation_tests",
     ]
+    assert context.config.deliverables["native_regulator_plan_margin_enrichment"].recipe == (
+        "native_regulator_plan_margin_enrichment_recipe"
+    )
+    assert context.config.deliverables["native_regulator_plan_margin_enrichment"].outputs["scalars"] == [
+        "native_regulator_plan_margin_enrichment",
+        "native_regulator_go_bp_plan_margin_enrichment",
+    ]
+    assert context.config.deliverables["native_regulator_plan_margin_enrichment"].outputs["plots"] == [
+        "native_regulator_plan_margin_enrichment",
+        "native_regulator_go_bp_plan_margin_enrichment",
+    ]
     assert context.config.exports == {}
 
 
 def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
+    context = _workspace_context(workspace)
     pre_assay_steps = {step.id: step for step in _recipe_steps(context, "pre_assay_representation_triage_recipe")}
     appendix_steps = {step.id: step for step in _recipe_steps(context, "appendix_umap_gallery_recipe")}
     native_tf_steps = {step.id: step for step in _recipe_steps(context, "native_tf_axis_orientation_audit_recipe")}
+    regulator_margin_steps = {
+        step.id: step for step in _recipe_steps(context, "native_regulator_plan_margin_enrichment_recipe")
+    }
 
     assert "materialize_intermediate_embedding_20b_anchor_60bp" not in pre_assay_steps
     assert "build_alignment_intermediate_embedding_20b_anchor_to_full_context" not in pre_assay_steps
@@ -795,12 +1183,65 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         "column": "derived__parent_dataset",
         "equals": "usr_regulondb_native_promoters",
     }
+    assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["expected_output_rows"] == 3180
     assert native_tf_steps["build_native_tf_axis_orientation_audit"].params["association_overlay"]["row_key"] == (
         "derived__parent_id"
     )
     assert native_tf_steps["build_native_tf_axis_orientation_tests"].params["where"] == {
         "column": "derived__parent_dataset",
         "equals": "usr_regulondb_native_promoters",
+    }
+    regulator_margin_params = regulator_margin_steps["build_native_regulator_plan_margin_enrichment"].params
+    assert regulator_margin_params["kind"] == "native_regulator_plan_margin_enrichment"
+    assert regulator_margin_params["view_id"] == "intermediate_embedding_7b_context_anchor_mean_bidir_concat"
+    assert regulator_margin_params["native_filter"] == {
+        "column": "derived__parent_dataset",
+        "equals": "usr_regulondb_native_promoters",
+    }
+    assert regulator_margin_params["expected_output_rows"] == 3180
+    assert regulator_margin_params["native_metadata_columns"] == [
+        "alias_id",
+        "regulondb__primary_promoter_id",
+        "regulondb__primary_promoter_name",
+    ]
+    assert list(regulator_margin_params["centroid_groups"]) == ["background", "ethanol", "cipro", "dual"]
+    assert regulator_margin_params["thresholds"] == [0.05, 0.1]
+    assert regulator_margin_params["tail_modes"] == [
+        "margin_top_quantile",
+        "margin_top_quantile_nearest_plan_only",
+    ]
+    assert regulator_margin_params["rank_test_alternative"] == "greater"
+    assert regulator_margin_params["native_parent_column"] == "derived__parent_id"
+    assert "row_key" not in regulator_margin_params["regulatory_interactions"]
+    assert regulator_margin_params["regulatory_interactions"]["required_columns"] == [
+        "source_release",
+        "source_route",
+        "regulatory_interaction_id",
+        "confidence",
+        "evidence",
+    ]
+    assert regulator_margin_steps["render_native_regulator_plan_margin_enrichment"].params == {
+        "plot_id": "native_regulator_plan_margin_enrichment"
+    }
+    go_bp_params = regulator_margin_steps["build_native_regulator_go_bp_plan_margin_enrichment"].params
+    assert go_bp_params["kind"] == "plan_margin_feature_enrichment"
+    assert go_bp_params["source_scalar"] == "native_regulator_plan_margin_enrichment"
+    assert go_bp_params["scores_table"] == "native_plan_margin_scores.parquet"
+    assert go_bp_params["tail_membership_table"] == "native_plan_margin_tail_membership.parquet"
+    assert go_bp_params["feature_membership"]["subject_column"] == "usr_id"
+    assert go_bp_params["feature_membership"]["feature_id_column"] == "go_id"
+    assert go_bp_params["feature_membership"]["feature_label_column"] == "go_name"
+    assert go_bp_params["feature_membership"]["feature_namespace_column"] == "go_namespace"
+    assert go_bp_params["feature_membership"]["namespace_filter"] == "biological_process"
+    assert go_bp_params["feature_membership"]["exclude_label_prefixes"] == ["obsolete "]
+    assert go_bp_params["feature_membership"]["source_metadata_columns"] == [
+        "biocyc_kb_version",
+        "smarttable_id",
+        "source_terms_sha256",
+    ]
+    assert go_bp_params["rank_test_alternative"] == "greater"
+    assert regulator_margin_steps["render_native_regulator_go_bp_plan_margin_enrichment"].params == {
+        "plot_id": "native_regulator_go_bp_plan_margin_enrichment"
     }
     assert all(
         step.params.get("kind")
@@ -845,6 +1286,8 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
         "reference_sfxi_archive",
         "reference_native_mg1655",
         "reference_native_mg1655_core60",
+        "reference_regulondb_native_core60_all",
+        "reference_regulondb_tf_axis_targets",
         "reference_anderson_igem",
         "reference_anderson_igem_core60",
         "reference_w_collection",
@@ -902,7 +1345,16 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
 
     assert "build_umap_sample_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
     assert "fit_umap_intermediate_embedding_20b_anchor_60bp" not in appendix_steps
-    scorecard_sample_filter = {"column": "source_class", "in": ["densegen", "manual_or_wildtype"]}
+    scorecard_sample_filter = {
+        "column": "source_class",
+        "in": [
+            "densegen",
+            "manual_or_wildtype",
+            "reference_control",
+            "construct_derived",
+            "legacy_construct_seed",
+        ],
+    }
     for view_id in _FIRST_CLASS_CANDIDATE_VIEWS:
         assert f"build_scorecard_sample_{view_id}" in pre_assay_steps
         assert pre_assay_steps[f"build_scorecard_sample_{view_id}"].params["where"] == scorecard_sample_filter
@@ -952,24 +1404,16 @@ def test_live_study_recipes_rebuild_from_clean_workspace_state() -> None:
 
 
 def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() -> None:
-    appendix_geometry_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "appendix_geometry_review.md"
-    ).read_text(encoding="utf-8")
-    appendix_umap_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "appendix_umap_gallery.md"
-    ).read_text(encoding="utf-8")
+    appendix_geometry_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "appendix",
+        "appendix_geometry_review.md",
+    )
+    appendix_umap_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "appendix",
+        "appendix_umap_gallery.md",
+    )
 
     parsed_geometry = _parse_deliverable_markdown(appendix_geometry_doc)
     parsed_umap = _parse_deliverable_markdown(appendix_umap_doc)
@@ -981,33 +1425,21 @@ def test_live_study_appendix_deliverable_docs_cover_current_appendix_surfaces() 
 
 
 def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfaces() -> None:
-    sigma_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "sigma35_ordinal_audit.md"
-    ).read_text(encoding="utf-8")
-    context_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "context_robustness_summary.md"
-    ).read_text(encoding="utf-8")
-    frontier_doc = (
-        _repo_root()
-        / "src"
-        / "dnadesign"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "deliverables"
-        / "candidate_decision_frontier.md"
-    ).read_text(encoding="utf-8")
+    sigma_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "primary",
+        "sigma35_ordinal_audit.md",
+    )
+    context_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "primary",
+        "context_robustness_summary.md",
+    )
+    frontier_doc = _study_deliverable_doc(
+        "stress_ethanol_cipro_growth",
+        "primary",
+        "candidate_decision_frontier.md",
+    )
 
     parsed_sigma = _parse_deliverable_markdown(sigma_doc)
     parsed_context = _parse_deliverable_markdown(context_doc)
@@ -1023,9 +1455,9 @@ def test_live_study_primary_deliverable_docs_cover_companion_and_frontier_surfac
 
 def test_live_generated_catalog_and_controls_do_not_publish_retired_plot_surfaces() -> None:
     workspace = _live_workspace()
-    context = load_workspace_config(workspace)
-    workspace_catalog_from_context(context)
-    catalog = json.loads((workspace / "outputs" / "catalog.json").read_text(encoding="utf-8"))
+    context = _workspace_context(workspace)
+    catalog = _workspace_catalog_payload(workspace)
+    assert catalog is not None
     controls = build_workspace_notebook_controls_payload(
         context,
         notebook_id="latent_geometry_browser",

@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/app/snapback_show_load.py
+
 Load preserved-site Snapback bundle artifacts for readback validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

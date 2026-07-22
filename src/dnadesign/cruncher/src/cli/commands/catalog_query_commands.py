@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/catalog_query_commands.py
 
 Catalog query and inspection command registration.
 
-Author(s): Eric J. South
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

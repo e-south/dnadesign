@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_grid_and_preflight.py
 
 Validate Study trial-grid expansion and parse-readiness preflight contracts.
@@ -38,7 +38,8 @@ def _write_grid_spec(spec_path: Path) -> None:
                 "exit_code_policy": "nonzero_if_any_error",
                 "summarize_after_run": True,
             },
-            "artifacts": {"trial_output_profile": "analysis_ready"},
+            # Grid expansion is the contract here; analysis-ready artifacts are covered by study smoke tests.
+            "artifacts": {"trial_output_profile": "minimal"},
             "replicates": {"seed_path": "sample.seed", "seeds": [11]},
             "trials": [],
             "trial_grids": [

@@ -1,4 +1,13 @@
-"""Native RegulonDB promoter metadata profile coverage for LatentDNA."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_regulondb_native_promoter_profile.py
+
+Native RegulonDB promoter metadata profile coverage for LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -123,7 +132,7 @@ def test_live_regulondb_workspace_declares_representation_health_review_path() -
     assert context.config.study_binding is not None
     assert context.config.study_binding.record_root == "docs/studies/regulondb_native_promoter_panel"
     assert context.config.study_binding.deliverable_docs_root == (
-        "src/dnadesign/studies/regulondb_native_promoter_panel"
+        "src/dnadesign/studies/units/regulondb_native_promoter_panel"
     )
     assert notebook.default_deliverable == "representation_health_summary"
     assert notebook.ordered_plots[:5] == [

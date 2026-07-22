@@ -43,6 +43,8 @@ from ..registry import (
     USR_LABEL_NAMESPACE,
     ensure_registry_entries,
     ensure_sequence_contract_namespaces,
+    parse_columns_spec,
+    register_namespace,
 )
 from ..sequence_views import (
     SEQUENCE_VIEW_SIDECAR_RELATIVE_PATH,
@@ -133,5 +135,7 @@ __all__ = [
     "write_view_semantics",
     "ensure_registry_entries",
     "ensure_sequence_contract_namespaces",
+    "parse_columns_spec",
+    "register_namespace",
     "__version__",
 ]

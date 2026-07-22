@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/util.py
 
 Shared utility helpers for dashboard notebooks.

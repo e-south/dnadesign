@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/predict/test_predict_output_format.py
+
+Regression tests for predict output format OPAL predict.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

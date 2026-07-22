@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_core_import_contract.py
 
 Contract checks for core import boundaries.

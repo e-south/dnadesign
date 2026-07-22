@@ -1,0 +1,49 @@
+schema_version: 1
+catalog_order: 55
+registry_id: studies.stress-ethanol-cipro-growth.status
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: "`docs/studies/stress_ethanol_cipro_growth/`"
+exit_artifact: a read-only snapshot of this study's checked-in record, dataset posture, and handoff surfaces
+summary: Read the stress_ethanol_cipro_growth study record and report its current phase, datasets, and owner handoffs.
+execution_kind: iterative
+status_kind: stress-ethanol-cipro-growth-status
+keywords:
+  - stress ethanol ciprofloxacin
+  - study record
+  - densegen
+  - construct
+  - infer
+  - latentdna
+  - cluster
+  - opal
+related_tools:
+  - densegen
+  - construct
+  - infer
+  - latentdna
+  - cluster
+  - opal
+  - notify
+  - ops
+related_tool_routes:
+  - tool: construct
+    route: template-contexts
+  - tool: infer
+    route: evo2-sequence-features
+  - tool: latentdna
+    route: stress-ethanol-cipro-representation-comparison
+  - tool: cluster
+    route: exploratory-clustering
+  - tool: opal
+    route: usr-infer-x-active-learning
+relations:
+  - type: handoff-to
+    target: studies.stress-ethanol-cipro-growth.preflight
+  - type: execution-support
+    target: usr.data-plane.multi-source-source-of-truth
+  - type: execution-support
+    target: usr.data-plane.construct-infer-source-of-truth
+  - type: handoff-to
+    target: opal.downstream.usr-infer-x-active-learning

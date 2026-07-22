@@ -1,4 +1,13 @@
-"""Integration coverage for multi-panel plot gallery rendering."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/integrations/test_plot_gallery_rendering.py
+
+Integration coverage for multi-panel plot gallery rendering.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

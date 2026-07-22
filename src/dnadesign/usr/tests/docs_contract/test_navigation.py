@@ -31,14 +31,14 @@ def test_docs_indexes_route_to_expected_usr_surfaces() -> None:
     usr_docs_links = markdown_links("src/dnadesign/usr/docs/README.md")
     reference_links = markdown_links("src/dnadesign/usr/docs/reference/README.md")
 
-    assert "../src/dnadesign/usr/docs/operations/workflow-map.md" in docs_index_links
-    assert "../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index_links
-    assert "../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md" in docs_index_links
-    assert "../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md" in docs_index_links
+    assert "../src/dnadesign/usr/docs/operations/routes/workflow-map.md" in docs_index_links
+    assert "../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md" in docs_index_links
+    assert "../src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md" in docs_index_links
+    assert "../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_index_links
     assert "studies/README.md" in docs_index_links
 
-    assert "operations/workflow-map.md" in usr_docs_links
-    assert "operations/sync.md" in usr_docs_links
+    assert "operations/routes/workflow-map.md" in usr_docs_links
+    assert "operations/sync/README.md" in usr_docs_links
     assert "reference/python-api.md" in usr_docs_links
     assert "reference/dataset-layout-and-code-map.md" in usr_docs_links
 

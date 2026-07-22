@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_early_stop_unique_successes.py
 
 Validates diversity-aware early-stop gating.

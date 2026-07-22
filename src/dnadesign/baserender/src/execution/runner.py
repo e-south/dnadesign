@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/execution/runner.py
 
 Sequence-rows job orchestration for adapter, pipeline, selection, and output execution.

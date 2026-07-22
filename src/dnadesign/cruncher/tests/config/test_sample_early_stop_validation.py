@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_sample_early_stop_validation.py
 
 Validates early-stop configuration invariants.

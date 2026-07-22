@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/src/contracts/normalize.py
 
 Sequence normalization and deterministic ID hashing rules.

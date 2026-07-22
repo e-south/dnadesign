@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/catalog_export_commands.py
 
 Catalog export command registration for DenseGen artifacts and site tables.
 
-Author(s): Eric J. South
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

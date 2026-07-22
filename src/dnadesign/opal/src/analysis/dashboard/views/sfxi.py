@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/views/sfxi.py
 
-Computes SFXI scoring metrics for dashboard views. Provides label/prediction
-SFXI view data for charts.
+Computes SFXI scoring metrics for dashboard views. Provides label/prediction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -21,7 +20,6 @@ import polars as pl
 
 from ....objectives import sfxi_math
 from ...sfxi.gates import nearest_gate
-from ..datasets import CampaignInfo
 from ..labels import observed_event_ids
 from ..util import list_series_to_numpy
 
@@ -68,44 +66,6 @@ class PredSfxiView:
 class Nearest2FactorCounts:
     df: pl.DataFrame
     note: str | None
-
-
-@dataclass(frozen=True)
-class SFXIReadiness:
-    ready: bool
-    notice: str | None
-    x_col: str | None
-    y_col: str | None
-
-
-def resolve_sfxi_readiness(campaign_info: CampaignInfo | None) -> SFXIReadiness:
-    if campaign_info is None:
-        return SFXIReadiness(
-            ready=False,
-            notice="Campaign config unavailable; SFXI disabled.",
-            x_col=None,
-            y_col=None,
-        )
-    if campaign_info.objective_name != "sfxi_v1":
-        return SFXIReadiness(
-            ready=False,
-            notice=f"Objective `{campaign_info.objective_name}` is not supported here.",
-            x_col=campaign_info.x_column,
-            y_col=campaign_info.y_column,
-        )
-    if campaign_info.y_expected_length not in (None, 8):
-        return SFXIReadiness(
-            ready=False,
-            notice="SFXI expects 8-length label vectors; campaign uses a different length.",
-            x_col=campaign_info.x_column,
-            y_col=campaign_info.y_column,
-        )
-    return SFXIReadiness(
-        ready=True,
-        notice=None,
-        x_col=campaign_info.x_column,
-        y_col=campaign_info.y_column,
-    )
 
 
 def compute_sfxi_params(
@@ -326,32 +286,6 @@ def compute_label_sfxi_view(
         if col and col in table_df.columns
     ]
     return LabelSfxiView(df=df_sfxi, notice=None, table_df=table_df, table_cols=table_cols)
-
-
-def build_label_sfxi_view(
-    *,
-    readiness: SFXIReadiness,
-    selected_round: int | None,
-    labels_view_df: pl.DataFrame,
-    labels_current_df: pl.DataFrame,
-    params: SFXIParams,
-) -> LabelSfxiView:
-    if not readiness.ready:
-        raise ValueError(readiness.notice or "SFXI disabled.")
-    if selected_round is None:
-        sfxi_view = compute_label_sfxi_view(
-            labels_view_df=labels_view_df,
-            labels_current_df=labels_view_df,
-            y_col=readiness.y_col,
-            params=params,
-        )
-        return sfxi_view
-    return compute_label_sfxi_view(
-        labels_view_df=labels_view_df,
-        labels_current_df=labels_current_df,
-        y_col=readiness.y_col,
-        params=params,
-    )
 
 
 def build_pred_sfxi_view(

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/optimizers/progress.py
 
 Provide optional progress wrappers for optimizer iterations.

@@ -1,0 +1,3 @@
+densegen_batch:
+  surface_type: runbook
+  runbook_ref: repo:src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml

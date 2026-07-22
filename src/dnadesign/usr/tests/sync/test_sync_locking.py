@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/sync/test_sync_locking.py
 
 Ensure sync operations take the dataset write lock.

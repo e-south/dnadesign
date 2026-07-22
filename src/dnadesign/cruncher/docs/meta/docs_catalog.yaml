@@ -8,7 +8,7 @@ docs_catalog:
       audience: [cruncher-maintainers]
       applies_to: schema_v3
       last_verified: "2026-03-26"
-      next: [index.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md, demos/demo_yiu_workspace.md]
+      next: [index.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md, demos/demo_yiu_workspace.md, guides/scar_nick_workflow.md]
     - id: docs_index
       path: index.md
       title: Cruncher docs
@@ -16,7 +16,7 @@ docs_catalog:
       audience: [cruncher-maintainers]
       applies_to: schema_v3
       last_verified: "2026-03-26"
-      next: [README.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md, demos/demo_yiu_workspace.md]
+      next: [README.md, demos/demo_pairwise.md, demos/demo_cassette_workspace.md, demos/demo_yiu_workspace.md, guides/scar_nick_workflow.md]
     - id: demo_pairwise
       path: demos/demo_pairwise.md
       title: Pairwise Demo
@@ -161,6 +161,14 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-04-21"
       next: [reference/released_snapback_artifacts.md, reference/release_enzyme_catalogs.md]
+    - id: guide_scar_nick
+      path: guides/scar_nick_workflow.md
+      title: Scar-Nick Workflow
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-05-14"
+      next: [../workspaces/scar_nick_teto/runbook.md, ../src/scar_nick/README.md, reference/nickase_catalog.md]
     - id: guide_yiu
       path: guides/yiu_workflow.md
       title: YIU Workflow
@@ -321,6 +329,22 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-04-22"
       next: [reference/runbook_steps.md, guides/snapback_released_workflow.md]
+    - id: scar_nick_teto_runbook
+      path: ../workspaces/scar_nick_teto/runbook.md
+      title: scar_nick_teto runbook
+      kind: tutorial
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-05-14"
+      next: [guides/scar_nick_workflow.md, ../src/scar_nick/README.md]
+    - id: scar_nick_package_map
+      path: ../src/scar_nick/README.md
+      title: scar_nick Package Map
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-05-14"
+      next: [guides/scar_nick_workflow.md, ../workspaces/scar_nick_teto/runbook.md]
     - id: internals_spec
       path: internals/spec.md
       title: Cruncher Internals Spec

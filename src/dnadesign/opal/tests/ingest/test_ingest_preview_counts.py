@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/ingest/test_ingest_preview_counts.py
+
+Regression tests for ingest preview counts OPAL ingest.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +20,7 @@ from dnadesign.opal.src.cli.formatting.renderers.ingest import render_ingest_pre
 from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
 from dnadesign.opal.src.registries.transforms_y import get_transform_y, register_transform_y
 from dnadesign.opal.src.runtime.ingest import IngestPreview, run_ingest
-from dnadesign.opal.src.transforms_y import scalar_from_table_v1  # noqa: F401 (registers)
+from dnadesign.opal.src.transforms_y import scalar_from_table_v1, vector_from_table_v1  # noqa: F401 (registers)
 
 
 def _ingest_ctx() -> RoundCtx:
@@ -144,3 +146,40 @@ def test_ingest_preview_renders_unresolved_id_instead_of_nan() -> None:
     rendered = render_ingest_preview_text(preview, sample_rows, transform_name="scalar_from_table_v1")
     assert "id=<unresolved>" in rendered
     assert "id=nan" not in rendered
+
+
+def test_ingest_preview_does_not_apply_logic_bounds_to_generic_vectors() -> None:
+    records_df = pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "sequence": ["AAA", "BBB"],
+            "bio_type": ["dna", "dna"],
+            "alphabet": ["dna_4", "dna_4"],
+        }
+    )
+    csv_df = pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "sequence": ["AAA", "BBB"],
+            "count_a": [0.0, 3.0],
+            "count_b": [2.0, 1.0],
+            "count_c": [5.0, 0.0],
+        }
+    )
+
+    _, preview = run_ingest(
+        records_df,
+        csv_df,
+        transform_name="vector_from_table_v1",
+        transform_params={
+            "sequence_column": "sequence",
+            "id_column": "id",
+            "value_columns": ["count_a", "count_b", "count_c"],
+        },
+        y_expected_length=3,
+        y_column_name="Y",
+        duplicate_policy="error",
+        ctx=_ingest_ctx_for("vector_from_table_v1"),
+    )
+
+    assert preview.warnings == []

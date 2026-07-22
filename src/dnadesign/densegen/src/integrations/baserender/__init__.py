@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/integrations/baserender/__init__.py
+
 DenseGen BaseRender integration surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from .notebook_contract import (

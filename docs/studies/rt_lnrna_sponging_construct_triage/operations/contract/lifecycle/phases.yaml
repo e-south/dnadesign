@@ -1,0 +1,32 @@
+- id: phase_0_contracts
+  status: in_progress
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas
+  notes: Define schemas, source ledgers, blocker list, and minimal fixtures.
+- id: phase_1_construct_subject_table
+  status: planned
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects
+  notes: Anchor fixtures are source-authority resolved and representable under the multi-slot Construct manifest.
+- id: phase_2_construct_projection
+  status: planned
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/construct-contract.md
+  notes: Strategy resolved as public multi-slot Construct assembly; six source view lanes are test-backed with template_custom context metadata.
+- id: phase_3_infer_handoff
+  status: planned
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/representation-contract.md
+  notes: Evo2 7B sidecars exist for the six explicit view_name selectors; future Infer refreshes must keep explicit view_name selection.
+- id: phase_4_overlay_linkage
+  status: planned
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/source-overlays.md
+  notes: Keep abundance priors separate from materialized Reader sponging labels.
+- id: phase_5_analysis
+  status: planned
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench/design_sets/v1-construct-subject-scope.md
+  notes: LatentDNA review surfaces are materialized for audit; candidate-X review is paused before OPAL handoff.
+- id: phase_6_wet_lab_handoff
+  status: blocked
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/record/status.md
+  notes: Reader label materialization is complete; this phase remains blocked only until candidate-X review is accepted.
+- id: phase_7_opal_readiness
+  status: blocked
+  next_surface: repo:docs/studies/rt_lnrna_sponging_construct_triage/contexts/opal-handoff.md
+  notes: Blocked until rt_lnrna_sponging_construct_triage_opal_training_examples_v1 has a selected fixed-size X and joins the materialized Reader sponging labels.

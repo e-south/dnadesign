@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_generate_execution.py
+dnadesign
+src/dnadesign/infer/tests/runtime/test_generate_execution.py
 
 Chunk-execution and payload contract tests for infer generation.
 

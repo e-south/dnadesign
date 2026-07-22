@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/snapback/released_search/evaluator_adapter.py
+
 Evaluation adapter for released-product target-search pairs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

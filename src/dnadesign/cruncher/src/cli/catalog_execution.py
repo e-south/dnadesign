@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/catalog_execution.py
 
 Execution helpers for catalog CLI commands.

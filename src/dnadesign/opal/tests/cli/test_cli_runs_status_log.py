@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_runs_status_log.py
+
+Regression tests for CLI runs status log OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -35,7 +37,11 @@ def test_runs_list_and_show_json(tmp_path):
 
     res = runner.invoke(app, ["--no-color", "runs", "list", "-c", str(campaign), "--json"])
     assert res.exit_code == 0, res.stdout
-    runs = json.loads(res.stdout)
+    payload = json.loads(res.stdout)
+    assert payload["schema_version"] == "opal.runs_list.v1"
+    assert payload["campaign"]["config_path"] == str(campaign)
+    assert payload["round_selector"] is None
+    runs = payload["runs"]
     assert any(r.get("run_id") == run_id for r in runs)
 
     res = runner.invoke(
@@ -52,7 +58,10 @@ def test_runs_list_and_show_json(tmp_path):
         ],
     )
     assert res.exit_code == 0, res.stdout
-    row = json.loads(res.stdout)
+    payload = json.loads(res.stdout)
+    assert payload["schema_version"] == "opal.run_meta.v1"
+    assert payload["campaign"]["config_path"] == str(campaign)
+    row = payload["run"]
     assert row["run_id"] == run_id
 
 
@@ -88,3 +97,94 @@ def test_log_json_summary(tmp_path):
     out = json.loads(res.stdout)
     assert out["events"] == 5
     assert out["predict_rows"] == 2
+
+
+def test_progress_json_summary(tmp_path):
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    stale_plot = workdir / "outputs" / "plots" / "old.png"
+    stale_plot.parent.mkdir(parents=True, exist_ok=True)
+    stale_plot.write_bytes(b"stale")
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "progress", "-c", str(campaign), "--round", "all", "--json"])
+
+    assert res.exit_code == 0, res.stdout
+    out = json.loads(res.stdout)
+    assert out["schema_version"] == "opal.campaign_progress.v1"
+    assert out["status"] == "done"
+    assert out["round_count"] == 1
+    assert out["locks"]["campaign"]["scope"] == "local_host"
+    assert "warnings" in out
+    assert out["event_contract"]["run_events"] == 5
+    assert out["event_contract"]["aborted_rounds"] == []
+    assert "run_scope" in out["rounds"][0]["summary"]
+    assert out["rounds"][0]["predict"]["rows"] == 2
+    assert out["artifact_garden"]["schema_version"] == "opal.artifact_garden.v1"
+    assert out["artifact_garden"]["stale_artifact_count"] == 1
+    assert out["stale_artifacts"][0]["path"] == str(stale_plot)
+    assert any(row["category"] == "StaleArtifactWarning" for row in out["warnings"])
+
+    res = runner.invoke(
+        app,
+        ["--no-color", "progress", "-c", str(campaign), "--round", "all", "--run-id", "run-0", "--json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    scoped = json.loads(res.stdout)
+    assert scoped["run_id"] == "run-0"
+    assert scoped["rounds"][0]["summary"]["run_scope"]["requested_run_id"] == "run-0"
+
+
+def test_progress_rejects_missing_explicit_round(tmp_path):
+    _, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "progress", "-c", str(campaign), "--round", "7", "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert "--round 7 not found" in payload["error"]["message"]
+
+
+def test_status_json_error_for_missing_config(tmp_path):
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "status", "-c", str(tmp_path / "missing.yaml"), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "status"
+
+
+def test_runs_list_json_error_for_missing_config(tmp_path):
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "runs", "list", "-c", str(tmp_path / "missing.yaml"), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "runs list"
+
+
+def test_artifacts_audit_json_error_uses_shared_cli_error_contract(tmp_path):
+    app = _build()
+    runner = CliRunner()
+
+    res = runner.invoke(app, ["--no-color", "artifacts", "audit", "-c", str(tmp_path / "missing.yaml"), "--json"])
+
+    assert res.exit_code != 0, res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["ok"] is False
+    assert payload["error"]["schema_version"] == "opal.cli_error.v1"
+    assert payload["error"]["context"] == "artifacts audit"
+    assert payload["error"]["category"] == "OpalError"
+    assert isinstance(payload["error"]["exit_code"], int)

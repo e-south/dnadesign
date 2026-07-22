@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_analyze_metadata.py
 
 Validate analysis metadata loaders preserve PWM scoring contracts from sample runs.

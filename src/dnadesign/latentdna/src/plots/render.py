@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/render.py
+
 Artifact-driven plotting helpers for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -10,8 +17,8 @@ from typing import Any
 from ..contracts.errors import ContractViolationError
 from ..contracts.plot import SUPPORTED_PLOT_KINDS, ResolvedPlotSpec, metric_panel_uses_square_axes
 from ..contracts.plot_semantics import PlotSemantics
-from ..metadata_axes import axis_style_map_from_config
-from ..visual_style import (
+from ..metadata.axes import axis_style_map_from_config
+from ..presentation.visual_style import (
     DEFAULT_PLOT_PNG_DPI,
     PLOT_FONT_FAMILY,
     TEXT_COLOR,
@@ -29,6 +36,7 @@ from .renderers.agreement import render_agreement_summary_plot, render_correspon
 from .renderers.categorical import render_categorical_count_plot
 from .renderers.curve import render_curve_plot
 from .renderers.distribution import render_distribution_plot
+from .renderers.enrichment_summary import render_categorical_enrichment_summary_plot
 from .renderers.heatmap import render_heatmap_grid_plot, render_heatmap_plot
 from .renderers.metric import (
     load_metric_panel_grid_input,
@@ -58,7 +66,14 @@ def _tight_layout_kwargs(
     legend_bottom: float,
     legend_right: float = 0.0,
 ) -> dict[str, object]:
-    return plot_tight_layout_kwargs(spec.plot_id, legend_bottom=legend_bottom, legend_right=legend_right)
+    return plot_tight_layout_kwargs(
+        spec.plot_id,
+        legend_bottom=legend_bottom,
+        legend_right=legend_right,
+        pad=spec.tight_layout_pad,
+        h_pad=spec.tight_layout_h_pad,
+        w_pad=spec.tight_layout_w_pad,
+    )
 
 
 def _inject_svg_accessibility(output_path: Path, *, semantics: PlotSemantics) -> None:
@@ -118,6 +133,8 @@ def render_plot_artifact(
         raise ContractViolationError("categorical_count rendering requires a scalar artifact")
     if spec.kind == "metric_panel_grid" and spec.scalar_id is None:
         raise ContractViolationError("metric_panel_grid rendering requires a scalar artifact")
+    if spec.kind == "categorical_enrichment_summary" and spec.scalar_id is None:
+        raise ContractViolationError("categorical_enrichment_summary rendering requires a scalar artifact")
     if spec.kind == "curve" and spec.reducer_id is None:
         raise ContractViolationError("curve rendering requires a reducer artifact")
     if spec.kind == "distribution_grid" and not spec.scalar_ids:
@@ -156,6 +173,10 @@ def render_plot_artifact(
         plot_metadata.update(count_result.metadata)
         layout_reservation.reserve_bottom(count_result.layout_reservation.legend_bottom)
         layout_reservation.reserve_right(count_result.layout_reservation.legend_right)
+    elif spec.kind == "categorical_enrichment_summary":
+        enrichment_result = render_categorical_enrichment_summary_plot(context, spec, pyplot=plt)
+        fig = enrichment_result.figure
+        plot_metadata.update(enrichment_result.metadata)
     elif spec.kind == "metric_panel_grid":
         metric_input = load_metric_panel_grid_input(context, spec)
         rows = metric_input.rows
@@ -167,6 +188,9 @@ def render_plot_artifact(
             len(panel_groups),
             prefer_single_row=bool(spec.single_row_panels),
             square_panels=square_metric_panels,
+            panel_width=spec.panel_width,
+            panel_height=spec.panel_height,
+            extra_width_per_column=spec.extra_width_per_column,
         )
         fig, axes = plt.subplots(
             rows_count,

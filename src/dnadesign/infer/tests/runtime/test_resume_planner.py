@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_resume_planner.py
+src/dnadesign/infer/tests/runtime/test_resume_planner.py
 
 Contract tests for USR resume planning module boundaries.
 

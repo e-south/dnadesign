@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/snapback/test_visual_publication.py
 
 Visual publication tests for snapback QA and public snapback visual artifacts.

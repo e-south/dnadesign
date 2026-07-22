@@ -1,7 +1,7 @@
 ## Architecture Decision Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 ### At a glance
 ADRs capture accepted architectural decisions and their consequences.
@@ -23,4 +23,8 @@ Use this directory for new decisions going forward.
 3. Mark status as `proposed`, `accepted`, or `superseded`.
 
 ### Template
-- `../../templates/adr.md`
+- `../../templates/records/adr.md`
+
+### Records
+- [ADR 0001: Namespace-scoped compatibility hashes for USR overlays](adr-0001-usr-namespace-contract-hash.md)
+- [ADR 0002: Generic linear ssDNA composition in Construct](adr-0002-generic-linear-ssdna-composition.md)

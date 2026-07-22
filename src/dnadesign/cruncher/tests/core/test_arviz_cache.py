@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_arviz_cache.py
 
 Validate ArviZ cache-directory setup for writable runtime diagnostics.

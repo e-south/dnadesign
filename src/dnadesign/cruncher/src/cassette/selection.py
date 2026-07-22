@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/selection.py
 
-Deterministic accepted-pool admission and hit-selection policies for cassette
-solve workflows.
+Deterministic accepted-pool admission and hit-selection policies for cassette.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

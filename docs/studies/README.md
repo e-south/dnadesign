@@ -1,285 +1,183 @@
+---
+doc_id: study-records-router
+surface: studies-index
+owner: dnadesign-maintainers
+last_verified: 2026-06-19
+first_hop: docs/studies/<study-id>/routes/README.md
+record_root_contract: docs/studies/<study-id>
+---
+
 ## Study Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-29
+**Last verified:** 2026-06-19
 
-Use this index for `where is the real study right now?`, not for generic
-workflow routing.
+Studies hold cross-tool context, motivation, notes, selected command surfaces,
+and current handoff docs for long-running work. They are not generic workflow
+docs and they are not the Ops API.
 
-Study records are checked-in status artifacts for one live effort. They are not
-runbooks or generated outputs.
-They are the record plane: `ops progress` reads them as observation surfaces,
-while `ops runbook` stays in the control plane for planning and execution.
+Study records are checked-in record artifacts for one live effort. They are not
+runbooks or generated outputs. Treat them as the record plane: `ops progress`
+may read them for observation, while `ops runbook` remains the control plane
+for planning and execution.
 
-Family note:
-
-- `promoter` studies use `usr.data-plane.promoter-study-status` and
-  `usr.data-plane.promoter-study-preflight`.
-- `cruncher` studies use `cruncher.data-plane.cruncher-study-status` and
-  `cruncher.data-plane.cruncher-study-preflight`.
-- `docs/studies/index.yaml` is a repo-wide selector, not a family-wide one. If
-  the request names a checked-in study that is not `active_study_id`, keep the
-  selector untouched and pin that study with `--study-dir docs/studies/<study-id>`.
-- If the active checked-in study belongs to another family, pin the desired
-  study with `--study-dir docs/studies/<study-id>`.
-- The worked examples below remain promoter-oriented; Cruncher studies lean
-  harder on `routes.md` and `pipeline.yaml` because command grouping and native-agent
-  bootstrap are part of the family contract.
+Checked-in studies carry an `operations/ops.study.yaml` contract for lifecycle
+and owned execution surfaces. A study declares `ops_surfaces.status_kind` and
+`ops_surfaces.preflight_kind` only after it owns a concrete provider; do not
+borrow another study's status surface.
 
 ### Quick route
 
-Use these surfaces in order:
+Use these surfaces by intent:
 
 | Need | Surface | Why |
 | --- | --- | --- |
-| Where is the live study right now? | `uv run ops progress show usr.data-plane.promoter-study-status --json` | Cheap checked-in snapshot of the active study record. |
-| What blocks the next execution step here? | `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json` | Command-level readiness for the next actionable phase on this host. |
-| Which owner doc or workspace should I open next? | `docs/studies/<study-id>/routes.md` | Study-owned one-hop handoff for DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL. |
+| A request names a checked-in study | `docs/studies/<study-id>/routes/README.md` when present, otherwise the study directory README/status note | Start from the named study's living route map instead of assuming the repo-wide active study. |
+| A request asks for status, history, blockers, or readiness | [Study Ops status surfaces](reference/study-status-ops-surfaces.md) | Use Ops only when the task is explicitly observation or readiness. |
+| A request asks how to add or refresh study records | [Study record authoring](reference/study-record-authoring.md) | Keep authoring and promoter-template details out of this top-level router. |
 
-### Family shortcuts
+### Checked-In Study Routes
 
-- Active promoter-study snapshot:
-  `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Checked-in Cruncher retron hairpin study snapshot:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
-- Checked-in Cruncher retron hairpin study preflight:
-  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
-- Checked-in Cruncher retron hairpin study route handoff:
-  `docs/studies/retron_hairpin_design/routes.md`
-- Repo-local retron hairpin study skill:
-  `.agents/skills/retron-hairpin-study/SKILL.md`
+| Study | First route | Status surface | Skill |
+| --- | --- | --- | --- |
+| `stress_ethanol_cipro_growth` | [docs/studies/stress_ethanol_cipro_growth/routes](stress_ethanol_cipro_growth/routes/README.md) | OPS provider: `studies.stress-ethanol-cipro-growth.status`; preflight provider: `studies.stress-ethanol-cipro-growth.preflight` | `.agents/skills/stress-ethanol-cipro-growth-status/SKILL.md` |
+| `regulondb_native_promoter_panel` | [docs/studies/regulondb_native_promoter_panel/routes](regulondb_native_promoter_panel/routes/README.md) | Record-only: use `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml`, and the route map. No OPS provider is registered. | none |
+| `retron_hairpin_design` | [docs/studies/retron_hairpin_design/routes](retron_hairpin_design/routes/README.md) | Route-first for MSD work; use `studies.retron-hairpin-design.status` and `studies.retron-hairpin-design.preflight` only for explicit status or readiness questions. | `.agents/skills/retron-hairpin-study/SKILL.md` |
+| `rt_lnrna_sponging_construct_triage` | [docs/studies/rt_lnrna_sponging_construct_triage/routes](rt_lnrna_sponging_construct_triage/routes/README.md) | Record-only Phase 0/1 study: use `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml`, and the route map. No OPS provider is registered. | `.agents/skills/rt-lnrna-spop-composite-plot/SKILL.md` for Reader SPOP composite plot requests |
+| `eco1_rt_repack` | [docs/studies/eco1_rt_repack/routes](eco1_rt_repack/routes/README.md) | Record-only Phase 0 study: use `record/status.md`, `record/datasets.yaml`, `operations/ops.study.yaml`, and the route map. No OPS provider is registered. | `.agents/skills/eco1-rt-repack-status/SKILL.md` |
 
-### Fresh-thread bootstrap
+### Authority chain
 
-Use this sequence when a new thread starts cold or the repo-local skill is not
-visible:
+`docs/studies/index.yaml` selects the repo-wide active study. If the request
+names a checked-in study that is not `active_study_id`, keep the selector
+untouched and pin that study's directory or route map directly.
 
-1. Read `docs/studies/index.yaml`.
-2. If the request names a checked-in study that is not `active_study_id`, pin
-   that study immediately with the family-specific `--study-dir` command and
-   treat the registry as discovery only.
-3. Run `uv run ops progress show usr.data-plane.promoter-study-status --json`
-   only when the question is about the repo-wide active promoter study.
-4. Run
-   `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
-   only when the question is blocker or next-run readiness for that same active
-   promoter study.
-5. Open `docs/studies/<study-id>/routes.md` after the state or blocker question
-   is answered and the next owner surface is the real need.
+Each checked-in live study keeps these artifacts:
 
-For the checked-in Cruncher retron hairpin example, pin the study explicitly:
+- `README.md`: directory ontology and first-hop usage note
+  - include YAML frontmatter with `doc_id`, `surface`, `study_id`, `owner`,
+    `last_verified`, and `first_hop` or `entrypoint`
+- `record/`: checked-in factual record plane
+  - `record/campaign.yaml`: optional explicit campaign/progress manifest
+  - `record/datasets.yaml`: affiliated dataset registry and sync posture
+  - `record/status.md`: maintainer-facing current state and concise next actions
+- `operations/`: operational declarations read by tooling
+  - `operations/ops.study.yaml`: required OPS-facing lifecycle/track contract;
+    optional `ops_surfaces` only when the study owns concrete status/preflight
+    providers. When the contract is split, this file stays as the entrypoint
+    and lists `parts` under `operations/contract/`.
+  - `operations/contract/`: optional split lifecycle, artifact,
+    execution-surface, snapshot, and preflight declarations loaded by
+    `ops.study.yaml`. A `parts` entry may point at one file or a short ordered
+    list of files. Keep fragment files under semantic sublanes such as
+    `lifecycle/`, `surfaces/execution/{runbooks,commands}/`, `status/`, and
+    `readiness/checks/`. Split any bulky owner lane into a nested directory
+    before it becomes a 200-line mixed-purpose YAML file.
+  - `operations/catalog/`: optional status/preflight catalog pages for studies
+    with concrete OPS providers. Put the contract pages under
+    `operations/catalog/contracts/` and their runbook-catalog sidecars under
+    `operations/catalog/contracts/registry/`.
+  - `operations/runtime/command-groups/pipeline.yaml`: optional machine-readable runtime context for
+    exact command groups or automation bootstrap
+- `routes/README.md`: optional one-hop handoff map for current owner surfaces
+  - include YAML frontmatter with `doc_id`, `surface: study-route-map`,
+    `study_id`, `owner`, `last_verified`, and status/preflight posture
+- `routes/`: optional focused route-detail pages when one owner surface would
+  otherwise turn the router into a workflow encyclopedia
+- `contexts/`: optional long-form study rationale or handoff notes that are not
+  current task routers. Tool bindings that are durable study context, such as
+  LatentDNA bindings, live under context-specific subdirectories instead of a
+  root-level config shelf.
+- `compiler/`: optional study-owned compiler input/config records when a study
+  has a narrow compiler surface
+- `workbench/`: optional study-specific experimental workbench for hypotheses,
+  ontology terms, design sets, and run provenance that should outlive transient
+  tool outputs. For multi-record workbenches, prefer `ontology/`,
+  `design_sets/`, and `provenance/` lanes instead of placing YAML records flat
+  at the workbench root.
+- `audits/`: optional machine-readable sync/readiness evidence
 
-- `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
-- `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`
-- Open `docs/studies/retron_hairpin_design/routes.md` for the canonical
-  post-probe handoff after the state or blocker answer is settled.
+Keep the code boundary clear: concrete study status and preflight
+implementation lives under `src/dnadesign/studies/units/<study-id>/`, not under
+`src/dnadesign/ops/` and not in a generic cross-study status bucket. Ops reads
+checked-in records and dispatches providers, but snapshot/preflight logic and
+study-specific parsers stay with the owning study package.
 
-Authority chain: `docs/studies/index.yaml` selects the active study,
-the matching `docs/studies/<study-id>/` directory holds the required
-`campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml`, and may
-also carry optional `routes.md` and `pipeline.yaml` surfaces when the study
-needs explicit cross-tool handoff navigation plus study-owned runtime context
-that should not be reconstructed from generic tool docs.
-For a named non-active study, the pinned `--study-dir` path overrides the
-registry selector for that lookup without changing the repo-wide active-study
-record.
-
-Keep four complementary artifacts for each real study:
-
-- `campaign.yaml`: workflow progress and registered procedure evidence
-- `datasets.yaml`: machine-readable registry of affiliated USR datasets and
-  sync posture across local and remote locations
-- `status.md`: maintainer-facing current datasets, current phase, current row
-  counts, downstream posture, and next actions
-- `ops.study.yaml`: OPS-facing study contract for lifecycle order, record
-  sources, artifacts, execution surfaces, and explicit preflight scope/check
-  planning. Declare generic readiness kinds there, such as `path_exists`,
-  `dataset_snapshot`, `workspace_layout`, `environment`, `gpu_availability`,
-  `command`, `scheduler_queue`, `sequence_view_contract`, and `runbook_plan`,
-  then bind them to explicit artifact ids and execution-surface ids.
-
-Keep the code boundary clear: study-family implementation code lives under
-`src/dnadesign/studies/`, not under `src/dnadesign/ops/`. OPS reads the
-checked-in record and dispatches the provider, but the snapshot and preflight
-logic stay with the family package.
-
-When a study already owns concrete execution surfaces, add one optional fifth
-artifact:
-
-- `pipeline.yaml`: optional study-owned runtime context for exact Construct,
-  Infer, batch, or Notify paths that complement `ops.study.yaml` without
-  replacing its lifecycle or preflight authority
-
-When a study already spans several owner surfaces, add one optional sixth
-artifact:
-
-- `routes.md`: optional study-owned one-hop route map for DenseGen, Construct,
-  Infer, LatentDNA, Cluster, and OPAL handoffs
-
-Use the study record even while the effort is still in source assembly.
-An active study does not need to wait for the final feature matrix, but the
-record must say whether the current shared feature dataset is materialized or
-still pending.
-
-Use `docs/studies/index.yaml` to declare the active study record and the study
-family that owns its adapter.
+Treat each concrete study as a study unit with three durable shelves:
+`docs/studies/<study-id>/` for the checked-in record and route map,
+`src/dnadesign/studies/units/<study-id>/` for study-owned implementation, and
+`src/dnadesign/studies/units/<study-id>/tests/` for study-owned tests. The
+`src/dnadesign/studies/tests/` root is reserved for shared `studies.core` and
+package-level contracts; concrete study tests must stay inside their owning
+study unit.
 
 ### Declared layout
 
-Keep promoter-study records under:
-
 ```text
 docs/studies/<study-id>/
-  campaign.yaml
-  datasets.yaml
-  status.md
-  ops.study.yaml
-  routes.md    # optional but recommended once the study spans multiple owner surfaces
-  pipeline.yaml  # optional but recommended once the study owns execution surfaces
+  README.md      # directory ontology and first-hop usage
+  record/
+    campaign.yaml
+    datasets.yaml
+    status.md
+  operations/
+    ops.study.yaml
+    catalog/
+      contracts/
+        status.md
+        preflight.md
+        registry/
+          status.registry.yaml
+          preflight.registry.yaml
+    contract/
+      lifecycle/
+        mode.yaml
+        phases.yaml
+      surfaces/
+        artifacts.yaml
+        execution/
+          workspaces.yaml
+          runbooks/
+          commands/
+      status/
+        snapshot.yaml
+      readiness/
+        scope.yaml
+        group-bindings.yaml
+        next-scope.yaml
+        checks/
+    runtime/
+      command-groups/
+        pipeline.yaml
+  routes/
+    README.md    # optional, preferred once the study spans owner surfaces
+    ...          # optional focused route details for bulky owner surfaces
+  contexts/      # optional, long-form rationale and handoff notes
+  compiler/      # optional, study-owned compiler inputs/config
+  workbench/     # optional, durable ontology, design-set, and provenance records
   audits/
 ```
 
-and keep the study selector at:
+Study-specific implementation helpers, when needed, live under:
 
 ```text
-docs/studies/index.yaml
+src/dnadesign/studies/units/<study-id>/
+src/dnadesign/studies/units/<study-id>/tests/
 ```
 
-- `campaign.yaml` is the explicit multi-step manifest generated from
-  `uv run ops progress scaffold ...` and then filled with the real artifact
-  paths. Use v2 semantics with explicit `version`, `path_base`, and per-step
-  `inputs:` mappings.
-- `datasets.yaml` declares which USR datasets belong to the study, whether each
-  location is a shared USR root or a workspace-local export root, how
-  it should be onboarded, and how it syncs to remotes such as `cluster` or a
-  study-specific workspace-export remote.
-- `status.md` is the maintainer-facing note that records current datasets, current
-  phase, current row counts, downstream posture, and concise next actions.
-- `ops.study.yaml` is the machine-readable OPS contract for lifecycle
-  ordering, record sources, artifacts, execution surfaces, repo-scoped
-  snapshot posture, and explicit preflight scope/check planning. Snapshot stays
-  repo-backed and cheap; preflight is the execution-readiness surface.
-- `routes.md`, when present, is the study-owned one-hop handoff page for the
-  current DenseGen, Construct, Infer, LatentDNA, Cluster, and OPAL surfaces.
-- `pipeline.yaml`, when present, records study-owned runtime context that is
-  useful outside the OPS preflight contract, such as exact Construct workspace
-  mappings or lane-specific Infer details. Keep OPS-facing lifecycle order,
-  declared execution surfaces, and preflight shape in `ops.study.yaml`.
-- `audits/` stores machine-readable sync audit JSON files referenced from
-  `datasets.yaml`.
-
-### Create or refresh a promoter-study record
-
-1. Create the study directory:
-   `mkdir -p docs/studies/<study-id>`
-2. If `docs/studies/index.yaml` is missing, bootstrap it once:
-   `cp docs/templates/promoter-study-index.yaml docs/studies/index.yaml`
-3. Generate the manifest:
-   `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root> > docs/studies/<study-id>/campaign.yaml`
-4. Copy the dataset registry template:
-   `cp docs/templates/promoter-study-datasets.yaml docs/studies/<study-id>/datasets.yaml`
-5. Copy the status-note template:
-   `cp docs/templates/promoter-study-status.md docs/studies/<study-id>/status.md`
-6. Copy the OPS-facing study contract template:
-   `cp docs/templates/promoter-study-ops.study.yaml docs/studies/<study-id>/ops.study.yaml`
-7. Create the audit directory:
-   `mkdir -p docs/studies/<study-id>/audits`
-8. Edit the checked-in `index.yaml` plus the new `campaign.yaml`, `datasets.yaml`, `status.md`, and `ops.study.yaml` so they point at the real study ids, paths, and commands.
-9. If the study already spans several owner surfaces, add
-   `docs/studies/<study-id>/routes.md` and use it as the study-owned handoff
-   page.
-10. If the study already has concrete Construct, Infer, or batch surfaces,
-   add `docs/studies/<study-id>/pipeline.yaml` and record those exact
-   paths there.
-11. Refresh evidence with:
-   `uv run ops progress campaign --repo-root <repo-root> --manifest docs/studies/<study-id>/campaign.yaml`
-
-### Dataset registry contract
-
-Use `datasets.yaml` to keep one DRY declaration of study-affiliated datasets.
-Every dataset entry should answer:
-
-- which role the dataset plays in the study
-- which `usr_root` and dataset id own that artifact locally
-- whether that root is the shared root, a workspace-local export root, or
-  `external_usr`
-- whether the dataset is already `present` or still `planned`
-- whether the dataset is being onboarded as `existing_local`,
-  `existing_remote`, `existing_both`, or `create_new`
-- whether the source of truth is `local`, `remote`, or `shared`
-- whether sync is required, which remote profile is used, and where the sync
-  audit JSON should be written
-
-Keep the terminology strict:
-
-- `workspace_local_export`: a producer-owned USR-shaped dataset rooted under a
-  tool workspace rather than the shared study root
-- `shared`: the cross-tool study copy rooted under an explicit shared
-  USR root such as `src/dnadesign/usr/datasets`
-- `external_usr`: an operator-owned but non-repo USR root that is still
-  explicit in the study record
-
-For a sync-enabled dataset, refresh evidence with explicit commands such as:
-
-```bash
-# Confirm the local dataset exists and inspect its metadata shape.
-uv run usr --root <usr-root> info <dataset-id> --format json
-# Capture remote drift against the study's declared remote profile.
-uv run usr --root <usr-root> diff <dataset-id> <remote-name> \
-  --audit-json-out docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
-# Summarize the same sync audit through the registered status view.
-uv run ops progress show usr.data-plane.hpc-sync \
-  --sync-audit-json docs/studies/<study-id>/audits/<dataset-id>--<remote-name>-diff.json
-```
-
-If a dataset is being onboarded from a remote-only starting point, keep
-`strict_bootstrap_id: true` in `datasets.yaml` and use an explicit dataset id
-for the first pull rather than relying on local name guessing.
-
-### Status lookup rules
-
-- Status summary:
-  `uv run ops progress show usr.data-plane.promoter-study-status --json`
-- Command preflight:
-  `uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
-- To pin a non-active study or run from outside the repo checkout, add:
-  `--repo-root <repo-root> --study-dir docs/studies/<study-id>`
-- The repo-local promoter-study skill lives at `.agents/skills/promoter-study-status/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the two `ops progress` commands above directly.
-- The repo-local retron hairpin study skill lives at `.agents/skills/retron-hairpin-study/SKILL.md`, but native project-scope skill discovery only picks it up when Codex is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the pinned `cruncher-study-status` and `cruncher-study-preflight` commands above directly.
-- Read `docs/studies/index.yaml` first.
-- If the request names a checked-in study that is not `active_study_id`, pin it
-  with `--study-dir docs/studies/<study-id>` instead of treating the registry
-  selector as a redirect.
-- `active_study_id` must name a study declared under `studies:`.
-- The selected study entry must declare `family` and `record_root`.
-- The selected study directory must contain `campaign.yaml`, `datasets.yaml`,
-  `status.md`, and `ops.study.yaml`.
-- `ops.study.yaml` is the OPS-facing source of lifecycle phase order, record
-  sources, declared execution surfaces, repo snapshot summary scope, and
-  preflight scope/check posture.
-- If `routes.md` exists, treat it as the study-owned cross-tool handoff page
-  rather than expanding the status note into a workflow encyclopedia.
-- If `pipeline.yaml` exists, treat it as supplemental study-owned runtime
-  context for exact Construct, Infer, batch, or Notify details that are not
-  already declared in `ops.study.yaml`; do not reconstruct those paths from
-  generic workspace docs.
-- Use `ops progress show usr.data-plane.promoter-study-status` for the cheap
-  record-plane snapshot, then escalate to
-  `ops progress show usr.data-plane.promoter-study-preflight --scope next --command-timeout-seconds 30 --json`
-  when the question is "what should run next?" or "which execution-readiness
-  blockers remain right now?" Use the returned ontology fields such as
-  `observes_plane`, `summary_scope`, `scope`, `phase_id`, `group_id`, `kind`,
-  `surface_id`, and `artifact_id` when you summarize blockers.
-- If the registry and directory contents disagree, fail visibly and fix the
-  registry before asking agents for live study status.
+Those helpers must stay narrow. If behavior becomes reusable outside one study,
+promote it into the owning generic package or an explicitly shared contract
+instead of growing a study-local tool.
 
 ### Related docs
 
-- [Promoter study status contract](../../src/dnadesign/usr/docs/operations/promoter-study-status-contract.md)
-- [Promoter study preflight contract](../../src/dnadesign/usr/docs/operations/promoter-study-preflight.md)
-- [stress_ethanol_cipro_growth route map](stress_ethanol_cipro_growth/routes.md)
-- [Promoter study index template](../templates/promoter-study-index.yaml)
-- [Promoter study datasets template](../templates/promoter-study-datasets.yaml)
-- [Promoter study status template](../templates/promoter-study-status.md)
-- [Promoter study OPS contract template](../templates/promoter-study-ops.study.yaml)
+- [Study reference docs](reference/README.md)
+- [Study status and preflight surfaces](reference/study-status-ops-surfaces.md)
+- [Study record authoring](reference/study-record-authoring.md)
+- [Study index](index.yaml)
+- [Retron hairpin route map](retron_hairpin_design/routes/README.md)
+- [Stress ethanol/cipro route map](stress_ethanol_cipro_growth/routes/README.md)
+- [Stress ethanol/cipro status contract](stress_ethanol_cipro_growth/operations/catalog/contracts/status.md)
+- [Stress ethanol/cipro preflight contract](stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md)
+- [Eco1 RT repack route map](eco1_rt_repack/routes/README.md)
 - [Documentation index](../README.md)

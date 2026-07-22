@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/scar_nick_visual_v1.py
 
 Shared scar-nick visual contract for terminal scar-nick QA rendering.

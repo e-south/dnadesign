@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_logic_fidelity_closeness.py
 
-Plots observed label logic fidelity vs closeness for SFXI campaigns. Reads
-ledger labels and run metadata for setpoint context.
+Plots observed label logic fidelity vs closeness for SFXI campaigns. Reads.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +17,19 @@ from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._mpl_utils import annotate_plot_meta, ensure_mpl_config_dir
+from ._mpl_utils import (
+    COLORBLIND_PALETTE,
+    DEFAULT_LANDSCAPE_FIGSIZE,
+    DEFAULT_SQUARE_FIGSIZE,
+    add_flush_colorbar,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    ensure_mpl_config_dir,
+    math_label,
+    save_notebook_square_figure,
+    sequential_colormap,
+)
+from .sfxi_diag_data import parse_setpoint_from_runs
 
 if TYPE_CHECKING:
     import numpy as np
@@ -36,15 +47,27 @@ def _import_pyarrow():
 @register_plot(
     "sfxi_logic_fidelity_closeness",
     meta=PlotMeta(
-        summary="Logic fidelity vs closeness to setpoint (observed labels).",
+        summary="Observed SFXI logic closeness to the setpoint by round.",
         params={
             "top_percentile": "Optional percentile cutoff for highlighting.",
             "violin": "Show violin distributions (default true).",
             "on_violin_invalid": "error|line (default error).",
             "setpoint_override": "Override setpoint vector (length-4).",
         },
-        requires=["observed_round", "y_obs", "objective__params"],
+        requires=["observed_round", "y_obs", "objective__defs_json"],
         notes=["Reads outputs/ledger/labels.parquet + outputs/ledger/runs.parquet for setpoint."],
+        data_shape="observed label agreement matrix",
+        tidy_schema=["observed_round", "mse"],
+        objective_family="sfxi",
+        data_layer="labels_objective",
+        round_scope="single_or_round_history",
+        label_requirement="required",
+        failure_modes=[
+            "missing labels or runs ledger",
+            "invalid length-8 observed label vectors",
+            "missing setpoint metadata",
+            "insufficient points for violin mode",
+        ],
     ),
 )
 def render(context, params: dict) -> None:
@@ -52,8 +75,9 @@ def render(context, params: dict) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
-    from mpl_toolkits.axes_grid1 import axes_size, make_axes_locatable
+    import polars as pl
 
+    apply_plot_style()
     arrow_pc, ds = _import_pyarrow()
     # ---- Parameters (assertive, yet simple to change) ----
     # Source is now *observed* labels (outputs/ledger/labels.parquet) instead of predictions.
@@ -64,13 +88,10 @@ def render(context, params: dict) -> None:
         if not (0.0 < top_percentile <= 100.0):
             raise ValueError("top_percentile must be in (0, 100].")
 
-    cmap = str(params.get("cmap", "Greys"))
+    cmap = sequential_colormap(params.get("cmap", "opal_seafoam"))
     # Geometry: keep both main panels square (1:1). Allow explicit figsize_in to tune fonts vs. plot area.
     panel_size_in = float(params.get("panel_size_in", 4.0))  # used if no figsize_in
     figsize_in = params.get("figsize_in")  # optional [W,H] in inches
-    cbar_w_in = float(params.get("cbar_width_in", 0.30))
-    cbar_pad_in = float(params.get("cbar_pad_in", 0.06))
-    gap_in = float(params.get("gap_between_panels_in", 0.40))
     use_violin = bool(params.get("violin", True))
     violin_alpha = float(params.get("violin_alpha", 0.55))
     violin_width = float(params.get("violin_width", 0.9))
@@ -139,13 +160,6 @@ def render(context, params: dict) -> None:
     if df.empty:
         raise ValueError("outputs/ledger/labels.parquet had zero rows for the requested rounds.")
 
-    # Resolve setpoint: override > specific round > latest
-    def _extract_setpoint(obj):
-        try:
-            return [float(x) for x in (obj or {}).get("setpoint_vector", [])]
-        except Exception:
-            return None
-
     # Param overrides for setpoint (optional but assertive)
     sp_override = params.get("setpoint") or params.get("setpoint_override")
     sp_round = params.get("setpoint_round")  # int (as_of_round in outputs/ledger/runs.parquet)
@@ -155,33 +169,22 @@ def render(context, params: dict) -> None:
             raise ValueError("setpoint_override must be a finite length-4 vector.")
         setpoint = sp_arr
     else:
-        druns = ds.dataset(str(runs_path))
-        nn = {f.name for f in druns.schema}
-        need_runs = {"as_of_round", "objective__params"}
-        miss = sorted(need_runs - nn)
-        if miss:
-            raise ValueError(f"outputs/ledger/runs.parquet missing columns: {miss}")
+        runs = pl.read_parquet(runs_path)
+        if context.run_id is not None:
+            runs = runs.filter(pl.col("run_id") == str(context.run_id))
         if sp_round is None:
-            # Pick the latest run that has a setpoint
-            meta = druns.to_table(columns=list(need_runs)).to_pandas()
-            meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
-            meta = meta.dropna(subset=["setpoint"])
-            if meta.empty:
-                raise ValueError("No setpoint_vector found in outputs/ledger/runs.parquet objective__params.")
-            meta = meta.sort_values(["as_of_round"]).tail(1)
-            setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
+            latest = int(runs["as_of_round"].max())
+            runs = runs.filter(pl.col("as_of_round") == latest)
         else:
             try:
                 sp_round = int(sp_round)
             except Exception as e:
                 raise ValueError("setpoint_round must be an integer.") from e
-            filt_r = arrow_pc.field("as_of_round") == sp_round
-            meta = druns.to_table(columns=list(need_runs), filter=filt_r).to_pandas()
-            meta["setpoint"] = meta["objective__params"].map(_extract_setpoint)
-            meta = meta.dropna(subset=["setpoint"])
-            if meta.empty:
-                raise ValueError(f"No setpoint_vector found in outputs/ledger/runs.parquet for as_of_round={sp_round}.")
-            setpoint = np.asarray(list(meta["setpoint"].iloc[0]), dtype=float).ravel()
+            runs = runs.filter(pl.col("as_of_round") == sp_round)
+        setpoint = np.asarray(
+            parse_setpoint_from_runs(runs, selection_view_id=context.selection_view_id),
+            dtype=float,
+        ).ravel()
 
     if setpoint.size != 4 or not np.all(np.isfinite(setpoint)):
         raise ValueError("Resolved setpoint must be a finite length-4 vector.")
@@ -235,85 +238,48 @@ def render(context, params: dict) -> None:
     mean_logic = np.vstack(mean_logic)
 
     # Stack target (first row) + per-round means into a single heatmap
-    labels_y = ["target"] + [f"r{r}" for r in rows]
+    labels_y = ["Target"] + [f"R{r}" for r in rows]
     heat = np.vstack([setpoint[None, :], mean_logic])
     if heat.shape[1] != 4:
         raise ValueError("Expected 4 logic dimensions for SFXI plots.")
 
-    # ---- Figure layout: two square panels + cbar. If figsize_in provided, derive panel size from it.
+    # ---- Figure layout: heatmap plus MSE panel. The SFXI heatmap has 4 columns
+    # and many round rows, so a side-by-side landscape layout avoids overlap.
     if figsize_in is not None:
-        fig_w, fig_h = float(figsize_in[0]), float(figsize_in[1])
-        # Choose the largest square side that fits both panels + cbar + gap
-        side = min(fig_h, (fig_w - gap_in - cbar_pad_in - cbar_w_in) / 2.0)
-        side = max(0.5, side)
-        left_block_w = side + cbar_pad_in + cbar_w_in
-        right_block_w = side
-        figsize = (fig_w, fig_h)
+        figsize = (float(figsize_in[0]), float(figsize_in[1]))
     else:
-        left_block_w = panel_size_in + cbar_pad_in + cbar_w_in
-        right_block_w = panel_size_in
-        fig_w = left_block_w + gap_in + right_block_w
-        fig_h = panel_size_in
-        figsize = (fig_w, fig_h)
+        figsize = (10.8, 5.4)
 
-    plt.rcParams.update(
-        {
-            "axes.titlesize": 18,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 12,
-            "ytick.labelsize": 12,
-        }
+    fig, (ax_hm, ax_mse) = plt.subplots(
+        1,
+        2,
+        figsize=figsize if figsize != DEFAULT_SQUARE_FIGSIZE else DEFAULT_LANDSCAPE_FIGSIZE,
+        gridspec_kw={"width_ratios": [0.85, 1.0], "wspace": 0.40},
     )
-    # Build two axes (heatmap block | MSE). Attach the colorbar to heatmap with inch-precise pad.
-    fig = plt.figure(figsize=figsize)  # explicit spacing control
-    gs = fig.add_gridspec(1, 2, width_ratios=[left_block_w, right_block_w])
-    ax_hm = fig.add_subplot(gs[0, 0])
-    ax_mse = fig.add_subplot(gs[0, 1])
-    # Convert inch gap to fractional wspace
-    avg_ax_w_in = 0.5 * (left_block_w + right_block_w)
-    fig.subplots_adjust(wspace=gap_in / max(avg_ax_w_in, 1e-6))
 
-    # Style: hide top/right spines
-    for ax in (ax_hm, ax_mse):
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
+    apply_notebook_axes_style(ax_hm, grid=False, square=False)
+    apply_notebook_axes_style(ax_mse, square=False)
 
-    # Left: grayscale heatmap, square cells, shared bottom x-axis tick labels only
+    # Left: mean observed logic by round. aspect='equal' keeps each heatmap cell square.
     im = ax_hm.imshow(
         heat,
-        aspect="equal",  # square cells
+        aspect="equal",
         vmin=0.0,
         vmax=1.0,
         cmap=cmap,
         interpolation="nearest",
     )
-    # Make the left axes square independent of data aspect
-    try:
-        ax_hm.set_box_aspect(1.0)
-    except Exception:
-        ax_hm.set_aspect("equal", adjustable="box")
     ax_hm.set_yticks(np.arange(heat.shape[0]))
     ax_hm.set_yticklabels(labels_y)
     ax_hm.set_xticks(np.arange(4))
-    ax_hm.set_xticklabels(["v00", "v10", "v01", "v11"])
-    ax_hm.set_xlabel("Logic components")
-    ax_hm.set_title("SFXI logic (0–1) — target + mean by round (grayscale)")
+    ax_hm.set_xticklabels(["v00", "v10", "v01", "v11"], rotation=45, ha="right")
+    ax_hm.set_xlabel("Logic component")
+    ax_hm.set_ylabel("Observed round")
+    ax_hm.set_title("Observed logic vs target")
 
-    # colorbar: append next to heatmap with an exact pad/width (inches)
-    divider = make_axes_locatable(ax_hm)
-    cax = divider.append_axes(
-        "right",
-        size=axes_size.Fixed(cbar_w_in),  # inches
-        pad=axes_size.Fixed(cbar_pad_in),  # inches
-    )
-    cbar = fig.colorbar(im, cax=cax, orientation="vertical")
-    cbar.ax.set_ylabel("logic value", rotation=90, va="center")
+    add_flush_colorbar(fig, ax_hm, im, label="Logic value")
 
     # Right: closeness vs setpoint distributions (violin by default; mean line if not)
-    try:
-        ax_mse.set_box_aspect(1.0)
-    except Exception:
-        ax_mse.set_aspect("equal", adjustable="box")
     title_suffix = "" if top_percentile is None else f" (top {top_percentile:.0f}%)"
 
     # ---- Decide how to draw the right panel (assertive preflight, no hidden fallbacks)
@@ -350,37 +316,34 @@ def render(context, params: dict) -> None:
             showextrema=False,
         )
         for body in parts["bodies"]:
+            body.set_facecolor(COLORBLIND_PALETTE[0])
+            body.set_edgecolor("#444444")
+            body.set_linewidth(0.7)
             body.set_alpha(violin_alpha)
         parts["cmeans"].set_alpha(min(1.0, violin_alpha + 0.2))
-        ax_mse.set_ylabel("MSE vs setpoint")
-        ax_mse.set_title("Pool closeness (violin)" + title_suffix)
+        ax_mse.set_ylabel(math_label("mse_to_reference"))
+        ax_mse.set_title("Observed-label MSE by round" + title_suffix)
     else:
-        ax_mse.plot(rows, mse_series, marker="o", linewidth=2.0)
-        ax_mse.set_ylabel("MSE vs setpoint")
+        ax_mse.axhline(0.0, color="#B8B8B8", linewidth=0.9, linestyle="--", zorder=0)
+        ax_mse.plot(
+            rows,
+            mse_series,
+            marker="o",
+            color=COLORBLIND_PALETTE[0],
+            linewidth=2.2,
+            markersize=6,
+        )
+        ax_mse.set_ylabel(math_label("mse_to_reference"))
         subtitle = "mean line (auto)" if use_violin else "mean line"
-        ax_mse.set_title(f"Pool closeness — {subtitle}" + title_suffix)
+        ax_mse.set_title(f"Observed-label MSE, {subtitle}" + title_suffix)
     ax_mse.set_xlabel("Observed round")
     ax_mse.set_xticks(rows)
 
-    # Annotate + log
-    sp_str = "[" + ", ".join(f"{v:.2f}" for v in list(setpoint)) + "]"
-    annotate_plot_meta(
-        ax_hm,
-        hue=None,
-        size_by=None,
-        alpha=None,
-        rasterized=False,
-        extras={
-            "setpoint": sp_str,
-            "top%": (f"{top_percentile:.0f}" if top_percentile else "all"),
-            "source": "y_obs (outputs/ledger/labels.parquet)",
-        },
-    )
     context.logger.info(
         "params sfxi_logic_fidelity_closeness: source=labels rounds=%s figsize=%s panel=%.2f top_percentile=%s coerce_clip=%s draw=%s violin_min_pts=%d nonzero_var=%s",  # noqa
         rows,
         (figsize if figsize_in is not None else "(auto)"),
-        (right_block_w if figsize_in is not None else panel_size_in),
+        panel_size_in,
         (f"{top_percentile:.0f}" if top_percentile else "all"),
         bool(coerce_clip),
         ("violin" if draw_violin else "line"),
@@ -390,7 +353,8 @@ def render(context, params: dict) -> None:
 
     # Save
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    fig.subplots_adjust(left=0.10, right=0.94, bottom=0.16, top=0.86, wspace=0.42)
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:

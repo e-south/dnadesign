@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/utils.py
+
+Core runtime primitives for utils OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -53,6 +55,11 @@ class LedgerError(OpalError):
 
 class RunError(OpalError):
     pass
+
+
+class LeakageContractError(OpalError):
+    def __init__(self, message: str):
+        super().__init__(message, ExitCodes.CONTRACT_VIOLATION)
 
 
 # -----------------------

@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/notebook_service.py
 
-Author(s): Eric J. South
+Application services for notebook service Cruncher app.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

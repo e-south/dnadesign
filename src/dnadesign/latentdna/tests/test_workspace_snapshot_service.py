@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_workspace_snapshot_service.py
+
+Regression tests for workspace snapshot service LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -6,8 +17,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from dnadesign.latentdna.src.services.workspace_snapshot_service import (
-    _decision_ladder,
     _model_families,
+    decision_ladder,
     workspace_snapshot,
 )
 
@@ -49,7 +60,7 @@ def test_decision_ladder_excludes_appendix_only_deliverables() -> None:
         )
     )
 
-    assert _decision_ladder(context) == [
+    assert decision_ladder(context) == [
         "dataset_overview",
         "workspace_snapshot_export",
     ]
@@ -129,7 +140,11 @@ views:
         encoding="utf-8",
     )
 
-    snapshot = workspace_snapshot(workspace_dir)
+    snapshot = workspace_snapshot(workspace_dir, write=False)
 
     assert "native" in snapshot["sources"]
     assert "future_core60_features" not in snapshot["sources"]
+    assert not (workspace_dir / "outputs" / "status" / "workspace_snapshot.json").exists()
+
+    workspace_snapshot(workspace_dir)
+    assert (workspace_dir / "outputs" / "status" / "workspace_snapshot.json").is_file()

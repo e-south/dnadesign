@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/rounds.py
+
+Core runtime primitives for rounds OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

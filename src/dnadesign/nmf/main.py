@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-nmf/main.py
+dnadesign
+src/dnadesign/nmf/main.py
+
+CLI entrypoint for NMF.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

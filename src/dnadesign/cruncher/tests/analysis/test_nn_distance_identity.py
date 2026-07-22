@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_nn_distance_identity.py
+
+Regression tests for nn distance identity Cruncher analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

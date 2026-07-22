@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/common.py
 
 Shared model helpers for cassette visual contracts.

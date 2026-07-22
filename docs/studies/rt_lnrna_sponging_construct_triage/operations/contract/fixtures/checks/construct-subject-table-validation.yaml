@@ -1,0 +1,19 @@
+fixture_id: construct-subject-table-validation
+expected_status: pass_with_genbank_source_authority_and_construct_representability_manifest
+source_authority_registry: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml
+construct_projection_manifest: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct/construct-projection-manifest.yaml
+candidate_fixture_paths:
+  - docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron26-working-anchor.yaml
+  - docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/fixtures/construct-subjects/retron43-failed-anchor.yaml
+expected_construct_subject_ids:
+  - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+expected_blockers:
+  - real_sponging_assay_observations_absent
+forbidden_core_fields:
+  - perturbation_class
+  - cloning_constraint_set
+  - representation_result
+label_separation:
+  abundance_prior_overlay_ids: metadata_only
+  sponging_assay_observation_ids: future_label_source

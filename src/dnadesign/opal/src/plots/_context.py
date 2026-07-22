@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/_context.py
+
+Plot builders for context OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -10,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -26,6 +28,7 @@ class PlotContext:
     workspace: CampaignWorkspace
     rounds: str | list[int]  # "unspecified" | "latest" | "all" | [ints]
     run_id: str | None  # explicit run_id (required when multiple runs per round)
+    selection_view_id: str
     data_paths: dict[str, Path]  # built-ins + YAML data entries (resolved)
     output_dir: Path
     filename: str  # final filename (with round suffix applied)
@@ -33,6 +36,8 @@ class PlotContext:
     format: str  # "png" (default) | "svg" | "pdf"
     logger: logging.Logger
     save_data: bool  # if true, plugins should save tidy data
+    saved_data_paths: list[Path] = field(default_factory=list)
+    artifact_metadata: dict[str, object] = field(default_factory=dict)
 
     def save_df(self, df: "pd.DataFrame", filename: str | None = None) -> Path:
         """
@@ -44,4 +49,5 @@ class PlotContext:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         target = self.output_dir / (filename or (self.filename.rsplit(".", 1)[0] + ".csv"))
         df.to_csv(target, index=False)
+        self.saved_data_paths.append(target)
         return target

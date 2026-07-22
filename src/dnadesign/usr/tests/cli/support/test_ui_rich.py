@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/cli/support/test_ui_rich.py
 
 Rich table rendering tests for USR CLI output.

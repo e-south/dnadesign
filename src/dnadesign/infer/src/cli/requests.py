@@ -6,7 +6,6 @@ src/dnadesign/infer/src/cli/requests.py
 CLI request assembly helpers for infer extract and generate commands.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

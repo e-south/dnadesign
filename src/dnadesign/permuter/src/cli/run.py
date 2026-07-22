@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/cli/run.py
+
+CLI wiring for run Permuter CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,15 +20,15 @@ from typing import Any, Dict, Iterable, Optional
 
 import numpy as np
 import pandas as pd
-import yaml
 from rich.console import Console
 
-from dnadesign.permuter.src.core.config import JobConfig
+from dnadesign.permuter.src.cli.output import emit_json
+from dnadesign.permuter.src.core.config import ScopeConfig
 from dnadesign.permuter.src.core.ids import derive_seed64, variant_id
 from dnadesign.permuter.src.core.paths import (
     expand_param_paths,
     resolve,
-    resolve_job_hint,
+    resolve_workspace_config_hint,
 )
 from dnadesign.permuter.src.core.registry import get_protocol
 from dnadesign.permuter.src.core.storage import (
@@ -38,31 +40,16 @@ from dnadesign.permuter.src.core.storage import (
     write_ref_protein_fasta,
 )
 from dnadesign.permuter.src.core.usr import make_usr_row
+from dnadesign.permuter.src.workspaces.loader import load_workspace
 
 console = Console()
 _LOG = logging.getLogger("permuter.run")
 
 
-def _load_job(path: str | Path) -> tuple[JobConfig, Path]:
-    job_path = resolve_job_hint(Path(path))
-    data = yaml.safe_load(job_path.read_text(encoding="utf-8"))
-    try:
-        return JobConfig.model_validate(data), job_path
-    except Exception as e:
-        raise ValueError(f"Invalid job YAML ({job_path}): {e}") from e
-
-
-def _load_refs(cfg: JobConfig, base_dir: Path) -> pd.DataFrame:
-    refs_path = (
-        (base_dir / cfg.job.input.refs) if not Path(cfg.job.input.refs).is_absolute() else Path(cfg.job.input.refs)
-    )
-    if not refs_path.exists():
-        raise FileNotFoundError(f"Refs CSV not found: {refs_path}")
-    df = pd.read_csv(refs_path, dtype=str)
-    need = {cfg.job.input.name_col, cfg.job.input.seq_col}
-    if not need.issubset(df.columns):
-        raise ValueError(f"Refs CSV must contain columns {need}, got {list(df.columns)}")
-    return df
+def _load_config(path: str | Path) -> tuple[ScopeConfig, Path]:
+    config_path = resolve_workspace_config_hint(Path(path))
+    workspace = load_workspace(config_path)
+    return workspace.config, workspace.config_path
 
 
 def _pick_reference(df: pd.DataFrame, name_col: str, seq_col: str, desired: Optional[str]) -> tuple[str, str]:
@@ -87,15 +74,13 @@ def _variants_stream(
     sequence: str,
     *,
     seed: int,
-    job_dir: Path,
+    workspace_dir: Path,
     dataset_dir: Path,
 ) -> Iterable[Dict[str, Any]]:
     proto_cls = get_protocol(protocol_name)
     proto = proto_cls()
-    # Resolve all job-relative file params recursively.
-    params_resolved = expand_param_paths(params or {}, job_dir=job_dir)
-    # Pass job_dir for protocol-side fallback when run programmatically.
-    params_resolved["_job_dir"] = str(job_dir)
+    params_resolved = expand_param_paths(params or {}, workspace_dir=workspace_dir)
+    params_resolved["_workspace_dir"] = str(workspace_dir)
     params_resolved["_artifact_dir"] = str(dataset_dir)
     proto.validate_cfg(params=params_resolved)
     rng = np.random.default_rng(seed)
@@ -114,33 +99,40 @@ def _argv() -> str:
         return " ".join(sys.argv)
 
 
-def run(job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: bool = False):
+def run(
+    workspace: str | Path,
+    ref: Optional[str],
+    out: Optional[Path],
+    overwrite: bool = False,
+    as_json: bool = False,
+) -> dict[str, object]:
     t0 = time.time()
-    job_path = resolve_job_hint(Path(str(job)))
-    cfg, job_path = _load_job(job)
+    cfg, config_path = _load_config(workspace)
     # Resolve all paths in one place
     jp = resolve(
-        job_yaml=job_path,
-        refs=cfg.job.input.refs,
-        output_dir=cfg.job.output.dir,
+        config_yaml=config_path,
+        refs=cfg.scope.input.refs,
+        output_dir=cfg.scope.output.dir,
         ref_name="__PENDING__",
         out_override=out,
-        layout=getattr(cfg.job.output, "layout", None),
+        layout=getattr(cfg.scope.output, "layout", None),
     )
     df_refs = pd.read_csv(jp.refs_csv, dtype=str)
-    console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
-    desired = ref or getattr(cfg.job.input, "reference_sequence", None)
-    ref_name, ref_seq = _pick_reference(df_refs, cfg.job.input.name_col, cfg.job.input.seq_col, desired)
-    console.print(f"[dim]Using reference[/dim] [bold]{ref_name}[/bold]")
+    if not as_json:
+        console.print(f"[cyan]Using refs CSV[/cyan]: {jp.refs_csv}")
+    desired = ref or getattr(cfg.scope.input, "reference_sequence", None)
+    ref_name, ref_seq = _pick_reference(df_refs, cfg.scope.input.name_col, cfg.scope.input.seq_col, desired)
+    if not as_json:
+        console.print(f"[dim]Using reference[/dim] [bold]{ref_name}[/bold]")
 
     # Re-resolve with actual ref_name for dataset dir
     jp = resolve(
-        job_yaml=job_path,
-        refs=cfg.job.input.refs,
-        output_dir=cfg.job.output.dir,
+        config_yaml=config_path,
+        refs=cfg.scope.input.refs,
+        output_dir=cfg.scope.output.dir,
         ref_name=ref_name,
         out_override=out,
-        layout=getattr(cfg.job.output, "layout", None),
+        layout=getattr(cfg.scope.output, "layout", None),
     )
     ensure_output_dir(jp.dataset_dir)
     # Existence & overwrite behavior
@@ -150,49 +142,52 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: boo
                 f"Dataset already exists for ref '{ref_name}': {jp.records_parquet}\n"
                 "Refuse to overwrite. Re-run with --overwrite, or choose a different --out."
             )
-        console.print(f"[yellow]Overwrite enabled[/yellow] → will replace {jp.records_parquet}")
-    console.print(f"[cyan]Dataset dir[/cyan]: {jp.dataset_dir}")
+        if not as_json:
+            console.print(f"[yellow]Overwrite enabled[/yellow] → will replace {jp.records_parquet}")
+    if not as_json:
+        console.print(f"[cyan]Dataset dir[/cyan]: {jp.dataset_dir}")
 
     # stable RNG seed derived from knobs (so hairpin protocol is reproducible)
     seed = derive_seed64(
-        job=cfg.job.name,
+        scope=cfg.scope.name,
         ref=ref_name,
-        protocol=cfg.job.permute.protocol,
-        params=cfg.job.permute.params or {},
+        protocol=cfg.scope.permute.protocol,
+        params=cfg.scope.permute.params or {},
     )
 
-    console.rule(f"[bold]Permuter run[/bold] • job={cfg.job.name} • ref={ref_name}")
+    if not as_json:
+        console.rule(f"[bold]Permuter run[/bold] • workspace={cfg.scope.name} • ref={ref_name}")
     rows: list[dict] = []
-    with console.status("[bold]Generating variants[/bold] …", spinner="dots") as st:
-        for var in _variants_stream(
-            cfg.job.permute.protocol,
-            cfg.job.permute.params or {},
-            ref_name,
-            ref_seq,
-            seed=seed,
-            job_dir=jp.job_dir,
-            dataset_dir=jp.dataset_dir,
-        ):
+    stream = _variants_stream(
+        cfg.scope.permute.protocol,
+        cfg.scope.permute.params or {},
+        ref_name,
+        ref_seq,
+        seed=seed,
+        workspace_dir=jp.workspace_dir,
+        dataset_dir=jp.dataset_dir,
+    )
+
+    def _append_rows() -> None:
+        for var in stream:
             row = make_usr_row(
                 sequence=var["sequence"],
                 bio_type=cfg.infer_bio_type(ref_seq),
-                source=f"permuter run {cfg.job.name}/{ref_name}",
+                source=f"permuter run {cfg.scope.name}/{ref_name}",
             )
-            # variant identity (stable across rebuilds)
             mods = list(var.get("modifications", []))
             row["permuter__var_id"] = variant_id(
-                job=cfg.job.name,
+                scope=cfg.scope.name,
                 ref=ref_name,
-                protocol=cfg.job.permute.protocol,
+                protocol=cfg.scope.permute.protocol,
                 sequence=var["sequence"],
                 modifications=mods,
             )
-            # standard permuter columns
-            row["permuter__job"] = cfg.job.name
+            row["permuter__scope"] = cfg.scope.name
             row["permuter__ref"] = ref_name
-            row["permuter__protocol"] = cfg.job.permute.protocol
+            row["permuter__protocol"] = cfg.scope.permute.protocol
             row["permuter__modifications"] = mods
-            row["permuter__round"] = 1  # single-pass DMS
+            row["permuter__round"] = 1
 
             for k, v in var.items():
                 if k in ("sequence", "modifications"):
@@ -201,7 +196,13 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: boo
                 row[key] = v
 
             rows.append(row)
-        st.update(status=f"[bold]Generated[/bold] {len(rows)} variants")
+
+    if as_json:
+        _append_rows()
+    else:
+        with console.status("[bold]Generating variants[/bold] …", spinner="dots") as st:
+            _append_rows()
+            st.update(status=f"[bold]Generated[/bold] {len(rows)} variants")
 
     if not rows:
         raise RuntimeError("Protocol produced zero variants")
@@ -210,17 +211,17 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: boo
     atomic_write_parquet(df, jp.records_parquet)
     write_ref_fasta(jp.dataset_dir, ref_name, ref_seq)
     # Optional authoritative protein sidecar from refs.csv if configured
-    aa_col = getattr(cfg.job.input, "aa_col", None)
+    aa_col = getattr(cfg.scope.input, "aa_col", None)
     if aa_col and aa_col in df_refs.columns:
-        aa_row = df_refs[df_refs[cfg.job.input.name_col] == ref_name]
+        aa_row = df_refs[df_refs[cfg.scope.input.name_col] == ref_name]
         aa_seq = str(aa_row.iloc[0][aa_col]).strip() if not aa_row.empty else ""
         if aa_seq:
             write_ref_protein_fasta(jp.dataset_dir, ref_name, aa_seq)
     # Initialize RECORD.md and log the command
     init_record_md(
         dataset_dir=jp.dataset_dir,
-        job_yaml=job_path,
-        job_name=cfg.job.name,
+        config_path=config_path,
+        scope_id=cfg.scope.name,
         ref_name=ref_name,
         refs_csv=jp.refs_csv,
     )
@@ -228,11 +229,11 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: boo
         jp.dataset_dir,
         "RUN",
         [
-            f"job: {cfg.job.name}",
-            f"job_yaml: {job_path}",
+            f"scope: {cfg.scope.name}",
+            f"workspace_config: {config_path}",
             f"refs_csv: {jp.refs_csv}",
             f"ref: {ref_name}",
-            f"protocol: {cfg.job.permute.protocol}",
+            f"protocol: {cfg.scope.permute.protocol}",
             f"dataset: {jp.records_parquet}",
         ],
         command=_argv(),
@@ -258,6 +259,21 @@ def run(job: str | Path, ref: Optional[str], out: Optional[Path], overwrite: boo
             {k: float(v) for k, v in hp_lens.items() if isinstance(v, (int, float))},
         )
 
-    console.print(f"[green]✔[/green] Variants: {len(df)} → {jp.records_parquet}")
-    console.print(f"Elapsed: {time.time() - t0:.2f}s")
-    console.print(f"[dim]Record:[/dim] {jp.dataset_dir / 'RECORD.md'}")
+    elapsed = time.time() - t0
+    summary: dict[str, object] = {
+        "schema": "permuter.run.v1",
+        "workspace": cfg.scope.name,
+        "ref": ref_name,
+        "dataset_dir": jp.dataset_dir,
+        "records": jp.records_parquet,
+        "row_count": len(df),
+        "output_layout": getattr(cfg.scope.output, "layout", None) or "default",
+        "elapsed_seconds": round(elapsed, 3),
+    }
+    if as_json:
+        emit_json(summary)
+    else:
+        console.print(f"[green]✔[/green] Variants: {len(df)} → {jp.records_parquet}")
+        console.print(f"Elapsed: {elapsed:.2f}s")
+        console.print(f"[dim]Record:[/dim] {jp.dataset_dir / 'RECORD.md'}")
+    return summary

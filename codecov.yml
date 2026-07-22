@@ -67,6 +67,10 @@ component_management:
       name: construct
       paths:
         - src/dnadesign/construct/**
+    - component_id: folding
+      name: folding
+      paths:
+        - src/dnadesign/folding/**
     - component_id: opal
       name: opal
       paths:
@@ -103,6 +107,10 @@ component_management:
       name: aligner
       paths:
         - src/dnadesign/aligner/**
+    - component_id: thread
+      name: thread
+      paths:
+        - src/dnadesign/thread/**
     - component_id: baserender
       name: baserender
       paths:

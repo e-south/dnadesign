@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
+src/dnadesign/tfkdanalysis/analysis.py
+
+Dunlop Lab.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

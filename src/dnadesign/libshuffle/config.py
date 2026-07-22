@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/config.py
+dnadesign
+src/dnadesign/libshuffle/config.py
 
 Loads and validates the libshuffle configuration from a YAML file.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

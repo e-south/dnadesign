@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_insertion_bidirectional.py
 
-Author(s): Eric J. South
+Regression tests for insertion bidirectional Cruncher core.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

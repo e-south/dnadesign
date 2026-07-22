@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/cassette.py
 
 CLI entrypoints for the dual-context cassette workflow.

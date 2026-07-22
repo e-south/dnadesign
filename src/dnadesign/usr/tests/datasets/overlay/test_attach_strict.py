@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/overlay/test_attach_strict.py
+
+Regression tests for attach strict USR datasets overlay.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

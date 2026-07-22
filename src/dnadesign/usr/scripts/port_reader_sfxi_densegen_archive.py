@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/port_reader_sfxi_densegen_archive.py
+
 Read-only planner and explicit writer for the Reader SFXI pDual DenseGen archive port.
 
-This is intentionally a one-off migration helper. It does not mutate Reader inputs,
-the archived DenseGen dataset, or any existing modern DenseGen dataset. The default
-CLI mode is a dry run; dataset creation requires --write.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

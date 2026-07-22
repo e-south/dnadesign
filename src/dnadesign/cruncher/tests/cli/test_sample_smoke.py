@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_sample_smoke.py
 
 CLI smoke test for a minimal two-TF sampling run (matrix PWMs).

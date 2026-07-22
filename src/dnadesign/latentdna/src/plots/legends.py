@@ -1,11 +1,20 @@
-"""Shared legend helpers for static plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/legends.py
+
+Shared legend helpers for static plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..metadata_axes import AxisStyle
-from ..visual_style import (
+from ..metadata.axes import AxisStyle
+from ..presentation.visual_style import (
     PLOT_FONT_FAMILY,
     PLOT_LEGEND_FONT_SIZE,
     TEXT_COLOR,

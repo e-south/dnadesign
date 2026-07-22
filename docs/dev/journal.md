@@ -13,6 +13,7 @@ This section lists dated entries so you can jump to a specific investigation win
 - [2026-02-15](#2026-02-15)
 - [2026-02-18](#2026-02-18)
 - [2026-03-16](#2026-03-16)
+- [2026-07-12](#2026-07-12)
 
 ### 2026-02-04
 - Investigated the reported stall in `test_round_robin_chunk_cap.py::test_stall_detected_with_no_solutions`.
@@ -245,16 +246,17 @@ This section lists dated entries so you can jump to a specific investigation win
   - `docs/exec-plans/README.md`
   - `docs/templates/README.md`
 - Added reusable templates:
-  - `docs/templates/system-of-record.md`
-  - `docs/templates/runbook.md`
-  - `docs/templates/adr.md`
-  - `docs/templates/exec-plan.md`
+  - `docs/templates/records/system-of-record.md`
+  - `docs/templates/runbooks/runbook.md`
+  - `docs/templates/records/adr.md`
+  - `docs/templates/plans/exec-plan.md`
 - Added explicit ADR policy: numbered ADRs are required for new decisions going forward; historical backfill is optional.
 - Extended docs check contract to validate relative links from root system-of-record docs, not only `docs/` plus root `README.md`.
 - SOR hardening pass implemented with CI/devtool enforcement:
   - Root SOR docs now include required metadata (`Type`, `Owner`, `Last verified`).
   - `dnadesign.devtools.docs.checks` now enforces:
-    - root SOR metadata presence/date freshness (`--max-sor-age-days`)
+    - root SOR metadata presence and the calendar-age gate that was later
+      replaced by the change-aware policy in the 2026-07-12 entry
     - execution-plan metadata and traceability link requirements for non-README files under `docs/exec-plans/`.
   - Added `dnadesign.devtools.architecture.boundaries` and wired it into the core CI lane to fail on undeclared cross-tool imports.
   - Added `dnadesign.devtools.quality.score` to generate CI-backed quality score inputs from coverage summary, baseline, and lane outcomes.
@@ -573,3 +575,13 @@ This section lists dated entries so you can jump to a specific investigation win
       - nearest project `cluster/results/`
       - `./results`
     - make checked-in job paths portable by resolving path-like params relative to the job file
+
+### 2026-07-12
+- Replaced calendar-expiry failures for documentation verification with an
+  event-relative rule: required `Last verified` metadata must cover a known
+  change to that document.
+- Local checks discover dirty Markdown files; CI passes its changed-file ledger
+  so committed changes use stable Git dates.
+- The scheduled quality entropy report keeps review-age findings as advisory
+  maintenance evidence. Missing or invalid metadata and broken evidence links
+  remain blocking.

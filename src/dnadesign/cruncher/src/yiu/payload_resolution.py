@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/payload_resolution.py
 
 Resolve YIU payload sequences from direct input or Sample hit artifacts.
-This module is the public orchestration seam; sample-hit IO details live in
-`sample_hit_sources.py`.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

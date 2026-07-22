@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-densegen project
+dnadesign
 src/dnadesign/densegen/tests/docs/test_densegen_source_module_size_contract.py
 
 Contract checks that DenseGen source modules stay below the monolith threshold.

@@ -1,15 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/metric_by_mutation_count.py
 
 Round-separated swarms with population indication (transparent violins).
-X = round (R1, R2, ...), Y = metric/objective. Color encodes mutation count.
-
-Single metric → axis label is that metric; multi → 'Objective'.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
@@ -51,7 +47,7 @@ def plot(
     elite_df: pd.DataFrame,
     all_df: pd.DataFrame,
     output_path: Path,
-    job_name: str,
+    scope_name: str,
     ref_sequence: Optional[str] = None,  # unused
     metric_id: Optional[str] = None,
     evaluators: str = "",
@@ -75,7 +71,7 @@ def plot(
         df["mut_count"] = df["permuter__modifications"].apply(_count_mods)
 
     if "permuter__round" not in df.columns:
-        raise RuntimeError(f"{job_name}: variants missing 'permuter__round' field")
+        raise RuntimeError(f"{scope_name}: variants missing 'permuter__round' field")
     rounds = sorted(df["permuter__round"].unique())
     x_pos = {r: i + 1 for i, r in enumerate(rounds)}
 
@@ -143,7 +139,7 @@ def plot(
     # title + subtitle kept inside figure to avoid clipping when saving
     ref_name = df["permuter__ref"].iloc[0] if "permuter__ref" in df.columns and not df.empty else ""
 
-    title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
+    title = f"{scope_name}{f' ({ref_name})' if ref_name else ''}"
     fig.suptitle(title, fontsize=int(round(12 * fs)), y=0.995)
     if evaluators:
         fig.text(

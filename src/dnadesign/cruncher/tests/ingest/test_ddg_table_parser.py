@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/ingest/test_ddg_table_parser.py
 
 Tests for delta-delta-G table parsing and conversion.

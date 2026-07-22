@@ -1,7 +1,7 @@
 ## Security Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-05-20
 
 ### At a glance
 This index covers security policy, secrets handling, and supply-chain hygiene references.
@@ -11,4 +11,4 @@ Start with `SECURITY.md` for system-of-record policy and follow links here for o
 - [Root security policy](../../SECURITY.md)
 - [Notify operations](../notify/README.md)
 - [USR event contracts](../notify/usr-events.md)
-- [BU SCC install guidance](../bu-scc/install.md)
+- [BU SCC install guidance](../bu-scc/setup/install.md)

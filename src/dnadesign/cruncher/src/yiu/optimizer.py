@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/optimizer.py
 
 Deterministic exhaustive optimizer for YIU v4 payload selection.

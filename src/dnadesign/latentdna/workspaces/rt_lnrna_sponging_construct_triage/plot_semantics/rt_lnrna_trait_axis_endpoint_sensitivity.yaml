@@ -1,0 +1,16 @@
+plot_id: rt_lnrna_trait_axis_endpoint_sensitivity
+question: Are fitted abundance axes stable under the configured endpoint definitions?
+decision_role: primary
+encoding: Metric-panel grid of axis-vector concordance to each trait axis primary endpoint.
+scope: Crawford and Khan trait-axis summary rows across the four intermediate candidate-X views.
+guardrails:
+  - Endpoint sensitivity is a robustness diagnostic, not an additional biological label source.
+  - DMS rows remain sensitivity projections and are not used to fit endpoint centroids.
+caption: Endpoint-definition sensitivity for fitted Crawford and Khan trait axes.
+alt_text: Metric panels showing how closely each endpoint-definition axis matches the configured primary endpoint axis.
+preprocessing_md: Uses the trait_axis_projection_summary scalar; no raw representation matrices are loaded by the plot.
+math_md: |
+  The scalar reports the dot product between each endpoint-definition axis vector and the configured primary endpoint axis for the same trait and view.
+rationale_md: Makes high-versus-low endpoint choices visible before accepting a view as a stable abundance geometry.
+limitations_md: The panel does not show row-level placement; pair it with the existence and population-placement plots.
+failure_modes_md: If primary endpoint rows are missing, the summary scalar marks the affected group insufficient before plotting.

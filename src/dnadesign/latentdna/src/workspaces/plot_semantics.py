@@ -1,4 +1,13 @@
-"""Workspace-side loading for decoupled plot semantics sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/workspaces/plot_semantics.py
+
+Workspace-side loading for decoupled plot semantics sidecars.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -18,8 +18,8 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.construct.cli import app
-from dnadesign.construct.src import seed as seed_module
+from dnadesign.construct.src.cli import app
+from dnadesign.construct.src.seeding import bootstrap as seed_module
 from dnadesign.usr import Dataset
 
 _RUNNER = CliRunner()
@@ -312,7 +312,7 @@ datasets:
 
 def test_seed_promoter_swap_demo_rejects_non_integer_slot_bounds(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "dnadesign.construct.src.seed._seed_asset_payload",
+        "dnadesign.construct.src.seeding.bootstrap._seed_asset_payload",
         lambda: {
             "demo_id": "bad_demo",
             "datasets": {"anchors": "bad_anchors", "templates": "bad_templates"},
@@ -343,7 +343,7 @@ def test_seed_promoter_swap_demo_rejects_non_integer_slot_bounds(tmp_path: Path,
 
 def test_seed_promoter_swap_demo_rejects_reversed_slot_bounds(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "dnadesign.construct.src.seed._seed_asset_payload",
+        "dnadesign.construct.src.seeding.bootstrap._seed_asset_payload",
         lambda: {
             "demo_id": "bad_demo",
             "datasets": {"anchors": "bad_anchors", "templates": "bad_templates"},

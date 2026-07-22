@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_config_resolver.py
 
-Author(s): Eric J. South
+Regression tests for config resolver Cruncher CLI.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

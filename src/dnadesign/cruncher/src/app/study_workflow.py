@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/study_workflow.py
 
 Orchestrate first-class Study runs, replays, and aggregate reporting.

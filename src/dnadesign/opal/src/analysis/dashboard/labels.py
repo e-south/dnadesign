@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/labels.py
 
-Parses label history entries for dashboard views and diagnostics. Normalizes
-label/pred events from records into analysis-ready tables.
+Parses label history entries for dashboard views and diagnostics. Normalizes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

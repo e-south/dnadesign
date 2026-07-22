@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/predict/test_predict_robustness.py
+
+Regression tests for predict robustness OPAL predict.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

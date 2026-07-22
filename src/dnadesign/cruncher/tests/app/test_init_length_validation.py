@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_init_length_validation.py
 
 Validates fixed-length constraints against PWM widths.

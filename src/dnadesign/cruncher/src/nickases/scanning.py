@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/nickases/scanning.py
 
 Shared recognition-site scanning helpers for explicit nickase-aware workflows.

@@ -1,4 +1,13 @@
-"""Distribution renderers for static and notebook plot surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/distribution.py
+
+Distribution renderers for static and notebook plot surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,9 +19,10 @@ import pyarrow.parquet as pq
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...labels import humanize_candidate
-from ...metadata_axes import AxisStyle, normalize_axis_categories
-from ...visual_style import PUBLICATION_PALETTE, humanize_display_text, wrap_plot_title
+from ...metadata.axes import AxisStyle, normalize_axis_categories
+from ...presentation.labels import humanize_candidate
+from ...presentation.visual_style import PUBLICATION_PALETTE, humanize_display_text, wrap_plot_title
+from ...stats.rank import kendall_tau_b, linear_r2, spearman_correlation
 from ...workspaces.loader import WorkspaceContext
 from ..axes import (
     apply_axes_style,
@@ -67,49 +77,8 @@ def _coerce_float(value: object) -> float | None:
     return coerced if np.isfinite(coerced) else None
 
 
-def _rankdata(values: np.ndarray) -> np.ndarray:
-    order = np.argsort(values, kind="mergesort")
-    ranks = np.empty(values.size, dtype=np.float64)
-    sorted_values = values[order]
-    start = 0
-    while start < values.size:
-        end = start + 1
-        while end < values.size and sorted_values[end] == sorted_values[start]:
-            end += 1
-        ranks[order[start:end]] = (start + end - 1) / 2.0
-        start = end
-    return ranks
-
-
-def _spearman_rho(x_values: list[float], y_values: list[float]) -> float | None:
-    if len(x_values) < 3 or len(y_values) < 3:
-        return None
-    x = np.asarray(x_values, dtype=np.float64)
-    y = np.asarray(y_values, dtype=np.float64)
-    finite = np.isfinite(x) & np.isfinite(y)
-    if int(finite.sum()) < 3:
-        return None
-    x_ranks = _rankdata(x[finite])
-    y_ranks = _rankdata(y[finite])
-    if np.std(x_ranks) == 0.0 or np.std(y_ranks) == 0.0:
-        return None
-    return float(np.corrcoef(x_ranks, y_ranks)[0, 1])
-
-
-def _linear_r2(x_values: list[float], y_values: list[float]) -> float | None:
-    if len(x_values) < 3 or len(y_values) < 3:
-        return None
-    x = np.asarray(x_values, dtype=np.float64)
-    y = np.asarray(y_values, dtype=np.float64)
-    finite = np.isfinite(x) & np.isfinite(y)
-    if int(finite.sum()) < 3:
-        return None
-    x = x[finite]
-    y = y[finite]
-    if np.std(x) == 0.0 or np.std(y) == 0.0:
-        return None
-    pearson = float(np.corrcoef(x, y)[0, 1])
-    return pearson * pearson
+def _finite_statistic(value: float) -> float | None:
+    return float(value) if np.isfinite(value) else None
 
 
 def _linear_fit_coefficients(x_values: list[float], y_values: list[float]) -> tuple[float, float] | None:
@@ -176,7 +145,10 @@ def _render_ordinal_swarm(
     median_points: list[tuple[float, float]] = []
     category_sizes: list[int] = []
     order_to_positions: dict[float, list[float]] = {}
-    max_points_per_category = 700
+    # Dense source overlays can contain thousands of rows per ordinal class.
+    # Keep the visual layer bounded while preserving all rows for the fitted
+    # statistics and endpoint summaries above.
+    max_points_per_category = 250
     for category in categories:
         category_rows = [
             row for row, row_category in zip(rows, category_values, strict=True) if row_category == category
@@ -186,7 +158,9 @@ def _render_ordinal_swarm(
             dtype=np.float32,
         )
         rank_values = [
-            _coerce_float(row.get("ordinal_plot_order")) or float(category_to_position[category])
+            order_value
+            if (order_value := _coerce_float(row.get("ordinal_plot_order"))) is not None
+            else float(category_to_position[category])
             for row in category_rows
             if _coerce_float(row.get(metric_column)) is not None
         ]
@@ -207,7 +181,7 @@ def _render_ordinal_swarm(
         if order_value is not None:
             order_to_positions.setdefault(order_value, []).append(x_center)
         jitter = rng.uniform(-0.18, 0.18, size=plotted_values.size)
-        point_size = 36.0 if plotted_values.size == 1 else 24.0
+        point_size = 36.0 if plotted_values.size == 1 else 20.0
         ax.scatter(
             np.full(plotted_values.size, x_center, dtype=np.float32) + jitter,
             plotted_values,
@@ -279,12 +253,18 @@ def _render_ordinal_swarm(
         ha="center" if len(categories) <= 9 else "right",
     )
     ax.set_xlim(0.35, len(categories) + 0.65)
-    rho = _spearman_rho(stat_x, stat_y)
-    r2 = _linear_r2(stat_x, stat_y)
+    rho = _finite_statistic(spearman_correlation(stat_x, stat_y, min_pairs=3))
+    # The pure-Python Kendall implementation is quadratic in row count. Large
+    # review overlays keep Spearman/R2 on all rows and omit Kendall from the
+    # panel callout rather than blocking interactive notebook filtering.
+    tau_b = _finite_statistic(kendall_tau_b(stat_x, stat_y, min_pairs=3)) if len(stat_y) <= 1_500 else None
+    r2 = _finite_statistic(linear_r2(stat_x, stat_y, min_pairs=3))
     if rho is not None:
-        stat_label = f"Ordinal-order rho={rho:.2f}"
+        stat_label = f"Spearman ρ={rho:.2f}"
+        if tau_b is not None:
+            stat_label = f"{stat_label}\nKendall τb={tau_b:.2f}"
         if r2 is not None:
-            stat_label = f"{stat_label}\nlinear R^2={r2:.2f}"
+            stat_label = f"{stat_label}\nlinear R²={r2:.2f}"
         ax.text(
             0.03,
             0.97,

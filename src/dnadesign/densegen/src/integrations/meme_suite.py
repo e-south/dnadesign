@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/integrations/meme_suite.py
+dnadesign
+src/dnadesign/densegen/src/integrations/meme_suite.py
 
 Lightweight MEME Suite tool resolution for DenseGen.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

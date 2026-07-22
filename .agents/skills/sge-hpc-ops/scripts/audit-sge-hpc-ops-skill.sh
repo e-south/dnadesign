@@ -75,7 +75,7 @@ require_file "$ROOT_DIR/references/automation-qa-preflight.md"
 require_file "$ROOT_DIR/references/ci-mechanical-gates.md"
 require_file "$ROOT_DIR/references/workload-dnadesign.md"
 require_file "$ROOT_DIR/references/bu-scc-system-usage.md"
-require_file "$ROOT_DIR/references/source-evidence.md"
+require_file "$ROOT_DIR/references/external-sources.md"
 require_file "$ROOT_DIR/references/session-status-reporting.md"
 require_file "$ROOT_DIR/references/user-status-contract.md"
 require_file "$ROOT_DIR/references/submission-shape-advisor.md"
@@ -667,7 +667,7 @@ required_urls=(
 )
 
 for url in "${required_urls[@]}"; do
-  if rg -Fq "$url" "$ROOT_DIR/references/source-evidence.md"; then
+  if rg -Fq "$url" "$ROOT_DIR/references/external-sources.md"; then
     pass "source evidence includes $url"
   else
     fail "source evidence missing $url"
@@ -681,14 +681,14 @@ for url in "${required_urls[@]}"; do
 done
 
 for claim in "5 interactive jobs" "10 GB" "75,000" "scc-globus.bu.edu" "15 min"; do
-  if rg -Fq "$claim" "$ROOT_DIR/references/bu-scc-system-usage.md" "$ROOT_DIR/references/source-evidence.md"; then
+  if rg -Fq "$claim" "$ROOT_DIR/references/bu-scc-system-usage.md" "$ROOT_DIR/references/external-sources.md"; then
     pass "volatile claim coverage includes: $claim"
   else
     fail "volatile claim coverage missing: $claim"
   fi
 done
 
-if python3 - "$ROOT_DIR/references/source-evidence.md" <<'PY'; then
+if python3 - "$ROOT_DIR/references/external-sources.md" <<'PY'; then
 import datetime
 import pathlib
 import re

@@ -111,7 +111,7 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
         assert all(box.loc == 2 for box in tier_boxes)
         assert all(box.txt._text.get_fontsize() >= 6.6 for box in tier_boxes)
     finally:
-        fig.clf()
+        plt.close(fig)
 
 
 def test_stage_a_strata_overview_accepts_regulator_id_columns() -> None:
@@ -153,7 +153,7 @@ def test_stage_a_strata_overview_accepts_regulator_id_columns() -> None:
     try:
         assert fig.axes
     finally:
-        fig.clf()
+        plt.close(fig)
 
 
 def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
@@ -196,7 +196,7 @@ def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
     try:
         assert ax_right.get_xlim()[1] >= len(long_tfbs)
     finally:
-        fig.clf()
+        plt.close(fig)
 
 
 def test_stage_a_strata_overview_xlims_cover_all_regulators() -> None:
@@ -251,7 +251,7 @@ def test_stage_a_strata_overview_xlims_cover_all_regulators() -> None:
         dashed = [line for line in axes_left[0].lines if line.get_linestyle() == "--"]
         assert len(dashed) >= 2
     finally:
-        fig.clf()
+        plt.close(fig)
 
 
 def test_draw_tier_markers_caps_height_and_adds_box() -> None:
@@ -280,7 +280,7 @@ def test_draw_tier_markers_caps_height_and_adds_box() -> None:
         edge = box.patch.get_edgecolor()
         assert edge[-1] == 0.0
     finally:
-        fig.clf()
+        plt.close(fig)
 
 
 def test_stage_a_strata_excludes_background_regulators_from_fimo_panels() -> None:
@@ -336,7 +336,7 @@ def test_stage_a_strata_excludes_background_regulators_from_fimo_panels() -> Non
         labels = [text.get_text().lower() for text in legend.texts]
         assert "background" not in labels
     finally:
-        fig.clf()
+        plt.close(fig)
 
 
 def test_stage_a_strata_marks_worst_retained_percentile_with_single_solid_lollipop() -> None:
@@ -394,4 +394,4 @@ def test_stage_a_strata_marks_worst_retained_percentile_with_single_solid_lollip
         assert len(solid_a) == 0
         assert len(solid_b) == 1
     finally:
-        fig.clf()
+        plt.close(fig)

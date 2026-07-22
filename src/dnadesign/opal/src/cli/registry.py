@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/registry.py
 
-Registers and installs OPAL CLI commands and command groups. Supports hidden
-commands and deferred import error handling.
+Registers and installs OPAL CLI commands and command groups. Supports hidden.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -31,6 +30,7 @@ class CommandSpec:
 
 
 _CLI_REGISTRY: Dict[str, CommandSpec] = {}
+_DISCOVERED_PACKAGES: set[str] = set()
 
 
 def cli_command(name: str, help: str, *, hidden: bool = False):
@@ -54,10 +54,16 @@ def cli_group(name: str, help: str, *, hidden: bool = False):
 
 
 def install_registered_commands(app: typer.Typer) -> None:
+    installed_commands = {info.name for info in app.registered_commands}
+    installed_groups = {info.name for info in app.registered_groups}
     for spec in _CLI_REGISTRY.values():
         if spec.is_group:
+            if spec.name in installed_groups:
+                continue
             app.add_typer(spec.callback, name=spec.name, help=spec.help, hidden=spec.hidden)
         else:
+            if spec.name in installed_commands:
+                continue
             app.command(name=spec.name, help=spec.help, hidden=spec.hidden)(spec.callback)
 
 
@@ -67,6 +73,9 @@ def discover_commands(package: str = "dnadesign.opal.src.cli.commands") -> None:
     decorators run. Import errors are captured and deferred: we register a
     placeholder command that, when invoked, prints the original import error.
     """
+    if package in _DISCOVERED_PACKAGES:
+        return
+
     module = importlib.import_module(package)
     pkg_path = module.__path__  # type: ignore[attr-defined]
 
@@ -118,3 +127,5 @@ def discover_commands(package: str = "dnadesign.opal.src.cli.commands") -> None:
                 help="(unavailable due to import error; set OPAL_DEBUG=1 for details)",
                 callback=_make_placeholder(),
             )
+
+    _DISCOVERED_PACKAGES.add(package)

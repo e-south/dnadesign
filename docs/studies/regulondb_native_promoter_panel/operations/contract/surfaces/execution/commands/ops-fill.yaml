@@ -1,0 +1,10 @@
+infer_fill_remaining_7b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - ops
+  - runbook
+  - fill-infer
+  - --study-dir
+  - docs/studies/regulondb_native_promoter_panel

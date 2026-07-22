@@ -16,10 +16,11 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.ops.preflight.models import supported_preflight_check_kinds
-from dnadesign.ops.status.path_ref import resolve_path_ref
+from dnadesign.ops.preflight import supported_preflight_check_kinds
+from dnadesign.ops.status import resolve_path_ref
 
 from .models import (
+    STUDY_LIFECYCLE_MODES,
     STUDY_PHASE_STATUSES,
     STUDY_PREFLIGHT_SCOPES,
     STUDY_SUMMARY_SCOPES,
@@ -29,27 +30,83 @@ from .models import (
     StudyPreflightNextScopeContract,
 )
 
+_OPS_STUDY_TOP_LEVEL_KEYS = {
+    "version",
+    "study_id",
+    "title",
+    "parts",
+    "ops_surfaces",
+    "record_sources",
+    "lifecycle",
+    "phases",
+    "tracks",
+    "artifacts",
+    "execution_surfaces",
+    "snapshot",
+    "preflight",
+    "family",
+}
+_OPS_STUDY_PART_KEYS = {
+    "lifecycle",
+    "phases",
+    "tracks",
+    "artifacts",
+    "execution_surfaces",
+    "snapshot",
+    "preflight",
+}
+_OPS_SURFACES_KEYS = {"status_kind", "preflight_kind"}
+
 
 def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     resolved_study_root = study_root.expanduser().resolve()
     repo_root = _discover_repo_root(resolved_study_root)
-    contract_path = resolved_study_root / "ops.study.yaml"
+    contract_path = resolved_study_root / "operations" / "ops.study.yaml"
     if not contract_path.exists():
         raise ValueError(f"study record missing ops.study.yaml: {contract_path}")
     payload = yaml.safe_load(contract_path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         raise ValueError(f"ops.study.yaml must be a mapping: {contract_path}")
+    payload = _expand_ops_study_parts(payload, contract_path=contract_path)
+    _reject_unknown_mapping_keys(
+        payload,
+        allowed_keys=_OPS_STUDY_TOP_LEVEL_KEYS,
+        label="ops.study.yaml",
+        source=contract_path,
+    )
     version = int(payload.get("version") or 0)
     if version != 2:
         raise ValueError(f"unsupported ops.study.yaml version {version}: {contract_path}")
 
     study_id = str(payload.get("study_id") or "").strip()
-    family = str(payload.get("family") or "").strip()
     title = _string_or_none(payload.get("title"))
     if not study_id:
         raise ValueError(f"ops.study.yaml must define study_id: {contract_path}")
-    if not family:
-        raise ValueError(f"ops.study.yaml must define family: {contract_path}")
+    if "family" in payload:
+        raise ValueError(
+            "ops.study.yaml must not define legacy family; define explicit "
+            f"ops_surfaces.status_kind and ops_surfaces.preflight_kind instead: {contract_path}"
+        )
+    ops_surfaces = payload.get("ops_surfaces")
+    if ops_surfaces is None:
+        ops_surfaces = {}
+    if not isinstance(ops_surfaces, dict):
+        raise ValueError(f"ops.study.yaml ops_surfaces must be a mapping: {contract_path}")
+    _reject_unknown_mapping_keys(
+        ops_surfaces,
+        allowed_keys=_OPS_SURFACES_KEYS,
+        label="ops.study.yaml ops_surfaces",
+        source=contract_path,
+    )
+    status_kind = str(ops_surfaces.get("status_kind") or "").strip()
+    preflight_kind = str(ops_surfaces.get("preflight_kind") or "").strip()
+    if bool(status_kind) != bool(preflight_kind):
+        raise ValueError(
+            "ops.study.yaml ops_surfaces.status_kind and ops_surfaces.preflight_kind "
+            f"must be declared together: {contract_path}"
+        )
+    resolved_status_kind = status_kind or None
+    resolved_preflight_kind = preflight_kind or None
 
     record_sources = _validated_contract_refs_mapping(
         payload.get("record_sources"),
@@ -62,53 +119,71 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     lifecycle_payload = payload.get("lifecycle") or {}
     if not isinstance(lifecycle_payload, dict):
         raise ValueError(f"ops.study.yaml lifecycle must be a mapping: {contract_path}")
-    phase_order_payload = lifecycle_payload.get("phase_order") or []
+    lifecycle_mode = str(lifecycle_payload.get("mode") or "sequential").strip().lower()
+    if lifecycle_mode not in STUDY_LIFECYCLE_MODES:
+        allowed_modes = ", ".join(sorted(STUDY_LIFECYCLE_MODES))
+        raise ValueError(f"ops.study.yaml lifecycle.mode must be one of: {allowed_modes}: {contract_path}")
+
+    uses_tracks = "tracks" in payload
+    if uses_tracks and "phases" in payload:
+        raise ValueError(f"ops.study.yaml must define either phases or tracks, not both: {contract_path}")
+    if uses_tracks and lifecycle_mode != "tracks":
+        raise ValueError(f"ops.study.yaml lifecycle.mode must be tracks when tracks are declared: {contract_path}")
+    if not uses_tracks and lifecycle_mode == "tracks":
+        raise ValueError(f"ops.study.yaml lifecycle.mode tracks requires a tracks list: {contract_path}")
+    lifecycle_item_label = "track" if uses_tracks else "phase"
+    order_key = "track_order" if uses_tracks else "phase_order"
+    current_key = "current_track" if uses_tracks else "current_phase"
+    collection_key = "tracks" if uses_tracks else "phases"
+
+    phase_order_payload = lifecycle_payload.get(order_key) or []
     if not isinstance(phase_order_payload, list) or not phase_order_payload:
-        raise ValueError(f"ops.study.yaml lifecycle.phase_order must define a non-empty list: {contract_path}")
+        raise ValueError(f"ops.study.yaml lifecycle.{order_key} must define a non-empty list: {contract_path}")
     phase_order = _string_sequence(
         phase_order_payload,
-        label="ops.study.yaml lifecycle.phase_order",
+        label=f"ops.study.yaml lifecycle.{order_key}",
         source=contract_path,
     )
 
-    current_phase_payload = lifecycle_payload.get("current_phase") or {}
+    current_phase_payload = lifecycle_payload.get(current_key) or {}
     if current_phase_payload and not isinstance(current_phase_payload, dict):
-        raise ValueError(f"ops.study.yaml lifecycle.current_phase must be a mapping: {contract_path}")
+        raise ValueError(f"ops.study.yaml lifecycle.{current_key} must be a mapping: {contract_path}")
     current_phase_strategy = str(current_phase_payload.get("strategy") or "explicit").strip().lower()
     if current_phase_strategy not in {"explicit", "derive_from_phase_status"}:
         raise ValueError(
-            "ops.study.yaml lifecycle.current_phase.strategy must be one of: "
+            f"ops.study.yaml lifecycle.{current_key}.strategy must be one of: "
             f"explicit, derive_from_phase_status: {contract_path}"
         )
     current_phase_id = str(current_phase_payload.get("id") or "").strip() or None
 
-    phases_payload = payload.get("phases") or []
+    phases_payload = payload.get(collection_key) or []
     if not isinstance(phases_payload, list) or not phases_payload:
-        raise ValueError(f"ops.study.yaml must define a non-empty phases list: {contract_path}")
+        raise ValueError(f"ops.study.yaml must define a non-empty {collection_key} list: {contract_path}")
     phases: list[StudyPhaseContract] = []
     seen_phase_ids: set[str] = set()
     for index, item in enumerate(phases_payload, start=1):
         if not isinstance(item, dict):
-            raise ValueError(f"ops.study.yaml phase entry {index} must be a mapping: {contract_path}")
+            raise ValueError(f"ops.study.yaml {lifecycle_item_label} entry {index} must be a mapping: {contract_path}")
         phase_id = str(item.get("id") or "").strip()
         phase_status = str(item.get("status") or "").strip()
         if not phase_id:
-            raise ValueError(f"ops.study.yaml phase entry {index} must define id: {contract_path}")
+            raise ValueError(f"ops.study.yaml {lifecycle_item_label} entry {index} must define id: {contract_path}")
         if not phase_status:
-            raise ValueError(f"ops.study.yaml phase {phase_id} must define status: {contract_path}")
+            raise ValueError(f"ops.study.yaml {lifecycle_item_label} {phase_id} must define status: {contract_path}")
         if phase_status not in STUDY_PHASE_STATUSES:
             allowed_statuses = ", ".join(sorted(STUDY_PHASE_STATUSES))
             raise ValueError(
-                f"ops.study.yaml phase {phase_id} has unsupported status {phase_status!r}; "
+                f"ops.study.yaml {lifecycle_item_label} {phase_id} has unsupported status {phase_status!r}; "
                 f"expected one of: {allowed_statuses}: {contract_path}"
             )
         if phase_id in seen_phase_ids:
-            raise ValueError(f"ops.study.yaml phases must not duplicate id {phase_id!r}: {contract_path}")
+            raise ValueError(f"ops.study.yaml {collection_key} must not duplicate id {phase_id!r}: {contract_path}")
         seen_phase_ids.add(phase_id)
         required_for_main_study_state = item.get("required_for_main_study_state", True)
         if not isinstance(required_for_main_study_state, bool):
             raise ValueError(
-                f"ops.study.yaml phase {phase_id} required_for_main_study_state must be boolean: {contract_path}"
+                f"ops.study.yaml {lifecycle_item_label} {phase_id} "
+                f"required_for_main_study_state must be boolean: {contract_path}"
             )
         phases.append(
             StudyPhaseContract(
@@ -118,7 +193,7 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
                     item.get("next_surface"),
                     repo_root=repo_root,
                     study_root=resolved_study_root,
-                    label=f"ops.study.yaml phase {phase_id} next_surface",
+                    label=f"ops.study.yaml {lifecycle_item_label} {phase_id} next_surface",
                 ),
                 blocker=_string_or_none(item.get("blocker")),
                 output_dataset=_string_or_none(item.get("output_dataset")),
@@ -130,17 +205,17 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     phase_ids = tuple(phase.id for phase in phases)
     if phase_order != phase_ids:
         raise ValueError(
-            f"ops.study.yaml lifecycle.phase_order must match phases ids in the same order: {contract_path}"
+            f"ops.study.yaml lifecycle.{order_key} must match {collection_key} ids in the same order: {contract_path}"
         )
     if current_phase_strategy == "explicit":
         if current_phase_id is None:
             raise ValueError(
-                f"ops.study.yaml lifecycle.current_phase.id must be defined for explicit strategy: {contract_path}"
+                f"ops.study.yaml lifecycle.{current_key}.id must be defined for explicit strategy: {contract_path}"
             )
         if current_phase_id not in seen_phase_ids:
             raise ValueError(
-                "ops.study.yaml lifecycle.current_phase.id "
-                f"{current_phase_id!r} is not declared under phases: {contract_path}"
+                f"ops.study.yaml lifecycle.{current_key}.id "
+                f"{current_phase_id!r} is not declared under {collection_key}: {contract_path}"
             )
     else:
         current_phase_id = _derive_current_phase_id(phases)
@@ -175,8 +250,11 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     scopes_payload = preflight_payload.get("scopes") or {}
     if scopes_payload and not isinstance(scopes_payload, dict):
         raise ValueError(f"ops.study.yaml preflight.scopes must be a mapping: {contract_path}")
-    if "group_phase_bindings" not in preflight_payload:
-        raise ValueError(f"ops.study.yaml preflight.group_phase_bindings must be defined: {contract_path}")
+    group_bindings_key = "group_track_bindings" if uses_tracks else "group_phase_bindings"
+    target_groups_key = "target_track_groups" if uses_tracks else "target_phase_groups"
+    runtime_groups_key = "runtime_track_groups" if uses_tracks else "runtime_phase_groups"
+    if group_bindings_key not in preflight_payload:
+        raise ValueError(f"ops.study.yaml preflight.{group_bindings_key} must be defined: {contract_path}")
     if "next_scope" not in preflight_payload:
         raise ValueError(f"ops.study.yaml preflight.next_scope must be defined: {contract_path}")
     checks_payload = preflight_payload.get("checks") or {}
@@ -185,34 +263,34 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     next_scope_payload = preflight_payload.get("next_scope") or {}
     if next_scope_payload and not isinstance(next_scope_payload, dict):
         raise ValueError(f"ops.study.yaml preflight.next_scope must be a mapping: {contract_path}")
-    if "target_phase_groups" not in next_scope_payload:
-        raise ValueError(f"ops.study.yaml preflight.next_scope.target_phase_groups must be defined: {contract_path}")
-    if "runtime_phase_groups" not in next_scope_payload:
-        raise ValueError(f"ops.study.yaml preflight.next_scope.runtime_phase_groups must be defined: {contract_path}")
+    if target_groups_key not in next_scope_payload:
+        raise ValueError(f"ops.study.yaml preflight.next_scope.{target_groups_key} must be defined: {contract_path}")
+    if runtime_groups_key not in next_scope_payload:
+        raise ValueError(f"ops.study.yaml preflight.next_scope.{runtime_groups_key} must be defined: {contract_path}")
     if "runtime_shared_groups" not in next_scope_payload:
         raise ValueError(f"ops.study.yaml preflight.next_scope.runtime_shared_groups must be defined: {contract_path}")
-    target_phase_groups_payload = next_scope_payload.get("target_phase_groups") or {}
+    target_phase_groups_payload = next_scope_payload.get(target_groups_key) or {}
     if target_phase_groups_payload and not isinstance(target_phase_groups_payload, dict):
-        raise ValueError(f"ops.study.yaml preflight.next_scope.target_phase_groups must be a mapping: {contract_path}")
-    group_phase_bindings_payload = preflight_payload.get("group_phase_bindings") or {}
+        raise ValueError(f"ops.study.yaml preflight.next_scope.{target_groups_key} must be a mapping: {contract_path}")
+    group_phase_bindings_payload = preflight_payload.get(group_bindings_key) or {}
     if group_phase_bindings_payload and not isinstance(group_phase_bindings_payload, dict):
-        raise ValueError(f"ops.study.yaml preflight.group_phase_bindings must be a mapping: {contract_path}")
+        raise ValueError(f"ops.study.yaml preflight.{group_bindings_key} must be a mapping: {contract_path}")
 
     target_phase_groups: dict[str, tuple[str, ...]] = {}
     for phase_id, groups_payload in target_phase_groups_payload.items():
         normalized_phase_id = str(phase_id or "").strip()
         if not normalized_phase_id:
             raise ValueError(
-                f"ops.study.yaml preflight.next_scope.target_phase_groups keys must be non-empty: {contract_path}"
+                f"ops.study.yaml preflight.next_scope.{target_groups_key} keys must be non-empty: {contract_path}"
             )
         if normalized_phase_id not in seen_phase_ids:
             raise ValueError(
-                f"ops.study.yaml preflight.next_scope.target_phase_groups references undeclared phase "
+                f"ops.study.yaml preflight.next_scope.{target_groups_key} references undeclared {lifecycle_item_label} "
                 f"{normalized_phase_id!r}: {contract_path}"
             )
         target_phase_groups[normalized_phase_id] = _string_sequence(
             groups_payload or [],
-            label=f"ops.study.yaml preflight.next_scope.target_phase_groups.{normalized_phase_id}",
+            label=f"ops.study.yaml preflight.next_scope.{target_groups_key}.{normalized_phase_id}",
             source=contract_path,
             allow_empty=True,
         )
@@ -222,21 +300,23 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
         group = str(raw_group or "").strip()
         phase_id = str(raw_phase_id or "").strip()
         if not group:
-            raise ValueError(f"ops.study.yaml preflight.group_phase_bindings keys must be non-empty: {contract_path}")
+            raise ValueError(f"ops.study.yaml preflight.{group_bindings_key} keys must be non-empty: {contract_path}")
         if not phase_id:
             raise ValueError(
-                f"ops.study.yaml preflight.group_phase_bindings.{group} must be a non-empty phase id: {contract_path}"
+                f"ops.study.yaml preflight.{group_bindings_key}.{group} "
+                f"must be a non-empty {lifecycle_item_label} id: {contract_path}"
             )
         if phase_id not in seen_phase_ids:
             raise ValueError(
-                f"ops.study.yaml preflight.group_phase_bindings.{group} references undeclared phase "
+                f"ops.study.yaml preflight.{group_bindings_key}.{group} "
+                f"references undeclared {lifecycle_item_label} "
                 f"{phase_id!r}: {contract_path}"
             )
         group_phase_bindings[group] = phase_id
 
     runtime_phase_groups = _string_sequence(
-        next_scope_payload.get("runtime_phase_groups") or [],
-        label="ops.study.yaml preflight.next_scope.runtime_phase_groups",
+        next_scope_payload.get(runtime_groups_key) or [],
+        label=f"ops.study.yaml preflight.next_scope.{runtime_groups_key}",
         source=contract_path,
         allow_empty=True,
     )
@@ -271,11 +351,14 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
 
     return StudyOpsContract(
         study_id=study_id,
-        family=family,
+        status_kind=resolved_status_kind,
+        preflight_kind=resolved_preflight_kind,
         title=title,
         phase_order=phase_order,
         current_phase_id=current_phase_id,
         phases=tuple(phases),
+        lifecycle_mode=lifecycle_mode,
+        lifecycle_item_label=lifecycle_item_label,
         snapshot_summary_scope=summary_scope,
         preflight=StudyPreflightContract(
             default_scope=default_scope,
@@ -295,6 +378,125 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     )
 
 
+def _expand_ops_study_parts(payload: Mapping[str, object], *, contract_path: Path) -> dict[str, object]:
+    parts_payload = payload.get("parts")
+    if parts_payload is None:
+        return dict(payload)
+    if not isinstance(parts_payload, dict):
+        raise ValueError(f"ops.study.yaml parts must be a mapping: {contract_path}")
+    _reject_unknown_mapping_keys(
+        parts_payload,
+        allowed_keys=_OPS_STUDY_PART_KEYS,
+        label="ops.study.yaml parts",
+        source=contract_path,
+    )
+    expanded = {str(key): value for key, value in payload.items() if str(key) != "parts"}
+    for raw_section, raw_ref in parts_payload.items():
+        section = str(raw_section or "").strip()
+        if not section:
+            raise ValueError(f"ops.study.yaml parts keys must be non-empty: {contract_path}")
+        if section in expanded:
+            raise ValueError(f"ops.study.yaml parts.{section} duplicates an inline {section} section: {contract_path}")
+        part_paths = _resolve_ops_study_part_paths(
+            raw_ref,
+            contract_path=contract_path,
+            label=f"ops.study.yaml parts.{section}",
+        )
+        if section in {"phases", "tracks"}:
+            merged_sequence: list[object] = []
+            for part_path in part_paths:
+                part_payload = yaml.safe_load(part_path.read_text(encoding="utf-8")) or []
+                if not isinstance(part_payload, list):
+                    raise ValueError(f"ops.study.yaml parts.{section} must load a list: {part_path}")
+                merged_sequence.extend(part_payload)
+            expanded[section] = merged_sequence
+            continue
+
+        merged_mapping: dict[str, object] = {}
+        for part_path in part_paths:
+            part_payload = yaml.safe_load(part_path.read_text(encoding="utf-8")) or {}
+            if not isinstance(part_payload, dict):
+                raise ValueError(f"ops.study.yaml parts.{section} must load a mapping: {part_path}")
+            _merge_ops_study_part_mapping(
+                merged_mapping,
+                part_payload,
+                label=f"ops.study.yaml parts.{section}",
+                part_path=part_path,
+            )
+        expanded[section] = merged_mapping
+    return expanded
+
+
+def _merge_ops_study_part_mapping(
+    target: dict[str, object],
+    source: Mapping[str, object],
+    *,
+    label: str,
+    part_path: Path,
+) -> None:
+    for raw_key, value in source.items():
+        key = str(raw_key or "").strip()
+        if not key:
+            raise ValueError(f"{label} loaded an empty key: {part_path}")
+        if key not in target:
+            target[key] = value
+            continue
+        existing = target[key]
+        if isinstance(existing, dict) and isinstance(value, Mapping):
+            _merge_ops_study_part_mapping(
+                existing,
+                value,
+                label=f"{label}.{key}",
+                part_path=part_path,
+            )
+            continue
+        if isinstance(existing, list) and isinstance(value, list):
+            existing.extend(value)
+            continue
+        raise ValueError(f"{label}.{key} is defined by multiple incompatible part files: {part_path}")
+
+
+def _resolve_ops_study_part_paths(raw_value: object, *, contract_path: Path, label: str) -> tuple[Path, ...]:
+    if isinstance(raw_value, list):
+        if not raw_value:
+            raise ValueError(f"{label} must list at least one path: {contract_path}")
+        return tuple(
+            _resolve_ops_study_part_path(item, contract_path=contract_path, label=f"{label}[{index}]")
+            for index, item in enumerate(raw_value)
+        )
+    return (
+        _resolve_ops_study_part_path(
+            raw_value,
+            contract_path=contract_path,
+            label=label,
+        ),
+    )
+
+
+def _resolve_ops_study_part_path(raw_value: object, *, contract_path: Path, label: str) -> Path:
+    text = _string_or_none(raw_value)
+    if text is None:
+        raise ValueError(f"{label} must be a non-empty path: {contract_path}")
+    if text.startswith(("repo:", "manifest:")):
+        raise ValueError(f"{label} must be relative to the operations directory, not a path ref: {contract_path}")
+    relative_path = Path(text)
+    if relative_path.is_absolute():
+        raise ValueError(f"{label} must be relative to the operations directory: {contract_path}")
+    if ".." in relative_path.parts:
+        raise ValueError(f"{label} must not escape the operations directory: {contract_path}")
+    operations_dir = contract_path.parent.resolve()
+    part_path = (operations_dir / relative_path).resolve()
+    try:
+        part_path.relative_to(operations_dir)
+    except ValueError as exc:
+        raise ValueError(f"{label} escapes the operations directory: {contract_path}") from exc
+    if part_path == contract_path.resolve():
+        raise ValueError(f"{label} must not point back at ops.study.yaml: {contract_path}")
+    if not part_path.exists():
+        raise ValueError(f"{label} file does not exist: {part_path}")
+    return part_path
+
+
 def _derive_current_phase_id(phases: list[StudyPhaseContract]) -> str | None:
     ordered_statuses = ("in_progress", "ready", "planned", "blocked_gpu", "blocked", "parallel_optional")
     for status in ordered_statuses:
@@ -307,6 +509,18 @@ def _derive_current_phase_id(phases: list[StudyPhaseContract]) -> str | None:
 def _string_or_none(value: object) -> str | None:
     text = str(value or "").strip()
     return text or None
+
+
+def _reject_unknown_mapping_keys(
+    payload: Mapping[str, object],
+    *,
+    allowed_keys: set[str],
+    label: str,
+    source: Path,
+) -> None:
+    unknown_keys = sorted(str(key) for key in payload if str(key) not in allowed_keys)
+    if unknown_keys:
+        raise ValueError(f"{label} contains unknown key(s) {', '.join(unknown_keys)}: {source}")
 
 
 def _string_sequence(
@@ -587,6 +801,12 @@ def _validated_preflight_checks(
                     raise ValueError(
                         f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} must define positive integer "
                         f"target_rows: {contract_path}"
+                    )
+                row_count_mode = _string_or_none(spec.get("row_count_mode")) or "at_least"
+                if row_count_mode not in {"at_least", "exact"}:
+                    raise ValueError(
+                        f"ops.study.yaml preflight.checks.{phase_id} entry {check_id} has unsupported "
+                        f"row_count_mode {row_count_mode!r}: {contract_path}"
                     )
             if kind in {
                 "runbook_plan",

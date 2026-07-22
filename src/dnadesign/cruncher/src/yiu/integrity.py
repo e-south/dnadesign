@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/integrity.py
 
 Bundle integrity checks for YIU v4 publication and `show`.

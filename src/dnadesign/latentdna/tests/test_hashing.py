@@ -1,4 +1,13 @@
-"""Hashing helper contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_hashing.py
+
+Hashing helper contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

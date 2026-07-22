@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_support.py
+
 Shared browser runtime support helpers for generated latentdna marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -8,17 +15,14 @@ import json
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable
 
-import marimo as mo
+import marimo as mo  # noqa: F401
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from ..annotation_layout import choose_annotation_placement
 from ..contracts.notebook import WorkspaceNotebookControls
-from ..labels import humanize_column_name
-from ..metadata_axes import (
+from ..metadata.axes import (
     AxisStyle,
     axis_color_map,
     axis_display_label,
@@ -28,17 +32,12 @@ from ..metadata_axes import (
     normalize_axis_category,
     ordered_categories_for_axis,
 )
-from ..reference_sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
-from ..visual_style import (
+from ..metadata.join_keys import candidate_join_key_pairs_for_columns
+from ..presentation.annotation_layout import choose_annotation_placement
+from ..presentation.labels import humanize_column_name
+from ..presentation.visual_style import (
     ANNOTATION_LABEL_BOX_ALPHA,
-    GRID_COLOR,
-    NOTEBOOK_FONT_STACK,
-    PANEL_BACKGROUND_COLOR,
-    PLOT_FONT_FAMILY,
-    PLOT_LABEL_FONT_SIZE,
-    PLOT_LEGEND_FONT_SIZE,
     PLOT_TICK_FONT_SIZE,
-    PLOT_TITLE_FONT_SIZE,
     PUBLICATION_PALETTE,
     SPINE_COLOR,
     TEXT_COLOR,
@@ -46,8 +45,36 @@ from ..visual_style import (
     humanize_display_text,
     reference_annotation_label,
 )
-from ..visual_style import scatter_style as shared_scatter_style
+from ..presentation.visual_style import scatter_style as shared_scatter_style
+from ..references.sets import reference_set_required_columns, resolve_reference_set_ids_from_columns
 from ..workspaces.loader import load_workspace_config
+from .browser_runtime_ui import (
+    key_value_table as key_value_table,
+)
+from .browser_runtime_ui import (
+    labeled_options as labeled_options,
+)
+from .browser_runtime_ui import (
+    notebook_theme as notebook_theme,
+)
+from .browser_runtime_ui import (
+    option_key_for_value as option_key_for_value,
+)
+from .browser_runtime_ui import (
+    resolve_labeled_option_card as resolve_labeled_option_card,
+)
+from .browser_runtime_ui import (
+    style_notebook_axes as style_notebook_axes,
+)
+from .browser_runtime_ui import (
+    style_notebook_legend as style_notebook_legend,
+)
+from .browser_runtime_ui import (
+    table_from_records as table_from_records,
+)
+from .browser_runtime_ui import (
+    unique_in_order as unique_in_order,
+)
 from .raster_scatter import BACKGROUND_RASTER_MIN_ALPHA
 
 _RUNTIME_TABLE_ARTIFACT_KINDS = {
@@ -230,114 +257,6 @@ def read_text(path_text: str | None) -> str | None:
 
 def load_workspace_notebook_controls(control_path: Path) -> dict[str, object]:
     return WorkspaceNotebookControls.model_validate(load_json(control_path)).model_dump(mode="json")
-
-
-def notebook_theme():
-    return mo.Html(
-        f"""
-        <style>
-          .latentdna-badge {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 5.5rem;
-            padding: 0.2rem 0.55rem;
-            border-radius: 999px;
-            font-size: 0.82rem;
-            font-weight: 650;
-            letter-spacing: 0.02em;
-            font-family: {NOTEBOOK_FONT_STACK};
-            color: {TEXT_COLOR};
-            background: rgba(226, 232, 240, 0.82);
-          }}
-
-          .latentdna-badge--primary {{
-            background: rgba(59, 130, 246, 0.12);
-          }}
-
-          .latentdna-badge--appendix {{
-            background: rgba(236, 201, 75, 0.22);
-          }}
-        </style>
-        """
-    )
-
-
-def unique_in_order(values):
-    seen = set()
-    ordered = []
-    for value in values:
-        key = str(value or "Unsectioned").strip() or "Unsectioned"
-        if key in seen:
-            continue
-        seen.add(key)
-        ordered.append(key)
-    return ordered
-
-
-def option_key_for_value(options: dict[str, object], target_value: object) -> str | None:
-    target_text = str(target_value)
-    for key, value in options.items():
-        if str(value) == target_text:
-            return key
-    return None
-
-
-def labeled_options(pairs: Iterable[tuple[str, object]]) -> dict[str, object]:
-    normalized: list[tuple[str, object]] = []
-    counts: dict[str, int] = {}
-    for label, value in pairs:
-        value_text = str(value).strip()
-        base_label = str(label).strip() or value_text
-        normalized.append((base_label, value))
-        counts[base_label] = counts.get(base_label, 0) + 1
-
-    options: dict[str, object] = {}
-    for base_label, value in normalized:
-        value_text = str(value).strip()
-        if not value_text:
-            continue
-        label = base_label if counts[base_label] == 1 else f"{base_label} [{value_text}]"
-        if label in options:
-            if str(options[label]).strip() == value_text:
-                continue
-            suffix = 2
-            while f"{label} #{suffix}" in options:
-                suffix += 1
-            label = f"{label} #{suffix}"
-        options[label] = value
-    return options
-
-
-def resolve_labeled_option_card(
-    cards: Iterable[dict[str, object]],
-    selected_value: object,
-    *,
-    id_column: str = "plot_id",
-    title_column: str = "title",
-) -> dict[str, object] | None:
-    """Resolve a Marimo dropdown selection against stable IDs and display labels.
-
-    Marimo dropdowns are configured from ``label -> value`` dictionaries, but the
-    browser-side select element exposes display labels. Accepting both the
-    durable ID and the rendered label makes generated notebooks robust to manual
-    use and browser-level review automation.
-    """
-    ordered_cards = [dict(card) for card in cards]
-    if not ordered_cards:
-        return None
-    selected_text = str(selected_value or "").strip()
-    if not selected_text:
-        return ordered_cards[0]
-    for card in ordered_cards:
-        card_id = str(card.get(id_column) or "").strip()
-        card_title = str(card.get(title_column) or "").strip()
-        accepted = {value for value in (card_id, card_title) if value}
-        if card_id and card_title:
-            accepted.add(f"{card_title} [{card_id}]")
-        if selected_text in accepted:
-            return card
-    return ordered_cards[0]
 
 
 def normalize_label(value) -> str:
@@ -576,7 +495,17 @@ def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = No
     if column == "promoter_standard__strength_value_numeric":
         return "Reference strength"
     if column == "sfxi_ref__metric_value":
-        return "SFXI metric"
+        return "SFXI selected metric"
+    if column == "sfxi_ref__sfxi":
+        return "SFXI score"
+    if column == "sfxi_ref__logic_fidelity":
+        return "SFXI logic fidelity"
+    if column == "sfxi_ref__effect_scaled":
+        return "SFXI effect scaled"
+    if column == "sfxi_ref__effect_raw":
+        return "SFXI raw effect"
+    if column == "tf_bin":
+        return "Native TF bin"
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:
         model = "7B" if "__7b__" in column else "20B"
         scope = "1 kb construct context" if "__template_1kb_" in column else "anchor-source insert"
@@ -743,24 +672,7 @@ def resolve_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> tuple[str, str
 
 
 def candidate_join_keys(left: pd.DataFrame, right: pd.DataFrame) -> list[tuple[str, str]]:
-    candidate_pairs = [
-        ("alias_id", "alias_id"),
-        ("construct__anchor_id", "construct__anchor_id"),
-        ("construct__anchor_id", "id"),
-        # Anchor-only projection rows should join context summary tables by anchor id.
-        ("id", "construct__anchor_id"),
-        ("id", "id"),
-        ("alignment_parent_sequence_id", "alignment_parent_sequence_id"),
-        ("subject_id", "subject_id"),
-        ("context_id", "context_id"),
-    ]
-    left_columns = set(left.columns)
-    right_columns = set(right.columns)
-    return [
-        (left_key, right_key)
-        for left_key, right_key in candidate_pairs
-        if left_key in left_columns and right_key in right_columns
-    ]
+    return candidate_join_key_pairs_for_columns(left.columns, right.columns)
 
 
 def shared_join_key(left: pd.DataFrame, right: pd.DataFrame) -> str | None:
@@ -934,6 +846,40 @@ def available_hues_for_frames(
     return available
 
 
+def available_reference_hues_for_frames(
+    frames: list[pd.DataFrame],
+    *,
+    preferred_hues: list[str],
+    hue_kinds: dict[str, str],
+    reference_labels: list[str],
+    reference_match_column: str = "usr_label__primary",
+    axis_styles: dict[str, object] | None = None,
+    x_column: str = "x",
+    y_column: str = "y",
+) -> list[str]:
+    available: list[str] = []
+    for hue in preferred_hues:
+        hue_column = str(hue or "").strip()
+        if not hue_column:
+            continue
+        hue_kind = normalize_hue_kind(hue_kinds.get(hue_column)) or "continuous"
+        if (
+            reference_hue_render_params(
+                frames,
+                reference_labels=reference_labels,
+                reference_match_column=reference_match_column,
+                reference_hue_column=hue_column,
+                reference_hue_kind=hue_kind,
+                axis_styles=axis_styles,
+                x_column=x_column,
+                y_column=y_column,
+            )
+            is not None
+        ):
+            available.append(hue_column)
+    return available
+
+
 def classify_hue_series(series: pd.Series, *, configured_kind: object = None) -> str:
     explicit_kind = normalize_hue_kind(configured_kind)
     if explicit_kind is not None:
@@ -984,6 +930,16 @@ def continuous_hue_render_params(column: str | None, values: pd.Series) -> dict[
     }
 
 
+def _reference_categorical_hue_series(values: pd.Series) -> pd.Series:
+    labels: list[str] = []
+    for value in values.tolist():
+        if _is_missing_hue_value(value):
+            labels.append("")
+            continue
+        labels.append(_format_listlike_hue_value(value) or _format_hue_token(value))
+    return pd.Series(labels, index=values.index, dtype="string")
+
+
 def selected_reference_rows(
     frame: pd.DataFrame,
     *,
@@ -1017,12 +973,15 @@ def reference_hue_render_params(
     reference_labels: list[str],
     reference_match_column: str = "usr_label__primary",
     reference_hue_column: str | None = None,
+    reference_hue_kind: str | None = None,
+    axis_styles: dict[str, object] | None = None,
     x_column: str = "x",
     y_column: str = "y",
 ) -> dict[str, object] | None:
     hue_column = str(reference_hue_column or "").strip()
     if not hue_column:
         return None
+    hue_kind = normalize_hue_kind(reference_hue_kind) or "continuous"
     series_parts: list[pd.Series] = []
     for frame in frames:
         if hue_column not in frame.columns:
@@ -1036,15 +995,34 @@ def reference_hue_render_params(
         )
         if selected.empty or hue_column not in selected.columns:
             continue
-        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
-        if not numeric.empty:
-            series_parts.append(numeric)
+        if hue_kind == "continuous":
+            numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            if not numeric.empty:
+                series_parts.append(numeric)
+        else:
+            categorical = _reference_categorical_hue_series(selected[hue_column])
+            categorical = categorical.loc[categorical.astype(str).str.strip() != ""]
+            if not categorical.empty:
+                series_parts.append(categorical)
     if not series_parts:
         return None
     combined = pd.concat(series_parts, ignore_index=True)
+    if hue_kind != "continuous":
+        categories = category_values_for_legend(
+            [str(value) for value in combined.tolist() if str(value).strip()],
+            column=hue_column,
+            axis_styles=axis_styles,
+        )
+        if not categories:
+            return None
+        return {
+            "kind": hue_kind,
+            "categories": categories,
+            "color_map": category_color_map(categories, column=hue_column, axis_styles=axis_styles),
+        }
     if combined.nunique() < 2:
         return None
-    return continuous_hue_render_params(hue_column, combined)
+    return {"kind": "continuous", **continuous_hue_render_params(hue_column, combined)}
 
 
 def reference_annotation_mode_options() -> dict[str, str]:
@@ -1070,12 +1048,14 @@ def reference_hue_coverage_warnings(
     reference_labels: list[str],
     reference_match_column: str = "usr_label__primary",
     reference_hue_column: str | None = None,
+    reference_hue_kind: str | None = None,
     x_column: str = "x",
     y_column: str = "y",
 ) -> list[str]:
     hue_column = str(reference_hue_column or "").strip()
     if not hue_column:
         return []
+    hue_kind = normalize_hue_kind(reference_hue_kind) or "continuous"
     missing_column_panels: list[str] = []
     empty_hue_panels: list[str] = []
     for index, frame in enumerate(frames):
@@ -1097,8 +1077,13 @@ def reference_hue_coverage_warnings(
         if hue_column not in selected.columns:
             missing_column_panels.append(panel_label)
             continue
-        numeric = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
-        if not bool(numeric.notna().any()):
+        if hue_kind == "continuous":
+            values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+            has_values = bool(values.notna().any())
+        else:
+            values = _reference_categorical_hue_series(selected[hue_column])
+            has_values = bool((values.astype(str).str.strip() != "").any())
+        if not has_values:
             empty_hue_panels.append(panel_label)
 
     warnings: list[str] = []
@@ -1111,7 +1096,7 @@ def reference_hue_coverage_warnings(
         )
     if empty_hue_panels:
         warnings.append(
-            f"reference hue `{hue_column}` has no finite values for selected reference rows in "
+            f"reference hue `{hue_column}` has no values for selected reference rows in "
             f"{len(empty_hue_panels)} panel(s): "
             + ", ".join(empty_hue_panels[:4])
             + (" ..." if len(empty_hue_panels) > 4 else "")
@@ -1190,73 +1175,6 @@ def category_values_for_legend(
     return ordered_categories_for_axis(None, categories)
 
 
-def table_from_records(
-    records: pd.DataFrame | list[dict[str, object]],
-    *,
-    columns: list[str] | None = None,
-    page_size: int | None = None,
-):
-    frame = records.copy() if isinstance(records, pd.DataFrame) else pd.DataFrame(records)
-    if frame.empty and columns is not None:
-        frame = pd.DataFrame(columns=columns)
-    if columns is not None:
-        frame = frame.reindex(columns=columns)
-    if page_size is None:
-        return mo.ui.table(frame)
-    return mo.ui.table(frame, page_size=page_size)
-
-
-def key_value_table(
-    rows: list[tuple[str, object]],
-    *,
-    field_name: str = "Field",
-    value_name: str = "Value",
-):
-    normalized_rows = [{field_name: str(field), value_name: value} for field, value in rows]
-    return table_from_records(
-        normalized_rows,
-        columns=[field_name, value_name],
-        page_size=min(max(len(normalized_rows), 1), 12),
-    )
-
-
-def style_notebook_axes(ax, *, grid: bool = True, square: bool = False) -> None:
-    ax.set_facecolor(PANEL_BACKGROUND_COLOR)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_color(SPINE_COLOR)
-    ax.spines["bottom"].set_color(SPINE_COLOR)
-    ax.spines["left"].set_linewidth(0.85)
-    ax.spines["bottom"].set_linewidth(0.85)
-    ax.tick_params(colors=TEXT_COLOR, labelsize=PLOT_TICK_FONT_SIZE, length=4.5, width=0.8, direction="out")
-    ax.xaxis.label.set_color(TEXT_COLOR)
-    ax.yaxis.label.set_color(TEXT_COLOR)
-    ax.xaxis.label.set_fontsize(PLOT_LABEL_FONT_SIZE)
-    ax.yaxis.label.set_fontsize(PLOT_LABEL_FONT_SIZE)
-    ax.title.set_color(TEXT_COLOR)
-    ax.title.set_fontsize(PLOT_TITLE_FONT_SIZE)
-    ax.title.set_fontweight("semibold")
-    ax.title.set_fontfamily(PLOT_FONT_FAMILY)
-    ax.margins(x=0.04, y=0.05)
-    if square:
-        ax.set_box_aspect(1)
-    if grid:
-        ax.grid(True, color=GRID_COLOR, linewidth=0.75, alpha=0.58)
-        ax.set_axisbelow(True)
-
-
-def style_notebook_legend(legend) -> None:
-    if legend is None:
-        return
-    title = legend.get_title()
-    if title is not None:
-        title.set_visible(False)
-    for text in legend.get_texts():
-        text.set_color(TEXT_COLOR)
-        text.set_fontsize(PLOT_LEGEND_FONT_SIZE)
-        text.set_fontfamily(PLOT_FONT_FAMILY)
-
-
 def draw_reference_labels(
     ax,
     frame: pd.DataFrame,
@@ -1291,37 +1209,68 @@ def draw_reference_labels(
         bool(hue_column)
         and reference_hue_params is not None
         and hue_column in selected.columns
-        and reference_hue_params.get("cmap") is not None
+        and (reference_hue_params.get("cmap") is not None or reference_hue_params.get("color_map") is not None)
     )
     if can_color_by_reference_hue:
-        hue_values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
-        finite_hue = hue_values.notna()
-        if (~finite_hue).any():
-            ax.scatter(
-                selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
-                selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
-                c="#111111",
-                s=125,
-                marker="*",
-                linewidths=0.8,
-                edgecolors="white",
-                zorder=5,
-            )
-        if finite_hue.any():
-            ax.scatter(
-                selected.loc[finite_hue, x_column].to_numpy(dtype=float),
-                selected.loc[finite_hue, y_column].to_numpy(dtype=float),
-                c=hue_values.loc[finite_hue].to_numpy(dtype=float),
-                cmap=str(reference_hue_params["cmap"]),
-                norm=reference_hue_params.get("norm"),
-                vmin=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmin"),
-                vmax=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmax"),
-                s=132,
-                marker="*",
-                linewidths=0.85,
-                edgecolors="white",
-                zorder=5,
-            )
+        reference_hue_kind = normalize_hue_kind(reference_hue_params.get("kind")) or "continuous"
+        if reference_hue_kind == "continuous":
+            hue_values = pd.to_numeric(selected[hue_column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+            finite_hue = hue_values.notna()
+            if (~finite_hue).any():
+                ax.scatter(
+                    selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
+                    c="#111111",
+                    s=125,
+                    marker="*",
+                    linewidths=0.8,
+                    edgecolors="white",
+                    zorder=5,
+                )
+            if finite_hue.any():
+                ax.scatter(
+                    selected.loc[finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[finite_hue, y_column].to_numpy(dtype=float),
+                    c=hue_values.loc[finite_hue].to_numpy(dtype=float),
+                    cmap=str(reference_hue_params["cmap"]),
+                    norm=reference_hue_params.get("norm"),
+                    vmin=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmin"),
+                    vmax=None if reference_hue_params.get("norm") is not None else reference_hue_params.get("vmax"),
+                    s=132,
+                    marker="*",
+                    linewidths=0.85,
+                    edgecolors="white",
+                    zorder=5,
+                )
+        else:
+            hue_values = _reference_categorical_hue_series(selected[hue_column])
+            finite_hue = hue_values.astype(str).str.strip() != ""
+            color_map = {
+                str(key): str(value) for key, value in dict(reference_hue_params.get("color_map") or {}).items()
+            }
+            if (~finite_hue).any():
+                ax.scatter(
+                    selected.loc[~finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[~finite_hue, y_column].to_numpy(dtype=float),
+                    c="#111111",
+                    s=125,
+                    marker="*",
+                    linewidths=0.8,
+                    edgecolors="white",
+                    zorder=5,
+                )
+            if finite_hue.any():
+                colors = [color_map.get(str(value), "#111111") for value in hue_values.loc[finite_hue].tolist()]
+                ax.scatter(
+                    selected.loc[finite_hue, x_column].to_numpy(dtype=float),
+                    selected.loc[finite_hue, y_column].to_numpy(dtype=float),
+                    c=colors,
+                    s=132,
+                    marker="*",
+                    linewidths=0.85,
+                    edgecolors="white",
+                    zorder=5,
+                )
     else:
         ax.scatter(
             selected[x_column].to_numpy(dtype=float),

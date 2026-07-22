@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/outputs/__init__.py
 
-Output writer public compatibility surface.
+Exposes BaseRender output writers for image and video artifacts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

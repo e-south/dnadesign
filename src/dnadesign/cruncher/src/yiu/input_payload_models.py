@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/input_payload_models.py
 
 Resolved input payload models for payload-centric YIU workflows.

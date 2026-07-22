@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/_style.py
 
 Shared Matplotlib styling helpers for analysis plots.

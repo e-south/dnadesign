@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/progress.py
 
 Minimal progress hooks for runtime workflows (CLI-agnostic).
-Provides a NullProgress implementation and a small protocol surface that
-CLI/TUI layers can implement (e.g., Rich progress bars).
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

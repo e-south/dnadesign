@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_factorial_effects.py
 
 Matplotlib chart for SFXI factorial-effects diagnostics.
@@ -16,11 +16,20 @@ from typing import Sequence
 import numpy as np
 import polars as pl
 
-from ....plots._mpl_utils import annotate_plot_meta, apply_plot_style, scale_to_sizes, scatter_smart
+from ....plots._mpl_utils import (
+    add_flush_colorbar,
+    annotate_plot_meta,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    math_label,
+    pretty_label,
+    scale_to_sizes,
+    scatter_smart,
+)
 from ...sfxi.factorial_effects import compute_factorial_effects
 from ...sfxi.state_order import STATE_ORDER, assert_state_order
 from ..util import list_series_to_numpy
-from .diagnostics_style import diagnostics_figsize
+from .diagnostics_style import diagnostics_figsize, finalize_single_panel_diagnostics
 
 
 def make_factorial_effects_figure(
@@ -37,6 +46,7 @@ def make_factorial_effects_figure(
     rasterize_at: int | None = None,
     cmap: str = "coolwarm",
     state_order: Sequence[str] = STATE_ORDER,
+    show_meta: bool = False,
 ):
     assert_state_order(state_order)
     if df.is_empty():
@@ -60,7 +70,8 @@ def make_factorial_effects_figure(
     apply_plot_style()
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=diagnostics_figsize(), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=diagnostics_figsize())
+    apply_notebook_axes_style(ax, square=True)
     sc = scatter_smart(
         ax,
         a_eff,
@@ -71,12 +82,12 @@ def make_factorial_effects_figure(
         cmap=cmap,
         rasterize_at=rasterize_at,
     )
-    ax.set_xlabel("A effect")
-    ax.set_ylabel("B effect")
+    ax.set_xlabel(math_label("factorial_a"))
+    ax.set_ylabel(math_label("factorial_b"))
     ax.axhline(0.0, color="#B0B0B0", linewidth=0.8)
     ax.axvline(0.0, color="#B0B0B0", linewidth=0.8)
-    cb = fig.colorbar(sc, ax=ax, pad=0.02)
-    cb.set_label("AB interaction")
+    cb = add_flush_colorbar(fig, ax, sc, pad=0.045)
+    cb.set_label(math_label("factorial_ab", fallback=pretty_label("AB interaction")), labelpad=8)
 
     if label_col and label_col in df.columns:
         mask = df.select(pl.col(label_col).fill_null(False)).to_numpy().ravel().astype(bool)
@@ -91,15 +102,13 @@ def make_factorial_effects_figure(
                 alpha=1.0,
             )
 
-    annotate_plot_meta(
-        ax,
-        hue="AB interaction",
-        size_by=size_col,
-        alpha=alpha,
-        rasterized=bool(rasterize_at),
-    )
-    if subtitle:
-        ax.set_title(f"{title}\n{subtitle}")
-    else:
-        ax.set_title(title)
+    if show_meta:
+        annotate_plot_meta(
+            ax,
+            hue="AB interaction",
+            size_by=size_col,
+            alpha=alpha,
+            rasterized=bool(rasterize_at),
+        )
+    finalize_single_panel_diagnostics(fig, title=title, subtitle=subtitle, right=0.75)
     return fig

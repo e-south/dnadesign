@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-26
+**Last verified:** 2026-06-24
 
 ## At a glance
 This document defines reliability intent for runtime behavior, CI behavior, and operator workflows.
@@ -20,10 +20,11 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - Runtime and CI behavior should avoid hidden fallback paths.
 - Long-running workflows should surface machine-readable state transitions and terminal outcomes.
 - Repeated campaign orchestration state is workspace-scoped (`<workspace-root>/outputs/logs/ops/*`) to avoid root-level runbook/log fan-out.
-- Observation-plane status discovery is metadata-first: checked-in
-  `src/dnadesign/**/ops/status.registry.yaml` fragments must load without
-  importing provider implementations, and provider code should only import when
-  the selected surface executes.
+- Observation-plane status discovery is metadata-first: checked-in tool-local
+  `src/dnadesign/**/ops/status.registry.yaml` fragments and Ops-owned
+  `src/dnadesign/ops/providers/*/status.registry.yaml` fragments must load
+  without importing provider implementations, and provider code should only
+  import when the selected surface executes.
 - Snapshot and preflight surfaces stay distinct:
   - record-plane snapshots are cheap, repo-scoped, and should not probe local
     GPUs or scheduler state on the fast path
@@ -46,10 +47,10 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - CI gate lane: explicit merge gate that requires core lane success and requires external integration lane success whenever external integration scope is active.
 
 ## Operational runbook map
-- SCC quickstart and batch guidance: `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`
-- SCC status-first and queue-fair operator guidance: `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`, `docs/bu-scc/submission-reference.md`
+- SCC quickstart and batch guidance: `docs/bu-scc/setup/quickstart.md`, `docs/bu-scc/runbooks/batch-notify.md`
+- SCC status-first and queue-fair operator guidance: `docs/bu-scc/setup/quickstart.md`, `docs/bu-scc/runbooks/batch-notify.md`, `docs/bu-scc/reference/submission.md`
 - Repo BU SCC docs are the operational baseline; repo-local Codex skills are optional overlays, not required dependencies.
-- Cross-tool orchestration and single-study accumulation contracts: `docs/operations/orchestration-runbooks.md`
+- Cross-tool orchestration and single-study accumulation contracts: `docs/operations/orchestration/runbooks.md`
 - Notify operator runbook and event contracts: `docs/notify/README.md`, `docs/notify/usr-events.md`
 - Maintainer CI/test details: `docs/dev/README.md`
 

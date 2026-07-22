@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/views/test_dataset_read_ops.py
 
 Read-path tests for Dataset helpers.

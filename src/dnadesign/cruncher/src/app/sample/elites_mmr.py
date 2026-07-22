@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/elites_mmr.py
 
 MMR-based elite pool and metadata helpers.

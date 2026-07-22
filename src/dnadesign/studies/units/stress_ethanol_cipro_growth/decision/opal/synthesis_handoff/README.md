@@ -1,0 +1,177 @@
+# Stress OPAL Synthesis Handoff
+
+**Owner:** stress_ethanol_cipro_growth study
+**Lifecycle:** assay batch 1 accepted for order; vendor submission not performed
+**Last verified:** 2026-07-21
+
+Study-owned conversion from an OPAL logical selection batch to physical
+synthesis artifacts.
+
+## Ownership
+
+OPAL owns model fitting, candidate predictions, selection views, and the
+deduplicated logical `selection_batch`. This package owns cloning transforms,
+order aliases, manifests, vendor projections, and physical lifecycle records.
+Candidate `id` and promoter `sequence` remain unchanged across the boundary.
+
+The measured-round contract is one campaign, one run, and one logical batch.
+Target membership is carried by `selection_memberships`; it is not inferred
+from campaign names.
+
+## Sources
+
+### Pre-assay batch zero
+
+`study_batch0_selector` preserves the digest-pinned pre-assay 18-row seed. Its
+SFXI source-run slugs map explicitly to declared selection-view IDs:
+
+- `secg_ethanol_rf_sfxi_topn` -> `ethanol`
+- `secg_cipro_rf_sfxi_topn` -> `ciprofloxacin`
+- `secg_and_rf_sfxi_topn` -> `and`
+
+Those slugs are source-provenance labels, not executable OPAL configurations.
+Their artifacts and batch-zero exports are stored under the study-owned
+`workbench/source_evidence/opal_sfxi_round0/` root.
+
+### Measured OPAL rounds
+
+`opal_selection_batch` loads one v3 campaign run. It loads every declared view
+through OPAL's public `load_selection_set` contract, loads the deduplicated
+batch, verifies every membership ID/rank/score, and verifies sequence parity
+against the campaign records table.
+
+No campaign list, per-campaign run map, implicit view, or duplicate-filling
+policy is supported.
+
+## Manifest
+
+Every measured-round row includes campaign, round, run, JSON
+`selection_view_ids`, structured `selection_memberships`, canonical candidate
+identity, cloning spans, hashes, and physical validation. A candidate selected
+by multiple views appears once with every membership.
+
+### Stable study aliases
+
+The study alias registry assigns one cumulative `SECG-NNN` name to each exact
+candidate and promoter-core sequence. An alias does not encode a campaign,
+selection view, or order batch. This keeps the same name usable in later OPAL
+rounds and Reader bindings, including for candidates nominated earlier but not
+physically included in a prior batch. Reusing an alias for another candidate or
+sequence is rejected.
+
+## Lifecycle Record
+
+The authority is
+`docs/studies/stress_ethanol_cipro_growth/record/synthesis_handoffs.yaml`.
+
+The first physical assay batch selected by the MSRB campaign has assay index 1
+and was chosen by the model fitted at OPAL round 0. Those axes are
+related but not interchangeable: `assay_batch_index` counts physical assay
+batches, while `model_as_of_round` identifies the label snapshot and model
+that made the selection.
+
+The accepted handoff uses this mapping:
+
+```yaml
+- handoff_id: stress-opal-assay-b1-r0-msrb-v1
+  lifecycle_status: accepted_for_order
+  source_authority: opal_selection_batch
+  selection_epoch: opal_model_round
+  assay_batch_index: 1
+  model_as_of_round: 0
+  campaign_slug: secg_msrb_greedy
+  run_id: <msrb-round-0-run-id>
+  strategy_id: stress_promoter_insert:v1
+  expected_selection_views:
+    - {selection_view_id: ethanol, expected_rows: 6}
+    - {selection_view_id: ciprofloxacin, expected_rows: 6}
+    - {selection_view_id: and, expected_rows: 6}
+  materialization_contract:
+    campaign_config: {path: <canonical-campaign-config>, sha256: <sha256>}
+    selection_batch: {path: <run-selection-batch>, sha256: <sha256>}
+    candidate_records: {path: <candidate-records-parquet>, sha256: <sha256>}
+    promoter_alias_registry: {path: <canonical-alias-registry>, sha256: <sha256>}
+    cloning_strategy: {path: <canonical-cloning-strategy>, sha256: <sha256>}
+    expected_candidates:
+      - study_alias: SECG-019
+        candidate_id: <exact-candidate-id>
+        core_sha256: <promoter-core-sha256>
+      # One exact row per selected candidate, through SECG-036 for this preview.
+  expected_artifact:
+    campaign_slug: secg_msrb_greedy
+    expected_rows: 18
+    manifest_path: <generated-manifest-path>
+    vendor_workbook_path: <generated-workbook-path>
+    genbank_dir_path: <generated-genbank-directory>
+    genbank_feature_table_path: <generated-feature-table-path>
+```
+
+The record fails if campaign, run, input digest, alias-to-candidate binding,
+promoter-core digest, unique batch count, or per-view membership count drifts.
+The candidate-record receipt is required because that table supplies the
+DenseGen and fixed-element annotations written into GenBank. All input and
+output paths must resolve inside the active repository checkout, including
+through existing symlinks. These bindings authorize one materialization; they
+do not claim that the sequences were ordered or assayed.
+
+## Commands
+
+Inspect the unified selections:
+
+```bash
+uv run opal selection-set show \
+  -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml \
+  --view ethanol --round latest --json
+
+uv run opal selection-batch show \
+  -c src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml \
+  --round latest --json
+```
+
+Preview a draft from one explicit run:
+
+```bash
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
+  --source opal-round --round <model_as_of_round> --run-id <run_id> \
+  --batch-id <physical_assay_batch_id> --json
+```
+
+Preview a checked-in lifecycle record:
+
+```bash
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff \
+  --handoff-id <measured_round_handoff_id> --json
+```
+
+The current handoff has moved through `authorized_for_materialization` and
+`generated_pending_acceptance` to `accepted_for_order`. Materializing and
+accepting files does not place a vendor order.
+
+The exact accepted bundle is retained in the repository. A clean checkout can
+therefore rerun the readback and digest checks without reopening write mode.
+Missing, partial, or modified accepted files fail live status and preflight.
+
+Write mode accepts only the canonical lifecycle record, active campaign config,
+study alias registry, and cloning strategy in the active source checkout. Each
+file must match the SHA-256 recorded for the measured round. Preview mode may
+use alternate fixture paths because it cannot create handoff artifacts.
+
+`--source selected-csv` is fixture/debug input and requires explicit JSON
+`selection_memberships`. It is preview-only: the CLI rejects `--write` because
+only a checked-in OPAL handoff record at `authorized_for_materialization` may
+create synthesis artifacts.
+
+## Physical Validation
+
+The declared strategy wraps an uppercase 60 nt promoter core with lowercase
+15 nt flanks. BamHI is allowed only in the left flank and EcoRI only in the
+right flank. The assembled insert is rescanned before files are written.
+
+Generated outputs contain a vendor-neutral manifest, Azenta/GeneWiz workbook,
+one GenBank file per insert, and a DenseGen feature-table sidecar. DenseGen
+TFBS coordinates use `offset`; sigma-70 fixed elements use `offset_raw`.
+Neither is a fallback for the other.
+
+Generating files alone does not authorize synthesis. The checked-in
+`accepted_for_order` lifecycle state records that decision for this exact
+handoff; vendor submission remains a later action.

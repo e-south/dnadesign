@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/visual_geometry.py
 
 Coordinate helpers for scar_nick terminal-nick visual contracts.

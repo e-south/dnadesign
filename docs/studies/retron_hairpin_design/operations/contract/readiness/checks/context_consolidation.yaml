@@ -1,0 +1,134 @@
+checks:
+  context_consolidation:
+  - kind: path_exists
+    check_id: study.status.present
+    check_group: study_record
+    summary: Study status note is present.
+    required: true
+    artifact: status_note
+  - kind: path_exists
+    check_id: study.routes.present
+    check_group: study_record
+    summary: Study route map is present.
+    required: true
+    artifact: routes_doc
+  - kind: path_exists
+    check_id: study.route_msd_design_references.present
+    check_group: study_record
+    summary: MSD design-reference route detail is present.
+    required: true
+    artifact: route_msd_design_references
+  - kind: path_exists
+    check_id: study.route_released_product_snapback.present
+    check_group: study_record
+    summary: Released-product Snapback route detail is present.
+    required: true
+    artifact: route_released_product_snapback
+  - kind: path_exists
+    check_id: study.route_scar_nick_base_junction.present
+    check_group: study_record
+    summary: Scar-nick route detail is present.
+    required: true
+    artifact: route_scar_nick_base_junction
+  - kind: path_exists
+    check_id: study.route_linear_ssdna_composition.present
+    check_group: study_record
+    summary: Linear ssDNA composition route detail is present.
+    required: true
+    artifact: route_linear_ssdna_composition
+  - kind: path_exists
+    check_id: study.route_yiu_boundary_check.present
+    check_group: study_record
+    summary: YIU boundary route detail is present.
+    required: true
+    artifact: route_yiu_boundary_check
+  - kind: path_exists
+    check_id: study.pipeline.present
+    check_group: study_record
+    summary: Study pipeline context is present.
+    required: true
+    artifact: pipeline_doc
+  - kind: path_exists
+    check_id: study.retron_context.present
+    check_group: study_record
+    summary: Retron context note is present.
+    required: true
+    artifact: retron_context_note
+  - kind: path_exists
+    check_id: study.scar_nick_base_junction.present
+    check_group: study_record
+    summary: Scar-nick base-junction context note is present.
+    required: true
+    artifact: scar_nick_base_junction_note
+  - kind: path_exists
+    check_id: study.linear_ssdna_composition.present
+    check_group: study_record
+    summary: Linear ssDNA composition handoff note is present.
+    required: true
+    artifact: linear_ssdna_composition_note
+  - kind: path_exists
+    check_id: study.msd_design_registry.present
+    check_group: study_record
+    summary: Study-owned MSD design registry is present.
+    required: true
+    artifact: msd_design_registry
+  - kind: path_exists
+    check_id: study.msd_cap_sources.present
+    check_group: study_record
+    summary: Explicit MSD cap source lookup is present.
+    required: true
+    artifact: msd_cap_sources
+  - kind: path_exists
+    check_id: study.msd_design_hit_labels.present
+    check_group: study_record
+    summary: Study-selected MSD design labels are present.
+    required: true
+    artifact: msd_design_hit_labels
+  - kind: path_exists
+    check_id: study.workbench_readme.present
+    check_group: study_record
+    summary: Study workbench entrypoint is present.
+    required: true
+    artifact: workbench_readme
+  - kind: path_exists
+    check_id: study.workbench_directions.present
+    check_group: study_record
+    summary: Study workbench directions are present.
+    required: true
+    artifact: workbench_directions
+  - kind: path_exists
+    check_id: study.workbench_scar_nick_profile_panel.present
+    check_group: study_record
+    summary: Study workbench design-set record is present.
+    required: true
+    artifact: workbench_scar_nick_profile_panel
+  - kind: path_exists
+    check_id: study.workbench_compile_run.present
+    check_group: study_record
+    summary: Study workbench compiler-run provenance is present.
+    required: true
+    artifact: workbench_msd_177_194_compile_run
+  - kind: path_exists
+    check_id: study.workbench_materialization_record.present
+    check_group: study_record
+    summary: Study workbench materialization provenance is present.
+    required: true
+    artifact: workbench_msd_177_194_materialization_record
+  - kind: path_exists
+    check_id: study.linear_ssdna_composition_dev_spec.present
+    check_group: study_record
+    summary: Generic linear ssDNA composition dev spec is present.
+    required: true
+    artifact: linear_ssdna_composition_dev_spec
+  - kind: path_exists
+    check_id: study.linear_ssdna_composition_exec_plan.present
+    check_group: study_record
+    summary: Generic linear ssDNA composition execution plan is present.
+    required: true
+    artifact: linear_ssdna_composition_exec_plan
+  - kind: path_exists
+    check_id: study.yiu_boundary_note.present
+    check_group: study_record
+    summary: YIU boundary note is present.
+    required: true
+    artifact: yiu_boundary_note

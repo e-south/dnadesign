@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/core/types.py
 
 Core sequence span and alphabet type contracts used by records and renderers.

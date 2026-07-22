@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-dnadesign/densegen/utils/plot_style.py
+src/dnadesign/densegen/src/utils/plot_style.py
 
 Plot styling helpers for Stage-A summary figures.
 

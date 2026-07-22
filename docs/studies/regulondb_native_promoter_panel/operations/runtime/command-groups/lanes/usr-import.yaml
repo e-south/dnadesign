@@ -1,0 +1,19 @@
+contract: study_runtime_command_group_lane_v1
+schema_version: 1
+study_id: regulondb_native_promoter_panel
+lane_id: usr_import
+owner: usr
+last_verified: 2026-05-18
+surface_role: curated-dataset
+current_state: local_validated
+route_detail: repo:docs/studies/regulondb_native_promoter_panel/routes/source/usr-import.md
+canonical_payload:
+  path: repo:docs/studies/regulondb_native_promoter_panel/operations/runtime/command-groups/pipeline.yaml
+  keys:
+    - command_groups[id=usr_dry_run]
+    - command_groups[id=usr_committed_import]
+entry_artifacts:
+  - cruncher_promoter_export
+exit_artifacts:
+  - usr_regulondb_native_promoters
+navigation_note: Open this lane for generated USR dataset import posture; write mode remains explicit and generated data stays untracked.

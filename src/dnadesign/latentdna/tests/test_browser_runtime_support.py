@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_browser_runtime_support.py
+
+Regression tests for browser runtime support LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +21,7 @@ from dnadesign.latentdna.src.notebooks import browser_runtime_support as runtime
 from dnadesign.latentdna.src.notebooks import rendering as notebook_rendering
 from dnadesign.latentdna.src.notebooks.browser_runtime_support import (
     available_hues_for_frames,
+    available_reference_hues_for_frames,
     candidate_hue_columns,
     category_color_map,
     classify_hue_series,
@@ -39,7 +51,7 @@ from dnadesign.latentdna.src.notebooks.rendering import (
     resolve_plot_render_asset,
     select_plot_render_path,
 )
-from dnadesign.latentdna.src.visual_style import SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE, wrap_plot_title
+from dnadesign.latentdna.src.presentation.visual_style import SCATTER_CATEGORY_MAX_RELATIVE_LUMINANCE, wrap_plot_title
 
 SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
 SIGMA35_AXIS_STYLES = {
@@ -462,16 +474,19 @@ def test_render_matplotlib_figure_prefers_raster_image_in_app_run_mode(monkeypat
     monkeypatch.setattr(notebook_rendering.mo, "app_meta", lambda: SimpleNamespace(mode="run"))
 
     fig, ax = plt.subplots()
-    ax.plot([0, 1], [1, 0])
+    try:
+        ax.plot([0, 1], [1, 0])
 
-    rendered = render_matplotlib_figure(fig, alt="run mode figure")
+        rendered = render_matplotlib_figure(fig, alt="run mode figure")
 
-    assert isinstance(rendered, mo.Html)
-    assert "run mode figure" in rendered.text
-    assert "<img" in rendered.text
-    assert "image/png" in rendered.text
-    assert "overflow-x: auto" in rendered.text
-    assert "max-width: 100%" in rendered.text
+        assert isinstance(rendered, mo.Html)
+        assert "run mode figure" in rendered.text
+        assert "<img" in rendered.text
+        assert "image/png" in rendered.text
+        assert "overflow-x: auto" in rendered.text
+        assert "max-width: 100%" in rendered.text
+    finally:
+        plt.close(fig)
 
 
 def test_render_plot_asset_wraps_svg_as_data_uri_image(tmp_path: Path) -> None:
@@ -586,17 +601,19 @@ def test_draw_reference_labels_uses_requested_coordinate_columns() -> None:
         }
     )
     fig, ax = plt.subplots()
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=["spyp"],
+            x_column="wildtype_margin_ethanol_vs_control",
+            y_column="wildtype_margin_cipro_vs_control",
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=["spyp"],
-        x_column="wildtype_margin_ethanol_vs_control",
-        y_column="wildtype_margin_cipro_vs_control",
-    )
-
-    assert len(ax.collections) == 1
-    assert any(text.get_text() == "spyP" for text in ax.texts)
+        assert len(ax.collections) == 1
+        assert any(text.get_text() == "spyP" for text in ax.texts)
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_uses_reference_set_display_labels() -> None:
@@ -608,16 +625,18 @@ def test_draw_reference_labels_uses_reference_set_display_labels() -> None:
         }
     )
     fig, ax = plt.subplots()
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=["J23105"],
+            reference_display_labels={"J23105": "Anderson J23105"},
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=["J23105"],
-        reference_display_labels={"J23105": "Anderson J23105"},
-    )
-
-    assert len(ax.collections) == 1
-    assert any(text.get_text() == "Anderson J23105" for text in ax.texts)
+        assert len(ax.collections) == 1
+        assert any(text.get_text() == "Anderson J23105" for text in ax.texts)
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_separates_close_reference_annotations() -> None:
@@ -629,15 +648,18 @@ def test_draw_reference_labels_separates_close_reference_annotations() -> None:
         }
     )
     fig, ax = plt.subplots(figsize=(4.0, 4.0))
-    ax.set_xlim(-0.1, 0.2)
-    ax.set_ylim(-0.1, 0.2)
+    try:
+        ax.set_xlim(-0.1, 0.2)
+        ax.set_ylim(-0.1, 0.2)
 
-    draw_reference_labels(ax, frame, reference_labels=["spyp", "sulAp", "J23105"])
-    fig.canvas.draw()
-    text_positions = [tuple(round(value, 3) for value in text.get_position()) for text in ax.texts]
+        draw_reference_labels(ax, frame, reference_labels=["spyp", "sulAp", "J23105"])
+        fig.canvas.draw()
+        text_positions = [tuple(round(value, 3) for value in text.get_position()) for text in ax.texts]
 
-    assert len(text_positions) == 3
-    assert len(set(text_positions)) == 3
+        assert len(text_positions) == 3
+        assert len(set(text_positions)) == 3
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_uses_compact_font_for_many_native_labels() -> None:
@@ -650,17 +672,19 @@ def test_draw_reference_labels_uses_compact_font_for_many_native_labels() -> Non
         }
     )
     fig, ax = plt.subplots(figsize=(4.0, 4.0))
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=labels,
+            reference_label_limit=len(labels),
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=labels,
-        reference_label_limit=len(labels),
-    )
-
-    assert len(ax.texts) == len(labels)
-    assert max(text.get_fontsize() for text in ax.texts) <= 7.8
-    assert all("_context1kb" not in text.get_text() for text in ax.texts)
+        assert len(ax.texts) == len(labels)
+        assert max(text.get_fontsize() for text in ax.texts) <= 7.8
+        assert all("_context1kb" not in text.get_text() for text in ax.texts)
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_uses_translucent_label_boxes() -> None:
@@ -672,29 +696,33 @@ def test_draw_reference_labels_uses_translucent_label_boxes() -> None:
         }
     )
     fig, ax = plt.subplots(figsize=(4.0, 4.0))
+    try:
+        draw_reference_labels(ax, frame, reference_labels=["spyp"])
 
-    draw_reference_labels(ax, frame, reference_labels=["spyp"])
-
-    assert len(ax.texts) == 1
-    bbox_patch = ax.texts[0].get_bbox_patch()
-    assert bbox_patch is not None
-    assert bbox_patch.get_alpha() == 0.82
+        assert len(ax.texts) == 1
+        bbox_patch = ax.texts[0].get_bbox_patch()
+        assert bbox_patch is not None
+        assert bbox_patch.get_alpha() == 0.82
+    finally:
+        plt.close(fig)
 
 
 def test_draw_reference_labels_skips_frames_without_requested_coordinates() -> None:
     frame = pd.DataFrame({"usr_label__primary": ["spyp"], "other_metric": [0.4]})
     fig, ax = plt.subplots()
+    try:
+        draw_reference_labels(
+            ax,
+            frame,
+            reference_labels=["spyp"],
+            x_column="wildtype_margin_ethanol_vs_control",
+            y_column="wildtype_margin_cipro_vs_control",
+        )
 
-    draw_reference_labels(
-        ax,
-        frame,
-        reference_labels=["spyp"],
-        x_column="wildtype_margin_ethanol_vs_control",
-        y_column="wildtype_margin_cipro_vs_control",
-    )
-
-    assert len(ax.collections) == 0
-    assert len(ax.texts) == 0
+        assert len(ax.collections) == 0
+        assert len(ax.texts) == 0
+    finally:
+        plt.close(fig)
 
 
 def test_resolve_reference_annotation_does_not_fallback_to_default_labels_for_unknown_set(
@@ -809,8 +837,70 @@ def test_reference_hue_render_params_supports_semantic_xy_columns() -> None:
     assert params["cmap"] == "viridis"
 
 
+def test_reference_hue_render_params_supports_categorical_tf_bins() -> None:
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["bae", "lex", "densegen_0"],
+                "synthetic_margin_ethanol_vs_background": [0.3, 0.6, -0.2],
+                "synthetic_margin_cipro_vs_background": [0.1, 0.4, -0.3],
+                "tf_bin": ["ethanol_TF", "lexA_TF", "neither"],
+            }
+        )
+    ]
+
+    params = reference_hue_render_params(
+        frames,
+        reference_labels=["bae", "lex"],
+        reference_hue_column="tf_bin",
+        reference_hue_kind="categorical",
+        x_column="synthetic_margin_ethanol_vs_background",
+        y_column="synthetic_margin_cipro_vs_background",
+    )
+
+    assert params is not None
+    assert params["kind"] == "categorical"
+    assert params["categories"] == ["Ethanol TF", "Lexa TF"]
+    assert set(params["color_map"]) == {"Ethanol TF", "Lexa TF"}
+
+
+def test_available_reference_hues_for_frames_filters_to_selected_reference_rows() -> None:
+    frames = [
+        pd.DataFrame(
+            {
+                "usr_label__primary": ["native_a", "native_b", "densegen_0", "densegen_1"],
+                "synthetic_margin_ethanol_vs_background": [0.1, 0.2, -0.3, 0.4],
+                "synthetic_margin_cipro_vs_background": [0.4, 0.2, 0.1, -0.5],
+                "promoter_standard__strength_value_numeric": [np.nan, np.nan, 1.0, 9.0],
+                "tf_bin": ["ethanol_TF", "lexA_TF", None, None],
+            }
+        )
+    ]
+
+    assert available_hues_for_frames(
+        frames,
+        preferred_hues=["promoter_standard__strength_value_numeric", "tf_bin"],
+        hue_kinds={
+            "promoter_standard__strength_value_numeric": "continuous",
+            "tf_bin": "categorical",
+        },
+    ) == ["promoter_standard__strength_value_numeric", "tf_bin"]
+
+    assert available_reference_hues_for_frames(
+        frames,
+        preferred_hues=["promoter_standard__strength_value_numeric", "tf_bin"],
+        hue_kinds={
+            "promoter_standard__strength_value_numeric": "continuous",
+            "tf_bin": "categorical",
+        },
+        reference_labels=["native_a", "native_b"],
+        x_column="synthetic_margin_ethanol_vs_background",
+        y_column="synthetic_margin_cipro_vs_background",
+    ) == ["tf_bin"]
+
+
 def test_display_hue_label_names_sfxi_reference_metric() -> None:
-    assert display_hue_label("sfxi_ref__metric_value") == "SFXI metric"
+    assert display_hue_label("sfxi_ref__metric_value") == "SFXI selected metric"
 
 
 def test_reference_label_limit_for_annotation_mode_maps_notebook_options() -> None:

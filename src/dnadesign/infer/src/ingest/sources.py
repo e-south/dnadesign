@@ -6,7 +6,6 @@ src/dnadesign/infer/src/ingest/sources.py
 Input-source loaders for infer runtime ingest paths.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

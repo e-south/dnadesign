@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/optimizers/gibbs_summary.py
 
 Build summary payloads for Gibbs annealing optimizer state and diagnostics.

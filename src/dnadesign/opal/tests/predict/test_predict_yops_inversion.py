@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/predict/test_predict_yops_inversion.py
+
+Regression tests for predict yops inversion OPAL predict.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

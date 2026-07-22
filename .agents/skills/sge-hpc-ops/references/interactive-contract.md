@@ -32,7 +32,7 @@ qstat -u "$USER"
 - treat OnDemand as user-authenticated flow requiring explicit confirmation
 - require post-confirmation verification before claiming session-ready state
 - OnDemand browser logout does not terminate running sessions; surface this before exit
-- when policy-sensitive thresholds are cited (for example, the 5-job interactive limit), validate freshness in `source-evidence.md`
+- when policy-sensitive thresholds are cited (for example, the 5-job interactive limit), validate freshness in `external-sources.md`
 - for large-memory OnDemand sessions, require explicit extra qsub options based on current BU guidance
 
 ### OnDemand handoff contract

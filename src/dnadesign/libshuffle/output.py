@@ -1,13 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/output.py
+dnadesign
+src/dnadesign/libshuffle/output.py
 
-Provides helper functions to generate global summary and sublibrary YAML files,
-and optionally save selected subsample .pt files.
+Provides helper functions to generate global summary and sublibrary YAML files,.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

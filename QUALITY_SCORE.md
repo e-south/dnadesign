@@ -1,8 +1,20 @@
+---
+doc_id: quality-score
+surface: system-of-record
+owner: dnadesign-maintainers
+last_verified: 2026-07-13
+freshness_status: review_on_change
+verification_policy: change-aware
+---
+
 # QUALITY SCORE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-24
+**Last verified:** 2026-07-13
+**Freshness:** verification dates are evidence timestamps, not expiry dates.
+Changed documents must be reviewed at or after their change; review age is a
+nonblocking maintenance signal.
 
 ## At a glance
 This document defines how `dnadesign` grades quality across tool domains and architectural layers.
@@ -34,7 +46,9 @@ Each score uses a `0-4` rubric:
 ## Evidence standard
 - Every scored row must include at least one evidence link (CI workflow, test suite, runbook, or dashboard).
 - Every scored row must include `Owner`, `Last verified`, and `Next action`.
-- Rows without evidence or verification metadata are treated as stale regardless of numeric value.
+- Rows without evidence or verification metadata are invalid regardless of numeric value.
+- A row's age is advisory. A row becomes invalid when its evidence changes without
+  a corresponding review or when its evidence link no longer resolves.
 
 ## Quality scorecard
 | Area | Axis | Score (0-4) | Trend | Gate | Evidence | Owner | Last verified | Next action |
@@ -60,6 +74,7 @@ Each score uses a `0-4` rubric:
 | Contract | Enforcement path | Status |
 | --- | --- | --- |
 | Docs naming/link integrity | `dnadesign.devtools.docs.checks` + CI | enforced |
+| Change-aware docs verification | changed-file dates + `Last verified` metadata in `dnadesign.devtools.docs.freshness` | enforced |
 | Core vs external integration test semantics | pytest markers + CI lanes | enforced |
 | External integration non-skipped execution (per in-scope external integration tool) | `dnadesign.devtools.runtime.pytest_gate` + JUnit XML in CI | enforced |
 | Per-tool coverage floors | `dnadesign.devtools.quality.tool_coverage` + baseline JSON | enforced |
@@ -86,7 +101,8 @@ Each score uses a `0-4` rubric:
 ## Entropy control cadence
 - Per PR: CI enforces docs checks, core tests, coverage gate, and external integration lane when in scope.
 - Weekly: review scorecard trend and close one tracked gap.
-- Monthly: prune stale docs links and refresh `Last verified` timestamps.
+- On change: review affected documents and update `Last verified` in the same change.
+- Quarterly: inspect review-age advisories and prioritize by owner and operational risk; do not refresh dates without review.
 - Release cut: confirm scorecard evidence links still resolve and match shipped behavior.
 
 ## Autonomy readiness

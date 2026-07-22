@@ -1,7 +1,7 @@
 ## DenseGen HPC runbook
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 This how-to guide provides scheduler-safe DenseGen execution patterns for long-running environments. Read it when you need predictable preflight checks, resume behavior, and clear separation between generation and analysis phases.
@@ -96,4 +96,4 @@ Durability knobs for interruption tolerance:
 ### Notify event wiring
 This section points to the event-boundary docs instead of duplicating event semantics.
 
-Notify must consume USR `.events.log` rather than DenseGen diagnostics. Use **[observability and events](../concepts/observability_and_events.md)** plus the **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for wiring and validation.
+Notify must consume USR `.events.log` rather than DenseGen diagnostics. Use **[observability and events](../concepts/runtime/observability-and-events.md)** plus the **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for wiring and validation.

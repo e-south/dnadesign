@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_mmr_sweep.py
 
 Tests for artifact-driven MMR sweep replay diagnostics.

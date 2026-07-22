@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/trajectory_video_timeline.py
 
 Timeline and sampling helpers for chain-trajectory video frame selection.

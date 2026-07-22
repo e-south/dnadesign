@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/status/__init__.py
 
-Neutral status/observation package surface with lazy execution-module exports.
+Neutral status/observation public surface.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -24,24 +24,40 @@ from .models import (
     combine_states,
     state_counts,
 )
+from .parsing import (
+    optional_positive_int,
+    required_metadata_text,
+    required_text,
+    string_list_or_empty,
+    string_or_none,
+)
+from .path_ref import PathBase, resolve_path_ref
+from .paths import (
+    flatten_named_paths,
+    path_or_none,
+    required_path,
+    resolve_input_path,
+    resolve_named_path_mapping,
+    resolve_repo_relative_path,
+)
 
 
-def build_campaign_scaffold(*args, **kwargs):
-    from .campaign import build_campaign_scaffold as _build_campaign_scaffold
+def file_count(*args, **kwargs):
+    from .artifacts import file_count as _file_count
 
-    return _build_campaign_scaffold(*args, **kwargs)
-
-
-def build_procedure_status(*args, **kwargs):
-    from .campaign import build_procedure_status as _build_procedure_status
-
-    return _build_procedure_status(*args, **kwargs)
+    return _file_count(*args, **kwargs)
 
 
-def build_status_inputs(*args, **kwargs):
-    from .service import build_status_inputs as _build_status_inputs
+def line_count(*args, **kwargs):
+    from .artifacts import line_count as _line_count
 
-    return _build_status_inputs(*args, **kwargs)
+    return _line_count(*args, **kwargs)
+
+
+def load_yaml_mapping(*args, **kwargs):
+    from .artifacts import load_yaml_mapping as _load_yaml_mapping
+
+    return _load_yaml_mapping(*args, **kwargs)
 
 
 def list_status_kind_specs(*args, **kwargs):
@@ -50,22 +66,28 @@ def list_status_kind_specs(*args, **kwargs):
     return _list_status_kind_specs(*args, **kwargs)
 
 
-def load_campaign_status(*args, **kwargs):
-    from .campaign import load_campaign_status as _load_campaign_status
+def list_status_kind_specs_for_repo(*args, **kwargs):
+    from .registry_loader import list_status_kind_specs_for_repo as _list_status_kind_specs_for_repo
 
-    return _load_campaign_status(*args, **kwargs)
-
-
-def load_status_kind_spec(*args, **kwargs):
-    from .registry_loader import load_status_kind_spec as _load_status_kind_spec
-
-    return _load_status_kind_spec(*args, **kwargs)
+    return _list_status_kind_specs_for_repo(*args, **kwargs)
 
 
-def run_status_kind(*args, **kwargs):
-    from .service import run_status_kind as _run_status_kind
+def namespace_column_counts(*args, **kwargs):
+    from .artifacts import namespace_column_counts as _namespace_column_counts
 
-    return _run_status_kind(*args, **kwargs)
+    return _namespace_column_counts(*args, **kwargs)
+
+
+def overlay_namespace_names(*args, **kwargs):
+    from .artifacts import overlay_namespace_names as _overlay_namespace_names
+
+    return _overlay_namespace_names(*args, **kwargs)
+
+
+def parquet_row_count(*args, **kwargs):
+    from .artifacts import parquet_row_count as _parquet_row_count
+
+    return _parquet_row_count(*args, **kwargs)
 
 
 __all__ = [
@@ -73,18 +95,32 @@ __all__ = [
     "CampaignScaffoldStep",
     "CampaignStatus",
     "InputFieldSpec",
+    "PathBase",
     "ProcedureStatus",
     "STATE_SEVERITY",
     "STATUS_STATES",
     "StatusKindSpec",
     "StatusState",
-    "build_campaign_scaffold",
-    "build_procedure_status",
-    "build_status_inputs",
     "combine_states",
+    "file_count",
+    "flatten_named_paths",
+    "line_count",
     "list_status_kind_specs",
-    "load_campaign_status",
-    "load_status_kind_spec",
-    "run_status_kind",
+    "list_status_kind_specs_for_repo",
+    "load_yaml_mapping",
+    "namespace_column_counts",
+    "optional_positive_int",
+    "overlay_namespace_names",
+    "parquet_row_count",
+    "path_or_none",
+    "required_metadata_text",
+    "required_path",
+    "required_text",
+    "resolve_input_path",
+    "resolve_named_path_mapping",
+    "resolve_path_ref",
+    "resolve_repo_relative_path",
     "state_counts",
+    "string_list_or_empty",
+    "string_or_none",
 ]

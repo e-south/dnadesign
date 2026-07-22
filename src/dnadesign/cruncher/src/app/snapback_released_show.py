@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/snapback_released_show.py
 
 Path-oriented integrity checks for released-product snapback bundles.

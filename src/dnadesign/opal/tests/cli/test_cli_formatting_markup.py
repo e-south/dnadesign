@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_formatting_markup.py
+
+Regression tests for CLI formatting markup OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

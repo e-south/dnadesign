@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/config/test_public_api_module_layout.py
 
-Tests that DenseGen exposes its public API from package root without top-level
-facade module sprawl.
+Tests that DenseGen exposes its public API from package root without top-level.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

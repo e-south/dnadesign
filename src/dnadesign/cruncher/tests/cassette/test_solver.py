@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cassette/test_solver.py
 
 Solve/search tests for the cassette workflow.

@@ -110,6 +110,8 @@ tmp/
 # Large/binary data artifacts (keep out of git)
 # -----------------------------------------------------------------------------
 *.parquet
+!src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
+!src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_observations.parquet
 *.parq
 *.pq
 *.feather
@@ -173,25 +175,16 @@ src/dnadesign/prototypes/
 src/dnadesign/usr/archived/
 src/dnadesign/usr/datasets/usr_regulondb_native_promoters/
 
-# Permuter docs (local only for now)
-src/dnadesign/permuter/docs/
-
 # OPAL campaigns: keep configs tracked, ignore artifacts/data.
 src/dnadesign/opal/campaigns/**
 !src/dnadesign/opal/campaigns/**/
 !src/dnadesign/opal/campaigns/**/campaign.yaml
-!src/dnadesign/opal/campaigns/**/campaign.yml
-!src/dnadesign/opal/campaigns/**/opal.yaml
-!src/dnadesign/opal/campaigns/**/opal.yml
 !src/dnadesign/opal/campaigns/**/plots.yaml
-!src/dnadesign/opal/campaigns/**/plots.yml
 !src/dnadesign/opal/campaigns/**/README.md
 !src/dnadesign/opal/campaigns/.gitignore
 src/dnadesign/opal/campaigns/**/notebooks/
 src/dnadesign/opal/campaigns/**/notebooks/**
 src/dnadesign/opal/campaigns/**/inputs/
-!src/dnadesign/opal/campaigns/demo/inputs/
-!src/dnadesign/opal/campaigns/demo/inputs/**
 !src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/inputs/
 !src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/inputs/**
 !src/dnadesign/opal/campaigns/demo_gp_topn/inputs/
@@ -199,8 +192,12 @@ src/dnadesign/opal/campaigns/**/inputs/
 !src/dnadesign/opal/campaigns/demo_gp_ei/inputs/
 !src/dnadesign/opal/campaigns/demo_gp_ei/inputs/**
 src/dnadesign/opal/campaigns/**/records.parquet
-!src/dnadesign/opal/campaigns/demo/records.parquet
+!src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/records.parquet
 src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
+
+# Stress-study OPAL source evidence: preserve local immutable run artifacts
+# outside the executable campaign registry.
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/**
 
 # OPAL per-run products anywhere
 **/outputs/
@@ -307,6 +304,8 @@ src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/.gitkeep
 
 # LatentDNA workspaces: keep configs/templates tracked; generated analysis outputs stay local.
+# The stress study snapshot is a sanctioned checked-in status record; use
+# `latentdna workspace snapshot --dry-run` for read-only inspections.
 src/dnadesign/latentdna/workspaces/**/outputs/
 !src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/
 src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/*
@@ -314,7 +313,7 @@ src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/*
 src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/*
 !src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
 
-# Legacy DenseGen runs (ignored to avoid local artifact noise)
+# DenseGen run outputs retained outside active package surfaces
 src/dnadesign/densegen/runs/**
 !src/dnadesign/densegen/runs/demo/inputs/*.jaspar
 !src/dnadesign/densegen/runs/demo_meme_two_tf/
@@ -337,6 +336,7 @@ src/dnadesign/usr/datasets/**
 !src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/README.md
 
 # Common local project dirs
+/.var/
 /campaigns/
 /datasets/
 /prototypes/
@@ -370,6 +370,7 @@ AGENTS.md
 !src/dnadesign/cruncher/AGENTS.md
 !src/dnadesign/latentdna/AGENTS.md
 !src/dnadesign/notify/AGENTS.md
+!src/dnadesign/permuter/AGENTS.md
 src/dnadesign/notify/.secrets/
 
 # Marimo

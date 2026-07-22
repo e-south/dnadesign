@@ -7,13 +7,13 @@ Use these gates when users ask for automated quality assurance around SCC workfl
 1. Skill contract gate
 
 ```bash
-bash scripts/audit-sge-hpc-ops-skill.sh
+bash $SKILL_DIR/scripts/audit-sge-hpc-ops-skill.sh
 ```
 
 2. Submission policy gate (template-level)
 
 ```bash
-scripts/qa-sge-submit-preflight.sh \
+$SKILL_DIR/scripts/qa-sge-submit-preflight.sh \
   --template <qsub-template-1> \
   --template <qsub-template-2> \
   --require-project-flag
@@ -22,19 +22,19 @@ scripts/qa-sge-submit-preflight.sh \
 3. Session-status gate
 
 ```bash
-scripts/sge-session-status.sh --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --warn-over-running 3
 ```
 
 For deterministic fixture validation:
 
 ```bash
-scripts/sge-session-status.sh --qstat-file <fixture> --warn-over-running 3
+$SKILL_DIR/scripts/sge-session-status.sh --qstat-file <fixture> --warn-over-running 3
 ```
 
 4. Submission-shape advisor gate
 
 ```bash
-scripts/sge-submit-shape-advisor.sh \
+$SKILL_DIR/scripts/sge-submit-shape-advisor.sh \
   --planned-submits <N> \
   --warn-over-running 3
 ```
@@ -42,7 +42,7 @@ scripts/sge-submit-shape-advisor.sh \
 5. Operator brief gate
 
 ```bash
-scripts/sge-operator-brief.sh \
+$SKILL_DIR/scripts/sge-operator-brief.sh \
   --planned-submits <N> \
   --warn-over-running 3
 ```
@@ -50,7 +50,7 @@ scripts/sge-operator-brief.sh \
 6. Active-jobs reporter gate
 
 ```bash
-scripts/sge-active-jobs.sh --qstat-file <fixture> --max-jobs 12
+$SKILL_DIR/scripts/sge-active-jobs.sh --qstat-file <fixture> --max-jobs 12
 ```
 
 7. Determinism gate
@@ -60,7 +60,7 @@ Run the skill audit three times and compare outputs.
 ```bash
 tmpdir="$(mktemp -d)"
 for i in 1 2 3; do
-  bash scripts/audit-sge-hpc-ops-skill.sh > "$tmpdir/run$i.log"
+  bash $SKILL_DIR/scripts/audit-sge-hpc-ops-skill.sh > "$tmpdir/run$i.log"
 done
 shasum "$tmpdir"/run*.log
 ```
@@ -71,7 +71,7 @@ Use these after editing the repo-local skill or BU SCC operator docs.
 
 ```bash
 uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py
-uv run python -m dnadesign.devtools.docs_checks --repo-root .
+uv run python -m dnadesign.devtools.docs.checks --repo-root .
 ```
 
 ### Optional policy gate for strict environments
@@ -79,7 +79,7 @@ uv run python -m dnadesign.devtools.docs_checks --repo-root .
 Use this when org policy requires shorter shared-queue runtimes by default.
 
 ```bash
-scripts/qa-sge-submit-preflight.sh \
+$SKILL_DIR/scripts/qa-sge-submit-preflight.sh \
   --template <qsub-template> \
   --require-project-flag \
   --max-runtime-hours 12

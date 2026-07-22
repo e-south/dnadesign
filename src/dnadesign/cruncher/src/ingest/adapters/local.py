@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/ingest/adapters/local.py
 
-Author(s): Eric J. South
+Ingest helpers for local Cruncher ingest adapters.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

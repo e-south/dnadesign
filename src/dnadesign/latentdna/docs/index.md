@@ -1,5 +1,5 @@
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-17
+**Last verified:** 2026-07-14
 
 Open the latentdna docs index through the unified [latentdna docs](README.md) index.
 
@@ -7,4 +7,4 @@ Open the latentdna docs index through the unified [latentdna docs](README.md) in
 - Reference: CLI contracts, workspace schema, workspace snapshot, artifact naming, source/view/alignment/scalar contracts, manifests, exports, deliverables, and performance budgets
 - Operations: snapshot consumption, freshness inspection, and status registry surfaces
 - Concepts: ownership boundary, coordinate spaces, and landmarks
-- Dev: implementation journal and phase status
+- Dev: implementation journal, phase status, and the trait-axis projection dev spec

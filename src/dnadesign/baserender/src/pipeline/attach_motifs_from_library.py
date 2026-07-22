@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/pipeline/attach_motifs_from_library.py
 
-Transform that rewrites motif_logo matrices from a tool-provided motif library
-primitives artifact.
+Transform that rewrites motif_logo matrices from a tool-provided motif library.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

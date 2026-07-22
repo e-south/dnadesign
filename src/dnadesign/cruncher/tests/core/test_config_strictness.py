@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_config_strictness.py
 
-Author(s): Eric J. South
+Regression tests for config strictness Cruncher core.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

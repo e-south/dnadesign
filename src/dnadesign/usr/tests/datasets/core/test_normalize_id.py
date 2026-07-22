@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/core/test_normalize_id.py
 
 Tests deterministic ID hashing rules and delimiter handling.

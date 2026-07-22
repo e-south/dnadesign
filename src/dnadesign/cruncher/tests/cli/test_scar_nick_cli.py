@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_scar_nick_cli.py
 
 CLI smoke tests for the scar-nick command group.
@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -131,6 +133,30 @@ def _write_spec(tmp_path: Path, *, materialize_top_k: int = 8) -> tuple[Path, Pa
         encoding="utf-8",
     )
     return workspace, spec_path
+
+
+@pytest.fixture(scope="module")
+def scar_nick_show_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    tmp_path = tmp_path_factory.mktemp("scar_nick_show_template")
+    _workspace, spec_path = _write_spec(tmp_path, materialize_top_k=2)
+    result = runner.invoke(
+        app,
+        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
+        color=False,
+    )
+
+    assert result.exit_code == 0
+    return Path(json.loads(result.output)["run_dir"])
+
+
+def _copy_scar_nick_show_run(template: Path, destination: Path) -> Path:
+    shutil.copytree(template, destination)
+    return destination
+
+
+@pytest.fixture
+def scar_nick_show_run(scar_nick_show_template: Path, tmp_path: Path) -> Path:
+    return _copy_scar_nick_show_run(scar_nick_show_template, tmp_path / "scar_nick_run")
 
 
 def test_root_help_includes_scar_nick_group() -> None:
@@ -339,106 +365,61 @@ def test_scar_nick_design_writes_unique_terminal_nick_visuals_and_baserender_job
     assert "BaseRender job ->" in show_result.output
 
 
-def test_scar_nick_show_fails_on_missing_report_and_provenance_drift(tmp_path: Path) -> None:
-    _workspace, spec_path = _write_spec(tmp_path)
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    run_dir = Path(json.loads(result.output)["run_dir"])
-
-    report_path = run_dir / "analysis" / "report.json"
+def test_scar_nick_show_fails_on_missing_report_and_provenance_drift(
+    scar_nick_show_template: Path, tmp_path: Path
+) -> None:
+    missing_report_run = _copy_scar_nick_show_run(scar_nick_show_template, tmp_path / "missing_report_run")
+    report_path = missing_report_run / "analysis" / "report.json"
     report_path.unlink()
-    missing_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    missing_result = runner.invoke(app, ["scar-nick", "show", "--run", str(missing_report_run)], color=False)
     assert missing_result.exit_code == 1
     assert "Missing scar-nick report" in missing_result.output
 
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    (run_dir / "provenance" / "spec.snapshot.yaml").write_text("scar_nick: drifted\n", encoding="utf-8")
-    drift_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    drift_run = _copy_scar_nick_show_run(scar_nick_show_template, tmp_path / "provenance_drift_run")
+    (drift_run / "provenance" / "spec.snapshot.yaml").write_text("scar_nick: drifted\n", encoding="utf-8")
+    drift_result = runner.invoke(app, ["scar-nick", "show", "--run", str(drift_run)], color=False)
     assert drift_result.exit_code == 1
     assert "provenance drift" in drift_result.output.lower()
 
 
-def test_scar_nick_show_fails_on_missing_advertised_visual(tmp_path: Path) -> None:
-    _workspace, spec_path = _write_spec(tmp_path)
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    run_dir = Path(json.loads(result.output)["run_dir"])
+def test_scar_nick_show_fails_on_missing_advertised_visual(scar_nick_show_run: Path) -> None:
+    (scar_nick_show_run / "analysis" / "views" / "post_terminal_nick.scar_nick_visual.v1.json").unlink()
 
-    (run_dir / "analysis" / "views" / "post_terminal_nick.scar_nick_visual.v1.json").unlink()
-
-    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(scar_nick_show_run)], color=False)
 
     assert show_result.exit_code == 1
     assert "Missing scar-nick visual artifact" in show_result.output
 
 
-def test_scar_nick_show_fails_on_report_content_drift(tmp_path: Path) -> None:
-    _workspace, spec_path = _write_spec(tmp_path, materialize_top_k=2)
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    run_dir = Path(json.loads(result.output)["run_dir"])
-    report_path = run_dir / "analysis" / "report.json"
+def test_scar_nick_show_fails_on_report_content_drift(scar_nick_show_run: Path) -> None:
+    report_path = scar_nick_show_run / "analysis" / "report.json"
     report = json.loads(report_path.read_text(encoding="utf-8"))
     report["metadata"]["materialized_candidate_count"] = 0
     report_path.write_text(json.dumps(report), encoding="utf-8")
 
-    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(scar_nick_show_run)], color=False)
 
     assert show_result.exit_code == 1
     assert "artifact drift for report.json" in show_result.output
 
 
-def test_scar_nick_show_fails_on_materialized_candidate_payload_drift(tmp_path: Path) -> None:
-    _workspace, spec_path = _write_spec(tmp_path, materialize_top_k=2)
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    run_dir = Path(json.loads(result.output)["run_dir"])
+def test_scar_nick_show_fails_on_materialized_candidate_payload_drift(scar_nick_show_run: Path) -> None:
     candidate_json_path = (
-        run_dir / "analysis" / "materialized_candidates" / "candidate_01" / "analysis" / "candidate.json"
+        scar_nick_show_run / "analysis" / "materialized_candidates" / "candidate_01" / "analysis" / "candidate.json"
     )
     candidate_payload = json.loads(candidate_json_path.read_text(encoding="utf-8"))
     candidate_payload["left_base"] = "CCCC"
     candidate_json_path.write_text(json.dumps(candidate_payload), encoding="utf-8")
 
-    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(scar_nick_show_run)], color=False)
 
     assert show_result.exit_code == 1
     assert "materialized candidate payload drift" in show_result.output
 
 
-def test_scar_nick_show_fails_on_missing_materialized_candidate_visual(tmp_path: Path) -> None:
-    _workspace, spec_path = _write_spec(tmp_path, materialize_top_k=2)
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    run_dir = Path(json.loads(result.output)["run_dir"])
-
+def test_scar_nick_show_fails_on_missing_materialized_candidate_visual(scar_nick_show_run: Path) -> None:
     (
-        run_dir
+        scar_nick_show_run
         / "analysis"
         / "materialized_candidates"
         / "candidate_01"
@@ -447,47 +428,31 @@ def test_scar_nick_show_fails_on_missing_materialized_candidate_visual(tmp_path:
         / "post_terminal_nick.scar_nick_visual.v1.json"
     ).unlink()
 
-    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(scar_nick_show_run)], color=False)
 
     assert show_result.exit_code == 1
     assert "Missing scar-nick visual artifact" in show_result.output
 
 
-def test_scar_nick_show_fails_on_visual_manifest_content_drift(tmp_path: Path) -> None:
-    _workspace, spec_path = _write_spec(tmp_path, materialize_top_k=2)
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    run_dir = Path(json.loads(result.output)["run_dir"])
-    views_manifest_path = run_dir / "analysis" / "views" / "views_manifest.v1.json"
+def test_scar_nick_show_fails_on_visual_manifest_content_drift(scar_nick_show_run: Path) -> None:
+    views_manifest_path = scar_nick_show_run / "analysis" / "views" / "views_manifest.v1.json"
     views_manifest = json.loads(views_manifest_path.read_text(encoding="utf-8"))
     views_manifest["views"] = views_manifest["views"][:-1]
     views_manifest_path.write_text(json.dumps(views_manifest), encoding="utf-8")
 
-    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(scar_nick_show_run)], color=False)
 
     assert show_result.exit_code == 1
     assert "views manifest drift" in show_result.output
 
 
-def test_scar_nick_show_fails_on_baserender_job_content_drift(tmp_path: Path) -> None:
-    _workspace, spec_path = _write_spec(tmp_path, materialize_top_k=2)
-    result = runner.invoke(
-        app,
-        ["scar-nick", "design", "--spec", str(spec_path), "--force-overwrite", "--json"],
-        color=False,
-    )
-    assert result.exit_code == 0
-    run_dir = Path(json.loads(result.output)["run_dir"])
-    job_path = run_dir / "baserender_jobs" / "scar_nick_terminal_nick.job.yaml"
+def test_scar_nick_show_fails_on_baserender_job_content_drift(scar_nick_show_run: Path) -> None:
+    job_path = scar_nick_show_run / "baserender_jobs" / "scar_nick_terminal_nick.job.yaml"
     job = yaml.safe_load(job_path.read_text(encoding="utf-8"))
     job["run"]["strict"] = False
     job_path.write_text(yaml.safe_dump(job), encoding="utf-8")
 
-    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
+    show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(scar_nick_show_run)], color=False)
 
     assert show_result.exit_code == 1
     assert "BaseRender job drift" in show_result.output

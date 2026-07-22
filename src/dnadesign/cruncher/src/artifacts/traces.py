@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/artifacts/traces.py
 
-Author(s): Eric J. South
+Artifact contracts for traces Cruncher artifacts.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

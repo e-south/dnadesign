@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/yiu_workflow/render.py
 
 Render payload-centric YIU bundles from specs.

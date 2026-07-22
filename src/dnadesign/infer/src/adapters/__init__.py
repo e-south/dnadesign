@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/adapters/__init__.py
 
+Package exports for infer adapters.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

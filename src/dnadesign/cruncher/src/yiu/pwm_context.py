@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/pwm_context.py
 
 Resolve YIU PWM context from inline specs, local files, or Sample metadata.

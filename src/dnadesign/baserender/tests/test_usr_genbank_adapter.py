@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_usr_genbank_adapter.py
 
 USR GenBank annotation adapter and render-contract tests.

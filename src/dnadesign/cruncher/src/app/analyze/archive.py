@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/archive.py
 
 Archive and rewrite analysis outputs for repeated runs.

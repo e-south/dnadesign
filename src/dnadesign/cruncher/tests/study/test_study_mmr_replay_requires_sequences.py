@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_mmr_replay_requires_sequences.py
 
 Ensure MMR replay enforces required sequence artifacts.

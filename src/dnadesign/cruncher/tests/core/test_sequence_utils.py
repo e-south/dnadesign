@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_sequence_utils.py
 
-Author(s): Eric J. South
+Regression tests for sequence utils Cruncher core.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

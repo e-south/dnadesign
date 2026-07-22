@@ -1,0 +1,277 @@
+variant_id: retron170
+display_id: pES-retron-170
+file_stem: pes-retron-170-msd-region
+source_record_id: msd-retron-170
+source_description: ''
+source_sequence_sha256: 86e1b131b9c9f8c2732373efbd557be7269dd1e8cf3f126f584dd05a3105587b  # pragma: allowlist secret
+msd_sequence_sha256: 04d3b7f42e6801fe3e029a525f033ef3dac2e54ef3a2f32314a51fbc40511c69  # pragma: allowlist secret
+sequence_length_nt: 88
+msd_sequence_5to3: GTCAGAAAAAACAAGTCCCTATTAGTGATAGAGATCCTCAGCCCGCTGAGGATCTCTATCGCTGATAGGGACTCGACAGTAACTCAGA
+rna_sequence_5to3: GUCAGAAAAAACAAGUCCCUAUUAGUGAUAGAGAUCCUCAGCCCGCUGAGGAUCUCUAUCGCUGAUAGGGACUCGACAGUAACUCAGA
+annotation_status: label_only_normalized
+annotation_warnings: []
+annotation_notes:
+- kind: foldback_feature_boundary_granularity
+  role: snapback_foldback_geometry
+  label: Foldback
+  source_span_0:
+  - 37
+  - 53
+  display_span_0:
+  - 35
+  - 51
+  annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+  compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+  severity: info
+  note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+    geometry uses the full interval between payload_primary and payload_complement.
+- kind: payload_complement_sequence_is_source_explicit
+  role: payload_complement
+  label: tet operator [complement]
+  source_span_0:
+  - 17
+  - 36
+  display_span_0:
+  - 52
+  - 71
+  annotated_sequence_5to3: TCTCTATCGCTGATAGGGA
+  compiler_sequence_5to3: TCTCTATCGCTGATAGGGA
+  severity: info
+  note: Source complement arm is not the reverse complement of the source primary
+    arm; this is represented as an explicit source arm and classified through pairing_segments.
+pairing_segments:
+- segment: payload_stem
+  left_role: payload_primary
+  right_role: payload_complement
+  left_sequence_5to3: TCCCTATTAGTGATAGAGA
+  right_sequence_5to3: TCTCTATCGCTGATAGGGA
+  length_bp: 19
+  watson_crick_bp: 17
+  wobble_bp: 2
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: intentional_mismatch
+  intent: declared_design
+  note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+- segment: foldback_stem
+  left_role: snapback_retained_stem
+  right_role: snapback_foldback_return
+  left_sequence_5to3: TCCTCAG
+  right_sequence_5to3: CTGAGGA
+  length_bp: 7
+  watson_crick_bp: 7
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Foldback stem/return segment between payload stem and snapback cap.
+payload_binding_sites:
+- segment: payload_stem
+  primary_sequence_5to3: TCCCTATTAGTGATAGAGA
+  complement_sequence_5to3: TCTCTATCGCTGATAGGGA
+  payload_length_nt: 19
+  payload_family_id: null
+  parent_payload_id: null
+  payload_member_id: null
+  payload_class: motif_congruent_uncataloged_payload
+  retained_parent_span_0: null
+  motif_alignments:
+  - motif_model_id: tetr_westmann
+    motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    motif_width_nt: 17
+    motif_span_0:
+      start: 0
+      end: 17
+    payload_window_0:
+      start: 1
+      end: 18
+    strand: +
+    sequence_5to3: CCCTATTAGTGATAGAG
+    consensus_sequence_5to3: CTCTATCGCCGATAGAG
+    score_bits: 14.488965
+    consensus_score_bits: 17.22639
+    consensus_score_fraction: 0.841091
+  reference_comparisons:
+  - reference_payload_id: tetO_ecoli_working_w00_19
+    reference_payload_family_id: tetO_ecoli_working
+    reference_span_0:
+      start: 0
+      end: 17
+    query_span_0:
+      start: 0
+      end: 17
+    query_sequence_5to3: CCCTATTAGTGATAGAG
+    reference_sequence_5to3: CCCTATCAGTGATAGAG
+    compared_nt: 17
+    mismatch_count: 1
+    identity_fraction: 0.941176
+    comparison_class: single_edit
+features:
+- role: msd_region
+  source_role: null
+  label: msd[tetO]
+  feature_type: misc_feature
+  source_start_0: 0
+  source_end_0: 88
+  source_strand: -1
+  display_start_0: 0
+  display_end_0: 88
+  display_strand: 1
+  sequence_5to3: GTCAGAAAAAACAAGTCCCTATTAGTGATAGAGATCCTCAGCCCGCTGAGGATCTCTATCGCTGATAGGGACTCGACAGTAACTCAGA
+- role: flank_3p
+  source_role: null
+  label: 3' Flanking
+  feature_type: misc_feature
+  source_start_0: 0
+  source_end_0: 17
+  source_strand: 1
+  display_start_0: 71
+  display_end_0: 88
+  display_strand: -1
+  sequence_5to3: CTCGACAGTAACTCAGA
+- role: stem_base_right
+  source_role: null
+  label: Right base
+  feature_type: misc_feature
+  source_start_0: 13
+  source_end_0: 17
+  source_strand: 1
+  display_start_0: 71
+  display_end_0: 75
+  display_strand: -1
+  sequence_5to3: CTCG
+- role: null
+  source_role: null
+  label: G-T mismatch
+  feature_type: misc_feature
+  source_start_0: 14
+  source_end_0: 15
+  source_strand: 1
+  display_start_0: 73
+  display_end_0: 74
+  display_strand: -1
+  sequence_5to3: C
+- role: payload_complement
+  source_role: null
+  label: tet operator [complement]
+  feature_type: protein_bind
+  source_start_0: 17
+  source_end_0: 36
+  source_strand: 1
+  display_start_0: 52
+  display_end_0: 71
+  display_strand: -1
+  sequence_5to3: TCTCTATCGCTGATAGGGA
+- role: null
+  source_role: null
+  label: T>C [G-T mismatch]
+  feature_type: misc_feature
+  source_start_0: 27
+  source_end_0: 28
+  source_strand: 1
+  display_start_0: 60
+  display_end_0: 61
+  display_strand: -1
+  sequence_5to3: G
+- role: snapback_foldback_return
+  source_role: null
+  label: Foldback return
+  feature_type: misc_feature
+  source_start_0: 37
+  source_end_0: 43
+  source_strand: 1
+  display_start_0: 45
+  display_end_0: 51
+  display_strand: -1
+  sequence_5to3: CTGAGG
+- role: snapback_foldback_geometry
+  source_role: null
+  label: Foldback
+  feature_type: misc_feature
+  source_start_0: 37
+  source_end_0: 53
+  source_strand: 1
+  display_start_0: 35
+  display_end_0: 51
+  display_strand: -1
+  sequence_5to3: CCTCAGCCCGCTGAGG
+- role: snapback_cap
+  source_role: null
+  label: Cap
+  feature_type: misc_feature
+  source_start_0: 43
+  source_end_0: 47
+  source_strand: 1
+  display_start_0: 41
+  display_end_0: 45
+  display_strand: -1
+  sequence_5to3: CCCG
+- role: snapback_retained_stem
+  source_role: null
+  label: Foldback stem
+  feature_type: misc_feature
+  source_start_0: 47
+  source_end_0: 53
+  source_strand: -1
+  display_start_0: 35
+  display_end_0: 41
+  display_strand: 1
+  sequence_5to3: CCTCAG
+- role: payload_primary
+  source_role: null
+  label: tet operator
+  feature_type: protein_bind
+  source_start_0: 54
+  source_end_0: 73
+  source_strand: -1
+  display_start_0: 15
+  display_end_0: 34
+  display_strand: 1
+  sequence_5to3: TCCCTATTAGTGATAGAGA
+- role: null
+  source_role: null
+  label: C>T [G-T mismatch]
+  feature_type: misc_feature
+  source_start_0: 65
+  source_end_0: 66
+  source_strand: 1
+  display_start_0: 22
+  display_end_0: 23
+  display_strand: -1
+  sequence_5to3: T
+- role: flank_5p
+  source_role: null
+  label: 5' Flanking
+  feature_type: misc_feature
+  source_start_0: 73
+  source_end_0: 88
+  source_strand: -1
+  display_start_0: 0
+  display_end_0: 15
+  display_strand: 1
+  sequence_5to3: GTCAGAAAAAACAAG
+- role: stem_base_left
+  source_role: null
+  label: Left base
+  feature_type: misc_feature
+  source_start_0: 73
+  source_end_0: 77
+  source_strand: -1
+  display_start_0: 11
+  display_end_0: 15
+  display_strand: 1
+  sequence_5to3: CAAG
+- role: null
+  source_role: null
+  label: G-T mismatch
+  feature_type: misc_feature
+  source_start_0: 75
+  source_end_0: 76
+  source_strand: 1
+  display_start_0: 12
+  display_end_0: 13
+  display_strand: -1
+  sequence_5to3: A
+contract: retron_msd_region_record_v1
+schema_version: 1

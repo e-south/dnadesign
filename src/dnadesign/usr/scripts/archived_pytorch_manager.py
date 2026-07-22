@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/scripts/archived_pytorch_manager.py
+
+Script entrypoints for archived pytorch manager USR scripts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

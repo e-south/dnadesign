@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/models.py
 
 Schema and normalized planning contracts for the cassette workflow.

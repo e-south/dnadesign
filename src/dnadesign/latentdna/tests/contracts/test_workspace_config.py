@@ -456,6 +456,56 @@ recipes:
         load_workspace_config(workspace_dir)
 
 
+def test_load_workspace_config_rejects_projection_recipe_without_explicit_seed(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg, png]
+  neighbor_backend: auto
+sources:
+  anchor60:
+    kind: parquet
+    path: inputs/anchor60.parquet
+    record_key: id
+    subject_key: subject_id
+metadata:
+  include: []
+views:
+  z20_60:
+    source: anchor60
+    vector:
+      kind: column
+      name: embedding
+    coordinate_space_id: shared_space
+    tags: {model: demo}
+    role: primary
+recipes:
+  projection_recipe:
+    steps:
+      - id: fit_projection
+        op: projection.fit
+        params:
+          view: z20_60
+          sample: atlas_sample
+          run_id: umap_z20_60
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(WorkspaceValidationError, match="projection.fit.*explicit seed"):
+        load_workspace_config(workspace_dir)
+
+
 def test_load_workspace_config_rejects_unknown_deliverable_recipe(tmp_path) -> None:
     workspace_dir = tmp_path / "workspace"
     workspace_dir.mkdir()
@@ -947,7 +997,7 @@ sources: {}
 metadata:
   include: []
 study_binding:
-  study_dir: src/dnadesign/studies/stress_ethanol_cipro_growth
+  study_dir: src/dnadesign/studies/units/stress_ethanol_cipro_growth
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -977,7 +1027,7 @@ metadata:
   include: []
 study_binding:
   study_id: stress_ethanol_cipro_growth
-  docs_root: src/dnadesign/studies/stress_ethanol_cipro_growth
+  docs_root: src/dnadesign/studies/units/stress_ethanol_cipro_growth
         """.strip()
         + "\n",
         encoding="utf-8",
@@ -1143,9 +1193,10 @@ def test_load_workspace_config_rejects_docs_ref_path_traversal(tmp_path) -> None
     workspace_dir.mkdir()
     record_root = tmp_path / "docs" / "studies" / "demo_study"
     record_root.mkdir(parents=True)
-    for file_name in ("campaign.yaml", "datasets.yaml", "ops.study.yaml"):
+    for file_name in ("record/campaign.yaml", "record/datasets.yaml", "operations/ops.study.yaml"):
+        (record_root / file_name).parent.mkdir(parents=True, exist_ok=True)
         (record_root / file_name).write_text("version: 1\n", encoding="utf-8")
-    (record_root / "status.md").write_text("## Demo\n", encoding="utf-8")
+    (record_root / "record" / "status.md").write_text("## Demo\n", encoding="utf-8")
     deliverable_docs_root = tmp_path / "study_docs"
     deliverable_docs_root.mkdir()
     (deliverable_docs_root / "study.yaml").write_text("study_id: demo_study\n", encoding="utf-8")

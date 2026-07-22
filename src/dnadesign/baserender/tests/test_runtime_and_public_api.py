@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_runtime_and_public_api.py
 
 Tests for explicit runtime bootstrap and stable public API helpers.
@@ -15,6 +15,7 @@ import shutil
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 
 import dnadesign.baserender as baserender
@@ -109,6 +110,54 @@ def test_public_sequence_panel_contract_renders_image() -> None:
     assert result.diagnostics.contract_id == "dnadesign.baserender.sequence_panel.v1"
     assert result.diagnostics.style_profile == "promoter_compact_slide.v1"
     assert result.diagnostics.strand_count == 2
+    assert result.diagnostics.strand_center_y_px == pytest.approx(70.0, abs=1.0)
+
+
+def test_public_sequence_panel_contract_uses_white_canvas_under_dark_rc() -> None:
+    row = {
+        "id": "r1",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [
+            {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+            {"regulator": "cpxR", "orientation": "fwd", "sequence": "TATAAT", "offset": 23},
+        ],
+    }
+
+    with plt.rc_context(
+        {
+            "figure.facecolor": "black",
+            "axes.facecolor": "black",
+            "savefig.facecolor": "black",
+        }
+    ):
+        result = baserender.render_sequence_panel_image(
+            row,
+            adapter_kind="densegen_tfbs",
+            target_width_px=420,
+            target_height_px=140,
+        )
+
+    rgb = np.asarray(result.image)[:, :, :3]
+    near_black_fraction = float((rgb.max(axis=2) <= 24).mean())
+    assert near_black_fraction < 0.01
+
+
+def test_public_sequence_panel_contract_renders_empty_densegen_annotations() -> None:
+    row = {
+        "id": "r1",
+        "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+        "densegen__used_tfbs_detail": [],
+    }
+
+    result = baserender.render_sequence_panel_image(
+        row,
+        adapter_kind="densegen_tfbs",
+        target_width_px=420,
+        target_height_px=140,
+    )
+
+    assert result.image.shape == (140, 420, 4)
+    assert result.diagnostics.feature_count == 0
 
 
 def test_public_sequence_panel_contract_renders_usr_genbank_image() -> None:
@@ -176,6 +225,9 @@ def test_public_sequence_panel_contract_renders_usr_genbank_image() -> None:
     assert result.diagnostics.adapter_kind == "usr_genbank_annotations_v1"
     assert result.diagnostics.feature_count == 4
     assert result.diagnostics.strand_count == 2
+    assert result.diagnostics.strand_center_y_px == pytest.approx(70.0, abs=1.0)
+    assert result.diagnostics.title is None
+    assert result.diagnostics.record_label == "demoP"
 
 
 def test_public_sequence_panel_contract_rejects_invalid_profile_and_adapter() -> None:
@@ -280,6 +332,26 @@ def test_public_adapter_helpers_adapt_in_memory_contract_rows() -> None:
 
     assert record.id == "assembled_payload"
     assert [item.id for item in records] == ["assembled_payload", "assembled_payload"]
+
+
+def test_public_sequence_evidence_adapter_rejects_unequal_complement_length() -> None:
+    row = {
+        "contract_kind": "sequence_evidence_map_v1",
+        "state_id": "assembled_payload",
+        "topology_kind": "linear_dsdna",
+        "alphabet": "iupac_dna",
+        "primary_sequence": "ACGT",
+        "complement_sequence": "TGCAT",
+        "owners": [],
+        "effect_tags": [],
+        "boundaries": [],
+        "pairings": [],
+        "display": {"title": "Assembled payload"},
+        "meta": {},
+    }
+
+    with pytest.raises(baserender.SchemaError, match="complement_sequence length must match primary_sequence"):
+        baserender.adapt_record(row, adapter_kind="sequence_evidence_map_v1", alphabet="IUPAC_DNA")
 
 
 def test_public_adapter_helpers_reject_unknown_adapter_columns() -> None:

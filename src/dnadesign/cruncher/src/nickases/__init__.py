@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/nickases/__init__.py
 
 Shared nickase catalog and scanning contracts for Cruncher workflow families.

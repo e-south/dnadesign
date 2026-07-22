@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/fixtures/regulondb_payloads.py
 
-Author(s): Eric J. South
+Regression tests for RegulonDB payloads Cruncher fixtures.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

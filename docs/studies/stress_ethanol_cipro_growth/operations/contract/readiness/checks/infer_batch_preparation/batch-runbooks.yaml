@@ -1,0 +1,45 @@
+checks:
+  infer_batch_preparation:
+  - kind: scheduler_queue
+    check_id: infer.batch.queue
+    check_group: infer_batch_plan
+    summary: Scheduler queue is below the declared submit threshold.
+    required: false
+    surface: scheduler_default
+    max_running_jobs: 3
+  - kind: runbook_plan
+    check_id: infer.batch.20b.anchor_only.plan
+    check_group: infer_batch_plan
+    phase_id: infer_anchor_only_20b
+    summary: Anchor-only 20B infer runbook renders cleanly.
+    required: false
+    surface: infer_batch_20b_anchor_only
+  - kind: runbook_plan
+    check_id: infer.batch.20b.anchor_plus_template.plan
+    check_group: infer_batch_plan
+    phase_id: infer_anchor_plus_template_20b
+    summary: Anchor-plus-template 20B infer runbook renders cleanly.
+    required: false
+    surface: infer_batch_20b_anchor_plus_template
+  - kind: runbook_plan
+    check_id: infer.batch.7b.sequence_views_anchor_construct_insert.plan
+    check_group: infer_batch_plan
+    phase_id: infer_sequence_views_anchor_construct_insert_7b
+    summary: Sequence-view construct-insert 7B infer runbook renders cleanly.
+    required: true
+    surface: infer_batch_sequence_views_anchor_construct_insert_7b
+  - kind: runbook_plan
+    check_id: infer.batch.7b.sequence_views_context_forward_seq_and_anchor_mean.plan
+    check_group: infer_batch_plan
+    phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+    summary: Sequence-view forward-context sequence-mean plus anchor-mean 7B infer runbook renders cleanly.
+    required: true
+    surface: infer_batch_sequence_views_context_forward_seq_and_anchor_mean_7b
+  - kind: runbook_plan
+    check_id: infer.batch.7b.sequence_views_context_reverse_complement_seq_and_anchor_mean.plan
+    check_group: infer_batch_plan
+    phase_id: infer_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b
+    summary: Sequence-view reverse-complement-context sequence-mean plus anchor-mean 7B infer runbook
+      renders cleanly.
+    required: true
+    surface: infer_batch_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b

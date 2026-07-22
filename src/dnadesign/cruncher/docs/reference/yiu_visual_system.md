@@ -3,7 +3,7 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `uv run cruncher yiu render|show` and the published BaseRender handoff
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-07
+**Last verified:** 2026-07-07
 **Last updated by:** cruncher-maintainers on 2026-04-07
 
 YIU renders one composite page with a clear priority order: payload evidence first, split geometry second, and assembled confirmation third. The named visual system for that page is `bench_strip`.

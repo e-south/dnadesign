@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/analysis/test_sfxi_diagnostics_altair.py
+
+Regression tests for SFXI diagnostics altair OPAL analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

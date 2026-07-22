@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/tests/snapback/builders.py
+
 Shared builders for preserved-site Snapback tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -152,4 +159,59 @@ def write_snapback_workspace(tmp_path: Path) -> SnapbackWorkspaceFixture:
     )
 
 
-__all__ = ["SnapbackWorkspaceFixture", "write_snapback_workspace"]
+def write_snapback_target_search_catalog(workspace_root: Path) -> Path:
+    catalog_path = workspace_root / "inputs" / "nickases" / "target-search.nickases.yaml"
+    catalog_path.parent.mkdir(parents=True, exist_ok=True)
+    catalog_path.write_text(
+        yaml.safe_dump(
+            {
+                "nickases": {
+                    "schema_version": 1,
+                    "entries": [
+                        {
+                            "id": "Nt.BspQI",
+                            "specificity_id": "BspQI",
+                            "motif_top_5to3": "GCTCTTC",
+                            "raw_cut_notation": "GCTCTTC(1/none)",
+                            "raw_cut_offset_reference": "motif_end",
+                        },
+                        {
+                            "id": "Nt.CviPII",
+                            "specificity_id": "CviPII",
+                            "motif_top_5to3": "CCD",
+                            "raw_cut_notation": "CCD(-3/none)",
+                            "raw_cut_offset_reference": "motif_end",
+                        },
+                        {
+                            "id": "Nb.BsrDI",
+                            "specificity_id": "BsrDI",
+                            "motif_top_5to3": "GCAATG",
+                            "vendor_diagram_top_5to3": "GCAATGNN",
+                            "raw_cut_notation": "GCAATG(none/0)",
+                            "raw_cut_offset_reference": "motif_end",
+                        },
+                        {
+                            "id": "Nb.BtsI",
+                            "specificity_id": "BtsI",
+                            "motif_top_5to3": "GCAGTG",
+                            "vendor_diagram_top_5to3": "GCAGTGNN",
+                            "raw_cut_notation": "GCAGTG(none/0)",
+                            "raw_cut_offset_reference": "motif_end",
+                        },
+                        {
+                            "id": "Nt.Bpu10I",
+                            "specificity_id": "Bpu10I",
+                            "motif_top_5to3": "CCTNAGC",
+                            "raw_cut_notation": "CCTNAGC(2/none)",
+                        },
+                    ],
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return catalog_path
+
+
+__all__ = ["SnapbackWorkspaceFixture", "write_snapback_target_search_catalog", "write_snapback_workspace"]

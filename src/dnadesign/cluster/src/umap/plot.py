@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/umap/plot.py
 
+UMAP helpers for plot cluster UMAP.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

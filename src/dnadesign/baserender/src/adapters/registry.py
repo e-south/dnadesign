@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/registry.py
 
 Central adapter registry for construction and source-column requirements.

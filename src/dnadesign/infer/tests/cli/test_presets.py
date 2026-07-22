@@ -1,15 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_presets.py
+dnadesign
+src/dnadesign/infer/tests/cli/test_presets.py
 
-Public API:
-  - run_extract
-  - run_generate
-  - run_job (YAML-driven)
+Public API:.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

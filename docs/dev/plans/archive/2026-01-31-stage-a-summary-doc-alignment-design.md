@@ -31,7 +31,7 @@ Create a single authoritative "How to read `stage_a_summary`" section in `sampli
 - Adding new plots or annotations.
 
 ### Recommended Approach (A)
-Move the full interpretive narrative into `src/dnadesign/densegen/docs/concepts/sampling.md` as a dedicated section and replace interpretive prose elsewhere with links to that section.
+Move the full interpretive narrative into `src/dnadesign/densegen/docs/concepts/generation/sampling.md` as a dedicated section and replace interpretive prose elsewhere with links to that section.
 
 ### Proposed Changes
 #### 1) Canonical narrative in sampling.md

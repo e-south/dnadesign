@@ -1,7 +1,7 @@
 # USR interactive notebook
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 Use the marimo notebook for interactive exploration (filters, summaries, and quick dataset inspection).
@@ -37,5 +37,5 @@ When running inside `src/dnadesign/usr/datasets/<dataset-id>`, commands default 
 
 ## Next steps
 
-- Sync workflows: [../operations/sync.md](../operations/sync.md)
+- Sync workflows: [USR sync operations](../operations/sync/README.md)
 - Contracts and schema details: [../reference/README.md](../reference/README.md)

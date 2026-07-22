@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_exit_codes_lock.py
+
+Regression tests for exit codes lock OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

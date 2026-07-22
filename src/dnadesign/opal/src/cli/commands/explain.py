@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/explain.py
+
+CLI wiring for explain OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -36,8 +38,7 @@ def cmd_explain(
         ...,
         "--round",
         "-r",
-        "--labels-as-of",
-        help="Labels cutoff (same as run --labels-as-of).",
+        help="Labels cutoff (same as run --round).",
     ),
     json: bool = typer.Option(
         False,

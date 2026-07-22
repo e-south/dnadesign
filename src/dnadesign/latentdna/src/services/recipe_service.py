@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/recipe_service.py
+
 Recipe validation and execution services for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -175,7 +182,7 @@ def _fit_projection_step(
         projection_id=str(_require_param(params, "projection_id", "run_id")),
         sample_id=str(_require_param(params, "sample_id", "sample")),
         metric=_optional_param(params, "metric", default=None),
-        seed=int(_optional_param(params, "seed", default=17)),
+        seed=int(_require_param(params, "seed")),
         allow_memory_overage=allow_memory_overage,
         force=force,
     )

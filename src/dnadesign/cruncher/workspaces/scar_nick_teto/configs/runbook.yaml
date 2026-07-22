@@ -1,0 +1,48 @@
+runbook:
+  schema_version: 1
+  name: scar_nick_teto
+  steps:
+  - id: scar_nick_bbsI_hf_validate
+    description: Validate the BbsI-HF retained-scar terminal-nick panel.
+    run:
+    - scar-nick
+    - validate
+    - --spec
+    - configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml
+  - id: scar_nick_bbsI_hf_design
+    description: Write the deterministic BbsI-HF scar-nick design bundle.
+    run:
+    - scar-nick
+    - design
+    - --spec
+    - configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml
+    - --force-overwrite
+  - id: scar_nick_bbsI_hf_show
+    description: Inspect the BbsI-HF scar-nick bundle and drift checks.
+    run:
+    - scar-nick
+    - show
+    - --run
+    - outputs/scar_nick/teto_upstream_processing_bbsI_hf
+  - id: scar_nick_paqci_core_panel_validate
+    description: Validate the PaqCI core retained-scar terminal-nick panel.
+    run:
+    - scar-nick
+    - validate
+    - --spec
+    - configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml
+  - id: scar_nick_paqci_core_panel_design
+    description: Write the deterministic PaqCI core scar-nick design bundle.
+    run:
+    - scar-nick
+    - design
+    - --spec
+    - configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml
+    - --force-overwrite
+  - id: scar_nick_paqci_core_panel_show
+    description: Inspect the PaqCI core scar-nick bundle and drift checks.
+    run:
+    - scar-nick
+    - show
+    - --run
+    - outputs/scar_nick/teto_upstream_processing_paqci_core_panel

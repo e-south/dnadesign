@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_move_schedule.py
 
-Author(s): Eric J. South
+Regression tests for move schedule Cruncher core.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

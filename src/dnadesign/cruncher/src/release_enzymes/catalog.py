@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/release_enzymes/catalog.py
 
-Release-enzyme catalog loading and merging for released-product snapback
-workflows.
+Release-enzyme catalog loading and merging for released-product snapback.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

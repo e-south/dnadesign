@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/outputs/base.py
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/base.py
 
-Base output sink interfaces for DenseGen.
+Defines DenseGen output sink contracts and alignment digests.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

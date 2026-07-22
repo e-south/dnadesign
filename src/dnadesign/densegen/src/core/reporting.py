@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/reporting.py
+dnadesign
+src/dnadesign/densegen/src/core/reporting.py
 
 Report data facade for DenseGen run summaries.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

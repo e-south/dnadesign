@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/cli/test_cli_strict.py
 
 CLI strictness tests for assertive error behavior.

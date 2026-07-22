@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/view_payload_content.py
 
 Payload-view content policy for payload-centric YIU bundles.

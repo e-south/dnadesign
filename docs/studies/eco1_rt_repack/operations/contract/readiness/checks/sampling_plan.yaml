@@ -1,0 +1,87 @@
+checks:
+  phase1_thread_contract:
+    - kind: path_exists
+      check_id: eco1_rt.sampling.profile_policy
+      check_group: sampling_plan
+      summary: Eco1 profile fixture declares allowed backends, temperatures, seed policy, and no fallback.
+      required: true
+      artifact: eco1_rt_profile_fixture
+    - kind: path_exists
+      check_id: eco1_rt.sampling.artifact_chain_schema
+      check_group: sampling_plan
+      summary: Artifact chain schema declares thread_plan and sample_table requirements.
+      required: true
+      artifact: thread_artifact_chain_schema
+  phase2_real_backend_ingest:
+    - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_simple_mask_set
+      check_group: sampling_plan
+      summary: Real backend ingest requires mask_set.yaml under eco1_rt_clade9_plurality25_direct_contact5a_v1 before thread_plan.yaml.
+      required: true
+      artifact: planned_mask_set
+      validator_intent:
+        required_state: materialized
+        required_inputs:
+          - planned_contact_geometry_profile
+          - planned_conservation_profile
+          - planned_manual_mask_authority
+        required_fields:
+          - policy_id
+          - protected
+          - non_fixed
+          - non_fixed_missing_backbone
+          - protection_reasons
+        required_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1
+    - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_thread_plan
+      check_group: sampling_plan
+      summary: Real backend ingest requires thread_plan.yaml with request hash, explicit no-fallback policy, and non-fixed positions from the validated simple mask.
+      required: true
+      artifact: thread_plan_artifact
+      validator_intent:
+        required_state: materialized
+        upstream_artifacts:
+          - planned_mask_set
+        required_fields:
+          - backend_kind
+          - backend_request_manifest
+          - request_hash
+          - seed_set
+          - temperature_schedule
+          - fallback_policy
+        fallback_policy: explicit_no_fallback
+    - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_proteinmpnn_request
+      check_group: sampling_plan
+      summary: Real backend ingest requires ProteinMPNN helper-compatible request sidecars with chain-local fixed positions.
+      required: true
+      artifact: planned_proteinmpnn_request
+      validator_intent:
+        required_state: materialized
+        upstream_artifacts:
+          - thread_plan_artifact
+        required_fields:
+          - request_hash
+          - fixed_positions_jsonl
+          - canonical_to_proteinmpnn_position
+          - omit_aas
+          - fallback_policy
+        position_basis: chain_local_1_indexed_after_export
+        omit_aas:
+          - C
+        fallback_policy: explicit_no_fallback
+    - kind: path_exists
+      check_id: eco1_rt.sampling.materialized_sample_table
+      check_group: sampling_plan
+      summary: Real backend ingest requires materialized sample_table.parquet with backend provenance.
+      required: true
+      artifact: planned_sample_table
+      validator_intent:
+        required_state: materialized
+        required_columns:
+          - sample_id
+          - backend_run_id
+          - request_hash
+          - backend_result_hash
+          - sequence_hash
+          - status

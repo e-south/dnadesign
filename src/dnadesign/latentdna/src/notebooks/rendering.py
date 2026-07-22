@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/rendering.py
+
 Notebook rendering helpers for generated LatentDNA marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -15,7 +22,7 @@ from xml.sax.saxutils import escape
 import marimo as mo
 import matplotlib.pyplot as plt
 
-from ..visual_style import (
+from ..presentation.visual_style import (
     DEFAULT_NOTEBOOK_FIG_DPI,
     PANEL_BACKGROUND_COLOR,
     PLOT_FONT_FAMILY,

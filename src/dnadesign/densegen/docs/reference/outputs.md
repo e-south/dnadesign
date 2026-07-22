@@ -1,7 +1,7 @@
 ## DenseGen outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
@@ -9,7 +9,7 @@ DenseGen can emit Parquet outputs locally and/or write through USR. When USR
 is enabled for a shared study, DenseGen writes to the shared root declared in
 the config rather than inventing a workspace-local mirror.
 
-For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../concepts/quick-checklist.md)**.
+For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../concepts/checklists/quick-checklist.md)**.
 
 ### Contents
 
@@ -26,7 +26,7 @@ For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../co
 
 ### Event boundary paths
 
-Use **[observability and events](../concepts/observability_and_events.md)** for stream-boundary behavior; this section lists only artifact paths.
+Use **[observability and events](../concepts/runtime/observability-and-events.md)** for stream-boundary behavior; this section lists only artifact paths.
 
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
 - USR mutation events: `<usr_root>/<dataset>/.events.log`
@@ -155,7 +155,7 @@ DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events 
 
 
 See also:
-- DenseGen boundary and mistakes: **[observability and events](../concepts/observability_and_events.md)**
+- DenseGen boundary and mistakes: **[observability and events](../concepts/runtime/observability-and-events.md)**
 - USR event schema: `../../../usr/docs/reference/event-log.md`
 - Notify operators doc: `../../../../../docs/notify/usr-events.md`
 - DenseGen watcher walkthrough: **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)**
@@ -317,7 +317,7 @@ For large expanded runs, `solve_pressure_and_progress.pdf` plan rows auto-collap
 `attempt_outcome_timeline.pdf` has independent plan scoping controls (`run_health_outcomes_plan_scope: per_plan|auto|per_group`, `run_health_outcomes_plan_max_labels`).
 `attempt_outcome_timeline.pdf` tiles attempts into per-plan rows (first attempts at top) with optional packing controls (`run_health_outcomes_attempts_per_row`, `run_health_outcomes_rows_per_block`).
 
-See `../concepts/sampling.md` for plot interpretation context.
+See `../concepts/generation/sampling.md` for plot interpretation context.
 
 `stage_a_sampling_yield`, `stage_a_pool_diversity`, and `stage_a_pool_score_strata`
 require diversity metrics in `pool_manifest.json`. If your pool manifest predates

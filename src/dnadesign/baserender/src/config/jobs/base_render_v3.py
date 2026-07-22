@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/jobs/base_render_v3.py
 
 BaseRender v3 orchestration contract exports.

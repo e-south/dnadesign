@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/ingest/validators.py
 
+Ingest helpers for validators infer ingest.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

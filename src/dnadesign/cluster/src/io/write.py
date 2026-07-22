@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/io/write.py
 
+I/O helpers for write cluster I/O.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

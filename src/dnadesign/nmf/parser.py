@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-nmf/parser.py
+dnadesign
+src/dnadesign/nmf/parser.py
+
+Parsing helpers for NMF.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

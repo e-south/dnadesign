@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/tests/cli/test_ingest.py
 
 Characterization tests for infer CLI ingest request builders.

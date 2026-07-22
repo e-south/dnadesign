@@ -1,11 +1,11 @@
 ## Infer Dev Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-07-14
 
 - Architecture map: [../architecture/README.md](../architecture/README.md)
 - Active development journal: [journal.md](journal.md)
-- Current refactor stream: information architecture reorganization with progressive disclosure.
+- The development journal records information-architecture and progressive-disclosure work.
 
 ### Maintainer Workflow
 

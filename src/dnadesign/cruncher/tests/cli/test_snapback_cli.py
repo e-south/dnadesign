@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_snapback_cli.py
 
 CLI contract tests for the snapback command group.
@@ -22,6 +22,7 @@ from typer.testing import CliRunner
 
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.nickases.models import reverse_complement
+from dnadesign.cruncher.tests.snapback.builders import write_snapback_target_search_catalog
 
 runner = CliRunner()
 
@@ -193,10 +194,19 @@ def test_snapback_visual_help_describes_visual_spec_contract() -> None:
 def test_snapback_target_search_json_reports_exact_and_near_hits(tmp_path: Path) -> None:
     workspace_root = tmp_path / "workspaces" / "demo_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
+    write_snapback_target_search_catalog(workspace_root)
 
     result = runner.invoke(
         app,
-        ["snapback", "target-search", "--workspace-root", str(workspace_root), "--json"],
+        [
+            "snapback",
+            "target-search",
+            "--workspace-root",
+            str(workspace_root),
+            "--additional-path",
+            "inputs/nickases/target-search.nickases.yaml",
+            "--json",
+        ],
         color=False,
     )
 

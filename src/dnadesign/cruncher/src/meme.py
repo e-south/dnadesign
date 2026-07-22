@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/meme.py
 
 Public MEME parsing API for Cruncher and sibling tools.

@@ -3,18 +3,9 @@
 dnadesign
 src/dnadesign/infer/__init__.py
 
-Public API:
-  - run_extract
-  - run_evo2_sequence_features
-  - run_generate
-  - run_job (YAML-driven)
-  - export_evo2_sequence_opal_matrix
-  - inspect_local_gpu_inventory
-  - resolve_infer_runtime_lane_contracts
-  - validate_runbook_gpu_resources
+Public API:.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

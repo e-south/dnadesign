@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/guidance.py
 
-Builds guided workflow runbooks and state-aware next-step recommendations for
-OPAL campaigns.
+Builds guided workflow runbooks and state-aware next-step recommendations for.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,9 +15,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..config.types import RootConfig
+from ..config.types import LabelSourceUSRSidecar, LocationLocal, LocationUSR, RootConfig
 from ..core.utils import OpalError
 from ..storage.data_access import RecordsStore
+from ..storage.label_sources import label_source_status
 from ..storage.state import CampaignState
 from ..storage.workspace import CampaignWorkspace
 
@@ -54,18 +54,21 @@ class NextGuidance:
     run_exists_for_labels_as_of: bool
     next_commands: list[str]
     learn_more: list[str]
+    records_path: str | None = None
+    records_exists: bool | None = None
+    label_source: dict[str, Any] = field(default_factory=dict)
 
 
 def detect_workflow_key(cfg: RootConfig) -> str:
     model_name = str(cfg.model.name)
-    selection_name = str(cfg.selection.selection.name)
-    objective_names = [str(o.name) for o in cfg.objectives.objectives]
+    selection_names = {str(view.selection.name) for view in cfg.selection_views}
+    objective_names = [str(view.objective.name) for view in cfg.selection_views]
     has_sfxi = "sfxi_v1" in objective_names
-    if model_name == "random_forest" and selection_name == "top_n" and has_sfxi:
+    if model_name == "random_forest" and selection_names == {"top_n"} and has_sfxi:
         return "rf_sfxi_topn"
-    if model_name == "gaussian_process" and selection_name == "top_n" and has_sfxi:
+    if model_name == "gaussian_process" and selection_names == {"top_n"} and has_sfxi:
         return "gp_sfxi_topn"
-    if model_name == "gaussian_process" and selection_name == "expected_improvement" and has_sfxi:
+    if model_name == "gaussian_process" and selection_names == {"expected_improvement"} and has_sfxi:
         return "gp_sfxi_ei"
     return "custom"
 
@@ -81,28 +84,33 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     ]
     source: list[str] = [
         f"{src_root}/runtime/run_round.py",
-        f"{src_root}/runtime/round/stages.py",
+        f"{src_root}/runtime/round/stages/training.py",
+        f"{src_root}/runtime/round/stages/x_matrices.py",
+        f"{src_root}/runtime/round/stages/scoring.py",
         f"{src_root}/registries/models.py",
         f"{src_root}/registries/objectives.py",
         f"{src_root}/registries/selection.py",
     ]
 
     model_name = str(cfg.model.name)
-    selection_name = str(cfg.selection.selection.name)
-    objective_names = [str(o.name) for o in cfg.objectives.objectives]
+    selection_names = {str(view.selection.name) for view in cfg.selection_views}
+    objective_names = [str(view.objective.name) for view in cfg.selection_views]
     if model_name == "gaussian_process":
-        docs.append("docs/plugins/model-gaussian-process.md")
+        docs.append("docs/plugins/models/gaussian-process.md")
         source.append(f"{src_root}/models/gaussian_process.py")
     else:
-        docs.append("docs/plugins/models.md")
+        docs.append("docs/plugins/models/README.md")
         source.append(f"{src_root}/models/random_forest.py")
     if "sfxi_v1" in objective_names:
-        docs.append("docs/plugins/objective-sfxi.md")
+        docs.append("docs/plugins/objectives/sfxi.md")
         source.append(f"{src_root}/objectives/sfxi_v1.py")
-    if selection_name == "expected_improvement":
-        docs.append("docs/plugins/selection-expected-improvement.md")
+    if "spop_v1" in objective_names:
+        docs.append("docs/plugins/objectives/spop.md")
+        source.append(f"{src_root}/objectives/spop_v1.py")
+    if "expected_improvement" in selection_names:
+        docs.append("docs/plugins/selection/expected-improvement.md")
         source.append(f"{src_root}/selection/expected_improvement.py")
-    docs.append("docs/plugins/selection.md")
+    docs.append("docs/plugins/selection/README.md")
     if workflow_key == "rf_sfxi_topn":
         docs.append("docs/workflows/rf-sfxi-topn.md")
     elif workflow_key == "gp_sfxi_topn":
@@ -119,38 +127,82 @@ def _default_labels_file(cfg_path: Path) -> str:
     return str((cfg_path.parent.parent / "inputs" / "r0" / "vec8-b0.xlsx").resolve())
 
 
-def _build_steps(cfg_path: Path, labels_as_of: int) -> list[GuidanceStep]:
+def _records_path_from_cfg(cfg: RootConfig) -> Path:
+    location = cfg.data.location
+    if isinstance(location, LocationUSR):
+        return (Path(location.path) / location.dataset / "records.parquet").resolve()
+    if isinstance(location, LocationLocal):
+        return Path(location.path).resolve()
+    raise OpalError(f"Unsupported data.location.kind: {getattr(location, 'kind', None)!r}")
+
+
+def _label_source_summary(cfg: RootConfig) -> dict[str, Any]:
+    source = cfg.labels.source
+    if isinstance(source, LabelSourceUSRSidecar):
+        location = cfg.data.location
+        if not isinstance(location, LocationUSR):
+            raise OpalError("labels.source.kind=usr_sidecar requires data.location.kind=usr.")
+        return {
+            "kind": "usr_sidecar",
+            "path": str((Path(location.path) / source.dataset / source.path).resolve()),
+            "y_space": cfg.labels.y_space,
+            "prediction_records": cfg.writeback.prediction_records,
+        }
+    return {
+        "kind": "campaign_history",
+        "column": f"opal__{cfg.campaign.slug}__label_hist",
+        "prediction_records": cfg.writeback.prediction_records,
+    }
+
+
+def _ingest_command(*, cfg_path: Path, cfg: RootConfig, labels_as_of: int, labels_file: str) -> str:
+    command = f"opal ingest-y -c {cfg_path.resolve()} --round {labels_as_of} --csv {labels_file}"
+    if isinstance(cfg.labels.source, LabelSourceUSRSidecar):
+        command += " --unknown-sequences error"
+    return f"{command} --apply"
+
+
+def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[GuidanceStep]:
     c = str(cfg_path.resolve())
     labels_file = _default_labels_file(cfg_path)
+    records_path = str(_records_path_from_cfg(cfg))
+    label_source = _label_source_summary(cfg)
+    if label_source["kind"] == "usr_sidecar":
+        ingest_why = "Append observed round labels to the shared USR observed-label sidecar."
+        ingest_writes = [str(label_source["path"]), "outputs/ledger/labels.parquet"]
+    else:
+        ingest_why = "Append observed round labels to campaign-local label history."
+        ingest_writes = ["records.parquet", "outputs/ledger/labels.parquet"]
     return [
         GuidanceStep(
-            title="Initialize campaign workspace",
-            why="Create OPAL output sinks and state.json for this campaign.",
-            command=f"opal init -c {c}",
-            reads=[c],
-            writes=["state.json", "outputs/"],
-        ),
-        GuidanceStep(
             title="Validate schema and plugin wiring",
-            why="Fail fast on config, plugin names, and records schema issues before runtime.",
+            why="Fail fast on config, plugin names, records schema, and X-vector issues before writing campaign state.",
             command=f"opal validate -c {c}",
-            reads=[c, "records.parquet"],
+            reads=[c, records_path],
             writes=[],
         ),
         GuidanceStep(
+            title="Initialize campaign workspace",
+            why="Create OPAL output sinks and state.json for this campaign after validation passes.",
+            command=f"opal init -c {c}",
+            reads=[c, records_path],
+            writes=["state.json", "outputs/"],
+        ),
+        GuidanceStep(
             title="Ingest observed labels",
-            why="Append observed round labels to canonical label history.",
-            command=f"opal ingest-y -c {c} --observed-round {labels_as_of} --in {labels_file} --apply",
-            reads=[labels_file, "records.parquet"],
-            writes=["records.parquet", "outputs/ledger/labels.parquet"],
+            why=ingest_why,
+            command=_ingest_command(cfg_path=cfg_path, cfg=cfg, labels_as_of=labels_as_of, labels_file=labels_file),
+            reads=[labels_file, records_path],
+            writes=ingest_writes,
         ),
         GuidanceStep(
             title="Run train/score/select round",
             why="Train surrogate, evaluate objectives, and produce selected candidates.",
-            command=f"opal run -c {c} --labels-as-of {labels_as_of}",
-            reads=["records.parquet", "state.json"],
+            command=f"opal run -c {c} --round {labels_as_of}",
+            reads=[records_path, "state.json"],
             writes=[
-                f"outputs/rounds/round_{labels_as_of}/selection/selection_top_k.csv",
+                f"outputs/rounds/round_{labels_as_of}/selection/selections.parquet",
+                f"outputs/rounds/round_{labels_as_of}/selection/selection_batch.parquet",
                 "outputs/ledger/runs.parquet",
                 "outputs/ledger/predictions/",
             ],
@@ -158,15 +210,22 @@ def _build_steps(cfg_path: Path, labels_as_of: int) -> list[GuidanceStep]:
         GuidanceStep(
             title="Verify selection/ledger agreement",
             why="Confirm persisted selection artifacts match ledger prediction rows.",
-            command=f"opal verify-outputs -c {c} --round latest",
-            reads=["outputs/rounds/round_*/selection/selection_top_k.csv", "outputs/ledger/predictions/"],
+            command=f"opal verify-outputs -c {c} --round latest --view <selection-view-id>",
+            reads=["outputs/rounds/round_*/selection/selections.parquet", "outputs/ledger/predictions/"],
             writes=[],
         ),
         GuidanceStep(
-            title="Inspect runtime carriers and next-round preflight",
-            why="Review RoundCtx contracts and dry-run the next labels-as-of cut.",
-            command=f"opal ctx audit -c {c} --round latest && opal explain -c {c} --labels-as-of {labels_as_of + 1}",
-            reads=["outputs/rounds/round_*/metadata/round_ctx.json", "records.parquet"],
+            title="Inspect runtime carriers",
+            why="Review RoundCtx contracts emitted by the latest run.",
+            command=f"opal ctx audit -c {c} --round latest",
+            reads=["outputs/rounds/round_*/metadata/round_ctx.json", records_path],
+            writes=[],
+        ),
+        GuidanceStep(
+            title="Dry-run next-round preflight",
+            why="Explain the next label cutoff before running it.",
+            command=f"opal explain -c {c} --round {labels_as_of + 1}",
+            reads=[records_path, "state.json"],
             writes=[],
         ),
     ]
@@ -175,7 +234,30 @@ def _build_steps(cfg_path: Path, labels_as_of: int) -> list[GuidanceStep]:
 def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int = 0) -> GuidanceReport:
     ws = CampaignWorkspace.from_config(cfg, cfg_path)
     workflow_key = detect_workflow_key(cfg)
-    objective_rows = [{"name": str(o.name), "params": dict(o.params or {})} for o in cfg.objectives.objectives]
+    view_rows = [
+        {
+            "id": view.id,
+            "objective": {"name": view.objective.name, "params": dict(view.objective.params or {})},
+            "selection": {"name": view.selection.name, "params": dict(view.selection.params or {})},
+        }
+        for view in cfg.selection_views
+    ]
+    objective_names = [str(view.objective.name) for view in cfg.selection_views]
+    common_errors = [
+        "EI requires uncertainty_ref resolving to a finite, strictly positive standard-deviation channel.",
+        "Each view's score_ref and uncertainty_ref must name channels declared by that view's objective.",
+    ]
+    if "sfxi_v1" in objective_names:
+        common_errors.insert(
+            0,
+            "SFXI min_n failures occur when current-round observed labels are missing for the run cutoff.",
+        )
+    if "spop_v1" in objective_names:
+        common_errors.insert(
+            0,
+            "SPOP campaigns require scalar Y with y_expected_length=1 and score_ref 'spop_v1/spop'.",
+        )
+
     report = GuidanceReport(
         workflow_key=workflow_key,
         campaign={
@@ -183,46 +265,28 @@ def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int 
             "slug": cfg.campaign.slug,
             "config_path": str(ws.config_path),
             "workdir": str(ws.workdir),
-            "records_path": str(Path(cfg.data.location.path).resolve()),
+            "records_path": str(_records_path_from_cfg(cfg)),
+            "label_source": _label_source_summary(cfg),
         },
         plugins={
             "model": {"name": cfg.model.name, "params": dict(cfg.model.params or {})},
-            "objectives": objective_rows,
-            "selection": {
-                "name": cfg.selection.selection.name,
-                "params": dict(cfg.selection.selection.params or {}),
-            },
+            "selection_views": view_rows,
         },
         round_semantics={
             "observed_round": "Round index stamped on ingested labels (wet-lab event time).",
             "labels_as_of": "Training cutoff; model sees labels with observed_round <= labels_as_of.",
         },
-        steps=_build_steps(cfg_path, int(labels_as_of)),
-        common_errors=[
-            "SFXI min_n failures occur when current-round observed labels are missing for labels-as-of round.",
-            "EI requires uncertainty_ref resolving to a finite, strictly positive standard-deviation channel.",
-            "score_ref and uncertainty_ref must be '<objective>/<channel>' and resolve against configured objectives.",
-        ],
+        steps=_build_steps(cfg_path, cfg, int(labels_as_of)),
+        common_errors=common_errors,
         learn_more=_build_doc_pointers(cfg, workflow_key),
     )
     return report
 
 
-def _label_counts_by_round(store: RecordsStore, df) -> dict[int, int]:
-    counts: dict[int, int] = {}
-    lh_col = store.label_hist_col()
-    if lh_col not in df.columns:
-        return counts
-    for cell in df[lh_col].tolist():
-        for entry in store._normalize_hist_cell(cell):
-            if entry.get("kind") != "label":
-                continue
-            try:
-                rr = int(entry.get("observed_round"))
-            except Exception:
-                continue
-            counts[rr] = counts.get(rr, 0) + 1
-    return counts
+def _label_counts_by_round(cfg: RootConfig, store: RecordsStore, df) -> dict[int, int]:
+    status = label_source_status(cfg, store, df, strict=False)
+    counts = status.get("counts_by_round") or {}
+    return {int(round_index): int(count) for round_index, count in dict(counts).items()}
 
 
 def _state_round_set(state_path: Path) -> set[int]:
@@ -236,15 +300,16 @@ def _state_round_set(state_path: Path) -> set[int]:
 
 
 def _sfxi_min_n(cfg: RootConfig) -> int | None:
-    for obj in cfg.objectives.objectives:
-        if str(obj.name) != "sfxi_v1":
+    minimums: list[int] = []
+    for view in cfg.selection_views:
+        if str(view.objective.name) != "sfxi_v1":
             continue
-        scaling = dict((obj.params or {}).get("scaling") or {})
+        scaling = dict((view.objective.params or {}).get("scaling") or {})
         try:
-            return int(scaling.get("min_n", 5))
+            minimums.append(int(scaling.get("min_n", 5)))
         except Exception:
-            return 5
-    return None
+            minimums.append(5)
+    return max(minimums) if minimums else None
 
 
 def build_next_guidance(
@@ -263,21 +328,24 @@ def build_next_guidance(
 
     if not state_exists:
         return NextGuidance(
-            stage="init",
-            reason="Campaign state is missing. Initialize before ingest/run operations.",
+            stage="validate",
+            reason="Campaign state is missing. Validate the candidate table before writing state.json.",
             labels_as_of=target_as_of,
             observed_round=target_observed,
             labels_in_observed_round=0,
             state_exists=False,
             run_exists_for_labels_as_of=False,
             next_commands=[
-                f"opal init -c {ws.config_path}",
                 f"opal validate -c {ws.config_path}",
+                f"opal init -c {ws.config_path}",
             ],
             learn_more=["docs/reference/cli.md", "docs/workflows"],
+            records_path=str(store.records_path),
+            records_exists=store.records_path.exists(),
+            label_source=_label_source_summary(cfg),
         )
 
-    labels_by_round = _label_counts_by_round(store, df)
+    labels_by_round = _label_counts_by_round(cfg, store, df)
     labels_in_round = int(labels_by_round.get(target_observed, 0))
     rounds_with_runs = _state_round_set(ws.state_path)
     run_exists = target_as_of in rounds_with_runs
@@ -297,22 +365,27 @@ def build_next_guidance(
             state_exists=True,
             run_exists_for_labels_as_of=run_exists,
             next_commands=[
-                f"opal ingest-y -c {ws.config_path} --observed-round {target_observed} --in <labels.xlsx> --apply",
+                _ingest_command(
+                    cfg_path=ws.config_path,
+                    cfg=cfg,
+                    labels_as_of=target_observed,
+                    labels_file="<labels.xlsx>",
+                ),
             ],
-            learn_more=["docs/reference/cli.md", "docs/plugins/objective-sfxi.md"],
+            learn_more=["docs/reference/cli.md", "docs/plugins/objectives/sfxi.md"],
         )
 
     if not run_exists:
         return NextGuidance(
             stage="run",
-            reason=f"Labels exist for observed round {target_observed}; run selection for labels-as-of {target_as_of}.",
+            reason=f"Labels exist for observed round {target_observed}; run selection through round {target_as_of}.",
             labels_as_of=target_as_of,
             observed_round=target_observed,
             labels_in_observed_round=labels_in_round,
             state_exists=True,
             run_exists_for_labels_as_of=False,
             next_commands=[
-                f"opal run -c {ws.config_path} --labels-as-of {target_as_of}",
+                f"opal run -c {ws.config_path} --round {target_as_of}",
             ],
             learn_more=["docs/reference/cli.md", "docs/concepts/architecture.md"],
         )
@@ -326,10 +399,39 @@ def build_next_guidance(
         state_exists=True,
         run_exists_for_labels_as_of=True,
         next_commands=[
-            f"opal verify-outputs -c {ws.config_path} --round latest",
+            f"opal verify-outputs -c {ws.config_path} --view <selection-view-id> --round latest",
             f"opal ctx audit -c {ws.config_path} --round latest",
             f"opal status -c {ws.config_path}",
-            f"opal explain -c {ws.config_path} --labels-as-of {target_as_of + 1}",
+            f"opal explain -c {ws.config_path} --round {target_as_of + 1}",
         ],
         learn_more=["docs/reference/cli.md", "docs/concepts/roundctx.md"],
+    )
+
+
+def build_missing_records_guidance(
+    cfg_path: Path,
+    cfg: RootConfig,
+    records_path: Path,
+    *,
+    labels_as_of: int | None = None,
+    observed_round: int | None = None,
+) -> NextGuidance:
+    target_as_of = int(labels_as_of) if labels_as_of is not None else 0
+    target_observed = int(observed_round) if observed_round is not None else target_as_of
+    return NextGuidance(
+        stage="candidate_table",
+        reason=f"Candidate records.parquet is missing: {records_path}",
+        labels_as_of=target_as_of,
+        observed_round=target_observed,
+        labels_in_observed_round=0,
+        state_exists=CampaignWorkspace.from_config(cfg, cfg_path).state_path.exists(),
+        run_exists_for_labels_as_of=False,
+        next_commands=[
+            f"opal guide -c {cfg_path}",
+            f"opal validate -c {cfg_path}",
+        ],
+        learn_more=["docs/reference/data-contracts.md", "docs/workflows/usr-infer-x-active-learning.md"],
+        records_path=str(records_path),
+        records_exists=False,
+        label_source=_label_source_summary(cfg),
     )

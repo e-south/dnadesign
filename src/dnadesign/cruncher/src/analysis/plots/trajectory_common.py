@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/trajectory_common.py
 
 Shared helpers for trajectory scatter and sweep plotting.

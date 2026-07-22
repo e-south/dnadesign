@@ -1,0 +1,24 @@
+snapback_released_target_search:
+  surface_type: command
+  cwd_ref: repo:src/dnadesign/cruncher/workspaces/de033
+  argv:
+  - uv
+  - run
+  - cruncher
+  - snapback
+  - released-target-search
+  - --workspace-root
+  - .
+  - --nick-preset
+  - neb_nicking_v1
+  - --nick-additional-preset
+  - thermo_nicking_v1
+  - --release-preset
+  - type_iis_release_v1
+  - --nick-boundary
+  - '0'
+  - --paired-bp
+  - '3'
+  - --cap-nt
+  - '3'
+  - --json

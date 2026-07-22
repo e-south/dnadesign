@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/_cli_helpers.py
+
+Regression tests for CLI helpers OPAL.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -15,6 +17,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import yaml
 
 from dnadesign.opal.src import LEDGER_SCHEMA_VERSION
@@ -23,7 +27,7 @@ from dnadesign.opal.src.storage.ledger import LedgerWriter
 from dnadesign.opal.src.storage.state import CampaignState, RoundEntry
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 from dnadesign.opal.src.storage.writebacks import (
-    SelectionEmit,
+    SelectionViewEmit,
     build_run_meta_event,
     build_run_pred_events,
 )
@@ -35,20 +39,54 @@ def write_records(
     include_opal_cols: bool = False,
     slug: str = "demo",
 ) -> pd.DataFrame:
-    df = pd.DataFrame(
+    table_columns = {
+        "id": pa.array(["a", "b"], type=pa.string()),
+        "sequence": pa.array(["AAA", "BBB"], type=pa.string()),
+        "bio_type": pa.array(["dna", "dna"], type=pa.string()),
+        "alphabet": pa.array(["dna_4", "dna_4"], type=pa.string()),
+        "X": pa.FixedSizeListArray.from_arrays(
+            pa.array([0.1, 0.2, 0.2, 0.3], type=pa.float32()),
+            2,
+        ),
+    }
+    if include_opal_cols:
+        table_columns[f"opal__{slug}__label_hist"] = pa.array([[], []])
+        table_columns["Y"] = pa.array([None, None], type=pa.null())
+    table = pa.table(table_columns)
+    pq.write_table(table, path)
+    return pd.read_parquet(path)
+
+
+def write_records_with_x_values(
+    path: Path,
+    *,
+    values: list[list[float] | None],
+    ids: list[str] | None = None,
+    include_opal_cols: bool = True,
+    slug: str = "demo",
+) -> pd.DataFrame:
+    row_ids = ids or [chr(ord("a") + index) for index in range(len(values))]
+    table_columns = {
+        "id": pa.array(row_ids, type=pa.string()),
+        "sequence": pa.array(["AAA"] * len(row_ids), type=pa.string()),
+        "bio_type": pa.array(["dna"] * len(row_ids), type=pa.string()),
+        "alphabet": pa.array(["dna_4"] * len(row_ids), type=pa.string()),
+        "X": pa.array(values, type=pa.list_(pa.float32(), list_size=2)),
+    }
+    if include_opal_cols:
+        table_columns[f"opal__{slug}__label_hist"] = pa.array([[] for _ in row_ids])
+        table_columns["Y"] = pa.array([None for _ in row_ids], type=pa.null())
+    table = pa.table(table_columns)
+    pq.write_table(table, path)
+    return pd.DataFrame(
         {
-            "id": ["a", "b"],
-            "sequence": ["AAA", "BBB"],
-            "bio_type": ["dna", "dna"],
-            "alphabet": ["dna_4", "dna_4"],
-            "X": [[0.1, 0.2], [0.2, 0.3]],
+            "id": row_ids,
+            "sequence": ["AAA"] * len(row_ids),
+            "bio_type": ["dna"] * len(row_ids),
+            "alphabet": ["dna_4"] * len(row_ids),
+            "X": values,
         }
     )
-    if include_opal_cols:
-        df[f"opal__{slug}__label_hist"] = [[], []]
-        df["Y"] = [None, None]
-    df.to_parquet(path, index=False)
-    return df
 
 
 def write_campaign_yaml(
@@ -78,7 +116,7 @@ def write_campaign_yaml(
     score_channel = "sfxi" if objective_name == "sfxi_v1" else "scalar"
     default_selection_params: Dict[str, Any] = {
         "top_k": 1,
-        "score_ref": f"{objective_name}/{score_channel}",
+        "score_ref": score_channel,
         "objective_mode": "maximize",
         "tie_handling": "competition_rank",
     }
@@ -89,7 +127,12 @@ def write_campaign_yaml(
         merged_selection_params.update(selection_params)
     if selection_name == "expected_improvement" and "uncertainty_ref" not in merged_selection_params:
         merged_selection_params["uncertainty_ref"] = str(merged_selection_params["score_ref"])
+    for ref_key in ("score_ref", "uncertainty_ref"):
+        if ref_key in merged_selection_params and "/" in str(merged_selection_params[ref_key]):
+            merged_selection_params[ref_key] = str(merged_selection_params[ref_key]).rsplit("/", 1)[-1]
     cfg: Dict[str, Any] = {
+        "schema_version": "opal.campaign.v3",
+        "ownership": {"owner_scope": "opal_demo", "portable": True},
         "campaign": {"name": "Demo", "slug": slug, "workdir": str(workdir)},
         "data": {
             "location": {"kind": "local", "path": str(records_path)},
@@ -100,17 +143,24 @@ def write_campaign_yaml(
         "transforms_x": {"name": "identity", "params": {}},
         "transforms_y": {"name": transforms_y_name, "params": transforms_y_params},
         "model": {"name": model_name, "params": model_params},
-        "objectives": [{"name": objective_name, "params": objective_params}],
-        "selection": {"name": selection_name, "params": merged_selection_params},
+        "selection_views": [
+            {
+                "id": "primary",
+                "objective": {"name": objective_name, "params": objective_params},
+                "selection": {"name": selection_name, "params": merged_selection_params},
+            }
+        ],
     }
     if plots is not None:
-        cfg["plots"] = plots
+        plot_path = path.with_name("plots.yaml")
+        plot_path.write_text(yaml.safe_dump({"plots": plots}, sort_keys=False))
+        cfg["plot_config"] = plot_path.name
     if safety is not None:
         cfg["safety"] = safety
     path.write_text(yaml.safe_dump(cfg, sort_keys=False))
 
 
-def write_round_log(path: Path) -> None:
+def write_round_log(path: Path, *, run_id: str | None = None, round_index: int | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
@@ -119,6 +169,19 @@ def write_round_log(path: Path) -> None:
         {"ts": "2025-01-01T00:00:07+00:00", "stage": "predict_batch", "rows": 2},
         {"ts": "2025-01-01T00:00:08+00:00", "stage": "done"},
     ]
+    for position, line in enumerate(lines):
+        line.update(
+            {
+                "schema_version": "opal.progress_event.v1",
+                "event_id": f"test-event-{position}",
+                "phase": "run",
+                "severity": "info",
+            }
+        )
+        if run_id is not None:
+            line["run_id"] = str(run_id)
+        if round_index is not None:
+            line["round"] = int(round_index)
     path.write_text("\n".join([json.dumps(line) for line in lines]))
 
 
@@ -133,7 +196,7 @@ def write_state(
     round_dir.mkdir(parents=True, exist_ok=True)
     round_log = round_dir / "logs" / "round.log.jsonl"
     if not round_log.exists():
-        write_round_log(round_log)
+        write_round_log(round_log, run_id=run_id, round_index=round_index)
     st = CampaignState(
         campaign_slug="demo",
         campaign_name="Demo",
@@ -155,8 +218,16 @@ def write_state(
             labels_used_rounds=[int(round_index)],
             number_of_training_examples_used_in_round=2,
             number_of_candidates_scored_in_round=2,
-            selection_top_k_requested=1,
-            selection_top_k_effective_after_ties=1,
+            selection_views={
+                "primary": {
+                    "objective_name": "sfxi_v1",
+                    "selection_name": "top_n",
+                    "score_ref": "primary/sfxi",
+                    "top_k_requested": 1,
+                    "top_k_effective_after_ties": 1,
+                }
+            },
+            selection_batch={"deduplicate_by": "id", "unique_count": 1, "expected_unique_count": None},
             model={
                 "type": "random_forest",
                 "params": {},
@@ -173,15 +244,29 @@ def write_state(
     st.save(workdir / "state.json")
 
 
-def write_ledger(workdir: Path, *, run_id: str, round_index: int = 0) -> None:
+def write_ledger(
+    workdir: Path,
+    *,
+    run_id: str,
+    round_index: int = 0,
+    artifact_paths_and_hashes: Optional[Dict[str, tuple[str, str]]] = None,
+) -> None:
     ws = CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir)
     writer = LedgerWriter(ws)
 
     y_hat = np.array([[0.1], [0.2]])
     y_obj = np.array([0.1, 0.2])
-    sel_emit = SelectionEmit(
+    selection_view = SelectionViewEmit(
+        selection_view_id="primary",
+        objective_name="sfxi_v1",
+        selection_name="top_n",
+        score=y_obj,
+        score_ref="primary/sfxi",
+        selection_score=y_obj,
         ranks_competition=np.array([1, 2]),
         selected_bool=np.array([True, False]),
+        top_k=1,
+        diagnostics={"logic_fidelity": np.array([1.0, 0.5])},
     )
     run_pred = build_run_pred_events(
         run_id=run_id,
@@ -189,11 +274,8 @@ def write_ledger(workdir: Path, *, run_id: str, round_index: int = 0) -> None:
         ids=["a", "b"],
         sequences=["AAA", "BBB"],
         y_hat_model=y_hat,
-        selected_score=y_obj,
-        selected_score_ref="sfxi_v1/sfxi",
         y_dim=1,
-        obj_diagnostics={"logic_fidelity": np.array([1.0, 0.5])},
-        sel_emit=sel_emit,
+        selection_views=[selection_view],
     )
 
     run_meta = build_run_meta_event(
@@ -206,25 +288,29 @@ def write_ledger(workdir: Path, *, run_id: str, round_index: int = 0) -> None:
         x_transform_params={},
         y_ingest_transform_name="sfxi_vec8_from_table_v1",
         y_ingest_transform_params={},
-        objective_name="sfxi_v1",
-        objective_params={"setpoint_vector": [0, 0, 0, 1]},
-        objective_defs=[{"name": "sfxi_v1", "score_channels": ["sfxi_v1/sfxi"], "uncertainty_channels": []}],
-        selection_name="top_n",
-        selection_params={"top_k": 1, "score_ref": "sfxi_v1/sfxi"},
-        selection_score_ref="sfxi_v1/sfxi",
-        selection_uncertainty_ref=None,
-        selection_objective_mode="maximize",
-        sel_tie_handling="competition_rank",
+        objective_defs=[
+            {
+                "selection_view_id": "primary",
+                "objective_name": "sfxi_v1",
+                "params": {"setpoint_vector": [0, 0, 0, 1]},
+                "score_channels": ["primary/sfxi"],
+                "uncertainty_channels": [],
+            }
+        ],
+        selection_view_defs=[
+            {
+                "selection_view_id": "primary",
+                "selection_name": "top_n",
+                "score_ref": "primary/sfxi",
+                "objective_mode": "maximize",
+                "tie_handling": "competition_rank",
+                "top_k": 1,
+            }
+        ],
         stats_n_train=2,
         stats_n_scored=2,
-        unc_mean_sd=None,
         pred_rows_df=run_pred,
-        artifact_paths_and_hashes={},
-        objective_summary_stats={
-            "score_min": 0.1,
-            "score_median": 0.2,
-            "score_max": 0.3,
-        },
+        artifact_paths_and_hashes=artifact_paths_and_hashes or {},
     )
     # Ensure required schema/version fields are present (build_run_meta_event already includes them)
     run_meta["schema__version"] = LEDGER_SCHEMA_VERSION

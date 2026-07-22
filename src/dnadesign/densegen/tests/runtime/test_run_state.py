@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/runtime/test_run_state.py
+
+Regression tests for run state DenseGen runtime.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from dnadesign.densegen.src.core.run_paths import ensure_run_meta_dir, run_state_path

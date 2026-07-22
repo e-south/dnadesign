@@ -1,0 +1,16 @@
+plot_id: rt_lnrna_crawford_khan_axis_agreement
+question: Do the independently fitted Crawford and Khan abundance axes point in compatible LatentDNA directions?
+decision_role: primary
+encoding: Metric-panel grid of direct Crawford-versus-Khan axis-vector concordance by endpoint definition and candidate-X view.
+scope: Axis vectors emitted by the trait_axis_projection_rows sidecar and summarized through the axis_concordance scalar table.
+guardrails:
+  - Concordance compares fitted geometry only; it does not pool Crawford and Khan abundance measurements.
+  - Negative or near-zero concordance is a review signal, not an automatic rejection rule.
+caption: Direct axis-vector agreement between independently fitted Crawford and Khan abundance axes.
+alt_text: Bar panels comparing Crawford-Khan axis concordance across endpoint definitions and intermediate representation views.
+preprocessing_md: Uses the scalar_sidecar_table builder to publish axis_concordance.parquet as a normal scalar table.
+math_md: |
+  Concordance is the dot product between normalized Crawford and Khan fitted axis vectors for matching view, endpoint definition, and normalization policy.
+rationale_md: Separates agreement between source-scoped fitted directions from source-value correlation or endpoint-effect summaries.
+limitations_md: The comparison exists only for endpoint definitions configured in both source axes.
+failure_modes_md: Missing fitted-axis sidecars or mismatched axis dimensions fail the upstream summary scalar before this plot is rendered.

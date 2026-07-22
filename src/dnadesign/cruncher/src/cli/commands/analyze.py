@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/analyze.py
 
 Run the analysis pipeline for Cruncher sample runs.

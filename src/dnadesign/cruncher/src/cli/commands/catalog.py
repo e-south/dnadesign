@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/catalog.py
 
 Catalog CLI command group entrypoint and command registration.
 
-Author(s): Eric J. South
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

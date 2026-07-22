@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_atomic_write.py
 
-Author(s): Eric J. South
+Regression tests for atomic write Cruncher app.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

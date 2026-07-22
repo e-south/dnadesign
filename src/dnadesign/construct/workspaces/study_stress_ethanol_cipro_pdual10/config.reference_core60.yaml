@@ -34,7 +34,7 @@ job:
           kind: usr
           dataset: usr_pdual10_plasmid_template
           root: ../../../usr/datasets
-          record_id: c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d
+          record_id: 55e46be6e47613d42f38607d57b78496423418ee
           field: sequence
         circular: true
       placement_ref: replace:3574-3666

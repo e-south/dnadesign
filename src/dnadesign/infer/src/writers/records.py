@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/writers/records.py
 
+Writer helpers for records infer writers.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

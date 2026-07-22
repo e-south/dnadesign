@@ -1,18 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/multisite_select/scoring.py
 
 Robust score normalization and composite scoring for multi-site selection.
-
-Implements:
-  • robust median/MAD z-scaling for observed fitness (LLR) and epistasis,
-  • Gaussian-consistent MAD scaling (optional),
-  • optional symmetric winsorization in MAD units,
-  • composite score = alpha · z_llr + β · z_epi.
-
-No k-aware scaling is implemented here by design; the multi-site selector uses
-global robust scaling across all mutation counts k.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

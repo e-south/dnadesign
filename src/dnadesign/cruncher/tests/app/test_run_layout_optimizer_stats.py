@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_run_layout_optimizer_stats.py
 
 Validates manifest/sidecar handling for optimizer stats payloads.

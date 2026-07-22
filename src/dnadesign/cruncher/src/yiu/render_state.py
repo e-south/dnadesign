@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/render_state.py
 
-Render-state persistence and artifact cleanup helpers for payload-centric YIU
-bundles.
+Render-state persistence and artifact cleanup helpers for payload-centric YIU.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

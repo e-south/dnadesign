@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_projection_selection.py
 
-Match selection and precursor-boundary validation helpers for released-product
-projection.
+Match selection and precursor-boundary validation helpers for released-product.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

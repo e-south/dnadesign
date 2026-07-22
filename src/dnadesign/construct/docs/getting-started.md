@@ -1,7 +1,7 @@
 ## Construct getting started
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-07-14
 
 This page gets you from zero to a validated Construct run with the fewest moving parts.
 
@@ -54,6 +54,6 @@ The blank scaffold now writes explicit workspace-local `root: outputs/usr_datase
 
 - [Construct docs](README.md)
 - [Workspaces guide](../workspaces/README.md)
-- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/construct-infer-shared-dataset-runbook.md)
+- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
 - [Config reference](reference/config.md)
 - [Workspace registry reference](reference/workspace-registry.md)

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/status/provider_protocols.py
 
-Provider protocols for lazy-loaded ops status adapters.
+Provider protocols for lazy-loaded ops status providers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

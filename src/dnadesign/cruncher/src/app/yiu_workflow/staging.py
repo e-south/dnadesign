@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/yiu_workflow/staging.py
 
 Staging helpers for payload-centric YIU bundle publication.

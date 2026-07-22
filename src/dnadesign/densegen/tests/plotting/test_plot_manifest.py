@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/plotting/test_plot_manifest.py
 
 Plot manifest coverage for plot generation outputs.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/mutation_summary.py
 
-Given a dataset (DataFrame) and a metric id, compute the per-mutation
-effects (Δ vs reference if available; for LLR this equals the value),
-extract the Top +K and Bottom -K events, and write a tidy CSV next to
-the dataset's plots directory (i.e., in the dataset directory itself).
+Given a dataset (DataFrame) and a metric id, compute the per-mutation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -20,6 +17,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import pandas as pd
+
+from dnadesign.permuter.src.contracts.metrics import observed_metric_column
 
 _LOG = logging.getLogger("permuter.summary.aa_mutation")
 
@@ -58,15 +57,10 @@ def _has_aa_signals(df: pd.DataFrame) -> bool:
 
 def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
-        raise RuntimeError("metric_id is required (expects a column permuter__metric__<id>)")
-    col = f"permuter__metric__{metric_id}"
+        raise RuntimeError("metric_id is required (expects a column permuter__observed__<id>)")
+    col = observed_metric_column(metric_id)
     if col not in df.columns:
-        # fallback: exact suffix match
-        cand = [c for c in df.columns if c.startswith("permuter__metric__") and c.split("__", 2)[-1] == str(metric_id)]
-        if len(cand) == 1:
-            col = cand[0]
-        else:
-            raise RuntimeError(f"Metric column not found: {col}")
+        raise RuntimeError(f"Metric column not found: {col}")
     return df[col].astype("float64"), str(metric_id)
 
 
@@ -132,7 +126,7 @@ def _extract_aa_events(df: pd.DataFrame, ycol: str) -> pd.DataFrame:
 def compute_aa_llr_summary(all_df: pd.DataFrame, metric_id: str, *, top_k: int = 20) -> pd.DataFrame:
     """
     Core computation (no I/O). Returns tidy DF with:
-      ['direction','rank','canon','wt','pos','to_res','delta','metric_id','job','ref']
+      ['direction','rank','canon','wt','pos','to_res','delta','metric_id','scope','ref']
     'direction' ∈ {'top','bottom'}, rank 1..K in each direction.
     """
     if "sequence" not in all_df.columns or "permuter__round" not in all_df.columns:
@@ -167,11 +161,11 @@ def compute_aa_llr_summary(all_df: pd.DataFrame, metric_id: str, *, top_k: int =
     top.insert(1, "rank", range(1, len(top) + 1))
     bot.insert(1, "rank", range(1, len(bot) + 1))
 
-    job = str(df.get("permuter__job", pd.Series(["job"])).iloc[0])
+    scope = str(df.get("permuter__scope", pd.Series(["scope"])).iloc[0])
     ref = str(df.get("permuter__ref", pd.Series(["ref"])).iloc[0])
     for frame in (top, bot):
         frame["metric_id"] = str(metric_id)
-        frame["job"] = job
+        frame["scope"] = scope
         frame["ref"] = ref
 
     out = pd.concat([top, bot], ignore_index=True)
@@ -186,7 +180,7 @@ def compute_aa_llr_summary(all_df: pd.DataFrame, metric_id: str, *, top_k: int =
             "to_res",
             "delta",
             "metric_id",
-            "job",
+            "scope",
             "ref",
         ]
     ]

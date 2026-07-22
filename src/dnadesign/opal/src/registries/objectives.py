@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/registries/objectives.py
 
-Registers objective functions and loads built-in and plugin objectives. Provides
-objective access with PluginCtx contract enforcement.
+Registers objective functions and loads built-in and plugin objectives. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -32,6 +31,7 @@ class _ObjectiveFn(Protocol):
 
 # Registry: name -> callable(y_pred, *, params, ctx, train_view) -> ObjectiveResult
 _REG_O: Dict[str, _ObjectiveFn] = {}
+_OBJECTIVE_FAMILIES: Dict[str, str] = {}
 
 _BUILTINS_LOADED = False
 _PLUGINS_LOADED = False
@@ -39,6 +39,8 @@ _PLUGINS_LOADED = False
 _DECLARED_SCORE_CHANNELS_ATTR = "__opal_score_channels__"
 _DECLARED_UNCERTAINTY_CHANNELS_ATTR = "__opal_uncertainty_channels__"
 _DECLARED_SCORE_MODES_ATTR = "__opal_score_modes__"
+_OBSERVED_REPLAY_CONTRACT_ATTR = "__opal_observed_replay_contract__"
+_SUPPORTED_OBSERVED_REPLAY_CONTRACTS = frozenset({"pointwise_params_v1"})
 
 
 def _validate_objective_signature(func: _ObjectiveFn, *, name: str) -> None:
@@ -85,14 +87,19 @@ def _ensure_all_loaded() -> None:
     _ensure_plugins_loaded()
 
 
-def register_objective(name: str):
-    """Decorator to register an objective by name."""
+def register_objective(name: str, *, family: str = "generic"):
+    """Decorator to register an objective and its plot-compatibility family."""
+
+    objective_family = str(family)
+    if not objective_family or objective_family != objective_family.strip():
+        raise ValueError("objective family must be a non-empty canonical string")
 
     def _wrap(func: _ObjectiveFn):
         if name in _REG_O:
             raise ValueError(f"objective '{name}' already registered")
         _validate_objective_signature(func, name=name)
         _REG_O[name] = func
+        _OBJECTIVE_FAMILIES[name] = objective_family
         _dbg(f"registered objective: {name}")
         return func
 
@@ -138,6 +145,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: _ObjectiveFn) -> _ObjectiveFn:
         _DECLARED_SCORE_CHANNELS_ATTR,
         _DECLARED_UNCERTAINTY_CHANNELS_ATTR,
         _DECLARED_SCORE_MODES_ATTR,
+        _OBSERVED_REPLAY_CONTRACT_ATTR,
     ):
         if hasattr(fn, attr):
             setattr(_wrapped, attr, getattr(fn, attr))
@@ -165,6 +173,17 @@ def get_objective(name: str) -> _ObjectiveFn:
 def list_objectives() -> List[str]:
     _ensure_all_loaded()
     return sorted(_REG_O)
+
+
+def get_objective_family(name: str) -> str:
+    """Return the declared plot-compatibility family for an objective."""
+
+    _ensure_all_loaded()
+    try:
+        return _OBJECTIVE_FAMILIES[name]
+    except KeyError:
+        avail = ", ".join(sorted(_REG_O))
+        raise KeyError(f"objective '{name}' not found. Available: [{avail}].")
 
 
 def _declared_channels(fn: _ObjectiveFn, *, attr_name: str, label: str) -> tuple[str, ...]:
@@ -220,3 +239,24 @@ def get_objective_declared_channels(name: str) -> Dict[str, Any]:
         ),
         "score_modes": _declared_score_modes(fn),
     }
+
+
+def get_objective_observed_replay_contract(name: str) -> str | None:
+    """Return an objective's opt-in contract for replaying observed point estimates."""
+
+    _ensure_all_loaded()
+    try:
+        fn = _REG_O[name]
+    except KeyError:
+        avail = ", ".join(sorted(_REG_O))
+        raise KeyError(f"objective '{name}' not found. Available: [{avail}].")
+    raw = getattr(fn, _OBSERVED_REPLAY_CONTRACT_ATTR, None)
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if value not in _SUPPORTED_OBSERVED_REPLAY_CONTRACTS:
+        raise ValueError(
+            f"objective '{name}' declares unsupported observed replay contract {raw!r}; "
+            f"supported={sorted(_SUPPORTED_OBSERVED_REPLAY_CONTRACTS)}."
+        )
+    return value

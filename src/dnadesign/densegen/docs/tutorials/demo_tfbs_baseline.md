@@ -1,7 +1,7 @@
 ## DenseGen TFBS baseline tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 Use this tutorial to run the smallest DenseGen workspace end to end. You validate the config, generate sequences from TFBS inputs, and render analysis artifacts from local outputs.
@@ -123,6 +123,6 @@ uv run dense notebook run -c "$PWD/config.yaml"
 
 ### Related docs
 
-- [Pipeline lifecycle](../concepts/pipeline-lifecycle.md)
+- [Pipeline lifecycle](../concepts/runtime/pipeline-lifecycle.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)

@@ -1,7 +1,7 @@
 ## Stress ethanol and ciprofloxacin study tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 Use this tutorial to run the largest packaged DenseGen campaign. It combines expanded stress-condition plans, a GUROBI solver backend, and a shared USR sink around a constitutive σ70 promoter core.
@@ -206,6 +206,6 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 - [DenseGen to USR to Notify tutorial](demo_usr_notify.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspaces directory](../../workspaces/README.md)
-- [BU SCC Quickstart](../../../../../docs/bu-scc/quickstart.md)
-- [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/batch-notify.md)
+- [BU SCC Quickstart](../../../../../docs/bu-scc/setup/quickstart.md)
+- [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/runbooks/batch-notify.md)
 - [BU SCC job templates](../../../../../docs/bu-scc/jobs/README.md)

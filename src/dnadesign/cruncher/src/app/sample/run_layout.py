@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/run_layout.py
 
 Run layout and manifest helpers for sampling workflows.

@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/workspace.py
+
 Workspace schema contracts for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -58,6 +65,51 @@ class MetadataCopyDerivationConfig(StrictWorkspaceModel):
     value_type: MetadataValueType | None = None
 
 
+class MetadataTokenPresenceDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["token_presence"]
+    source: str | None = None
+    sources: list[str] = Field(default_factory=list)
+    delimiter: NonEmptyText = ";"
+    present_value: str | bool = True
+    absent_value: str | bool = False
+    value_type: MetadataValueType | None = None
+
+    @model_validator(mode="after")
+    def _validate_source_selection(self) -> "MetadataTokenPresenceDerivationConfig":
+        if bool(self.source) == bool(self.sources):
+            raise ValueError("token_presence derivations must declare exactly one of source or sources")
+        return self
+
+
+class MetadataDelimitedNumericMeanDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["delimited_numeric_mean"]
+    source: str
+    delimiter: NonEmptyText = ";"
+    value_type: MetadataValueType | None = "float64"
+
+
+class MetadataSingleCategoricalTokenDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["single_categorical_token"]
+    source: str
+    delimiter: NonEmptyText = ";"
+    value_type: MetadataValueType | None = "string"
+
+
+class MetadataNumericQuantileBinDerivationConfig(StrictWorkspaceModel):
+    kind: Literal["numeric_quantile_bin"]
+    source: str
+    edges: list[float] = Field(min_length=1)
+    labels: list[NonEmptyText] = Field(min_length=2)
+    delimiter: NonEmptyText = ";"
+    value_type: MetadataValueType | None = "string"
+
+    @model_validator(mode="after")
+    def _validate_label_count(self) -> "MetadataNumericQuantileBinDerivationConfig":
+        if len(self.labels) != len(self.edges) + 1:
+            raise ValueError("numeric_quantile_bin labels must contain exactly len(edges) + 1 entries")
+        return self
+
+
 class MetadataRegexCaptureDerivationConfig(StrictWorkspaceModel):
     kind: Literal["regex_capture"]
     source: str
@@ -96,6 +148,7 @@ class MetadataLookupDerivationConfig(StrictWorkspaceModel):
     right_key: str
     value_column: str
     missing_policy: Literal["error", "null"] = "error"
+    default: str | int | float | bool | None = None
 
 
 class MetadataAnnotationDerivationConfig(StrictWorkspaceModel):
@@ -129,6 +182,10 @@ class MetadataAnnotationDerivationConfig(StrictWorkspaceModel):
 
 MetadataDerivationConfig = Annotated[
     MetadataCopyDerivationConfig
+    | MetadataTokenPresenceDerivationConfig
+    | MetadataDelimitedNumericMeanDerivationConfig
+    | MetadataSingleCategoricalTokenDerivationConfig
+    | MetadataNumericQuantileBinDerivationConfig
     | MetadataRegexCaptureDerivationConfig
     | MetadataMapValuesDerivationConfig
     | MetadataCoalesceDerivationConfig
@@ -169,9 +226,18 @@ class MetadataAxisConfig(StrictWorkspaceModel):
     display_labels: dict[str, str] = Field(default_factory=dict)
     compact_display_labels: dict[str, str] = Field(default_factory=dict)
     category_colors: dict[str, str] = Field(default_factory=dict)
+    category_alpha: dict[str, float] = Field(default_factory=dict)
     noncanonical_policy: MetadataAxisNoncanonicalPolicyConfig | None = None
     ordinal_subset: list[str] = Field(default_factory=list)
     metric_labels: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("category_alpha")
+    @classmethod
+    def _validate_category_alpha(cls, value: dict[str, float]) -> dict[str, float]:
+        invalid = {key: alpha for key, alpha in value.items() if alpha <= 0.0 or alpha > 1.0}
+        if invalid:
+            raise ValueError("metadata axis category_alpha values must be in the interval (0, 1]")
+        return value
 
 
 class MetadataSection(StrictWorkspaceModel):

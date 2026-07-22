@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_artifacts.py
 
 Artifact paths and persistence helpers for released-product snapback bundles.

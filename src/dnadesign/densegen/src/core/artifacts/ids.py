@@ -1,7 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/core/artifacts/ids.py
+
 Stable identifier helpers for DenseGen artifacts.
 
-These hashes are intended to be deterministic and join-friendly across runs.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,0 +1,869 @@
+version: 1
+study_id: eco1_rt_repack
+last_verified: 2026-07-10
+datasets:
+  - id: eco1_rt_v1_profile
+    owner: eco1_rt_repack
+    kind: checked_in_fixture
+    path: docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml
+    status: scaffolded
+    description: Eco1 RT fixed-backbone profile stub and policy anchors.
+  - id: eco1_rt_conservative_mask_cases
+    owner: eco1_rt_repack
+    kind: checked_in_fixture
+    path: docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/conservative_mask_cases.yaml
+    status: scaffolded
+    description: Planned pass/fail cases for conservative residue-mask policy.
+  - id: thread_artifact_chain_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/thread-artifact-chain.schema.yaml
+    status: scaffolded
+    description: Study-local artifact-chain schema until reusable thread contracts exist.
+  - id: eco1_rt_profile_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/eco1-rt-profile.schema.yaml
+    status: scaffolded
+    description: Study-owned Eco1 profile schema with Phase 0 pending-authority limits.
+  - id: thread_candidate_handoff_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/thread-candidate-handoff.schema.yaml
+    status: scaffolded
+    description: Study-local candidate handoff schema until reusable thread contracts exist.
+  - id: rt_lnrna_candidate_acceptance_schema
+    owner: eco1_rt_repack
+    kind: checked_in_schema
+    path: docs/studies/eco1_rt_repack/operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml
+    status: scaffolded
+    description: Local RT-only downstream acceptance contract stub until the RT-lnRNA study owns the promotion record.
+  - id: eco1_rt_structure_sources
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
+    status: selected_authority
+    description: Selected Eco1/Ec86 structure-authority record using the sibling ec86kit protomer-1 workspace as provenance.
+  - id: eco1_rt_structure_preprocessing_policy
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/structure-preprocessing.yaml
+    status: selected_policy
+    description: Study-owned provenance policy for raw RCSB 7V9U dimer context, the selected ec86kit protomer-1 modeling unit, retained protein/DNA/RNA chains, and excluded paired-protomer context. The selected protomer does not establish oligomeric state.
+  - id: eco1_rt_residue_numbering_policy
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml
+    status: selected_policy
+    description: Selected residue-numbering policy from the ec86kit chain-A amino-acid map; local residue_map.parquet is materialized.
+  - id: eco1_rt_contract_validator
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py
+    status: phase1_contact_profile_validation
+    description: Study-owned CLI for scaffold contracts, selected authority, materialized structure/contact artifacts, and next conservation/mask blockers.
+  - id: eco1_rt_contract_validator_package
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/
+    status: semantic_validator_package
+    description: Study-owned contract-validation package split by profile, artifact-chain, structure authority, conservation-source, and runtime-artifact ontology.
+  - id: eco1_rt_structure_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure/
+    status: phase1_structure_artifact_materializer
+    description: Study-owned materializer for thread-shaped backbone_bundle.yaml and residue_map.parquet from the selected ec86kit authority.
+  - id: eco1_rt_structure_preprocessing_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/structure_preprocessing/
+    status: phase1_structure_preprocessing_manifest_materializer
+    description: Study-owned materializer for structure_preprocessing_manifest.yaml; hash-checks selected ec86kit model provenance and machine-checks RT/DNA/RNA retained chain ontology before contact geometry.
+  - id: eco1_rt_contact_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact/
+    status: phase1_contact_profile_materializer
+    description: Study-owned materializer for thread-shaped contact_profile.parquet from the retained ec86kit DNA/RNA context distance profile.
+  - id: eco1_rt_contact_geometry_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/contact_geometry/
+    status: phase1_contact_geometry_materializer
+    description: Study-owned Biopython/mmCIF materializer for contact_geometry_profile.parquet with atom-class DNA/RNA distance evidence. The current rule uses the mapped retained-DNA/RNA <=5 A predicate; contact-density and retained-chain-count classes do not decide protected residues.
+  - id: eco1_rt_conservation_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation/
+    status: phase1_conservation_profile_materializer
+    description: Study-owned materializer for thread-shaped conservation_profile.parquet from explicit aligned FASTA inputs; it does not fetch or align source sequences.
+  - id: eco1_rt_conservation_alignment_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/conservation_alignments/
+    status: phase1_alignment_bundle_materializer_accepted_local
+    description: Study-owned orchestration package that validates source FASTA sufficiency, parses the declared MSA backend command, delegates alignment to the hardened dnadesign.aligner.msa atomic-publish runner, supports selected profile ids, and writes alignment bundle manifests; both selected profiles are accepted locally under the current Clustal Omega policy.
+  - id: aligner_msa_visualization_api
+    owner: aligner
+    kind: checked_in_code
+    path: src/dnadesign/aligner/msa/visualization/
+    status: generic_msa_visualization_api
+    description: Generic diagnostic sidecar API for accepted aligned FASTA inputs; writes per-profile QC YAML, per-position QC CSV, SVG, HTML, optional target-position annotation tracks, explicit exemplar-row windows, all-record overview panels, plurality/gap histograms, and an index manifest without owning Eco1 source authority, conservation scoring, or designability.
+  - id: eco1_rt_annotation_tracks
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/rt-annotation-tracks.yaml
+    status: rt1_rt7_interval_authority_v1
+    description: Study-owned target-position annotation tracks for audited Eco1 RT1-RT7 intervals and motif anchors rendered by the generic aligner.msa visualization API; not a mask source or designability rule.
+  - id: eco1_rt_manual_mask_authority_source
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/manual-mask-authority.yaml
+    status: rt1_rt7_interval_authority_v1
+    description: Study-owned manual mask ontology for audited Eco1 NAxxH, YADD, VTG, RT1-RT7 annotation spans, and Wang/Ec86 direct substrate-contact priors. Under the selected simple policy, RT1-RT7 spans are review labels rather than blanket hard masks.
+  - id: eco1_rt_msa_exemplar_rows
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/msa-exemplar-rows.yaml
+    status: first_pass_display_exemplars
+    description: Study-owned explicit row selection for motif-window MSA visualization; not used as the conservation denominator or mask evidence.
+  - id: eco1_rt_msa_panel_spec
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/ontology/msa-panel-spec.yaml
+    status: first_pass_publication_panel_spec
+    description: Study-owned display contract for Simon/Mestre-inspired all-record overview and plurality/gap histogram panels; not used as the conservation denominator or mask evidence.
+  - id: eco1_rt_conservation_source_sequence_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/
+    status: source_sequence_bundle_materializer_and_sufficiency_gate
+    description: Study-owned source-sequence primitive with shared source-contract parsing, unaligned FASTA bundle materialization, and pre-alignment sufficiency routing.
+  - id: eco1_rt_conservation_provider_source_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/provider_sources/
+    status: provider_source_materializer
+    description: Study-owned provider-source acquisition package for declared NCBI Protein and BV-BRC protein FASTA source files plus explicit unresolved-provider ledgers.
+  - id: eco1_rt_conservation_roster_cache_materializer
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/roster_cache/
+    status: roster_cache_materializer
+    description: Study-owned materializer for source_records.yaml, filtered provider FASTA caches, and source_cache_manifest.yaml from a hash-pinned Mestre roster table plus explicit provider FASTA source files.
+  - id: eco1_rt_conservation_source_sequence_sufficiency
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/sufficiency/
+    status: implemented_fail_fast_preflight
+    description: CLI/API gate that rejects missing source caches, placeholder accessions, under-supported profile bundles, hash drift, target drift, and implicit exclusions before MSA backend alignment.
+  - id: eco1_rt_conservation_source_sequence_contracts
+    owner: eco1_rt_repack
+    kind: checked_in_code
+    path: src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/source_sequences/contracts/
+    status: semantic_source_contract_package
+    description: Shared parser/accessor layer for conservation-sources.yaml, including provider accession policy used by provider-source, roster-cache, source-bundle, and sufficiency materialization code.
+  - id: eco1_rt_conservation_source_discovery
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-source-discovery.md
+    status: source_discovery
+    description: Study-owned source-discovery note for Ec86 clade 9 and II-A3 cluster 42_1 conservation profile authority, updated as MSA alignment and conservation-profile materialization advance.
+  - id: eco1_rt_conservation_sources
+    owner: eco1_rt_repack
+    kind: checked_in_record
+    path: docs/studies/eco1_rt_repack/workbench/provenance/conservation-sources.yaml
+    status: selected_authority
+    description: Study-owned MSA source contract for Ec86 clade 9 and II-A3 cluster 42_1 conservation profiles, including provider policy and ec86kit target-row pinning.
+  - id: eco1_rt_msa_method
+    owner: eco1_rt_repack
+    kind: checked_in_context
+    path: docs/studies/eco1_rt_repack/contexts/msa-method.md
+    status: method_documented
+    description: Human-readable reproduction method for future MSA curation, Tao-style conservation scoring, and T301/A301 source mismatch handling.
+  - id: eco1_rt_backbone_bundle
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/backbone_bundle.yaml
+    status: materialized
+    description: Local generated selected structure/reference bundle with typed chain inventory; runtime output is not checked in by default.
+  - id: eco1_rt_residue_map
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
+    status: materialized
+    description: Local generated all-position residue-numbering map; 309 mapped positions and 11 terminal missing-backbone positions. Terminal residues 1, 2, and 312-320 are non_fixed_missing_backbone under eco1_rt_clade9_plurality25_direct_contact5a_v1.
+  - id: eco1_rt_structure_preprocessing_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
+    status: materialized_local
+    description: Local generated raw-to-protomer provenance manifest for RCSB 7V9U/ec86kit protomer 1; verifies RT chain A, retained DNA chain D, retained RNA chains E/F, and excluded paired-protomer context. It does not determine oligomeric state.
+  - id: eco1_rt_conservation_profile
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
+    status: materialized_local
+    description: Local generated MSA-derived conservation profile from accepted Clustal Omega alignments for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1; 640 rows, 616 usable evidence rows, 22 unresolved-structure rows, and 2 low-non-gap-support rows.
+  - id: eco1_rt_contact_profile
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
+    status: materialized
+    description: Local generated retained-context contact profile with 5 A direct-contact threshold provenance; 120 mapped rows pass the contact predicate and runtime output is not checked in by default.
+  - id: eco1_rt_contact_geometry_profile
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_geometry_profile.parquet
+    status: materialized_local
+    description: Local generated atom-class geometry profile from the selected ec86kit mmCIF model; 320 canonical rows with all-atom, side-chain, backbone, DNA/RNA split, contact-density, and retained-chain-count evidence. The current rule uses mapped <=5 A retained DNA/RNA distance, not contact-density classes.
+  - id: eco1_rt_conservation_provider_sources
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_provider_sources/
+    status: materialized_local
+    description: Local generated provider-source FASTA root; NCBI returned 350/350 records and BV-BRC returned 1464/1577 records with 113 explicit unresolved-provider ledger entries.
+  - id: eco1_rt_conservation_source_cache
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_source_cache/
+    status: materialized_local_qc_passed
+    description: Local generated source_records.yaml plus filtered provider FASTA caches for the selected Ec86 clade 9 and II-A3/42_1 profiles. Current regenerated cache includes 302/22 included/excluded ec86_clade9_conservation_v1 rows and 44/3 included/excluded ec86_iia3_cluster42_1_conservation_v1 rows, with pairwise target coverage, pairwise identity, length, motif-marker, and hard-reject QC metadata.
+  - id: eco1_rt_conservation_source_fastas
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_sources/
+    status: materialized_local_sufficiency_passed
+    description: Local generated unaligned source FASTA bundles for ec86_clade9_conservation_v1 and ec86_iia3_cluster42_1_conservation_v1. Source-sequence sufficiency passes for the regenerated selected profiles.
+  - id: eco1_rt_conservation_alignment_bundle
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_alignments/
+    status: materialized_local_accepted
+    description: Local generated aligned FASTA bundle for both selected conservation profiles under the selected Clustal Omega policy. ec86_clade9_conservation_v1 has 303 aligned records and ec86_iia3_cluster42_1_conservation_v1 has 45 aligned records, both with the pinned target row and accepted manifests.
+  - id: eco1_rt_conservation_visualizations
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_visualizations/
+    status: materialized_local
+    description: Local generated MSA QC sidecars produced through the generic dnadesign.aligner.msa.visualization API for both selected conservation profiles, with Eco1-owned RT1-RT7 interval and motif-anchor annotations, exemplar-row windows, all-record overview panels, plurality/gap histograms, HTML report, and index manifest.
+  - id: eco1_rt_manual_mask_authority
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/manual_mask_authority.yaml
+    status: materialized_local
+    description: Local generated manual mask-authority artifact. It records NAxxH 105-109, YADD 195-198, VTG 243-245, RT1-RT7 annotation spans, and Wang/Ec86 direct substrate-contact priors. The current mask rule protects NAxxH/YADD/VTG and Wang direct-contact priors, but does not blanket hard-fix RT1-RT7.
+  - id: eco1_rt_mask_set
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/mask_set.yaml
+    status: materialized_local_accepted
+    description: Local generated simple mask set under eco1_rt_clade9_plurality25_direct_contact5a_v1. It records 123 mapped non-fixed residues, 11 non-fixed terminal missing-backbone residues, and protected residues from NAxxH/YADD/VTG, Wang/Ec86 direct-contact priors, Ec86 clade 9 >=25% WT plurality conservation, or mapped <=5 A retained DNA/RNA.
+  - id: eco1_rt_contact_risk_profile
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_risk_profile.yaml
+    status: materialized_local_audit_only
+    description: Local generated contact-risk evidence review. It joins retained-context nearest-distance evidence, atom-class contact geometry, MSA conservation masks, manual mask authority, and Wang/Ec86 direct-contact mask priors. It is not a mask call.
+  - id: eco1_rt_generation_policy_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/generation_policy_manifest.yaml
+    status: materialized
+    description: >-
+      Active v3 generation contract for three complete ProteinMPNN policies:
+      distal scaffold, peripheral, and combined peripheral plus distal. Each
+      policy requests 336 complete sequences.
+  - id: eco1_rt_generation_policy_positions
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/generation_policy_positions.parquet
+    status: materialized
+    description: >-
+      Per-policy fixed/open position table. It records protected reason codes,
+      retained DNA/RNA distances, and mapped residues 255-311 as fixed.
+  - id: eco1_rt_generation_policy_alphabets
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/generation_policy_alphabets.parquet
+    status: materialized
+    description: >-
+      ProteinMPNN alphabet contract. Peripheral alternatives are MSA-observed
+      without new D/E, P, or G residues. The v3 global cysteine omission can
+      force an open WT cysteine such as C233 to change.
+  - id: eco1_rt_generation_policy_requests
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
+    status: materialized
+    description: >-
+      Three validated ProteinMPNN request manifests with chain-local fixed
+      positions and residue-specific omit_AA_jsonl sidecars. The run produced
+      1007 unique accepted sequences across the three policy groups.
+  - id: eco1_rt_generation_policy_candidate_pool
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/candidate_pool_manifest.yaml
+    status: materialized
+    description: >-
+      Materialized deduplicated pool of complete v3 sequences with policy id,
+      policy version, and policy-manifest hash provenance.
+  - id: eco1_rt_foldcheck_request_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_request/foldcheck_request_manifest.yaml
+    status: materialized
+    description: Materialized v3 ColabFold request for WT plus the deduplicated v3 candidate pool.
+  - id: eco1_rt_foldcheck_report
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_report.parquet
+    status: materialized
+    description: Materialized normalized ColabFold report for v3 complete sequences.
+  - id: eco1_rt_foldcheck_candidate_ranking
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/foldcheck_candidate_ranking.parquet
+    status: materialized
+    description: Materialized v3 fold-review table. Review labels and fold metrics remain descriptive; local C-alpha RMSD supplies the selection geometry rule.
+  - id: eco1_rt_foldcheck_structure_panel
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/foldcheck_structure_panel.yaml
+    status: materialized
+    description: Materialized compact structure-review panel for the v3 fold models.
+  - id: eco1_rt_foldcheck_full_structure_set
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/foldcheck_full_structure_set.yaml
+    status: materialized
+    description: Materialized normalized structure manifest for WT and v3 candidate models.
+  - id: eco1_rt_foldcheck_chimerax_script
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/chimerax/ec86_fold_panel.cxc
+    status: materialized
+    description: Materialized opt-in ChimeraX review script for the compact v3 fold panel.
+  - id: eco1_rt_foldcheck_full_chimerax_script
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/chimerax/ec86_full_fold_set.cxc
+    status: materialized
+    description: Materialized opt-in ChimeraX script for the normalized v3 structure set.
+  - id: eco1_rt_foldcheck_review_visual_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/review_visual_manifest.yaml
+    status: materialized
+    description: Materialized v3 visual manifest with plot paths, alt text, source data, and interpretation limits.
+  - id: eco1_rt_foldcheck_review_plots
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/plots/
+    status: materialized
+    description: Materialized compact v3 fold-review SVG bundle with accessible descriptions.
+  - id: eco1_rt_foldcheck_review_notebook
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/notebooks/eco1_foldcheck_review.py
+    status: materialized
+    description: Materialized v3 marimo fold-review notebook; it launches no external GUI.
+  - id: eco1_rt_foldcheck_atlas_subset_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_review/atlas_subset_manifest.yaml
+    status: materialized_local_review
+    description: Local generated Atlas subset manifest selecting WT plus a contrastive fold-review subset for later model annotation. Atlas remains post-fold model-feature context, not a candidate acceptance gate.
+  - id: eco1_rt_atlas_semantic_profile
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_semantic_profile.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: >-
+      Compact ESM Atlas semantic-profile summary for the all-97 fold-check
+      request. A bounded hash-lookup/on-demand probe accepted WT, returned
+      explicit 404 rows for the first four synthetic ProteinMPNN candidates even
+      with fold_on_miss=true, and left the remaining 92 candidates explicitly
+      unattempted for resume safety. It is not fold validation, not a
+      processivity model, and not a functional acceptance gate.
+  - id: eco1_rt_atlas_protein_activations
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_protein_activations.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Sparse protein-level ESM Atlas SAE activations for accepted Atlas lookup rows. The current accepted row is WT, stored as 2,095 nonzero activation rows rather than a dense 16,384-feature vector.
+  - id: eco1_rt_atlas_residue_activations
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_residue_activations.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Sparse per-residue ESM Atlas SAE activations for accepted Atlas lookup rows. The current accepted row is WT, with 20,480 nonzero rows, zero-based Atlas residue indices, and one-based sequence positions. Long feature descriptions are not repeated per residue.
+  - id: eco1_rt_atlas_feature_catalog
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/atlas_feature_catalog.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Compact feature metadata table for the top 100 Atlas SAE features observed in the accepted WT Atlas response.
+  - id: eco1_rt_structure_prediction_registry
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_predictions/structure_prediction_registry.parquet
+    status: materialized_all97_on_demand_probe_partial
+    description: Generic structure-prediction registry for optional model-predicted structures. The current Atlas on-demand probe records one WT Atlas/ESMFold-derived structure and keeps it separate from ColabFold fold-check structures.
+  - id: eco1_rt_biohub_esmc_sae_profile
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_sae_profile.parquet
+    status: materialized_all97
+    description: >-
+      Authenticated Biohub ESMC/logits query-time SAE profile for WT plus all
+      96 fold-report candidate rows accepted by the validator. The
+      materialization accepted all 97 query rows. This is a model annotation artifact, not fold
+      validation or candidate acceptance.
+  - id: eco1_rt_biohub_esmc_protein_features
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_protein_features.parquet
+    status: materialized_all97
+    description: >-
+      Sparse per-sequence SAE feature summaries derived from Biohub ESMC/logits
+      residue activations. The current 6B normalized materialized table has
+      204,935 rows.
+  - id: eco1_rt_biohub_esmc_residue_features
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_residue_features.parquet
+    status: materialized_all97
+    description: >-
+      Sparse per-residue Biohub ESMC SAE activations. The current all-97 run
+      has 1,986,560 rows: 97 sequences x 320 residues x 64 active features
+      per residue.
+  - id: eco1_rt_biohub_esmc_feature_catalog
+    owner: thread
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc_feature_catalog.parquet
+    status: materialized_all97
+    description: >-
+      Observed Biohub ESMC SAE feature indices for the current 6B layer-60 16k
+      run. Labels and descriptions are fetched from the exact Biohub
+      feature-description dictionary when available, stored once here, and not
+      repeated in the sparse residue/protein tables.
+  - id: eco1_rt_biohub_esmc_sae_interpretation_visuals
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_sae_interpretation/
+    status: materialized_foundation
+    description: >-
+      Study-owned Biohub ESMC feature-review visuals generated from the
+      existing all-97 sparse SAE tables without new API calls. The current
+      panels select peak-ranked top WT-active features from the exact
+      esmc-6b-2024-12-sae-layer60-k64-codebook16384 dictionary, show their
+      WT residue activation patterns, and stage an interactive selected-feature
+      heatmap over WT plus ProteinMPNN candidates. Rows are WT plus variants,
+      columns are Ec86 canonical residue positions, and color is the selected
+      feature's per-residue activation value. The directory also stores
+      `protein_top_sae_features.parquet`, a compact per-protein table ranked by
+      peak activation and prevalence. Feature names and descriptions come from
+      the exact 6B layer-60 16k feature-description source when available.
+      These visuals are model review aids, not fold validation, processivity
+      evidence, or candidate acceptance gates.
+  - id: eco1_rt_biohub_esmc_wt_position_entropy
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_position_entropy.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      WT-only ESMC masked-marginal position table with one accepted row per
+      Ec86 WT residue. It records sequence-logit entropy, WT log probability,
+      fraction of the 19 non-WT alternate residues with negative LLR, and
+      best/worst alternate residue summaries. This is model-derived in silico
+      mutation-scoring evidence, not experimental deep mutational scanning and
+      not a current-mask update.
+  - id: eco1_rt_biohub_esmc_wt_substitution_llr
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_substitution_llr.parquet
+    status: materialized_full_wt_6080_rows
+    description: >-
+      WT-only ESMC masked-marginal substitution table with 6,080 accepted rows
+      for 320 positions x 19 non-WT canonical amino-acid substitutions. LLR is
+      computed from Biohub sequence logits as log P(alternate) minus log P(WT)
+      at the masked position.
+  - id: eco1_rt_biohub_esmc_wt_mutation_scoring_mask_join
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/wt_mutation_scoring_mask_join.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      Study-owned join from WT ESMC mutation-scoring rows to the current Eco1
+      mask context, including protected status, protection reasons, clade-9 WT
+      plurality frequency, and retained DNA/RNA contact distance. This is an
+      audit table for future mask-policy review; it does not change the
+      current mask.
+  - id: eco1_rt_biohub_esmc_6b_wt_position_entropy
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_position_entropy.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      6B ESMC WT-only masked-marginal position table for the same 320 Ec86 WT
+      residue contexts as the 300M grid. This is a model-derived rescore for
+      candidate review, not whole-protein likelihood and not assay evidence.
+  - id: eco1_rt_biohub_esmc_6b_wt_substitution_llr
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_substitution_llr.parquet
+    status: materialized_full_wt_6080_rows
+    description: >-
+      6B ESMC WT-context single-substitution table with 6,080 accepted rows for
+      320 positions x 19 non-WT canonical amino-acid substitutions. Candidate
+      review sums these rows over ProteinMPNN-designed substitutions.
+  - id: eco1_rt_biohub_esmc_6b_wt_mutation_scoring_mask_join
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/mutation_scoring/esmc_6b_2024_12/wt_mutation_scoring_mask_join.parquet
+    status: materialized_full_wt_320_positions
+    description: >-
+      Study-owned join from the 6B WT ESMC mutation-scoring rows to the current
+      Eco1 mask context. This supports comparison with the 300M grid and does
+      not change the current mask.
+  - id: eco1_rt_biohub_esmc_6b_sequence_pseudolikelihood_position_pll
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: deferred_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sequence_pseudolikelihood/esmc_6b_2024_12/position_pll.parquet
+    status: deferred_v1_not_selection_blocking
+    description: >-
+      Deferred Biohub ESMC 6B leave-one-out position table for fold-accepted
+      canonical Eco1 RT sequences. Each row masks one residue, reads sequence
+      logits through the public Biohub encode-to-logits API path, and stores
+      log P(observed residue | remaining sequence). This is not fold validation
+      and not activity evidence. It is not required for the v1 six-variant
+      selection funnel.
+  - id: eco1_rt_biohub_esmc_6b_sequence_pseudolikelihood_sequence_pll
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: deferred_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sequence_pseudolikelihood/esmc_6b_2024_12/sequence_pll.parquet
+    status: deferred_v1_not_selection_blocking
+    description: >-
+      Deferred per-sequence pseudo-likelihood summary for the same Biohub ESMC
+      6B leave-one-out run. Rows report total pseudo-log-likelihood,
+      per-residue mean pseudo-log-likelihood, pseudo-perplexity, and delta
+      versus WT. This is a masked-language-model plausibility review field, not
+      a calibrated probability of natural occurrence or a candidate acceptance
+      gate. It is not required for the first protein review panel.
+  - id: eco1_rt_biohub_esmc_6b_sequence_pseudolikelihood_manifest
+    owner: eco1_rt_repack
+    method_contract_owner: permuter
+    kind: deferred_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/biohub_esmc/sequence_pseudolikelihood/esmc_6b_2024_12/sequence_pseudolikelihood_manifest.yaml
+    status: deferred_v1_not_selection_blocking
+    description: >-
+      Deferred redacted provenance manifest for the 6B ESMC sequence
+      pseudo-likelihood run, including source request hash, model, endpoint
+      flow, request counts, accepted/partial sequence counts, and method
+      interpretation limits. Whole-protein pseudo-likelihood is a later
+      review lane, not a v1 selection requirement.
+  - id: eco1_rt_biohub_esmc_sae_feature_window_summary
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/design_classes/biohub_esmc/sae_feature_window_summary.parquet
+    status: materialized_expanded_1731_rows
+    description: >-
+      Model-compatible summary of sparse Biohub ESMC SAE activations over three
+      declared Eco1 windows: catalytic-palm negative control, thumb/palm
+      nucleic-acid-binding surface, and mutable near retained DNA/RNA/basic-surface
+      region. This is local model review evidence, not
+      a processivity score and not a candidate acceptance gate.
+  - id: eco1_rt_review_deliverable_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
+    status: materialized
+    description: >-
+      Materialized v3 notebook manifest. It lists only present artifacts and
+      record display titles, input hashes, alt text, plain descriptions, and
+      interpretation limits.
+  - id: eco1_rt_communication_visual_bundle
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/communication_visuals/
+    status: materialized
+    description: >-
+      Source-derived residue map, structural screen, selected-mutation map,
+      16:9 protected-evidence movie with one full turn per category, a centered
+      cycle over all 738 local-geometry-retained ColabFold models, and a 16:9
+      reference-plus-selected qualitative ChimeraX Coulombic movie with one
+      full turn per sequence and a fixed unit-bearing potential scale. The
+      notebook exposes present artifacts through one communication-visual
+      evidence set; none adds a selection rule.
+  - id: eco1_rt_msa_plurality_mask_panel
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/msa_plurality_mask_panel/
+    status: materialized_foundation
+    description: >-
+      Constraint-evidence deliverable for the design mask. It uses the accepted
+      Mestre-derived Ec86 clade 9 alignment, places the Eco1/Ec86 target row
+      first, marks >=25% WT-plurality columns and protected mask positions on
+      canonical residue coordinates, and keeps full-row inspection in marimo
+      rather than a dense static all-row SVG.
+  - id: eco1_rt_mask_structure_context_panel
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/mask_structure_context/
+    status: materialized_script_png
+    description: >-
+      Active mask-evidence context deliverable. The ChimeraX `.cxc` script is
+      written for an off-white EC86 RT structure with categorical overlays for
+      protected residues, motif anchors, Wang/Ec86 substrate-contact priors,
+      retained DNA/RNA 5 A contacts, and clade 9 p25 WT-plurality residues.
+      The PNG render is opt-in; normal materialization records a skipped
+      optional-render status unless an existing render is being retained.
+  - id: eco1_rt_mask_structure_browser_manifest
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/mask_structure_browser_manifest.yaml
+    status: materialized_foundation
+    description: >-
+      Study-owned manifest for browser-native interactive mask inspection in
+      the review-deliverables marimo notebook. It points to the off-white
+      ec86kit/7V9U reference backbone and exposes dropdown views for catalytic
+      motif anchors, Wang/Ec86 substrate-contact priors, retained DNA/RNA 5 A
+      contacts, clade 9 p25 WT-plurality residues, baseline fixed residues, and
+      mutable ProteinMPNN positions. It uses the generic
+      `dnadesign.thread.structure_views` residue-selection contract and is
+      review context only.
+  - id: eco1_rt_colabfold_structure_review_panels
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_review/
+    status: materialized
+    description: >-
+      Materialized v3 fold-review visual bundle. Fold metrics are review context;
+      the local-backbone rule is the structural selection criterion.
+  - id: eco1_rt_interactive_structure_browser_manifest
+    owner: eco1_rt_repack
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/interactive_structure_browser_manifest.yaml
+    status: materialized
+    description: >-
+      Materialized browser-native v3 structure manifest. It will point to normalized
+      v3 fold models and the ec86kit/7V9U reference without copying structures.
+      py3Dmol provides interactive review; the view does not add selection
+      criteria.
+  - id: eco1_rt_selection_local_structure_stratification
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_local_structure_stratification.svg
+    status: materialized
+    description: >-
+      Compact review visual showing local C-alpha RMSD distributions by
+      declared RT review region after one global fit. The one declared 2.5 A
+      cutoff applies to non-distal regions; distal RMSD is review context. The
+      plot does not measure RT activity.
+  - id: eco1_rt_selection_local_structure_threshold_sensitivity
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_local_structure_threshold_sensitivity.svg
+    status: materialized
+    description: >-
+      Compact review visual showing local C-alpha RMSD gate failures under
+      tighter, declared, and looser thresholds. It audits threshold sensitivity
+      and does not replace the declared gate.
+  - id: eco1_rt_selection_hypothesis_panel_flow
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_hypothesis_panel_flow.svg
+    status: materialized
+    description: >-
+      Quantitative branch-flow visual showing complete sequences, rows passing
+      the non-distal 2.5 A local-backbone rule, the three policy-defined design
+      groups, and the eight selected sequences. Policy assignment is not a
+      quality gate. The plot does not measure RT activity.
+  - id: eco1_rt_selection_mutation_set_dissimilarity
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_mutation_set_dissimilarity.svg
+    status: materialized
+    description: >-
+      Compact review visual showing within-group mutated-position Jaccard
+      distances among selected candidates and separate cumulative pair
+      distributions for the distal, peripheral, and combined pools.
+      Cross-group cells are omitted because the policies expose different
+      positions. Exact-substitution distance remains in the selected-panel
+      table. The visual audits overlap; it does not establish independent
+      mechanisms or measure RT activity.
+  - id: eco1_rt_selection_selected_substitutions_across_rt
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_selected_substitutions_across_rt.svg
+    status: materialized
+    description: >-
+      Compact review visual showing where selected substitutions fall across
+      Eco1 RT positions, with substitution chemistry and display-only RT region
+      context. It is descriptive review context, not activity evidence.
+  - id: eco1_rt_selection_regional_mutation_burden
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_regional_mutation_burden.svg
+    status: materialized
+    description: >-
+      Compact review visual summarizing selected substitutions by catalytic or
+      direct-contact, near retained DNA/RNA region, thumb-contact-track, and
+      distal scaffold regions, with the C-terminal primer-RNA recognition
+      context tracked as a separate overlapping review axis. It is regional
+      review context, not a functional predictor.
+  - id: eco1_rt_selection_local_structure_by_region
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_local_structure_by_region.svg
+    status: materialized
+    description: >-
+      Compact review visual showing selected-candidate local C-alpha RMSD after
+      one global mapped C-alpha fit, split by motif, thumb-track, near retained
+      DNA/RNA, C-terminal primer-RNA recognition, and distal control regions.
+      Metric availability and the declared 2.5 A cutoff are required for every
+      non-distal region. Distal RMSD is review context. RMSD values are
+      structural review metrics, not activity or assay-readiness evidence.
+  - id: eco1_rt_selection_na_facing_chemistry_balance
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_na_facing_chemistry_balance.svg
+    status: materialized
+    description: >-
+      Compact review visual separating charge and residue-class changes near
+      retained DNA/RNA into net charge change, basic gains, basic losses,
+      acidic gains, and proline/glycine gains. These are designed contrasts and
+      review fields, not compatibility or activity scores.
+  - id: eco1_rt_selection_regionwise_msa_support
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_regionwise_msa_support.svg
+    status: materialized
+    description: >-
+      Compact review visual showing whether selected substitutions are observed
+      in the matching natural-sequence set by catalytic/direct-contact, near
+      retained DNA/RNA, thumb-contact-track, C-terminal primer-RNA recognition,
+      and distal regions. The C-terminal region is an overlapping review
+      context. This is evolutionary review context, not functional proof.
+  - id: eco1_rt_wt_model_check_visuals
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/wt_model_check/
+    status: materialized_foundation
+    description: >-
+      WT-only model-check visuals that compare clade-9 WT plurality
+      against ESMC masked-marginal entropy, best alternate-residue LLR, and
+      residue-wise constraint tracks. The review manifest also links the
+      Permuter-style WT ESMC entropy, fraction-negative-alternate-LLR, and
+      substitution-LLR heatmap SVGs. The manifest carries the masked-marginal
+      method summary, row-count evidence, and MSA-vs-ESMC correlation evidence
+      for notebook review. These plots are presented with the design-mask
+      constraint evidence. They support future mask-policy review and do not
+      change the current mask.
+  - id: eco1_rt_biohub_esmc_wt_feature_frames
+    owner: eco1_rt_repack
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_wt_feature_frames/
+    status: not_generated
+    description: >-
+      Planned WT-control Biohub ESMC SAE structure frames. Each frame shows one
+      declared feature's per-residue activation on an off-white WT structure and
+      records the SAE model id, feature index, any source-backed label, and an
+      explicit interpretation limit.
+  - id: eco1_rt_biohub_esmc_feature_heatmap
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/biohub_esmc_feature_heatmap/
+    status: materialized_foundation
+    description: >-
+      Biohub ESMC selected-feature heatmap manifest for the review-deliverables
+      marimo notebook. The notebook renders one WT-active feature at a time
+      with WT plus candidate variants as rows, Ec86 canonical residue positions
+      as columns, WT residue letters on the top axis, and per-residue SAE
+      activation as color. It is model review context, not a processivity
+      ranking or candidate acceptance gate.
+  - id: eco1_rt_candidate_triage_table
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_triage_table.parquet
+    status: materialized
+    description: >-
+      Materialized v3 table joining generation-policy provenance, mutation geography,
+      charge events, regional MSA support, fold fields, and local C-alpha RMSD.
+      Selection requires the strong fold class before the local-geometry rule.
+      It is a review table, not a combined activity score.
+  - id: eco1_rt_local_structure_region_metrics
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/local_structure_region_metrics.parquet
+    status: materialized
+    description: >-
+      Study-owned derived metric table with one row per candidate and local RT
+      review region. It reports local C-alpha RMSD and displacement after one
+      global mapped C-alpha fit to the ec86kit/7V9U reference, with explicit
+      status fields for missing structures or insufficient overlap. Each row
+      carries the explicit residue positions and source-basis note for the
+      region. The declared 2.5 A review cutoff applies to all non-distal
+      regions; distal RMSD is descriptive. The cutoff is not a
+      literature-calibrated functional boundary.
+  - id: eco1_rt_candidate_selection_panel
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_selection_panel.parquet
+    status: materialized
+    description: >-
+      Materialized selected panel built from v3 rows that pass the generation
+      constraints, strong-fold rule, and local-backbone rule. Exact F10/R13
+      substitutions and the Wang R13A evidence match are reported but do not
+      filter or rank rows. The RT-msDNA oligomeric state is not established.
+      The panel contains two distal, three peripheral, and three combined
+      sequences with stable Eco1RT-G3-D, Eco1RT-G3-P, and Eco1RT-G3-DP aliases.
+      The first pair in each group maximizes
+      mutated-position Jaccard distance and then exact-substitution Jaccard
+      distance; each third peripheral or combined row maximizes its minimum
+      distance from that pair. Policy allocation defines experimental
+      contrasts, not quality tiers. ESMC and SAE are not used.
+  - id: eco1_rt_candidate_handoff_sequences
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_handoff_sequences.csv
+    status: materialized
+    description: >-
+      Flat reviewer-facing canonical 320-aa RT protein sequence table for all
+      eight selected sequences. It records the mapped 309-aa source sequence,
+      stable variant alias, both sequence hashes, compact substitutions, and
+      explicit not-DNA status.
+  - id: eco1_rt_twist_full_cds_handoff
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/twist_handoff/twist_handoff_manifest.yaml
+    status: materialized_quote_and_upload_ready
+    description: >-
+      Hash-linked handoff for all eight selected 963-bp Eco1 RT CDS designs.
+      The bundle includes a Twist CSV, FASTA, and one annotated GenBank file per
+      candidate using the stable Eco1RT-G3 aliases. It reports exact F10/R13
+      states, the Wang R13A evidence match, and unresolved RT-msDNA assembly
+      state. Internal BsaI and BsmBI sites are absent. The substitution-only
+      codon policy records E. coli K-12 MG1655 as
+      the assay host and cites the exact Kazusa E. coli K-12 codon-frequency
+      record used for changed residues. Assembly flanks and the live vendor
+      complexity check remain pending.
+  - id: eco1_rt_candidate_handoff
+    owner: thread
+    kind: planned_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml
+    status: not_generated
+    description: Planned RT-only handoff bundle; no RT-lnRNA construct subject is created before downstream acceptance.
+downstream_collaboration:
+  - study_id: rt_lnrna_sponging_construct_triage
+    relationship: downstream_construct_promotion_candidate
+    required_contract: explicit RT-only candidate promotion handoff
+    status: planned

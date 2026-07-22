@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_analyze_outputs.py
 
 Tests for analysis output payload and artifact helpers.

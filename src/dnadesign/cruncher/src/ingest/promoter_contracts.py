@@ -1,4 +1,13 @@
-"""Promoter ingest data contracts for Cruncher source normalization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/promoter_contracts.py
+
+Promoter ingest data contracts for Cruncher source normalization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

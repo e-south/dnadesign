@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/app/test_parquet_writer.py
 
-Author(s): Eric J. South
+Regression tests for parquet writer Cruncher app.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

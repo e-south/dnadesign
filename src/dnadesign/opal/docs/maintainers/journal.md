@@ -1,10 +1,29 @@
 ## OPAL Dev Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-07-13
 
 
 This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
+
+### 2026-07-10 SFXI uncertainty clipping correction
+
+What changed:
+- Removed the analytical uncertainty approximation from the accepted SFXI configuration and runtime contract.
+- Made `delta` the sole method and the default when model standard deviations are available.
+- Applied the chain rule through the actual score clips: logic derivatives are zero outside `(0, 1)`, and effect derivatives are zero outside `(0, denominator)`.
+- Added deterministic clipping tests and a seeded local Monte Carlo comparison.
+
+Why:
+- The analytical approximation recorded below did not implement every nonlinear branch of the score and could report nonzero uncertainty where clipping made SFXI locally constant.
+- Expected-improvement selection requires uncertainty for the score that is actually ranked. SFXI now emits zero where the clipped score is locally constant, and EI rejects that zero rather than accepting a numerically positive but mismatched estimate.
+
+Compatibility decision:
+- There is no compatibility alias. Configurations that explicitly request `analytical` fail validation and must use `delta`.
+- Runs without model standard deviations are unchanged; current stress campaigns use `top_n`, so their persisted rankings are unchanged.
+
+Validation:
+- Objective and configuration regression tests cover the sole-method contract, clipping, exact-setpoint cusp, and local Monte Carlo agreement.
 
 ### 2026-02-23 EI tie-break ordering by predicted score
 
@@ -16,8 +35,8 @@ What changed:
   - `test_expected_improvement_ties_break_by_predicted_score_then_id_for_maximize`
   - `test_expected_improvement_ties_break_by_predicted_score_then_id_for_minimize`
 - Updated docs to describe EI tie-break semantics explicitly:
-  - `src/dnadesign/opal/docs/plugins/selection-expected-improvement.md`
-  - `src/dnadesign/opal/docs/plugins/selection.md`
+  - `src/dnadesign/opal/docs/plugins/selection/expected-improvement.md`
+  - `src/dnadesign/opal/docs/plugins/selection/README.md`
   - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
 
 Why:
@@ -56,7 +75,7 @@ What changed:
 - Hardened `sfxi_v1` delta uncertainty path with a targeted fail-fast error when candidates land exactly on the logic setpoint (`dist=0`) and computed variance would otherwise collapse to zero due non-differentiability:
   - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
 - Updated SFXI docs to document this delta-method edge case explicitly:
-  - `src/dnadesign/opal/docs/plugins/objective-sfxi.md`
+  - `src/dnadesign/opal/docs/plugins/objectives/sfxi.md`
 
 Why:
 - During adversarial audit of issue-aligned uncertainty behavior, this remained a UX footgun: users could receive a generic strict-positivity error instead of a precise root-cause message for a non-differentiable delta branch corner.
@@ -129,17 +148,17 @@ Validation:
 
 What changed:
 - Added deep plugin behavior/math pages to match objective docs structure:
-  - `src/dnadesign/opal/docs/plugins/model-gaussian-process.md`
-  - `src/dnadesign/opal/docs/plugins/selection-expected-improvement.md`
+  - `src/dnadesign/opal/docs/plugins/models/gaussian-process.md`
+  - `src/dnadesign/opal/docs/plugins/selection/expected-improvement.md`
 - Updated docs switchboard and workflow guides to link these pages directly:
   - `src/dnadesign/opal/docs/index.md`
   - `src/dnadesign/opal/docs/workflows/gp-sfxi-topn.md`
   - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
   - `src/dnadesign/opal/docs/workflows/rf-sfxi-topn.md`
 - Kept registry-level pages focused on plugin contract/wiring and linked out to deep pages:
-  - `src/dnadesign/opal/docs/plugins/models.md`
-  - `src/dnadesign/opal/docs/plugins/selection.md`
-  - `src/dnadesign/opal/docs/plugins/objectives.md`
+  - `src/dnadesign/opal/docs/plugins/models/README.md`
+  - `src/dnadesign/opal/docs/plugins/selection/README.md`
+  - `src/dnadesign/opal/docs/plugins/objectives/README.md`
 - Tightened CLI reference scope to command contracts by removing tutorial-style workflow sections:
   - `src/dnadesign/opal/docs/reference/cli.md`
 - Removed local docs `.DS_Store` cruft from working tree (these were untracked; ignore rule already exists in repo root `.gitignore`).
@@ -178,8 +197,8 @@ What changed:
 - Renamed `docs/demos/` to `docs/workflows/` and updated cross-links from docs index, concepts, campaign readmes, and maintainer testing pages.
 - Removed nested plugin docs under `docs/reference/plugins/` and consolidated all plugin docs under `docs/plugins/`.
 - Moved objective math pages into plugins tree:
-  - `docs/plugins/objective-sfxi.md`
-  - `docs/plugins/objective-spop.md`
+  - `docs/plugins/objectives/sfxi.md`
+  - `docs/plugins/objectives/spop.md`
 - Added `docs/plugins/index.md` as the single plugin documentation entrypoint.
 - Updated docs switchboard and reference copy to use the new mental model:
   - workflows = end-to-end run paths
@@ -224,7 +243,7 @@ What changed:
   - `docs/maintainers/testing-matrix.md`
 - Added objective docs/navigation surfaces:
   - `docs/plugins/index.md`
-  - `docs/plugins/objectives.md`
+  - `docs/plugins/objectives/README.md`
 - Added user-facing runtime guidance pages:
   - `docs/reference/troubleshooting.md`
   - `docs/reference/schema-to-runtime.md`
@@ -527,8 +546,8 @@ Compatibility policy for this branch:
 Documentation scope to update in lockstep:
 - `src/dnadesign/opal/README.md`
 - `src/dnadesign/opal/docs/reference/configuration.md`
-- `src/dnadesign/opal/docs/plugins/models.md`
-- `src/dnadesign/opal/docs/plugins/selection.md`
+- `src/dnadesign/opal/docs/plugins/models/README.md`
+- `src/dnadesign/opal/docs/plugins/selection/README.md`
 - `src/dnadesign/opal/docs/reference/data-contracts.md`
 - `src/dnadesign/opal/docs/workflows/index.md`
 - (optional new guide) `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
@@ -563,8 +582,8 @@ Completed actions:
   - `README.md`
   - `docs/reference/configuration.md`
   - `docs/reference/data-contracts.md`
-  - `docs/plugins/models.md`
-  - `docs/plugins/selection.md`
+  - `docs/plugins/models/README.md`
+  - `docs/plugins/selection/README.md`
   - `docs/workflows/rf-sfxi-topn.md`
 
 Path matrix results (targeted tests):
@@ -717,10 +736,10 @@ New regression coverage:
   - updated `test_resolve_objective_mode_aliases` to assert strict v2 behavior.
 
 Docs updates:
-- `docs/plugins/selection.md` clarifies EI requires std-dev uncertainty channel.
+- `docs/plugins/selection/README.md` clarifies EI requires std-dev uncertainty channel.
 - `docs/reference/configuration.md` clarifies `uncertainty_ref` semantics.
-- `docs/plugins/models.md` clarifies EI channel expectation.
-- `docs/plugins/objective-sfxi.md` now documents `pred__uncertainty_selected`.
+- `docs/plugins/models/README.md` clarifies EI channel expectation.
+- `docs/plugins/objectives/sfxi.md` now documents `pred__uncertainty_selected`.
 
 Validation for this pass:
 - `uv run pytest -q src/dnadesign/opal/tests/test_objective_contract_v2.py::test_expected_improvement_uses_uncertainty_as_std src/dnadesign/opal/tests/test_dashboard_utils.py::test_resolve_objective_mode_aliases src/dnadesign/opal/tests/test_run_round_integrity.py::test_run_round_matrix_gp_topn_handles_scalar_uncertainty_multibatch` -> PASS
@@ -784,7 +803,7 @@ Implemented changes:
   - Updated plugin signature to require explicit `objective` and `tie_handling`.
 - `src/dnadesign/opal/src/cli/commands/run.py`
   - Removed summary-level defaults for `tie_handling` and `objective_mode`; summary now enforces required/valid values.
-- `src/dnadesign/opal/docs/plugins/selection.md`
+- `src/dnadesign/opal/docs/plugins/selection/README.md`
   - Updated runtime signature docs to match strict required args (no default objective/tie values).
 
 TDD additions:
@@ -946,8 +965,8 @@ Implemented docs changes:
   - `src/dnadesign/opal/docs/reference/configuration.md`
   - Clarified explicit selection keys and model->objective->selection wiring.
 - Updated plugin references for selection/optimizer communication:
-  - `src/dnadesign/opal/docs/plugins/models.md`
-  - `src/dnadesign/opal/docs/plugins/selection.md`
+  - `src/dnadesign/opal/docs/plugins/models/README.md`
+  - `src/dnadesign/opal/docs/plugins/selection/README.md`
 - Updated data-contract reference to include strict verify behavior:
   - `src/dnadesign/opal/docs/reference/data-contracts.md`
 - Expanded demo matrix to include full round-1 continuation and selector-difference check snippet:
@@ -983,7 +1002,7 @@ Changes:
   - Added `tmp_root` echo to support the follow-up selector comparison snippet.
 - `src/dnadesign/opal/docs/concepts/architecture.md`
   - Updated flow to explicit channel-driven v2 semantics (`score_ref`, `uncertainty_ref`).
-- `src/dnadesign/opal/docs/plugins/objective-sfxi.md`
+- `src/dnadesign/opal/docs/plugins/objectives/sfxi.md`
   - Corrected run_meta selection-field semantics.
 - `src/dnadesign/opal/docs/reference/data-contracts.md`
   - Clarified `selection__objective` stores objective mode.
@@ -1272,7 +1291,7 @@ Changes:
   - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
   - clip-fraction summary now computes directly and fails if diagnostics contract is broken.
 - Docs aligned to strict y-ops/std contract:
-  - `src/dnadesign/opal/docs/plugins/models.md`
+  - `src/dnadesign/opal/docs/plugins/models/README.md`
   - `src/dnadesign/opal/docs/concepts/strategy-matrix.md`
 
 TDD:

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/cli/actions.py
 
 Command actions backing the CLI without depending on Typer presentation logic.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/release_enzymes/scanning.py
 
 Recognition-site scanning helpers for release enzymes.

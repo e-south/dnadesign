@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/config.py
 
 Parses plot configuration for OPAL campaigns and validates plot entries.
-Provides helpers for resolving plot config sources and defaults.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -29,6 +28,8 @@ ALLOWED_PLOT_KEYS = {
     "enabled",
     "tags",
     "preset",
+    "round_selector",
+    "round_variants",
 }
 ALLOWED_PRESET_KEYS = {
     "kind",
@@ -37,6 +38,8 @@ ALLOWED_PRESET_KEYS = {
     "data",
     "enabled",
     "tags",
+    "round_selector",
+    "round_variants",
 }
 ALLOWED_PLOT_DEFAULT_KEYS = {"output", "data", "params"}
 ALLOWED_PLOT_CONFIG_KEYS = {"plots", "plot_defaults", "plot_presets"}
@@ -162,13 +165,8 @@ def _resolve_plot_config_source(
     *,
     campaign_cfg: dict,
     campaign_yaml: Path,
-    campaign_dir: Path,
     plot_config_opt: Optional[Path],
 ) -> tuple[dict, Path, Path, str]:
-    inline_plots = campaign_cfg.get("plots", None)
-    inline_defaults = campaign_cfg.get("plot_defaults", None)
-    inline_presets = campaign_cfg.get("plot_presets", None)
-    inline_present = inline_plots is not None or inline_defaults is not None or inline_presets is not None
     cfg_plot_path = campaign_cfg.get("plot_config", None)
 
     opt_path: Optional[Path] = None
@@ -185,8 +183,6 @@ def _resolve_plot_config_source(
             )
 
     if opt_path is not None:
-        if inline_present:
-            raise ValueError("[plot] Remove inline plots/plot_defaults/plot_presets when using --plot-config.")
         if not opt_path.exists():
             raise ValueError(f"[plot] plot_config not found: {opt_path}")
         plot_cfg = _load_yaml(opt_path)
@@ -196,8 +192,6 @@ def _resolve_plot_config_source(
         return plot_cfg, opt_path.resolve(), opt_path.parent.resolve(), "--plot-config"
 
     if cfg_plot_path:
-        if inline_present:
-            raise ValueError("[plot] Remove inline plots/plot_defaults/plot_presets when using campaign.plot_config.")
         plot_cfg_path = resolve_path_like(campaign_yaml, cfg_plot_path)
         if not plot_cfg_path.exists():
             raise ValueError(f"[plot] plot_config not found: {plot_cfg_path}")
@@ -212,28 +206,18 @@ def _resolve_plot_config_source(
             "campaign.plot_config",
         )
 
-    if inline_plots is None:
-        raise ValueError("[plot] No plots found. Provide a plots list or set plot_config.")
-
-    plot_cfg = {
-        "plots": inline_plots,
-        "plot_defaults": inline_defaults,
-        "plot_presets": inline_presets,
-    }
-    return plot_cfg, campaign_yaml.resolve(), campaign_dir.resolve(), "campaign.yaml"
+    raise ValueError("[plot] No plots found. Set campaign.plot_config or pass --plot-config.")
 
 
 def load_plot_config(
     *,
     campaign_cfg: dict,
     campaign_yaml: Path,
-    campaign_dir: Path,
     plot_config_opt: Optional[Path],
 ) -> PlotConfig:
     plot_cfg, plot_cfg_path, plot_cfg_dir, plot_src = _resolve_plot_config_source(
         campaign_cfg=campaign_cfg,
         campaign_yaml=campaign_yaml,
-        campaign_dir=campaign_dir,
         plot_config_opt=plot_config_opt,
     )
     plots_cfg = plot_cfg.get("plots")
@@ -257,6 +241,22 @@ def list_configured_plots(
     plot_presets: Dict[str, Dict[str, Any]],
 ) -> List[str]:
     rows: List[str] = []
+    for spec in list_configured_plot_specs(plots_cfg=plots_cfg, plot_presets=plot_presets):
+        status = "disabled" if not spec["enabled"] else "enabled"
+        tags = spec.get("tags") or []
+        tag_str = f" tags={tags}" if tags else ""
+        round_str = f" round_selector={spec['round_selector']}" if spec.get("round_selector") else ""
+        variant_str = f" round_variants={spec['round_variants']}" if spec.get("round_variants") else ""
+        rows.append(f"{spec['name']}: {spec['kind']} ({status}){tag_str}{round_str}{variant_str}")
+    return rows
+
+
+def list_configured_plot_specs(
+    *,
+    plots_cfg: List[Dict[str, Any]],
+    plot_presets: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    specs: List[Dict[str, Any]] = []
     for entry in plots_cfg:
         if not isinstance(entry, dict):
             raise ValueError(f"[plot] Each plot entry must be a mapping (got {type(entry).__name__}).")
@@ -285,10 +285,22 @@ def list_configured_plots(
         tags = _parse_tags(preset.get("tags"), ctx=f"preset:{preset_name}") + _parse_tags(
             entry.get("tags"), ctx=f"plot:{pname}"
         )
-        status = "disabled" if not enabled else "enabled"
-        tag_str = f" tags={tags}" if tags else ""
-        rows.append(f"{pname}: {pkind} ({status}){tag_str}")
-    return rows
+        spec: Dict[str, Any] = {
+            "name": pname,
+            "kind": pkind,
+            "enabled": enabled,
+            "tags": tags,
+        }
+        if preset_name is not None:
+            spec["preset"] = preset_name
+        entry_round_selector = entry.get("round_selector", preset.get("round_selector"))
+        if entry_round_selector is not None:
+            spec["round_selector"] = str(entry_round_selector)
+        entry_round_variants = entry.get("round_variants", preset.get("round_variants"))
+        if entry_round_variants is not None:
+            spec["round_variants"] = entry_round_variants
+        specs.append(spec)
+    return specs
 
 
 def apply_data_entries(

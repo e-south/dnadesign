@@ -1,0 +1,55 @@
+notify_profile_doctor_anchor_only_20b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - notify
+  - profile
+  - doctor
+  - --profile
+  - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_only_20b/profile.json
+  - --json
+notify_profile_doctor_anchor_plus_template_20b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - notify
+  - profile
+  - doctor
+  - --profile
+  - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/anchor_plus_template_20b/profile.json
+  - --json
+notify_profile_doctor_sequence_views_anchor_construct_insert_7b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - notify
+  - profile
+  - doctor
+  - --profile
+  - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_anchor_construct_insert_7b/profile.json
+  - --json
+notify_profile_doctor_sequence_views_context_forward_seq_and_anchor_mean_7b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - notify
+  - profile
+  - doctor
+  - --profile
+  - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_context_forward_seq_and_anchor_mean_7b/profile.json
+  - --json
+notify_profile_doctor_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - notify
+  - profile
+  - doctor
+  - --profile
+  - src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/outputs/notify/infer/sequence_views_context_reverse_complement_seq_and_anchor_mean_7b/profile.json
+  - --json

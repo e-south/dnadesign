@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-densegen project
+dnadesign
 src/dnadesign/densegen/tests/docs/test_densegen_docs_snippet_contracts.py
 
-Contract checks for DenseGen runbook/tutorial snippet comment and YAML annotation
-style in operator-facing docs.
+Contract checks for DenseGen runbook/tutorial snippet comment and YAML annotation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

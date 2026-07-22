@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/visual_foundations.py
 
 Producer-owned style foundations for the payload-centric YIU visual system.

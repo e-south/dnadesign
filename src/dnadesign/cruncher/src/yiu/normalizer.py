@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/normalizer.py
 
 Normalize YIU v4 specs into deterministic payload bundles.

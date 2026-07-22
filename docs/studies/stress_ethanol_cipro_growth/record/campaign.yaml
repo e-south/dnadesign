@@ -1,0 +1,10 @@
+version: 2
+path_base: repo
+campaign_id: stress_ethanol_cipro_growth
+steps:
+  - label: opal-candidate-feature-table-response-window
+    registry_id: opal.downstream.usr-infer-x-active-learning
+    inputs:
+      usr_root: repo:src/dnadesign/usr/datasets
+      dataset: usr_prom_eth_cip_opal_candidates
+      opal_config: repo:src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml

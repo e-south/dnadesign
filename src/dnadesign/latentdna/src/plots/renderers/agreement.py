@@ -1,4 +1,13 @@
-"""Agreement and correspondence renderers for static plot artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/agreement.py
+
+Agreement and correspondence renderers for static plot artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,7 +19,13 @@ import numpy as np
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...visual_style import PUBLICATION_PALETTE, SPINE_COLOR, TEXT_COLOR, humanize_display_text, wrap_plot_title
+from ...presentation.visual_style import (
+    PUBLICATION_PALETTE,
+    SPINE_COLOR,
+    TEXT_COLOR,
+    humanize_display_text,
+    wrap_plot_title,
+)
 from ...workspaces.loader import WorkspaceContext
 from ..axes import apply_axes_style
 from ..layout import _panel_grid_dimensions

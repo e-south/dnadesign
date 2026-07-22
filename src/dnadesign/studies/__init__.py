@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/studies/__init__.py
 
-Study-boundary packages that plug domain-specific status and preflight behavior
-into OPS without living inside OPS core.
+Study-boundary packages that plug domain-specific status and preflight behavior.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

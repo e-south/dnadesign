@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/devtools/docs_ia.py
 
-Generate and sync Cruncher docs map and runbook-step reference sections from a
-catalog and workspace machine runbooks.
+Generate and sync Cruncher docs map and runbook-step reference sections from a.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -152,6 +151,14 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                 "reference/release_enzyme_catalogs.md",
                 "../workspaces/de033/README.md",
                 "../workspaces/de033/runbook.md",
+            ),
+        ),
+        "scar_nick": (
+            "Design Retained-Scar Terminal Nicks",
+            (
+                "guides/scar_nick_workflow.md",
+                "../workspaces/scar_nick_teto/runbook.md",
+                "../src/scar_nick/README.md",
             ),
         ),
         "yiu": (

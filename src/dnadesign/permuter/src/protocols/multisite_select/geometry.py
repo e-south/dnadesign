@@ -1,17 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/multisite_select/geometry.py
 
-Geometry utilities for Evo-2 logits embeddings:
-
-  • row-wise L2 normalization
-  • cosine similarity and angular distance
-  • full pairwise angular distance matrix
-  • cluster medoid index under angular distance
-
-All routines assume finite numeric inputs; zero-norm vectors are rejected
-assertively (no silent fallbacks).
+Geometry utilities for Evo-2 logits embeddings:.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

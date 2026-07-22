@@ -1,4 +1,13 @@
-"""Heatmap renderers for static plot artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/heatmap.py
+
+Heatmap renderers for static plot artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,8 +19,8 @@ import numpy as np
 
 from ...contracts.errors import ContractViolationError, MissingArtifactError
 from ...contracts.plot import ResolvedPlotSpec
-from ...metadata_axes import AxisStyle
-from ...visual_style import TEXT_COLOR, humanize_display_text, normalize_category_key, wrap_plot_title
+from ...metadata.axes import AxisStyle
+from ...presentation.visual_style import TEXT_COLOR, humanize_display_text, normalize_category_key, wrap_plot_title
 from ...workspaces.loader import WorkspaceContext
 from ..axes import (
     apply_axes_style,

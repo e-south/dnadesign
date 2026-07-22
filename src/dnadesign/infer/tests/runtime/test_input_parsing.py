@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_input_parsing.py
+dnadesign
+src/dnadesign/infer/tests/runtime/test_input_parsing.py
 
 Unit tests for shared infer input parsing helpers.
 

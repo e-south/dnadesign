@@ -11,7 +11,7 @@
 **Status-kind:** cluster-run-index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-19
+**Last verified:** 2026-06-17
 
 Use this workflow when one feature column or exported matrix already exists and the next task is exploratory clustering, UMAP visualization, or unsupervised summaries.
 
@@ -19,7 +19,7 @@ Use this workflow when one feature column or exported matrix already exists and 
 
 - One chosen feature column or exported matrix is already present.
 - The input is a USR dataset (`--dataset`) or a file (`--file`) with that chosen feature column or matrix.
-- If that feature column or matrix does not exist yet, return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md) for the shared infer-backed workflow.
+- If that feature column or matrix does not exist yet, return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md) for the shared infer-backed workflow.
 
 ### First fit, UMAP, and analysis pass
 
@@ -154,4 +154,4 @@ If another Python tool needs to run the same flow in-process, use the public hel
 - [cluster docs index by workflow](../README.md)
 - [cluster CLI contracts](../reference/cli-contracts.md)
 - [cluster ownership boundary](../concepts/ownership-boundary.md)
-- [promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- [promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)

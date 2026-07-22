@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/stage_b.py
+dnadesign
+src/dnadesign/densegen/src/cli/stage_b.py
 
 Stage-B CLI command registration for building library artifacts.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -32,7 +32,7 @@ class WatchResolverMode:
 def _resolve_resolver_mode_run_id(*, tool_name: str, config_path: Path) -> str | None:
     if tool_name != "construct":
         return None
-    from dnadesign.construct.contracts import resolve_construct_run_id_from_config
+    from dnadesign.construct import resolve_construct_run_id_from_config
 
     try:
         return resolve_construct_run_id_from_config(config_path)

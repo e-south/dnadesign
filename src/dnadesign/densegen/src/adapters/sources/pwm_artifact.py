@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_artifact.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_artifact.py
 
 PWM input source for per-motif JSON artifacts (contract-first).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

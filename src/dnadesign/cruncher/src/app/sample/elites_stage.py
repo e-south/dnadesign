@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/elites_stage.py
 
 Select, validate, and persist elite outputs for sample runs.

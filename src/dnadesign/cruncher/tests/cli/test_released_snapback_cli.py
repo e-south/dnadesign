@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_released_snapback_cli.py
 
 CLI contract tests for released-product snapback commands.

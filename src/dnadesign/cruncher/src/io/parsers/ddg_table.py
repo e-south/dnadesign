@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/io/parsers/ddg_table.py
 
 Parse delta-delta-G binding-energy tables into probability PWMs.

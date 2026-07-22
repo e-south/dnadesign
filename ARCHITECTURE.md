@@ -1,8 +1,15 @@
+---
+doc_id: architecture
+surface: system-of-record
+owner: dnadesign-maintainers
+last_verified: 2026-07-14
+---
+
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-24
+**Last verified:** 2026-07-14
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -27,10 +34,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
 ## System boundaries
 - Tool packages: each top-level tool under `src/dnadesign/<tool>/` owns its CLI behavior, configs, and tests.
 - Shared artifact schemas live under `src/dnadesign/contracts/` when a producer and consumer need a neutral, versioned handoff model without importing either tool's internals.
-- Shared test infrastructure lives under `src/dnadesign/devtools/testsupport/` and is test-only by contract; production code must not depend on it.
+- Shared test infrastructure lives under `src/dnadesign/devtools/tests/support/` and is test-only by contract; production code must not depend on it.
 - OPS core is a neutral shell around discovery, observation/status, orchestration,
   and generic readiness evaluation; it must not own sibling-specific provider
-  implementations or study-family policy.
+  implementations or study-specific status/preflight policy.
 - Shared operational plane: Notify (`src/dnadesign/notify/`) consumes USR events as integration signals without controlling producer tools.
 - Shared storage semantics: USR overlay/compaction/file-shape contracts use USR domain terms and stay tool-agnostic so DenseGen, Infer, and future producers can share one records store.
 - Shared developer infrastructure: devtools modules provide CI scope detection, docs checks, coverage gates, and quality entropy reporting.
@@ -40,7 +47,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - `ARCHITECTURE.md` is the top-level authority for cross-tool boundaries and path ownership contracts.
 - `DESIGN.md` defines implementation invariants that must remain consistent with architecture boundaries.
 - `RELIABILITY.md` and `SECURITY.md` specialize runtime and secret-handling policy without overriding architecture boundaries.
-- `docs/operations/orchestration-runbooks.md` is the executable operator contract for batch orchestration behavior.
+- `docs/operations/orchestration/runbooks.md` is the executable operator contract for batch orchestration behavior.
 - `PLANS.md` governs lifecycle/process for promoting or changing these contracts.
 - Root docs route readers to one authoritative deep procedure; cross-tool runbooks may live either in top-level `docs/` or in the boundary-owning tool's operations docs when that tool owns the durable handoff.
 - `docs/runbooks/README.md` is the centralized inventory of authoritative cross-tool procedures and tool-local runbook sources; it is a discovery surface, not the owner of those procedures.
@@ -61,13 +68,15 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - `docs/runbooks/README.md` is the concise inventory surface for authoritative procedures; it links to owner-local runbooks and workflows without relocating them.
 - Control-plane orchestration artifacts stay under workspace-scoped logging roots; tool-local docs define exact subpaths and artifact names.
 - Boundary-owned observation surfaces publish checked-in metadata under
-  `src/dnadesign/**/ops/status.registry.yaml`. OPS recursively discovers those
-  fragments, renders help from metadata alone, and imports provider code only
-  for the selected surface.
+  tool-local `src/dnadesign/**/ops/status.registry.yaml` files. Ops-owned
+  built-in providers live under `src/dnadesign/ops/providers/*/status.registry.yaml`.
+  OPS recursively discovers those fragments, renders help from metadata alone,
+  and imports provider code only for the selected surface.
 - Checked-in study records are study-first rather than family-nested:
   `docs/studies/index.yaml` selects the active study, each live study record
-  lives under `docs/studies/<study-id>/`, and family routing resolves through
-  `src/dnadesign/studies/families/<family>/`.
+  lives under `docs/studies/<study-id>/`, and Ops-facing routes are declared
+  explicitly with `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind`
+  in `ops.study.yaml`.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Active shared USR dataset ids are flat owner-first contracts, for example
@@ -82,9 +91,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
   record or runbook.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
-- Study-family adapters are explicit seams. OPS loads them through metadata and
-  sanctioned loader boundaries; family-specific execution taxonomy does not
-  belong under `src/dnadesign/ops/`.
+- Study status and preflight logic is study-owned once it becomes specific.
+  OPS discovers provider metadata and imports only the selected provider
+  entrypoint; study-specific execution taxonomy stays under
+  `src/dnadesign/studies/units/<study-id>/`.
 - Document-type semantics are explicit:
   - `route`: index entry or decision surface only
   - `runbook`: authoritative operator procedure with ordered commands and verification
@@ -123,12 +133,12 @@ This file is the architecture map: it names system boundaries, major flows, and 
   - use `src/dnadesign/usr/docs/operations/` when the owner is a durable USR dataset, overlay set, or `.events.log`
   - use the downstream tool docs after the handoff when that tool owns the next state machine
 - Cross-tool path ownership is explicit: repeated runs accumulate in workspace-scoped directories, not repository-root runbook/log fan-out.
-- Repository-root transient operational working directories (for example `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are disallowed by policy; disposable working state belongs under `/scratch` and durable state belongs under `<workspace-root>/outputs/logs/ops/`.
+- Repository-root generated artifact and transient operational directories (for example `outputs/`, `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are disallowed by policy; disposable working state belongs under `/scratch` and durable state belongs under a tool or study workspace root.
 
 ## Where to go deeper
 - Maintainer index: `docs/dev/README.md`
-- Monorepo organization audit: `docs/dev/monorepo-organization-audit.md`
-- BU SCC operator references: `docs/bu-scc/README.md`, `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`, and `docs/bu-scc/jobs/README.md`
+- Monorepo organization audit: `docs/dev/audits/monorepo-organization.md`
+- BU SCC operator references: `docs/bu-scc/README.md`, `docs/bu-scc/setup/quickstart.md`, `docs/bu-scc/runbooks/batch-notify.md`, and `docs/bu-scc/jobs/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Reliability operations: `RELIABILITY.md`
 - Security policy and secrets handling: `SECURITY.md`

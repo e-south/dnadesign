@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/snapback/test_target_search.py
 
 Target-first snapback catalog search tests.
@@ -16,14 +16,16 @@ from pathlib import Path
 from dnadesign.cruncher.app.snapback_target_search_workflow import run_snapback_target_search
 from dnadesign.cruncher.snapback.models import CatalogSources
 from dnadesign.cruncher.snapback.target_models import SnapbackTargetGeometry
+from dnadesign.cruncher.tests.snapback.builders import write_snapback_target_search_catalog
 
 
 def test_run_snapback_target_search_finds_exact_origin_hit_and_later_near_hits(tmp_path: Path) -> None:
     workspace_root = tmp_path / "workspaces" / "demo_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
+    write_snapback_target_search_catalog(workspace_root)
 
     report = run_snapback_target_search(
-        catalog=CatalogSources(preset="neb_nicking_v1", additional_presets=["thermo_nicking_v1"]),
+        catalog=CatalogSources(additional_paths=[Path("inputs/nickases/target-search.nickases.yaml")]),
         workspace_root=workspace_root,
         target=SnapbackTargetGeometry(
             nick_boundary_from_left=0,

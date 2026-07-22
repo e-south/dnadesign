@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/selection_contracts.py
 
-Shared fail-fast parsers for selection contract fields used by runtime, CLI,
-and analysis views.
+Shared fail-fast parsers for selection contract fields used by runtime, CLI,.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -24,12 +23,47 @@ RESERVED_SELECTION_PARAM_KEYS = frozenset(
         "score_ref",
         "uncertainty_ref",
         "exclude_already_labeled",
+        "require_exact_top_k",
     }
 )
 
 
 def extract_selection_plugin_params(selection_params: Mapping[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in selection_params.items() if k not in RESERVED_SELECTION_PARAM_KEYS}
+
+
+def require_exact_selection_count(
+    selection_params: Mapping[str, Any],
+    *,
+    view_id: str,
+    top_k: int,
+    selected_count: int,
+    tie_handling: str,
+    error_cls: type[Exception] = ValueError,
+) -> None:
+    if not bool(selection_params.get("require_exact_top_k", False)) or selected_count == top_k:
+        return
+    plural = "s" if top_k != 1 else ""
+    raise error_cls(
+        f"Selection view {view_id!r} requires exactly {top_k} selected candidate{plural}, "
+        f"but {tie_handling} selected {selected_count}. "
+        "Resolve the boundary tie or choose an explicit tie policy before running the round."
+    )
+
+
+def resolve_selection_top_k(
+    selection_params: Mapping[str, Any],
+    *,
+    view_id: str,
+    override: int | None,
+    error_cls: type[Exception] = ValueError,
+) -> int:
+    if override is None and "top_k" not in selection_params:
+        raise error_cls(f"selection_views[{view_id}].selection.params.top_k is required.")
+    top_k = int(override if override is not None else selection_params["top_k"])
+    if top_k <= 0:
+        raise error_cls(f"selection_views[{view_id}].selection.params.top_k must be > 0.")
+    return top_k
 
 
 def resolve_selection_objective_mode(

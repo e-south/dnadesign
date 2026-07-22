@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_config_discovery.py
+
+Regression tests for CLI config discovery OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

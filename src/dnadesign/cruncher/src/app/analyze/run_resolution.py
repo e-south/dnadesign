@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/run_resolution.py
 
 Resolve sample run selection and analyze eligibility for analysis workflows.

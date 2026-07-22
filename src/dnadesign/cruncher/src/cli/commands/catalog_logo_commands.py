@@ -1,11 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/catalog_logo_commands.py
 
 Catalog logo rendering command registration.
 
-Author(s): Eric J. South
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

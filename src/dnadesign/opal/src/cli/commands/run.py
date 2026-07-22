@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/run.py
+
+CLI wiring for run OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -9,19 +11,27 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 from typing import Optional
 
 import typer
+from typer.models import OptionInfo
 
 from ...core.selection_contracts import (
     resolve_selection_objective_mode,
     resolve_selection_tie_handling,
 )
-from ...core.utils import ExitCodes, OpalError, print_stdout
-from ...runtime.run_round import RunRoundRequest, run_round
+from ...core.utils import ExitCodes, OpalError, now_iso, print_stdout
+from ...runtime.memory_guard import enforce_x_matrix_memory_budget
+from ...runtime.round_plan import required_candidate_columns
+from ...runtime.run_round import RunRoundRequest, assert_round_artifacts_writable, run_round
+from ...storage.artifacts import append_round_log_event
+from ...storage.candidate_scope import load_candidate_scope_ids
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
+from ...storage.workspace import CampaignWorkspace
+from ...storage.x_contracts import validate_x_parquet_column
 from ..formatting import render_run_summary_text
 from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
@@ -44,6 +54,101 @@ def _resolve_summary_selection_mode(sel_params: dict[str, object]) -> tuple[str,
     return tie_handling, objective_mode
 
 
+def _direct_call_default(value, default):
+    return default if isinstance(value, OptionInfo) else value
+
+
+def _append_cli_round_event(
+    cfg,
+    cfg_path: Path,
+    round_index: int,
+    stage: str,
+    *,
+    attempt_id: str | None = None,
+    **payload: object,
+) -> None:
+    ws = CampaignWorkspace.from_config(cfg, cfg_path)
+    if attempt_id is not None:
+        payload.setdefault("attempt_id", str(attempt_id))
+    append_round_log_event(
+        ws.round_logs_dir(int(round_index)) / "round.log.jsonl",
+        {"ts": now_iso(), "round": int(round_index), "stage": stage, **payload},
+    )
+
+
+def _append_abort_event(
+    cfg,
+    cfg_path: Path,
+    round_index: int,
+    error: BaseException,
+    *,
+    attempt_id: str | None = None,
+) -> None:
+    try:
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round_index),
+            "abort",
+            attempt_id=attempt_id,
+            severity="error",
+            error_type=type(error).__name__,
+            message=str(error),
+        )
+    except Exception:
+        pass
+
+
+def _release_run_lock(
+    lock: CampaignLock,
+    cfg,
+    cfg_path: Path,
+    round_index: int,
+    *,
+    attempt_id: str,
+    outcome: str,
+) -> None:
+    """Record the release boundary while ownership is held, then release it."""
+    try:
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round_index),
+            "lock_release_start",
+            attempt_id=attempt_id,
+            phase="finalize",
+            lock_scope="local_host",
+            lockfile=str(lock.lockfile),
+            status="releasing",
+            outcome=str(outcome),
+        )
+    finally:
+        lock.release()
+
+
+def _release_failed_run_lock(
+    lock: CampaignLock,
+    cfg,
+    cfg_path: Path,
+    round_index: int,
+    *,
+    attempt_id: str,
+    round_log_opened: bool,
+) -> None:
+    """Release without creating a round log that this attempt never opened."""
+    if not round_log_opened:
+        lock.release()
+        return
+    _release_run_lock(
+        lock,
+        cfg,
+        cfg_path,
+        int(round_index),
+        attempt_id=attempt_id,
+        outcome="aborted",
+    )
+
+
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
 def cmd_run(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
@@ -51,7 +156,6 @@ def cmd_run(
         ...,
         "--round",
         "-r",
-        "--labels-as-of",
         help="Labels cutoff for training (use labels with observed_round ≤ this value).",
     ),
     k: Optional[int] = typer.Option(None, "--k", "-k", help="Top-k (default from YAML)."),
@@ -61,20 +165,37 @@ def cmd_run(
         help="Allow overwriting existing round artifacts (required when rerunning a round).",
     ),
     score_batch_size: Optional[int] = typer.Option(None, "--score-batch-size", help="Override batch size."),
+    max_x_matrix_gib: Optional[float] = typer.Option(
+        None,
+        "--max-x-matrix-gib",
+        help="Override safety.max_x_matrix_gib for this run. Use only when the host has enough RAM.",
+    ),
     verbose: bool = typer.Option(True, "--verbose/--quiet"),
     no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
     json: bool = typer.Option(False, "--json/--text", help="Output format (default: text)"),
 ) -> None:
+    config = _direct_call_default(config, None)
+    k = _direct_call_default(k, None)
+    resume = bool(_direct_call_default(resume, False))
+    score_batch_size = _direct_call_default(score_batch_size, None)
+    max_x_matrix_gib = _direct_call_default(max_x_matrix_gib, None)
+    verbose = bool(_direct_call_default(verbose, True))
+    no_hints = bool(_direct_call_default(no_hints, False))
+    json = bool(_direct_call_default(json, False))
+
+    cfg_path: Path | None = None
+    cfg = None
+    attempt_id: str | None = None
+    round_log_opened = False
+    campaign_lock: CampaignLock | None = None
     try:
+        attempt_id = uuid.uuid4().hex
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
-        store = store_from_cfg(cfg)
-        df = store.load()
-        if not json:
-            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
-        # Guard: if this round already exists in state.json, prompt unless --resume
-        st_path = Path(cfg.campaign.workdir) / "state.json"
+        # Reject an implicit rerun before opening the prior round's immutable log.
+        ws = CampaignWorkspace.from_config(cfg, cfg_path)
+        st_path = ws.state_path
         if st_path.exists():
             try:
                 st = CampaignState.load(st_path)
@@ -90,6 +211,136 @@ def cmd_run(
                     print_stdout("Aborted.")
                     raise typer.Exit(code=ExitCodes.BAD_ARGS)
                 resume = True
+        assert_round_artifacts_writable(
+            ws.round_dir(int(round)),
+            round_index=int(round),
+            allow_resume=bool(resume),
+        )
+
+        command_started_at = now_iso()
+        lock_acquire_started_at = now_iso()
+        lockfile = Path(cfg.campaign.workdir) / ".opal.lock"
+        campaign_lock = CampaignLock(
+            Path(cfg.campaign.workdir),
+            payload_extra={"attempt_id": attempt_id, "round": int(round), "command": "run"},
+        )
+        campaign_lock.acquire()
+        # Another invocation may have completed this round between the
+        # pre-lock check and lock acquisition. Recheck before opening the
+        # immutable round log or writing any other round-scoped artifact.
+        assert_round_artifacts_writable(
+            ws.round_dir(int(round)),
+            round_index=int(round),
+            allow_resume=bool(resume),
+        )
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "command_start",
+            attempt_id=attempt_id,
+            ts=command_started_at,
+            command="run",
+            status="started",
+        )
+        round_log_opened = True
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "lock_acquire_start",
+            attempt_id=attempt_id,
+            ts=lock_acquire_started_at,
+            lock_scope="local_host",
+            lockfile=str(lockfile),
+            status="started",
+        )
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "lock_acquired",
+            attempt_id=attempt_id,
+            lock_scope="local_host",
+            lockfile=str(campaign_lock.lockfile),
+            status="locked",
+        )
+        store = store_from_cfg(cfg)
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "x_validate_start",
+            attempt_id=attempt_id,
+            status="started",
+        )
+        x_contract = validate_x_parquet_column(store.records_path, x_column=cfg.data.x_column_name)
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "x_validate_done",
+            attempt_id=attempt_id,
+            status="ok",
+            rows=int(x_contract.row_count),
+            x_dim=int(x_contract.x_dim),
+        )
+        sbatch = int(score_batch_size or cfg.scoring.score_batch_size)
+        if sbatch <= 0:
+            raise OpalError("score_batch_size must be a positive integer.", ExitCodes.BAD_ARGS)
+        scoped_candidate_rows = (
+            len(load_candidate_scope_ids(cfg.data.candidate_scope))
+            if cfg.data.candidate_scope is not None
+            else int(x_contract.row_count)
+        )
+        memory_guard_rows = min(int(scoped_candidate_rows), int(sbatch))
+        memory_estimate = enforce_x_matrix_memory_budget(
+            row_count=int(memory_guard_rows),
+            x_dim=int(x_contract.x_dim),
+            item_size_bytes=max(8, int(x_contract.item_size_bytes)),
+            max_gib=max_x_matrix_gib if max_x_matrix_gib is not None else cfg.safety.max_x_matrix_gib,
+            context="OPAL run streaming score batch X matrix",
+        )
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "x_memory_guard_done",
+            attempt_id=attempt_id,
+            status="ok",
+            scope="streaming_score_batch",
+            candidate_rows=int(scoped_candidate_rows),
+            score_batch_size=int(sbatch),
+            rows=int(memory_estimate.row_count),
+            x_dim=int(memory_estimate.x_dim),
+            raw_gib=float(memory_estimate.raw_gib),
+            estimated_gib=float(memory_estimate.estimated_gib),
+            max_gib=float(memory_estimate.max_gib),
+        )
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "records_load_start",
+            attempt_id=attempt_id,
+            status="started",
+        )
+        df = store.load_runtime_frame(
+            include_x=False,
+            required_columns=required_candidate_columns(cfg),
+        )
+        _append_cli_round_event(
+            cfg,
+            cfg_path,
+            int(round),
+            "records_load_done",
+            attempt_id=attempt_id,
+            status="ok",
+            rows=int(len(df)),
+            columns=int(len(df.columns)),
+        )
+        if not json:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
 
         req = RunRoundRequest(
             cfg=cfg,
@@ -97,26 +348,33 @@ def cmd_run(
             config_path=cfg_path,
             k_override=k,
             score_batch_size_override=score_batch_size,
+            max_x_matrix_gib_override=max_x_matrix_gib,
+            x_dim_override=int(x_contract.x_dim),
+            x_item_size_bytes=int(x_contract.item_size_bytes),
             verbose=verbose,
             allow_resume=bool(resume),
             progress_factory=(tui_progress_factory() if verbose and not json else None),
         )
-        with CampaignLock(Path(cfg.campaign.workdir)):
-            res = run_round(store, df, req)
-        sel_params = dict(cfg.selection.selection.params or {})
-        tie_handling, objective_mode = _resolve_summary_selection_mode(sel_params)
+        res = run_round(store, df, req)
+        selection_views = {}
+        for view in cfg.selection_views:
+            sel_params = dict(view.selection.params or {})
+            tie_handling, objective_mode = _resolve_summary_selection_mode(sel_params)
+            selection_views[view.id] = {
+                **res.selection_views[view.id],
+                "top_k_source": "cli_override" if k is not None else "yaml_default",
+                "tie_handling": tie_handling,
+                "objective_mode": objective_mode,
+            }
         summary = {
             "ok": res.ok,
             "run_id": res.run_id,
             "as_of_round": res.as_of_round,
             "trained_on": res.trained_on,
             "scored": res.scored,
-            "top_k_requested": res.top_k_requested,
-            "top_k_effective": res.top_k_effective,
+            "selection_views": selection_views,
+            "selection_batch_count": res.selection_batch_count,
             "ledger": res.ledger_path,
-            "top_k_source": "cli_override" if k is not None else "yaml_default",
-            "tie_handling": tie_handling,
-            "objective_mode": objective_mode,
         }
         if json:
             json_out(summary)
@@ -129,9 +387,67 @@ def cmd_run(
                 json_output=json,
                 labels_as_of=int(round),
             )
+        _release_run_lock(
+            campaign_lock,
+            cfg,
+            cfg_path,
+            int(round),
+            attempt_id=attempt_id,
+            outcome="completed",
+        )
+    except typer.Exit as e:
+        if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
+            if round_log_opened:
+                _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
+            _release_failed_run_lock(
+                campaign_lock,
+                cfg,
+                cfg_path,
+                int(round),
+                attempt_id=str(attempt_id),
+                round_log_opened=round_log_opened,
+            )
+        raise
     except OpalError as e:
+        if (
+            round_log_opened
+            and campaign_lock is not None
+            and campaign_lock.acquired
+            and cfg is not None
+            and cfg_path is not None
+        ):
+            _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
+        if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
+            _release_failed_run_lock(
+                campaign_lock,
+                cfg,
+                cfg_path,
+                int(round),
+                attempt_id=str(attempt_id),
+                round_log_opened=round_log_opened,
+            )
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)
     except Exception as e:
+        if (
+            round_log_opened
+            and campaign_lock is not None
+            and campaign_lock.acquired
+            and cfg is not None
+            and cfg_path is not None
+        ):
+            _append_abort_event(cfg, cfg_path, int(round), e, attempt_id=attempt_id)
+        if campaign_lock is not None and campaign_lock.acquired and cfg is not None and cfg_path is not None:
+            _release_failed_run_lock(
+                campaign_lock,
+                cfg,
+                cfg_path,
+                int(round),
+                attempt_id=str(attempt_id),
+                round_log_opened=round_log_opened,
+            )
         internal_error("run", e)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
+    finally:
+        if campaign_lock is not None and campaign_lock.acquired:
+            campaign_lock.release()

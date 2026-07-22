@@ -1,4 +1,13 @@
-"""Context-audit assembly for workspace notebook controls."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/notebook_context_audit.py
+
+Context-audit assembly for workspace notebook controls.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

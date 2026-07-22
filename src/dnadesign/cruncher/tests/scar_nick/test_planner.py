@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/scar_nick/test_planner.py
 
 Planning, rejection, and ranking tests for scar-nick candidates.
@@ -243,6 +243,7 @@ def test_validate_scar_nick_spec_returns_ranked_hits(tmp_path: Path) -> None:
     assert report.candidates[0].rejection_reasons == []
     assert report.metadata.compatible_nickase_placement_count == 1
     assert report.metadata.enzyme_compatible_scar_count == 256
+    assert report.metadata.enumerated_candidate_count == 256 * 256
     terminal_fixture = next(
         entry
         for entry in report.nickase_geometry_audit

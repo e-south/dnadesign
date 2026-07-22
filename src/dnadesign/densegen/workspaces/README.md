@@ -53,8 +53,8 @@ Runbook mode is explicit: `fresh|resume|analysis`. Wrappers default to `fresh` a
 - `outputs/` (generated at runtime)
 
 ### References
-- Template behavior model: [workspace templates](../docs/concepts/workspace-templates.md)
-- Workspace layout contract: [workspace model](../docs/concepts/workspace.md)
+- Template behavior model: [workspace templates](../docs/concepts/workspace/templates.md)
+- Workspace layout contract: [workspace model](../docs/concepts/workspace/layout.md)
 - Output artifact contract: [outputs reference](../docs/reference/outputs.md)
 
 ### Stage-B Showcase Video

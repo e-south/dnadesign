@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/outputs/test_outputs_record.py
+
+Tests DenseGen output record namespacing.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from dnadesign.densegen.src.adapters.outputs import OutputRecord

@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/objective.py
 
-Author(s): Eric J. South
+Analysis helpers for objective Cruncher analysis.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

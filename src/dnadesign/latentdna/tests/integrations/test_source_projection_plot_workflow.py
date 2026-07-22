@@ -254,6 +254,9 @@ def test_usr_to_view_to_projection_to_plot_flow(tmp_path: Path) -> None:
     assert projection_payload["artifact_kind"] == "projection"
 
     projection_dir = workspace_dir / "outputs" / "projections" / "umap_z20_60"
+    projection_manifest = json.loads((projection_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert projection_manifest["params"]["random_seed"] == 17
+    assert projection_manifest["params"]["n_neighbors"] == 9
     coords = pq.read_table(projection_dir / "coords.parquet").to_pydict()
     assert len(coords["x"]) == 10
     assert len(coords["y"]) == 10

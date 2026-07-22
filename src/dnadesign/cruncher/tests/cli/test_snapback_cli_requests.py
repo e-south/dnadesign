@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_snapback_cli_requests.py
 
 Typed request-builder tests for Snapback CLI/app boundaries.

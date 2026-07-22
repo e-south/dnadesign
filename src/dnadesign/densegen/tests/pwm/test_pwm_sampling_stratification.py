@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/pwm/test_pwm_sampling_stratification.py
 
 FIMO stratification behavior for Stage-A PWM sampling.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

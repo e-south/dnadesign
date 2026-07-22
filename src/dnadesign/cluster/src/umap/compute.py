@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/umap/compute.py
 
+UMAP helpers for compute cluster UMAP.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

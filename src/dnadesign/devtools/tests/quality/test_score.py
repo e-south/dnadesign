@@ -20,7 +20,7 @@ from dnadesign.devtools.quality.score import build_quality_score_inputs, main
 def test_build_quality_score_inputs_uses_coverage_summary_and_baseline() -> None:
     coverage_summary = {
         "overall_core": 65.0,
-        "gate_passed_tools": 2,
+        "gate_passed_tools": 3,
         "gate_total_tools": 3,
         "tools": {
             "usr": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
@@ -93,6 +93,56 @@ def test_build_quality_score_inputs_fails_on_missing_actual_value() -> None:
         assert "missing required field 'actual'" in str(exc)
     else:
         raise AssertionError("Expected ValueError for missing actual field")
+
+
+def test_build_quality_score_inputs_fails_on_gate_count_mismatch() -> None:
+    coverage_summary = {
+        "overall_core": 65.0,
+        "gate_passed_tools": 999,
+        "gate_total_tools": 1,
+        "tools": {
+            "usr": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
+        },
+    }
+    baseline = {"usr": 57.0}
+
+    try:
+        build_quality_score_inputs(
+            coverage_summary=coverage_summary,
+            baseline=baseline,
+            core_lane_result="success",
+            external_integration_lane_result="success",
+            publish_lane_result="success",
+        )
+    except ValueError as exc:
+        assert "gate_passed_tools mismatch" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for aggregate gate-count drift")
+
+
+def test_build_quality_score_inputs_rejects_bool_gate_counts() -> None:
+    coverage_summary = {
+        "overall_core": 65.0,
+        "gate_passed_tools": True,
+        "gate_total_tools": 1,
+        "tools": {
+            "usr": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
+        },
+    }
+    baseline = {"usr": 57.0}
+
+    try:
+        build_quality_score_inputs(
+            coverage_summary=coverage_summary,
+            baseline=baseline,
+            core_lane_result="success",
+            external_integration_lane_result="success",
+            publish_lane_result="success",
+        )
+    except ValueError as exc:
+        assert "gate_passed_tools" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for bool aggregate gate count")
 
 
 def test_main_writes_quality_score_inputs(tmp_path: Path) -> None:

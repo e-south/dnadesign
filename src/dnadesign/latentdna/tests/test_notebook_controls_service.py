@@ -1,4 +1,13 @@
-"""Contract tests for workspace notebook control-plane assembly."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_notebook_controls_service.py
+
+Contract tests for workspace notebook control-plane assembly.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -790,6 +799,291 @@ def test_notebook_controls_exclude_hidden_model_joinable_tables(tmp_path: Path) 
     joinable_artifact_ids = {table.artifact_id for table in controls.geometry_controls.joinable_tables}
     assert "design_centroid_margins_intermediate_embedding_7b_anchor_60bp" in joinable_artifact_ids
     assert "design_centroid_margins_intermediate_embedding_20b_anchor_60bp" not in joinable_artifact_ids
+
+
+def test_notebook_controls_include_reference_selector_scalar_columns_in_joinable_inventory(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["reference_sets"] = {
+        "tf_axis_targets": {
+            "label": "TF-axis targets",
+            "match_column": "derived__parent_id",
+            "label_column": "regulondb__primary_promoter_name",
+            "where": [{"column": "has_CpxR", "equals": True}],
+        }
+    }
+    config["notebooks"]["latent_geometry_browser"]["default_reference_set"] = "tf_axis_targets"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    context = load_workspace_config(workspace_dir)
+
+    view_dir = context.output_root / "views" / "intermediate_embedding_7b_anchor_60bp"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ["row0", "row1"], "subject_id": ["row0", "row1"]}).to_parquet(
+        view_dir / "rows.parquet",
+        index=False,
+    )
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+
+    scalar_dir = context.output_root / "scalars" / "native_tf_axis_orientation_audit"
+    scalar_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "id": ["row0", "row1"],
+            "derived__parent_id": ["native_a", "native_b"],
+            "regulondb__primary_promoter_name": ["nativeA", "nativeB"],
+            "has_CpxR": [False, True],
+        }
+    ).to_parquet(scalar_dir / "table.parquet", index=False)
+    _write_artifact_manifest(
+        scalar_dir,
+        artifact_kind="scalar_table",
+        artifact_id="native_tf_axis_orientation_audit",
+        inputs=[
+            {
+                "kind": "view_rows",
+                "id": "intermediate_embedding_7b_anchor_60bp",
+            }
+        ],
+    )
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    joinable_artifact_ids = {table.artifact_id for table in controls.geometry_controls.joinable_tables}
+    assert "native_tf_axis_orientation_audit" in joinable_artifact_ids
+    assert controls.geometry_controls.default_reference_set == "tf_axis_targets"
+
+
+def test_notebook_controls_declares_cross_view_reference_hue_compatibility(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["views"]["intermediate_embedding_7b_full_context_1kb"] = {
+        "source": "anchor_60bp",
+        "vector": {"kind": "column", "name": "embedding"},
+        "coordinate_space_id": "demo_space",
+        "tags": {"model": "7b", "family": "intermediate_embedding", "scope": "full_context_1kb"},
+    }
+    config["reference_sets"] = {
+        "tf_axis_targets": {
+            "label": "TF-axis targets",
+            "match_column": "construct__anchor_id",
+            "label_column": "tf_bin",
+            "where": [{"column": "tf_bin", "in_values": ["ethanol_TF"]}],
+        }
+    }
+    config["notebooks"]["latent_geometry_browser"]["reference_hue_options"] = [
+        {
+            "label": "Native TF bin",
+            "column": "tf_bin",
+            "type": "categorical",
+            "reference_set_ids": ["tf_axis_targets"],
+        },
+        {
+            "label": "SFXI score",
+            "column": "sfxi_ref__sfxi",
+            "type": "continuous",
+            "reference_set_ids": ["tf_axis_targets"],
+        },
+    ]
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    context = load_workspace_config(workspace_dir)
+
+    for view_id, rows in {
+        "intermediate_embedding_7b_anchor_60bp": pd.DataFrame(
+            {
+                "id": ["anchor0", "anchor1"],
+                "subject_id": ["anchor0", "anchor1"],
+                "sfxi_ref__sfxi": [0.2, 0.8],
+            }
+        ),
+        "intermediate_embedding_7b_full_context_1kb": pd.DataFrame(
+            {
+                "id": ["context0", "context1"],
+                "construct__anchor_id": ["anchor0", "anchor1"],
+                "sfxi_ref__sfxi": [0.2, 0.8],
+            }
+        ),
+    }.items():
+        view_dir = context.output_root / "views" / view_id
+        view_dir.mkdir(parents=True, exist_ok=True)
+        rows.to_parquet(view_dir / "rows.parquet", index=False)
+        np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+        _write_projection_artifact(context, projection_id=f"umap_{view_id}", view_id=view_id)
+
+    scalar_dir = context.output_root / "scalars" / "native_tf_axis_orientation_audit"
+    scalar_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "construct__anchor_id": ["anchor0", "anchor1"],
+            "tf_bin": ["neither", "ethanol_TF"],
+        }
+    ).to_parquet(scalar_dir / "table.parquet", index=False)
+    _write_artifact_manifest(
+        scalar_dir,
+        artifact_kind="scalar_table",
+        artifact_id="native_tf_axis_orientation_audit",
+        inputs=[{"kind": "view_rows", "id": "intermediate_embedding_7b_anchor_60bp"}],
+    )
+    incidental_scalar_dir = context.output_root / "scalars" / "incidental_reference_row_metadata"
+    incidental_scalar_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "construct__anchor_id": ["anchor0", "anchor1"],
+            "sfxi_ref__sfxi": [0.2, 0.8],
+        }
+    ).to_parquet(incidental_scalar_dir / "table.parquet", index=False)
+    _write_artifact_manifest(
+        incidental_scalar_dir,
+        artifact_kind="scalar_table",
+        artifact_id="incidental_reference_row_metadata",
+        inputs=[{"kind": "view_rows", "id": "intermediate_embedding_7b_anchor_60bp"}],
+    )
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    tf_table = next(
+        table
+        for table in controls.geometry_controls.joinable_tables
+        if table.artifact_id == "native_tf_axis_orientation_audit"
+    )
+    assert tf_table.view_ids == ["intermediate_embedding_7b_anchor_60bp"]
+    assert tf_table.compatible_view_ids == [
+        "intermediate_embedding_7b_anchor_60bp",
+        "intermediate_embedding_7b_full_context_1kb",
+    ]
+    incidental_table = next(
+        table
+        for table in controls.geometry_controls.joinable_tables
+        if table.artifact_id == "incidental_reference_row_metadata"
+    )
+    assert incidental_table.view_ids == ["intermediate_embedding_7b_anchor_60bp"]
+    assert incidental_table.compatible_view_ids == []
+
+
+def test_notebook_controls_expose_configured_reference_hue_options(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["reference_sets"] = {
+        "reference_sfxi_archive": {
+            "label": "SFXI archive",
+            "match_column": "id",
+            "label_column": "subject_id",
+            "ids": ["row0"],
+        },
+        "reference_native_mg1655": {
+            "label": "Native MG1655 GenBank panel",
+            "match_column": "id",
+            "label_column": "subject_id",
+            "ids": ["row1"],
+        },
+    }
+    config["notebooks"]["latent_geometry_browser"]["reference_hue_options"] = [
+        {
+            "label": "SFXI score",
+            "column": "sfxi_ref__sfxi",
+            "type": "continuous",
+            "reference_set_ids": ["reference_sfxi_archive"],
+        },
+        {
+            "label": "SFXI logic fidelity",
+            "column": "sfxi_ref__logic_fidelity",
+            "type": "continuous",
+            "reference_set_ids": ["reference_sfxi_archive"],
+        },
+        {
+            "label": "SFXI effect scaled",
+            "column": "sfxi_ref__effect_scaled",
+            "type": "continuous",
+            "reference_set_ids": ["reference_sfxi_archive"],
+        },
+    ]
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    context = load_workspace_config(workspace_dir)
+
+    view_dir = context.output_root / "views" / "intermediate_embedding_7b_anchor_60bp"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "id": ["row0", "row1"],
+            "subject_id": ["row0", "row1"],
+            "sfxi_ref__sfxi": [0.1, None],
+            "sfxi_ref__logic_fidelity": [0.5, None],
+            "sfxi_ref__effect_scaled": [0.9, None],
+        }
+    ).to_parquet(view_dir / "rows.parquet", index=False)
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+
+    controls = build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
+
+    assert [option.column for option in controls.geometry_controls.reference_hue_options] == [
+        "sfxi_ref__sfxi",
+        "sfxi_ref__logic_fidelity",
+        "sfxi_ref__effect_scaled",
+    ]
+    assert [option.label for option in controls.geometry_controls.reference_hue_options] == [
+        "SFXI score",
+        "SFXI logic fidelity",
+        "SFXI effect scaled",
+    ]
+    assert [option.reference_set_ids for option in controls.geometry_controls.reference_hue_options] == [
+        ["reference_sfxi_archive"],
+        ["reference_sfxi_archive"],
+        ["reference_sfxi_archive"],
+    ]
+    assert [
+        option.column
+        for option in controls.geometry_controls.reference_hue_options_by_reference_set["reference_sfxi_archive"]
+    ] == [
+        "sfxi_ref__sfxi",
+        "sfxi_ref__logic_fidelity",
+        "sfxi_ref__effect_scaled",
+    ]
+    assert controls.geometry_controls.reference_hue_options_by_reference_set["reference_native_mg1655"] == []
+
+
+def test_notebook_controls_fail_fast_on_unknown_reference_hue_scope(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_workspace_config(workspace_dir)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["reference_sets"] = {
+        "reference_sfxi_archive": {
+            "label": "SFXI archive",
+            "match_column": "id",
+            "label_column": "subject_id",
+            "ids": ["row0"],
+        }
+    }
+    config["notebooks"]["latent_geometry_browser"]["reference_hue_options"] = [
+        {
+            "label": "SFXI score",
+            "column": "sfxi_ref__sfxi",
+            "type": "continuous",
+            "reference_set_ids": ["missing_reference_set"],
+        }
+    ]
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    context = load_workspace_config(workspace_dir)
+
+    view_dir = context.output_root / "views" / "intermediate_embedding_7b_anchor_60bp"
+    view_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"id": ["row0", "row1"], "subject_id": ["row0", "row1"]}).to_parquet(
+        view_dir / "rows.parquet",
+        index=False,
+    )
+    np.save(view_dir / "matrix.npy", np.asarray([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32))
+
+    with pytest.raises(ValueError, match="unknown notebook reference_sets: missing_reference_set"):
+        build_workspace_notebook_controls_payload(context, notebook_id="latent_geometry_browser")
 
 
 def test_notebook_controls_only_surface_preferred_hues_backed_by_joinable_tables(tmp_path: Path) -> None:

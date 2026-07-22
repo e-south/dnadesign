@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/platform/test_pyarrow_sysctl_filter.py
+
+Regression tests for pyarrow sysctl filter OPAL platform.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

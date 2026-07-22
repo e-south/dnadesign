@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/tests/test_outputs_parquet.py
+src/dnadesign/densegen/tests/outputs/test_outputs_parquet.py
 
-Parquet output metadata contract tests.
+Tests DenseGen Parquet output metadata contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

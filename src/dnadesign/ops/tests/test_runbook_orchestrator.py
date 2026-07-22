@@ -1043,8 +1043,9 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
     import dnadesign.ops.orchestrator.infer_fill as infer_fill
 
     repo_root = tmp_path
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\nversion='0.0.0'\n", encoding="utf-8")
     study_dir = repo_root / "docs" / "studies" / "demo"
-    study_dir.mkdir(parents=True)
+    (study_dir / "operations").mkdir(parents=True)
     workspace_root = repo_root / "workspace"
     _write_sequence_view_infer_config(workspace_root / "config.yaml")
     runbook_path = repo_root / "runbooks" / "infer.yaml"
@@ -1053,15 +1054,40 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
         yaml.safe_dump(_infer_runbook_payload(workspace_root, runbook_id="infer_sequence_view")),
         encoding="utf-8",
     )
-    (study_dir / "ops.study.yaml").write_text(
+    (study_dir / "operations" / "ops.study.yaml").write_text(
         yaml.safe_dump(
             {
+                "version": 2,
+                "study_id": "demo",
+                "lifecycle": {
+                    "mode": "sequential",
+                    "phase_order": ["infer_batch_preparation"],
+                    "current_phase": {
+                        "strategy": "explicit",
+                        "id": "infer_batch_preparation",
+                    },
+                },
+                "phases": [
+                    {
+                        "id": "infer_batch_preparation",
+                        "status": "in_progress",
+                    },
+                ],
                 "execution_surfaces": {
                     "infer_sequence_views": {
                         "surface_type": "runbook",
                         "runbook_ref": "repo:runbooks/infer.yaml",
                     }
-                }
+                },
+                "preflight": {
+                    "default_scope": "next",
+                    "group_phase_bindings": {"infer": "infer_batch_preparation"},
+                    "next_scope": {
+                        "target_phase_groups": {"infer_batch_preparation": ["infer"]},
+                        "runtime_phase_groups": ["infer"],
+                        "runtime_shared_groups": [],
+                    },
+                },
             }
         ),
         encoding="utf-8",
@@ -1315,7 +1341,7 @@ def test_infer_fill_plans_stale_sidecar_repair_when_durable_shard_plan_available
     assert fill_plan.lanes[0].stale_scalars == 20
 
 
-def test_infer_fill_skips_infer_runbooks_without_sequence_view_inventory(
+def test_infer_fill_blocks_infer_runbooks_without_sequence_view_inventory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import dnadesign.ops.orchestrator.infer_fill as infer_fill
@@ -1341,8 +1367,10 @@ def test_infer_fill_skips_infer_runbooks_without_sequence_view_inventory(
     fill_plan = build_infer_fill_plan(repo_root=tmp_path, runbook_paths=(runbook_path,))
 
     assert fill_plan.aggregate_submit_commands == 0
-    assert fill_plan.lanes[0].action == "skip_unsupported"
-    assert fill_plan.lanes[0].reasons == ("legacy/non-sequence-view Infer config skipped before SGE plan rendering",)
+    assert fill_plan.lanes[0].action == "blocked"
+    assert fill_plan.lanes[0].reasons == (
+        "unsupported Infer config: selected jobs must define feature_bundle.sequence_view_inputs",
+    )
 
 
 def test_discover_active_job_ids_matches_explicit_identity_tags(

@@ -41,4 +41,4 @@ plot_details_md: |
 limitations_md: Heatmaps remain pairwise summaries of centroid geometry and do not capture within-variant dispersion or higher-order manifold structure.
 failure_modes_md: Small-cohort instability, confounding by non-Sigma-35 design features, or accidentally reintroducing non-audit reference categories can exaggerate apparent ordinal structure.
 docs_refs:
-  - src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md
+  - src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/notes/rationale/2026-05-10-candidate-x-story-surfaces.md

@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/pwm/test_pwm_artifact_set_source.py
 
 PWM artifact-set data source sampling tests.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

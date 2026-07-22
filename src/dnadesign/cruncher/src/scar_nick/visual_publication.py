@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/visual_publication.py
 
 Publication and drift checks for scar_nick visual artifacts.

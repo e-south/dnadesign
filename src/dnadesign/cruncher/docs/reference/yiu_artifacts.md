@@ -3,7 +3,7 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `uv run cruncher yiu render|show`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-07
+**Last verified:** 2026-07-07
 **Last updated by:** cruncher-maintainers on 2026-04-07
 
 A successful YIU render writes one deterministic bundle under the workspace-relative `output.bundle_dir` path. Treat that bundle directory as the source of truth. `output.published_plot_path` is only an optional mirror of the composite PDF. Use this reference for emitted files, render-status semantics, and the shared `render`/`show --verbose` inspection surface.

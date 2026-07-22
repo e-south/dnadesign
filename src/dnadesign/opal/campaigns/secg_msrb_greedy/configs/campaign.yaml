@@ -1,0 +1,190 @@
+schema_version: opal.campaign.v3
+
+campaign:
+  name: "SECG MSRB greedy learning campaign"
+  slug: "secg_msrb_greedy"
+  description: "One shared response-window predictor with ethanol, ciprofloxacin, and AND MSRB selection views."
+  workdir: "."
+  metadata:
+    study_id: stress_ethanol_cipro_growth
+    protocol_id: secg_msrb_learning_probe_v1
+    response_reduction: event_logmean_4_8h_post
+    y_space: reader_response_window_vector_v1
+    metric_acronym: MSRB
+    softmin:
+      protocol: exact_primary_reader_candidate_experiments_pooled_q90_v1
+      scale: 0.31063783855250376
+      reader_bundle_manifest_sha256: bdc6f7afc8b00a7960eac7bf402be2632f9815c7fedc88cae4c27d47e9d09418  # pragma: allowlist secret
+      candidate_bindings_manifest_sha256: 273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8  # pragma: allowlist secret
+      unit_count: 41
+      excluded_nonexact_unit_count: 6
+
+plot_config: "plots.yaml"
+
+ownership:
+  owner_scope: study_campaign
+  study_id: stress_ethanol_cipro_growth
+  dataset_id: usr_prom_eth_cip_opal_candidates
+  portable: false
+
+data:
+  location:
+    kind: usr
+    path: "../../../usr/datasets"
+    dataset: usr_prom_eth_cip_opal_candidates
+  x_column_name: "latentdna__evo2_7b__context_anchor_mean_bidir_concat"
+  y_column_name: "opal__reader_response_window_vector_v1__y"
+  y_expected_length: 8
+
+candidate_eligibility:
+  rules:
+    - name: candidate_id_exclusion
+      params:
+        exclusion_set_id: stress_response_window_observation_dispositions_v1
+        min_remaining_candidates: 1000
+        entries:
+          - candidate_id: 09b59d2365b6a6cb71fd44e155a40d92ae2a88f0  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: 4038eae023686f1abb6226022acd7daf18cd6e19  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: 435c9049d7a0b9df2aedb3724cff0c7f8486992d  # pragma: allowlist secret
+            reason: repeat_source_disagreement
+          - candidate_id: 7871958259f60506b8ffedfeff6683b53c5c688b  # pragma: allowlist secret
+            reason: repeat_source_disagreement
+          - candidate_id: 7d19c4330b78ea3eebeaaaaede6a7f4be72f3412  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: b59c5a320c7a1eb3c9e9e85d2e18a4f2d3f69470  # pragma: allowlist secret
+            reason: nonexact_primary_component
+          - candidate_id: c33e022ac822d1ca608940a561e4fb76802faa74  # pragma: allowlist secret
+            reason: repeat_source_disagreement
+          - candidate_id: e0cdedf311d28b733f95ccd8fe0a10b0280f8978  # pragma: allowlist secret
+            reason: repeat_source_disagreement
+    - name: restriction_site_exclusion
+      params:
+        sequence_column: sequence
+        scan_space: final_assembled_insert
+        assembly_strategy_ref: stress_promoter_insert:v1
+        left_flank: accgggatcctgcag
+        right_flank: tgagggaattcgcga
+        expected_core_length: 60
+        min_remaining_candidates: 1000
+        exclude_rows_where:
+          - column: id
+            equals: 2fe51277935496ce8f02932e2866143258c80d55  # pragma: allowlist secret
+          - column: id
+            equals: 97b4ac8535ae8c1f67c079b0644e87777d29e1d1  # pragma: allowlist secret
+        forbidden_sites:
+          - enzyme: BamHI
+            motif: GGATCC
+            allowed_regions: [left_flank]
+          - enzyme: EcoRI
+            motif: GAATTC
+            allowed_regions: [right_flank]
+
+labels:
+  source:
+    kind: usr_sidecar
+    dataset: usr_prom_eth_cip_opal_candidates
+    path: "_opal/response_window_labels_v5/observed_labels.parquet"
+    manifest_path: "_opal/response_window_labels_v5/promotion.manifest.json"
+  y_space: reader_response_window_vector_v1
+  id_column: id
+  round_column: observed_round
+  batch_column: batch_id
+  dedup_policy: error_on_duplicate
+
+writeback:
+  prediction_records: ledger_only
+
+ingest:
+  duplicate_policy: "error"
+
+training:
+  policy:
+    cumulative_training: true
+    label_cross_round_deduplication_policy: "latest_only"
+    allow_resuggesting_candidates_until_labeled: true
+
+transforms_x: { name: identity, params: {} }
+transforms_y:
+  name: vector_from_table_v1
+  params:
+    id_column: id
+    value_columns: [r00, r10, r01, r11, b00, b10, b01, b11]
+
+model:
+  name: random_forest
+  params:
+    n_estimators: 100
+    criterion: "friedman_mse"
+    bootstrap: true
+    oob_score: true
+    random_state: 7
+    n_jobs: -1
+    emit_feature_importance: true
+
+selection_views:
+  - id: ethanol
+    objective:
+      name: multistate_response_behavior_v1
+      params:
+        state_ids: ["00", "10", "01", "11"]
+        target_mask: [0, 1, 0, 1]
+        softmin_scale: 0.31063783855250376
+    selection:
+      name: top_n
+      params:
+        top_k: 6
+        score_ref: behavior_score
+        tie_handling: ordinal
+        objective_mode: maximize
+        require_exact_top_k: true
+
+  - id: ciprofloxacin
+    objective:
+      name: multistate_response_behavior_v1
+      params:
+        state_ids: ["00", "10", "01", "11"]
+        target_mask: [0, 0, 1, 1]
+        softmin_scale: 0.31063783855250376
+    selection:
+      name: top_n
+      params:
+        top_k: 6
+        score_ref: behavior_score
+        tie_handling: ordinal
+        objective_mode: maximize
+        require_exact_top_k: true
+
+  - id: and
+    objective:
+      name: multistate_response_behavior_v1
+      params:
+        state_ids: ["00", "10", "01", "11"]
+        target_mask: [0, 0, 0, 1]
+        softmin_scale: 0.31063783855250376
+    selection:
+      name: top_n
+      params:
+        top_k: 6
+        score_ref: behavior_score
+        tie_handling: ordinal
+        objective_mode: maximize
+        require_exact_top_k: true
+
+selection_batch:
+  deduplicate_by: sequence
+  expected_unique_count: 18
+  allocation:
+    strategy: round_robin_next_best_unallocated
+    view_priority: [ethanol, ciprofloxacin, and]
+
+scoring:
+  score_batch_size: 1000
+
+safety:
+  fail_on_mixed_biotype_or_alphabet: true
+  require_biotype_and_alphabet_on_init: true
+  conflict_policy_on_duplicate_ids: "error"
+  write_back_requires_columns_present: true
+  accept_x_mismatch: false

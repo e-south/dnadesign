@@ -1,142 +1,175 @@
 ---
 name: retron-hairpin-study
-description: Recover the checked-in retron hairpin design effort across released-product Snapback cap/shortening, scar-nick base-junction design, and YIU boundary contrast. Use when the user asks about the TetO/retron hairpin effort, snapback shortening, scar-nick stem-base scars, profile-diverse S0=M scar_nick coverage, current phase, next route, or study-owned docs/bootstrap hardening. Pair with `harness-engineering` for study-surface hardening and with `code-change-discipline` for lane, ontology, contract, or fail-fast boundary changes. Do not use for generic Cruncher walkthroughs, unrelated Snapback feature work, generic retron biology, or bench-protocol advice.
+description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.4.0
+  version: 0.7.29
   category: workflow-automation
-  tags: [cruncher, retron, hairpin, snapback, scar-nick, study, routes]
+  tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
-
 # Retron Hairpin Study
-
 ## Purpose
-
-Answer `what is the checked-in retron hairpin design effort trying to do right
-now?` from the study record. The checked-in study id is
-`retron_hairpin_design`, and the ontology covers both cap/shortening work
-through released-product Snapback and base-junction work through scar-nick.
-
+Route Retron MSD product work: compile a reference, materialize one MSD unit, or route missing constraints to a primitive solver.
 ## Scope
-
 In scope:
-- the checked-in `docs/studies/retron_hairpin_design/` record
-- released-product Snapback for cap/shortening geometry
-- scar-nick for upstream Type IIS scar plus terminal nick base-junction geometry
-- YIU as a contrast-only boundary surface
-- `cruncher-study-status` and `cruncher-study-preflight` for this study
-- study-owned automation bootstrap, route maps, and progressive disclosure
-
+- Retron MSD shorthand IDs and explicit part sets.
+- Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, literal payloads or trim metadata, and selected public cap/stem-base primitive sources.
+- Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation and workbench provenance.
+- Reader SPOP MSD-region source ingest from one-variant GenBank files, plus decomposed primitive and pairing records under workbench provenance.
+- Routing missing cap/shortening constraints to Snapback.
+- Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
+- Routing mismatch-display questions to YIU as contrast only.
+- Construct/BaseRender service calls for one MSD unit per design after parts are selected.
+- Skill, route-map, and compiler-harness hardening.
 Out of scope:
-- generic Cruncher operator walkthroughs outside this tracked study
-- turning YIU into the shortening or scar-nick topology engine
-- treating retron/P4 biology as hidden solver scoring
-- arbitrary released-product or scar-nick feature work with no tracked-study angle
-- bench-level retron protocol advice
-
+- Generic Cruncher walkthroughs.
+- Bench-level retron protocol advice.
+- Making Retron MSD compilation a top-level `retron-msd` tool.
+- Creating one Construct or Folding workspace per requested design.
+- Reporting phase/status posture unless the user explicitly asks for study progress or blockers.
 ## Success Criteria
-
-- answers come from the checked-in study record plus pinned status/preflight
-- subtopic routing is explicit: Snapback for cap/shortening, scar-nick for
-  base-junction processing, YIU for contrast
-- released-product Snapback remains the active shortening lane
-- scar-nick context preserves the strict terminal nick rule: top or bottom nick
-  allowed, zero protected bases downstream, downstream `N` only, and `S0=M`
-- YIU remains mismatch-centric and contrast-only
-- the next route goes through `routes.md`; open `pipeline.yaml` only for
-  machine-readable command-group or bootstrap confirmation
-- harness or contract changes stay explicit and fail fast
-
+- The first decision is input completeness: compile now, or route missing constraints.
+- Complete user-provided parts are validated and compiled without solver work.
+- User-provided labels are the source of truth for a live request; do not replace them with a checked-in cohort spec or scar-compatible analog.
+- Compiler specs are parsed at the boundary, then compile from trusted part structures.
+- Incomplete parts route to the smallest primitive: Snapback, scar-nick, or YIU contrast.
+- Solved cap and stem-base primitive inputs come through public Snapback/scar-nick APIs; selectors must be explicit and multi-option selections must not expand silently.
+- Sequence artifact output is one MSD unit per design: 5' flank + left base, payload primary, user-selected cap/foldback segment, payload complement, right base + 3' flank. Snapback subsection annotations are emitted only when topology is supplied.
+- Materialized variant directories use `<construct-id>__<msd-design-id>`, for example `pES-retron-177__msd-tetr-C172-LCGGG-RACAG-MXMX`.
+- Requests for "outputs", "deliverables", "exports", "GenBank", "plots", or "open in Finder" must run `materialize`; a reference catalog is not enough.
+- Materialized plot deliverables require ViennaRNA status `ok`; publish `secondary_structure.native.png`, two-row `composition_overview.svg`, and high-resolution `composition_overview.png`, not legacy composites.
+- Retron review packages run after materialization with `review-outputs` and an
+  explicit deliverable plan. The plan owns row counts, assigned pES-retron IDs,
+  MSD-only `record_ids`, PWM panel files, montage files, review manifest, and
+  flat `benchling_genbank/` import contents.
+- Reverse-complement GenBank import directions come from the feature-role
+  ontology and the `feature_directions.py` contract, not local renderer prose.
+- Secondary-structure subtitles must include the scar-nick mismatch profile
+  from the selected MSD design, for example `mismatch profile MXMM`.
+- No user-facing repeat count; do not chain complete MSD units together.
+- GenBank/CSV output uses display labels, keeps raw ids in machine qualifiers, and avoids duplicate full component spans as same-span annotations.
+- Persistent hypotheses/design-set meaning lives in `workbench/`; generated outputs go to explicit transient or caller-owned directories.
+- Default `S0=M` is required. Profile drift, non-ligatable S0 labels without explicit control opt-in, unknown registry parts, and missing artifacts fail fast. Deliberate controls require `--allow-non-ligatable-s0` or `allow_non_ligatable_s0: true`, and emitted references must carry `scar_nick.s0_match_required=false`.
+- Status/preflight commands are optional progress tools, not default answer posture.
 ## Workflow
+1. Classify the request.
+- Complete MSD label or complete parts: use [msd-design-references.md](references/msd-design-references.md).
+- Complete MSD labels plus "outputs", "deliverables", "exports", "plots",
+  "GenBank", or "open in Finder": materialize, not compile-only.
+- Existing materialized bundle plus PWM panel, sequence montage, review
+  manifest, or review package request: open `workbench/deliverables/`, then run
+  `review-outputs --deliverable-plan <plan.yaml>`.
+- Typed compiler spec: lint with `--spec`; accept labels or explicit designs,
+  and use `selector.mode=rank` for the preferred explicit primitive
+  combination.
+- If a user provides concrete labels, pass those exact labels with `--id` or a transient typed spec.
+- Checked-in 177-194 specs are named study fixtures, not substitutes for arbitrary user input.
+- Need sequence, visual, or GenBank: materialize with `--spec` or explicit
+  payload/cap sequences; `C###` cap IDs never imply a de033 sequence by pattern.
+- Need an intentional non-ligatable S0 control: materialize with `--allow-non-ligatable-s0` or a typed spec that sets `allow_non_ligatable_s0: true`; do not use this for profile-drift errors.
+- Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
+- Need Reader SPOP MSD source primitives, stem lengths, or pairing status: open `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/`. Active GenBank sources are one file per variant under `source_inputs/variants/`; retired bulk source metadata is provenance only.
+- Missing cap, shortening, or stem/cap geometry: route to Snapback in `docs/studies/retron_hairpin_design/routes/README.md`.
+- Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile: route to scar-nick.
+- Mismatch-only display or boundary contrast: route to YIU; it is not the
+  topology engine.
+- Progress or blocker question: only then use
+  `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json` or
+  `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`.
 
-1. Load the checked-in study surfaces.
-- Read `docs/studies/README.md` and `docs/studies/index.yaml`.
-- Read `docs/studies/retron_hairpin_design/status.md`.
-- Use `docs/studies/retron_hairpin_design/routes.md` as the canonical
-  next-command handoff.
-- Open `docs/studies/retron_hairpin_design/pipeline.yaml` only when the
-  task needs machine-readable command-group or automation bootstrap context.
-- Use [study-surfaces.md](references/study-surfaces.md) for ownership
-  boundaries.
+2. Load only the needed surfaces.
+- Compiler route: `docs/studies/retron_hairpin_design/routes/README.md`, then
+  `docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml`, then
+  `references/msd-design-references.md`.
+- Whole-product context: `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md` plus the active exec plan.
+- Machine-readable command groups: open `docs/studies/retron_hairpin_design/operations/runtime/command-groups/README.md`
+  first, then the matching `command-groups/lanes/` sidecar; use `pipeline.yaml` only for the full payload.
+- Ownership boundaries: [study-surfaces.md](references/study-surfaces.md).
 
-2. Refresh the record-backed answer first.
-- Run
-  `uv run ops progress show cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json`
-  for current phase, command groups, and bootstrap context.
-- Route blocker or next-run readiness questions to
-  `uv run ops progress show cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json`.
-- Use [route-matrix.md](references/route-matrix.md) and
-  [refresh-loop.md](references/refresh-loop.md) for cold-start routing.
+3. Execute or report the route.
+- For complete reference inputs, run `uv run python -m dnadesign.studies.units.retron_hairpin_design.interfaces.cli.app lint|compile`.
+- For GenBank/structure-review output, run the same module's `materialize` command with `--spec` or explicit payload/cap sequences. Do not add `--repeat-count`.
+- If the user asked to open outputs in Finder, do not stop after `compile`; after `materialize`, open the root and verify `manifest/indexes/sequence_index.tsv`, per-design `sequences/forward.gb`, `plots/secondary_structure.native.png`, `composition_overview.svg`, `composition_overview.png`, and a secondary-structure subtitle containing the mismatch profile.
+- For review packages, run `review-outputs` only after materialize has produced
+  the deliverable plan's expected `sequence_index.tsv`; verify the PWM
+  triptych, pES-retron stills, montage MP4/manifest, review manifest,
+  MSD-only Benchling GenBank imports, and reverse-complement/folding evidence.
+- If sequence subcomponents are missing, report the exact missing IDs or the primitive route needed; manual custom payload/cap parts belong in a typed
+  spec with literal sequences; cap IDs require explicit 5'->3' sequence/source;
+  do not present catalog JSONs as the requested deliverables.
+- If `S0` is non-ligatable and the user explicitly says it is a control, rerun with the S0-control opt-in and verify `scar_nick.s0_match_required=false`.
+- If lint fails because `S0!=M` and the user did not explicitly opt in, stop with the exact failing label; do not substitute bases, profile, cap, or construct number.
+- For missing constraints, name the missing fields and the primitive route.
+- For generated artifacts, name the output directory and contracts produced.
+  Review packages should point to `reviews/review_manifest.json`.
 
-3. Load subtopic detail only when needed.
-- For origin-0/stem-3/cap-3 Snapback nickase questions, open
-  [origin-033-hits.md](references/origin-033-hits.md).
-- For scar-nick base, profile-diverse S0-matched coverage, top/bottom nick flexibility, or
-  retained-scar sequence-space questions, open
-  `docs/studies/retron_hairpin_design/scar-nick-base-junction.md`.
-
-4. Pair with the right companion skill when the task widens.
-- Pair with `harness-engineering` when the change touches study status,
-  preflight, repo-local skill routing, or docs integrity.
-- Pair with `code-change-discipline` when the change touches lane boundaries,
-  ontologies, contracts, degraded modes, or fail-fast behavior.
+4. Pair when the work widens.
+- Pair with `harness-engineering` for skill routing, deterministic checks, or
+  agent-execution reliability.
+- Pair with `code-change-discipline` for contract, ontology, fail-fast, or
+  module-boundary changes.
 
 ## Guardrails
-
-- `released-product Snapback` is the shortening architecture under test.
-- `scar-nick` is the base-junction processing surface, not a retron phenotype
-  predictor.
-- Scar-nick current processing policy is exact terminal nick, top or bottom strand
-  allowed, zero protected bases downstream, downstream degenerate `N` only, and
-  `S0=M` for ligation.
-- The current scar-nick context says exact supplied B26/B43 L/R pairs are not
-  catalog-feasible under that policy; profile-diverse S0-matched analogs are
-  the maintained route.
-- Active scar-nick panels allow S3-edge double-hard buckets such as
-  `XXMM` and `XMXM`, but keep middle-middle `MXXM` as reserve/not active.
-- Default operational policy excludes `FREQUENT_CUTTER` nickases.
-- `preserved-site Snapback` stays a separate contract.
-- `YIU` stays mismatch-centric and contrast-only.
-- Retron/P4 notes are framing context, not hidden scoring hooks.
-- Use pinned study commands and paths; do not rebuild them from memory.
+- IDs select and validate provided parts; catalogs freeze references.
+- Snapback and scar-nick solve primitives; the compiler emits one selected MSD
+  unit per design.
+- Study code must not import `dnadesign.cruncher.src.*` or parse Cruncher
+  workspace internals; use `dnadesign.cruncher.snapback` and
+  `dnadesign.cruncher.scar_nick` public primitive-export APIs.
+- Rank ranges, rank lists, and all-hit selectors are valid source language only
+  when a future expansion contract is explicit; current product compilation
+  must fail fast instead of running implicit combinatorics.
+- Scar-nick source refs project only four-base left/right basal spans into the
+  final ssDNA unless a future contract selects more.
+- Construct owns generic sequence assembly, not Retron biology.
+- Folding has no workspace; it consumes producer bundles or explicit files.
+- BaseRender renders visual contracts; it does not run ViennaRNA.
+- Reader consumes frozen design catalogs, not live dnadesign workspaces.
+- Reader SPOP structure-panel source ingest must use per-variant GenBank files
+  or the materialized provenance records. Steady-state commands must not read
+  retired bulk source files.
+- Narrow foldback spans and explicit complement arms are annotation notes unless
+  they create unbalanced or unresolved pairing segments.
+- Do not say "snapshot posture" or lead with current phase unless the user
+  asked for progress/status.
 
 ## Required Deliverables
-
-- whether the answer came from snapshot posture or preflight readiness
-- current phase and next owning surface
-- requested subtopic route: Snapback, scar-nick, YIU, or study-harness
-- current primary lane and contrast lane
-- explicit note that YIU is contrast-only
-- explicit pair-with guidance when harness or boundary work is requested
-
+- Input completeness classification.
+- Selected route: compile, Snapback, scar-nick, YIU contrast, or status.
+- Exact command or next file to open.
+- Output directory/contract posture.
+- Deliverable verification for materialize requests: record count, bundle root,
+  GenBank/native-structure-PNG/review-SVG/review-PNG counts, or exact blockers.
+- Deliverable verification for `review-outputs`: PWM triptych, semantic
+  pES-retron-named stills, montage MP4/manifest, review manifest, expected
+  sequence rows, verified sequence handoff rows, and expected Benchling import
+  GenBank files from the deliverable plan's `record_ids`.
+- Fail-fast checks that apply.
+- Primitive source selector posture when a spec references solver outputs.
+- Residual unknowns or handoff route.
 ## Output
-
-Return:
-- study id and checked-in path note when relevant
-- snapshot vs preflight posture
-- current phase and next route
-- subtopic route and the next file, workspace, or command group to open
-- explicit blockers only when preflight was requested
+Return a short routing answer with:
+- what parts are present and missing
+- what will run next
+- where outputs should live
+- whether artifacts were emitted or which sequence subcomponents blocked them
+- which invariant protects against drift
+- status/preflight details only when explicitly requested
 
 ## Trigger Tests
-
 Should trigger:
-- "Check the retron hairpin study."
-- "Where does the retron hairpin design effort stand right now?"
-- "Route the scar-nick base-junction context."
-- "What profile-diverse S0=M scar_nick candidates can we generate?"
-- "Harden the hairpin study status, preflight, or skill routing."
-- "Which nicking endonucleases result in the 033 snapback?"
+- "Compile this Retron MSD shorthand ID into a design catalog."
+- "Generate one MSD sequence with GenBank and PNG outputs for these Retron IDs."
+- "Open a transient Finder window with these Retron MSD outputs."
+- "Generate the tetO trim PWM triptych and sequence montage review package."
+- "I have left/right bases but need to know if the scar-nick profile is valid."
+- "Which primitive route owns this missing Retron MSD part?"
+- "Harden the Retron MSD compiler skill or routing."
 
 Should not trigger:
 - "Run a generic Cruncher snapback search."
 - "Explain retron biology broadly."
-- "Design a new YIU payload."
-- "Add a released-product feature with no study-record change."
+- "Design a wet-lab retron protocol."
+- "Expose Retron MSD assembly as a generic top-level CLI."
 
 ## References
-
-- [route-matrix.md](references/route-matrix.md)
-- [refresh-loop.md](references/refresh-loop.md)
-- [study-surfaces.md](references/study-surfaces.md)
-- [origin-033-hits.md](references/origin-033-hits.md)
-- [external-sources.md](references/external-sources.md)
+- [msd-design-references.md](references/msd-design-references.md), [route-matrix.md](references/route-matrix.md), [study-surfaces.md](references/study-surfaces.md), [refresh-loop.md](references/refresh-loop.md), [test-matrix.md](references/test-matrix.md), [external-sources.md](references/external-sources.md)

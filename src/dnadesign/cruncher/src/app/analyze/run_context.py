@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/run_context.py
 
 Resolves run-scoped computed analysis context used by plotting and publication.

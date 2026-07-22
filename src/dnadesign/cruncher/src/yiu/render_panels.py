@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/render_panels.py
 
 Shared YIU helpers for loading view contracts and assembling composite renders.

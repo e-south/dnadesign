@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/study_summary.py
 
 Aggregate Study trial outputs into summary tables, manifests, and plots.

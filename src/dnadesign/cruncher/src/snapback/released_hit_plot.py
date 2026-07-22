@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_hit_plot.py
 
 Truthful origin-anchored plotting for released-product snapback solve hits.

@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/store/test_catalog_index.py
 
-Author(s): Eric J. South
+Regression tests for catalog index Cruncher store.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/evaluators/evo2_logits.py
+
+Evaluator adapters for Evo2 logits Permuter evaluators.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,6 +15,7 @@ import logging
 from typing import List
 
 from dnadesign.permuter.src.evaluators.base import Evaluator
+from dnadesign.permuter.src.evaluators.infer_backend import infer_run_extract
 
 
 class Evo2LogitsMeanEvaluator(Evaluator):
@@ -47,14 +50,7 @@ class Evo2LogitsMeanEvaluator(Evaluator):
         if self._ready:
             return
         if self._rex is None:
-            try:
-                from dnadesign.infer import run_extract as _rex
-            except Exception as e:
-                raise RuntimeError(
-                    "Evo2 backend unavailable: dnadesign.infer.run_extract is not importable. "
-                    "Install evo2 and ensure dnadesign.infer is available."
-                ) from e
-            self._rex = _rex
+            self._rex = infer_run_extract()
         probe_seq = ["ACGTAC"] if self.alphabet.lower().startswith("dna") else ["ACDE"]
         outputs = [
             {

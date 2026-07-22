@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/ops/runbooks/workflow_metadata.py
 
-Explicit orchestration workflow metadata and validation contracts for ops
-runbooks.
+Explicit orchestration workflow metadata and validation contracts for ops.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

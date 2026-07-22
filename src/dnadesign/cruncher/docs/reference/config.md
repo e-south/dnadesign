@@ -1,7 +1,7 @@
 ## Cruncher config
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-28
+**Last verified:** 2026-06-02
 
 
 **Last updated by:** cruncher-maintainers on 2026-02-28

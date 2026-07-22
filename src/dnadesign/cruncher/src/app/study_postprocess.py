@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/study_postprocess.py
 
 Postprocess helpers for Study replay, summarize, and final completion phases.

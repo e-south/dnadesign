@@ -1,0 +1,35 @@
+checks:
+  latentdna_native_audit:
+  - kind: path_exists
+    check_id: latentdna.binding.present
+    check_group: latentdna
+    summary: RegulonDB LatentDNA study binding is present.
+    required: true
+    artifact: latentdna_binding
+  - kind: path_exists
+    check_id: latentdna.workspace.layout
+    check_group: latentdna
+    summary: RegulonDB LatentDNA workspace root is present.
+    required: true
+    artifact: latentdna_workspace_root
+  - kind: path_exists
+    check_id: latentdna.input.native_full_7b.present
+    check_group: latentdna
+    summary: Native/full 7B Infer sidecar features are present for LatentDNA after
+      batch execution.
+    required: false
+    artifact: infer_native_full_dataset_7b
+  - kind: path_exists
+    check_id: latentdna.input.core60_7b.present
+    check_group: latentdna
+    summary: Core60 7B Infer sidecar features are present for LatentDNA after Construct
+      and batch execution.
+    required: false
+    artifact: infer_core60_dataset_7b
+  - kind: command
+    check_id: latentdna.workspace.deep.validates
+    check_group: latentdna
+    summary: RegulonDB LatentDNA workspace validates against sidecar-backed native/full
+      and core60 feature views.
+    required: true
+    surface: latentdna_validate_workspace

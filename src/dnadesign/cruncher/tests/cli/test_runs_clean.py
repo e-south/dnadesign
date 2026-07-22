@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_runs_clean.py
 
-Author(s): Eric J. South
+Regression tests for runs clean Cruncher CLI.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

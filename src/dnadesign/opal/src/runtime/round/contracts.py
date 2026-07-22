@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/round/contracts.py
 
-Defines round-level data contracts for OPAL execution stages. Provides
-dataclasses for round inputs, outputs, and stage bundles.
+Defines round-level data contracts for OPAL execution stages. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -32,6 +31,9 @@ class RunRoundRequest:
     config_path: Optional[Path] = None
     k_override: Optional[int] = None
     score_batch_size_override: Optional[int] = None
+    max_x_matrix_gib_override: Optional[float] = None
+    x_dim_override: Optional[int] = None
+    x_item_size_bytes: Optional[int] = None
     verbose: bool = True
     allow_resume: bool = False
     progress_factory: Optional[ProgressFactory] = None
@@ -44,8 +46,8 @@ class RunRoundResult:
     as_of_round: int
     trained_on: int
     scored: int
-    top_k_requested: int
-    top_k_effective: int
+    selection_views: Dict[str, Dict[str, int]]
+    selection_batch_count: int
     ledger_path: str
 
 
@@ -64,6 +66,7 @@ class TrainingBundle:
     rep: Any
     plan: Any
     train_df: pd.DataFrame
+    observed_events_df: pd.DataFrame
     train_ids: List[str]
     Y_train: np.ndarray
     R_train: np.ndarray
@@ -74,7 +77,6 @@ class TrainingBundle:
 class XBundle:
     X_train: np.ndarray
     id_order_train: List[str]
-    X_pool: np.ndarray
     id_order_pool: List[str]
     cand_df: pd.DataFrame
 
@@ -85,33 +87,19 @@ class ScoreBundle:
     fit_metrics: Any
     fit_duration: float
     Y_hat: np.ndarray
-    y_obj_scalar: np.ndarray
-    diag: Dict[str, Any]
-    obj_summary_stats: Optional[Dict[str, Any]]
-    obj_name: str
-    obj_params: Dict[str, Any]
-    obj_mode: str
     objective_defs: List[Dict[str, Any]]
     score_channels: Dict[str, np.ndarray]
     uncertainty_channels: Dict[str, np.ndarray]
-    score_ref: str
-    uncertainty_ref: Optional[str]
-    sel_name: str
-    sel_params: Dict[str, Any]
-    tie_handling: str
-    mode: str
-    ranks_competition: np.ndarray
-    selected_bool: np.ndarray
-    selected_effective: int
-    top_k: int
-    obj_sha: str
-    scores: np.ndarray
-    uq_scalar: Optional[np.ndarray]
+    selections: Dict[str, Any]
+    selection_batch: Any
+    objective_meta_sha: str
 
 
 @dataclass(frozen=True)
 class ArtifactBundle:
     apaths: Any
     selected_df: pd.DataFrame
+    selection_batch_df: pd.DataFrame
     labels_used_df: Optional[pd.DataFrame]
+    observed_events_df: pd.DataFrame
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]]

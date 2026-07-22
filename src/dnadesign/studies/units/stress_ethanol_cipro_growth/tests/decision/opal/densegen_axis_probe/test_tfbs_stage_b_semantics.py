@@ -1,0 +1,51 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/densegen_axis_probe/test_tfbs_stage_b_semantics.py
+
+Regression tests for TFBS stage b semantics studies units stress ethanol.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from .probe_modules import probe_module
+
+_semantics = probe_module("tfbs.stage_b.semantics")
+TFBS_STAGE_B_ORACLE_ROLES = _semantics.TFBS_STAGE_B_ORACLE_ROLES
+TFBS_STAGE_B_PROBE_FAMILY = _semantics.TFBS_STAGE_B_PROBE_FAMILY
+TFBS_STAGE_B_SCOPE = _semantics.TFBS_STAGE_B_SCOPE
+TFBS_STAGE_B_SPLIT_ID = _semantics.TFBS_STAGE_B_SPLIT_ID
+TFBS_STAGE_B_STAGE = _semantics.TFBS_STAGE_B_STAGE
+TfbsStageBRunIdentity = _semantics.TfbsStageBRunIdentity
+stage_b_dataset_id = _semantics.stage_b_dataset_id
+validate_stage_b_oracle_role = _semantics.validate_stage_b_oracle_role
+validate_stage_b_split_id = _semantics.validate_stage_b_split_id
+
+
+def test_stage_b_identity_terms_are_stable() -> None:
+    identity = TfbsStageBRunIdentity(
+        label_name="lexA_present",
+        oracle_role="positive",
+        split_id=TFBS_STAGE_B_SPLIT_ID,
+        seed=7,
+    )
+
+    assert TFBS_STAGE_B_PROBE_FAMILY == "densegen_tfbs_learnability_probe_v1"
+    assert TFBS_STAGE_B_STAGE == "B"
+    assert TFBS_STAGE_B_SCOPE == "stage_b_sentinel_initial"
+    assert TFBS_STAGE_B_ORACLE_ROLES == ("positive", "matched_null")
+    assert identity.run_key == "tfbs_lexA_present_positive_random_id_seed7"
+    assert identity.campaign_slug == "tfbs_v1_lexa_present_positive_random_id_seed7"
+    assert stage_b_dataset_id(split_id=TFBS_STAGE_B_SPLIT_ID, seed=7).endswith("_tfbs_random_id_seed7")
+
+
+def test_stage_b_semantics_fail_fast_on_unknown_terms() -> None:
+    with pytest.raises(ValueError, match="unsupported Stage B oracle role"):
+        validate_stage_b_oracle_role("negative")
+    with pytest.raises(ValueError, match="supports split_id"):
+        validate_stage_b_split_id("leave_sigma35_variant")

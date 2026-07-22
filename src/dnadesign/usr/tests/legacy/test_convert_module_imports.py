@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/legacy/test_convert_module_imports.py
 
 Import-time contract tests for legacy conversion helpers.

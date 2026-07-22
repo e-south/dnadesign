@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/pwm_context_sources.py
 
 Concrete YIU PWM context source loaders behind the public resolution facade.

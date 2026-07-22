@@ -1,0 +1,85 @@
+version: 1
+profile_id: eco1_rt_v1
+study_id: eco1_rt_repack
+kind: fixed_backbone_profile
+status: scaffold
+reference:
+  protein_name: Eco1 reverse transcriptase
+  sequence_authority: ec86kit_manifest_2025-10-09T17-47-31Z
+  structure_authority: ec86kit_7v9u_protomer1
+  structure_chain_id: A
+  retained_context_policy: rt_with_msdna_msrna_no_effector
+  residue_numbering_origin: ec86kit_aa_map_chain_a_to_reference_sequence_v1
+  reference_sequence_hash: sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
+thread_contract:
+  planned_tool: thread
+  backbone_bundle: planned
+  residue_map: planned
+  conservation_profile: planned
+  contact_profile: planned
+  mask_set: planned
+  thread_plan: planned
+conservative_policy:
+  status: clade9_plurality25_direct_contact5a_selected
+  mask_policy_id: eco1_rt_clade9_plurality25_direct_contact5a_v1
+  manual_mask_groups:
+    - id: motif_anchors
+      status: audited_in_manual_mask_authority
+      policy: protected
+      proposed_anchors:
+        - YADD catalytic motif
+        - NAxxH retron X motif
+        - VTG retron Y motif
+    - id: wang_ec86_direct_contact_priors
+      status: audited_in_manual_mask_authority
+      policy: protected
+      proposed_anchors:
+        - Ec86 substrate-contact residues called from Wang/Ec86 structural priors
+    - id: rt1_rt7_intervals
+      status: audited_review_labels
+      policy: not_blanket_fixed
+      proposed_anchors:
+        - RT1-RT7 interval labels for review and figures
+  direct_contact_threshold_angstrom: 5
+  conservation_threshold: 0.25
+  conservation_profiles:
+    - ec86_clade9_conservation_v1
+  conservation_rule: protected_when_clade9_wt_is_plurality_and_frequency_meets_threshold
+  cysteine_policy: no_new_cysteine
+  unresolved_residue_policy: terminal_missing_backbone_is_non_fixed_missing_backbone
+  designable_rule: mapped_and_not_protected
+sampling_policy:
+  status: planned
+  backends_allowed:
+    - proteinmpnn
+    - ligandmpnn
+  selected_backend: proteinmpnn
+  backend_selection_policy: explicit_no_fallback
+  design_contract_owner: thread
+  process_execution_owner: explicit_backend_or_infer_manifest
+  backend_result_ingest_policy: declared_manifest_only
+  temperatures:
+    - 0.1
+    - 0.3
+  seed_policy: explicit_seed_list_required
+  seed_set:
+    - 101
+    - 202
+    - 303
+  batch_id: eco1_rt_p25_5a_n96_20260624
+  num_seq_per_target: 16
+  batch_size: 1
+fold_validation_policy:
+  status: planned
+  wild_type_baseline_required: true
+  runtime_parameters_hash_required: true
+  threshold_policy_required: true
+  fixture_rows_do_not_satisfy_materialized_handoff: true
+assembly_policy:
+  status: planned
+  first_tier: full_gene_candidate
+  bounded_window_requires_parent_haplotype_trace: true
+downstream:
+  rt_lnrna_sponging_construct_triage:
+    relationship: downstream_candidate_promotion
+    status: planned

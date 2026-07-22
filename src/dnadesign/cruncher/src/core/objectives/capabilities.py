@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/objectives/capabilities.py
+
+Core runtime primitives for capabilities Cruncher core objectives.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

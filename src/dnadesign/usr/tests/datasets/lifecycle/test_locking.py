@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/lifecycle/test_locking.py
 
 Tests dataset write lock behavior.

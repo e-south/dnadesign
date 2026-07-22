@@ -1,0 +1,2775 @@
+schema_version: latentdna.workspace.v1
+workspace:
+  id: rt_lnrna_sponging_construct_triage
+  title: RT-lnRNA sponging construct triage
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats:
+    - svg
+    - png
+  neighbor_backend: auto
+sources:
+  dual_cassette_2000bp_seq_mean_intermediate:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_seq_mean_output_layer:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_seq_mean_log_likelihood_mean_per_token:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      view_name: dual_cassette_2000bp_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_intermediate:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: seq_mean
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_output_layer:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: seq_mean
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  dual_cassette_2000bp_reverse_complement_seq_mean_log_likelihood_mean_per_token:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: dual_cassette_2000bp_reverse_complement_seq_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: full_sequence
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      view_name: dual_cassette_2000bp_reverse_complement_seq_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_intermediate:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_output_layer:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_anchor_mean_log_likelihood_mean_per_token:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      view_name: lnrna_fixed_384bp_window_in_construct_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_intermediate:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_output_layer:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 384
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      view_name: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_intermediate:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_output_layer:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_anchor_mean_log_likelihood_mean_per_token:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      view_name: rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_intermediate:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      layer_name: block26_mlp_out
+      pooling_operation: anchor_mean
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_output_layer:
+    kind: infer_feature_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      representation_kind: output_layer_mean
+      pooling_operation: anchor_mean
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_total:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__total
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_log_likelihood_mean_per_token:
+    kind: infer_feature_scalar_sidecar
+    root: ../../../usr/datasets
+    dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: primary
+    sequence_scope: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    emitted_length_bp: 2000
+    pooling_span_bp: 1600
+    where:
+      model_name: evo2_7b
+      scalar_kind: log_likelihood__mean_per_token
+      view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+  rt_lnrna_reader_spop_candidate_summary:
+    kind: parquet
+    path: study_inputs/reader_spop_candidate_summary.parquet
+    record_key: construct_subject__id
+    subject_key: construct_subject__id
+    role: source_overlay
+metadata:
+  include:
+    - source_family
+    - candidate_source
+    - source_collection_id
+    - source_literature_id
+    - source_variant_id
+    - source_regime
+    - source_promotion_status
+    - source_window_case
+    - abundance_affiliation
+    - construct_projection_status
+    - label_readiness_status
+    - template_name
+    - target_context_source_id
+    - target_context_region_start_0
+    - target_context_region_end_0
+    - target_context_variable_length_policy
+    - rt_variant_class
+    - rt_dms_mutation_class
+    - compiler_msd_cap_id
+    - compiler_msd_design_id
+    - compiler_msd_stem_profile
+    - khan_abundance_overlay_status
+    - khan_abundance_raw_value
+    - khan_abundance_normalized_value
+    - khan_abundance_ordinal_bin
+    - crawford_abundance_overlay_status
+    - crawford_abundance_raw_value
+    - crawford_abundance_ordinal_bin
+    - crawford_design_reference_status
+    - reader_spop_overlay_status
+    - reader_spop_metric_id
+    - reader_spop_experiment_ids
+    - reader_spop_normalized_value
+    - reader_spop_score_median
+    - reader_spop_observation_count
+    - reader_spop_qc_flags
+  derivations:
+    source_family:
+      kind: copy
+      source: construct_subject__source_basis
+      value_type: string
+    candidate_source:
+      kind: copy
+      source: construct_subject__source_basis
+      value_type: string
+    source_collection_id:
+      kind: coalesce
+      sources: [construct_subject__source_collection_id]
+      default: no_source_collection
+      value_type: string
+    source_literature_id:
+      kind: coalesce
+      sources: [construct_subject__source_literature_id]
+      default: study_owned_or_unresolved
+      value_type: string
+    source_variant_id:
+      kind: coalesce
+      sources: [construct_subject__source_variant_id]
+      default: no_source_variant
+      value_type: string
+    source_regime:
+      kind: coalesce
+      sources: [construct_subject__source_regime]
+      default: source_regime_unassigned
+      value_type: string
+    source_promotion_status:
+      kind: token_presence
+      source: construct_subject__source_collection_id
+      present_value: source_promoted
+      absent_value: provenance_only
+      value_type: string
+    source_window_case:
+      kind: map_values
+      source: construct_subject__construct_projection_status
+      mapping:
+        representable: within_window_materialized
+      default: over_window_or_unresolved
+      value_type: string
+    abundance_affiliation:
+      kind: token_presence
+      sources:
+        - construct_subject__khan_abundance_observation_ids
+        - construct_subject__crawford_abundance_observation_ids
+      present_value: abundance_affiliated
+      absent_value: not_abundance_affiliated
+      value_type: string
+    construct_projection_status:
+      kind: copy
+      source: construct_subject__construct_projection_status
+      value_type: string
+    label_readiness_status:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_overlay_status
+      missing_policy: "null"
+      default: reader_spop_labels_not_materialized
+    template_name:
+      kind: constant
+      value: dual_cassette_rt_lnrna_expression_template_v1
+      value_type: string
+    target_context_source_id:
+      kind: constant
+      value: genbank:2000bp-region.gb#record
+      value_type: string
+    target_context_region_start_0:
+      kind: constant
+      value: 56
+      value_type: int64
+    target_context_region_end_0:
+      kind: constant
+      value: 1656
+      value_type: int64
+    target_context_variable_length_policy:
+      kind: constant
+      value: symmetric_flank_trim_from_lnrna_center
+      value_type: string
+    rt_variant_class:
+      kind: coalesce
+      sources: [construct_subject__variant_class]
+      default: variant_class_unassigned
+      value_type: string
+    rt_dms_mutation_class:
+      kind: token_presence
+      source: construct_subject__dms_slot
+      present_value: rt_cds_point_mutation
+      absent_value: not_rt_cds_point_mutation
+      value_type: string
+    compiler_msd_cap_id:
+      kind: coalesce
+      sources: [construct_subject__msd_cap_id]
+      default: no_compiler_cap
+      value_type: string
+    compiler_msd_design_id:
+      kind: coalesce
+      sources: [construct_subject__msd_design_id]
+      default: no_compiler_design
+      value_type: string
+    compiler_msd_stem_profile:
+      kind: coalesce
+      sources: [construct_subject__msd_profile_s3s2s1s0]
+      default: no_compiler_stem_profile
+      value_type: string
+    khan_abundance_overlay_status:
+      kind: token_presence
+      source: construct_subject__khan_abundance_observation_ids
+      present_value: abundance_affiliated
+      absent_value: not_abundance_affiliated
+      value_type: string
+    khan_abundance_raw_value:
+      kind: delimited_numeric_mean
+      source: construct_subject__khan_abundance_raw_values
+      value_type: float64
+    khan_abundance_normalized_value:
+      kind: delimited_numeric_mean
+      source: construct_subject__khan_abundance_normalized_values
+      value_type: float64
+    khan_abundance_ordinal_bin:
+      kind: single_categorical_token
+      source: construct_subject__khan_abundance_ordinal_bins
+      value_type: string
+    crawford_abundance_overlay_status:
+      kind: token_presence
+      source: construct_subject__crawford_abundance_observation_ids
+      present_value: abundance_affiliated
+      absent_value: not_abundance_affiliated
+      value_type: string
+    crawford_abundance_raw_value:
+      kind: delimited_numeric_mean
+      source: construct_subject__crawford_abundance_raw_values
+      value_type: float64
+    crawford_abundance_ordinal_bin:
+      kind: numeric_quantile_bin
+      source: construct_subject__crawford_abundance_raw_values
+      edges: [8.90033258134951, 95.97675900112976, 212.83370392895753, 380.6567556708186]
+      labels: [very_low, low, medium, high, very_high]
+      value_type: string
+    crawford_design_reference_status:
+      kind: token_presence
+      source: construct_subject__crawford_reference_record_ids
+      present_value: design_reference_affiliated
+      absent_value: not_design_reference_affiliated
+      value_type: string
+    reader_spop_overlay_status:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_overlay_status
+      missing_policy: "null"
+    reader_spop_metric_id:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_metric_id
+      missing_policy: "null"
+    reader_spop_experiment_ids:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_experiment_ids
+      missing_policy: "null"
+    reader_spop_normalized_value:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_normalized_value
+      missing_policy: "null"
+    reader_spop_score_median:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_score_median
+      missing_policy: "null"
+    reader_spop_observation_count:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_observation_count
+      missing_policy: "null"
+    reader_spop_qc_flags:
+      kind: lookup
+      source: rt_lnrna_reader_spop_candidate_summary
+      left_key: construct_subject__id
+      right_key: construct_subject__id
+      value_column: reader_spop_qc_flags
+      missing_policy: "null"
+  axes:
+    khan_abundance_ordinal_bin:
+      column: khan_abundance_ordinal_bin
+      label: Khan PAGE RT-DNA abundance group
+      kind: ordinal
+      category_order: [nondetect, low, medium, high, very_high]
+      display_labels:
+        nondetect: Nondetect
+        low: Low
+        medium: Medium
+        high: High
+        very_high: Very high
+      metric_labels:
+        khan_abundance_ordinal_spearman: Khan abundance ordinal Spearman
+        khan_abundance_ordinal_kendall: Khan abundance ordinal Kendall
+        khan_abundance_balanced_ordinal_spearman: Khan abundance balanced ordinal Spearman
+        khan_abundance_label_permutation_pvalue: Khan abundance permutation p-value
+    crawford_abundance_ordinal_bin:
+      column: crawford_abundance_ordinal_bin
+      label: Crawford Fig2 Eco1 msDNA score group
+      kind: ordinal
+      category_order: [very_low, low, medium, high, very_high]
+      display_labels:
+        very_low: Very low
+        low: Low
+        medium: Medium
+        high: High
+        very_high: Very high
+      metric_labels:
+        crawford_abundance_ordinal_spearman: Crawford abundance ordinal Spearman
+        crawford_abundance_ordinal_kendall: Crawford abundance ordinal Kendall
+        crawford_abundance_balanced_ordinal_spearman: Crawford abundance balanced ordinal Spearman
+        crawford_abundance_label_permutation_pvalue: Crawford abundance permutation p-value
+    candidate_source:
+      column: candidate_source
+      label: Candidate source
+      kind: categorical
+      display_labels: &rt_lnrna_source_display_labels
+        compiler_generated_msd_lnrna_variant: Compiler msDNA lnRNA variant
+        crawford_eco1_lnrna_fixed_wt_rt: Crawford Eco1 lnRNA fixed WT RT
+        genbank_variant_catalog: GenBank variant catalog
+        in_silico_rt_cds_dms: In silico RT CDS DMS
+        khan_abundance_affiliated_rt_lnrna_reference: Khan RT-lnRNA abundance reference
+    source_family:
+      column: source_family
+      label: Source family
+      kind: categorical
+      display_labels: *rt_lnrna_source_display_labels
+    ordinal_group_id:
+      column: ordinal_group_id
+      label: Abundance source
+      kind: categorical
+      display_labels:
+        khan_abundance: Khan PAGE RT-DNA abundance
+        crawford_abundance: Crawford Fig2 Eco1 msDNA score
+    ordinal_axis_id:
+      column: ordinal_axis_id
+      label: Abundance axis
+      kind: categorical
+      display_labels:
+        khan_abundance: Khan PAGE RT-DNA abundance
+        crawford_abundance: Crawford Fig2 Eco1 msDNA score
+    axis_id:
+      column: axis_id
+      label: Trait axis
+      kind: categorical
+      display_labels:
+        crawford_eco1_msdna_abundance_axis: Crawford Eco1 msDNA abundance
+        khan_rt_dna_abundance_axis: Khan RT-DNA abundance
+    endpoint_definition_id:
+      column: endpoint_definition_id
+      label: Endpoint definition
+      kind: categorical
+      category_order: [quantile_0_10, quantile_0_05, quantile_0_20, min_max]
+      display_labels:
+        quantile_0_05: q05 endpoint
+        quantile_0_10: q10 endpoint
+        quantile_0_20: q20 endpoint
+        min_max: min/max endpoint
+    population_role:
+      column: population_role
+      label: Scored population
+      kind: categorical
+      category_order: [fit, eval, reference, sensitivity]
+      display_labels:
+        fit: Fit rows
+        eval: Evaluation rows
+        reference: GenBank/reference rows
+        sensitivity: Sensitivity rows
+    label_readiness_status:
+      column: label_readiness_status
+      label: Label readiness
+      kind: categorical
+      display_labels:
+        reader_spop_assay_observed: Reader SPOP observed
+        reader_spop_labels_not_materialized: SPOP labels not materialized
+    reader_spop_score_median:
+      column: reader_spop_score_median
+      label: Reader SPOP median
+      kind: continuous
+    source_window_case:
+      column: source_window_case
+      label: Source window
+      kind: categorical
+      display_labels:
+        lnrna_slot: lnRNA span
+        rt_cds_slot: RT CDS span
+        lnrna_rt_slot_pair: lnRNA + RT CDS pair
+    view_id:
+      column: view_id
+      label: Candidate-X view
+      kind: categorical
+      display_labels: &rt_lnrna_view_display_labels
+        intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp intermediate
+        intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span intermediate
+        intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span intermediate
+        intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair intermediate
+        output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp output layer
+        output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span output layer
+        output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span output layer
+        output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair output layer
+metric_definitions:
+  khan_abundance_ordinal_spearman:
+    display_name: Khan abundance ordinal Spearman
+    mathematical_definition: Spearman correlation between source-scoped Khan PAGE RT-DNA abundance group rank gaps and observed centroid cosine-distance gaps.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  khan_abundance_ordinal_kendall:
+    display_name: Khan abundance ordinal Kendall
+    mathematical_definition: Kendall tau correlation between source-scoped Khan PAGE RT-DNA abundance group rank gaps and observed centroid cosine-distance gaps.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  khan_abundance_balanced_ordinal_spearman:
+    display_name: Balanced Khan abundance ordinal Spearman
+    mathematical_definition: Spearman correlation between source-scoped Khan PAGE RT-DNA abundance group rank gaps and observed centroid cosine-distance gaps after config-declared cohort balancing.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  khan_abundance_label_permutation_pvalue:
+    display_name: Khan abundance permutation p-value
+    mathematical_definition: Two-sided permutation p-value for the global Khan abundance ordinal Spearman statistic under shuffled source-scoped Khan PAGE RT-DNA abundance groups.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: p_value
+    direction: lower_is_better
+    aggregation_level: candidate_summary
+  crawford_abundance_ordinal_spearman:
+    display_name: Crawford abundance ordinal Spearman
+    mathematical_definition: Spearman correlation between source-scoped Crawford Fig2 Eco1 msDNA score group rank gaps and observed centroid cosine-distance gaps.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  crawford_abundance_ordinal_kendall:
+    display_name: Crawford abundance ordinal Kendall
+    mathematical_definition: Kendall tau correlation between source-scoped Crawford Fig2 Eco1 msDNA score group rank gaps and observed centroid cosine-distance gaps.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  crawford_abundance_balanced_ordinal_spearman:
+    display_name: Balanced Crawford abundance ordinal Spearman
+    mathematical_definition: Spearman correlation between source-scoped Crawford Fig2 Eco1 msDNA score group rank gaps and observed centroid cosine-distance gaps after config-declared cohort balancing.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  crawford_abundance_label_permutation_pvalue:
+    display_name: Crawford abundance permutation p-value
+    mathematical_definition: Two-sided permutation p-value for the global Crawford abundance ordinal Spearman statistic under shuffled source-scoped Crawford Fig2 Eco1 msDNA score groups.
+    metric_family: ordinal_structure
+    evidence_tier: primary
+    unit: p_value
+    direction: lower_is_better
+    aggregation_level: candidate_summary
+  source_family_separation_ratio:
+    display_name: Source-family separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for RT-lnRNA source-family cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  rt_variant_class_separation_ratio:
+    display_name: RT variant-class separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for RT-native variant-class cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  abundance_affiliation_separation_ratio:
+    display_name: Abundance-affiliation separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for abundance-affiliated versus non-affiliated cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  khan_overlay_separation_ratio:
+    display_name: Khan overlay separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for Khan abundance-affiliated versus non-affiliated cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  crawford_overlay_separation_ratio:
+    display_name: Crawford overlay separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for Crawford abundance-affiliated versus non-affiliated cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  compiler_msd_cap_separation_ratio:
+    display_name: Compiler cap separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for compiler MSD cap cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  compiler_msd_stem_separation_ratio:
+    display_name: Compiler stem-profile separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for compiler MSD stem-profile cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  rt_dms_mutation_class_separation_ratio:
+    display_name: RT-DMS mutation-class separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for RT-CDS DMS mutation-class cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  source_regime_separation_ratio:
+    display_name: Source-regime separation ratio
+    mathematical_definition: Mean between-centroid cosine distance divided by mean within-centroid cosine distance for RT source-regime cohorts.
+    metric_family: source_structure
+    evidence_tier: primary
+    unit: ratio
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  source_family_retention_correlation:
+    display_name: Source-family retention
+    mathematical_definition: Pearson correlation between aligned representation centroid-distance matrices for source-family cohorts.
+    metric_family: context_stability
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  abundance_affiliation_retention_correlation:
+    display_name: Abundance-affiliation retention
+    mathematical_definition: Pearson correlation between aligned representation centroid-distance matrices for abundance-affiliation cohorts.
+    metric_family: context_stability
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  rt_variant_class_retention_correlation:
+    display_name: RT variant-class retention
+    mathematical_definition: Pearson correlation between aligned representation centroid-distance matrices for RT variant-class cohorts.
+    metric_family: context_stability
+    evidence_tier: primary
+    unit: correlation
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  context_robustness_median:
+    display_name: Context robustness median
+    mathematical_definition: Median context-self cosine across aligned RT-lnRNA representation robustness comparisons for a candidate view.
+    metric_family: context_stability
+    evidence_tier: primary
+    unit: cosine
+    direction: higher_is_better
+    aggregation_level: candidate_summary
+  dimensional_cost:
+    display_name: Dimensional cost
+    mathematical_definition: Candidate vector dimensionality used as an explicit lower-is-better cost term for OPAL X selection.
+    metric_family: representation_cost
+    evidence_tier: primary
+    unit: dimensions
+    direction: lower_is_better
+    aggregation_level: candidate_summary
+alignments:
+  rt_lnrna_intermediate_full_to_lnrna_slot:
+    left: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+    right: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+    "on": subject_key
+  rt_lnrna_intermediate_full_to_rt_slot:
+    left: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+    right: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    "on": subject_key
+  rt_lnrna_intermediate_lnrna_slot_to_rt_slot:
+    left: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+    right: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    "on": subject_key
+  rt_lnrna_intermediate_full_forward_to_reverse_complement:
+    left: intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+    right: intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+    "on": subject_key
+  rt_lnrna_output_full_to_lnrna_slot:
+    left: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+    right: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+    "on": subject_key
+  rt_lnrna_output_full_to_rt_slot:
+    left: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+    right: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    "on": subject_key
+  rt_lnrna_output_lnrna_slot_to_rt_slot:
+    left: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+    right: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    "on": subject_key
+  rt_lnrna_output_full_forward_to_reverse_complement:
+    left: output_layer_mean_7b_dual_cassette_2000bp_seq_mean
+    right: output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+    "on": subject_key
+views:
+  intermediate_embedding_7b_dual_cassette_2000bp_seq_mean:
+    source: dual_cassette_2000bp_seq_mean_intermediate
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_dual_cassette_2000bp_seq_mean
+    tags: {model: evo2_7b, family: intermediate_embedding, scope: dual_cassette_2000bp, pooling: seq_mean}
+  intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean:
+    source: dual_cassette_2000bp_reverse_complement_seq_mean_intermediate
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_dual_cassette_2000bp_seq_mean
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: dual_cassette_2000bp
+      pooling: seq_mean
+      orientation: reverse_complement
+  intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_anchor_mean_intermediate
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+    tags: {model: evo2_7b, family: intermediate_embedding, scope: lnrna_slot, pooling: anchor_mean}
+  intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_intermediate
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: lnrna_slot
+      pooling: anchor_mean
+      orientation: reverse_complement
+  intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_anchor_mean_intermediate
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    tags: {model: evo2_7b, family: intermediate_embedding, scope: rt_cds_slot, pooling: anchor_mean}
+  intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_intermediate
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: rt_cds_slot
+      pooling: anchor_mean
+      orientation: reverse_complement
+  output_layer_mean_7b_dual_cassette_2000bp_seq_mean:
+    source: dual_cassette_2000bp_seq_mean_output_layer
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {model: evo2_7b, family: output_layer_mean, scope: dual_cassette_2000bp, pooling: seq_mean}
+    role: appendix
+  output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean:
+    source: dual_cassette_2000bp_reverse_complement_seq_mean_output_layer
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: dual_cassette_2000bp
+      pooling: seq_mean
+      orientation: reverse_complement
+    role: appendix
+  output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_anchor_mean_output_layer
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {model: evo2_7b, family: output_layer_mean, scope: lnrna_slot, pooling: anchor_mean}
+    role: appendix
+  output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean:
+    source: lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean_output_layer
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: lnrna_slot
+      pooling: anchor_mean
+      orientation: reverse_complement
+    role: appendix
+  output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_anchor_mean_output_layer
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags: {model: evo2_7b, family: output_layer_mean, scope: rt_cds_slot, pooling: anchor_mean}
+    role: appendix
+  output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean:
+    source: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean_output_layer
+    vector: {kind: column, name: value}
+    coordinate_space_id: evo2_7b_output_layer_mean
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: rt_cds_slot
+      pooling: anchor_mean
+      orientation: reverse_complement
+    role: appendix
+  intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+        - intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+    coordinate_space_id: evo2_7b_dual_cassette_2000bp_bidir_concat
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: dual_cassette_2000bp
+      pooling: seq_mean
+      transform: block_normalized_concatenate
+    role: primary
+  intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    coordinate_space_id: evo2_7b_slot_anchor_mean_bidir_concat
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: lnrna_slot
+      pooling: anchor_mean
+      transform: block_normalized_concatenate
+    role: primary
+  intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    coordinate_space_id: evo2_7b_slot_anchor_mean_bidir_concat
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: rt_cds_slot
+      pooling: anchor_mean
+      transform: block_normalized_concatenate
+    role: primary
+  intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    coordinate_space_id: evo2_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    tags:
+      model: evo2_7b
+      family: intermediate_embedding
+      scope: lnrna_rt_slot_pair
+      pooling: anchor_mean
+      transform: block_normalized_concatenate
+    role: exploratory
+  output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - output_layer_mean_7b_dual_cassette_2000bp_seq_mean
+        - output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+    coordinate_space_id: evo2_7b_output_layer_mean_dual_cassette_2000bp_bidir_concat
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: dual_cassette_2000bp
+      pooling: seq_mean
+      transform: block_normalized_concatenate
+    role: appendix
+  output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+    coordinate_space_id: evo2_7b_output_layer_mean_slot_anchor_mean_bidir_concat
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: lnrna_slot
+      pooling: anchor_mean
+      transform: block_normalized_concatenate
+    role: appendix
+  output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+    coordinate_space_id: evo2_7b_output_layer_mean_slot_anchor_mean_bidir_concat
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: rt_cds_slot
+      pooling: anchor_mean
+      transform: block_normalized_concatenate
+    role: appendix
+  output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat:
+    derive:
+      kind: block_normalized_concatenate
+      inputs:
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+    coordinate_space_id: evo2_7b_output_layer_mean_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    tags:
+      model: evo2_7b
+      family: output_layer_mean
+      scope: lnrna_rt_slot_pair
+      pooling: anchor_mean
+      transform: block_normalized_concatenate
+    role: appendix
+reference_sets:
+  reference_genbank_catalog_rows:
+    label: GenBank catalog rows
+    match_column: construct_subject__id
+    label_column: source_variant_id
+    label_limit: 24
+    where_all:
+      - column: candidate_source
+        equals: genbank_variant_catalog
+      - column: source_variant_id
+        not_regex: '^no_source_variant$'
+  reference_reader_spop_assayed_genbank_rows:
+    label: Reader SPOP assayed GenBank rows
+    match_column: construct_subject__id
+    label_column: source_variant_id
+    label_limit: 12
+    where_all:
+      - column: candidate_source
+        equals: genbank_variant_catalog
+      - column: reader_spop_overlay_status
+        equals: reader_spop_assay_observed
+  reference_source_family_anchors:
+    label: Source-family anchors
+    match_column: construct_subject__id
+    label_column: candidate_source
+    label_mode: highlight_only
+    label_limit: 0
+    where:
+      - column: candidate_source
+        in_values:
+          - genbank_variant_catalog
+          - khan_abundance_affiliated_rt_lnrna_reference
+          - crawford_eco1_lnrna_fixed_wt_rt
+          - compiler_generated_msd_lnrna_variant
+  reference_msd_compiler_landmarks:
+    label: MSD compiler landmarks
+    match_column: construct_subject__id
+    label_column: compiler_msd_design_id
+    label_limit: 12
+    where_all:
+      - column: candidate_source
+        equals: compiler_generated_msd_lnrna_variant
+      - column: compiler_msd_design_id
+        not_regex: '^no_compiler_design$'
+  reference_crawford_design_affiliated_rows:
+    label: Crawford design-affiliated rows
+    match_column: construct_subject__id
+    label_column: construct_subject__crawford_reference_record_ids
+    label_mode: highlight_only
+    label_limit: 0
+    where_all:
+      - column: crawford_design_reference_status
+        equals: design_reference_affiliated
+  reference_khan_abundance_rows:
+    label: Khan abundance-affiliated rows
+    match_column: construct_subject__id
+    label_column: source_variant_id
+    label_limit: 12
+    where_all:
+      - column: khan_abundance_overlay_status
+        equals: abundance_affiliated
+  reference_crawford_high_abundance_examples:
+    label: Crawford high-abundance examples
+    match_column: construct_subject__id
+    label_column: construct_subject__crawford_abundance_observation_ids
+    label_limit: 12
+    where_all:
+      - column: crawford_abundance_ordinal_bin
+        equals: very_high
+  reference_crawford_low_abundance_examples:
+    label: Crawford low-abundance examples
+    match_column: construct_subject__id
+    label_column: construct_subject__crawford_abundance_observation_ids
+    label_limit: 12
+    where_all:
+      - column: crawford_abundance_ordinal_bin
+        equals: very_low
+candidate_sets:
+  rt_lnrna_construct_gallery_v1:
+    label: RT-lnRNA construct representation gallery
+    description: Full-construct, lnRNA span, RT CDS span, and paired-span Evo2 7B intermediate plus output-layer mean views.
+    views:
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    panel_titles:
+      intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp intermediate
+      intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span intermediate
+      intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span intermediate
+      intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair intermediate
+      output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat: Full 2,000 bp output layer
+      output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat: lnRNA span output layer
+      output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat: RT CDS span output layer
+      output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat: lnRNA + RT CDS pair output layer
+  rt_lnrna_output_layer_diagnostics_v1:
+    label: RT-lnRNA output-layer diagnostics
+    description: Companion Evo2 7B output-layer mean views for appendix geometry and collapse diagnostics.
+    views:
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+  rt_lnrna_opal_x_review_v1:
+    label: RT-lnRNA OPAL X review candidates
+    description: Intermediate-embedding candidates eligible for OPAL X selection after LatentDNA health review.
+    views:
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+plots:
+  rt_lnrna_dataset_overview:
+    kind: categorical_count
+    visibility_tier: primary
+    single_row_panels: false
+    square_panels: true
+    scalar: rt_lnrna_dataset_overview_counts
+    category_column: dimension
+    label_column: category_label
+    value_column: fraction
+    panel_column: dimension_label
+    semantics_ref: plot_semantics/rt_lnrna_dataset_overview.yaml
+  representation_health_summary:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    scalar: representation_health_summary_metrics
+    facet_column: category
+    panel_title_column: display_name
+    category_column: label
+    label_column: candidate_label
+    value_column: metric_value
+    color_column: candidate_family
+    direction_column: direction
+    unit_column: unit
+    sort_rule: panel_direction
+    measure_kind: metric
+    value_kind: score
+    value_label: Metric value
+    semantics_ref: plot_semantics/representation_health_summary.yaml
+  rt_lnrna_source_structure_summary:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalar: rt_lnrna_source_structure_summary_metrics
+    facet_column: category
+    panel_title_column: display_name
+    category_column: label
+    label_column: candidate_label
+    value_column: metric_value
+    ci_lower_column: ci_lower
+    ci_upper_column: ci_upper
+    color_column: candidate_family
+    direction_column: direction
+    unit_column: unit
+    sort_rule: candidate_order
+    measure_kind: metric
+    value_kind: score
+    value_label: Metric value
+    semantics_ref: plot_semantics/rt_lnrna_source_structure_summary.yaml
+  representation_scree_diagnostic:
+    kind: curve_grid
+    visibility_tier: appendix
+    reducers:
+      - pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    panel_titles:
+      - Full 2,000 bp intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
+      - Full 2,000 bp output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
+    semantics_ref: plot_semantics/representation_scree_diagnostic.yaml
+  rt_lnrna_overlay_ordinal_audit:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    scalar: rt_lnrna_overlay_ordinal_audit_metrics
+    facet_column: ordinal_metric_role
+    panel_title_column: ordinal_metric_label
+    category_column: label
+    label_column: candidate_label
+    value_column: metric_value
+    ci_lower_column: ci_lower
+    ci_upper_column: ci_upper
+    color_column: ordinal_axis_id
+    direction_column: direction
+    unit_column: unit
+    sort_rule: candidate_order
+    measure_kind: metric
+    value_kind: score
+    value_label: Ordinal geometry statistic
+    bar_orientation: horizontal
+    show_uncertainty_note: false
+    panel_width: 5.2
+    panel_height: 5.25
+    tight_layout_h_pad: 1.6
+    tight_layout_w_pad: 1.75
+    semantics_ref: plot_semantics/rt_lnrna_overlay_ordinal_audit.yaml
+  rt_lnrna_abundance_margin_ladder_gallery:
+    kind: distribution_grid
+    visibility_tier: primary
+    single_row_panels: true
+    square_panels: true
+    hide_repeated_y_axis: false
+    scalars: &rt_lnrna_abundance_ladder_rows_scalars
+      - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    metric_columns: [ordinal_margin]
+    x_axis_label: '$r_{\mathrm{abund}}(x)$ low$\to$high abundance group'
+    y_axis_label: '$m_{\mathrm{abund}}(x)=\cos(z_x,c_{\mathrm{high}})-\cos(z_x,c_{\mathrm{low}})$'
+    color_column: ordinal_label
+    render_mode: ordinal_swarm
+    filter_options:
+      - column: ordinal_group_id
+        label: Abundance source
+        include_all: false
+        values:
+          - {value: khan_abundance, label: Khan PAGE RT-DNA abundance}
+          - {value: crawford_abundance, label: Crawford Fig2 Eco1 msDNA score}
+    panel_titles:
+      - Full 2,000 bp intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
+      - Full 2,000 bp output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
+    semantics_ref: plot_semantics/rt_lnrna_abundance_margin_ladder_gallery.yaml
+  rt_lnrna_abundance_margin_scatter_gallery:
+    kind: xy_scatter_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalars: *rt_lnrna_abundance_ladder_rows_scalars
+    panel_titles:
+      - Full 2,000 bp intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
+      - Full 2,000 bp output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
+    x_column: ordinal_source_value
+    y_column: ordinal_margin
+    x_axis_label: Source assay value (source-scoped)
+    y_axis_label: Abundance endpoint margin
+    default_hue: ordinal_group_id
+    hue_options:
+      - {column: ordinal_group_id, label: Abundance source, type: categorical}
+      - {column: ordinal_axis_value, label: Abundance group, type: ordinal}
+      - {column: candidate_source, label: Candidate source, type: categorical}
+    filter_options:
+      - column: ordinal_group_id
+        label: Abundance source
+        include_all: false
+        values:
+          - {value: khan_abundance, label: Khan PAGE RT-DNA abundance}
+          - {value: crawford_abundance, label: Crawford Fig2 Eco1 msDNA score}
+    semantics_ref: plot_semantics/rt_lnrna_abundance_margin_scatter_gallery.yaml
+  rt_lnrna_trait_axis_existence:
+    kind: xy_scatter
+    visibility_tier: primary
+    scalar: rt_lnrna_trait_axis_projection_rows
+    x_column: source_value
+    y_column: axis_projection
+    x_axis_label: Source assay value (source-scoped)
+    y_axis_label: Trait-axis projection
+    render_mode: density_contour
+    default_hue: endpoint_definition_id
+    hue_options:
+      - {column: endpoint_definition_id, label: Endpoint definition, type: categorical}
+      - {column: population_role, label: Population role, type: categorical}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: view_id, label: Candidate-X view, type: categorical}
+    filter_options: &rt_lnrna_trait_axis_filter
+      - column: axis_id
+        label: Trait axis
+        include_all: false
+        values:
+          - {value: crawford_eco1_msdna_abundance_axis, label: Crawford Eco1 msDNA abundance}
+          - {value: khan_rt_dna_abundance_axis, label: Khan RT-DNA abundance}
+    semantics_ref: plot_semantics/rt_lnrna_trait_axis_existence.yaml
+  rt_lnrna_crawford_khan_axis_agreement:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalar: rt_lnrna_trait_axis_projection_concordance
+    facet_column: endpoint_definition_id
+    panel_title_column: endpoint_definition_id
+    category_column: left_trait_id
+    label_column: view_id
+    value_column: axis_concordance
+    sort_rule: label_asc
+    measure_kind: metric
+    value_kind: score
+    value_label: Crawford-Khan axis vector concordance
+    reference_line: 0.0
+    semantics_ref: plot_semantics/rt_lnrna_crawford_khan_axis_agreement.yaml
+  rt_lnrna_trait_axis_endpoint_sensitivity:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    scalar: rt_lnrna_trait_axis_projection_summary
+    facet_column: trait_id
+    panel_title_column: view_id
+    category_column: endpoint_definition_id
+    label_column: endpoint_definition_id
+    value_column: axis_vector_primary_concordance
+    color_column: endpoint_definition_id
+    sort_rule: label_asc
+    measure_kind: metric
+    value_kind: score
+    value_label: Axis concordance to primary endpoint
+    reference_line: 0.0
+    semantics_ref: plot_semantics/rt_lnrna_trait_axis_endpoint_sensitivity.yaml
+  rt_lnrna_trait_axis_view_scorecard:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    scalar: rt_lnrna_trait_axis_projection_summary
+    facet_column: trait_id
+    panel_title_column: view_id
+    category_column: endpoint_definition_id
+    label_column: endpoint_definition_id
+    value_column: axis_projection_spearman
+    color_column: endpoint_definition_id
+    sort_rule: label_asc
+    measure_kind: metric
+    value_kind: score
+    value_label: Source-value Spearman correlation
+    reference_line: 0.0
+    semantics_ref: plot_semantics/rt_lnrna_trait_axis_view_scorecard.yaml
+  rt_lnrna_reference_compiler_axis_projection:
+    kind: distribution_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalars:
+      - rt_lnrna_trait_axis_projection_rows
+    metric_columns: [axis_projection, endpoint_margin]
+    panel_titles:
+      - Trait-axis projection by scored population
+      - Endpoint margin by scored population
+    x_axis_label: Scored population role
+    y_axis_label: Trait-axis score
+    color_column: population_role
+    render_mode: violin_box
+    filter_options: *rt_lnrna_trait_axis_filter
+    semantics_ref: plot_semantics/rt_lnrna_reference_compiler_axis_projection.yaml
+  rt_lnrna_slot_context_robustness_summary:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalar: rt_lnrna_slot_context_robustness_summary_metrics
+    facet_column: category
+    panel_title_column: display_name
+    category_column: label
+    label_column: candidate_label
+    value_column: metric_value
+    color_column: candidate_family
+    direction_column: direction
+    unit_column: unit
+    sort_rule: candidate_order
+    measure_kind: metric
+    value_kind: score
+    value_label: Metric value
+    semantics_ref: plot_semantics/rt_lnrna_slot_context_robustness_summary.yaml
+  rt_lnrna_slot_geometry_scatter_gallery:
+    kind: xy_scatter_grid
+    visibility_tier: primary
+    single_row_panels: true
+    scalars:
+      - rt_lnrna_slot_delta_intermediate_full_lnrna
+      - rt_lnrna_slot_delta_intermediate_full_rt
+      - rt_lnrna_slot_delta_intermediate_lnrna_rt
+      - rt_lnrna_slot_delta_intermediate_full_fwd_rc
+    panel_titles:
+      - Full 2,000 bp vs lnRNA span
+      - Full 2,000 bp vs RT CDS span
+      - lnRNA span vs RT CDS span
+      - Full forward vs reverse complement
+    x_column: context_self_cosine
+    y_column: context_shift_l2
+    x_axis_label: Aligned row cosine stability
+    y_axis_label: Aligned row L2 shift
+    default_hue: candidate_source
+    hue_options:
+      - {column: candidate_source, label: Candidate source, type: categorical}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: abundance_affiliation, label: Abundance affiliation, type: categorical}
+      - {column: rt_variant_class, label: RT variant class, type: categorical}
+    semantics_ref: plot_semantics/rt_lnrna_slot_geometry_scatter_gallery.yaml
+  rt_lnrna_candidate_decision_frontier:
+    kind: xy_scatter
+    visibility_tier: primary
+    scalar: rt_lnrna_candidate_decision_frontier_metrics
+    x_column: source_family_separation_ratio
+    y_column: crawford_abundance_ordinal_spearman
+    x_axis_label: Source-family separation ratio
+    y_axis_label: Crawford source-scoped abundance ordinal Spearman
+    size_column: effective_rank
+    size_range: [140, 260]
+    shape_column: frontier_label
+    label_column: frontier_label
+    label_values:
+      - Full 2,000 bp
+      - lnRNA span
+      - RT CDS span
+      - lnRNA + RT CDS pair
+    semantics_ref: plot_semantics/rt_lnrna_candidate_decision_frontier.yaml
+  rt_lnrna_candidate_x_scorecard:
+    kind: metric_panel_grid
+    visibility_tier: primary
+    scalar: rt_lnrna_candidate_x_scorecard_metrics
+    facet_column: category
+    panel_title_column: display_name
+    category_column: scorecard_section
+    label_column: candidate_label
+    value_column: metric_value
+    color_column: candidate_family
+    direction_column: direction
+    unit_column: unit
+    sort_rule: candidate_order
+    measure_kind: metric
+    value_kind: score
+    value_label: Metric value
+    semantics_ref: plot_semantics/rt_lnrna_candidate_x_scorecard.yaml
+  appendix_umap_gallery:
+    kind: projection_grid
+    visibility_tier: appendix
+    projections:
+      - umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    panel_titles:
+      - Full 2,000 bp intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
+      - Full 2,000 bp output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
+    default_hue: candidate_source
+    hue_options:
+      - {column: candidate_source, label: Candidate source, type: categorical}
+      - {column: source_family, label: Source family, type: categorical}
+      - {column: source_literature_id, label: Literature source, type: categorical}
+      - {column: source_regime, label: Source regime, type: categorical}
+      - {column: abundance_affiliation, label: Abundance affiliation, type: categorical}
+      - {column: construct_projection_status, label: Construct projection, type: categorical}
+      - {column: rt_variant_class, label: RT variant class, type: categorical}
+      - {column: rt_dms_mutation_class, label: RT-DMS mutation class, type: categorical}
+      - {column: template_name, label: Template, type: categorical}
+      - {column: reader_spop_score_median, label: Reader SPOP median, type: continuous, scale: panel}
+      - {column: reader_spop_overlay_status, label: Reader SPOP status, type: categorical}
+      - {column: khan_abundance_normalized_value, label: Khan PAGE RT-DNA abundance, type: continuous, scale: panel}
+      - {column: khan_abundance_ordinal_bin, label: Khan abundance group, type: ordinal}
+      - {column: crawford_abundance_raw_value, label: Crawford Fig2 Eco1 msDNA score, type: continuous, scale: panel}
+      - {column: crawford_abundance_ordinal_bin, label: Crawford score group, type: ordinal}
+      - {column: crawford_design_reference_status, label: Crawford design reference, type: categorical}
+    annotation:
+      reference_set: reference_genbank_catalog_rows
+      missing_policy: allow
+    semantics_ref: plot_semantics/appendix_umap_gallery.yaml
+notebooks:
+  latent_geometry_browser:
+    kind: workspace
+    title: RT-lnRNA latent geometry browser
+    description: Read-only QC browser for dual-cassette construct, lnRNA span, RT CDS span, and paired-span Evo2 7B views.
+    default_deliverable: rt_lnrna_trait_axis_projection
+    default_surface: plots
+    candidate_sets:
+      - rt_lnrna_construct_gallery_v1
+      - rt_lnrna_output_layer_diagnostics_v1
+      - rt_lnrna_opal_x_review_v1
+    default_candidate_set: rt_lnrna_construct_gallery_v1
+    default_reference_set: reference_genbank_catalog_rows
+    context_audit_scalar_ids:
+      - rt_lnrna_slot_context_robustness_summary_metrics
+    geometry_order:
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    candidate_grid_views:
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+      - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+      - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+      - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    candidate_grid_panel_titles:
+      - Full 2,000 bp intermediate
+      - lnRNA span intermediate
+      - RT CDS span intermediate
+      - lnRNA + RT CDS pair intermediate
+      - Full 2,000 bp output layer
+      - lnRNA span output layer
+      - RT CDS span output layer
+      - lnRNA + RT CDS pair output layer
+    show_missing_projection_placeholders: false
+    preferred_hues:
+      - candidate_source
+      - source_family
+      - source_literature_id
+      - source_regime
+      - abundance_affiliation
+      - construct_projection_status
+      - rt_variant_class
+      - rt_dms_mutation_class
+      - template_name
+      - reader_spop_score_median
+      - reader_spop_overlay_status
+      - khan_abundance_normalized_value
+      - khan_abundance_ordinal_bin
+      - crawford_abundance_raw_value
+      - crawford_abundance_ordinal_bin
+      - crawford_design_reference_status
+    preferred_hue_kinds:
+      candidate_source: categorical
+      source_family: categorical
+      source_literature_id: categorical
+      source_regime: categorical
+      abundance_affiliation: categorical
+      construct_projection_status: categorical
+      rt_variant_class: categorical
+      rt_dms_mutation_class: categorical
+      template_name: categorical
+      reader_spop_score_median: continuous
+      reader_spop_overlay_status: categorical
+      khan_abundance_normalized_value: continuous
+      khan_abundance_ordinal_bin: ordinal
+      crawford_abundance_raw_value: continuous
+      crawford_abundance_ordinal_bin: ordinal
+      crawford_design_reference_status: categorical
+    reference_hue_options:
+      - label: Candidate source
+        column: candidate_source
+        type: categorical
+        reference_set_ids:
+          - reference_genbank_catalog_rows
+          - reference_source_family_anchors
+          - reference_msd_compiler_landmarks
+          - reference_khan_abundance_rows
+          - reference_crawford_design_affiliated_rows
+          - reference_reader_spop_assayed_genbank_rows
+      - label: Literature source
+        column: source_literature_id
+        type: categorical
+        reference_set_ids:
+          - reference_genbank_catalog_rows
+          - reference_khan_abundance_rows
+          - reference_crawford_design_affiliated_rows
+          - reference_reader_spop_assayed_genbank_rows
+      - label: Reader SPOP median
+        column: reader_spop_score_median
+        type: continuous
+        reference_set_ids:
+          - reference_genbank_catalog_rows
+          - reference_reader_spop_assayed_genbank_rows
+      - label: Reader SPOP status
+        column: reader_spop_overlay_status
+        type: categorical
+        reference_set_ids:
+          - reference_genbank_catalog_rows
+          - reference_reader_spop_assayed_genbank_rows
+      - label: Abundance affiliation
+        column: abundance_affiliation
+        type: categorical
+        reference_set_ids:
+          - reference_khan_abundance_rows
+          - reference_crawford_high_abundance_examples
+          - reference_crawford_low_abundance_examples
+      - label: Crawford score group
+        column: crawford_abundance_ordinal_bin
+        type: ordinal
+        reference_set_ids:
+          - reference_crawford_high_abundance_examples
+          - reference_crawford_low_abundance_examples
+      - label: Khan abundance group
+        column: khan_abundance_ordinal_bin
+        type: ordinal
+        reference_set_ids:
+          - reference_khan_abundance_rows
+    default_layout: candidate_grid
+    default_compare_views:
+      - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+      - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    ordered_plots:
+      - rt_lnrna_dataset_overview
+      - rt_lnrna_trait_axis_existence
+      - rt_lnrna_crawford_khan_axis_agreement
+      - rt_lnrna_trait_axis_endpoint_sensitivity
+      - rt_lnrna_trait_axis_view_scorecard
+      - rt_lnrna_reference_compiler_axis_projection
+      - representation_health_summary
+      - rt_lnrna_source_structure_summary
+      - rt_lnrna_overlay_ordinal_audit
+      - rt_lnrna_abundance_margin_ladder_gallery
+      - rt_lnrna_abundance_margin_scatter_gallery
+      - rt_lnrna_slot_context_robustness_summary
+      - rt_lnrna_slot_geometry_scatter_gallery
+      - rt_lnrna_candidate_decision_frontier
+      - rt_lnrna_candidate_x_scorecard
+      - appendix_umap_gallery
+      - representation_scree_diagnostic
+recipes:
+  rt_lnrna_representation_review_recipe:
+    steps:
+      - {id: materialize_intermediate_embedding_7b_dual_cassette_2000bp_seq_mean, op: view.materialize, params: {view: intermediate_embedding_7b_dual_cassette_2000bp_seq_mean}}
+      - {id: materialize_intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean, op: view.materialize, params: {view: intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean}}
+      - {id: materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean}}
+      - {id: materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean}}
+      - {id: materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean}}
+      - {id: materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_dual_cassette_2000bp_seq_mean, op: view.materialize, params: {view: output_layer_mean_7b_dual_cassette_2000bp_seq_mean}}
+      - {id: materialize_output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean, op: view.materialize, params: {view: output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean}}
+      - {id: materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean}}
+      - {id: materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean, op: view.materialize, params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean}}
+      - id: derive_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        op: view.derive
+        depends_on:
+          - materialize_intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+          - materialize_intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+        params: {view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+      - id: derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        op: view.derive
+        depends_on:
+          - materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+          - materialize_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        op: view.derive
+        depends_on:
+          - materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+          - materialize_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        op: view.derive
+        depends_on:
+          - derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - id: derive_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        op: view.derive
+        depends_on:
+          - materialize_output_layer_mean_7b_dual_cassette_2000bp_seq_mean
+          - materialize_output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+        params: {view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+      - id: derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        op: view.derive
+        depends_on:
+          - materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean
+          - materialize_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        op: view.derive
+        depends_on:
+          - materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean
+          - materialize_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
+        params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+      - id: derive_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        op: view.derive
+        depends_on:
+          - derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - id: build_alignment_rt_lnrna_intermediate_full_to_lnrna_slot
+        op: alignment.build
+        depends_on:
+          - derive_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        params: {alignment: rt_lnrna_intermediate_full_to_lnrna_slot}
+      - id: build_alignment_rt_lnrna_intermediate_full_to_rt_slot
+        op: alignment.build
+        depends_on:
+          - derive_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {alignment: rt_lnrna_intermediate_full_to_rt_slot}
+      - id: build_alignment_rt_lnrna_intermediate_lnrna_slot_to_rt_slot
+        op: alignment.build
+        depends_on:
+          - derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {alignment: rt_lnrna_intermediate_lnrna_slot_to_rt_slot}
+      - id: build_alignment_rt_lnrna_intermediate_full_forward_to_reverse_complement
+        op: alignment.build
+        depends_on:
+          - materialize_intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+          - materialize_intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+        params: {alignment: rt_lnrna_intermediate_full_forward_to_reverse_complement}
+      - id: build_alignment_rt_lnrna_output_full_to_lnrna_slot
+        op: alignment.build
+        depends_on:
+          - derive_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        params: {alignment: rt_lnrna_output_full_to_lnrna_slot}
+      - id: build_alignment_rt_lnrna_output_full_to_rt_slot
+        op: alignment.build
+        depends_on:
+          - derive_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {alignment: rt_lnrna_output_full_to_rt_slot}
+      - id: build_alignment_rt_lnrna_output_lnrna_slot_to_rt_slot
+        op: alignment.build
+        depends_on:
+          - derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        params: {alignment: rt_lnrna_output_lnrna_slot_to_rt_slot}
+      - id: build_alignment_rt_lnrna_output_full_forward_to_reverse_complement
+        op: alignment.build
+        depends_on:
+          - materialize_output_layer_mean_7b_dual_cassette_2000bp_seq_mean
+          - materialize_output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+        params: {alignment: rt_lnrna_output_full_forward_to_reverse_complement}
+      - &sample_ie7_full {id: build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat], params: {sample: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, strategy: all, seed: 17}}
+      - &sample_ie7_lnrna {id: build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ie7_rt {id: build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ie7_pair {id: build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: sample.build, depends_on: [derive_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {sample: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, strategy: all, seed: 17}}
+      - &sample_ol7_full {id: build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat], params: {sample: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, strategy: all, seed: 17}}
+      - &sample_ol7_lnrna {id: build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ol7_rt {id: build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {sample: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, strategy: all, seed: 17}}
+      - &sample_ol7_pair {id: build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: sample.build, depends_on: [derive_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {sample: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, strategy: all, seed: 17}}
+      - id: build_rt_lnrna_dataset_overview_counts
+        op: scalar.build
+        depends_on:
+          - materialize_intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+        params:
+          scalar: rt_lnrna_dataset_overview_counts
+          kind: dataset_overview
+          source_ids:
+            - dual_cassette_2000bp_seq_mean_intermediate
+          dimensions:
+            - dimension: source_family
+              label: Source family
+              column: source_family
+            - dimension: source_promotion_status
+              label: Promotion status
+              column: source_promotion_status
+            - dimension: abundance_affiliation
+              label: Abundance affiliation
+              column: abundance_affiliation
+            - dimension: construct_projection_status
+              label: Construct projection
+              column: construct_projection_status
+            - dimension: label_readiness_status
+              label: Label readiness
+              column: label_readiness_status
+            - dimension: source_window_case
+              label: Source window case
+              column: source_window_case
+      - id: build_rt_lnrna_source_structure_summary_metrics
+        op: scalar.build
+        depends_on:
+          - build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params:
+          scalar: rt_lnrna_source_structure_summary_metrics
+          kind: design_structure_summary
+          bootstrap_iterations: 100
+          seed: 17
+          axes:
+            - {axis_id: source_family, column: source_family, metric_id: source_family_separation_ratio, label: Source-family separation ratio}
+            - {axis_id: rt_variant_class, column: rt_variant_class, metric_id: rt_variant_class_separation_ratio, label: RT variant-class separation ratio}
+            - {axis_id: khan_overlay_status, column: khan_abundance_overlay_status, metric_id: khan_overlay_separation_ratio, label: Khan overlay separation ratio}
+            - {axis_id: crawford_overlay_status, column: crawford_abundance_overlay_status, metric_id: crawford_overlay_separation_ratio, label: Crawford overlay separation ratio}
+            - {axis_id: compiler_msd_cap, column: compiler_msd_cap_id, metric_id: compiler_msd_cap_separation_ratio, label: Compiler cap separation ratio, exclude_values: [no_compiler_cap]}
+            - {axis_id: compiler_msd_stem, column: compiler_msd_stem_profile, metric_id: compiler_msd_stem_separation_ratio, label: Compiler stem-profile separation ratio, exclude_values: [no_compiler_stem_profile]}
+            - {axis_id: rt_dms_mutation_class, column: rt_dms_mutation_class, metric_id: rt_dms_mutation_class_separation_ratio, label: RT-DMS mutation-class separation ratio}
+            - {axis_id: source_regime, column: source_regime, metric_id: source_regime_separation_ratio, label: Source-regime separation ratio, exclude_values: [source_regime_unassigned]}
+          candidates:
+            - {view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - &pca_ie7_full {id: reduce_pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, reduced_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat_reduced, sample: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, dims: 16}}
+      - &pca_ie7_lnrna {id: reduce_pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ie7_rt {id: reduce_pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ie7_pair {id: reduce_pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: view.reduce, depends_on: [build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reduced_view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat_reduced, sample: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, dims: 16}}
+      - &pca_ol7_full {id: reduce_pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, reduced_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat_reduced, sample: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, dims: 16}}
+      - &pca_ol7_lnrna {id: reduce_pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ol7_rt {id: reduce_pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reduced_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat_reduced, sample: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, dims: 16}}
+      - &pca_ol7_pair {id: reduce_pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: view.reduce, depends_on: [build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reduced_view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat_reduced, sample: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, dims: 16}}
+      - {id: fit_umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, seed: 17}}
+      - {id: fit_umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: projection.fit, depends_on: [build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat], params: {view: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, sample: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, run_id: umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat], params: {view: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, run_id: umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, seed: 17}}
+      - {id: fit_umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, op: projection.fit, depends_on: [build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat], params: {view: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, run_id: umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, seed: 17}}
+      - id: build_representation_health_summary_metrics
+        op: scalar.build
+        depends_on:
+          - reduce_pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - reduce_pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params:
+          scalar: representation_health_summary_metrics
+          kind: representation_health_summary
+          collapse_rules:
+            effective_rank_min: 2.0
+            pc1_fraction_max: 0.80
+            pairwise_distance_iqr_min: 0.01
+          pairwise_max_rows: 4096
+          pairwise_seed: 17
+          candidates:
+            - {view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, reducer_id: pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reducer_id: pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+            - {view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, reducer_id: pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, reducer_id: pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, reducer_id: pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - id: build_rt_lnrna_overlay_ordinal_audit_metrics
+        op: scalar.build
+        depends_on:
+          - build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params:
+          scalar: rt_lnrna_overlay_ordinal_audit_metrics
+          kind: ordinal_axes_audit
+          balance_columns: []
+          bootstrap_iterations: 100
+          permutations: 100
+          seed: 17
+          candidates:
+            - {view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+            - {view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+          axes:
+            - axis_id: khan_abundance
+              label: Khan PAGE RT-DNA abundance group
+              column: khan_abundance_ordinal_bin
+              order_path: study_inputs/khan_abundance_order.yaml
+              metric_ids:
+                spearman: khan_abundance_ordinal_spearman
+                kendall: khan_abundance_ordinal_kendall
+                balanced_spearman: khan_abundance_balanced_ordinal_spearman
+                permutation_pvalue: khan_abundance_label_permutation_pvalue
+            - axis_id: crawford_abundance
+              label: Crawford Fig2 Eco1 msDNA score group
+              column: crawford_abundance_ordinal_bin
+              order_path: study_inputs/crawford_abundance_order.yaml
+              metric_ids:
+                spearman: crawford_abundance_ordinal_spearman
+                kendall: crawford_abundance_ordinal_kendall
+                balanced_spearman: crawford_abundance_balanced_ordinal_spearman
+                permutation_pvalue: crawford_abundance_label_permutation_pvalue
+      - &rt_lnrna_abundance_ladder_rows_intermediate_dual
+        id: build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        op: scalar.build
+        depends_on: [build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          kind: ordinal_ladder_rows
+          groups: &rt_lnrna_abundance_ladder_rows_groups
+            - group_id: khan_abundance
+              label: Khan PAGE RT-DNA abundance
+              source_value_column: khan_abundance_normalized_value
+              source_value_label: Khan PAGE RT-DNA abundance vs Eco1
+              axis:
+                axis_id: khan_abundance
+                label: Khan PAGE RT-DNA abundance group
+                column: khan_abundance_ordinal_bin
+                order_path: study_inputs/khan_abundance_order.yaml
+                stronger_rank: max
+              where:
+                - {column: khan_abundance_overlay_status, equals: abundance_affiliated}
+            - group_id: crawford_abundance
+              label: Crawford Fig2 Eco1 msDNA score
+              source_value_column: crawford_abundance_raw_value
+              source_value_label: Crawford Fig2 Eco1 msDNA score vs mean WT
+              axis:
+                axis_id: crawford_abundance
+                label: Crawford Fig2 Eco1 msDNA score group
+                column: crawford_abundance_ordinal_bin
+                order_path: study_inputs/crawford_abundance_order.yaml
+                stronger_rank: max
+              where:
+                - {column: crawford_abundance_overlay_status, equals: abundance_affiliated}
+          candidates:
+            - {view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+      - &rt_lnrna_abundance_ladder_rows_intermediate_lnrna
+        id: build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        op: scalar.build
+        depends_on: [build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          kind: ordinal_ladder_rows
+          groups: *rt_lnrna_abundance_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+      - &rt_lnrna_abundance_ladder_rows_intermediate_rt
+        id: build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        op: scalar.build
+        depends_on: [build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          kind: ordinal_ladder_rows
+          groups: *rt_lnrna_abundance_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+      - &rt_lnrna_abundance_ladder_rows_intermediate_pair
+        id: build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        op: scalar.build
+        depends_on: [build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          kind: ordinal_ladder_rows
+          groups: *rt_lnrna_abundance_ladder_rows_groups
+          candidates:
+            - {view_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - &rt_lnrna_abundance_ladder_rows_output_dual
+        id: build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        op: scalar.build
+        depends_on: [build_sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          kind: ordinal_ladder_rows
+          groups: *rt_lnrna_abundance_ladder_rows_groups
+          candidates:
+            - {view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, sample_id: sample_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+      - &rt_lnrna_abundance_ladder_rows_output_lnrna
+        id: build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        op: scalar.build
+        depends_on: [build_sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          kind: ordinal_ladder_rows
+          groups: *rt_lnrna_abundance_ladder_rows_groups
+          candidates:
+            - {view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+      - &rt_lnrna_abundance_ladder_rows_output_rt
+        id: build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        op: scalar.build
+        depends_on: [build_sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          kind: ordinal_ladder_rows
+          groups: *rt_lnrna_abundance_ladder_rows_groups
+          candidates:
+            - {view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, sample_id: sample_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+      - &rt_lnrna_abundance_ladder_rows_output_pair
+        id: build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        op: scalar.build
+        depends_on: [build_sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat]
+        params:
+          scalar: rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          kind: ordinal_ladder_rows
+          groups: *rt_lnrna_abundance_ladder_rows_groups
+          candidates:
+            - {view_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, sample_id: sample_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+      - id: build_rt_lnrna_trait_axis_projection_rows
+        op: scalar.build
+        depends_on:
+          - build_sample_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_sample_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_sample_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params:
+          scalar: rt_lnrna_trait_axis_projection_rows
+          kind: trait_axis_projection_rows
+          candidate_id_column: construct_subject__id
+          metadata_columns:
+            - source_family
+            - candidate_source
+            - source_literature_id
+            - source_variant_id
+            - abundance_affiliation
+            - rt_variant_class
+            - rt_dms_mutation_class
+            - compiler_msd_design_id
+            - crawford_abundance_ordinal_bin
+            - khan_abundance_ordinal_bin
+            - reader_spop_overlay_status
+            - reader_spop_score_median
+            - reader_spop_experiment_ids
+          candidate_views:
+            - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+            - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          axes:
+            - trait_id: crawford_eco1_msdna_abundance
+              axis_id: crawford_eco1_msdna_abundance_axis
+              label: Crawford Eco1 msDNA abundance
+              source_value_column: crawford_abundance_raw_value
+              primary_endpoint_definition_id: quantile_0_10
+              fit_population:
+                population_id: crawford_abundance_fit_basis
+                role: fit
+                where:
+                  - {column: source_family, equals: crawford_eco1_lnrna_fixed_wt_rt}
+                  - {column: crawford_abundance_raw_value, finite: true}
+              endpoint_groups:
+                method: quantile
+                value_column: crawford_abundance_raw_value
+                low_quantile: 0.10
+                high_quantile: 0.90
+                min_low_rows: 10
+                min_high_rows: 10
+              endpoint_sensitivity:
+                enabled: true
+                endpoint_definitions: [min_max, quantile_0_05, quantile_0_10, quantile_0_20]
+              score_populations:
+                - population_id: crawford_labeled
+                  role: fit
+                  where:
+                    - {column: source_family, equals: crawford_eco1_lnrna_fixed_wt_rt}
+                - population_id: khan_labeled
+                  role: eval
+                  where:
+                    - {column: source_family, equals: khan_abundance_affiliated_rt_lnrna_reference}
+                - population_id: genbank_catalog
+                  role: reference
+                  where:
+                    - {column: source_family, equals: genbank_variant_catalog}
+                - population_id: compiler_msd
+                  role: reference
+                  where:
+                    - {column: source_family, equals: compiler_generated_msd_lnrna_variant}
+                - population_id: rt_cds_dms
+                  role: sensitivity
+                  where:
+                    - {column: source_family, equals: in_silico_rt_cds_dms}
+            - trait_id: khan_rt_dna_abundance
+              axis_id: khan_rt_dna_abundance_axis
+              label: Khan RT-DNA abundance
+              source_value_column: khan_abundance_normalized_value
+              primary_endpoint_definition_id: quantile_0_20
+              fit_population:
+                population_id: khan_abundance_fit_basis
+                role: fit
+                where:
+                  - {column: source_family, equals: khan_abundance_affiliated_rt_lnrna_reference}
+                  - {column: khan_abundance_normalized_value, finite: true}
+              endpoint_groups:
+                method: quantile
+                value_column: khan_abundance_normalized_value
+                low_quantile: 0.20
+                high_quantile: 0.80
+                min_low_rows: 3
+                min_high_rows: 3
+              endpoint_sensitivity:
+                enabled: true
+                endpoint_definitions: [min_max, quantile_0_20]
+              score_populations:
+                - population_id: khan_labeled
+                  role: fit
+                  where:
+                    - {column: source_family, equals: khan_abundance_affiliated_rt_lnrna_reference}
+                - population_id: crawford_labeled
+                  role: eval
+                  where:
+                    - {column: source_family, equals: crawford_eco1_lnrna_fixed_wt_rt}
+                - population_id: genbank_catalog
+                  role: reference
+                  where:
+                    - {column: source_family, equals: genbank_variant_catalog}
+                - population_id: compiler_msd
+                  role: reference
+                  where:
+                    - {column: source_family, equals: compiler_generated_msd_lnrna_variant}
+                - population_id: rt_cds_dms
+                  role: sensitivity
+                  where:
+                    - {column: source_family, equals: in_silico_rt_cds_dms}
+      - id: build_rt_lnrna_trait_axis_projection_summary
+        op: scalar.build
+        depends_on:
+          - build_rt_lnrna_trait_axis_projection_rows
+        params:
+          scalar: rt_lnrna_trait_axis_projection_summary
+          kind: trait_axis_projection_summary
+          source_scalar: rt_lnrna_trait_axis_projection_rows
+          score_columns:
+            - axis_projection
+            - endpoint_margin
+          concordance:
+            enabled: true
+            compare_trait_ids:
+              - [crawford_eco1_msdna_abundance, khan_rt_dna_abundance]
+      - id: build_rt_lnrna_trait_axis_projection_concordance
+        op: scalar.build
+        depends_on:
+          - build_rt_lnrna_trait_axis_projection_summary
+        params:
+          scalar: rt_lnrna_trait_axis_projection_concordance
+          kind: scalar_sidecar_table
+          source_scalar: rt_lnrna_trait_axis_projection_summary
+          sidecar: axis_concordance.parquet
+          required_columns:
+            - view_id
+            - endpoint_definition_id
+            - left_trait_id
+            - right_trait_id
+            - left_axis_id
+            - right_axis_id
+            - axis_concordance
+            - axis_angle
+            - normalization_policy
+      - id: build_rt_lnrna_slot_delta_intermediate_full_lnrna
+        op: scalar.build
+        depends_on:
+          - build_alignment_rt_lnrna_intermediate_full_to_lnrna_slot
+        params:
+          scalar: rt_lnrna_slot_delta_intermediate_full_lnrna
+          kind: alignment_metrics
+          alignment_id: rt_lnrna_intermediate_full_to_lnrna_slot
+          left_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          right_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          metadata_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          left_margin_source: null
+          right_margin_source: null
+          margin_deltas: []
+          sample_size: 4096
+          sample_group_column: candidate_source
+          table_sample_only: true
+          seed: 17
+      - id: build_rt_lnrna_slot_delta_intermediate_full_rt
+        op: scalar.build
+        depends_on:
+          - build_alignment_rt_lnrna_intermediate_full_to_rt_slot
+        params:
+          scalar: rt_lnrna_slot_delta_intermediate_full_rt
+          kind: alignment_metrics
+          alignment_id: rt_lnrna_intermediate_full_to_rt_slot
+          left_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          right_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          metadata_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          left_margin_source: null
+          right_margin_source: null
+          margin_deltas: []
+          sample_size: 4096
+          sample_group_column: candidate_source
+          table_sample_only: true
+          seed: 18
+      - id: build_rt_lnrna_slot_delta_intermediate_lnrna_rt
+        op: scalar.build
+        depends_on:
+          - build_alignment_rt_lnrna_intermediate_lnrna_slot_to_rt_slot
+        params:
+          scalar: rt_lnrna_slot_delta_intermediate_lnrna_rt
+          kind: alignment_metrics
+          alignment_id: rt_lnrna_intermediate_lnrna_slot_to_rt_slot
+          left_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          right_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          metadata_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          left_margin_source: null
+          right_margin_source: null
+          margin_deltas: []
+          sample_size: 4096
+          sample_group_column: candidate_source
+          table_sample_only: true
+          seed: 19
+      - id: build_rt_lnrna_slot_delta_intermediate_full_fwd_rc
+        op: scalar.build
+        depends_on:
+          - build_alignment_rt_lnrna_intermediate_full_forward_to_reverse_complement
+        params:
+          scalar: rt_lnrna_slot_delta_intermediate_full_fwd_rc
+          kind: alignment_metrics
+          alignment_id: rt_lnrna_intermediate_full_forward_to_reverse_complement
+          left_view_id: intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+          right_view_id: intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean
+          metadata_view_id: intermediate_embedding_7b_dual_cassette_2000bp_seq_mean
+          left_margin_source: null
+          right_margin_source: null
+          margin_deltas: []
+          sample_size: 4096
+          sample_group_column: candidate_source
+          table_sample_only: true
+          seed: 20
+      - id: build_rt_lnrna_slot_context_robustness_summary_metrics
+        op: scalar.build
+        depends_on:
+          - build_alignment_rt_lnrna_intermediate_full_to_lnrna_slot
+          - build_alignment_rt_lnrna_intermediate_full_to_rt_slot
+          - build_alignment_rt_lnrna_intermediate_lnrna_slot_to_rt_slot
+          - build_alignment_rt_lnrna_intermediate_full_forward_to_reverse_complement
+          - build_alignment_rt_lnrna_output_full_to_lnrna_slot
+          - build_alignment_rt_lnrna_output_full_to_rt_slot
+          - build_alignment_rt_lnrna_output_lnrna_slot_to_rt_slot
+          - build_alignment_rt_lnrna_output_full_forward_to_reverse_complement
+        params:
+          scalar: rt_lnrna_slot_context_robustness_summary_metrics
+          kind: context_robustness_summary
+          sample_size: 4096
+          sample_group_column: candidate_source
+          seed: 17
+          retention_axes:
+            - {axis_id: source_family, column: source_family, metric_id: source_family_retention_correlation, label: Source-family retention}
+            - {axis_id: abundance_affiliation, column: abundance_affiliation, metric_id: abundance_affiliation_retention_correlation, label: Abundance-affiliation retention}
+            - {axis_id: rt_variant_class, column: rt_variant_class, metric_id: rt_variant_class_retention_correlation, label: RT variant-class retention, exclude_values: [variant_class_unassigned]}
+          pairs:
+            - {pair_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Intermediate: full 2,000 bp vs lnRNA span", alignment_id: rt_lnrna_intermediate_full_to_lnrna_slot, anchor_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, context_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "Intermediate: lnRNA span vs full 2,000 bp", alignment_id: rt_lnrna_intermediate_full_to_lnrna_slot, anchor_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "Intermediate: RT CDS span vs full 2,000 bp", alignment_id: rt_lnrna_intermediate_full_to_rt_slot, anchor_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "Intermediate: lnRNA span vs RT CDS span", alignment_id: rt_lnrna_intermediate_lnrna_slot_to_rt_slot, anchor_view_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: rt_lnrna_intermediate_forward_reverse_stability, label: "Intermediate: full forward vs reverse complement", alignment_id: rt_lnrna_intermediate_full_forward_to_reverse_complement, anchor_view_id: intermediate_embedding_7b_dual_cassette_2000bp_seq_mean, context_view_id: intermediate_embedding_7b_dual_cassette_2000bp_reverse_complement_seq_mean}
+            - {pair_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Output layer: full 2,000 bp vs lnRNA span", alignment_id: rt_lnrna_output_full_to_lnrna_slot, anchor_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat, context_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "Output layer: lnRNA span vs full 2,000 bp", alignment_id: rt_lnrna_output_full_to_lnrna_slot, anchor_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "Output layer: RT CDS span vs full 2,000 bp", alignment_id: rt_lnrna_output_full_to_rt_slot, anchor_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {pair_id: output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "Output layer: lnRNA span vs RT CDS span", alignment_id: rt_lnrna_output_lnrna_slot_to_rt_slot, anchor_view_id: output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, context_view_id: output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {pair_id: rt_lnrna_output_forward_reverse_stability, label: "Output layer: full forward vs reverse complement", alignment_id: rt_lnrna_output_full_forward_to_reverse_complement, anchor_view_id: output_layer_mean_7b_dual_cassette_2000bp_seq_mean, context_view_id: output_layer_mean_7b_dual_cassette_2000bp_reverse_complement_seq_mean}
+      - id: build_rt_lnrna_candidate_decision_frontier_metrics
+        op: scalar.build
+        depends_on:
+          - build_representation_health_summary_metrics
+          - build_rt_lnrna_source_structure_summary_metrics
+          - build_rt_lnrna_overlay_ordinal_audit_metrics
+          - build_rt_lnrna_slot_context_robustness_summary_metrics
+        params:
+          scalar: rt_lnrna_candidate_decision_frontier_metrics
+          kind: candidate_decision_frontier
+          health_scalar: representation_health_summary_metrics
+          design_scalar: rt_lnrna_source_structure_summary_metrics
+          design_metric_id: source_family_separation_ratio
+          design_output_column: source_family_separation_ratio
+          design_display_name: Source-family separation ratio
+          ordinal_scalar: rt_lnrna_overlay_ordinal_audit_metrics
+          ordinal_metric_id: crawford_abundance_ordinal_spearman
+          ordinal_output_column: crawford_abundance_ordinal_spearman
+          ordinal_display_name: Crawford source-scoped abundance ordinal Spearman
+          context_scalar: rt_lnrna_slot_context_robustness_summary_metrics
+          candidate_ids:
+            - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+            - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          context_pairs:
+            - {candidate_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, pair_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat}
+            - {candidate_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, pair_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat}
+            - {candidate_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, pair_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat}
+            - {candidate_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, pair_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat}
+          annotation_labels:
+            - {candidate_id: intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat, label: "Full 2,000 bp"}
+            - {candidate_id: intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat, label: "lnRNA span"}
+            - {candidate_id: intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat, label: "RT CDS span"}
+            - {candidate_id: intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat, label: "lnRNA + RT CDS pair"}
+      - id: build_rt_lnrna_candidate_x_scorecard_metrics
+        op: scalar.build
+        depends_on:
+          - build_representation_health_summary_metrics
+          - build_rt_lnrna_source_structure_summary_metrics
+          - build_rt_lnrna_overlay_ordinal_audit_metrics
+          - build_rt_lnrna_slot_context_robustness_summary_metrics
+        params:
+          scalar: rt_lnrna_candidate_x_scorecard_metrics
+          kind: candidate_x_selection_scorecard
+          candidate_ids:
+            - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+            - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+            - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          metric_sources:
+            - {scalar: representation_health_summary_metrics, metric_id: effective_rank, section: representation_health}
+            - {scalar: representation_health_summary_metrics, metric_id: pc1_variance_fraction, section: representation_health}
+            - {scalar: rt_lnrna_source_structure_summary_metrics, metric_id: source_family_separation_ratio, section: source_structure}
+            - {scalar: rt_lnrna_source_structure_summary_metrics, metric_id: rt_variant_class_separation_ratio, section: source_structure}
+            - {scalar: rt_lnrna_overlay_ordinal_audit_metrics, metric_id: crawford_abundance_ordinal_spearman, section: abundance_ordinal_signal}
+            - {scalar: rt_lnrna_overlay_ordinal_audit_metrics, metric_id: khan_abundance_ordinal_spearman, section: abundance_ordinal_signal}
+            - {scalar: rt_lnrna_slot_context_robustness_summary_metrics, metric_id: context_self_cosine_median, section: context_robustness}
+          aggregate_sources:
+            - scalar: representation_health_summary_metrics
+              output_metric_id: dimensional_cost
+              source_column: pca_input_dims
+              aggregation: median
+              section: dimensional_cost
+              where:
+                - {column: metric_id, equals: effective_rank}
+      - {id: render_rt_lnrna_dataset_overview, op: plot.render, depends_on: [build_rt_lnrna_dataset_overview_counts], params: {plot_id: rt_lnrna_dataset_overview}}
+      - {id: render_representation_health_summary, op: plot.render, depends_on: [build_representation_health_summary_metrics], params: {plot_id: representation_health_summary}}
+      - {id: render_rt_lnrna_source_structure_summary, op: plot.render, depends_on: [build_rt_lnrna_source_structure_summary_metrics], params: {plot_id: rt_lnrna_source_structure_summary}}
+      - id: render_representation_scree_diagnostic
+        op: plot.render
+        depends_on:
+          - reduce_pca_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - reduce_pca_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - reduce_pca_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params: {plot_id: representation_scree_diagnostic}
+      - {id: render_rt_lnrna_overlay_ordinal_audit, op: plot.render, depends_on: [build_rt_lnrna_overlay_ordinal_audit_metrics], params: {plot_id: rt_lnrna_overlay_ordinal_audit}}
+      - id: render_rt_lnrna_abundance_margin_ladder_gallery
+        op: plot.render
+        depends_on:
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params: {plot_id: rt_lnrna_abundance_margin_ladder_gallery}
+      - id: render_rt_lnrna_abundance_margin_scatter_gallery
+        op: plot.render
+        depends_on:
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - build_rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params: {plot_id: rt_lnrna_abundance_margin_scatter_gallery}
+      - {id: render_rt_lnrna_trait_axis_existence, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_rows], params: {plot_id: rt_lnrna_trait_axis_existence}}
+      - {id: render_rt_lnrna_crawford_khan_axis_agreement, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_concordance], params: {plot_id: rt_lnrna_crawford_khan_axis_agreement}}
+      - {id: render_rt_lnrna_trait_axis_endpoint_sensitivity, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_summary], params: {plot_id: rt_lnrna_trait_axis_endpoint_sensitivity}}
+      - {id: render_rt_lnrna_trait_axis_view_scorecard, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_summary], params: {plot_id: rt_lnrna_trait_axis_view_scorecard}}
+      - {id: render_rt_lnrna_reference_compiler_axis_projection, op: plot.render, depends_on: [build_rt_lnrna_trait_axis_projection_rows], params: {plot_id: rt_lnrna_reference_compiler_axis_projection}}
+      - {id: render_rt_lnrna_slot_context_robustness_summary, op: plot.render, depends_on: [build_rt_lnrna_slot_context_robustness_summary_metrics], params: {plot_id: rt_lnrna_slot_context_robustness_summary}}
+      - id: render_rt_lnrna_slot_geometry_scatter_gallery
+        op: plot.render
+        depends_on:
+          - build_rt_lnrna_slot_delta_intermediate_full_lnrna
+          - build_rt_lnrna_slot_delta_intermediate_full_rt
+          - build_rt_lnrna_slot_delta_intermediate_lnrna_rt
+          - build_rt_lnrna_slot_delta_intermediate_full_fwd_rc
+        params: {plot_id: rt_lnrna_slot_geometry_scatter_gallery}
+      - {id: render_rt_lnrna_candidate_decision_frontier, op: plot.render, depends_on: [build_rt_lnrna_candidate_decision_frontier_metrics], params: {plot_id: rt_lnrna_candidate_decision_frontier}}
+      - {id: render_rt_lnrna_candidate_x_scorecard, op: plot.render, depends_on: [build_rt_lnrna_candidate_x_scorecard_metrics], params: {plot_id: rt_lnrna_candidate_x_scorecard}}
+      - id: render_appendix_umap_gallery
+        op: plot.render
+        depends_on:
+          - fit_umap_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+          - fit_umap_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+          - fit_umap_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+          - fit_umap_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+          - fit_umap_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        params: {plot_id: appendix_umap_gallery}
+      - id: generate_latent_geometry_browser
+        op: notebook.generate
+        depends_on:
+          - render_rt_lnrna_dataset_overview
+          - render_representation_health_summary
+          - render_rt_lnrna_source_structure_summary
+          - render_representation_scree_diagnostic
+          - render_rt_lnrna_overlay_ordinal_audit
+          - render_rt_lnrna_abundance_margin_ladder_gallery
+          - render_rt_lnrna_abundance_margin_scatter_gallery
+          - render_rt_lnrna_trait_axis_existence
+          - render_rt_lnrna_crawford_khan_axis_agreement
+          - render_rt_lnrna_trait_axis_endpoint_sensitivity
+          - render_rt_lnrna_trait_axis_view_scorecard
+          - render_rt_lnrna_reference_compiler_axis_projection
+          - render_rt_lnrna_slot_context_robustness_summary
+          - render_rt_lnrna_slot_geometry_scatter_gallery
+          - render_rt_lnrna_candidate_decision_frontier
+          - render_rt_lnrna_candidate_x_scorecard
+          - render_appendix_umap_gallery
+        params: {notebook_id: latent_geometry_browser}
+deliverables:
+  rt_lnrna_dataset_overview:
+    title: RT-lnRNA dataset overview
+    section: primary
+    question: What RT-native source families, promotion states, abundance affiliations, projection states, label readiness states, and source-window cases make up the LatentDNA denominator?
+    summary: Dataset inventory for the materialized 2,000 bp RT-lnRNA construct population.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      sources:
+        - dual_cassette_2000bp_seq_mean_intermediate
+    outputs:
+      plots: [rt_lnrna_dataset_overview]
+      scalars: [rt_lnrna_dataset_overview_counts]
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_dataset_overview
+    acceptance_checks:
+      - {kind: required_plot_kind, value: categorical_count}
+  representation_health_summary:
+    title: RT-lnRNA representation health summary
+    section: gates
+    question: Do the planned intermediate and output-layer representation views avoid obvious collapse after Evo2 sidecars exist?
+    summary: PCA-rank and pairwise-distance health gate for the RT-lnRNA candidate gallery.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots: [representation_health_summary]
+      scalars: [representation_health_summary_metrics]
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/gates/representation_health_summary
+    acceptance_checks:
+      - {kind: required_plot_kind, value: metric_panel_grid}
+  rt_lnrna_source_structure_summary:
+    title: RT-lnRNA source and design-structure summary
+    section: primary
+    question: Do the four intermediate candidate-X views preserve RT-native source-family, GenBank variant, abundance overlay, compiler, RT-DMS, and source-regime structure?
+    summary: Generic design/source-structure separation metrics over RT-native metadata axes.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots: [rt_lnrna_source_structure_summary]
+      scalars: [rt_lnrna_source_structure_summary_metrics]
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_source_structure_summary
+    acceptance_checks:
+      - {kind: required_plot_kind, value: metric_panel_grid}
+  representation_scree_diagnostic:
+    title: RT-lnRNA representation scree diagnostic
+    section: appendix
+    question: How concentrated is retained PCA variance for each intermediate and output-layer RT-lnRNA view?
+    summary: Appendix scree curves for the PCA reducers that feed the representation-health collapse gate.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots: [representation_scree_diagnostic]
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/appendix/representation_scree_diagnostic
+    acceptance_checks:
+      - {kind: required_plot_kind, value: curve_grid}
+  rt_lnrna_overlay_ordinal_audit:
+    title: RT-lnRNA overlay ordinal audit
+    section: primary
+    question: Do Khan and Crawford source-scoped abundance groups form coherent ordered axes in each representation view?
+    summary: Ordered metadata-axis audit for Khan PAGE RT-DNA abundance and Crawford Fig2 Eco1 msDNA scores.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots:
+        - rt_lnrna_overlay_ordinal_audit
+        - rt_lnrna_abundance_margin_ladder_gallery
+        - rt_lnrna_abundance_margin_scatter_gallery
+      scalars:
+        - rt_lnrna_overlay_ordinal_audit_metrics
+        - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - rt_lnrna_abundance_ladder_rows_intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - rt_lnrna_abundance_ladder_rows_output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_overlay_ordinal_audit
+    acceptance_checks: []
+  rt_lnrna_trait_axis_projection:
+    title: RT-lnRNA trait-axis projection
+    section: primary
+    question: Does fitted LatentDNA geometry encode source-scoped Crawford or Khan abundance directions across candidate-X views?
+    summary: Row-level projection and compact summary scalars for separately fitted Crawford and Khan abundance trait axes.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots:
+        - rt_lnrna_trait_axis_existence
+        - rt_lnrna_crawford_khan_axis_agreement
+        - rt_lnrna_trait_axis_endpoint_sensitivity
+        - rt_lnrna_trait_axis_view_scorecard
+        - rt_lnrna_reference_compiler_axis_projection
+      scalars:
+        - rt_lnrna_trait_axis_projection_rows
+        - rt_lnrna_trait_axis_projection_summary
+        - rt_lnrna_trait_axis_projection_concordance
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_trait_axis_projection
+    acceptance_checks: []
+  rt_lnrna_slot_context_robustness_summary:
+    title: RT-lnRNA span and context robustness summary
+    section: primary
+    question: How stable are aligned full-construct, lnRNA span, RT CDS span, paired-span, forward/RC, and output-layer relationships?
+    summary: Aligned representation robustness metrics for the span-structured RT-lnRNA construct population.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      alignments:
+        - rt_lnrna_intermediate_full_to_lnrna_slot
+        - rt_lnrna_intermediate_full_to_rt_slot
+        - rt_lnrna_intermediate_lnrna_slot_to_rt_slot
+        - rt_lnrna_intermediate_full_forward_to_reverse_complement
+        - rt_lnrna_output_full_to_lnrna_slot
+        - rt_lnrna_output_full_to_rt_slot
+        - rt_lnrna_output_lnrna_slot_to_rt_slot
+        - rt_lnrna_output_full_forward_to_reverse_complement
+    outputs:
+      plots:
+        - rt_lnrna_slot_context_robustness_summary
+        - rt_lnrna_slot_geometry_scatter_gallery
+      scalars:
+        - rt_lnrna_slot_context_robustness_summary_metrics
+        - rt_lnrna_slot_delta_intermediate_full_lnrna
+        - rt_lnrna_slot_delta_intermediate_full_rt
+        - rt_lnrna_slot_delta_intermediate_lnrna_rt
+        - rt_lnrna_slot_delta_intermediate_full_fwd_rc
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_slot_context_robustness_summary
+    acceptance_checks: []
+  rt_lnrna_candidate_decision_frontier:
+    title: RT-lnRNA candidate decision frontier
+    section: primary
+    question: Which intermediate candidate-X view best balances representation health, source-structure preservation, abundance ordinal signal, context robustness, and dimensional cost?
+    summary: Candidate frontier restricted to the four intermediate OPAL X candidates.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots:
+        - rt_lnrna_candidate_decision_frontier
+        - rt_lnrna_candidate_x_scorecard
+      scalars:
+        - rt_lnrna_candidate_decision_frontier_metrics
+        - rt_lnrna_candidate_x_scorecard_metrics
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/primary/rt_lnrna_candidate_decision_frontier
+    acceptance_checks: []
+  appendix_umap_gallery:
+    title: RT-lnRNA appendix UMAP gallery
+    section: appendix
+    question: How do the construct, span, paired-span, and output-layer representation views distribute in persisted UMAP coordinates?
+    summary: Appendix UMAP projection grid with Khan/Crawford overlay hue controls.
+    recipe: rt_lnrna_representation_review_recipe
+    requires:
+      views:
+        - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
+        - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - intermediate_embedding_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+        - output_layer_mean_7b_dual_cassette_2000bp_fwd_rc_concat
+        - output_layer_mean_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
+        - output_layer_mean_7b_lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
+    outputs:
+      plots: [appendix_umap_gallery]
+    docs_refs:
+      - study:rt_lnrna_sponging_construct_triage/deliverables/appendix/appendix_umap_gallery
+    acceptance_checks:
+      - {kind: required_plot_kind, value: projection_grid}
+study_binding:
+  study_id: rt_lnrna_sponging_construct_triage
+  record_root: docs/studies/rt_lnrna_sponging_construct_triage
+  deliverable_docs_root: src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage
+  readiness_vocabulary: [missing, attention, ok]

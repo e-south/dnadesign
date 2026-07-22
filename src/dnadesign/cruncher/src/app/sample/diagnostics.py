@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/diagnostics.py
 
 Aggregate diagnostics and scoring summaries for sampling workflows.

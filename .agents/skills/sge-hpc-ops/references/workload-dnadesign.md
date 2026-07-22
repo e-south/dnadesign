@@ -10,8 +10,8 @@ find "$REPO_ROOT/docs/bu-scc/jobs" -maxdepth 1 -type f -name "*.qsub" 2>/dev/nul
 ```
 
 Primary docs:
-- `docs/bu-scc/quickstart.md`
-- `docs/bu-scc/batch-notify.md`
+- `docs/bu-scc/setup/quickstart.md`
+- `docs/bu-scc/runbooks/batch-notify.md`
 - `docs/bu-scc/jobs/README.md`
 
 ### Storage and quota precheck
@@ -129,3 +129,23 @@ For `GUROBI` runs:
 - For interactive reconnectability, route through BU OnDemand guidance before suggesting qrsh-only flows.
 
 Solver backend defaults are workspace-specific; verify `config.yaml` before submit.
+
+### RT-lnRNA Infer six-view workload
+
+Workspace path:
+- `src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/config.sequence_views.six_view.evo2_7b.yaml`
+
+Runbook preset:
+- `src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml`
+
+Use the study-aware fill command to plan, execute, or submit only the missing
+sidecar work:
+
+```bash
+uv run ops runbook fill-infer --study-dir docs/studies/rt_lnrna_sponging_construct_triage
+```
+
+The lane uses explicit `view_name` selectors for the six RT-lnRNA Construct
+views and one Notify watcher for the lane. Completion planning should reuse
+current-fingerprint sidecars, block missing sequence products, and resume
+missing or stale vector/scalar sidecars through the normal Infer shard ledger.

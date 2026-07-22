@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/portfolio/test_portfolio_spec_strict_validation.py
 
 Validate strict Portfolio spec contracts.

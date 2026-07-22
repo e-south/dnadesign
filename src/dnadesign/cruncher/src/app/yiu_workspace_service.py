@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/yiu_workspace_service.py
 
 Scaffold the payload-centric YIU workspace.

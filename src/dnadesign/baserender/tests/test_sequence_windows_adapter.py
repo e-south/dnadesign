@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_sequence_windows_adapter.py
 
 Tests for the sequence_windows_v1 adapter and schema wiring.

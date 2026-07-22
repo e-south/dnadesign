@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/io/read.py
 
+I/O helpers for read cluster I/O.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/yiu_workspace_blueprints.py
 
 Blueprint payloads for scaffolding payload-centric YIU workspaces.

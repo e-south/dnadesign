@@ -161,9 +161,9 @@ submitting Notify-backed lanes:
 Cold-start gate for first real write-back:
 
 1. current study snapshot:
-   `uv run ops progress show usr.data-plane.promoter-study-status --json`
+   `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
 2. current host readiness:
-   `NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show usr.data-plane.promoter-study-preflight --scope next --json`
+   `NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json`
 3. live GPU runtime:
    `uv run infer validate config --config <lane-config>`
    `uv run infer run --config <lane-config> --dry-run`

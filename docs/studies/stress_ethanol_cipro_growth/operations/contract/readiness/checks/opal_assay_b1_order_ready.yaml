@@ -1,0 +1,50 @@
+checks:
+  opal_assay_b1_order_ready:
+  - kind: path_exists
+    check_id: opal.response_window_labels.promotion
+    check_group: opal
+    summary: The verified 27-label response-window promotion manifest is present.
+    required: true
+    artifact: opal_response_window_label_promotion
+  - kind: path_exists
+    check_id: opal.round0.run_context
+    check_group: opal
+    summary: The completed round-0 run context is present.
+    required: true
+    artifact: opal_round0_run_context
+  - kind: path_exists
+    check_id: opal.round0.selection_batch
+    check_group: opal
+    summary: The 18-candidate sequence-unique round-0 selection batch is present.
+    required: true
+    artifact: opal_round0_selection_batch
+  - kind: command
+    check_id: opal.campaign.validate
+    check_group: opal
+    summary: The MSRB campaign validates its candidate table and typed observed-label source.
+    required: true
+    surface: opal_campaign_validate_json
+  - kind: command
+    check_id: opal.round0.selection_batch.load
+    check_group: opal
+    summary: The final round-0 selection batch loads from the run ledger.
+    required: true
+    surface: opal_selection_batch_round0_json
+  - kind: command
+    check_id: opal.round0.ethanol.verify_outputs
+    check_group: opal
+    summary: The ethanol round-0 selections match their run-ledger predictions.
+    required: true
+    surface: opal_verify_outputs_round0_ethanol_json
+  - kind: command
+    check_id: opal.round0.ciprofloxacin.verify_outputs
+    check_group: opal
+    summary: The ciprofloxacin round-0 selections match their run-ledger predictions.
+    required: true
+    surface: opal_verify_outputs_round0_ciprofloxacin_json
+  - kind: command
+    check_id: opal.round0.and.verify_outputs
+    check_group: opal
+    summary: The AND round-0 selections match their run-ledger predictions.
+    required: true
+    surface: opal_verify_outputs_round0_and_json

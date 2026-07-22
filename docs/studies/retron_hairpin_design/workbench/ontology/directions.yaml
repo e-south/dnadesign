@@ -1,0 +1,102 @@
+contract: retron_workbench_directions_v1
+schema_version: 1
+study_id: retron_hairpin_design
+title: Retron hairpin experimental directions
+direction_order:
+  - cap_permissiveness
+  - base_failure_probe
+  - s2_hard_comparator
+  - wobble_rescue
+  - double_hard_challenge
+  - mxmm_route_replicate
+  - top_nick_comparator
+  - teto_retained_span_trim_tetr_pwm_elite
+  - teto_retained_span_trim_ecoli_working
+directions:
+  - id: cap_permissiveness
+    label: Cap permissiveness
+    question: Does a 172-cap context tolerate a 26-derived basal base route?
+    effect_tags: [cap_crossover, cap_172, base_26_derived, non_ligatable_s0_control]
+  - id: base_failure_probe
+    label: Base failure probe
+    question: Does a 43-like basal base route drive failure even with the 26 cap?
+    effect_tags: [cap_26, base_43_like, failure_probe]
+  - id: s2_hard_comparator
+    label: S2 hard comparator
+    question: How does the 43-like S2-hard comparator behave in the resolved bottom-nick route?
+    effect_tags: [s2_hard, bottom_nick]
+  - id: wobble_rescue
+    label: G:T wobble rescue and controls
+    question: Which S3/S2/S1 hard or wobble combinations preserve useful scar-nick-compatible profiles?
+    effect_tags: [s3_hard, s2_hard, s1_hard, s2_gt_wobble, s1_gt_wobble, double_wobble, single_wobble_control]
+  - id: double_hard_challenge
+    label: Double-hard challenge
+    question: Which edge double-hard mismatch profiles remain useful under strict S0=M scar-nick constraints?
+    effect_tags: [double_hard, s3_s2_double_hard, s3_s1_double_hard]
+  - id: mxmm_route_replicate
+    label: MXMM route replicate
+    question: How reproducible are resolved MXMM comparator routes across basal sequence and nickase choices?
+    effect_tags: [mxmm_replicate, bottom_nick]
+  - id: top_nick_comparator
+    label: Top-nick comparator
+    question: Do top-nick Nt.BsmAI routes preserve the same MXMM design-reference posture?
+    effect_tags: [mxmm_replicate, top_nick]
+  - id: teto_retained_span_trim_tetr_pwm_elite
+    label: TetR PWM elite retained-span trim
+    question: How does retained-span shortening of the bidirectional TetR PWM elite payload affect SPOP in retron43 and retron180 contexts under WT Eco1 RT?
+    effect_tags:
+      - teto_pwm_elite_full_parent
+      - teto_pwm_elite_mild_retained_span_trim
+      - teto_pwm_elite_stronger_retained_span_trim
+      - teto_flank_only_trim_contrast
+      - cargo_length_test
+      - retron26_control
+      - retron43_target
+      - retron180_target
+      - wt_eco1_only
+  - id: teto_retained_span_trim_ecoli_working
+    label: Eco1 tetO retained-span trim
+    question: Does the same retained-span trim logic behave differently when applied to the working Eco1 tetO-like payload family instead of the Cruncher TetR PWM elite payload family?
+    effect_tags:
+      - teto_ecoli_working_payload_family
+      - teto_ecoli_working_mild_retained_span_trim
+      - teto_ecoli_working_stronger_retained_span_trim
+      - payload_family_contrast
+      - retron26_control
+      - retron43_target
+      - retron180_target
+      - wt_eco1_only
+effect_tags:
+  base_26_derived: 26-derived basal base context.
+  base_43_like: 43-like basal base context.
+  bottom_nick: Resolved through a bottom-nick scar-nick route.
+  cap_26: Uses the C26 cap family.
+  cap_172: Uses the C172 cap family.
+  cap_crossover: Crosses basal base family and cap family.
+  double_hard: Two hard mismatch positions in the S3/S2/S1 window.
+  double_wobble: Two G:T wobble positions in the S3/S2/S1 window.
+  failure_probe: Tests whether the basal route, rather than the cap, drives failure.
+  mxmm_replicate: Comparator replicate of an MXMM profile route.
+  non_ligatable_s0_control: Deliberate S0!=M control; requires explicit compiler opt-in and must not be substituted with a scar-compatible base.
+  s1_gt_wobble: G:T wobble at S1.
+  s1_hard: Hard mismatch at S1.
+  s2_gt_wobble: G:T wobble at S2.
+  s2_hard: Hard mismatch at S2.
+  s3_hard: Hard mismatch at S3.
+  s3_s1_double_hard: S3/S1 double-hard profile.
+  s3_s2_double_hard: S3/S2 double-hard profile.
+  single_wobble_control: Single G:T wobble control.
+  cargo_length_test: Tests whether shortening the TetR/tetO cargo/P4 burden improves SPOP.
+  retron180_target: Uses the pES-retron-180 C172/AGTG/CATG/XWMM cap and stem-base context.
+  retron26_control: Uses retron26 as a positive scaffold or binding control, not as the optimization target.
+  retron43_target: Uses the retron43 target scaffold.
+  top_nick: Resolved through a top-nick scar-nick route.
+  teto_pwm_elite_full_parent: Uses the full 19 nt bidirectional TetR motif payload.
+  teto_flank_only_trim_contrast: Names the old 17 nt flank-only tetO trim as a possible contrast, not as the active primary trim.
+  teto_pwm_elite_mild_retained_span_trim: Uses the 15 nt mild dual-site TetR trim.
+  teto_ecoli_working_mild_retained_span_trim: Uses the 15 nt retained-span trim from the Eco1 tetO-like payload family.
+  teto_pwm_elite_stronger_retained_span_trim: Uses the 13 nt stronger dual-site TetR trim.
+  teto_ecoli_working_stronger_retained_span_trim: Uses the 13 nt retained-span trim from the Eco1 tetO-like payload family.
+  teto_ecoli_working_payload_family: Uses the cataloged tetO-like payload family sourced from the working Eco1 retron26 scaffold.
+  payload_family_contrast: Uses the same retained-span rule while changing payload family.
+  wt_eco1_only: Uses WT Eco1 RT; RT fusions are excluded from trim-effect classification.

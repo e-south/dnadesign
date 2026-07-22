@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/plot.py
+
 Plot recipe contracts for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ SUPPORTED_PLOT_KINDS: frozenset[str] = frozenset(
         "xy_scatter_grid",
         "paired_xy_scatter_grid",
         "categorical_count",
+        "categorical_enrichment_summary",
         "metric_panel_grid",
         "distribution",
         "distribution_grid",
@@ -60,9 +68,19 @@ class PlotBaseConfig(StrictPlotModel):
     single_row_panels: bool = False
     square_panels: bool = False
     hide_repeated_y_axis: bool = False
+    panel_width: float | None = Field(default=None, gt=0)
+    panel_height: float | None = Field(default=None, gt=0)
+    extra_width_per_column: float | None = Field(default=None, ge=0)
+    tight_layout_pad: float | None = Field(default=None, ge=0)
+    tight_layout_h_pad: float | None = Field(default=None, ge=0)
+    tight_layout_w_pad: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _validate_hue_defaults(self) -> "PlotBaseConfig":
+        if len(self.filter_options) > 1:
+            raise ValueError(
+                "plot filter_options currently supports at most one filter; use one filter or implement multi-filter UI"
+            )
         if self.default_hue is None:
             return self
         allowed = {option.column for option in self.hue_options}
@@ -95,6 +113,11 @@ class PlotFilterOptionConfig(StrictPlotModel):
     type: Literal["categorical"] = "categorical"
     include_all: bool = True
     values: list[PlotFilterValueConfig] = Field(default_factory=list)
+
+
+class PlotStaticFilterConfig(StrictPlotModel):
+    column: Identifier
+    equals: str | int | float | bool
 
 
 class PlotAnnotationConfig(StrictPlotModel):
@@ -269,6 +292,34 @@ class CategoricalCountPlotConfig(PlotBaseConfig):
     color_column: str | None = None
 
 
+class CategoricalEnrichmentSummaryPlotConfig(PlotBaseConfig):
+    kind: Literal["categorical_enrichment_summary"]
+    scalar: Identifier
+    group_column: str
+    feature_column: str
+    value_column: str = "enrichment_ratio"
+    count_column: str | None = None
+    total_column: str | None = None
+    p_value_column: str | None = None
+    q_value_column: str | None = None
+    common_feature_column: str | None = None
+    static_filters: list[PlotStaticFilterConfig] = Field(default_factory=list)
+    group_order: list[str] = Field(default_factory=list)
+    max_features_per_group: int = Field(default=8, ge=1, le=30)
+    reference_line: float | None = 1.0
+
+    @model_validator(mode="after")
+    def _validate_filters_and_order(self) -> "CategoricalEnrichmentSummaryPlotConfig":
+        seen_filters: set[str] = set()
+        for item in self.static_filters:
+            if item.column in seen_filters:
+                raise ValueError("categorical_enrichment_summary static_filters must not repeat columns")
+            seen_filters.add(item.column)
+        if len(set(self.group_order)) != len(self.group_order):
+            raise ValueError("categorical_enrichment_summary group_order contains duplicates")
+        return self
+
+
 class MetricPanelGridPlotConfig(PlotBaseConfig):
     kind: Literal["metric_panel_grid"]
     scalar: Identifier
@@ -287,6 +338,8 @@ class MetricPanelGridPlotConfig(PlotBaseConfig):
     value_kind: str
     value_label: str
     reference_line: float | None = None
+    bar_orientation: Literal["auto", "vertical", "horizontal"] = "auto"
+    show_uncertainty_note: bool = True
 
 
 class DistributionPlotConfig(PlotBaseConfig):
@@ -399,6 +452,7 @@ PlotConfig = Annotated[
     | XYScatterGridPlotConfig
     | PairedXYScatterGridPlotConfig
     | CategoricalCountPlotConfig
+    | CategoricalEnrichmentSummaryPlotConfig
     | MetricPanelGridPlotConfig
     | DistributionPlotConfig
     | DistributionGridPlotConfig
@@ -423,6 +477,7 @@ class ResolvedPlotSpec(StrictPlotModel):
         "xy_scatter_grid",
         "paired_xy_scatter_grid",
         "categorical_count",
+        "categorical_enrichment_summary",
         "metric_panel_grid",
         "distribution",
         "distribution_grid",
@@ -444,6 +499,11 @@ class ResolvedPlotSpec(StrictPlotModel):
     left_cluster_id: Identifier | None = None
     right_cluster_id: Identifier | None = None
     value_column: str | None = None
+    count_column: str | None = None
+    total_column: str | None = None
+    p_value_column: str | None = None
+    q_value_column: str | None = None
+    common_feature_column: str | None = None
     ci_lower_column: str | None = None
     ci_upper_column: str | None = None
     value_columns: list[str] = Field(default_factory=list)
@@ -463,6 +523,9 @@ class ResolvedPlotSpec(StrictPlotModel):
     direction_column: str | None = None
     unit_column: str | None = None
     reference_line: float | None = None
+    static_filters: list[PlotStaticFilterConfig] = Field(default_factory=list)
+    group_order: list[str] = Field(default_factory=list)
+    max_features_per_group: int | None = None
     pair_id_column: str | None = None
     render_mode: str | None = None
     label_column: str | None = None
@@ -482,5 +545,21 @@ class ResolvedPlotSpec(StrictPlotModel):
     single_row_panels: bool = False
     square_panels: bool = False
     hide_repeated_y_axis: bool = False
+    panel_width: float | None = None
+    panel_height: float | None = None
+    extra_width_per_column: float | None = None
+    tight_layout_pad: float | None = None
+    tight_layout_h_pad: float | None = None
+    tight_layout_w_pad: float | None = None
+    bar_orientation: Literal["auto", "vertical", "horizontal"] = "auto"
+    show_uncertainty_note: bool = True
     config_id: Identifier | None = None
     semantics_ref: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_filter_options(self) -> "ResolvedPlotSpec":
+        if len(self.filter_options) > 1:
+            raise ValueError(
+                "plot filter_options currently supports at most one filter; use one filter or implement multi-filter UI"
+            )
+        return self

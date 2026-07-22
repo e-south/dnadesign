@@ -1,21 +1,38 @@
-## OPAL Command Line Interface
+---
+id: opal-reference-cli
+title: OPAL Command Line Interface
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-16
+audience:
+  - operator
+  - maintainer
+  - agent
+entrypoints:
+  cli: uv run opal
+---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-07-16
+
+## OPAL Command Line Interface
 
 
-The OPAL CLI is a thin layer over OPAL’s application modules. It lets you initialize a campaign, ingest labeled samples, train/score/select for a round, inspect records and models, validate your dataset, and generate plots.
+The OPAL CLI initializes campaigns, ingests labels, executes rounds, inspects
+records and models, validates data contracts, and generates plots.
 
 Commands are registry-driven and plugin‑agnostic: they operate on the configured plugin names and enforce only declared contracts.
 
 ### Command overview
 
-Each command should do one thing. Usage blocks show required args; optional flags are in brackets.
+Each command has one operational purpose. Usage blocks show required arguments;
+optional flags appear in brackets.
 
 Round semantics:
 
-- `ingest-y --observed-round` stamps label events with the observed round.
-- `run/explain --labels-as-of` chooses the training cutoff (labels with `observed_round <= as_of_round`).
+- `ingest-y --round` stamps label events with the observed round.
+- `run/explain --round` chooses the training cutoff (labels with
+  `observed_round <= round`).
 
 Guided hints:
 
@@ -29,14 +46,16 @@ Generate a guided runbook from the current campaign config.
 **Usage**
 
 ```bash
-opal guide --config <yaml> [--labels-as-of <r>] [--format text|markdown|json] [--out <path>]
-opal guide next --config <yaml> [--observed-round <r>] [--labels-as-of <r>] [--json]
+opal guide --config <yaml> [--round <r>] [--format text|markdown|json] [--out <path>]
+opal guide next --config <yaml> [--round <r>] [--json]
 ```
 
 **Notes**
 
 * `guide` is read-only. It summarizes plugin wiring, lifecycle steps, round semantics, and deep-dive docs/source pointers.
-* `guide next` inspects campaign state + label history and prints the recommended next command sequence.
+* `guide next` inspects the candidate table, campaign state, and label source,
+  then prints the recommended next command sequence. If `records.parquet` is
+  missing, it reports `stage=candidate_table` before suggesting ingest or run.
 * Prefer `guide next` in agent/automation loops for state-aware progression.
 
 ---
@@ -76,19 +95,19 @@ opal init --config <yaml> [--json]
 **Notes**
 
 * Ensures the campaign `workdir` has `outputs/`.
-* Ensures the label history column exists in `records.parquet`.
 * Writes/updates `state.json` with campaign identity, data location, and settings.
 
 ---
 
 ### `ingest-y`
 
-Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and append to label history.
+Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and
+append to the configured label source.
 
 **Usage**
 
 ```bash
-opal ingest-y --config <yaml> --observed-round <r> --in <path> \
+opal ingest-y --config <yaml> --round <r> --csv <path> \
   [--transform <name>] [--params <transform_params.json>] \
   [--unknown-sequences create|drop|error] [--infer-missing-required] \
   [--if-exists fail|skip|replace] [--apply] [--json]
@@ -97,17 +116,18 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set).
-* `--round, -r, --observed-round`: Observed round stamp for these labels.
-* `--csv, --in`: CSV/Parquet/XLSX input (`.csv`, `.parquet`, `.pq`, or `.xlsx`).
+* `--round, -r`: Observed round stamp for these labels.
+* `--csv`: CSV/Parquet/XLSX input (`.csv`, `.parquet`, `.pq`, or `.xlsx`).
 * `--transform`: Override YAML `transforms_y.name`.
 * `--params`: JSON file (.json) with transform params (overrides YAML `transforms_y.params`).
 * `--unknown-sequences`: How to handle sequences not found in records (default: `create`). Use `drop` to skip
-  unknown sequences when required columns are missing or when you want a strict in‑place update.
+  unknown sequences when required columns are missing or for a strict in-place update.
 * `--infer-missing-required`: Auto-fill missing required columns for new sequences (`bio_type`, `alphabet`)
   using the most common values found in `records.parquet`.
-* `--if-exists`: Behavior if `(id, round)` already exists in label history (`fail`/`skip`/`replace`).
+* `--if-exists`: Behavior if `(id, round)` already exists in the configured label source (`fail`/`skip`/`replace`).
 * `--apply`: Apply ingest without interactive confirmation.
-* `--json`: Output as machine-readable JSON (default output is plain text).
+* `--json`: Output as machine-readable JSON (default output is plain text). With `--apply`, the command emits
+  one final JSON object containing commit counts, preview data, and `ingest_runtime` telemetry.
 
 **Behavior & checks**
 
@@ -115,52 +135,91 @@ opal ingest-y --config <yaml> --observed-round <r> --in <path> \
 * **Strict preflights**: schema checks, completeness.
 * **Preview is printed** (counts + sample) before any write.
 * Duplicate handling is controlled by `ingest.duplicate_policy` (error | keep_first | keep_last).
-* **New IDs** allowed if your CSV includes essentials: `sequence`, `bio_type`, `alphabet`, and the configured X column.
+* **New IDs** are allowed only for campaign-history flows when the input
+  includes `sequence`, `bio_type`, `alphabet`, and the
+  configured X column. Shared `usr_sidecar` label sources use a fixed candidate
+  universe and reject unknown IDs unless `--unknown-sequences drop` is used.
 * If new sequences are missing required columns, OPAL will prompt to infer defaults for `bio_type`/`alphabet`
   (or use `--infer-missing-required` for non-interactive runs). For other missing columns, use
   `--unknown-sequences drop` or provide the columns.
 * If `records.parquet` contains duplicate sequences, `ingest-y` requires an explicit `id` column for all rows
   to avoid ambiguous sequence → id mapping.
-* When unknown sequences are missing **X** data, `ingest-y` drops those rows automatically (unless you pass
-  `--unknown-sequences error`). This avoids creating partial records without X.
+* When unknown sequences are missing **X** data, `ingest-y --unknown-sequences create` fails fast.
+  Provide X values for new rows or pass `--unknown-sequences drop` to skip unknown rows explicitly.
 * If adding **new sequences** and X is list-valued, prefer **Parquet** input so the X column remains list-typed
   (CSV will coerce lists to strings).
-* Appends to `opal__<slug>__label_hist` and writes the current Y column.
+* For `labels.source.kind: campaign_history`, appends to
+  `opal__<slug>__label_hist` and writes the current Y column.
+* For `labels.source.kind: usr_sidecar` without `manifest_path`, appends
+  observed labels to the shared sidecar such as
+  `_opal/observed_labels.parquet`; it does not duplicate assay truth into
+  campaign label-history columns. Fixed-universe sidecar ingest loads only the
+  records identity frame (`id`, `sequence`) and does not materialize the
+  configured X column.
+* For a USR sidecar with `manifest_path`, `ingest-y --apply` fails before any
+  label or ledger write. The source is a study-published immutable snapshot;
+  its owning workflow publishes a new Parquet artifact and promotion manifest.
+* The text preview includes a `[Runtime] ingest-y` block. JSON output includes
+  `ingest_runtime.schema_version: opal.ingest_runtime.v1`, `mode`, loaded
+  columns, candidate index rows, estimated frame memory, unknown-sequence policy,
+  and write scope. Shared `usr_sidecar` appends report `mode=identity_index`,
+  `write_scope=label_sidecar`, and `full_records_loaded=false`.
 * Emits `label` events into `outputs/ledger/labels.parquet`.
 
 ---
 
 ### `run`
 
-Train on labels with **`observed_round ≤ R`** (where `R` comes from `--labels-as-of`), score the candidate universe,
-apply the objective, select top-k, write artifacts, and append run-aware label history entries.
+Train on labels with **`observed_round <= R`**, score the candidate universe,
+evaluate every selection view, and write campaign artifacts and ledgers.
 
 **Usage**
 
 ```bash
-opal run --config <yaml> --labels-as-of <r> \
-  [--k <n>] [--resume] [--score-batch-size <n>] [--verbose|--quiet] [--json]
+opal run --config <yaml> --round <r> \
+  [--k <n>] [--resume] [--score-batch-size <n>] [--max-x-matrix-gib <gib>] \
+  [--verbose|--quiet] [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set).
-* `--round, -r, --labels-as-of`: Training cutoff (use labels with `observed_round ≤ r`).
-* `--k, -k`: Override `selection.params.top_k`.
+* `--round, -r`: Training cutoff (use labels with `observed_round <= r`).
+* `--k, -k`: Override `selection_views[].selection.params.top_k` for every
+  declared selection view.
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
-* `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/rounds/round_<r>/` already contains artifacts). When set, the round directory is wiped before writing new artifacts.
+* `--max-x-matrix-gib`: Override `safety.max_x_matrix_gib` for this run. Prefer lowering `--score-batch-size` before raising this on memory-constrained hosts.
+* `--resume`: Allow replacing mutable latest-run mirrors (required if
+  `outputs/rounds/round_<r>/` already contains artifacts). Every artifact named
+  by the prior run ledger remains in that run's immutable snapshot; the new run
+  receives a separate snapshot.
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
 * `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Pipeline**
 
 * Pulls effective labels per `training.policy` (cumulative vs current round, dedup policy).
+* Validates the Parquet X contract in bounded batches before round execution.
+* Loads record metadata without X, including the columns declared by candidate
+  eligibility plugins and `selection_batch.deduplicate_by`, then streams
+  model-ready candidate X in bounded score batches.
+* Aborts if the train plus score batch X footprint exceeds `safety.max_x_matrix_gib`.
 * Predicts in batches (`scoring.score_batch_size` or `--score-batch-size`).
-* Evaluates configured objective plugins and emits named score/uncertainty channels.
-* Resolves `selection.params.score_ref` (and optional `uncertainty_ref`) to choose channels for selection.
-* Selects with the configured strategy + tie handling.
-  * If `selection.params.exclude_already_labeled: true` (default), designs already labeled are **excluded**;
+  The batch stream may follow Parquet storage order; OPAL realigns predictions
+  to the requested candidate ID order before objectives, selection, and ledger
+  writes, and fails fast on missing, extra, or duplicate streamed IDs.
+* Fits one model and predicts the candidate universe once.
+* Evaluates every `selection_views` objective against the shared prediction.
+* Resolves each view's `selection.params.score_ref` and optional
+  `uncertainty_ref`, then applies that view's selector and tie policy.
+  * If a view sets `selection.params.exclude_already_labeled: true` (default), designs already labeled are **excluded**;
     scope is controlled by `training.policy.allow_resuggesting_candidates_until_labeled`.
+* Builds `selection_batch` as the declared deduplicated union of all selection
+  sets. A declared `expected_unique_count` is exact. OPAL fails on overlap
+  under the default union contract; an explicit
+  `round_robin_next_best_unallocated` allocation may instead advance each view
+  through its deterministic ranking. Every skipped overlap and replacement is
+  recorded; OPAL never fills or drops candidates silently.
 
 **Artifacts written** (`outputs/rounds/round_<r>/`)
 
@@ -169,10 +228,12 @@ opal run --config <yaml> --labels-as-of <r> \
   * `model_meta.json`
   * `feature_importance.csv` (optional)
 * `selection/`
-  * `selection_top_k.csv`
-  * `selection_top_k__run_<run_id>.csv` (immutable per-run copy)
-* `labels/`
-  * `labels_used.parquet` (training snapshot for this run)
+  * `selections.parquet` (long form, keyed by `selection_view_id`)
+  * `selection_batch.parquet` (final deduplicated batch)
+  * `allocation_trace.parquet` (configured unique-slot allocation only)
+* `run_artifacts/<run-slug>/`
+  * immutable copies of every model, selection, metadata, and label artifact
+    named by this run's ledger row
 * `metadata/`
   * `round_ctx.json`
   * `objective_meta.json`
@@ -181,22 +242,22 @@ opal run --config <yaml> --labels-as-of <r> \
 
 **Events appended** to **ledger sinks** under `outputs/`
 
-* `run_pred` → `outputs/ledger/predictions/` (one row per candidate with **`pred__y_hat_model`** and
-  **`pred__score_selected`**, selection rank/flag, and diagnostics).
-* `run_meta` → `outputs/ledger/runs.parquet` (one row per run with model/config/selection snapshot
-  and artifact checksums).
+* `run_pred` → `outputs/ledger/predictions/` (one row per candidate with one
+  **`pred__y_hat_model`** plus nested **`pred__selection_views`** score,
+  rank, selection, uncertainty, and diagnostic records).
+* `run_meta` → `outputs/ledger/runs.parquet` (one row per run with the shared
+  model/config snapshot, view definitions, and artifact checksums).
 
 `pred__y_hat_model` is **objective-space** (after any Y‑ops inversion), so downstream logic is plugin‑agnostic.
 
 **Reruns & non-interactive mode**
 
-If you rerun a round that already exists in `state.json`, OPAL will prompt before overwriting. In non‑TTY
-contexts (e.g., CI), the prompt cannot be shown and the command will exit with a message instructing you to
-re‑run with `--resume`.
+Rerunning a round already present in `state.json` prompts before overwriting.
+In non-TTY contexts such as CI, the command exits and requires an explicit
+rerun with `--resume`.
 
-**Write-backs to `records.parquet` (primary label history)**
-
-* `opal__<slug>__label_hist` — append-only per-record history of observed labels and run-aware predictions.
+`opal run` keeps predictions, scores, and selections in campaign ledgers and
+does not mutate `records.parquet`.
 
 ---
 
@@ -246,6 +307,7 @@ Per-record history report (ground truth + per-round predictions/rank/selected).
 ```bash
 opal record-show --config <yaml> \
   [<ID-or-SEQ> | --id <ID> | --sequence <SEQ> | --selected-rank <n>] \
+  [--view <selection-view-id>] \
   [--round <k|latest>] \
   [--run-id <id>] [--with-sequence|--no-sequence] [--json]
 ```
@@ -255,7 +317,9 @@ opal record-show --config <yaml> \
 * `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set).
 * `<ID-or-SEQ>`: Positional id or sequence (use `--id/--sequence` to disambiguate).
 * `--id`, `--sequence`: Explicit lookup key (mutually exclusive).
-* `--selected-rank`: Resolve id from `selection_top_k.csv` by competition rank (1-based).
+* `--selected-rank`: Resolve an ID from the named selection set by competition rank (1-based).
+* `--view`: Selection view used for prediction fields and `--selected-rank`.
+  Required when the campaign declares more than one view.
 * `--round`: Round selector used with `--selected-rank` (default: `latest`).
 * `--run-id`: Explicit run_id for ledger predictions (or `latest` to pick the latest ledger run by `(as_of_round, run_id)`).
 * `--with-sequence/--no-sequence`: Include the sequence in output (default: on).
@@ -301,15 +365,17 @@ List objective metadata and diagnostic keys for a round.
 **Usage**
 
 ```bash
-opal objective-meta --config <yaml-or-dir> [--round <k|latest> | --run-id <id>] [--profile|--no-profile]
+opal objective-meta --config <yaml-or-dir> --view <selection-view-id> \
+  [--round <k|latest> | --run-id <id>] [--profile|--no-profile]
   [--json]
 ```
 
 **Flags**
 
-* `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set). Directories are supported only for `opal plot`, `opal notebook`, and `opal objective-meta`.
+* `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set). Directories are supported only for `opal progress`, `opal plot`, `opal notebook`, `opal review`, and `opal objective-meta`.
 * `--round, -r`: Round selector (integer or `latest`; default: latest).
 * `--run-id`: Explicit run_id to disambiguate when a round has multiple runs.
+* `--view`: Required selection view ID.
 * `--profile/--no-profile`: Profile candidate hue/size fields from the selected run.
 * `--json`: Output as machine-readable JSON (default output is plain text).
 
@@ -326,19 +392,70 @@ Compare selection artifacts against ledger predictions for a single run (run-awa
 **Usage**
 
 ```bash
-opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
+opal verify-outputs --config <yaml> --view <selection-view-id> \
+  [--round <k|latest> | --run-id <id>] \
   [--selection-path <path>] [--eps <float>] [--json]
 ```
 
 **Notes**
 
 * Resolves the selection artifact path from `outputs/ledger/runs.parquet` when possible.
-* Uses the ledger’s `pred__score_selected` as the primary score source.
+* Projects the named view from `pred__selection_views` and compares its score,
+  rank, and selected flag with `selections.parquet`.
+* Fails fast with leakage-guard contract errors when ledger prediction IDs are
+  duplicated for the selected run/round or when selected IDs are outside the
+  run-scoped prediction/eval evidence.
 * `--selection-path` accepts `.csv` or `.parquet`.
 * `--round, -r`: Round selector (integer or `latest`).
 * If the selected round has multiple runs, pass `--run-id` to disambiguate.
 * Reads from `outputs/ledger/runs.parquet` and `outputs/ledger/predictions/`.
-* `--json` writes JSON to stdout; redirect to a file when you need a saved report.
+* `--json` writes JSON to stdout for optional redirection to a saved report.
+
+---
+
+### `selection-set`
+
+Inspect or export the canonical selected-row contract for downstream consumers
+such as study-owned synthesis handoffs or probe analysis.
+
+**Usage**
+
+```bash
+opal selection-set show --config <yaml> --view <selection-view-id> \
+  [--round <k|latest>] [--run-id <id>] [--json]
+opal selection-set export --config <yaml> --view <selection-view-id> \
+  [--round <k|latest>] [--run-id <id>] \
+  --out <csv|json> [--format csv|json] [--json]
+```
+
+**Notes**
+
+* Reads the shared campaign ledger, projects `--view`, and verifies the matching
+  rows in `selections.parquet` before returning rows.
+* Returns `schema_version: opal.selection_set.v2` for `show` and
+  `opal.selection_set_export.v1` for `export`.
+* Rows preserve OPAL candidate `id`, `sequence`, rank, score metadata,
+  `run_id`, and `as_of_round`.
+* If a round has multiple run IDs, pass `--run-id`; OPAL fails fast instead of
+  guessing which rerun a downstream handoff should use.
+* Missing ledgers or mismatched selection artifacts are structured JSON errors
+  when `--json` is requested.
+
+---
+
+### `selection-batch`
+
+Inspect or export the final deduplicated selection batch in a
+run. This is an OPAL decision artifact, not a physical synthesis authorization.
+
+```bash
+opal selection-batch show --config <yaml> [--round <k|latest>] [--run-id <id>] [--json]
+opal selection-batch export --config <yaml> [--round <k|latest>] [--run-id <id>] \
+  --out <csv|json> [--format csv|json] [--json]
+```
+
+Rows retain `selection_view_ids` and per-view rank/score memberships. OPAL
+fails when the batch artifact is absent or its deduplication key is not unique.
 
 ---
 
@@ -390,14 +507,14 @@ Dry-run planner for a round: counts, plan, warnings. **No writes.**
 **Usage**
 
 ```bash
-opal explain --config <yaml> --labels-as-of <k>
+opal explain --config <yaml> --round <k>
   [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set).
-* `--round, -r, --labels-as-of`: Training cutoff (alias of `--round`).
+* `--round, -r`: Training cutoff.
 * `--json`: Output as machine-readable JSON (default output is plain text).
 
 Prints: number of training labels, candidate universe size, transforms/models/selection used,
@@ -407,7 +524,16 @@ vector dimension, and any preflight warnings.
 
 ### `status`
 
-Dashboard from `state.json`.
+Dashboard from config, `records.parquet`, label source, and `state.json`.
+Before initialization it still reports the records path, whether it exists, and
+the configured label-source path.
+
+For shared `usr_sidecar` campaigns, JSON output includes
+`label_source.leakage` with schema `opal.leakage_guard.v1`. Status reads only
+narrow label-status columns (`id`, configured Y when present, and
+`opal__<slug>__label_hist` when present), never the configured X column.
+Manifest-pinned sources also report `manifest_pinned`, `mutable`, manifest and
+label digests, and the verified promoted row count.
 
 **Usage**
 
@@ -444,6 +570,11 @@ opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>] [--json]
 **Notes**
 
 * `runs show --round <k>` requires `--run-id` if round `<k>` has multiple runs.
+* JSON output is schema-bearing. `runs list --json` emits
+  `schema_version: opal.runs_list.v1` with campaign metadata, requested and
+  resolved round scope, and a `runs` array. `runs show --json` emits
+  `schema_version: opal.run_meta.v1` with campaign metadata and a single `run`
+  object.
 
 ---
 
@@ -467,19 +598,53 @@ opal log --config <yaml> [--round <k|latest>] [--json]
 
 * If a round has been re-run (multiple `start` events in the same log), the summary focuses on the **latest run**.
 
-### `validate`
+---
 
-End-to-end table checks (essentials present; X present).
+### `progress`
+
+Summarize campaign progress from `state.json` and round logs.
 
 **Usage**
 
 ```bash
-opal validate --config <yaml>
+opal progress --config <yaml-or-dir> [--round <k|latest|all>] [--run-id <id>] [--json]
+```
+
+**Flags**
+
+* `--config, -c`: Path to `configs/campaign.yaml` or a campaign directory (required unless `$OPAL_CONFIG` is set).
+* `--round, -r`: Round selector (`latest`, `all`, or an integer).
+* `--run-id`: Filter round-log summaries to one run when a round has reruns.
+* `--json`: Output as machine-readable JSON (default output is plain text).
+
+**Notes**
+
+* This is the campaign-generic progress surface for operators and harnesses.
+* The JSON payload uses schema `opal.campaign_progress.v1` and reports per-round
+  status, last stage, elapsed seconds, prediction batch count, log path,
+  summarized stage counts, run scope, event phase counts, active lock state,
+  warnings, and stale review artifacts.
+* Round-log events written by current OPAL versions include schema
+  `opal.progress_event.v1`, an event ID, a phase (`command`, `preflight`,
+  `run`, `abort`, or `finalize`), and severity. Events that do not satisfy this
+  contract are rejected.
+* Study probes and campaign dashboards should consume this primitive instead of
+  parsing OPAL round-log paths directly.
+
+### `validate`
+
+End-to-end table checks (essentials present; X non-null, finite, and fixed-length).
+
+**Usage**
+
+```bash
+opal validate --config <yaml> [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set).
+* `--json`: Output schema `opal.validate.v1` as machine-readable JSON (default output is plain text).
 
 **Notes**
 
@@ -487,6 +652,8 @@ opal validate --config <yaml>
 * Verifies **USR essentials** exist in `records.parquet`.
 * Verifies the configured **X** column exists.
 * If Y is present, validates vector length & numeric/finite cells.
+* JSON errors use the shared `opal.cli_error.v1` payload, so scripts can rely
+  on parseable stdout for both pass and fail paths.
 
 ---
 
@@ -532,10 +699,14 @@ Generate plots declared in the campaign’s `plots:` block. Plots are plugin-dri
 
 ```bash
 opal plot --config <yaml-or-dir> [--plot-config <plots.yaml>] \
-  [--round <selector>] [--run-id <id>] [--name <plot-name>] [--tag <tag> ...]
+  [--round <selector>] [--run-id <id>] [--view <selection-view-id>] \
+  [--name <plot-name>] [--tag <tag> ...]
 opal plot --list
 opal plot --list-config --config <yaml-or-dir>
 opal plot --describe <plot-kind>
+opal plot --list --json
+opal plot --list-config --config <yaml-or-dir> --json
+opal plot --describe <plot-kind> --json
 ```
 
 **Flags**
@@ -547,13 +718,25 @@ opal plot --describe <plot-kind>
 * `--describe`: Show parameters + required fields for a plot kind.
 * `--round, -r`: `latest | all | 3 | 1,3,7 | 2-5` (plugin may define defaults).
 * `--run-id`: Explicit run_id to disambiguate ledger predictions (required if multiple runs exist for a round).
+* `--view`: Selection view ID; required for multi-view campaign plots.
 * `--name, -n`: Run a single plot by name; omit to run **all**.
 * `--tag`: Run plots with the given tag (repeatable).
+* `--json`: Emit machine-readable JSON for `--list`, `--list-config`, and
+  `--describe`.
 
 **Notes**
 
 * Overwrites files by default; continues on error; exit code **1** if any plot failed.
+* `plot --list-config --json` emits structured plot objects with `name`,
+  `kind`, `enabled`, `tags`, and optional `preset`; text output keeps the
+  compact `name: kind (enabled)` listing.
 * Output directory defaults to `outputs/plots`, or honors `output.dir` if provided.
+* Every plot run writes a per-plot manifest next to the rendered media and an
+  aggregate `plot_manifest.json` index in the output directory. Manifests record
+  plot kind, params, run/round scope, inputs, media outputs, tidy CSV outputs,
+  status, generated time, schema version, warnings, and errors.
+* `output.save_data: true` asks plot plugins to write tidy CSV data; the plot
+  manifest records the CSV paths that were produced.
 * Plot-specific knobs **must** live under `params:`; top-level plotting keys are errors.
 * Prefer `plot_config: plots.yaml` in configs/campaign.yaml to keep runtime config lean.
 * `plot_defaults` and `plot_presets` reduce redundancy; `preset: <name>` merges into each plot entry.
@@ -579,7 +762,7 @@ plots:
   - name: score_vs_rank_latest
     kind: scatter_score_vs_rank         # plot plugin id
     params:
-      score_field: "pred__score_selected" # field from run_pred rows
+      score_field: "view__selection_score" # projected field for --view
       hue: null                         # or "round"
       highlight_selected: false
     output:
@@ -589,7 +772,7 @@ plots:
 
 **Data sources**
 Plot plugins typically read from the campaign’s **ledger sinks** under `outputs/` and/or **`records.parquet`**.
-You may add extra sources per plot entry via:
+Additional sources may be declared per plot entry:
 
 ```yaml
 data:
@@ -609,25 +792,109 @@ Built-ins injected for plots:
 
 ### `notebook`
 
-Generate or run a campaign-tied marimo notebook for interactive analysis.
+Generate or run OPAL marimo artifact viewers.
 
 **Usage**
 
 ```bash
 uv run opal notebook
-uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate]
-uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
+uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate] [--json]
+uv run opal notebook generate --campaign <yaml-or-dir> --campaign <yaml-or-dir> [--config <anchor-yaml-or-dir>] [--out <path>] [--round <latest|k>] [--json]
+uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>] [--host <host>] [--port <port>] [--headless]
+uv run opal notebook edit --config <yaml-or-dir> [--path <notebook.py>] [--host <host>] [--port <port>] [--headless]
 ```
 
 **Notes**
 
-* `generate` writes a marimo notebook that loads ledger artifacts (runs/predictions/labels).
-* `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
-* By default, `generate` validates ledger artifacts exist. Use `--no-validate` to scaffold a notebook before any runs.
-* When `--validate` is on, `--round` must exist in ledger runs (otherwise use `--no-validate`).
-* `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
+* `generate` writes the campaign-specific artifact viewer for record contract
+  status, round/run state, ledger readiness, label and prediction summaries,
+  selection summaries, and manifest-backed `outputs/plots` deliverables.
+* Repeating `--campaign` writes an explicit campaign-set notebook with a
+  campaign dropdown, at-a-glance campaign table, selected-campaign status, plot
+  deliverable dropdowns, selected plot artifacts at the top, and
+  warnings/stale-artifact panels behind supporting detail sections. This is a
+  review surface over OPAL campaign contracts, not a study/probe dashboard.
+* `generate` requires the campaign `records.parquet` to exist so the notebook
+  can inspect schema and identity columns. The generated preview is
+  schema-pruned and does not load the configured X payload on startup.
+* `generate` works before the first OPAL run. Missing ledger, label,
+  prediction, and plot artifacts appear as explicit notebook states.
+* `generate --json` emits schema `opal.notebook_generate.v1` with the written
+  notebook path, config paths, round selector, optional pinned run ID, and
+  follow-up commands. JSON output has no human preamble.
+* `generate --run-id <id>` is single-campaign only. It resolves the run ID
+  through `outputs/ledger/runs.parquet`, pins the generated default round to
+  that run's `as_of_round`, and rejects mismatched `--round` values.
+* Generated notebooks import public helpers from `dnadesign.opal`, build a
+  `NotebookViewModel`, and render plot cards from review and plot manifests
+  rather than treating directory contents as authoritative.
+* The notebook surface is campaign review only: records contract, X provenance,
+  ledgers, progress, selections, labels, predictions, plots, and limitations.
+  Representation browsers, UMAP atlases, and study/probe-specific visuals live
+  outside canonical OPAL notebooks.
+* When `--validate` is on and ledger runs already exist, `--round` must resolve
+  in those runs. `--no-validate` skips that round check.
+* `run` launches `marimo run` app mode for review. Use `--host`,
+  `--port`, and `--headless` for local dogfood or automation.
+* `edit` launches `marimo edit` for notebook authoring. Do not use edit mode
+  as review evidence when app behavior is the question.
 * `run` resolves the notebook under `<workdir>/notebooks`. If multiple exist, it prompts in TTY or requires `--path` in non-interactive mode.
 * Running `uv run opal notebook` (no subcommand) lists available notebooks and nudges the next step.
+* Checked-in notebook fixtures are maintainer/test surfaces. Operator-facing
+  campaign notebooks should come from `opal notebook generate`.
+
+---
+
+### `review`
+
+Persist a campaign-scoped review bundle from completed OPAL run artifacts.
+
+**Usage**
+
+```bash
+opal review --config <yaml-or-dir> --view <selection-view-id> \
+  [--round <latest|k>] [--run-id <id>] [--out-dir <dir>] [--plots/--no-plots] [--json]
+```
+
+**Notes**
+
+* Writes the view-scoped bundle under
+  `outputs/review/selection_views/<view>/` by default.
+* Reads campaign ledgers and per-round artifacts; it does not rerun OPAL and
+  does not mutate records or labels.
+* Fails fast if run-scoped prediction evidence contains duplicate candidate IDs.
+* If a round has multiple run IDs, pass `--run-id` so the review does not mix
+  reruns.
+* The manifest is authoritative. Review reports stale files that exist under
+  the review output directory but are absent from the active manifest, and it
+  validates the configured X column before publishing review evidence.
+
+---
+
+### `artifacts`
+
+Audit and prune generated OPAL artifacts using active manifests as the
+authority.
+
+**Usage**
+
+```bash
+opal artifacts audit --config <yaml-or-dir> [--json]
+opal artifacts prune --config <yaml-or-dir> [--apply] [--json]
+```
+
+**Notes**
+
+* `audit` is read-only. It inventories `outputs/`, `notebooks/`, active review
+  and plot manifests, stale manifest-absent plot/review siblings, byte counts,
+  and whether the campaign root is local-only because it lives under `.var`.
+* `prune` is a dry-run by default. It deletes only stale artifacts from the
+  active prune plan when `--apply` is passed.
+* The command does not read `records.parquet` or the configured X column; it is
+  an artifact-gardening surface, not a campaign execution or scientific-review
+  step.
+* JSON errors use the shared `opal.cli_error.v1` envelope with context,
+  category, message, and exit code.
 
 ---
 
@@ -711,7 +978,7 @@ Campaign-scoped commands require explicit config context:
 1. **Explicit flag** (`--config`)
 2. **Environment variable** (`OPAL_CONFIG`)
 
-Passing a **directory** to `--config` is supported only for `opal plot`, `opal notebook`, and `opal objective-meta`.
+Passing a **directory** to `--config` is supported only for `opal progress`, `opal plot`, `opal notebook`, `opal review`, and `opal objective-meta`.
 Other campaign-scoped commands require a YAML config path.
 `plot_config` paths are resolved relative to the `configs/campaign.yaml` that declares them.
 For scripts and CI, pass `--config` explicitly.

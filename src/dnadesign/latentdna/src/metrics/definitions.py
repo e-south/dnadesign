@@ -1,4 +1,13 @@
-"""Canonical comparison-metric definitions for LatentDNA artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/metrics/definitions.py
+
+Canonical comparison-metric definitions for LatentDNA artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

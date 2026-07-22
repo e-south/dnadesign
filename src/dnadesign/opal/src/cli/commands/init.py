@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/init.py
 
-Initializes OPAL campaign workspaces and validates records layout. Writes
-state.json and ensures campaign directories exist.
+Initializes OPAL campaign workspaces and validates records layout. Writes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +15,7 @@ from pathlib import Path
 
 import typer
 
-from ...core.utils import ExitCodes, OpalError, ensure_dir, file_sha256, print_stdout
+from ...core.utils import ExitCodes, OpalError, ensure_dir, print_stdout
 from ...storage.state import CampaignState
 from ..formatting import render_init_text
 from ..guidance_hints import maybe_print_hints
@@ -32,7 +31,16 @@ from ._common import (
 )
 
 
-@cli_command("init", help="Initialize/validate the campaign workspace; write state.json.")
+def _records_metadata(records_path: Path) -> dict[str, object]:
+    stat = records_path.stat()
+    return {
+        "records_size_bytes": int(stat.st_size),
+        "records_mtime_ns": int(stat.st_mtime_ns),
+        "records_fingerprint_kind": "file_metadata",
+    }
+
+
+@cli_command("init", help="Initialize the campaign workspace and write state.json.")
 def cmd_init(
     config: Path = typer.Option(None, "--config", "-c", help="Path to campaign.yaml", envvar="OPAL_CONFIG"),
     no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
@@ -49,28 +57,35 @@ def cmd_init(
         ensure_dir(outputs_dir / "rounds")
 
         store = store_from_cfg(cfg)
-        df = store.load()
+        schema_columns = store.schema_columns()
+        scalar_columns = ["id"]
+        if cfg.safety.require_biotype_and_alphabet_on_init:
+            scalar_columns.extend(["bio_type", "alphabet"])
+        df = store.load_columns(scalar_columns)
         store.assert_unique_ids(df)
         if cfg.safety.require_biotype_and_alphabet_on_init:
-            missing = [c for c in ("bio_type", "alphabet") if c not in df.columns]
+            missing = [c for c in ("bio_type", "alphabet") if c not in schema_columns]
             if missing:
                 raise OpalError(f"records.parquet missing required columns: {missing}")
             for col in ("bio_type", "alphabet"):
                 if df[col].isna().any():
                     bad = df.loc[df[col].isna(), "id"].astype(str).tolist()[:10]
                     raise OpalError(f"Missing values in '{col}' (sample ids={bad}).")
-        df2, added = store.ensure_label_hist_column(df)
-        if added:
-            store.save_atomic(df2)
+        if (
+            getattr(cfg.labels.source, "kind", "campaign_history") == "campaign_history"
+            and store.label_hist_col() not in schema_columns
+        ):
+            store.append_null_column_atomic(store.label_hist_col())
+        data_location = {
+            "kind": store.kind,
+            "records_path": str(store.records_path.resolve()),
+            **_records_metadata(store.records_path),
+        }
         st = CampaignState(
             campaign_slug=cfg.campaign.slug,
             campaign_name=cfg.campaign.name,
             workdir=str(workdir.resolve()),
-            data_location={
-                "kind": store.kind,
-                "records_path": str(store.records_path.resolve()),
-                "records_sha256": (file_sha256(store.records_path) if store.records_path.exists() else ""),
-            },
+            data_location=data_location,
             x_column_name=cfg.data.x_column_name,
             y_column_name=cfg.data.y_column_name,
             representation_transform={
@@ -80,7 +95,14 @@ def cmd_init(
             training_policy=cfg.training.policy,
             performance={
                 "score_batch_size": cfg.scoring.score_batch_size,
-                "objectives": [o.name for o in cfg.objectives.objectives],
+                "selection_views": [
+                    {
+                        "id": view.id,
+                        "objective": view.objective.name,
+                        "selection": view.selection.name,
+                    }
+                    for view in cfg.selection_views
+                ],
             },
             representation_vector_dimension=0,
             backlog={"number_of_selected_but_not_yet_labeled_candidates_total": 0},

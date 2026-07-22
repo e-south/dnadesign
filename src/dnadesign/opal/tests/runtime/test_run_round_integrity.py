@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_run_round_integrity.py
+
+Regression tests for run round integrity OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,27 +19,30 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel
 
+from dnadesign.opal.src.analysis.ledger import read_run_labels_used, read_run_observed_events, read_runs
 from dnadesign.opal.src.config.types import (
     CampaignBlock,
     DataBlock,
     IngestBlock,
     LocationLocal,
-    ObjectivesBlock,
+    OwnershipBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
     ScoringBlock,
-    SelectionBlock,
+    SelectionBatchAllocationBlock,
+    SelectionBatchBlock,
+    SelectionView,
     TrainingBlock,
 )
 from dnadesign.opal.src.core.objective_result import ObjectiveResultV2
-from dnadesign.opal.src.core.utils import OpalError
+from dnadesign.opal.src.core.utils import OpalError, file_sha256
 from dnadesign.opal.src.registries.models import list_models, register_model
 from dnadesign.opal.src.registries.objectives import list_objectives, register_objective
 from dnadesign.opal.src.registries.selection import list_selections, register_selection
 from dnadesign.opal.src.registries.transforms_y import list_y_ops, register_y_op
 from dnadesign.opal.src.runtime.round import writebacks as round_writebacks
-from dnadesign.opal.src.runtime.round.stages import _format_summary_stats_for_log
+from dnadesign.opal.src.runtime.round.stages.telemetry import format_summary_stats_for_log
 from dnadesign.opal.src.runtime.run_round import RunRoundRequest, run_round
 from dnadesign.opal.src.storage.data_access import RecordsStore
 from dnadesign.opal.src.storage.state import CampaignState, RoundEntry
@@ -217,7 +222,7 @@ def test_format_summary_stats_for_log_handles_mixed_types() -> None:
         "train_effect_pool_size": 4,
         "non_finite_value": np.nan,
     }
-    kvs = _format_summary_stats_for_log(summary_stats)
+    kvs = format_summary_stats_for_log(summary_stats)
     assert kvs == [
         "non_finite_value=nan",
         "score_max=1.23457",
@@ -256,13 +261,18 @@ def _make_config(
     score_batch_size: int = 1000,
 ) -> RootConfig:
     resolved_sel = dict(selection_params or {"top_k": 1})
-    resolved_sel.setdefault("score_ref", f"{objective_name}/scalar")
+    resolved_sel.setdefault("score_ref", "scalar")
     resolved_sel.setdefault("tie_handling", "competition_rank")
     resolved_sel.setdefault("objective_mode", "maximize")
+    for ref_key in ("score_ref", "uncertainty_ref"):
+        if ref_key in resolved_sel and "/" in str(resolved_sel[ref_key]):
+            resolved_sel[ref_key] = str(resolved_sel[ref_key]).rsplit("/", 1)[-1]
     if model_params is None:
         model_params = {"n_estimators": 5, "random_state": 0}
     return RootConfig(
+        schema_version="opal.campaign.v3",
         campaign=CampaignBlock(name="Demo", slug="demo", workdir=str(workdir)),
+        ownership=OwnershipBlock(owner_scope="opal_demo"),
         data=DataBlock(
             location=LocationLocal(kind="local", path=str(records_path)),
             x_column_name="X",
@@ -272,8 +282,14 @@ def _make_config(
             y_expected_length=y_expected_length,
         ),
         model=PluginRef(name=model_name, params=model_params),
-        selection=SelectionBlock(selection=PluginRef(name=selection_name, params=resolved_sel)),
-        objectives=ObjectivesBlock(objectives=[PluginRef(name=objective_name, params=objective_params or {})]),
+        selection_views=[
+            SelectionView(
+                id="primary",
+                objective=PluginRef(name=objective_name, params=objective_params or {}),
+                selection=PluginRef(name=selection_name, params=resolved_sel),
+            )
+        ],
+        selection_batch=SelectionBatchBlock(),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
         scoring=ScoringBlock(score_batch_size=int(score_batch_size)),
@@ -479,6 +495,74 @@ def test_run_round_blocks_when_round_dir_has_any_entry_without_resume(tmp_path: 
         )
 
 
+def test_run_round_allows_cli_prerun_log_without_resume(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    records_path = tmp_path / "records.parquet"
+    _write_records(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+    round_log = workdir / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
+    round_log.parent.mkdir(parents=True, exist_ok=True)
+    round_log.write_text(
+        "\n".join(
+            [
+                '{"ts":"2025-01-01T00:00:00+00:00","stage":"command_start"}',
+                '{"ts":"2025-01-01T00:00:01+00:00","stage":"records_load_done"}',
+            ]
+        )
+    )
+
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+    res = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+
+    assert res.ok is True
+    runs = read_runs(workdir / "outputs" / "ledger" / "runs.parquet")
+    observed_events = read_run_observed_events(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=res.run_id,
+    ).frame.to_pandas()
+    assert observed_events[
+        ["id", "display_label", "observed_round", "batch_id", "y_space", "label_source_kind"]
+    ].to_dict(orient="records") == [
+        {
+            "id": "a",
+            "display_label": None,
+            "observed_round": 0,
+            "batch_id": None,
+            "y_space": None,
+            "label_source_kind": "campaign_history",
+        }
+    ]
+    state = CampaignState.load(workdir / "state.json")
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
+
+
 def test_run_round_resume_cleans_round_dir(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -526,6 +610,202 @@ def test_run_round_resume_cleans_round_dir(tmp_path: Path) -> None:
     assert not stale_dir.exists()
 
 
+def test_run_round_resume_retains_each_run_evidence_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = tmp_path / "records.parquet"
+    _write_records(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+    monkeypatch.setattr(
+        "dnadesign.opal.src.runtime.round.context.now_iso",
+        lambda: "2026-07-16T14:53:58+00:00",
+    )
+    monkeypatch.setattr(
+        "dnadesign.opal.src.runtime.round.context.time_ns",
+        lambda: 1_752_678_838_000_000_000,
+    )
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+
+    first = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+    second = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+            allow_resume=True,
+        ),
+    )
+    state = CampaignState.load(workdir / "state.json")
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
+
+    runs = read_runs(workdir / "outputs" / "ledger" / "runs.parquet")
+    first_snapshot = read_run_observed_events(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=first.run_id,
+    )
+    second_snapshot = read_run_observed_events(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=second.run_id,
+    )
+    first_labels = read_run_labels_used(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=first.run_id,
+    )
+    second_labels = read_run_labels_used(
+        runs,
+        outputs_dir=workdir / "outputs",
+        round_k=0,
+        run_id=second.run_id,
+    )
+
+    assert first.run_id != second.run_id
+    assert first_snapshot.path != second_snapshot.path
+    assert first_labels.path != second_labels.path
+    assert first_snapshot.path.is_file()
+    assert second_snapshot.path.is_file()
+    assert first_labels.path.is_file()
+    assert second_labels.path.is_file()
+    assert first_snapshot.sha256 != second_snapshot.sha256
+    assert first_labels.sha256 != second_labels.sha256
+    assert first_snapshot.frame.get_column("run_id").unique().to_list() == [first.run_id]
+    assert second_snapshot.frame.get_column("run_id").unique().to_list() == [second.run_id]
+    assert first_labels.frame.get_column("run_id").unique().to_list() == [first.run_id]
+    assert second_labels.frame.get_column("run_id").unique().to_list() == [second.run_id]
+
+    run_rows = {str(row["run_id"]): row for row in runs.to_dicts()}
+    first_artifacts = run_rows[first.run_id]["artifacts"]
+    second_artifacts = run_rows[second.run_id]["artifacts"]
+    shared_keys = sorted(set(first_artifacts) & set(second_artifacts))
+    assert shared_keys
+    for artifact_key in shared_keys:
+        first_reference = first_artifacts[artifact_key]
+        second_reference = second_artifacts[artifact_key]
+        if first_reference is None or second_reference is None:
+            continue
+        first_sha256, first_path_raw = first_reference
+        second_sha256, second_path_raw = second_reference
+        first_path = Path(first_path_raw)
+        second_path = Path(second_path_raw)
+        assert first_path != second_path, artifact_key
+        assert first_path.is_file(), artifact_key
+        assert second_path.is_file(), artifact_key
+        assert file_sha256(first_path) == first_sha256, artifact_key
+        assert file_sha256(second_path) == second_sha256, artifact_key
+
+
+def test_run_round_backlog_replaces_newly_observed_prior_selection(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records_path = tmp_path / "records.parquet"
+    _write_records_scalar_multibatch(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+        selection_params={
+            "top_k": 1,
+            "score_ref": "scalar",
+            "tie_handling": "ordinal",
+            "objective_mode": "maximize",
+            "require_exact_top_k": True,
+        },
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+
+    first = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+    state = CampaignState.load(workdir / "state.json")
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
+    first_batch_path = Path(state.rounds[0].artifacts["selection_batch_parquet"])
+    first_selected_id = str(pd.read_parquet(first_batch_path).iloc[0]["id"])
+
+    records = pd.read_parquet(records_path)
+    hist_col = "opal__demo__label_hist"
+    row_index = records.index[records["id"].astype(str).eq(first_selected_id)].item()
+    history = list(records.at[row_index, hist_col])
+    history.append(
+        {
+            "kind": "label",
+            "observed_round": 1,
+            "y_obs": {"value": [2.0], "dtype": "vector", "schema": {"length": 1}},
+        }
+    )
+    records.at[row_index, hist_col] = history
+    records.to_parquet(records_path, index=False)
+
+    second = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=1,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+
+    assert first.run_id != second.run_id
+    state = CampaignState.load(workdir / "state.json")
+    assert len(state.rounds) == 2
+    assert state.backlog == {"number_of_selected_but_not_yet_labeled_candidates_total": 1}
+    second_batch_path = Path(state.rounds[1].artifacts["selection_batch_parquet"])
+    second_selected_id = str(pd.read_parquet(second_batch_path).iloc[0]["id"])
+    assert second_selected_id != first_selected_id
+
+
 def test_run_round_allow_resume_rejects_malformed_state_round_index(tmp_path: Path, monkeypatch) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)
@@ -557,8 +837,8 @@ def test_run_round_allow_resume_rejects_malformed_state_round_index(tmp_path: Pa
             labels_used_rounds=[0],
             number_of_training_examples_used_in_round=1,
             number_of_candidates_scored_in_round=1,
-            selection_top_k_requested=1,
-            selection_top_k_effective_after_ties=1,
+            selection_views={},
+            selection_batch={},
             model={},
             metrics={},
             durations_sec={},
@@ -634,12 +914,82 @@ def test_run_round_preserves_null_sequence_in_selection_artifacts(tmp_path: Path
     )
     assert res.ok is True
 
-    sel_csv_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
-    sel_parquet_path = sel_csv_path.with_suffix(".parquet")
-    assert sel_csv_path.exists()
-    assert not sel_parquet_path.exists()
-    sel_df = pd.read_csv(sel_csv_path)
+    sel_parquet_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
+    assert sel_parquet_path.exists()
+    sel_df = pd.read_parquet(sel_parquet_path)
     assert pd.isna(sel_df.loc[0, "sequence"])
+
+
+def test_run_round_persists_unique_multi_view_allocation_trace(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    records_path = tmp_path / "records.parquet"
+    _write_records_scalar_multibatch(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name="scalar_identity_v1",
+        selection_params={
+            "top_k": 2,
+            "score_ref": "scalar",
+            "tie_handling": "ordinal",
+            "objective_mode": "maximize",
+            "require_exact_top_k": True,
+        },
+    )
+    selection = cfg.selection_views[0].selection
+    objective = cfg.selection_views[0].objective
+    cfg.selection_views = [
+        SelectionView(id="target_a", objective=objective, selection=selection),
+        SelectionView(id="target_b", objective=objective, selection=selection),
+    ]
+    cfg.selection_batch = SelectionBatchBlock(
+        deduplicate_by="sequence",
+        expected_unique_count=4,
+        allocation=SelectionBatchAllocationBlock(
+            strategy="round_robin_next_best_unallocated",
+            view_priority=["target_a", "target_b"],
+        ),
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+    result = run_round(
+        store,
+        store.load(),
+        RunRoundRequest(
+            cfg=cfg,
+            as_of_round=0,
+            config_path=workdir / "campaign.yaml",
+            verbose=False,
+        ),
+    )
+
+    assert result.selection_batch_count == 4
+    assert {view["top_k_effective"] for view in result.selection_views.values()} == {2}
+    selection_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
+    selections = pd.read_parquet(selection_dir / "selections.parquet")
+    batch = pd.read_parquet(selection_dir / "selection_batch.parquet")
+    trace = pd.read_parquet(selection_dir / "allocation_trace.parquet")
+    assert selections.groupby("selection_view_id").size().to_dict() == {"target_a": 2, "target_b": 2}
+    assert len(batch) == 4
+    assert batch["selection_batch_key"].nunique() == 4
+    assert "skipped_already_allocated" in set(trace["decision"])
+    state = CampaignState.load(workdir / "state.json")
+    allocation_summary = state.rounds[0].selection_batch["allocation"]
+    assert allocation_summary["initial_unique_count"] == 2
+    assert allocation_summary["final_unique_count"] == 4
+    assert allocation_summary["replacement_count"] == 2
 
 
 def test_run_round_bubbles_runtime_error_from_model_artifacts(tmp_path: Path) -> None:
@@ -698,7 +1048,7 @@ def test_run_round_matrix_gp_top_n_path(tmp_path: Path) -> None:
             "alpha": 1e-6,
             "kernel": {"name": "matern", "length_scale": 0.5, "nu": 1.5, "with_white_noise": True},
         },
-        selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
+        selection_params={"top_k": 1, "score_ref": "scalar"},
     )
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
@@ -737,7 +1087,7 @@ def test_run_round_matrix_rf_sfxi_top_n_path(tmp_path: Path) -> None:
         records_path=records_path,
         objective_name="sfxi_v1",
         objective_params={"setpoint_vector": [0, 0, 0, 1], "scaling": {"min_n": 1}},
-        selection_params={"top_k": 1, "score_ref": "sfxi_v1/sfxi"},
+        selection_params={"top_k": 1, "score_ref": "sfxi"},
         y_expected_length=8,
     )
     _write_state(workdir, cfg, records_path)
@@ -782,8 +1132,8 @@ def test_run_round_matrix_gp_ei_path(tmp_path: Path) -> None:
         selection_name="expected_improvement",
         selection_params={
             "top_k": 1,
-            "score_ref": f"{objective_name}/scalar",
-            "uncertainty_ref": f"{objective_name}/scalar_var",
+            "score_ref": "scalar",
+            "uncertainty_ref": "scalar_var",
             "objective_mode": "maximize",
             "alpha": 1.0,
             "beta": 1.0,
@@ -813,16 +1163,14 @@ def test_run_round_matrix_gp_ei_path(tmp_path: Path) -> None:
         ),
     )
     assert res.ok is True
-    df_after = store.load()
-    hist = df_after.loc[df_after["id"] == "b", "opal__demo__label_hist"].iloc[0]
-    pred_entries = [e for e in hist if e.get("kind") == "pred"]
-    assert pred_entries
-    metrics = pred_entries[-1]["metrics"]
-    assert "score" in metrics
-    assert np.isfinite(float(metrics["score"]))
-    assert 0.0 <= float(metrics["score"]) <= 1.0
-    assert f"score::{objective_name}/scalar" in metrics
-    assert f"uncertainty::{objective_name}/scalar_var" in metrics
+    ledger = pd.read_parquet(workdir / "outputs" / "ledger" / "predictions")
+    view_payload = ledger.loc[ledger["id"] == "b", "pred__selection_views"].iloc[0][0]
+    assert view_payload["selection_view_id"] == "primary"
+    assert np.isfinite(float(view_payload["selection_score"]))
+    assert 0.0 <= float(view_payload["selection_score"]) <= 1.0
+    assert view_payload["score_ref"] == "primary/scalar"
+    assert np.isfinite(float(view_payload["uncertainty"]))
+    assert view_payload["uncertainty_ref"] == "primary/scalar_var"
 
 
 def test_run_round_ei_fails_on_non_positive_uncertainty_channel(tmp_path: Path) -> None:
@@ -941,7 +1289,7 @@ def test_run_round_rejects_topn_when_yops_lacks_inverse_std_with_gp(tmp_path: Pa
         selection_name="top_n",
         selection_params={
             "top_k": 1,
-            "score_ref": "scalar_identity_v1/scalar",
+            "score_ref": "scalar",
             "objective_mode": "maximize",
         },
     )
@@ -992,8 +1340,8 @@ def test_run_round_gp_ei_with_intensity_yops_emits_finite_uncertainty(tmp_path: 
         selection_name="expected_improvement",
         selection_params={
             "top_k": 1,
-            "score_ref": "sfxi_v1/sfxi",
-            "uncertainty_ref": "sfxi_v1/sfxi",
+            "score_ref": "sfxi",
+            "uncertainty_ref": "sfxi",
             "objective_mode": "maximize",
             "alpha": 1.0,
             "beta": 1.0,
@@ -1026,16 +1374,9 @@ def test_run_round_gp_ei_with_intensity_yops_emits_finite_uncertainty(tmp_path: 
     )
     assert res.ok is True
 
-    df_after = store.load()
-    emitted = []
-    for hist in df_after["opal__demo__label_hist"]:
-        for event in hist:
-            if event.get("kind") != "pred":
-                continue
-            metrics = event.get("metrics", {}) or {}
-            if "uncertainty::sfxi_v1/sfxi" in metrics:
-                emitted.append(float(metrics["uncertainty::sfxi_v1/sfxi"]))
-    assert emitted, "Expected uncertainty::sfxi_v1/sfxi to be emitted in prediction metrics."
+    ledger = pd.read_parquet(workdir / "outputs" / "ledger" / "predictions")
+    emitted = [float(payload[0]["uncertainty"]) for payload in ledger["pred__selection_views"]]
+    assert emitted, "Expected view uncertainty in the shared prediction ledger."
     assert np.all(np.isfinite(np.asarray(emitted, dtype=float)))
     assert np.all(np.asarray(emitted, dtype=float) >= 0.0)
 
@@ -1053,7 +1394,7 @@ def test_run_round_matrix_gp_topn_handles_scalar_uncertainty_multibatch(tmp_path
         model_name="gaussian_process",
         model_params={"normalize_y": False, "alpha": 1e-6},
         selection_name="top_n",
-        selection_params={"top_k": 2, "score_ref": "scalar_identity_v1/scalar", "objective_mode": "maximize"},
+        selection_params={"top_k": 2, "score_ref": "scalar", "objective_mode": "maximize"},
         score_batch_size=2,
     )
     _write_state(workdir, cfg, records_path)
@@ -1129,8 +1470,8 @@ def test_run_round_uses_selection_score_for_tie_expansion(tmp_path: Path) -> Non
     )
     assert res.ok is True
 
-    sel_csv_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selection_top_k.csv"
-    sel_df = pd.read_csv(sel_csv_path)
+    sel_path = workdir / "outputs" / "rounds" / "round_0" / "selection" / "selections.parquet"
+    sel_df = pd.read_parquet(sel_path)
     assert sel_df.shape[0] == 2
 
 
@@ -1144,7 +1485,7 @@ def test_run_round_rejects_invalid_score_ref(tmp_path: Path) -> None:
         workdir=workdir,
         records_path=records_path,
         objective_name="scalar_identity_v1",
-        selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/missing"},
+        selection_params={"top_k": 1, "score_ref": "missing"},
     )
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
@@ -1184,7 +1525,7 @@ def test_run_round_rejects_missing_objective_mode(tmp_path: Path) -> None:
         objective_name="scalar_identity_v1",
         selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
     )
-    cfg.selection.selection.params.pop("objective_mode", None)
+    cfg.selection_views[0].selection.params.pop("objective_mode", None)
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
 
@@ -1223,7 +1564,7 @@ def test_run_round_rejects_missing_tie_handling(tmp_path: Path) -> None:
         objective_name="scalar_identity_v1",
         selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar", "objective_mode": "maximize"},
     )
-    cfg.selection.selection.params.pop("tie_handling", None)
+    cfg.selection_views[0].selection.params.pop("tie_handling", None)
     _write_state(workdir, cfg, records_path)
     (workdir / "campaign.yaml").write_text("campaign: {}")
 
@@ -1267,7 +1608,7 @@ def test_run_round_rejects_invalid_uncertainty_ref(tmp_path: Path) -> None:
         selection_params={
             "top_k": 1,
             "score_ref": f"{objective_name}/scalar",
-            "uncertainty_ref": f"{objective_name}/does_not_exist",
+            "uncertainty_ref": "does_not_exist",
             "objective_mode": "maximize",
         },
     )

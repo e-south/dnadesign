@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/released_models.py
 
 Compatibility facade for released-product snapback contracts.

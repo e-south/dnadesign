@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_workspace_scope.py
 
 Tests for workspace-scoped baserender job scaffolding and workspace-aware CLI flow.

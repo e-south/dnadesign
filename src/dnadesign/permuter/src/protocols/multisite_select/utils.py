@@ -1,19 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/multisite_select/utils.py
 
-Utility helpers for the multi-site selection protocol:
-
-  • reading the source dataset (records.parquet),
-  • strict row-level validation for selection,
-  • embedding extraction and shape checks,
-  • AA combo parsing and sequence construction,
-  • DNA codon decoration (uppercase mutated codons),
-  • basic pairwise diagnostics helpers.
-
-All functions are assertive: malformed inputs raise descriptive exceptions.
-No silent coercions, no lossy fallbacks.
+Utility helpers for the multi-site selection protocol:.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

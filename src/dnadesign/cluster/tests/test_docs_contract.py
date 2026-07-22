@@ -61,7 +61,7 @@ def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> 
     assert "../api.py" in workflow_index or "api.py" in workflow_index
     assert "concepts/ownership-boundary.md" in workflow_index
     assert "concepts/semantic-surface.md" in workflow_index
-    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in workflow_index
+    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" in workflow_index
     assert "../../infer/docs/README.md" in workflow_index
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in workflow_index
 
@@ -110,7 +110,7 @@ def test_cluster_docs_tree_exposes_workflow_reference_and_concept_surfaces() -> 
     assert "`uv run cluster workspaces list`" in reference
     assert "`uv run cluster workspaces show --help`" in reference
     assert "--method-param key=value" in reference
-    assert "Legacy top-level fit method keys" in reference
+    assert "Top-level fit method keys" in reference
     assert "`cluster sweep` is method-scoped and requires `--method`" in reference
     assert "fails fast instead of defaulting runtime state under `src/dnadesign/cluster/`" in reference
     assert "All attached overlay columns use one namespace contract" in reference

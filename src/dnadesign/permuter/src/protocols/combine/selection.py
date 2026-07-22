@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/combine/selection.py
+
+Permutation protocol logic for selection Permuter protocols combine.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,6 +18,11 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pandas as pd
+
+from dnadesign.permuter.src.contracts.metrics import (
+    metric_id_from_observed_column,
+    reject_legacy_metric_columns,
+)
 
 _LOG = logging.getLogger("permuter.protocol.combine_aa")
 
@@ -66,6 +73,7 @@ def select_elite_aa_events(df: pd.DataFrame, metric_col: str, cfg: Dict) -> List
 
     Returns: list of (pos:int, wt:str, alt:str, score:float) sorted by score↓.
     """
+    reject_legacy_metric_columns(df, context="combine_aa", expected_observed=metric_col)
     required_cols = [
         "permuter__round",
         "permuter__aa_pos",
@@ -75,7 +83,10 @@ def select_elite_aa_events(df: pd.DataFrame, metric_col: str, cfg: Dict) -> List
     ]
     missing = [c for c in required_cols if c not in df.columns]
     if missing:
-        raise ValueError(f"combine_aa: input dataset missing columns: {missing}. Expected singles with {required_cols}")
+        raise ValueError(
+            f"combine_aa: input dataset missing columns: {missing}. "
+            f"Expected round-1 singles with canonical observed metric column {metric_col!r}."
+        )
 
     singles = df[df["permuter__round"] == 1].copy()
     singles = singles[
@@ -169,7 +180,7 @@ def select_elite_aa_events(df: pd.DataFrame, metric_col: str, cfg: Dict) -> List
         )
 
     if emit_table:
-        metric_id = str(metric_col).split("permuter__metric__", 1)[-1].lstrip("_")
+        metric_id = metric_id_from_observed_column(metric_col)
         lines = [f"{r['_wt']}{int(r['_pos'])}{r['_alt']}  {r['_score']:+.3f}" for _, r in chosen.iterrows()]
         # 10 rows per column
         rows_per_col = 10
@@ -205,7 +216,7 @@ def select_elite_aa_events(df: pd.DataFrame, metric_col: str, cfg: Dict) -> List
         )
         if art_dir:
             art_dir.mkdir(parents=True, exist_ok=True)
-            metric_id = str(metric_col).split("permuter__metric__", 1)[-1].lstrip("_")
+            metric_id = metric_id_from_observed_column(metric_col)
             chosen_out = chosen.copy()
             chosen_out = chosen_out.rename(columns={"_pos": "pos", "_wt": "wt", "_alt": "alt", "_score": "score"})
             chosen_out["canon"] = chosen_out.apply(lambda r: f"{r['wt']}{int(r['pos'])}{r['alt']}", axis=1)

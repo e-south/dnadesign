@@ -1,7 +1,7 @@
 ## Construct Template Contexts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-18
+**Last verified:** 2026-06-17
 
 Use this page when construct is supplying larger resolved contexts for infer or other downstream tools.
 
@@ -22,10 +22,24 @@ For template-backed inference or other downstream analysis, the resolved constru
 - `construct__anchor_orientation`
 - `construct__anchor_start`
 - `construct__anchor_end`
+- `construct__assembly_mode`
+- `construct__slot_count`
+- `construct__slots`
 - `construct__resolved_length`
 - `construct__spec_id`
 
 These values are emitted relative to the realized sequence that construct writes.
+For multi-slot jobs, `construct__anchor_*` remains the focal part span for
+existing consumers, while `construct__slots` carries every named slot span.
+Any job that emits `realized_context` sequence-view variants must therefore
+declare an anchor handoff span when the view needs `anchor_mean`, either through
+`output_variants[].anchor_part`, `realize.focal_part`, or a single part named or
+role-tagged `anchor`.
+For slot-specific views, prefer `output_variants[].anchor_part`: Construct copies
+that named slot's emitted-orientation bounds into the sequence-view
+`anchor_start_0` / `anchor_end_0` fields without pretending the whole package has
+multiple generic anchors. Downstream Infer configs for those views should use
+`bounds_from: sequence_view`.
 
 ### What infer expects
 
@@ -46,10 +60,13 @@ Templated infer jobs fail fast when the required `construct__*` fields are missi
 
 Construct now also fails fast during preflight when a windowed output would clip or wrap the focal anchor so that
 `construct__anchor_start` / `construct__anchor_end` cannot be emitted as one contiguous span.
+Windowed jobs also fail when `realize.required_slots` names a part that would be
+clipped or split in the emitted view.
 
 ### Template strategy
 
-The current construct schema remains one-template-per-job.
+The current construct schema remains one-template-per-job. Within that one
+template, jobs may assemble multiple named slots from one candidate row.
 
 Use multiple construct projects when you need:
 
@@ -63,5 +80,5 @@ That keeps template choice explicit as workspace/config state instead of hiding 
 
 Use one of these next steps after construct materializes template-backed contexts:
 
-- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter-characterization-feature-matrix.md): promoter-study branch for feature extraction, cluster, and OPAL prep.
+- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
+- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md): promoter-study branch for feature extraction, cluster, and OPAL prep.

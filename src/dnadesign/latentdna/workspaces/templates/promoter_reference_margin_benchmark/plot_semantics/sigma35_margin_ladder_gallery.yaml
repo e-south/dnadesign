@@ -16,7 +16,7 @@ math_md: |
   m_{\sigma35}(x) = \cos(z_x, c_f) - \cos(z_x, c_b),
   $$
   where $c_f$ and $c_b$ are the study-internal centroids for Sigma-35 variants `f` and `b`, using leave-one-out handling for in-cohort rows. Positive values mean a row sits closer to the `f` centroid than the `b` centroid; more negative values mean the opposite.
-  The ordinal-swarm annotation reports Spearman rho between row-level Sigma-35 class order and this high-dimensional margin, plus a simple linear $R^2$ for those same row-level variables.
+  The ordinal-swarm annotation reports Spearman rho between row-level Sigma-35 class order and this high-dimensional margin, Kendall tau-b for pairwise ordering agreement with tie correction, and a simple linear $R^2$ for those same row-level variables.
 rationale_md: This makes the ordinal Spearman auditable. A better candidate shows the row-level margins shifting in the declared `f > e > d > c > b` order, so the scalar audit summarizes a visible ladder rather than relying on a single bar value.
 limitations_md: This is still a single derived axis conditioned on study labels, so it cannot substitute for the full ordinal audit or imply phenotype.
 failure_modes_md: If the category ordering regresses or control rows are overinterpreted, the ladder can be visually misleading.

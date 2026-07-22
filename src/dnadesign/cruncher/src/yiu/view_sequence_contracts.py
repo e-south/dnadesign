@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/view_sequence_contracts.py
 
 Sequence-evidence contract shells for split and assembled YIU views.

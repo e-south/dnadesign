@@ -36,6 +36,12 @@ def _validate_coverage_summary(coverage_summary: dict) -> None:
             raise ValueError(f"Coverage summary missing required field: {key}")
     if not isinstance(coverage_summary["tools"], dict):
         raise ValueError("Coverage summary field 'tools' must be an object.")
+    for key in ("gate_passed_tools", "gate_total_tools"):
+        value = coverage_summary[key]
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError(f"Coverage summary field '{key}' must be an integer.")
+        if value < 0:
+            raise ValueError(f"Coverage summary field '{key}' must be non-negative.")
 
 
 def _read_numeric_field(*, row: dict, tool_name: str, field_name: str) -> float:
@@ -116,6 +122,19 @@ def build_quality_score_inputs(
                 "gate": gate,
                 "meets_baseline": gate == "pass",
             }
+        )
+
+    computed_total_tools = len(tools_payload)
+    computed_passed_tools = sum(1 for tool in tools_payload if tool["gate"] == "pass")
+    if coverage_summary["gate_total_tools"] != computed_total_tools:
+        raise ValueError(
+            "Coverage summary gate_total_tools mismatch: "
+            f"{coverage_summary['gate_total_tools']} (summary) vs {computed_total_tools} (computed)."
+        )
+    if coverage_summary["gate_passed_tools"] != computed_passed_tools:
+        raise ValueError(
+            "Coverage summary gate_passed_tools mismatch: "
+            f"{coverage_summary['gate_passed_tools']} (summary) vs {computed_passed_tools} (computed)."
         )
 
     return {

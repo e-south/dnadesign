@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/publish_io.py
 
 Filesystem write helpers for payload-centric YIU publication.

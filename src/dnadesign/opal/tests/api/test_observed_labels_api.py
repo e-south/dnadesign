@@ -1,0 +1,197 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/api/test_observed_labels_api.py
+
+Contracts for OPAL's public immutable observed-label snapshot API.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pandas as pd
+import pyarrow.parquet as pq
+import pytest
+
+import dnadesign.opal.api as opal_api
+from dnadesign.opal import (
+    OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION,
+    ObservedLabelPromotionBinding,
+    verify_observed_label_snapshot,
+)
+from dnadesign.opal.api import (
+    CandidateExclusionSetBinding,
+    build_candidate_exclusion_projection,
+    candidate_exclusion_sets_from_config,
+    observed_labels,
+)
+
+LABEL_RELATIVE_PATH = "_opal/observed_labels.parquet"
+MANIFEST_RELATIVE_PATH = "_opal/observed_labels.manifest.json"
+PROVENANCE_RELATIVE_PATH = "_opal/study_label_provenance.json"
+CANDIDATE_RELATIVE_PATH = "records.parquet"
+
+
+def test_candidate_exclusion_helpers_are_available_from_the_api_package() -> None:
+    assert CandidateExclusionSetBinding is observed_labels.CandidateExclusionSetBinding
+    assert build_candidate_exclusion_projection is observed_labels.build_candidate_exclusion_projection
+    assert candidate_exclusion_sets_from_config is observed_labels.candidate_exclusion_sets_from_config
+    assert {
+        "CandidateExclusionSetBinding",
+        "build_candidate_exclusion_projection",
+        "candidate_exclusion_sets_from_config",
+    }.issubset(opal_api.__all__)
+
+
+def test_public_snapshot_api_verifies_and_materializes_exact_vectors(tmp_path: Path) -> None:
+    _write_promotion(tmp_path, _label_frame())
+
+    snapshot = verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=8)
+
+    assert snapshot.promotion.row_count == 2
+    assert snapshot.labels.to_dict(orient="records") == [
+        {"id": "candidate_a", "y": [0.0] * 8, "r": 0},
+        {"id": "candidate_b", "y": [1.0] * 8, "r": 0},
+    ]
+
+
+def test_public_snapshot_api_rejects_vector_width_mismatch(tmp_path: Path) -> None:
+    _write_promotion(tmp_path, _label_frame())
+
+    with pytest.raises(ValueError, match="expected 4 values"):
+        verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=4)
+
+
+def test_public_snapshot_api_materializes_the_complete_round_domain(tmp_path: Path) -> None:
+    frame = _label_frame()
+    frame.loc[0, "observed_round"] = 2**40
+    _write_promotion(tmp_path, frame)
+
+    snapshot = verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=8)
+
+    assert snapshot.labels.set_index("id")["r"].to_dict() == {
+        "candidate_a": 2**40,
+        "candidate_b": 0,
+    }
+
+
+def test_public_snapshot_api_rejects_duplicate_candidate_round_events(tmp_path: Path) -> None:
+    duplicate = (
+        _label_frame()
+        .iloc[[0]]
+        .assign(
+            observed_round=0,
+            batch_id="batch_0_repeat",
+        )
+    )
+    frame = pd.concat([_label_frame(), duplicate], ignore_index=True)
+    _write_promotion(tmp_path, frame)
+
+    with pytest.raises(ValueError, match="[Dd]uplicate"):
+        verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=8)
+
+
+def test_public_snapshot_api_preserves_cross_round_candidate_events(tmp_path: Path) -> None:
+    later = _label_frame().iloc[[0]].assign(observed_round=1, batch_id="batch_1")
+    frame = pd.concat([_label_frame(), later], ignore_index=True)
+    _write_promotion(tmp_path, frame)
+
+    snapshot = verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=8)
+
+    assert snapshot.labels.loc[snapshot.labels["id"].eq("candidate_a"), "r"].tolist() == [0, 1]
+
+
+@pytest.mark.parametrize("expected_y_width", [0, -1, True, 8.0])
+def test_public_snapshot_api_rejects_invalid_expected_width(
+    tmp_path: Path,
+    expected_y_width: object,
+) -> None:
+    _write_promotion(tmp_path, _label_frame())
+
+    with pytest.raises(ValueError, match="positive integer"):
+        verify_observed_label_snapshot(_binding(tmp_path), expected_y_width=expected_y_width)  # type: ignore[arg-type]
+
+
+def _label_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "id": ["candidate_a", "candidate_b"],
+            "observed_round": [0, 0],
+            "batch_id": ["batch_0", "batch_0"],
+            "y_space": ["response_window_vector_v1", "response_window_vector_v1"],
+            "y_obs": [[0.0] * 8, [1.0] * 8],
+        }
+    )
+
+
+def _write_promotion(dataset_root: Path, labels: pd.DataFrame) -> None:
+    candidate_path = dataset_root / CANDIDATE_RELATIVE_PATH
+    pd.DataFrame(
+        {
+            "id": ["candidate_a", "candidate_b"],
+            "sequence": ["ACGT", "TGCA"],
+            "x_feature": [[0.0, 1.0], [1.0, 0.0]],
+        }
+    ).to_parquet(candidate_path, index=False)
+    label_path = dataset_root / LABEL_RELATIVE_PATH
+    label_path.parent.mkdir(parents=True, exist_ok=True)
+    labels.to_parquet(label_path, index=False)
+    provenance_path = dataset_root / PROVENANCE_RELATIVE_PATH
+    provenance_path.write_text('{"schema_version":"stress-study.labels.v1"}\n', encoding="utf-8")
+    payload = {
+        "schema_version": OBSERVED_LABEL_PROMOTION_SCHEMA_VERSION,
+        "campaign_slug": "promoter",
+        "study_id": "stress_promoter",
+        "y_space": "response_window_vector_v1",
+        "study_provenance": {
+            "schema_id": "stress-study.labels.v1",
+            "path": PROVENANCE_RELATIVE_PATH,
+            "sha256": _sha256(provenance_path),
+        },
+        "candidate_exclusion_projection": {
+            "exclusion_set_id": "test_observed_label_dispositions_v1",
+            "entries_sha256": hashlib.sha256(b"[]").hexdigest(),
+            "entry_count": 0,
+        },
+        "candidate_artifact": _candidate_artifact(candidate_path),
+        "label_artifact": {
+            "path": LABEL_RELATIVE_PATH,
+            "sha256": _sha256(label_path),
+            "row_count": len(labels),
+        },
+    }
+    (dataset_root / MANIFEST_RELATIVE_PATH).write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _binding(dataset_root: Path) -> ObservedLabelPromotionBinding:
+    return ObservedLabelPromotionBinding(
+        dataset_root=dataset_root,
+        manifest_path=MANIFEST_RELATIVE_PATH,
+        label_path=LABEL_RELATIVE_PATH,
+        campaign_slug="promoter",
+        study_id="stress_promoter",
+        y_space="response_window_vector_v1",
+        candidate_x_column="x_feature",
+    )
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _candidate_artifact(path: Path) -> dict[str, object]:
+    parquet = pq.ParquetFile(path)
+    schema = parquet.schema_arrow
+    return {
+        "path": CANDIDATE_RELATIVE_PATH,
+        "sha256": _sha256(path),
+        "row_count": int(parquet.metadata.num_rows),
+        "columns": schema.names,
+        "schema_sha256": hashlib.sha256(schema.serialize().to_pybytes()).hexdigest(),
+    }

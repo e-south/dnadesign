@@ -1,4 +1,13 @@
-"""High-density scatter rasterization for notebook review surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/raster_scatter.py
+
+High-density scatter rasterization for notebook review surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

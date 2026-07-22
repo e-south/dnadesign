@@ -1,0 +1,55 @@
+fixture_id: retron26-working-anchor
+fixture_status: source_resolved_construct_representable_not_materialized
+candidate:
+  construct_subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  study_id: rt_lnrna_sponging_construct_triage
+  construct_contract: dual_cassette_rt_lnrna_expression_v1
+  representation_contract: dual_cassette_construct_context_embedding_v1
+  payload_program_id: tetO_sponging_v1
+  rt_cds_sequence_id: genbank:retron-eco1-rt.gb#ECD_00831
+  rt_source: Eco1
+  rt_variant: WT
+  rt_protein_provenance_id: genbank:retron-eco1-rt.gb#CDS
+  lnrna_sequence_id: genbank:pes-retron-26-a1-a2.gb#a1-a2
+  lnrna_source: Eco1-derived
+  lnrna_design_id: retron26
+  lnrna_provenance_id: genbank:pes-retron-26-a1-a2.gb#record
+  msd_design_spec_id: msd_design_spec__retron26__tetO_sponging_v1
+  variant_derivation:
+  source_basis: lab_anchor
+  construct_projection_status: representable
+  construct_id:
+  construct_context_view_ids: []
+  abundance_prior_overlay_ids: []
+  sponging_assay_observation_ids: []
+  construct_subject_role: working_control
+  source_authority_status: resolved_by_genbank_source_authority
+  blockers:
+    - real_sponging_assay_observations_absent
+  construct_subject_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; six 2,000 bp source view lanes and Infer sidecars are materialized, while real labels remain absent.
+msd_design_spec:
+  msd_design_spec_id: msd_design_spec__retron26__tetO_sponging_v1
+  schema_version: msd_design_spec_v1
+  payload_program_id: tetO_sponging_v1
+  payload_id: tetO
+  payload_sequence: TCCCTATCAGTGATAGAGA
+  compiler_source: docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml
+  compiler_contract: retron_msd_design_registry_v1
+  cap_id: C26
+  snapback_source_id: genbank:pes-retron-26-a1-a2.gb#WT-loop
+  scar_nick_source_id:
+  left_base: CCCG
+  right_base: TCTG
+  profile_s3s2s1s0:
+  nick_orientation:
+  nickase:
+  feasibility_status: needs_review
+  feasibility_reason: GenBank offsets resolve source authority and construct representability; cloning feasibility and context materialization remain unrun.
+  source_refs:
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml#pes_retron_26_vector
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank-source-authority.yaml#pes_retron_26_lnrna_a1_a2
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26.gb
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb
+    - docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/retron-eco1-rt.gb
+    - docs/studies/retron_hairpin_design/compiler/catalog/msd_design_registry.yaml#caps.C26
+    - docs/studies/retron_hairpin_design/compiler/catalog/msd_cap_sources.yaml#sources.C26

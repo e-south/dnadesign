@@ -1,0 +1,23 @@
+study_runtime_root:
+  surface_type: workspace
+  workspace_ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/workbench
+  status: present
+  checked_in: true
+latentdna_workspace:
+  surface_type: workspace
+  workspace_ref: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage
+  status: materialized
+  checked_in_config_allowed: true
+  generated_outputs_checked_in_by_default: false
+construct_workspace:
+  surface_type: workspace
+  workspace_ref: repo:src/dnadesign/usr/datasets
+  status: infer_sidecars_present
+  checked_in_config_allowed: true
+  generated_outputs_checked_in_by_default: false
+infer_workspace:
+  surface_type: workspace
+  workspace_ref: repo:src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage
+  status: configured
+  checked_in_config_allowed: true
+  generated_outputs_checked_in_by_default: false

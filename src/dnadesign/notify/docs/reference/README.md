@@ -1,7 +1,7 @@
 ## Notify reference index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-07-14
 
 Use this section when you need strict command, profile, and boundary contracts.
 

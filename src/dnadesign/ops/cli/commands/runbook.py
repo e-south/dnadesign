@@ -253,7 +253,7 @@ def _resolve_active_job_resolution(
     discover_active_jobs: bool,
     max_discovery_jobs: int,
 ) -> object:
-    from dnadesign.ops import api as ops_api
+    import dnadesign.ops.api as ops_api
 
     return ops_api.resolve_active_job_resolution(
         runbook=runbook,
@@ -657,7 +657,7 @@ def runbook_plan(
         ),
     ] = False,
 ) -> None:
-    from dnadesign.ops import api as ops_api
+    import dnadesign.ops.api as ops_api
 
     if max_discovery_jobs <= 0:
         raise_contract_error("Runbook contract error: --max-discovery-jobs must be > 0")
@@ -785,7 +785,7 @@ def runbook_fill_infer(
         ),
     ] = False,
 ) -> None:
-    from dnadesign.ops import api as ops_api
+    import dnadesign.ops.api as ops_api
 
     if max_discovery_jobs <= 0:
         raise_contract_error("Runbook contract error: --max-discovery-jobs must be > 0")
@@ -856,7 +856,7 @@ def runbook_active_jobs(
         typer.Option("--max-discovery-jobs", help="Maximum qstat jobs inspected during active-job discovery."),
     ] = 24,
 ) -> None:
-    from dnadesign.ops import api as ops_api
+    import dnadesign.ops.api as ops_api
     from dnadesign.ops.orchestrator.state import ActiveJobResolutionState, SchedulerProbeState
 
     if max_discovery_jobs <= 0:
@@ -965,7 +965,7 @@ def runbook_execute(
         ),
     ] = False,
 ) -> None:
-    from dnadesign.ops import api as ops_api
+    import dnadesign.ops.api as ops_api
 
     if command_timeout_seconds is not None and command_timeout_seconds <= 0:
         raise_contract_error("Runbook contract error: --command-timeout-seconds must be > 0")

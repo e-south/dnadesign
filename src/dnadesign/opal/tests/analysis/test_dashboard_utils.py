@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/analysis/test_dashboard_utils.py
+
+Regression tests for dashboard utils OPAL analysis.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,6 +18,7 @@ import altair as alt
 import numpy as np
 import polars as pl
 import pytest
+import yaml
 from sklearn.ensemble import RandomForestRegressor
 
 from dnadesign.opal.src.analysis.dashboard import (
@@ -35,6 +38,7 @@ from dnadesign.opal.src.analysis.dashboard.charts import diagnostics_guidance, p
 from dnadesign.opal.src.analysis.dashboard.views import sfxi
 from dnadesign.opal.src.analysis.sfxi.state_order import STATE_ORDER
 from dnadesign.opal.src.analysis.sfxi.uncertainty import supports_uncertainty
+from dnadesign.opal.src.core.utils import ConfigError
 
 
 def test_find_repo_root(tmp_path: Path) -> None:
@@ -98,19 +102,64 @@ def test_resolve_dataset_path(tmp_path: Path) -> None:
     assert custom_path == custom_abs
 
 
-def test_parse_campaign_info_dashboard_defaults(tmp_path: Path) -> None:
-    raw = {
-        "campaign": {"name": "demo", "slug": "demo", "workdir": "."},
-        "data": {"x_column_name": "x", "y_column_name": "y", "y_expected_length": 8},
-        "model": {"name": "random_forest", "params": {}},
-        "objective": {"name": "sfxi_v1", "params": {}},
-        "selection": {"name": "top_n", "params": {}},
-        "training": {"policy": {}, "y_ops": []},
-        "metadata": {"dashboard": {"explorer_defaults": {"x": "opal__view__score", "y": "opal__view__logic_fidelity"}}},
-    }
-    info = datasets.parse_campaign_info(raw=raw, path=tmp_path / "campaign.yaml", label="demo")
-    assert info.dashboard is not None
-    assert info.dashboard["explorer_defaults"]["x"] == "opal__view__score"
+def test_campaign_info_preserves_named_selection_views(tmp_path: Path) -> None:
+    config_path = tmp_path / "campaigns" / "multi_view" / "configs" / "campaign.yaml"
+    config_path.parent.mkdir(parents=True)
+    records_path = config_path.parents[1] / "records.parquet"
+    records_path.touch()
+    config_path.write_text(
+        """
+schema_version: opal.campaign.v3
+campaign: {name: Multi-view, slug: multi_view, workdir: .}
+ownership: {owner_scope: opal_demo, portable: true}
+data:
+  location: {kind: local, path: records.parquet}
+  x_column_name: x
+  y_column_name: y
+  y_expected_length: 1
+transforms_x: {name: identity, params: {}}
+transforms_y: {name: scalar_from_table_v1, params: {}}
+model: {name: random_forest, params: {n_estimators: 5}}
+selection_views:
+  - id: target_a
+    objective: {name: scalar_identity_v1, params: {}}
+    selection:
+      name: top_n
+      params: {top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank}
+  - id: target_b
+    objective: {name: scalar_identity_v1, params: {}}
+    selection:
+      name: top_n
+      params: {top_k: 1, score_ref: scalar, objective_mode: maximize, tie_handling: competition_rank}
+""".strip()
+        + "\n"
+    )
+
+    selected = datasets.load_campaign_selection(campaign_path=config_path, repo_root=tmp_path)
+
+    assert not selected.diagnostics.errors
+    assert selected.info is not None
+    assert selected.info.owner_scope == "opal_demo"
+    assert selected.info.study_id is None
+    assert selected.info.portable is True
+    assert [view.id for view in selected.info.selection_views] == ["target_a", "target_b"]
+    assert [view.objective_name for view in selected.info.selection_views] == [
+        "scalar_identity_v1",
+        "scalar_identity_v1",
+    ]
+
+
+def test_checked_in_campaign_discovery_rejects_missing_ownership(tmp_path: Path) -> None:
+    source = Path("src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/configs/campaign.yaml")
+    payload = yaml.safe_load(source.read_text())
+    payload.pop("ownership")
+    payload["campaign"]["slug"] = "unowned"
+    campaign_path = tmp_path / "src" / "dnadesign" / "opal" / "campaigns" / "unowned" / "configs"
+    campaign_path.mkdir(parents=True)
+    (campaign_path / "campaign.yaml").write_text(yaml.safe_dump(payload, sort_keys=False))
+
+    with pytest.raises(ConfigError, match="ownership"):
+        datasets.list_campaign_paths(tmp_path)
 
 
 def test_namespace_summary() -> None:

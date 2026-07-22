@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/sample/artifacts.py
 
 Persist sample workflow artifacts, configs, and run markers.

@@ -1,0 +1,5 @@
+summary_scope: repo
+summary_inputs:
+- kind: dataset_rows
+  artifact: densegen_anchor_source
+  target_rows: 100000

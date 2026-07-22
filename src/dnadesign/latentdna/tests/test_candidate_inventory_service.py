@@ -1,4 +1,13 @@
-"""Candidate X inventory contract tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_candidate_inventory_service.py
+
+Candidate X inventory contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

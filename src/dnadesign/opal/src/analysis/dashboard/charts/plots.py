@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/plots.py
 
-Altair chart builders for dashboard UMAP and cluster plots. Consumes view data
-from analysis.dashboard.views.plots.
+Altair chart builders for dashboard UMAP and cluster plots. Consumes view data.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

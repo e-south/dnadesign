@@ -31,6 +31,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
     If external router guidance points at that script, use the repo-local checks below instead.
   - `uv run ruff check .`
   - `uv run ruff format --check .`
+  - `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
   - `uv run pytest -q`
   - `uv run python -m dnadesign.devtools.docs.checks`
 - Discover CLIs:
@@ -39,16 +40,18 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 
 ## Operational references
 
-- BU SCC operations source of truth: `docs/bu-scc/README.md`, `docs/bu-scc/quickstart.md`, and `docs/bu-scc/batch-notify.md`
-- BU SCC quickstart: `docs/bu-scc/quickstart.md`
-- BU SCC batch + notify runbook: `docs/bu-scc/batch-notify.md`
+- BU SCC operations source of truth: `docs/bu-scc/README.md`, `docs/bu-scc/setup/quickstart.md`, and `docs/bu-scc/runbooks/batch-notify.md`
+- BU SCC quickstart: `docs/bu-scc/setup/quickstart.md`
+- BU SCC batch + notify runbook: `docs/bu-scc/runbooks/batch-notify.md`
 - Submit-ready BU SCC jobs: `docs/bu-scc/jobs/README.md`
 - Notify operator docs: `docs/notify/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Repo-local notify operator skill: `.agents/skills/notify-ops/SKILL.md`
+- Repo-local SGE/HPC operator skill: `.agents/skills/sge-hpc-ops/SKILL.md`
 - Repo-local BU SCC USR sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
-- Repo-local promoter-study status skill: `.agents/skills/promoter-study-status/SKILL.md`
+- Repo-local stress ethanol cipro growth status skill: `.agents/skills/stress-ethanol-cipro-growth-status/SKILL.md`
 - Repo-local retron hairpin study skill: `.agents/skills/retron-hairpin-study/SKILL.md`
+- Repo-local RT-lnRNA SPOP composite plot skill: `.agents/skills/rt-lnrna-spop-composite-plot/SKILL.md`
 - Critical reusable operational workflows live under `.agents/skills/`.
   Native project-scope skill discovery only applies when the Codex session is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the repo docs and explicit CLI entrypoints instead of assuming a repo-local skill will appear in the advertised skill list.
 - Checked-in live study records: `docs/studies/README.md`
@@ -75,13 +78,14 @@ Rules:
 
 - Do not hand-edit generated outputs; fix code/config and regenerate.
 - Ask before committing generated artifacts or large binaries.
-- Avoid changes under `src/dnadesign/archived/` and `src/dnadesign/prototypes/` unless explicitly requested.
+- Avoid archived or prototype source trees unless explicitly requested.
 
 ## Definition of done
 
 - Diff reviewed
 - Tests pass or scope-limited rationale documented
 - Ruff checks pass
+- Architecture boundary checks pass
 - Docs checks pass
 - No generated artifacts committed unintentionally
 - Changes are on a branch and ready for PR review

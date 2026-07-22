@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-nmf/config.py
+dnadesign
+src/dnadesign/nmf/config.py
+
+Configuration helpers for NMF.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

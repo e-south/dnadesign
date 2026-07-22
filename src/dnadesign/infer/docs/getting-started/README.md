@@ -1,7 +1,7 @@
 ## infer getting started
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-07-14
 
 Use this section for first-run command validation before moving to large pressure tests.
 

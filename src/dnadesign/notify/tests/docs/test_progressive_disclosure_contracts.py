@@ -51,8 +51,8 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
         ],
         label="docs/notify/README.md",
     )
-    assert "multi-source-shared-dataset-assembly.md" in text
-    assert "promoter-characterization-feature-matrix.md" in text
+    assert "assembly/multi-source-shared-dataset.md" in text
+    assert "promoter/characterization-feature-matrix.md" in text
     assert "--secret-source file" in text
     assert "--secret-ref file://" in text
     assert "--url-env" in text
@@ -175,7 +175,7 @@ def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:
     )
     assert "Workspace shorthand is repo-rooted for all resolver-mode tools." in text
     assert "ingest.root" in text
-    assert "one legacy USR write-back destination or exactly one sequence-view" in text
+    assert "one USR write-back destination or exactly one sequence-view" in text
     assert "Multi-destination infer configs must use explicit `--events <path>`" in text
 
 
@@ -207,7 +207,7 @@ def test_notify_agents_route_operator_workflow_to_repo_skill_and_docs() -> None:
     assert "docs/notify/README.md" in skill
     assert "docs/notify/usr-events.md" in skill
     assert "src/dnadesign/notify/docs/reference/command-contracts.md" in skill
-    assert "docs/bu-scc/batch-notify.md" in skill
+    assert "docs/bu-scc/runbooks/batch-notify.md" in skill
     assert ".events.log" in skill
     assert "outputs/meta/events.jsonl" in skill
     assert "--secret-source file --secret-ref file://" in skill

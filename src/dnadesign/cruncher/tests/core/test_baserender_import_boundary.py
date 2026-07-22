@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_baserender_import_boundary.py
 
 Enforce Cruncher->Baserender import boundary (public API only).

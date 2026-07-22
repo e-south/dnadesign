@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/yiu_hairpin_topology_v1.py
 
 Shared YIU hairpin-topology visual contract.

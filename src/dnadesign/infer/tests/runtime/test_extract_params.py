@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/tests/runtime/test_extract_params.py
 
 Unit tests for extract-parameter resolution contracts.

@@ -1,0 +1,76 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/review_deliverables/notebook_structure_assertions.py
+
+Notebook structure-browser control assertions for Eco1 review-deliverable tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+
+def assert_structure_notebook_contract(*, notebook_text: str, combined_text: str) -> None:
+    """Assert the generated notebook exposes stable, plain structure controls."""
+
+    assert "structure_sidechain_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="Highlighted side chains"' in notebook_text
+    assert "structure_surface_ui = mo.ui.checkbox" in notebook_text
+    assert 'value=False, label="Protein surface"' in notebook_text
+    assert "has_declared_protein_surface(selected_structure_row)" not in notebook_text
+    assert "structure_protein_ui = mo.ui.checkbox" not in notebook_text
+    assert 'label="Protein color"' not in notebook_text
+    assert "structure_dna_visible_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="Show DNA"' in notebook_text
+    assert "structure_rna_visible_ui = mo.ui.checkbox" in notebook_text
+    assert 'label="Show RNA"' in notebook_text
+    assert "structure_dna_ui = mo.ui.checkbox" not in notebook_text
+    assert "structure_rna_ui = mo.ui.checkbox" not in notebook_text
+    assert 'label="DNA color"' not in notebook_text
+    assert 'label="RNA color"' not in notebook_text
+    assert "WT Ec86 control" not in combined_text
+    assert "is_interactive_structure_deliverable(" in combined_text
+    assert "render_deliverable_details(" in combined_text
+    assert 'if selected_section == "fold_review":' not in notebook_text
+    assert "Reference sequence, alignment, and mask" not in combined_text
+    assert "Reference scaffold and mask evidence" not in combined_text
+    assert "ColabFold structure triage" not in combined_text
+    assert 'structure_label = "Structure view"' in notebook_text
+    assert "label=structure_label" in notebook_text
+    assert "structure_group_ui = review_dropdown" in notebook_text
+    assert 'structure_group_label = "Structure group"' in notebook_text
+    assert 'structure_group_label = "Mask evidence category"' in notebook_text
+    assert 'structure_group_label = "Selected hypothesis"' in notebook_text
+    assert "label=structure_group_label" in notebook_text
+    assert "if not is_interactive_structure_deliverable(selected_visual):" in notebook_text
+    assert "structure_group_ui = None" in notebook_text
+    assert "structure_background_ui = mo.ui.checkbox" in notebook_text
+    assert "structure_background_ui = None" not in notebook_text
+    assert 'label="Reference background"' in notebook_text
+    assert "structure_mutation_ui = mo.ui.checkbox" in notebook_text
+    assert "structure_mutation_ui = None" not in notebook_text
+    assert 'label="Mutation differences"' in notebook_text
+    assert "structure_dna_visible_ui = None" not in notebook_text
+    assert "structure_rna_visible_ui = None" not in notebook_text
+    assert "show_sidechains" in notebook_text
+    assert "show_protein_surface" in notebook_text
+    assert "highlight_dna" in notebook_text
+    assert "highlight_rna" in notebook_text
+    assert "highlight_protein" not in notebook_text
+    assert "highlight_dna = show_dna" in notebook_text
+    assert "highlight_rna = show_rna" in notebook_text
+    assert "show_dna" in notebook_text
+    assert "show_rna" in notebook_text
+    assert "structure_browser_rows = []" in notebook_text
+    assert "selected_deliverable_id=selected_visual_id" in notebook_text
+    assert "load_structure_highlight_rows(" in notebook_text
+    assert "structure_highlight_rows" in notebook_text
+    assert "selected_group=selected_structure_group" in notebook_text
+    assert "structure_group_lookup" in combined_text
+    eager_load_snippet = "structure_browser_rows = load_structure_browser_rows(\n        manifest_root=manifest_root,"
+    assert eager_load_snippet not in notebook_text
+
+    control_cell = notebook_text.split("def _(mo):\n    structure_background_ui", 1)
+    assert len(control_cell) == 2, "structure display controls must be owned by one row-independent cell"

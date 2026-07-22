@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cassette/test_catalog.py
 
 Contract tests for the cassette nickase catalog.

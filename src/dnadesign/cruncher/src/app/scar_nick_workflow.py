@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/scar_nick_workflow.py
 
 Application orchestration for scar-nick validation, design, and show.

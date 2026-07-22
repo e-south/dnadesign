@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze_support.py
 
 Shared helpers for analysis artifact loading, persistence, and elite summaries.

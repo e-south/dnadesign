@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/sequence_evidence_map_v1.py
 
 Shared nucleotide-evidence visual contract.

@@ -1,4 +1,13 @@
-"""Contracts for latentdna view metadata materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/views/test_materialization.py
+
+Contracts for latentdna view metadata materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -13,10 +22,12 @@ import yaml
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.io.parquet_io import read_table
 from dnadesign.latentdna.src.views.materialize import _derived_metadata_array, materialize_view_artifact
-from dnadesign.latentdna.src.views.promoter_metadata import (
-    _sig35_variant,
-    _source_class,
-    _spacer_length,
+from dnadesign.latentdna.src.views.promoter_metadata_sequence import sig35_variant, spacer_length
+from dnadesign.latentdna.src.views.promoter_metadata_stress import (
+    design_family,
+    design_regulator_composition,
+    is_control_row,
+    source_class,
 )
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
@@ -366,6 +377,91 @@ def test_materialize_view_lookup_derivation_fails_on_missing_parent_match(tmp_pa
         materialize_view_artifact(context, view_id="child_embedding")
 
 
+def test_materialize_view_lookup_derivation_can_fill_missing_matches_with_default(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    inputs_dir = workspace_dir / "inputs"
+    inputs_dir.mkdir()
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["parent_a"], type=pa.string()),
+                "label_status": pa.array(["observed"], type=pa.string()),
+            }
+        ),
+        inputs_dir / "parents.parquet",
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "subject_id": pa.array(["child_a", "child_b"], type=pa.string()),
+                "parent_id": pa.array(["parent_a", "missing_parent"], type=pa.string()),
+                "embedding": pa.array([[0.0, 1.0], [1.0, 0.0]], type=pa.list_(pa.float32())),
+            }
+        ),
+        inputs_dir / "children.parquet",
+    )
+    (workspace_dir / "config.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "latentdna.workspace.v1",
+                "workspace": {"id": "lookup_default_demo", "output_root": "./outputs"},
+                "defaults": {
+                    "analysis_dtype": "float32",
+                    "metric": "cosine",
+                    "random_seed": 17,
+                    "plot_formats": ["svg"],
+                    "neighbor_backend": "auto",
+                },
+                "sources": {
+                    "parents": {
+                        "kind": "parquet",
+                        "path": "inputs/parents.parquet",
+                        "record_key": "id",
+                        "subject_key": "id",
+                    },
+                    "children": {
+                        "kind": "parquet",
+                        "path": "inputs/children.parquet",
+                        "record_key": "id",
+                        "subject_key": "subject_id",
+                    },
+                },
+                "metadata": {
+                    "include": ["label_status"],
+                    "derivations": {
+                        "label_status": {
+                            "kind": "lookup",
+                            "source": "parents",
+                            "left_key": "parent_id",
+                            "right_key": "id",
+                            "value_column": "label_status",
+                            "missing_policy": "null",
+                            "default": "missing",
+                        }
+                    },
+                },
+                "views": {
+                    "child_embedding": {
+                        "source": "children",
+                        "vector": {"kind": "column", "name": "embedding"},
+                        "coordinate_space_id": "demo_space",
+                    }
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    context = load_workspace_config(workspace_dir)
+    artifact_dir, *_ = materialize_view_artifact(context, view_id="child_embedding")
+    rows = read_table(artifact_dir / "rows.parquet").to_pylist()
+
+    assert [row["label_status"] for row in rows] == ["observed", "missing"]
+
+
 def test_sig35_variant_uses_upstream_sigma70_core_annotation_when_plan_lacks_sig35() -> None:
     row = {
         "usr_label__primary": "pDual-10-ES3p",
@@ -388,7 +484,7 @@ def test_sig35_variant_uses_upstream_sigma70_core_annotation_when_plan_lacks_sig
         ],
     }
 
-    assert _sig35_variant(row) == "ACCGCG"
+    assert sig35_variant(row) == "ACCGCG"
 
 
 def test_sig35_variant_uses_annotation_before_control_fallback_when_plan_is_missing() -> None:
@@ -406,7 +502,7 @@ def test_sig35_variant_uses_annotation_before_control_fallback_when_plan_is_miss
         ],
     }
 
-    assert _sig35_variant(row) == "GCAGGT"
+    assert sig35_variant(row) == "GCAGGT"
 
 
 def test_sig35_variant_uses_sequence_annotation_feature_when_densegen_detail_is_missing() -> None:
@@ -430,13 +526,14 @@ def test_sig35_variant_uses_sequence_annotation_feature_when_densegen_detail_is_
         ],
     }
 
-    assert _sig35_variant(row) == "TTGACA"
+    assert sig35_variant(row) == "TTGACA"
 
 
 def test_sig35_variant_does_not_slice_projected_parent_annotation_bounds_from_context_sequence() -> None:
     row = {
         "usr_label__primary": "J23104_context1kb_forward",
         "densegen__plan": None,
+        "source_family": "genbank_projected_reference",
         "sequence": "A" * 1000,
         "seq_annot__sequence_region_start_0": 0,
         "seq_annot__sequence_region_end_0": 60,
@@ -451,7 +548,7 @@ def test_sig35_variant_does_not_slice_projected_parent_annotation_bounds_from_co
         ],
     }
 
-    assert _sig35_variant(row) == "control"
+    assert sig35_variant(row) == "control"
 
 
 def test_sig35_variant_uses_derived_retained_sigma35_bounds_for_analysis_window() -> None:
@@ -469,13 +566,14 @@ def test_sig35_variant_uses_derived_retained_sigma35_bounds_for_analysis_window(
         ],
     }
 
-    assert _sig35_variant(row) == "GTCAAA"
+    assert sig35_variant(row) == "GTCAAA"
 
 
 def test_sig35_variant_does_not_slice_projected_analysis_window_retention_from_context_sequence() -> None:
     row = {
         "usr_label__primary": "micFp_core60_context1kb_forward",
         "densegen__plan": None,
+        "source_family": "genbank_projected_reference",
         "sequence": "A" * 1000,
         "derived__target_length": 60,
         "derived__features_retained": [
@@ -487,22 +585,46 @@ def test_sig35_variant_does_not_slice_projected_analysis_window_retention_from_c
         ],
     }
 
-    assert _sig35_variant(row) == "control"
+    assert sig35_variant(row) == "control"
 
 
 def test_source_class_prefers_sequence_view_semantics_and_promoter_standard_metadata() -> None:
-    assert _source_class({"source_family": "genbank_projected_reference", "densegen__plan": None}) == (
+    assert source_class({"source_family": "genbank_projected_reference", "densegen__plan": None}) == (
         "reference_control"
     )
-    assert _source_class({"source_family": "densegen_generated", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
-    assert _source_class({"source_family": "construct_derived", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
-    assert _source_class({"regulondb__primary_promoter_name": "lexAp", "densegen__plan": None}) == ("native_regulondb")
-    assert _source_class({"derived__parent_dataset": "usr_regulondb_native_promoters", "densegen__plan": None}) == (
+    assert source_class({"source_family": "densegen_generated", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
+    assert source_class({"source_family": "construct_derived", "densegen__plan": "ethanol__sig35=b"}) == ("densegen")
+    assert source_class({"regulondb__primary_promoter_name": "lexAp", "densegen__plan": None}) == ("native_regulondb")
+    assert source_class({"derived__parent_dataset": "usr_regulondb_native_promoters", "densegen__plan": None}) == (
         "native_regulondb"
     )
-    assert _source_class({"promoter_standard__collection_id": "anderson", "densegen__plan": None}) == (
+    assert source_class({"promoter_standard__collection_id": "anderson", "densegen__plan": None}) == (
         "synthetic_reference_standard"
     )
+
+
+def test_densegen_plan_takes_precedence_over_reference_like_source_family() -> None:
+    row = {
+        "usr_label__primary": "synthetic_cpxr",
+        "source_family": "genbank_projected_reference",
+        "densegen__plan": "ethanol__sig35=b",
+        "densegen__required_regulators": ["cpxR"],
+    }
+
+    assert is_control_row(row) is False
+    assert design_family(row) == "ethanol"
+    assert design_regulator_composition(row) == "cpxR"
+    assert source_class(row) == "densegen"
+
+
+def test_promoter_metadata_missing_plan_without_control_provenance_fails_fast() -> None:
+    row = {"usr_label__primary": "unclassified_row", "densegen__plan": None}
+
+    with pytest.raises(ContractViolationError, match="design_family could not be derived"):
+        design_family(row)
+
+    with pytest.raises(ContractViolationError, match="source_class could not be derived"):
+        source_class(row)
 
 
 def test_materialize_view_canonicalizes_design_regulator_composition(tmp_path: Path) -> None:
@@ -993,7 +1115,7 @@ def test_spacer_length_accepts_numpy_object_array_entries() -> None:
         ),
     }
 
-    assert _spacer_length(row) == 17
+    assert spacer_length(row) == 17
 
 
 def test_spacer_length_returns_none_when_synthetic_detail_is_missing() -> None:
@@ -1003,7 +1125,7 @@ def test_spacer_length_returns_none_when_synthetic_detail_is_missing() -> None:
         "densegen__used_tfbs_detail": None,
     }
 
-    assert _spacer_length(row) is None
+    assert spacer_length(row) is None
 
 
 def test_materialize_view_populates_coalesced_metadata_from_source_columns(tmp_path: Path) -> None:

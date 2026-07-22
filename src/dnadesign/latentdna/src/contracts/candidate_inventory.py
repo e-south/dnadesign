@@ -1,4 +1,13 @@
-"""Candidate X inventory contracts shared by status and notebook surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/contracts/candidate_inventory.py
+
+Candidate X inventory contracts shared by status and notebook surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

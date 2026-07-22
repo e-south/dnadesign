@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/portfolio/plots/elite_showcase.py
 
 Render cross-workspace elite showcase panels from portfolio handoff tables.

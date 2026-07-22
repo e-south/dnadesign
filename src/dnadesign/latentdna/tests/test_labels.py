@@ -1,8 +1,17 @@
-"""Label humanization coverage for notebook-facing text."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_labels.py
+
+Label humanization coverage for notebook-facing text.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
-from dnadesign.latentdna.src.labels import humanize_candidate, humanize_label, humanize_plot_title
+from dnadesign.latentdna.src.presentation.labels import humanize_candidate, humanize_label, humanize_plot_title
 
 
 def test_humanize_label_preserves_required_public_labels() -> None:
@@ -14,6 +23,12 @@ def test_humanize_label_preserves_required_public_labels() -> None:
     assert humanize_label("full_context_1kb") == "1 kb construct context"
     assert humanize_label("sig35_variant") == "SIG35 Variant"
     assert humanize_label("variant f") == "Variant F"
+
+
+def test_humanize_label_does_not_embed_rt_lnrna_study_labels() -> None:
+    assert humanize_label("crawford_eco1_lnrna_fixed_wt_rt") != "Crawford Eco1 lnRNA fixed WT RT"
+    assert humanize_label("khan_abundance_affiliated_rt_lnrna_reference") != "Khan RT-lnRNA abundance reference"
+    assert humanize_label("Khan RT-DNA abundance prior") != "Khan PAGE RT-DNA abundance"
 
 
 def test_humanize_plot_title_removes_public_appendix_language() -> None:

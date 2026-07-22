@@ -1,0 +1,18 @@
+contract: study_runtime_command_group_lane_v1
+schema_version: 1
+study_id: retron_hairpin_design
+lane_id: yiu
+owner: cruncher/yiu
+last_verified: 2026-05-18
+surface_role: contrast-check
+current_state: planned
+route_detail: repo:docs/studies/retron_hairpin_design/routes/quality/yiu-boundary-check.md
+canonical_payload:
+  path: repo:docs/studies/retron_hairpin_design/operations/runtime/command-groups/pipeline.yaml
+  keys:
+    - command_groups[id=yiu_boundary_check]
+entry_artifacts:
+  - mismatch_display_or_boundary_language_question
+exit_artifacts:
+  - yiu_contrast_render_or_boundary_decision
+navigation_note: Open this lane only for contrast checks; YIU is not the shortening topology engine.

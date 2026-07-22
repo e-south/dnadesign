@@ -1,0 +1,26 @@
+{
+  "auditor_id": "codex_subagent.metric_adversarial_audit.v1",
+  "blockers": [],
+  "completed_at": "2026-07-19T22:32:54Z",
+  "findings": [
+    "An independent one-scale oracle matched raw clearances, family priors, the behavior score, all family scores, bottleneck weights, the hard bottleneck, compensation bounds, and direction flags in 60000 random K=2..16 cases with zero discrepancies.",
+    "A 60000-case common-unit rescaling probe found score covariance error at most 2.842170943040401e-14, bottleneck-weight invariance error at most 7.549516567451064e-15, and zero limiting-coordinate mismatches.",
+    "The pooled q90 soft-min scale is 0.31063783855250376 log2 and the campaign-scale four-state compensation bounds are 0.7719060307 log2 for a prior of 1/12 and 0.6825410935 log2 for a prior of 1/9.",
+    "The objective suite has 84 passing tests; the reviewed study slice has 29 passing shadow and completion-gate tests.",
+    "The active executable campaign is secg_msrb_greedy. The secg_rmf_greedy slug appears only inside the frozen comparator provenance outside the campaign registry.",
+    "Growth, feasibility, absolute OFF, cross-view score comparability, predictor quality, prospective enrichment, and hill climbing remain non-claims."
+  ],
+  "method": "independent_read_only_one_scale_oracle_and_scientific_contract_review",
+  "reviewed_preliminary_manifest_sha256": "sha256:987a3e8e155af7fb72e31af077784fcca4d4acbfa1f291fdf8ed66cf049a8293",
+  "reviewed_source_commit": "5fde329e11fe551cab493b47b99ab54f7ccc2825",
+  "schema_id": "stress_ethanol_cipro_growth.multistate_response_behavior_adversarial_audit.v1",
+  "schema_version": "1",
+  "scope": [
+    "one-scale objective mathematics and raw-unit output semantics",
+    "common-unit rescaling covariance and bounded compensation",
+    "study soft-min scale derivation and cardinality pressure",
+    "fixed-prediction RMF comparison and sequence-unique allocation",
+    "active campaign identity, artifact publication, and claim boundaries"
+  ],
+  "status": "pass"
+}

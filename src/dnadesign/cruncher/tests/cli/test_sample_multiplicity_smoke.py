@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/cli/test_sample_multiplicity_smoke.py
+
+Regression tests for sample multiplicity smoke Cruncher CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

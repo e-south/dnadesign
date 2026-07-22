@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/runtime/extract_params.py
 
-Resolves extract output parameters to explicit runtime contracts before adapter
-invocation.
+Resolves extract output parameters to explicit runtime contracts before adapter.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -17,13 +17,12 @@ from pathlib import Path
 import yaml
 
 from dnadesign.ops.catalog import discover_repo_root
-from dnadesign.ops.status.path_ref import resolve_path_ref
+from dnadesign.ops.status import resolve_path_ref
 
 
 @dataclass(frozen=True)
 class StudyIndexEntry:
     study_id: str
-    family: str
     record_root: Path
     title: str | None = None
     raw_payload: dict[str, object] = field(default_factory=dict, repr=False)
@@ -67,8 +66,12 @@ def load_study_index(repo_root: Path | None) -> StudyIndex:
     for index, item in enumerate(studies_payload, start=1):
         if not isinstance(item, dict):
             raise ValueError(f"study index entry {index} must be a mapping: {index_path}")
+        if "family" in item:
+            raise ValueError(
+                "checked-in study index entries must not define legacy family; "
+                f"use the study record's explicit ops_surfaces instead: {index_path}"
+            )
         study_id = _required_text(item.get("study_id"), label="study_id", source=index_path)
-        family = _required_text(item.get("family"), label=f"studies.{study_id}.family", source=index_path)
         if study_id in seen_study_ids:
             raise ValueError(f"checked-in study index must not duplicate study_id {study_id!r}: {index_path}")
         seen_study_ids.add(study_id)
@@ -84,7 +87,6 @@ def load_study_index(repo_root: Path | None) -> StudyIndex:
         studies.append(
             StudyIndexEntry(
                 study_id=study_id,
-                family=family,
                 title=_string_or_none(item.get("title")),
                 record_root=record_root,
                 raw_payload=dict(item),

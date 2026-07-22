@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/campaign_reset.py
 
-Resets a campaign to a clean slate for repeatable runs. Prunes OPAL columns,
-removes outputs, and clears state.json.
+Resets a campaign to a clean slate for repeatable runs. Prunes OPAL columns,.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -108,7 +107,7 @@ def cmd_campaign_reset(
         if json:
             json_out({"preview": preview, "to_delete": to_delete})
             if not apply:
-                raise typer.Exit(code=ExitCodes.OK)
+                return
         else:
             head = kv_block("[Preview] campaign-reset", preview)
             del_list = bullet_list("Columns to prune from records.parquet", to_delete or ["(none)"])

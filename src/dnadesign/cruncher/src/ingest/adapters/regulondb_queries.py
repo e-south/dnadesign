@@ -1,4 +1,13 @@
-"""GraphQL documents used by the RegulonDB adapter."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/adapters/regulondb_queries.py
+
+GraphQL documents used by the RegulonDB adapter.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

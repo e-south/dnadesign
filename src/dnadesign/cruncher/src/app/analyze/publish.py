@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/publish.py
 
 Publish analysis manifests, reports, and summary payloads for a completed run.

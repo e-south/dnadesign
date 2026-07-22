@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/outputs/factory.py
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/factory.py
 
-Factory for DenseGen output sinks.
+Builds DenseGen output sinks from workspace configuration.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,0 +1,9 @@
+version: 1
+study_id: eco1_rt_repack
+snapshot:
+  status: phase3_foldcheck_report_validated_selection_readiness_materialized
+  phase: phase3_foldcheck_report
+  current_record: docs/studies/eco1_rt_repack/record/status.md
+  blockers:
+    - RT-only candidate_handoff.yaml not materialized
+    - downstream RT-only acceptance not materialized

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/pwm_context_sample_motifs.py
 
 Motif-materialization helpers for sample-backed YIU PWM context resolution.

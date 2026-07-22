@@ -1,7 +1,7 @@
 # USR maintenance patterns
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-29
+**Last verified:** 2026-07-14
 
 
 This page captures common maintenance commands that mutate or package dataset state.
@@ -168,5 +168,5 @@ uv run usr export densegen_demo --fmt csv --out /tmp/usr_exports
 
 ## Next steps
 
-- End-to-end command chains: [../operations/workflow-map.md](../operations/workflow-map.md)
+- End-to-end command chains: [USR workflow map](../operations/routes/workflow-map.md)
 - Quickstart path: [../getting-started/cli-quickstart.md](../getting-started/cli-quickstart.md)

@@ -1,0 +1,47 @@
+LOCUS       msd-retron-47             74 bp    ds-DNA  linear   UNK 07-JUL-2026
+DEFINITION  .
+ACCESSION   msd-retron-47
+VERSION     msd-retron-47
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_feature    complement(1..74)
+                     /label="msd[tetO]"
+                     /ApEinfo_revcolor="#b1ff67"
+                     /ApEinfo_fwdcolor="#b1ff67"
+     misc_feature    1..17
+                     /label="3' Flanking"
+                     /ApEinfo_revcolor="#ff9ccd"
+                     /ApEinfo_fwdcolor="#ff9ccd"
+     protein_bind    18..36
+                     /label="tet operator"
+                     /ApEinfo_revcolor="#75c6a9"
+                     /ApEinfo_fwdcolor="#75c6a9"
+                     /note="bacterial operator O2 for the tetR and tetA genes"
+                     /gene="tetO"
+                     /bound_moiety="tetracycline repressor TetR"
+     misc_feature    37..40
+                     /label="Cap"
+                     /ApEinfo_revcolor="#ff9ccd"
+                     /ApEinfo_fwdcolor="#ff9ccd"
+     misc_feature    37..40
+                     /label="Foldback"
+                     /ApEinfo_revcolor="#84b0dc"
+                     /ApEinfo_fwdcolor="#84b0dc"
+     protein_bind    complement(41..59)
+                     /label="tet operator"
+                     /ApEinfo_revcolor="#75c6a9"
+                     /ApEinfo_fwdcolor="#75c6a9"
+                     /note="bacterial operator O2 for the tetR and tetA genes"
+                     /gene="tetO"
+                     /bound_moiety="tetracycline repressor TetR"
+     misc_feature    complement(60..74)
+                     /label="5' Flanking"
+                     /ApEinfo_revcolor="#b1ff67"
+                     /ApEinfo_fwdcolor="#b1ff67"
+ORIGIN
+        1 tctgagttac tgtctgttcc ctatcagtga tagagagcct tctctatcac tgatagggac
+       61 ccgttttttc tgac
+//

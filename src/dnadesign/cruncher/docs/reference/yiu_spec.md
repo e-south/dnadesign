@@ -3,7 +3,7 @@
 **Audience:** YIU workflow users and maintainers
 **Applies to:** `configs/yiu/*.yiu.yaml`
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-08
+**Last verified:** 2026-07-08
 **Last updated by:** cruncher-maintainers on 2026-04-08
 
 YIU uses one strict v4 payload-rendering document root. A YIU spec tells Cruncher where the payload comes from, which 4 nt junction windows and mismatch plans are allowed, how PWM context should be resolved, and where the published bundle should be written.

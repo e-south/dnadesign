@@ -1,0 +1,150 @@
+variant_id: retron178
+display_id: pES-retron-178
+file_stem: pes-retron-178-msd-region
+source_record_id: msd-retron-178
+source_description: ''
+source_sequence_sha256: c5fb739976e01eae410720cd728302a6bd860a00c3237793455678a86257fea7  # pragma: allowlist secret
+msd_sequence_sha256: 742082e0b546f6b7dc9682564e74d506722941a1163f87ab24a7e41dca8f82ab  # pragma: allowlist secret
+sequence_length_nt: 74
+msd_sequence_5to3: GTCAGAAAAAACAAGTCCCTATCAGTGATAGAGAAGGCTCTCTATCACTGATAGGGACTCGACAGTAACTCAGA
+rna_sequence_5to3: GUCAGAAAAAACAAGUCCCUAUCAGUGAUAGAGAAGGCUCUCUAUCACUGAUAGGGACUCGACAGUAACUCAGA
+annotation_status: typed_dnadesign_roles
+annotation_warnings: []
+annotation_notes: []
+pairing_segments:
+- segment: payload_stem
+  left_role: payload_primary
+  right_role: payload_complement
+  left_sequence_5to3: TCCCTATCAGTGATAGAGA
+  right_sequence_5to3: TCTCTATCACTGATAGGGA
+  length_bp: 19
+  watson_crick_bp: 19
+  wobble_bp: 0
+  mismatch_bp: 0
+  unpaired_nt: 0
+  pairing_status: canonical_wc
+  intent: declared_design
+  note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+payload_binding_sites:
+- segment: payload_stem
+  primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+  complement_sequence_5to3: TCTCTATCACTGATAGGGA
+  payload_length_nt: 19
+  payload_family_id: tetO_ecoli_working
+  parent_payload_id: tetO_ecoli_working_w00_19
+  payload_member_id: tetO_ecoli_working_w00_19
+  payload_class: catalog_parent_payload
+  retained_parent_span_0:
+    start: 0
+    end: 19
+  motif_alignments:
+  - motif_model_id: tetr_westmann
+    motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+    motif_width_nt: 17
+    motif_span_0:
+      start: 0
+      end: 17
+    payload_window_0:
+      start: 1
+      end: 18
+    strand: +
+    sequence_5to3: CCCTATCAGTGATAGAG
+    consensus_sequence_5to3: CTCTATCGCCGATAGAG
+    score_bits: 16.70845
+    consensus_score_bits: 17.22639
+    consensus_score_fraction: 0.969933
+  reference_comparisons:
+  - reference_payload_id: tetO_ecoli_working_w00_19
+    reference_payload_family_id: tetO_ecoli_working
+    reference_span_0:
+      start: 0
+      end: 17
+    query_span_0:
+      start: 0
+      end: 17
+    query_sequence_5to3: CCCTATCAGTGATAGAG
+    reference_sequence_5to3: CCCTATCAGTGATAGAG
+    compared_nt: 17
+    mismatch_count: 0
+    identity_fraction: 1.0
+    comparison_class: identical
+features:
+- role: flank_3p
+  source_role: flank_3p
+  label: 3' Flanking
+  feature_type: misc_feature
+  source_start_0: 0
+  source_end_0: 17
+  source_strand: 1
+  display_start_0: 57
+  display_end_0: 74
+  display_strand: -1
+  sequence_5to3: CTCGACAGTAACTCAGA
+- role: stem_base_right
+  source_role: stem_base_right
+  label: Right Base
+  feature_type: misc_feature
+  source_start_0: 13
+  source_end_0: 17
+  source_strand: 1
+  display_start_0: 57
+  display_end_0: 61
+  display_strand: -1
+  sequence_5to3: CTCG
+- role: payload_complement
+  source_role: payload_complement
+  label: msd[teto] complement
+  feature_type: misc_feature
+  source_start_0: 17
+  source_end_0: 36
+  source_strand: 1
+  display_start_0: 38
+  display_end_0: 57
+  display_strand: -1
+  sequence_5to3: TCTCTATCACTGATAGGGA
+- role: snapback_foldback_geometry
+  source_role: snapback_foldback_geometry
+  label: Cap
+  feature_type: misc_feature
+  source_start_0: 36
+  source_end_0: 40
+  source_strand: 1
+  display_start_0: 34
+  display_end_0: 38
+  display_strand: -1
+  sequence_5to3: AGGC
+- role: payload_primary
+  source_role: payload_primary
+  label: msd[teto]
+  feature_type: misc_feature
+  source_start_0: 40
+  source_end_0: 59
+  source_strand: -1
+  display_start_0: 15
+  display_end_0: 34
+  display_strand: 1
+  sequence_5to3: TCCCTATCAGTGATAGAGA
+- role: flank_5p
+  source_role: flank_5p
+  label: 5' Flanking
+  feature_type: misc_feature
+  source_start_0: 59
+  source_end_0: 74
+  source_strand: -1
+  display_start_0: 0
+  display_end_0: 15
+  display_strand: 1
+  sequence_5to3: GTCAGAAAAAACAAG
+- role: stem_base_left
+  source_role: stem_base_left
+  label: Left Base
+  feature_type: misc_feature
+  source_start_0: 59
+  source_end_0: 63
+  source_strand: -1
+  display_start_0: 11
+  display_end_0: 15
+  display_strand: 1
+  sequence_5to3: CAAG
+contract: retron_msd_region_record_v1
+schema_version: 1

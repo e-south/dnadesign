@@ -1,90 +1,181 @@
-## OPAL Data Contracts
+## OPAL Data and Artifact Contracts v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-07-18
 
+### Candidate records
 
-This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, label history, and append-only ledger sinks.
+`records.parquet` requires unique string `id`, `sequence`, `bio_type`, and
+`alphabet` columns. The configured X column must be a non-null, finite Arrow
+`fixed_size_list<float32|float64>[x_dim]`. Ragged lists and serialized arrays
+are import formats, not runtime formats.
 
-### Safety and validation
+Observed Y may come from campaign label history or a typed dataset-local
+sidecar. For `usr_sidecar`, required columns are:
 
-OPAL is assertive by default and fails fast on inconsistent inputs.
+- `id`: candidate ID
+- `observed_round`: integer label round
+- `batch_id`: study batch identity
+- `y_space`: exact configured label-space ID
+- `y_obs`: finite fixed-length vector
 
-- `opal validate` checks essentials + X presence; if Y exists it must be finite and expected length.
-- `label_hist` is required input for `run`/`explain` and the main dashboard source.
-- Labels in Y but missing from `label_hist` are rejected.
-- Ledger writes are strict: unknown columns are errors (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
-- Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (`error|keep_first|keep_last`).
-- `verify-outputs` is strict: selection IDs must be unique and must exist in the target run ledger predictions.
+OPAL rejects unknown IDs, mixed Y spaces, malformed lengths, and a missing
+configured sidecar. It does not infer or fall back to another label source.
+The immutable event key is `(id, observed_round)`: duplicate events fail, while
+the same candidate may appear again in a strictly later round. Cumulative
+training applies the campaign's declared cross-round policy, and run-scoped
+observed-event snapshots retain every verified event and exact `batch_id`.
 
-### Records schema
+A USR sidecar may declare `labels.source.manifest_path`. That manifest must use
+`opal.observed_label_promotion.v1` and bind the artifact to the configured
+campaign slug, study ID, Y-space ID, a digest-pinned study-provenance manifest,
+the exact `records.parquet` candidate/X snapshot, and the relative sidecar path,
+SHA-256 digest, schema, columns, and Parquet row count. OPAL verifies the
+candidate snapshot, provenance, and labels before every read. The study-provenance manifest owns assay,
+identity, reduction, and candidate-observation formation semantics; OPAL
+records its schema and
+digest without importing study logic. A
+manifest-pinned sidecar is immutable through generic OPAL ingest; its owning
+study publishes the label table, provenance manifest, and promotion manifest
+together. Any later candidate ID, sequence, X, schema, or row change invalidates
+the promotion until the study publishes a new versioned snapshot.
 
-Required columns in `records.parquet`:
+### Shared prediction ledger
 
-| column | type | notes |
-| --- | --- | --- |
-| `id` | string | unique per record |
-| `bio_type` | string | `"dna"` or `"protein"` |
-| `sequence` | string | case-insensitive |
-| `alphabet` | string | e.g. `dna_4` |
+`outputs/ledger/predictions/` stores one row per scored candidate and run:
 
-X and Y representation:
-
-- X: Arrow `list<float>` or JSON array string; fixed length across used rows
-- Y: Arrow `list<float>`; label history stored in `opal__<campaign>__label_hist`
-
-### Records label history (OPAL-managed)
-
-| column | type | purpose |
-| --- | --- | --- |
-| `opal__<slug>__label_hist` | list<struct> | Append-only per-record history of observed labels and run-aware predictions. |
-
-Prediction entries store objective channel metadata and selected metrics (`score_ref`, `uncertainty_ref`) so readers can reconstruct selection behavior without implicit defaults.
-
-### Ledger output schema (append-only)
-
-Append-only ledger datasets:
-
-`labels` (`outputs/ledger/labels.parquet`)
-
-- `event`: `"label"`
-- `observed_round`, `id`, `sequence` (if available)
-- `y_obs`: `list<float>`
-- `src`, `note`
-
-`run_pred` (`outputs/ledger/predictions/`)
-
-- `event`: `"run_pred"`, plus `run_id`, `as_of_round`, `id`, `sequence`
+- `event`, `run_id`, `as_of_round`, `id`, `sequence`
 - `pred__y_dim`, `pred__y_hat_model`
-- `pred__score_selected`, `pred__score_ref`
-- `pred__selection_score` (selection plugin score if different)
-- `pred__uncertainty_selected`, `pred__uncertainty_ref`
-- `pred__score_channels`, `pred__uncertainty_channels` (row-level channel payloads)
-- `sel__rank_competition`, `sel__is_selected`
-- Optional row diagnostics under `obj__*`
-- Contract checks are strict: all row-level vectors must match candidate count; score/uncertainty vectors and channel payload values must be finite; emitted uncertainty must be non-negative (some objective+selection paths enforce strict positivity, for example `sfxi_v1` uncertainty consumed by `expected_improvement`).
+- `pred__score_channels`, `pred__uncertainty_channels`
+- `pred__selection_views`
 
-`run_meta` (`outputs/ledger/runs.parquet`)
+`pred__selection_views` is a list of structs, one per named view:
 
-- `event`: `"run_meta"`, plus `run_id`, `as_of_round`
-- Config snapshot: `model__*`, `x_transform__*`, `y_ingest__*`, `objective__*`, `selection__*`, `training__y_ops`
-- Objective declarations: `objective__defs_json`
-- Selection controls: `selection__score_ref`, `selection__uncertainty_ref`, `selection__objective` (`maximize|minimize`), `selection__tie_handling`
-- Counts + summaries: `stats__*`, `objective__summary_stats`, `objective__denom_*`
-- `stats__unc_mean_sd_targets` is the mean of the selected uncertainty channel for the run when uncertainty is emitted; otherwise null.
-- `selection__score_ref` is always required and non-empty; `selection__uncertainty_ref` is null or a non-empty channel ref.
-- `objective__denom_percentile` is populated only when the objective emits denominator-percentile metadata; otherwise null.
-- Provenance: `artifacts` (paths + hashes), `schema__version`, `opal__version`
+- `selection_view_id`, `objective_name`, `selection_name`
+- `score`, `score_ref`, `selection_score`
+- `rank_competition`, `is_selected`, `top_k`
+- optional `uncertainty`, `uncertainty_ref`
+- view-local `diagnostics`
 
-### Channel conventions
+The shared model prediction is stored once. Public readers project one view to
+the analysis fields `view__score`, `view__selection_score`,
+`view__rank_competition`, `view__is_selected`, and related metadata. Raw ledger
+consumers must not invent a default view.
 
-- Score channel refs: `<objective_name>/<score_channel_name>`
-- Uncertainty channel refs: `<objective_name>/<uncertainty_channel_name>`
-- `selection.params.score_ref` must resolve to an emitted score channel.
-- `selection.params.uncertainty_ref` is required for uncertainty-driven selection (for example `expected_improvement`).
+### Run ledger
 
-### Design notes
+`outputs/ledger/runs.parquet` stores one row per shared model fit. Each fit has a
+collision-resistant `run_id`; committed run IDs are create-only across both the
+run and prediction ledgers:
 
-- Keep row-level diagnostics in `run_pred`, run-level summaries in `run_meta`.
-- Prefer explicit channels and references over implicit single-score columns.
-- Treat `schema__version` as compatibility guardrail for evolution.
+- model, X transform, Y ingest, and training-Y operation metadata
+- `objective__defs_json`: view-indexed objective declarations
+- `selection_views__defs_json`: view-indexed selector declarations and summary
+  statistics
+- training/scoring counts
+- artifact paths and digests
+- ledger and OPAL schema versions
+
+### Round artifacts
+
+Each `outputs/rounds/round_<k>/` contains mutable latest-run mirrors for command
+compatibility plus immutable evidence for every retained run:
+
+- `model/`: one shared model artifact and optional shared diagnostics
+- `predictions` in the append-only ledger, referenced by run ID
+- `metadata/objective_meta.json`: all objective and selection-view definitions
+- `selection/selections.parquet`: long-form selected rows keyed by
+  `selection_view_id`; `score` is the objective channel value and
+  `selection_score` is the selector's ranking value
+- `selection/selection_batch.parquet`: final deduplicated batch with
+  `selection_view_ids`, `preferred_view_ids`, allocation ownership, and
+  `selection_memberships`; each membership retains both scores
+- `selection/allocation_trace.parquet`: when coordinated allocation is
+  configured, the ordered allocated and skipped-overlap decisions with view,
+  slot, ranks, scores, batch key, and conflict owner
+- `run_artifacts/<run-slug>/`: a digest-bound snapshot of every artifact named
+  by that run's ledger row, including model, selection, metadata, and label
+  evidence
+- logs and context snapshots
+
+The run ledger addresses each snapshot by its stable logical key, including
+`labels/labels_used.parquet` and `labels/observed_events.parquet`. A same-round
+resume replaces only the latest-run mirrors, retains every prior run directory,
+and creates a new immutable snapshot; it never rewrites evidence pinned by an
+earlier run.
+
+`selections.parquet` is the verification artifact for one view.
+`selection_batch.parquet` is the final physical-batch proposal for downstream
+study review. Under the default policy it is the logical union; under explicit
+allocation it contains the exact unique-slot result. Neither artifact
+authorizes synthesis.
+
+`opal selection-batch show/export` exposes this artifact as
+`opal.selection_batch.v3`. The loader requires `run_id`, `as_of_round`, and
+`campaign_slug` provenance on every row and verifies them against the resolved
+run. Selection rows carry the projected `selection_batch_key` and
+`deduplicate_by` fields used for that run. The loader verifies the batch and
+long-form selection artifacts against their run-ledger SHA-256 digests, then
+reconciles each nested batch membership to the corresponding candidate/view
+selection row: batch key, ranks, scores, score reference, selection origin, and
+allocation slot must agree. Coordinated allocations additionally require the
+digest-bound allocation trace; `preferred_view_ids` must match its complete set
+of top-k preferences for the deduplication key. It also verifies configured
+view membership and allocation ownership.
+Logical-union rows are returned in competition-rank order;
+coordinated rows follow allocation slot and declared view priority. Rows that
+do not satisfy the v3 contract fail validation; the loader does not infer or
+upgrade missing provenance. An explicit batch-path audit override bypasses only
+the batch-file digest and must still reconcile to the digest-bound selection
+artifact.
+
+### Public inspection contracts
+
+- `opal selection-set show/export --view <id>` projects and verifies one view.
+- `opal selection-batch show/export` reads the final deduplicated batch.
+- `opal verify-outputs --view <id>` compares one selection artifact to the
+  shared prediction ledger.
+- `opal record-show --view <id>` reports view-specific rank and score.
+
+When a campaign has multiple views, view-specific commands require `--view`.
+They never choose the first configured view silently.
+
+### Plot and notebook artifacts
+
+View-specific plot manifests require `selection_view_id`. In multi-view
+campaigns, outputs are namespaced under
+`outputs/plots/selection_views/<view_id>/`. A generated notebook exposes one
+`Selection view` control and filters masks, scores, selections, and plot
+deliverables to that view. Shared model diagnostics are rendered once.
+
+### Reader evidence manifest adapter
+
+Reader evidence remains producer-owned. A study may keep its own
+`schema_version`, but it must opt into OPAL's notebook surface with
+`opal_adapter: opal.reader_evidence_manifest.v1`. The public adapter is a
+projection contract, not a study-schema alias.
+
+The adapter requires:
+
+- a trimmed producer `schema_version` and round label;
+- a `rows` list whose entries have a candidate or record ID, Reader design ID,
+  Reader experiment ID, and an `artifacts` list;
+- artifact entries with semantic kind, producer kind, record ID, scope, path,
+  existence flag, and media type; and
+- an exact five-field summary: row count, distinct ID count, Reader experiment
+  count, artifact count, and rows with missing artifact evidence.
+
+OPAL recomputes every summary count from the projected rows. Missing or
+duplicated artifact identities, malformed fields, non-boolean existence flags,
+and count drift reject the adapter before notebook discovery. Producer-specific
+assay semantics, candidate identity, artifact digests, and scientific claims
+remain in their owning contracts; the adapter only defines the common evidence
+shape OPAL is allowed to display.
+
+### Validation
+
+Ledger schemas are strict. Unknown columns, duplicate or previously committed
+run IDs, duplicate prediction IDs within a run, unresolved selection rows,
+non-finite values, mixed run IDs, unsupported observed-label source kinds, and
+artifact digest mismatches are errors. `OPAL_LEDGER_ALLOW_EXTRA=1` exists only for
+controlled schema development and must not be used in production workflows.

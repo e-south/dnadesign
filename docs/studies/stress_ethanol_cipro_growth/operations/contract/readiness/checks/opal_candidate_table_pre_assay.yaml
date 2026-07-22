@@ -1,0 +1,16 @@
+checks:
+  opal_candidate_table_pre_assay:
+  - kind: dataset_snapshot
+    check_id: opal.candidate_table.rows
+    check_group: opal_candidate_table
+    summary: OPAL candidate feature table is materialized with generated promoters plus measured Reader round-0 rows.
+    required: true
+    artifact: opal_candidate_feature_table
+    target_rows: 157185
+    row_count_mode: exact
+  - kind: command
+    check_id: opal.candidate_table.contract
+    check_group: opal_candidate_table
+    summary: OPAL candidate feature table validates fixed-length X and complete BaseRender-compatible DenseGen TFBS metadata.
+    required: true
+    surface: opal_candidate_table_contract

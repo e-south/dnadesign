@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/tests/test_usr_writer.py
+src/dnadesign/densegen/tests/outputs/test_usr_writer.py
 
-USR adapter tests for DenseGen output fidelity.
+Tests DenseGen USR output writer fidelity.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/artifacts/atomic_write.py
 
 Atomic write helpers for artifacts and metadata.

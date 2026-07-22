@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/effects/boundary_marker.py
 
 Boundary-marker drawer for strand-local nick/cut annotations.

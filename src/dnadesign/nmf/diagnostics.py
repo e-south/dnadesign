@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-nmf/diagnostics.py
+dnadesign
+src/dnadesign/nmf/diagnostics.py
+
+Diagnostic helpers for NMF.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

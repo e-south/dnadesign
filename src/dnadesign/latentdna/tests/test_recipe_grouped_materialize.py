@@ -1,4 +1,13 @@
-"""Recipe-level contracts for grouped Infer sidecar view materialization."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_recipe_grouped_materialize.py
+
+Recipe-level contracts for grouped Infer sidecar view materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

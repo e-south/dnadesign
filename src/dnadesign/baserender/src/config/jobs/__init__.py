@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/jobs/__init__.py
 
 Job schema namespaces for baserender config contracts.

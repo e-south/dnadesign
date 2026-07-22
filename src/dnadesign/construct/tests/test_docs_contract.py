@@ -38,9 +38,9 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
         "src/dnadesign/construct/workspaces/demo_anchor_template_shared_dataset/README.md"
     )
 
-    token = "../../usr/docs/operations/construct-infer-shared-dataset-runbook.md"
-    multi_source_token = "../../usr/docs/operations/multi-source-shared-dataset-assembly.md"
-    feature_matrix_token = "../../usr/docs/operations/promoter-characterization-feature-matrix.md"
+    token = "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md"
+    multi_source_token = "../../usr/docs/operations/assembly/multi-source-shared-dataset.md"
+    feature_matrix_token = "../../usr/docs/operations/promoter/characterization-feature-matrix.md"
     assert token in readme
     assert multi_source_token in readme
     assert feature_matrix_token in readme
@@ -55,7 +55,7 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "Construct takes anchor sequences or other focal DNA parts" in top_readme
     assert "reference/template-contexts.md" in readme
     assert "template-contexts.md" in config_doc
-    assert "../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" in outputs
+    assert "../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in outputs
     assert "construct__anchor_start" in outputs
     assert "construct__anchor_start" in template_contexts
     assert "prefix-conditioned token" in config_doc
@@ -65,6 +65,6 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "demo_anchor_template_shared_dataset" in workspaces
     assert "uv run construct workspace list" in workspaces
     assert "downstream consumers" in source_of_truth_workspace
-    assert "promoter-characterization-feature-matrix.md" in source_of_truth_workspace
+    assert "promoter/characterization-feature-matrix.md" in source_of_truth_workspace
     assert "unified [Construct docs](README.md) index" in index_doc
     assert "Open the Construct docs index" in index_doc

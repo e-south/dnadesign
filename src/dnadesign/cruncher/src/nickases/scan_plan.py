@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/nickases/scan_plan.py
 
 Precomputed motif scan plans for nickase recognition-site scanning.

@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/diagnostics.py
 
-Author(s): Eric J. South
+Diagnostic helpers for Cruncher analysis.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

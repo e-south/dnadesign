@@ -1,0 +1,51 @@
+checks:
+  phase1_thread_contract:
+    - kind: path_exists
+      check_id: eco1_rt.foldcheck.policy_context
+      check_group: foldcheck_runtime
+      summary: Fold-validation policy declares required fields, semantics, and fixture boundaries.
+      required: true
+      artifact: fold_validation_policy
+    - kind: path_exists
+      check_id: eco1_rt.foldcheck.handoff_schema
+      check_group: foldcheck_runtime
+      summary: Candidate handoff schema requires foldcheck_report coverage for selected candidates.
+      required: true
+      artifact: thread_candidate_handoff_schema
+  phase2_real_backend_ingest:
+    - kind: path_exists
+      check_id: eco1_rt.foldcheck.materialized_request
+      check_group: foldcheck_runtime
+      summary: Fold-check readiness requires WT plus candidate FASTA and a backend-neutral request manifest.
+      required: true
+      artifact: planned_foldcheck_request
+      validator_intent:
+        required_state: materialized
+        backend_kind: colabfold
+        fold_model_family: alphafold_family
+        execution_status: planned_not_run
+        required_inputs:
+          - planned_candidate_table
+          - planned_foldcheck_input_fasta
+  phase3_foldcheck_report:
+    - kind: path_exists
+      check_id: eco1_rt.foldcheck.materialized_report
+      check_group: foldcheck_runtime
+      summary: Fold-check report validation requires nonfixture rows, including an accepted WT baseline; downstream promotion still requires accepted selected-candidate rows in the handoff contract.
+      required: true
+      artifact: planned_foldcheck_report
+      validator_intent:
+        required_state: materialized
+        fixture_rows_allowed_for_acceptance: false
+        wt_baseline_must_be_accepted: true
+        report_sequence_hashes_must_match_request_manifest: true
+        selected_candidate_acceptance_checked_by_handoff: true
+        required_columns:
+          - candidate_id
+          - wt_baseline_artifact_id
+          - runtime_parameters_hash
+          - threshold_id
+          - threshold_values
+          - status
+          - rejection_reason
+        runtime_failures_must_be_rows: true

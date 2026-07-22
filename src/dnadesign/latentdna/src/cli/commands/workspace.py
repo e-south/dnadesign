@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/cli/commands/workspace.py
+
 Workspace CLI commands for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -89,12 +96,17 @@ def show(
 @app.command("snapshot")
 def snapshot(
     workspace: str = typer.Option(..., "--workspace"),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Build the snapshot payload without writing workspace_snapshot.json.",
+    ),
     format_name: str = typer.Option("text", "--format"),
     json_output: bool = typer.Option(False, "--json"),
     quiet: bool = typer.Option(False, "--quiet"),
 ) -> None:
     try:
-        payload = workspace_snapshot(workspace)
+        payload = workspace_snapshot(workspace, write=not dry_run)
     except Exception as exc:
         fail(exc)
     emit(payload, format_name=resolve_format(json_output=json_output, format_name=format_name), quiet=quiet)

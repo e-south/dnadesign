@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/optimizer_stats.py
 
 Resolve and validate optimizer stats payloads for analysis workflows.

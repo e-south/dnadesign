@@ -1,25 +1,36 @@
 ## OPAL Architecture and Data Flow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-07-15
 
-
-This page describes how OPAL executes one round and how config keys map to runtime behavior.
+OPAL executes each round through the stages below.
 
 ### Round lifecycle
 
 1. Load `configs/campaign.yaml` and validate schema + plugin names.
-2. Resolve labels up to `--labels-as-of` from `opal__<slug>__label_hist`.
-3. Build feature matrices with `transforms_x`.
-4. Fit `model` and predict `y_pred` (and optional predictive std-dev).
-5. Apply `training.y_ops` inversion to both mean and std-dev when configured.
-6. Evaluate configured `objectives` into named score and uncertainty channels.
-7. Run `selection` using explicit refs (`score_ref`, optional `uncertainty_ref`) and persist outputs.
+2. Resolve one label snapshot from the configured `labels` source.
+3. Apply candidate-scope and candidate-eligibility rules before scoring. These
+   rules declare their required candidate columns, filter rows, and do not
+   mutate `records.parquet`.
+4. Build feature matrices with `transforms_x`.
+5. Fit `model` and predict `y_pred` (and optional predictive std-dev).
+6. Apply `training.y_ops` inversion to both mean and std-dev when configured.
+7. Evaluate every `selection_views[].objective` against the shared phenotype
+   prediction. View IDs namespace score and uncertainty channels.
+8. Run each view's selector independently to produce a complete deterministic
+   ranking and its preferred top-k set.
+9. Build one deterministic `selection_batch`. The default is the exact logical
+   union. A declared round-robin allocator may instead assign each view its
+   next-best unallocated candidates until every exact quota is full.
+10. Persist final per-view allocations, the sequence-unique batch, and the
+    allocation trace before appending the run ledger.
 
 ### Runtime surfaces
 
 - Source records: `records.parquet`
-- Label history column: `opal__<slug>__label_hist`
+- Label source: `labels.source.kind`, either `campaign_history` or
+  `usr_sidecar`; a USR sidecar may be mutable or pinned to a study-issued
+  `opal.observed_label_promotion.v1` manifest
 - Round artifacts: `outputs/rounds/round_<k>/...`
 - Ledger sinks:
   - `outputs/ledger/labels.parquet`
@@ -29,27 +40,51 @@ This page describes how OPAL executes one round and how config keys map to runti
 ### Config to stage mapping
 
 - `campaign`, `data`: workspace and dataset resolution.
+- `labels`: training-label source resolution and batch/round label semantics.
 - `transforms_y`: ingest-only label construction.
+- `candidate_eligibility`: generic pre-selection exclusion rules and audit
+  reports; study-specific cloning or ordering semantics must enter through
+  rule parameters, not OPAL candidate records.
 - `transforms_x`: feature matrix for training/scoring.
 - `training.y_ops`: fit-time Y transforms and inference-time inversion.
 - `model`: fit/predict implementation.
-- `objectives`: score/uncertainty channel emission.
-- `selection`: ranking policy over explicit channel refs.
+- `selection_views`: named objective instances and ranking policies over
+  explicit, view-local channel refs.
+- `selection_batch`: deduplication, optional exact-cardinality, and optional
+  cross-view unique-slot allocation. Allocation uses only selector order and
+  never compares score magnitudes between views.
 - `scoring`: prediction batch size.
 - `safety`: preflight guards before writes.
 
 ### Channel contract
 
-- Objectives emit score channels and optional uncertainty channels.
-- Selection reads only configured refs:
-  - `selection.params.score_ref = "<objective>/<score_channel>"`
-  - `selection.params.uncertainty_ref = "<objective>/<uncertainty_channel>"` for uncertainty-based methods.
+- Each view objective emits score channels and optional uncertainty channels.
+- A view selector reads unqualified plugin channels such as
+  `score_ref: feasibility_margin`; persisted refs are namespaced as
+  `<selection_view_id>/<channel>`.
 - `objective_mode` and `tie_handling` are explicit required controls.
+
+A campaign owns learning, a selection view owns a target, and a selection
+batch owns the final deduplicated proposal. Different setpoints over the same
+X, Y, labels, and model are selection views, not separate campaigns.
 
 ### Failure model
 
 OPAL is fail-fast by design:
 - unknown plugins fail at config load/validation
+- unknown candidate-eligibility rules or invalid rule parameters fail during
+  config validation before round execution
 - unresolved score/uncertainty refs fail before selection
+- duplicate view IDs and objective channel collisions fail at config load
 - non-finite/invalid model/objective/selection outputs fail before writeback
+- declared selection-batch cardinality mismatch fails without filling slots
+  unless the campaign explicitly declares the unique-slot allocator
+- unique-slot allocation fails on non-ordinal ties, non-exact view quotas,
+  incomplete view priority, ambiguous deduplication keys, or pool exhaustion
 - ledger schema violations fail at write time
+- a configured shared label sidecar fails rather than falling back to
+  campaign-local label history when it is missing, malformed, or points at
+  unknown candidate IDs
+- a manifest-pinned sidecar fails when campaign, study, Y space, candidate/X
+  snapshot, path, digest, schema, columns, or row count differs from its
+  promotion manifest; generic ingest cannot mutate that source

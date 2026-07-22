@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/publish_inventory.py
 
 Normalized-payload, inventory, and manifest builders for YIU publication.

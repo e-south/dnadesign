@@ -1,0 +1,7 @@
+interface:
+  display_name: "ChimeraX Structure Review"
+  short_description: "Operate a visible ChimeraX review session and capture reproducible molecular scenes."
+  default_prompt: "Name the protein, DNA, and RNA roles in this ChimeraX complex, use native cartoons with ladder nucleotide display, let me approve the pose, and verify any saved render."
+
+policy:
+  allow_implicit_invocation: true

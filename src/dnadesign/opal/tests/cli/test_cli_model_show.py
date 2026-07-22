@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_model_show.py
+
+Regression tests for CLI model show OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

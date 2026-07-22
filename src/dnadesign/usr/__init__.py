@@ -59,6 +59,7 @@ _ATTR_SOURCES: dict[str, tuple[str, str]] = {
     "overlay_metadata": (".src.overlays", "overlay_metadata"),
     "overlay_parts": (".src.overlays", "overlay_parts"),
     "overlay_schema": (".src.overlays", "overlay_schema"),
+    "with_overlay_metadata": (".src.overlays", "with_overlay_metadata"),
     "OVERLAY_PART_PREFIX": (".src.overlays", "OVERLAY_PART_PREFIX"),
     "OVERLAY_DIGEST_LEDGER_FILENAME": (".src.overlays.support.digest_ledger", "OVERLAY_DIGEST_LEDGER_FILENAME"),
     "OVERLAY_DIGEST_LEDGER_SCHEMA_VERSION": (
@@ -98,6 +99,12 @@ _ATTR_SOURCES: dict[str, tuple[str, str]] = {
     "write_view_semantics": (".src.api", "write_view_semantics"),
     "ensure_registry_entries": (".src.api", "ensure_registry_entries"),
     "ensure_sequence_contract_namespaces": (".src.api", "ensure_sequence_contract_namespaces"),
+    "parse_columns_spec": (".src.api", "parse_columns_spec"),
+    "register_namespace": (".src.api", "register_namespace"),
+    "BiopythonGenBankParser": (".src.genbank", "BiopythonGenBankParser"),
+    "GenBankParser": (".src.genbank", "GenBankParser"),
+    "ParsedGenBankFeature": (".src.genbank", "ParsedGenBankFeature"),
+    "ParsedGenBankRecord": (".src.genbank", "ParsedGenBankRecord"),
 }
 
 __all__ = list(_ATTR_SOURCES)

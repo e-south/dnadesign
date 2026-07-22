@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/transforms/test_yops_intensity_scalar.py
+
+Regression tests for yops intensity scalar OPAL transforms.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

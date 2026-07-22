@@ -35,6 +35,26 @@ FEATURE_ALIAS_RELATIVE_PATH = "_derived/infer/feature_aliases.parquet"
 FEATURE_VECTOR_RELATIVE_PATH = "_derived/infer/feature_vectors.parquet"
 FEATURE_SCALAR_ALIAS_RELATIVE_PATH = "_derived/infer/feature_scalar_aliases.parquet"
 FEATURE_SCALAR_RELATIVE_PATH = "_derived/infer/feature_scalars.parquet"
+FEATURE_ALIAS_INVENTORY_COLUMNS = (
+    "view_id",
+    "feature_vector_key",
+    "model_name",
+    "layer_name",
+    "representation_kind",
+    "pooling_operation",
+    "orientation",
+    "runtime_fingerprint_key",
+    "sequence_case_policy",
+)
+FEATURE_SCALAR_ALIAS_INVENTORY_COLUMNS = (
+    "view_id",
+    "feature_scalar_key",
+    "model_name",
+    "scalar_kind",
+    "orientation",
+    "runtime_fingerprint_key",
+    "sequence_case_policy",
+)
 
 _FEATURE_ALIAS_SCHEMA = pa.schema(
     [
@@ -329,6 +349,21 @@ def load_feature_alias_rows(
     return read_table_with_schema(path, schema=_FEATURE_ALIAS_SCHEMA).to_pylist()
 
 
+def load_feature_alias_inventory_rows(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+) -> list[dict[str, object]]:
+    path = feature_alias_path(dataset_root=dataset_root, dataset_id=dataset_id)
+    if not path.exists():
+        return []
+    return _read_table_columns_with_schema(
+        path,
+        schema=_FEATURE_ALIAS_SCHEMA,
+        columns=FEATURE_ALIAS_INVENTORY_COLUMNS,
+    ).to_pylist()
+
+
 def load_feature_alias_ids(
     *,
     dataset_root: str | Path,
@@ -364,6 +399,21 @@ def load_feature_scalar_alias_rows(
     if not path.exists():
         return []
     return read_table_with_schema(path, schema=_FEATURE_SCALAR_ALIAS_SCHEMA).to_pylist()
+
+
+def load_feature_scalar_alias_inventory_rows(
+    *,
+    dataset_root: str | Path,
+    dataset_id: str,
+) -> list[dict[str, object]]:
+    path = feature_scalar_alias_path(dataset_root=dataset_root, dataset_id=dataset_id)
+    if not path.exists():
+        return []
+    return _read_table_columns_with_schema(
+        path,
+        schema=_FEATURE_SCALAR_ALIAS_SCHEMA,
+        columns=FEATURE_SCALAR_ALIAS_INVENTORY_COLUMNS,
+    ).to_pylist()
 
 
 def load_feature_vector_keys(
@@ -403,6 +453,21 @@ def load_feature_scalar_keys(
         return set()
     table = pq.read_table(path, columns=["feature_scalar_key"])
     return {str(key) for key in table.column("feature_scalar_key").to_pylist() if str(key) in wanted}
+
+
+def _read_table_columns_with_schema(path: Path, *, schema: pa.Schema, columns: tuple[str, ...]) -> pa.Table:
+    selected_fields = [schema.field(name) for name in columns]
+    file_schema = pq.read_schema(path)
+    available_columns = [name for name in columns if name in file_schema.names]
+    table = pq.read_table(path, columns=available_columns) if available_columns else None
+    num_rows = table.num_rows if table is not None else pq.ParquetFile(path).metadata.num_rows
+    projected_columns = {}
+    for field in selected_fields:
+        if table is not None and field.name in table.column_names:
+            projected_columns[field.name] = table.column(field.name).cast(field.type)
+        else:
+            projected_columns[field.name] = pa.nulls(num_rows, type=field.type)
+    return pa.table(projected_columns, schema=pa.schema(selected_fields))
 
 
 def load_feature_vector_rows(

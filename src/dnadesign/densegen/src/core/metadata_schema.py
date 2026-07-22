@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/metadata_schema.py
+dnadesign
+src/dnadesign/densegen/src/core/metadata_schema.py
 
 Typed metadata registry for DenseGen output fields.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/tables.py
 
 CSV handoff table writers for scar_nick runs.

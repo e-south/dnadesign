@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/recipes.py
+
 Plot recipe resolution for config-backed and inline plot renders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -44,6 +51,19 @@ def _resolved_layout_fields(config: PlotConfig) -> dict[str, object]:
         "single_row_panels": bool(getattr(config, "single_row_panels", False)),
         "square_panels": bool(getattr(config, "square_panels", False)),
         "hide_repeated_y_axis": bool(getattr(config, "hide_repeated_y_axis", False)),
+        "panel_width": getattr(config, "panel_width", None),
+        "panel_height": getattr(config, "panel_height", None),
+        "extra_width_per_column": getattr(config, "extra_width_per_column", None),
+        "tight_layout_pad": getattr(config, "tight_layout_pad", None),
+        "tight_layout_h_pad": getattr(config, "tight_layout_h_pad", None),
+        "tight_layout_w_pad": getattr(config, "tight_layout_w_pad", None),
+    }
+
+
+def _resolved_metric_panel_fields(config: PlotConfig) -> dict[str, object]:
+    return {
+        "bar_orientation": getattr(config, "bar_orientation", "auto"),
+        "show_uncertainty_note": bool(getattr(config, "show_uncertainty_note", True)),
     }
 
 
@@ -213,6 +233,29 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )
+    if config.kind == "categorical_enrichment_summary":
+        return ResolvedPlotSpec(
+            plot_id=plot_id,
+            kind=config.kind,
+            scalar_id=config.scalar,
+            row_column=config.group_column,
+            column_column=config.feature_column,
+            value_column=config.value_column,
+            label_column=config.feature_column,
+            count_column=config.count_column,
+            total_column=config.total_column,
+            p_value_column=config.p_value_column,
+            q_value_column=config.q_value_column,
+            common_feature_column=config.common_feature_column,
+            reference_line=config.reference_line,
+            static_filters=list(config.static_filters),
+            group_order=list(config.group_order),
+            max_features_per_group=config.max_features_per_group,
+            **_resolved_label_fields(config),
+            **_resolved_layout_fields(config),
+            config_id=config_id,
+            semantics_ref=config.semantics_ref,
+        )
     if config.kind == "metric_panel_grid":
         return ResolvedPlotSpec(
             plot_id=plot_id,
@@ -237,6 +280,7 @@ def _resolved_from_config(plot_id: str, config: PlotConfig, *, config_id: str | 
             **_resolved_filter_fields(config),
             **_resolved_label_fields(config),
             **_resolved_layout_fields(config),
+            **_resolved_metric_panel_fields(config),
             config_id=config_id,
             semantics_ref=config.semantics_ref,
         )

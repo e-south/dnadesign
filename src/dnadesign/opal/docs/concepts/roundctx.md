@@ -1,10 +1,12 @@
 ## RoundCtx and Contract Auditing
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-07-13
 
 
-`RoundCtx` is a runtime companion to `campaign.yaml`: YAML chooses plugin graph. `RoundCtx`tracks what each stage computes and what downstream components consume. Use this page to understand runtime carriers, contract enforcement, and audit keys.
+`campaign.yaml` declares the plugin graph. `RoundCtx` records what each runtime
+stage computes and what downstream components consume, with explicit contract
+and audit keys.
 
 The runner persists:
 
@@ -16,7 +18,8 @@ The runner persists:
 The runner injects a plugin-scoped `ctx` that expands `"<self>"` to the plugin name and enforces contracts.
 
 ```python
-from dnadesign.opal.src.core.round_context import roundctx_contract
+# Inside OPAL plugin modules, use the internal runtime contract decorator.
+from ...core.round_context import roundctx_contract
 
 @roundctx_contract(
   category="objective",

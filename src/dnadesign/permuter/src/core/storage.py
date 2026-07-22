@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/storage.py
+
+Core runtime primitives for storage Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -180,8 +182,8 @@ def append_record_event(
 def init_record_md(
     *,
     dataset_dir: Path,
-    job_yaml: Path,
-    job_name: str,
+    config_path: Path,
+    scope_id: str,
     ref_name: str,
     refs_csv: Path,
 ) -> Path:
@@ -200,9 +202,9 @@ def init_record_md(
 
         _Dataset created {ts} (UTC). This file is a lightweight, human‑editable record._
 
-        **Job**: {job_name}
+        **Workspace**: {scope_id}
         **Reference**: {ref_name}
-        **Job YAML**: {job_yaml}
+        **Config**: {config_path}
         **Refs CSV**: {refs_csv}
 
         ## Commands

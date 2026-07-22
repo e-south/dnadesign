@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_plot_render.py
+
+Regression tests for plot render LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import math
@@ -8,12 +19,12 @@ import matplotlib.pyplot as plt
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-from matplotlib.collections import PathCollection
+from matplotlib.collections import PathCollection, PolyCollection
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.contracts.plot import ResolvedPlotSpec, metric_panel_uses_square_axes
 from dnadesign.latentdna.src.contracts.plot_semantics import PlotSemantics
-from dnadesign.latentdna.src.metadata_axes import axis_style_map_from_payload
+from dnadesign.latentdna.src.metadata.axes import axis_style_map_from_payload
 from dnadesign.latentdna.src.plots.annotation_rendering import (
     annotation_continuous_color_encoding as _annotation_continuous_color_encoding,
 )
@@ -40,6 +51,9 @@ from dnadesign.latentdna.src.plots.renderers.distribution import (
     render_distribution_panel,
     render_distribution_plot,
 )
+from dnadesign.latentdna.src.plots.renderers.enrichment_summary import (
+    render_categorical_enrichment_summary_plot,
+)
 from dnadesign.latentdna.src.plots.renderers.heatmap import (
     heatmap_grid_from_rows as _heatmap_grid_from_rows,
 )
@@ -50,9 +64,11 @@ from dnadesign.latentdna.src.plots.renderers.metric import (
     load_metric_panel_grid_input,
     metric_panel_groups,
     metric_panel_needs_candidate_label_ticks,
+    metric_panel_prefers_horizontal_bars,
     metric_panel_uses_grouped_family_bars,
     render_metric_panel,
 )
+from dnadesign.latentdna.src.plots.renderers.metric_labels import candidate_tick_label
 from dnadesign.latentdna.src.plots.renderers.projection import render_projection_plot
 from dnadesign.latentdna.src.plots.renderers.scatter import axis_category_value as _axis_category_value
 from dnadesign.latentdna.src.plots.renderers.scatter import category_color_map as _category_color_map
@@ -60,8 +76,8 @@ from dnadesign.latentdna.src.plots.renderers.scatter import category_key as _cat
 from dnadesign.latentdna.src.plots.renderers.scatter import continuous_color_encoding as _continuous_color_encoding
 from dnadesign.latentdna.src.plots.renderers.xy import render_xy_plot
 from dnadesign.latentdna.src.plots.tables import read_table_rows
+from dnadesign.latentdna.src.presentation.visual_style import compact_candidate_title, wrap_plot_title
 from dnadesign.latentdna.src.services._plot_payloads import plot_input_payload
-from dnadesign.latentdna.src.visual_style import compact_candidate_title, wrap_plot_title
 
 SIGMA35_NONCANONICAL_BUCKET = "__latentdna_reference_or_other__"
 SIGMA35_AXIS_STYLES = axis_style_map_from_payload(
@@ -162,6 +178,36 @@ def _metric_spec(*, plot_id: str, color_column: str | None) -> ResolvedPlotSpec:
     return ResolvedPlotSpec.model_validate(payload)
 
 
+def test_metric_panel_layout_accepts_configured_geometry_overrides() -> None:
+    rows, columns, figsize = metric_panel_grid_layout(
+        "study_owned_metric_panel",
+        4,
+        panel_width=5.2,
+        panel_height=5.25,
+    )
+
+    assert (rows, columns) == (2, 2)
+    assert figsize == pytest.approx((10.4, 10.5))
+    assert plot_tight_layout_kwargs(
+        "study_owned_metric_panel",
+        legend_bottom=0.0,
+        h_pad=1.6,
+        w_pad=1.75,
+    ) == {"pad": 0.95, "h_pad": 1.6, "w_pad": 1.75}
+
+
+def test_metric_panel_bar_orientation_is_config_not_plot_id() -> None:
+    horizontal = _metric_spec(plot_id="study_owned_metric_panel", color_column=None).model_copy(
+        update={"bar_orientation": "horizontal"}
+    )
+    vertical = _metric_spec(plot_id="representation_health_summary", color_column=None).model_copy(
+        update={"bar_orientation": "vertical"}
+    )
+
+    assert metric_panel_prefers_horizontal_bars(horizontal)
+    assert not metric_panel_prefers_horizontal_bars(vertical)
+
+
 def test_category_key_compacts_list_values_for_categorical_legends() -> None:
     rows = [
         {"sigma_set": ["SIGMA24", "SIGMA38", "SIGMA70"]},
@@ -200,6 +246,49 @@ def test_axis_style_hue_keeps_context_derived_densegen_rows_categorical() -> Non
         )
         == SIGMA35_NONCANONICAL_BUCKET
     )
+
+
+def test_axis_style_category_alpha_deemphasizes_background_category() -> None:
+    styles = axis_style_map_from_payload(
+        {
+            "tf_bin": {
+                "axis_id": "tf_bin",
+                "column": "tf_bin",
+                "category_order": ["neither", "ethanol_TF", "lexA_TF"],
+                "category_colors": {"neither": "#D9DEE7", "ethanol_TF": "#0072B2", "lexA_TF": "#D55E00"},
+                "category_alpha": {"neither": 0.24},
+            }
+        }
+    )
+    rows = [
+        {"x": 0.0, "y": 0.0, "tf_bin": "ethanol_TF"},
+        {"x": 0.1, "y": 0.1, "tf_bin": "neither"},
+        {"x": 0.2, "y": 0.2, "tf_bin": "lexA_TF"},
+    ]
+    color_map, _ = _category_color_map([rows], "tf_bin", axis_styles=styles)
+    fig, ax = plt.subplots(figsize=(4, 4))
+    try:
+        from dnadesign.latentdna.src.plots.renderers.scatter import scatter_points
+
+        scatter_points(
+            ax,
+            rows,
+            resolved_x="x",
+            resolved_y="y",
+            color_column="tf_bin",
+            color_map=color_map,
+            shape_column=None,
+            shape_map={},
+            point_size=32.0,
+            alpha=0.9,
+            axis_styles=styles,
+        )
+
+        assert len(ax.collections) == 3
+        assert ax.collections[0].get_alpha() == pytest.approx(0.24)
+        assert ax.collections[1].get_alpha() == pytest.approx(0.9)
+    finally:
+        plt.close(fig)
 
 
 def test_continuous_color_encoding_honors_explicit_hue_option() -> None:
@@ -321,6 +410,95 @@ def test_xy_scatter_grid_preserves_full_axis_labels_per_panel(tmp_path: Path) ->
         figure_texts = {text.get_text() for text in result.figure.texts}
         assert expected_x_label not in figure_texts
         assert result.layout_reservation.legend_bottom >= 0.14
+    finally:
+        plt.close(result.figure)
+
+
+def test_xy_scatter_grid_applies_first_notebook_filter_to_static_artifact(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "abundance_rows"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "assay_value": [1.0, 2.0, 1000.0],
+                "margin": [0.1, 0.2, 0.9],
+                "ordinal_group_id": ["khan_abundance", "khan_abundance", "crawford_abundance"],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "rt_lnrna_abundance_margin_scatter_gallery",
+            "kind": "xy_scatter_grid",
+            "scalar_ids": ["abundance_rows"],
+            "x_column": "assay_value",
+            "y_column": "margin",
+            "color_column": "ordinal_group_id",
+            "filter_options": [
+                {
+                    "column": "ordinal_group_id",
+                    "label": "Abundance source",
+                    "include_all": False,
+                    "values": [
+                        {"value": "khan_abundance", "label": "Khan PAGE RT-DNA abundance"},
+                        {"value": "crawford_abundance", "label": "Crawford Fig2 Eco1 msDNA score"},
+                    ],
+                }
+            ],
+        }
+    )
+
+    result = render_xy_plot(
+        SimpleNamespace(output_root=tmp_path, config=SimpleNamespace(reference_sets={})),
+        spec,
+        pyplot=plt,
+        axis_styles=None,
+    )
+
+    try:
+        axis = result.figure.axes[0]
+        assert axis.get_xlim()[1] < 10.0
+    finally:
+        plt.close(result.figure)
+
+
+def test_xy_scatter_honors_non_point_render_mode(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "dense_rows"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "x": [float(index % 7) for index in range(70)],
+                "y": [float(index // 7) for index in range(70)],
+                "group": ["a" if index % 2 == 0 else "b" for index in range(70)],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "dense_xy",
+            "kind": "xy_scatter",
+            "scalar_id": "dense_rows",
+            "x_column": "x",
+            "y_column": "y",
+            "color_column": "group",
+            "render_mode": "hexbin",
+        }
+    )
+
+    result = render_xy_plot(
+        SimpleNamespace(output_root=tmp_path, config=SimpleNamespace(reference_sets={})),
+        spec,
+        pyplot=plt,
+        axis_styles=None,
+    )
+
+    try:
+        collections = result.figure.axes[0].collections
+        assert any(isinstance(collection, PolyCollection) for collection in collections)
+        assert not any(isinstance(collection, PathCollection) for collection in collections)
     finally:
         plt.close(result.figure)
 
@@ -595,9 +773,10 @@ def test_metric_panel_disables_grouped_family_bars_when_keys_would_overwrite_row
             square=False,
         )
 
-        tick_labels = [label.get_text().replace("\n", " ") for label in ax.get_xticklabels()]
-        assert any("Anchor Vs Context" in label for label in tick_labels)
-        assert any("Anchor Vs Full" in label for label in tick_labels)
+        tick_labels = [label.get_text() for label in ax.get_yticklabels()]
+        assert "Fwd\nanchor" in tick_labels
+        assert "Fwd\nseq" in tick_labels
+        assert all("7B Intermediate" not in label for label in tick_labels)
     finally:
         plt.close(fig)
 
@@ -626,6 +805,109 @@ def test_metric_panel_input_requires_configured_value_column(tmp_path: Path) -> 
 
     with pytest.raises(ContractViolationError, match="missing_score"):
         load_metric_panel_grid_input(SimpleNamespace(output_root=tmp_path), spec)
+
+
+def test_categorical_enrichment_summary_filters_and_orders_groups(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "fixture_enrichment"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "plan": ["cipro", "ethanol", "ethanol", "ethanol", "background"],
+                "regulator_abbrev": ["LexA", "CsgD", "Lrp", "FliZ", "CRP"],
+                "threshold": [0.10, 0.10, 0.10, 0.05, 0.10],
+                "tail_mode": ["margin_top_quantile"] * 5,
+                "passes_min_support": [True, True, True, True, True],
+                "passes_min_tail_hits": [True, True, True, True, False],
+                "n_regulator_tail": [9, 5, 11, 3, 3],
+                "n_regulator_total": [32, 11, 44, 10, 222],
+                "enrichment_ratio": [2.8, 4.5, 2.5, 6.0, 0.27],
+                "p_value": [0.003, 0.002, 0.003, 0.011, 0.99],
+                "q_value": [0.54, 0.54, 0.54, 1.0, 1.0],
+                "is_common_regulator": [False, False, True, False, True],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_enrichment",
+            "kind": "categorical_enrichment_summary",
+            "scalar_id": "fixture_enrichment",
+            "row_column": "plan",
+            "column_column": "regulator_abbrev",
+            "value_column": "enrichment_ratio",
+            "count_column": "n_regulator_tail",
+            "total_column": "n_regulator_total",
+            "p_value_column": "p_value",
+            "q_value_column": "q_value",
+            "common_feature_column": "is_common_regulator",
+            "static_filters": [
+                {"column": "threshold", "equals": 0.10},
+                {"column": "tail_mode", "equals": "margin_top_quantile"},
+                {"column": "passes_min_support", "equals": True},
+                {"column": "passes_min_tail_hits", "equals": True},
+            ],
+            "group_order": ["ethanol", "cipro", "background"],
+            "max_features_per_group": 2,
+            "reference_line": 1.0,
+        }
+    )
+
+    result = render_categorical_enrichment_summary_plot(
+        SimpleNamespace(output_root=tmp_path),
+        spec,
+        pyplot=plt,
+    )
+
+    try:
+        assert result.metadata["source_rows"] == 5
+        assert result.metadata["filtered_rows"] == 3
+        assert result.metadata["rendered_groups"] == 2
+        assert [panel["group"] for panel in result.metadata["panels"]] == ["ethanol", "cipro"]
+        assert result.metadata["panels"][0]["features"] == ["CsgD", "Lrp"]
+    finally:
+        plt.close(result.figure)
+
+
+def test_categorical_enrichment_summary_records_empty_filtered_surface(tmp_path: Path) -> None:
+    scalar_dir = tmp_path / "scalars" / "fixture_enrichment"
+    scalar_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "plan": ["ethanol"],
+                "regulator_abbrev": ["CsgD"],
+                "threshold": [0.05],
+                "enrichment_ratio": [4.5],
+            }
+        ),
+        scalar_dir / "table.parquet",
+    )
+    spec = ResolvedPlotSpec.model_validate(
+        {
+            "plot_id": "fixture_enrichment",
+            "kind": "categorical_enrichment_summary",
+            "scalar_id": "fixture_enrichment",
+            "row_column": "plan",
+            "column_column": "regulator_abbrev",
+            "value_column": "enrichment_ratio",
+            "static_filters": [{"column": "threshold", "equals": 0.10}],
+        }
+    )
+
+    result = render_categorical_enrichment_summary_plot(
+        SimpleNamespace(output_root=tmp_path),
+        spec,
+        pyplot=plt,
+    )
+
+    try:
+        assert result.metadata["source_rows"] == 1
+        assert result.metadata["filtered_rows"] == 0
+        assert result.metadata["rendered_groups"] == 0
+    finally:
+        plt.close(result.figure)
 
 
 def testrender_metric_panel_ignores_nan_values_when_setting_limits_and_annotations() -> None:
@@ -971,9 +1253,9 @@ def testrender_metric_panel_suppresses_redundant_scope_in_grouped_ticks() -> Non
             square=False,
         )
 
-        tick_labels = [label.get_text() for label in ax.get_xticklabels()]
+        tick_labels = [label.get_text() for label in ax.get_yticklabels()]
         assert tick_labels == ["7B", "20B"]
-        assert all(label.get_rotation() == 32.0 for label in ax.get_xticklabels())
+        assert all(label.get_rotation() == 0.0 for label in ax.get_yticklabels())
     finally:
         plt.close(fig)
 
@@ -1056,7 +1338,8 @@ def test_render_distribution_panel_ordinal_swarm_draws_sampled_points_and_rank_a
         line_labels = {line.get_label() for line in ax.lines}
         assert "_ordinal_linear_fit" in line_labels
         assert "_ordinal_class_median_connector" in line_labels
-        assert any("Ordinal-order rho" in text.get_text() and "R^2" in text.get_text() for text in ax.texts)
+        assert any("Spearman ρ" in text.get_text() and "Kendall τb" in text.get_text() for text in ax.texts)
+        assert not any("Ordinal-order rho" in text.get_text() for text in ax.texts)
     finally:
         plt.close(fig)
 
@@ -1097,6 +1380,91 @@ def test_render_distribution_panel_ordinal_swarm_does_not_draw_singleton_whisker
         plt.close(fig)
 
 
+def test_render_metric_panel_compacts_context_pair_tick_labels() -> None:
+    rows = [
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "1 kb anchor mean",
+            "comparison_role": "context_anchor_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.12,
+        },
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "1 kb sequence mean",
+            "comparison_role": "context_full_sequence_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.07,
+        },
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "RC 1 kb anchor mean",
+            "comparison_role": "reverse_complement_anchor_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.01,
+        },
+        {
+            "category": "context_self_cosine_median",
+            "display_name": "Context self cosine",
+            "label": "RC 1 kb sequence mean",
+            "comparison_role": "reverse_complement_full_sequence_mean",
+            "direction": "higher_is_better",
+            "unit": "cosine",
+            "metric_value": 0.02,
+        },
+    ]
+    spec = _metric_spec(plot_id="context_pair_summary", color_column="comparison_role").model_copy(
+        update={"label_column": "label", "sort_rule": "label_asc"}
+    )
+    color_map, _ = _category_color_map([rows], spec.color_column)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    try:
+        render_metric_panel(
+            ax,
+            rows=rows,
+            spec=spec,
+            panel_title="Context self cosine",
+            color_map=color_map,
+            square=True,
+        )
+
+        tick_labels = [label.get_text() for label in ax.get_yticklabels()]
+        assert tick_labels == [
+            "Fwd\nanchor",
+            "Fwd\nseq",
+            "RC\nanchor",
+            "RC\nseq",
+        ]
+        assert all(label.get_rotation() == 0.0 for label in ax.get_yticklabels())
+    finally:
+        plt.close(fig)
+
+
+def test_metric_context_label_compaction_is_plot_scoped() -> None:
+    row = {"label": "1 kb anchor mean"}
+    labeled_candidate = {
+        "candidate_label": "7B intermediate: anchor vs full 1 kb context",
+        "candidate_model": "7b",
+        "candidate_scope": "anchor_vs_context",
+        "candidate_family": "intermediate_embedding",
+        "label": "context_self_cosine_median",
+    }
+
+    assert candidate_tick_label(row, fallback_column="label", plot_id="context_pair_summary") == "Fwd\nanchor"
+    assert candidate_tick_label(row, fallback_column="label", plot_id="context_robustness_summary") == "Fwd\nanchor"
+    assert (
+        candidate_tick_label(labeled_candidate, fallback_column="label", plot_id="context_robustness_summary")
+        == "Fwd\nseq"
+    )
+    assert candidate_tick_label(row, fallback_column="label", plot_id="design_structure_summary") == "1 kb Anchor\nMean"
+
+
 def test_render_distribution_panel_ordinal_swarm_skips_trend_for_degenerate_rank() -> None:
     rows = [
         {
@@ -1122,6 +1490,43 @@ def test_render_distribution_panel_ordinal_swarm_skips_trend_for_degenerate_rank
         assert "_ordinal_linear_fit" not in line_labels
         assert "_ordinal_class_median_connector" not in line_labels
         assert "_ordinal_class_median_tick" in line_labels
+    finally:
+        plt.close(fig)
+
+
+def test_render_distribution_panel_ordinal_swarm_preserves_zero_rank_order() -> None:
+    rows = [
+        {
+            "ordinal_label": "weak",
+            "ordinal_plot_order": 0,
+            "ordinal_margin": -0.3,
+        },
+        {
+            "ordinal_label": "middle",
+            "ordinal_plot_order": 1,
+            "ordinal_margin": 0.0,
+        },
+        {
+            "ordinal_label": "strong",
+            "ordinal_plot_order": 2,
+            "ordinal_margin": 0.3,
+        },
+    ]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    try:
+        render_distribution_panel(
+            ax,
+            rows=rows,
+            metric_column="ordinal_margin",
+            color_column="ordinal_label",
+            render_mode="ordinal_swarm",
+            panel_title="Zero-based ladder",
+            square=False,
+        )
+
+        assert [label.get_text() for label in ax.get_xticklabels()] == ["Weak", "Middle", "Strong"]
+        assert any("Spearman ρ=1.00" in text.get_text() for text in ax.texts)
+        assert any("Kendall τb=1.00" in text.get_text() for text in ax.texts)
     finally:
         plt.close(fig)
 

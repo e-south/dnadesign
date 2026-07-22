@@ -1,0 +1,21 @@
+contract: study_runtime_command_group_lane_v1
+schema_version: 1
+study_id: stress_ethanol_cipro_growth
+lane_id: latentdna
+owner: latentdna
+last_verified: 2026-05-18
+surface_role: downstream-analysis
+current_state: x_selected_appendix_optional
+route_detail: repo:docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md
+canonical_payload:
+  path: repo:docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml
+  keys:
+    - study_pipeline.latentdna
+    - study_pipeline.infer.infer_priority
+entry_artifacts:
+  - infer_sequence_view_sidecars
+exit_artifacts:
+  - representation_health_summary
+  - candidate_x_selection_scorecard
+  - native_tf_axis_orientation_audit
+navigation_note: Open this lane for X-selection provenance, representation-browser review, or appendix-native interpretation.

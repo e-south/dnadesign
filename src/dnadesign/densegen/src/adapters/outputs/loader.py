@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/outputs/loader.py
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/loader.py
 
-Load output records for plotting/analysis.
+Loads DenseGen output records for reporting and analysis.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

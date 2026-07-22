@@ -1,0 +1,118 @@
+densegen_anchor_source:
+  artifact_type: dataset
+  dataset_id: densegen_prom_eth_cip_source
+  ref: repo:src/dnadesign/usr/datasets/densegen_prom_eth_cip_source
+sfxi_pdual10_densegen_source:
+  artifact_type: dataset
+  dataset_id: usr_sfxi_pdual10_densegen_promoters
+  ref: repo:src/dnadesign/usr/datasets/usr_sfxi_pdual10_densegen_promoters
+densegen_config:
+  artifact_type: file
+  ref: repo:src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
+merged_anchor_dataset:
+  artifact_type: dataset
+  dataset_id: usr_prom_eth_cip_anchor
+  ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_anchor
+construct_context_dataset:
+  artifact_type: dataset
+  dataset_id: construct_prom_eth_cip_context
+  ref: repo:src/dnadesign/usr/datasets/construct_prom_eth_cip_context
+opal_candidate_feature_table:
+  artifact_type: dataset
+  role: opal_candidate_feature_table
+  dataset_id: usr_prom_eth_cip_opal_candidates
+  ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates
+  row_count: 157185
+  x_column: latentdna__evo2_7b__context_anchor_mean_bidir_concat
+  x_source: intermediate_embedding_7b_context_anchor_mean_bidir_concat
+  source_population: dense_generated_promoters_plus_measured_reader_round0_rows
+  composition:
+    generated_promoter_candidates: 157160
+    measured_pdual10_sfxi_reference_rows: 23
+    measured_pdual10_control_rows: 2
+  sfxi_source_label_pool_state: present_35_rows
+  response_window_label_sidecar_state: verified_27_labels
+  response_window_label_promotion_artifact: opal_response_window_label_promotion
+opal_response_window_label_promotion:
+  artifact_type: file
+  role: observed_label_promotion_manifest
+  ref: repo:src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v5/promotion.manifest.json
+  schema_version: opal.observed_label_promotion.v1
+  study_id: stress_ethanol_cipro_growth
+  campaign_slug: secg_msrb_greedy
+  y_space: reader_response_window_vector_v1
+  reduction_id: event_logmean_4_8h_post
+  label_rows: 27
+  manifest_sha256: 12a6ae8c1f3720f9f72dc00bf556787e1a73953058cd8ab8d8030d516f023ef3  # pragma: allowlist secret
+  label_artifact_sha256: 746196094ae181d8bb18336545beac2cce644fa916b193731b66cabd2d742f92  # pragma: allowlist secret
+opal_round0_run_context:
+  artifact_type: file
+  role: opal_round_context
+  ref: repo:src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/metadata/round_ctx.json
+  campaign_slug: secg_msrb_greedy
+  round_index: 0
+  run_id: r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584
+  sha256: 1160e0037f8aab3f043d6f9420c8982efa3f5e30cca9de68d48fd8bf73944b1c  # pragma: allowlist secret
+opal_round0_selection_batch:
+  artifact_type: file
+  role: opal_selection_batch
+  ref: repo:src/dnadesign/opal/campaigns/secg_msrb_greedy/outputs/rounds/round_0/selection/selection_batch.parquet
+  campaign_slug: secg_msrb_greedy
+  round_index: 0
+  run_id: r0-2026-07-19T22:21:41+00:00-01784499701298508000-24e5927eb1ce4d0daf013dc0c352c584
+  row_count: 18
+  deduplicate_by: sequence
+  sha256: 856b50f61186102607e80503cf02473b3d849060c8a2871adc97645a090c1cff  # pragma: allowlist secret
+  authorization_state: candidate_review_only
+reference_native_dataset:
+  artifact_type: dataset
+  dataset_id: usr_promoter_references
+  ref: repo:src/dnadesign/usr/datasets/usr_promoter_references
+reference_core60_dataset:
+  artifact_type: dataset
+  dataset_id: construct_prom_eth_cip_reference_core60
+  ref: repo:src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_core60
+reference_context_dataset:
+  artifact_type: dataset
+  dataset_id: construct_prom_eth_cip_reference_contexts
+  ref: repo:src/dnadesign/usr/datasets/construct_prom_eth_cip_reference_contexts
+reference_feature_dataset:
+  artifact_type: dataset
+  dataset_id: infer_prom_eth_cip_reference_views_7b
+  ref: repo:src/dnadesign/usr/datasets/infer_prom_eth_cip_reference_views_7b
+latentdna_binding:
+  artifact_type: file
+  ref: repo:docs/studies/stress_ethanol_cipro_growth/contexts/latentdna/binding.yaml
+latentdna_workspace_snapshot:
+  artifact_type: file
+  ref: repo:src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
+infer_config_anchor_only_20b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_only.evo2_20b.yaml
+infer_config_anchor_plus_template_20b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.anchor_plus_template.evo2_20b.yaml
+infer_config_sequence_views_main_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.main.evo2_7b.yaml
+infer_config_sequence_views_reference_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference.evo2_7b.yaml
+infer_config_sequence_views_reference_analysis_window_core60_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml
+infer_config_sequence_views_reference_context_forward_seq_and_anchor_mean_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml
+infer_config_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml
+infer_config_sequence_views_anchor_construct_insert_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.anchor_construct_insert.evo2_7b.yaml
+infer_config_sequence_views_context_forward_seq_and_anchor_mean_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml
+infer_config_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b:
+  artifact_type: file
+  ref: repo:src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/portfolio/test_portfolio_workflow_hardening.py
 
 Focused hardening checks for Portfolio workflow boundaries.

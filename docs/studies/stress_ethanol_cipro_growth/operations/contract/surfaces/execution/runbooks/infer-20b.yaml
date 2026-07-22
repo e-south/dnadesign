@@ -1,0 +1,6 @@
+infer_batch_20b_anchor_only:
+  surface_type: runbook
+  runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml
+infer_batch_20b_anchor_plus_template:
+  surface_type: runbook
+  runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml

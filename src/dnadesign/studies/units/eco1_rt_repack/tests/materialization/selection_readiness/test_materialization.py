@@ -1,0 +1,163 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/tests/materialization/selection_readiness/test_materialization.py
+
+Panel-selection materialization tests for Eco1 RT repack.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+import yaml
+
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
+    cli as selection_readiness_cli,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness import (
+    materialize_selection_readiness,
+)
+from dnadesign.studies.units.eco1_rt_repack.operations.materialization.selection_readiness.sankey_plot import (
+    quantitative_flow,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness import (
+    _selection_manifest_assertions as manifest_assertions,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness import (
+    _selection_table_assertions as table_assertions,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._fixtures import (
+    write_inputs,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._handoff_fixture import (
+    candidate_handoff_payload,
+)
+from dnadesign.studies.units.eco1_rt_repack.tests.materialization.selection_readiness._source_basis_fixture import (
+    write_manual_mask_authority_source_basis,
+)
+
+
+def test_selection_readiness_writes_triage_and_selected_panel_without_synthesis_claims(tmp_path: Path) -> None:
+    repo_root = tmp_path
+    class_root = repo_root / "outputs/thread/design_classes"
+    selection_root = class_root / "selection"
+    source_root = repo_root / "outputs/thread"
+    inputs = write_inputs(class_root, source_root)
+    write_manual_mask_authority_source_basis(repo_root)
+    _write_handoff_fixture(source_root=source_root, selection_root=selection_root)
+    selection_root.mkdir(parents=True, exist_ok=True)
+    selection_root.joinpath("feasibility_report.parquet").write_text("retired\n", encoding="utf-8")
+
+    result = materialize_selection_readiness(
+        repo_root=repo_root,
+        output_root=class_root,
+        source_output_root=source_root,
+        selection_root=selection_root,
+        created_at="2026-07-02T00:00:00Z",
+    )
+
+    assert not hasattr(result, "feasibility_report_path")
+    assert not (selection_root / "feasibility_report.parquet").exists()
+    assert result.candidate_triage_table_path == selection_root / "candidate_triage_table.parquet"
+    assert result.local_structure_region_metrics_path == selection_root / "local_structure_region_metrics.parquet"
+    assert result.local_structure_threshold_sensitivity_path == (
+        selection_root / "local_structure_threshold_sensitivity.parquet"
+    )
+    assert result.region_msa_support_path == selection_root / "region_msa_support.parquet"
+    assert result.hypothesis_panel_selection_trace_path == selection_root / "hypothesis_panel_selection_trace.parquet"
+    assert result.candidate_selection_panel_path == selection_root / "candidate_selection_panel.parquet"
+    assert result.candidate_handoff_sequence_csv_path == selection_root / "candidate_handoff_sequences.csv"
+    assert result.plots_root == selection_root / "plots"
+    assert result.manifest_path == selection_root / "selection_readiness_manifest.yaml"
+
+    triage, panel = table_assertions.assert_materialized_selection_tables(result, inputs)
+    manifest = yaml.safe_load(result.manifest_path.read_text(encoding="utf-8"))
+    manifest_assertions.assert_materialized_selection_manifest(
+        result=result,
+        manifest=manifest,
+        triage=triage,
+        panel=panel,
+    )
+
+
+def test_selection_readiness_cli_reports_handoff_sequence_csv_path(tmp_path: Path, capsys) -> None:
+    repo_root = tmp_path
+    class_root = repo_root / "outputs/thread/design_classes"
+    selection_root = class_root / "selection"
+    source_root = repo_root / "outputs/thread"
+    write_inputs(class_root, source_root)
+
+    exit_code = selection_readiness_cli.main(
+        [
+            "--repo-root",
+            str(repo_root),
+            "--output-root",
+            str(class_root),
+            "--source-output-root",
+            str(source_root),
+            "--selection-root",
+            str(selection_root),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert "feasibility_report_path" not in payload
+    assert payload["candidate_handoff_sequence_csv_path"] == str(selection_root / "candidate_handoff_sequences.csv")
+    assert "near_region_charge_sensitivity_path" not in payload
+    assert "charge_sensitivity_shortlist_path" not in payload
+    assert Path(payload["candidate_handoff_sequence_csv_path"]).exists()
+
+
+def test_quantitative_flow_conserves_every_transition() -> None:
+    trace = [
+        {"stage_id": "candidate_pool", "input_count": 1007, "removed_count": 0, "remaining_count": 1007},
+        {"stage_id": "strong_fold_screen", "input_count": 1007, "removed_count": 29, "remaining_count": 978},
+        {"stage_id": "local_geometry_screen", "input_count": 978, "removed_count": 246, "remaining_count": 732},
+        {"stage_id": "design_groups", "input_count": 732, "removed_count": 0, "remaining_count": 732},
+        {
+            "stage_id": "selected_panel",
+            "input_count": 732,
+            "removed_count": 724,
+            "remaining_count": 8,
+        },
+    ]
+
+    stages, transitions = quantitative_flow(trace)
+
+    assert [stage.count for stage in stages] == [1007, 978, 732, 732, 8]
+    assert [transition.removed_count for transition in transitions] == [29, 246, 0, 724]
+    assert all(item.source_count == item.retained_count + item.removed_count for item in transitions)
+
+
+def test_quantitative_flow_rejects_discontinuous_trace() -> None:
+    trace = [
+        {"stage_id": "candidate_pool", "input_count": 10, "removed_count": 0, "remaining_count": 10},
+        {"stage_id": "strong_fold_screen", "input_count": 10, "removed_count": 1, "remaining_count": 9},
+        {"stage_id": "local_geometry_screen", "input_count": 8, "removed_count": 1, "remaining_count": 7},
+        {"stage_id": "design_groups", "input_count": 7, "removed_count": 0, "remaining_count": 7},
+        {
+            "stage_id": "selected_panel",
+            "input_count": 7,
+            "removed_count": 1,
+            "remaining_count": 6,
+        },
+    ]
+
+    with pytest.raises(ValueError, match="discontinuous"):
+        quantitative_flow(trace)
+
+
+def _write_handoff_fixture(*, source_root: Path, selection_root: Path) -> None:
+    root_handoff_path = source_root / "candidate_handoff.yaml"
+    root_handoff_path.write_text(yaml.safe_dump(candidate_handoff_payload(), sort_keys=False), encoding="utf-8")
+    selection_local_handoff_path = selection_root / "candidate_handoff.yaml"
+    selection_local_handoff_path.parent.mkdir(parents=True, exist_ok=True)
+    selection_local_handoff_path.write_text("handoff_kind: wrong_local_path\n", encoding="utf-8")

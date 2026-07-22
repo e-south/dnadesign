@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/cassette_solve_workflow.py
 
 Application orchestration for cassette solve/search workflows.

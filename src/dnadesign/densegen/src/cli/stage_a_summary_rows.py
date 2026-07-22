@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/src/cli/stage_a_summary_rows.py
+dnadesign
+src/dnadesign/densegen/src/cli/stage_a_summary_rows.py
 
 Build and format Stage-A sampling summary rows for CLI recaps.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

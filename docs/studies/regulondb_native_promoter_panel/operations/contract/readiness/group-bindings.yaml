@@ -1,0 +1,9 @@
+group_phase_bindings:
+  study_record: regulondb_source_inventory
+  cruncher_contract: regulondb_source_inventory
+  usr_import_contract: regulondb_source_inventory
+  usr_validation: metadata_overlay_validation
+  construct: core60_view_definition
+  infer: native_full_infer_7b
+  notify: native_full_infer_7b
+  latentdna: latentdna_native_audit

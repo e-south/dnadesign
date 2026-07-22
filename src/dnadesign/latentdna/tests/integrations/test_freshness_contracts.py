@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/integrations/test_freshness_contracts.py
+
 Freshness-aware contract tests for latentdna artifacts and deliverables.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

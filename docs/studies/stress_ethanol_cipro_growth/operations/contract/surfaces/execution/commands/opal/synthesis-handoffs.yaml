@@ -1,0 +1,40 @@
+opal_synthesis_handoff_source_evidence_preview_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff
+  - --handoff-id
+  - stress-opal-batch0-sfxi-v1
+  - --json
+opal_synthesis_handoff_round_preview_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff
+  - --handoff-id
+  - stress-opal-assay-b1-r0-msrb-v1
+  - --json
+opal_synthesis_handoff_round_draft_preview_json:
+  surface_type: command
+  writes_artifacts: false
+  argv:
+  - uv
+  - run
+  - python
+  - -m
+  - dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.synthesis_handoff
+  - --source
+  - opal-round
+  - --round
+  - <as_of_round>
+  - --run-id
+  - <run_id>
+  - --json

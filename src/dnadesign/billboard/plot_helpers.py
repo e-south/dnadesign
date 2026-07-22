@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-billboard/plot_helpers.py
+dnadesign
+src/dnadesign/billboard/plot_helpers.py
+
+Utility helpers for plot helpers billboard.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

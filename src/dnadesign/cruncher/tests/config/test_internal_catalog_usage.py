@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_internal_catalog_usage.py
 
 Guards internal app/cli code against using removed motif_store config aliases.

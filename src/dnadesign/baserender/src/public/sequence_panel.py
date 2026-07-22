@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/src/public/sequence_panel.py
+
 Public sequence-panel contract helpers for BaseRender.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -27,7 +34,7 @@ class SequencePanelConfig:
     renderer_name: str = "sequence_rows"
     alphabet: str = "DNA"
     target_width_px: int = 2200
-    target_height_px: int = 310
+    target_height_px: int = 430
     vertical_anchor: str = "center"
     canvas_top_pad_px: int = 0
 
@@ -46,6 +53,9 @@ class SequencePanelDiagnostics:
     legend_entries: tuple[str, ...]
     image_width_px: int
     image_height_px: int
+    strand_center_y_px: float
+    title: str | None
+    record_label: str | None
 
 
 @dataclass(frozen=True)
@@ -61,7 +71,7 @@ def _densegen_tfbs_adapter_defaults() -> tuple[dict[str, str], dict[str, object]
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
         },
-        {"on_invalid_row": "error", "require_non_empty": True},
+        {"on_invalid_row": "error", "require_non_empty": False},
     )
 
 
@@ -103,6 +113,7 @@ def _sequence_panel_profile_style_overrides(profile: str) -> dict[str, object]:
             "legend_mode": "bottom",
             "legend_height_px": 136.0,
             "legend_pad_px": 36.0,
+            "legend_content_gap_px": 18.0,
             "legend_patch_w": 88.0,
             "legend_patch_h": 34.0,
             "legend_font_size": 24,
@@ -118,6 +129,7 @@ def _sequence_panel_profile_style_overrides(profile: str) -> dict[str, object]:
             "span_link_line_width": 3.2,
             "span_link_tick_line_width": 2.8,
             "uniform_display_font_size": True,
+            "overlay_vertical_anchor": "content_top",
         }
     )
     return base
@@ -140,7 +152,7 @@ def sequence_panel_config_for_adapter(
     adapter_policies: Mapping[str, object] | None = None,
     style_overrides: Mapping[str, object] | None = None,
     target_width_px: int = 2200,
-    target_height_px: int = 310,
+    target_height_px: int = 430,
     vertical_anchor: str = "center",
     canvas_top_pad_px: int = 0,
 ) -> SequencePanelConfig:

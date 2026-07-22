@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/bundle_models.py
 
 Bundle, inventory, and summary models for YIU v4 publication.

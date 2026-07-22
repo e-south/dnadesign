@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_adaptive_controllers.py
 
-Validates adaptive controller behavior for move weights, proposal sizes, and
-per-pair PT swap ladder shaping.
+Validates adaptive controller behavior for move weights, proposal sizes, and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

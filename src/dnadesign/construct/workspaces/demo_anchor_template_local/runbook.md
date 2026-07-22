@@ -96,6 +96,6 @@ uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview
 
 Construct does not define its own remote-sync contract. For BU SCC and other remote USR workflows, use the USR operations docs:
 
-- [USR workflow map](../../../usr/docs/operations/workflow-map.md)
-- [USR HPC sync flow](../../../usr/docs/operations/hpc-agent-sync-flow.md)
-- [USR sync command contract](../../../usr/docs/operations/sync.md)
+- [USR workflow map](../../../usr/docs/operations/routes/workflow-map.md)
+- [USR HPC sync flow](../../../usr/docs/operations/sync/hpc-agent-flow.md)
+- [USR sync command contract](../../../usr/docs/operations/sync/README.md)

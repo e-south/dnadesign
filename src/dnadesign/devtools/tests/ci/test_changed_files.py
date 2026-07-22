@@ -50,6 +50,34 @@ def _create_repo_with_feature_change(tmp_path: Path) -> tuple[Path, str]:
     return repo_root, head_sha
 
 
+def _create_single_branch_feature_clone(tmp_path: Path) -> tuple[Path, str]:
+    remote_root = tmp_path / "remote.git"
+    seed_root = tmp_path / "seed"
+    checkout_root = tmp_path / "checkout"
+
+    _run_git(tmp_path, "init", "--bare", str(remote_root))
+    seed_root.mkdir(parents=True, exist_ok=True)
+    _run_git(seed_root, "init", "-b", "main")
+    _run_git(seed_root, "config", "user.email", "test@example.com")
+    _run_git(seed_root, "config", "user.name", "Test User")
+
+    (seed_root / "README.md").write_text("base\n", encoding="utf-8")
+    _run_git(seed_root, "add", "README.md")
+    _run_git(seed_root, "commit", "-m", "base commit")
+    _run_git(seed_root, "remote", "add", "origin", str(remote_root))
+    _run_git(seed_root, "push", "-u", "origin", "main")
+
+    _run_git(seed_root, "switch", "-c", "feature")
+    (seed_root / "README.md").write_text("base\nfeature\n", encoding="utf-8")
+    _run_git(seed_root, "add", "README.md")
+    _run_git(seed_root, "commit", "-m", "feature commit")
+    _run_git(seed_root, "push", "-u", "origin", "feature")
+
+    _run_git(tmp_path, "clone", "--single-branch", "--branch", "feature", str(remote_root), str(checkout_root))
+    head_sha = _run_git(checkout_root, "rev-parse", "HEAD")
+    return checkout_root, head_sha
+
+
 def test_collect_changed_files_returns_empty_for_non_pr(tmp_path: Path) -> None:
     repo_root, head_sha = _create_repo_with_feature_change(tmp_path)
 
@@ -74,6 +102,21 @@ def test_collect_changed_files_returns_pr_diff(tmp_path: Path) -> None:
     )
 
     assert files == ["README.md"]
+
+
+def test_collect_changed_files_fetches_missing_base_into_tracking_ref(tmp_path: Path) -> None:
+    repo_root, head_sha = _create_single_branch_feature_clone(tmp_path)
+    assert "origin/main" not in _run_git(repo_root, "branch", "--remotes").splitlines()
+
+    files = collect_changed_files(
+        event_name="pull_request",
+        repo_root=repo_root,
+        base_ref="main",
+        head_sha=head_sha,
+    )
+
+    assert files == ["README.md"]
+    assert _run_git(repo_root, "rev-parse", "--verify", "origin/main")
 
 
 def test_collect_changed_files_uses_existing_tracking_ref_without_fetch(tmp_path: Path) -> None:

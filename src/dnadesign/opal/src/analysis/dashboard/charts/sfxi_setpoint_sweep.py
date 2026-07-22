@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/charts/sfxi_setpoint_sweep.py
 
 Setpoint sweep heatmap for SFXI diagnostics.
@@ -16,7 +16,13 @@ from typing import Sequence
 import numpy as np
 import polars as pl
 
-from ....plots._mpl_utils import apply_plot_style
+from ....plots._mpl_utils import (
+    add_flush_colorbar,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    pretty_label,
+    sequential_colormap,
+)
 from ...sfxi.setpoint_sweep import format_setpoint_label
 from .diagnostics_style import DNAD_DIAGNOSTICS_PLOT_SIZE
 
@@ -55,22 +61,36 @@ def make_setpoint_sweep_figure(
     apply_plot_style()
     import matplotlib.pyplot as plt
 
-    n_cols = len(setpoint_labels)
-    n_rows = len(metrics)
-    cell = float(DNAD_DIAGNOSTICS_PLOT_SIZE) * 0.22
-    width = max(float(DNAD_DIAGNOSTICS_PLOT_SIZE) * 1.2, cell * max(n_cols, 1))
-    height = max(float(DNAD_DIAGNOSTICS_PLOT_SIZE) * 1.2, cell * max(n_rows, 1))
-    fig, ax = plt.subplots(figsize=(width, height), constrained_layout=True)
+    cell = 0.38
+    fig_w = max(float(DNAD_DIAGNOSTICS_PLOT_SIZE), len(setpoint_labels) * cell + 2.2)
+    fig_h = max(3.4, len(metrics) * cell + 2.2)
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     mask = np.ma.masked_invalid(values)
-    cmap = plt.cm.viridis.copy()
-    cmap.set_bad(color="#DDDDDD")
-    im = ax.imshow(mask, aspect="equal", cmap=cmap)
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cmap = sequential_colormap("opal_seafoam")
+    x_edges = np.arange(len(setpoint_labels) + 1)
+    y_edges = np.arange(len(metrics) + 1)
+    im = ax.pcolormesh(
+        x_edges,
+        y_edges,
+        mask,
+        cmap=cmap,
+        vmin=0.0,
+        vmax=1.0,
+        edgecolors="white",
+        linewidth=0.8,
+        shading="flat",
+    )
+    ax.set_xlim(0, len(setpoint_labels))
+    ax.set_ylim(len(metrics), 0)
+    ax.set_aspect("equal", adjustable="box")
+    apply_notebook_axes_style(ax, grid=False, square=False)
+    cbar = add_flush_colorbar(fig, ax, im)
+    cbar.ax.set_title("Metric value", fontsize=11, pad=8)
 
-    ax.set_xticks(np.arange(len(setpoint_labels)))
-    ax.set_yticks(np.arange(len(metrics)))
-    ax.set_xticklabels([str(s) for s in setpoint_labels], rotation=45, ha="right", fontsize=8)
-    ax.set_yticklabels([str(m).replace("_", " ") for m in metrics], fontsize=9)
+    ax.set_xticks(np.arange(len(setpoint_labels)) + 0.5)
+    ax.set_yticks(np.arange(len(metrics)) + 0.5)
+    ax.set_xticklabels([str(s) for s in setpoint_labels], rotation=45, ha="right", fontsize=9)
+    ax.set_yticklabels([_metric_tick_label(m) for m in metrics])
 
     show_text = len(setpoint_labels) <= 16 and len(metrics) <= 6
     if show_text:
@@ -81,10 +101,18 @@ def make_setpoint_sweep_figure(
                     label = "NA"
                 else:
                     label = f"{val:.3f}"
-                ax.text(j, i, label, ha="center", va="center", fontsize=7, color="black")
+                ax.text(j + 0.5, i + 0.5, label, ha="center", va="center", fontsize=7, color="black")
 
-    if subtitle:
-        ax.set_title(f"{title}\n{subtitle}")
-    else:
-        ax.set_title(title)
+    rendered_title = f"{title}\n{subtitle}" if subtitle else title
+    ax.set_title(rendered_title, pad=10, fontsize=15, linespacing=1.2)
+    fig.subplots_adjust(left=0.22, right=0.82, bottom=0.30, top=0.82)
     return fig
+
+
+def _metric_tick_label(metric: str) -> str:
+    labels = {
+        "logic_fidelity": r"Logic fidelity ($F_{\ell}$)",
+        "effect_scaled": r"Scaled effect ($E_{\mathrm{scaled}}$)",
+        "score": r"Score ($S$)",
+    }
+    return labels.get(str(metric), pretty_label(metric))

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/study/identity.py
 
 Deterministic Study identity helpers shared across workflows.

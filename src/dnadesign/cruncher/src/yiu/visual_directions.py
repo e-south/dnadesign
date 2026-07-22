@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/visual_directions.py
 
 Named direction deltas for the producer-owned YIU bench-strip visual system.

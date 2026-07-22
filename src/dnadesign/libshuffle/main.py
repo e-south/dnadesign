@@ -1,10 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-libshuffle/main.py
+dnadesign
+src/dnadesign/libshuffle/main.py
+
+CLI entrypoint for libshuffle.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

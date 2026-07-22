@@ -5,8 +5,6 @@ src/dnadesign/densegen/tests/pwm/test_pwm_other_sources.py
 
 PWM sampling tests for JASPAR and matrix CSV sources.
 
-Dunlop Lab.
-
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/export.py
 
 Export sequence-centric sample-run artifacts for downstream consumption.

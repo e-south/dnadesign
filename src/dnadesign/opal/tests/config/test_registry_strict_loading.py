@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/config/test_registry_strict_loading.py
+
+Regression tests for registry strict loading OPAL config.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py
+
+Regression tests for CLI predict yops inversion OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

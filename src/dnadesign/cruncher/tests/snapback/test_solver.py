@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/snapback/test_solver.py
 
 Bounded solve tests for v3 co-design snapback workflows.

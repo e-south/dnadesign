@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/pwm/test_pwm_progress.py
 
 Stage-A PWM progress formatting and stdout filtering.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

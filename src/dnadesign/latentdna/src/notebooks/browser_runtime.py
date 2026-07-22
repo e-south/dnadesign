@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime.py
+
 Browser runtime assembly for generated latentdna marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -14,7 +21,6 @@ from types import ModuleType
 import marimo as mo
 import pandas as pd
 
-from ..labels import humanize_plot_title
 from ..plots.recipes import resolve_plot_spec
 from ..studies.docs_refs import read_docs_ref
 from ..workspaces.loader import load_workspace_config
@@ -24,10 +30,12 @@ from .browser_runtime_compare import (
     render_distance_correlation,
     render_rowwise_distribution,
 )
+from .browser_runtime_docs import _humanize_plot_id, _parse_deliverable_markdown, resolve_plot_doc_block
 from .browser_runtime_plot_review import load_plot_review_frames, render_plot_review_surface
 from .browser_runtime_projection import enrich_projection_frame, load_projection_frame, render_projection_grid
 from .browser_runtime_support import (
     available_hues_for_frames,
+    available_reference_hues_for_frames,
     candidate_hue_columns,
     category_color_map,
     display_hue_label,
@@ -44,6 +52,7 @@ from .browser_runtime_support import (
     reference_annotation_mode_options,
     reference_label_limit_for_annotation_mode,
     resolve_labeled_option_card,
+    resolve_reference_annotation,
     style_notebook_axes,
     table_from_records,
     unique_in_order,
@@ -54,11 +63,6 @@ __all__ = ["build_workspace_browser_runtime", "load_workspace_notebook_controls"
 
 
 _ALLOWED_RUNTIME_HUE_KINDS = {"categorical", "binary", "continuous", "ordinal"}
-_REFERENCE_HUE_OPTIONS = {
-    "Black stars": "",
-    "Reference strength": "promoter_standard__strength_value_numeric",
-    "SFXI metric": "sfxi_ref__metric_value",
-}
 _PLOT_REVIEW_LIVE_RENDER_KINDS = {
     "projection_grid",
     "xy_scatter_grid",
@@ -124,7 +128,9 @@ class BrowserGeometry:
     reference_annotation_default: str
     reference_annotation_options: dict[str, str]
     reference_hue_columns: list[str]
+    reference_hue_kinds: dict[str, str]
     reference_hue_options: dict[str, str]
+    reference_hue_options_by_reference_set: dict[str, dict[str, str]]
     reference_labels: list[str]
     reference_required_columns: list[str]
     reference_sets: list[dict[str, object]]
@@ -141,6 +147,7 @@ class BrowserPlotReview:
 @dataclass(frozen=True)
 class BrowserSupport:
     available_hues_for_frames: Callable[..., list[str]]
+    available_reference_hues_for_frames: Callable[..., list[str]]
     candidate_hue_columns: Callable[[pd.DataFrame, list[str], set[str] | None], list[str]]
     category_color_map: Callable[[list[str]], dict[str, str]]
     display_hue_label: Callable[[str], str]
@@ -158,6 +165,7 @@ class BrowserSupport:
     reference_label_limit_for_annotation_mode: Callable[[str | None], int | None]
     render_math_markdown: Callable[[str], object]
     resolve_labeled_option_card: Callable[..., dict[str, object] | None]
+    resolve_reference_annotation: Callable[..., dict[str, object]]
     select_plot_render_path: Callable[[list[Path]], Path | None]
     style_notebook_axes: Callable[..., None]
     table_from_records: Callable[..., object]
@@ -185,10 +193,6 @@ class WorkspaceBrowserRuntime:
     plot_review: BrowserPlotReview
     renderers: BrowserRenderers
     support: BrowserSupport
-
-
-def _humanize_plot_id(plot_id: str) -> str:
-    return humanize_plot_title(plot_id)
 
 
 def _resolved_plot_semantics_payload(
@@ -225,6 +229,17 @@ def _runtime_hue_columns(
     )
     hue_kinds = resolve_runtime_hue_kinds(ordered_candidates, configured_hue_kinds)
     return [column for column in ordered_candidates if column in hue_kinds], hue_kinds
+
+
+def resolve_runtime_hue_kinds(
+    global_hue_columns: list[str],
+    configured_hue_kinds: dict[str, object],
+) -> dict[str, str]:
+    return {
+        column: str(configured_hue_kinds.get(column))
+        for column in global_hue_columns
+        if str(configured_hue_kinds.get(column)) in _ALLOWED_RUNTIME_HUE_KINDS
+    }
 
 
 def _candidate_inventory_from_control_plane(
@@ -318,6 +333,76 @@ def _reference_required_columns(reference_sets: list[dict[str, object]]) -> list
     return columns
 
 
+def _reference_hue_option_rows(geometry_control: dict[str, object]) -> list[dict[str, object]]:
+    configured = geometry_control.get("reference_hue_options", [])
+    rows: list[dict[str, object]] = []
+    if isinstance(configured, list):
+        for row in configured:
+            if isinstance(row, dict):
+                rows.append(row)
+    if rows:
+        return rows
+    return []
+
+
+def _reference_hue_options(geometry_control: dict[str, object]) -> dict[str, str]:
+    configured = _reference_hue_option_rows(geometry_control)
+    options = {"Single-color markers": ""}
+    for row in configured:
+        column = str(row.get("column") or "").strip()
+        label = str(row.get("label") or "").strip()
+        if not column:
+            continue
+        if not label:
+            label = display_hue_label(column)
+        if label in options and options[label] != column:
+            label = f"{label} [{column}]"
+        options[label] = column
+    return options
+
+
+def _reference_hue_kinds(geometry_control: dict[str, object]) -> dict[str, str]:
+    kinds: dict[str, str] = {}
+    for row in _reference_hue_option_rows(geometry_control):
+        column = str(row.get("column") or "").strip()
+        kind = str(row.get("type") or "continuous").strip()
+        if column and kind:
+            kinds[column] = kind
+    return kinds
+
+
+def _reference_hue_options_by_reference_set(
+    geometry_control: dict[str, object],
+    reference_sets: list[dict[str, object]],
+) -> dict[str, dict[str, str]]:
+    configured = geometry_control.get("reference_hue_options_by_reference_set", {})
+    options_by_reference_set: dict[str, dict[str, str]] = {}
+    if isinstance(configured, dict):
+        for reference_set_id, rows in configured.items():
+            reference_options = {"Single-color markers": ""}
+            if isinstance(rows, list):
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    column = str(row.get("column") or "").strip()
+                    if not column:
+                        continue
+                    label = str(row.get("label") or "").strip() or display_hue_label(column)
+                    if label in reference_options and reference_options[label] != column:
+                        label = f"{label} [{column}]"
+                    reference_options[label] = column
+            options_by_reference_set[str(reference_set_id)] = reference_options
+    if options_by_reference_set:
+        return options_by_reference_set
+
+    all_options = _reference_hue_options(geometry_control)
+    return {
+        str(row.get("reference_set_id")): dict(all_options)
+        for row in reference_sets
+        if str(row.get("reference_set_id") or "").strip()
+    }
+
+
 def _live_plot_status_rows(catalog_plots: list[dict[str, object]] | None) -> dict[str, dict[str, object]]:
     return {
         str(row.get("plot_id")): row for row in (catalog_plots or []) if isinstance(row, dict) and row.get("plot_id")
@@ -344,133 +429,6 @@ def _resolve_plot_review_render_mode(
     if kind == "projection_grid":
         return _projection_grid_render_mode(output_root=output_root, plot_spec=plot_spec)
     return True, None
-
-
-def _markdown_heading_level(line: str) -> int | None:
-    hash_count = len(line) - len(line.lstrip("#"))
-    if hash_count == 0 or hash_count > 6:
-        return None
-    if len(line) <= hash_count or line[hash_count] != " ":
-        return None
-    return hash_count
-
-
-def _next_heading_at_or_above(lines: list[str], start: int, level: int) -> int:
-    for index in range(start + 1, len(lines)):
-        heading_level = _markdown_heading_level(lines[index])
-        if heading_level is not None and heading_level <= level:
-            return index
-    return len(lines)
-
-
-def _parse_deliverable_markdown(markdown: str) -> dict[str, object]:
-    lines = markdown.splitlines()
-    summary_lines: list[str] = []
-    plot_sections: dict[str, dict[str, str]] = {}
-
-    first_h1 = next((index for index, line in enumerate(lines) if line.startswith("# ")), None)
-    if first_h1 is not None:
-        index = first_h1 + 1
-        while index < len(lines):
-            line = lines[index]
-            heading_level = _markdown_heading_level(line)
-            if heading_level is not None and heading_level <= 2:
-                break
-            summary_lines.append(line)
-            index += 1
-
-    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 3]
-    for start in heading_indices:
-        end = _next_heading_at_or_above(lines, start, 3)
-        heading = lines[start][4:].strip()
-        if "|" not in heading:
-            continue
-        plot_id_text, title_text = (part.strip() for part in heading.split("|", 1))
-        plot_sections[plot_id_text] = {
-            "title": title_text,
-            "markdown": "\n".join(lines[start + 1 : end]).strip(),
-        }
-
-    return {
-        "summary_markdown": "\n".join(summary_lines).strip(),
-        "plot_sections": plot_sections,
-    }
-
-
-def _extract_plot_details(markdown: str) -> str:
-    lines = markdown.splitlines()
-    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 4]
-    if not heading_indices:
-        return ""
-
-    for start in heading_indices:
-        end = _next_heading_at_or_above(lines, start, 4)
-        title = lines[start][5:].strip()
-        if title.casefold() != "plot details":
-            continue
-        return "\n".join(lines[start + 1 : end]).strip()
-    return ""
-
-
-def _strip_plot_details(markdown: str) -> str:
-    lines = markdown.splitlines()
-    heading_indices = [index for index, line in enumerate(lines) if _markdown_heading_level(line) == 4]
-    if not heading_indices:
-        return markdown.strip()
-
-    kept_blocks: list[str] = []
-    cursor = 0
-    for start in heading_indices:
-        end = _next_heading_at_or_above(lines, start, 4)
-        if cursor < start:
-            kept_blocks.append("\n".join(lines[cursor:start]).strip())
-        title = lines[start][5:].strip()
-        if title.casefold() != "plot details":
-            kept_blocks.append("\n".join(lines[start:end]).strip())
-        cursor = end
-    if cursor < len(lines):
-        kept_blocks.append("\n".join(lines[cursor:]).strip())
-    return "\n\n".join(block for block in kept_blocks if block).strip()
-
-
-def resolve_plot_doc_block(
-    *,
-    plot_id: str,
-    deliverable_summary: str,
-    parsed_markdown: dict[str, object] | None,
-) -> dict[str, object]:
-    plot_sections = parsed_markdown.get("plot_sections", {}) if isinstance(parsed_markdown, dict) else {}
-    summary_markdown = (
-        str(parsed_markdown.get("summary_markdown") or "").strip() if isinstance(parsed_markdown, dict) else ""
-    )
-    plot_entry = plot_sections.get(plot_id) if isinstance(plot_sections, dict) else None
-    if isinstance(plot_entry, dict):
-        markdown = str(plot_entry.get("markdown") or "").strip()
-        plot_details_md = _extract_plot_details(markdown)
-        return {
-            "title": str(plot_entry.get("title") or _humanize_plot_id(plot_id)),
-            "markdown": _strip_plot_details(markdown),
-            "plot_details_md": plot_details_md,
-            "warning": None,
-        }
-    fallback_markdown = summary_markdown or deliverable_summary.strip()
-    return {
-        "title": _humanize_plot_id(plot_id),
-        "markdown": fallback_markdown,
-        "plot_details_md": "",
-        "warning": f"Missing plot-specific study-doc subsection for `{plot_id}`.",
-    }
-
-
-def resolve_runtime_hue_kinds(
-    global_hue_columns: list[str],
-    configured_hue_kinds: dict[str, object],
-) -> dict[str, str]:
-    return {
-        column: str(configured_hue_kinds.get(column))
-        for column in global_hue_columns
-        if str(configured_hue_kinds.get(column)) in _ALLOWED_RUNTIME_HUE_KINDS
-    }
 
 
 def _resolve_review_plot_spec(context, *, plot_id: str):
@@ -740,7 +698,12 @@ def build_workspace_browser_runtime(
         if configured_default_reference_set in set(reference_annotation_options.values())
         else ""
     )
-    reference_hue_options = dict(_REFERENCE_HUE_OPTIONS)
+    reference_hue_options = _reference_hue_options(geometry_control)
+    reference_hue_options_by_reference_set = _reference_hue_options_by_reference_set(
+        geometry_control,
+        reference_sets,
+    )
+    reference_hue_kinds = _reference_hue_kinds(geometry_control)
     reference_hue_columns = [value for value in reference_hue_options.values() if value]
     reference_required_columns = list(
         dict.fromkeys([*_reference_required_columns(reference_sets), *reference_hue_columns])
@@ -847,7 +810,9 @@ def build_workspace_browser_runtime(
             reference_annotation_default=reference_annotation_default,
             reference_annotation_options=reference_annotation_options,
             reference_hue_columns=reference_hue_columns,
+            reference_hue_kinds=reference_hue_kinds,
             reference_hue_options=reference_hue_options,
+            reference_hue_options_by_reference_set=reference_hue_options_by_reference_set,
             reference_labels=reference_labels,
             reference_required_columns=reference_required_columns,
             reference_sets=reference_sets,
@@ -856,6 +821,7 @@ def build_workspace_browser_runtime(
         plot_review=plot_review,
         support=BrowserSupport(
             available_hues_for_frames=available_hues_for_frames,
+            available_reference_hues_for_frames=available_reference_hues_for_frames,
             candidate_hue_columns=candidate_hue_columns,
             category_color_map=partial(category_color_map, axis_styles=axis_styles),
             display_hue_label=partial(display_hue_label, axis_styles=axis_styles),
@@ -873,6 +839,7 @@ def build_workspace_browser_runtime(
             reference_label_limit_for_annotation_mode=reference_label_limit_for_annotation_mode,
             render_math_markdown=render_math_markdown,
             resolve_labeled_option_card=resolve_labeled_option_card,
+            resolve_reference_annotation=resolve_reference_annotation,
             select_plot_render_path=select_plot_render_path,
             style_notebook_axes=style_notebook_axes,
             table_from_records=table_from_records,

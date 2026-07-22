@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/sampler.py
+dnadesign
+src/dnadesign/densegen/src/core/sampler.py
 
 Binding-site sampling utilities for DenseGen.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

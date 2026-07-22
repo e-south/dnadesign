@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_ledger_compact.py
+
+Regression tests for CLI ledger compact OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

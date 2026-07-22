@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/fold_change_vs_logic_fidelity.py
 
-Plots effect vs logic fidelity diagnostics for SFXI predictions. Consumes
-ledger predictions with setpoint joins from run metadata.
+Plots effect vs logic fidelity diagnostics for SFXI predictions. Consumes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,14 +15,31 @@ from typing import List
 
 from ..registries.plots import PlotMeta, register_plot
 from ..storage.parquet_io import read_parquet_df
+from ._cohort_utils import selected_mask
 from ._events_util import load_events_with_setpoint, resolve_outputs_dir
 from ._mpl_utils import (
+    DEFAULT_SQUARE_FIGSIZE,
+    add_flush_colorbar,
     annotate_plot_meta,
+    apply_notebook_axes_style,
+    apply_plot_style,
+    categorical_color,
+    categorical_marker,
     ensure_mpl_config_dir,
+    legend_below_single_row,
+    math_label,
+    pretty_label,
+    save_notebook_square_figure,
     scale_to_sizes,
     scatter_smart,
 )
 from ._param_utils import event_columns_for, get_float, get_str, normalize_metric_field
+from .sfxi_reference_overlay import (
+    load_sfxi_reference_overlay,
+    reference_label_values,
+    reference_y_values,
+    sfxi_reference_overlay_enabled,
+)
 
 
 @register_plot(
@@ -35,15 +51,32 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
             "hue_field": "Optional obj__/pred__/sel__ or records.<col> for color.",
             "size_by": "Optional obj__/pred__/sel__ field for size.",
             "alpha": "Point alpha (default 0.40).",
+            "reference_overlay": "Overlay validated records-table sfxi_ref points (default false).",
+            "reference_collection_id": "Optional sfxi_ref collection filter.",
+            "reference_metric_id": "Optional sfxi_ref metric filter.",
+            "reference_y_axis": "Optional reference y metric when y_axis is not directly supported.",
+            "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
         requires=[
             "as_of_round",
             "run_id",
             "pred__y_hat_model",
-            "pred__score_selected",
+            "view__selection_score",
             "obj__diag__setpoint",
         ],
         notes=["Reads outputs/ledger/predictions + outputs/ledger/runs.parquet (setpoint join)."],
+        data_shape="objective component scatter",
+        tidy_schema=["obj__logic_fidelity"],
+        objective_family="sfxi",
+        data_layer="predictions_objective",
+        round_scope="single_or_round_history",
+        failure_modes=[
+            "missing prediction or setpoint columns",
+            "y-axis/hue/size fields are nonnumeric",
+            "records metadata hue column missing",
+            "reference overlay columns are absent or fail OPAL SFXI API validation",
+            "no rows match the requested round/run scope",
+        ],
     ),
 )
 def render(context, params: dict) -> None:
@@ -52,6 +85,7 @@ def render(context, params: dict) -> None:
     import numpy as np
     import pandas as pd
 
+    apply_plot_style()
     outputs_dir = resolve_outputs_dir(context)
 
     delta = get_float(params, ["intensity_log2_offset_delta"], 0.0)
@@ -89,8 +123,9 @@ def render(context, params: dict) -> None:
                 raise ValueError("Categorical hue requested but no records column provided.")
     # Colormaps: keep 'cmap' for continuous; allow 'hue_cmap' for categoricals (default tab10)
     cmap = get_str(params, ["cmap"], "viridis")
-    hue_cmap = get_str(params, ["hue_cmap"], "tab10")
+    hue_cmap = get_str(params, ["hue_cmap"], "okabe_ito")
     cbar = bool(params.get("cbar", True))  # ignored for categorical hue
+    show_meta = bool(params.get("show_meta", False))
     # Selected-point styling (shape override instead of overlay)
     selected_marker = get_str(params, ["selected_marker"], "*")
     selected_size_scale = get_float(params, ["selected_size_scale"], 1.0)
@@ -127,15 +162,21 @@ def render(context, params: dict) -> None:
         "run_id",
         "id",
         "pred__y_hat_model",
-        "sel__is_selected",
-        "pred__score_selected",
+        "view__is_selected",
+        "view__selection_score",
     }
     # If hue/size ask for objective/pred/sel columns, load them from predictions
     need |= event_columns_for(hue_field, size_by)
     # If hue/size/y ask for objective/pred/sel columns, load them from predictions
     # (fold_change is derived locally and won't be added here)
     need |= event_columns_for(hue_field, size_by, y_axis_field)
-    df = load_events_with_setpoint(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
+    df = load_events_with_setpoint(
+        outputs_dir,
+        need,
+        round_selector=context.rounds,
+        selection_view_id=context.selection_view_id,
+        run_id=context.run_id,
+    )
 
     # Round selection: single round (default latest)
     rsel = context.rounds
@@ -188,8 +229,11 @@ def render(context, params: dict) -> None:
 
         # Build palette: if user supplies a partial hue_palette, fill the rest from a discrete cmap deterministically.
         user_palette = params.get("hue_palette") or {}
-        cm = plt.cm.get_cmap(hue_cmap, max(1, len(hue_order)))
-        color_map = {c: cm(i) for i, c in enumerate(hue_order)}
+        if str(hue_cmap).strip().lower().replace("-", "_") in {"okabe_ito", "okabeito", "colorblind", "opal"}:
+            color_map = {c: categorical_color(i) for i, c in enumerate(hue_order)}
+        else:
+            cm = plt.cm.get_cmap(hue_cmap, max(1, len(hue_order)))
+            color_map = {c: cm(i) for i, c in enumerate(hue_order)}
         # Ensure '(missing)' is readable, unless explicitly overridden by user
         if "(missing)" in hue_order and "(missing)" not in user_palette:
             color_map["(missing)"] = (0.6, 0.6, 0.6, 1.0)
@@ -205,8 +249,6 @@ def render(context, params: dict) -> None:
                 "fold_change_vs_logic_fidelity: category-to-color mapping incomplete. "
                 f"Missing colors for: {missing_cats}. Check hue_order / hue_palette."
             )
-        # Numpy object array plays well with boolean masks later
-        colors_all = np.array(mapped.tolist(), dtype=object)
 
     # Split logic (0:4) and intensity (4:8)
     def _split(a):
@@ -243,37 +285,27 @@ def render(context, params: dict) -> None:
         if "obj__effect_raw" not in df.columns:
             raise ValueError("Requested y_axis=effect_raw but obj__effect_raw is missing.")
         y_plot = df["obj__effect_raw"].astype(float).to_numpy()
-        y_field_label = "Objective effect (raw)"
+        y_field_label = math_label("effect_raw")
         y_title_short = "Effect (raw)"
         tidy_col = "obj__effect_raw"
     elif _ya in ("effect_scaled", "obj__effect_scaled"):
         if "obj__effect_scaled" not in df.columns:
             raise ValueError("Requested y_axis=effect_scaled but obj__effect_scaled is missing.")
         y_plot = df["obj__effect_scaled"].astype(float).to_numpy()
-        y_field_label = "Objective effect (scaled)"
+        y_field_label = math_label("effect_scaled")
         y_title_short = "Effect (scaled)"
         tidy_col = "obj__effect_scaled"
-    elif _ya in ("score", "pred__score_selected"):
-        y_plot = df["pred__score_selected"].astype(float).to_numpy()
-        y_field_label = "Objective score"
+    elif _ya in ("score", "view__selection_score"):
+        y_plot = df["view__selection_score"].astype(float).to_numpy()
+        y_field_label = math_label("objective_score")
         y_title_short = "Score"
-        tidy_col = "pred__score_selected"
+        tidy_col = "view__selection_score"
     else:
         raise ValueError(f"Unknown y_axis: {y_axis!r}")
 
-    # Simple in-house styling (no seaborn dependency)
-    plt.rcParams.update(
-        {
-            "axes.titlesize": 18,
-            "axes.labelsize": 16,
-            "xtick.labelsize": 14,
-            "ytick.labelsize": 14,
-        }
-    )
-    figsize = tuple(params.get("figsize_in", (7.8, 5.2)))
-    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
+    figsize = tuple(params.get("figsize_in", DEFAULT_SQUARE_FIGSIZE))
+    fig, ax = plt.subplots(figsize=figsize)
+    apply_notebook_axes_style(ax, square=True)
 
     # Point sizes (optional) — can use derived series
     if size_by is None:
@@ -311,62 +343,96 @@ def render(context, params: dict) -> None:
 
     # Selection mask (if present)
     sel_mask = (
-        df["sel__is_selected"].fillna(False).astype(bool).to_numpy()
-        if "sel__is_selected" in df.columns
+        selected_mask(df["view__is_selected"], allow_null_false=True).to_numpy()
+        if "view__is_selected" in df.columns
         else np.zeros(lf.shape[0], dtype=bool)
     )
     not_sel = ~sel_mask
 
-    # Draw NON-selected first (base layer)
-    base_sizes = sizes if np.isscalar(sizes) else (sizes[not_sel])
-    base_color_kw = {}
     if hue_is_categorical:
-        base_color_kw = {"c": colors_all[not_sel]}
-    elif hue_vals_all is not None:
-        base_color_kw = {"c": hue_vals_all[not_sel], "cmap": cmap}
-        if vmin is not None and vmax is not None:
-            base_color_kw.update({"vmin": vmin, "vmax": vmax})
-    scatter_smart(
-        ax,
-        lf[not_sel],
-        y_plot[not_sel],
-        s=base_sizes,
-        alpha=alpha,
-        rasterize_at=rasterize_at,
-        **base_color_kw,
-    )
+        cat_values = cat_series.to_numpy(dtype=object)
+        for cat_index, category in enumerate(hue_order):
+            mask = not_sel & (cat_values == category)
+            if not np.any(mask):
+                continue
+            scatter_smart(
+                ax,
+                lf[mask],
+                y_plot[mask],
+                s=(sizes if np.isscalar(sizes) else sizes[mask]),
+                alpha=alpha,
+                marker=categorical_marker(cat_index),
+                c=color_map[category],
+                rasterize_at=rasterize_at,
+            )
+    else:
+        # Draw NON-selected first (base layer)
+        base_sizes = sizes if np.isscalar(sizes) else (sizes[not_sel])
+        base_color_kw = {}
+        if hue_vals_all is not None:
+            base_color_kw = {"c": hue_vals_all[not_sel], "cmap": cmap}
+            if vmin is not None and vmax is not None:
+                base_color_kw.update({"vmin": vmin, "vmax": vmax})
+        scatter_smart(
+            ax,
+            lf[not_sel],
+            y_plot[not_sel],
+            s=base_sizes,
+            alpha=alpha,
+            rasterize_at=rasterize_at,
+            **base_color_kw,
+        )
 
     # Draw SELECTED as a different marker (override, not overlay)
     if sel_mask.any():
         sel_sizes = sizes if np.isscalar(sizes) else (sizes[sel_mask] * float(selected_size_scale))
-        sel_color_kw = {}
         if hue_is_categorical:
-            sel_color_kw = {"c": colors_all[sel_mask]}
-        elif hue_vals_all is not None:
-            sel_color_kw = {"c": hue_vals_all[sel_mask], "cmap": cmap}
-            if vmin is not None and vmax is not None:
-                sel_color_kw.update({"vmin": vmin, "vmax": vmax})
-        scatter_smart(
-            ax,
-            lf[sel_mask],
-            y_plot[sel_mask],
-            s=sel_sizes,
-            alpha=selected_alpha,
-            marker=selected_marker,
-            edgecolors=(selected_edgecolor if selected_edgecolor else "none"),
-            linewidths=0.6 if selected_edgecolor else 0.0,
-            rasterize_at=rasterize_at,
-            **sel_color_kw,
-        )
+            cat_values = cat_series.to_numpy(dtype=object)
+            for cat_index, category in enumerate(hue_order):
+                mask = sel_mask & (cat_values == category)
+                if not np.any(mask):
+                    continue
+                scatter_smart(
+                    ax,
+                    lf[mask],
+                    y_plot[mask],
+                    s=(sel_sizes if np.isscalar(sel_sizes) else sel_sizes[cat_values[sel_mask] == category]),
+                    alpha=selected_alpha,
+                    marker=categorical_marker(cat_index),
+                    c=color_map[category],
+                    edgecolors=(selected_edgecolor if selected_edgecolor else "none"),
+                    linewidths=0.8 if selected_edgecolor else 0.0,
+                    rasterize_at=rasterize_at,
+                )
+        else:
+            sel_color_kw = {}
+            if hue_vals_all is not None:
+                sel_color_kw = {"c": hue_vals_all[sel_mask], "cmap": cmap}
+                if vmin is not None and vmax is not None:
+                    sel_color_kw.update({"vmin": vmin, "vmax": vmax})
+            scatter_smart(
+                ax,
+                lf[sel_mask],
+                y_plot[sel_mask],
+                s=sel_sizes,
+                alpha=selected_alpha,
+                marker=selected_marker,
+                edgecolors=(selected_edgecolor if selected_edgecolor else "none"),
+                linewidths=0.6 if selected_edgecolor else 0.0,
+                rasterize_at=rasterize_at,
+                **sel_color_kw,
+            )
 
     # Dedicated colorbar (continuous hue only)
+    continuous_colorbar_drawn = False
     if (not hue_is_categorical) and (hue_vals_all is not None) and cbar and (vmin is not None) and (vmax is not None):
         from matplotlib.cm import ScalarMappable
         from matplotlib.colors import Normalize
 
+        fig.subplots_adjust(left=0.13, right=0.76, bottom=0.13, top=0.88)
         mappable = ScalarMappable(norm=Normalize(vmin=vmin, vmax=vmax), cmap=cmap)
-        cb = fig.colorbar(mappable, ax=ax)
-        cb.set_label(hue_field.replace("obj__", "").replace("pred__", "").replace("sel__", ""))
+        add_flush_colorbar(fig, ax, mappable, label=math_label(hue_field), pad=0.055)
+        continuous_colorbar_drawn = True
 
     # Legend for categorical hue
     if hue_is_categorical:
@@ -377,25 +443,72 @@ def render(context, params: dict) -> None:
                 [],
                 [],
                 marker="o",
+                markerfacecolor=color_map[c],
+                markeredgecolor="#202020",
                 linestyle="None",
-                color=color_map[c],
+                color="none",
                 label=c,
-                markersize=6,
+                markersize=7,
             )
             for c in hue_order
         ]
-        lg = ax.legend(handles=handles, title=cat_hue_col, frameon=False, loc="best")
-        if lg and lg.get_title():
-            lg.get_title().set_fontsize(11)
+        for i, handle in enumerate(handles):
+            handle.set_marker(categorical_marker(i))
+        legend_below_single_row(fig, ax, handles=handles, labels=[pretty_label(c) for c in hue_order])
 
     # Axes, labels, and enforced x-limits for logic fidelity
-    ax.set_xlabel("Logic fidelity (0-1)")
+    ax.set_xlabel(math_label("logic_fidelity"))
     ax.set_ylabel(y_field_label)
-    ax.set_title(f"Trade-off: {y_title_short} vs Logic Fidelity")
+    ax.set_title(str(params.get("title") or f"{y_title_short} vs logic fidelity"))
     if force_xlim_01:
         ax.set_xlim(0.0, 1.0)
         if xticks_n and xticks_n >= 2:
             ax.set_xticks(np.linspace(0.0, 1.0, xticks_n))
+
+    reference_count = 0
+    if sfxi_reference_overlay_enabled(params):
+        records_path = context.data_paths.get("records")
+        reference_df = load_sfxi_reference_overlay(
+            records_path=records_path,
+            params=params,
+            expected_setpoint_vector=setpoint,
+        )
+        reference_y, reference_y_col = reference_y_values(reference_df, y_axis=y_axis, params=params)
+        reference_x = reference_df["sfxi_ref__logic_fidelity"].astype(float).to_numpy()
+        reference_count = int(reference_df.shape[0])
+        reference_marker = get_str(params, ["reference_marker"], "D") or "D"
+        reference_color = get_str(params, ["reference_color"], "#111827") or "#111827"
+        reference_edgecolor = get_str(params, ["reference_edgecolor"], "white") or "white"
+        reference_size = get_float(params, ["reference_size"], 72.0)
+        ax.scatter(
+            reference_x,
+            reference_y,
+            s=float(reference_size),
+            marker=reference_marker,
+            c=reference_color,
+            edgecolors=reference_edgecolor,
+            linewidths=0.8,
+            alpha=1.0,
+            label="SFXI reference",
+            zorder=5,
+        )
+        for label, x_val, y_val in zip(reference_label_values(reference_df), reference_x, reference_y):
+            if label:
+                ax.annotate(
+                    label,
+                    (x_val, y_val),
+                    textcoords="offset points",
+                    xytext=(4, 4),
+                    fontsize=7,
+                    alpha=0.85,
+                )
+        if not hue_is_categorical:
+            ax.legend(frameon=False, loc="upper right")
+        context.logger.info(
+            "[fold_change_vs_logic] reference_overlay rows=%d y=%s",
+            reference_count,
+            reference_y_col,
+        )
 
     # Log + annotate
     from ._mpl_utils import log_kv
@@ -409,26 +522,40 @@ def render(context, params: dict) -> None:
         alpha=float(alpha),
         rasterize_at=(rasterize_at if rasterize_at is not None else "off"),
         points=int(lf.size),
+        reference_points=int(reference_count),
     )
-    annotate_plot_meta(
-        ax,
-        hue=(f"records.{cat_hue_col}" if hue_is_categorical else hue_field),
-        size_by=size_by,
-        alpha=alpha,
-        rasterized=rasterized,
-        extras={
-            "delta": f"{delta:.3g}",
-            "selected_marker": selected_marker,
-            "selected_n": int(sel_mask.sum()),
-            "xlim": "[0,1]" if force_xlim_01 else "auto",
-        },
-    )
+    if show_meta:
+        annotate_plot_meta(
+            ax,
+            hue=(f"records.{cat_hue_col}" if hue_is_categorical else hue_field),
+            size_by=size_by,
+            alpha=alpha,
+            rasterized=rasterized,
+            extras={
+                "delta": f"{delta:.3g}",
+                "selected_marker": selected_marker,
+                "selected_n": int(sel_mask.sum()),
+                "reference_n": int(reference_count),
+                "xlim": "[0,1]" if force_xlim_01 else "auto",
+            },
+        )
 
     out = context.output_dir / context.filename
-    fig.savefig(out, dpi=context.dpi, bbox_inches="tight")
+    if not hue_is_categorical and not continuous_colorbar_drawn:
+        fig.subplots_adjust(left=0.13, right=0.88, bottom=0.13, top=0.88)
+    save_notebook_square_figure(fig, out, dpi=context.dpi, tight=False)
     plt.close(fig)
 
     if context.save_data:
         # Save logic_fidelity and the actually-plotted Y series under a meaningful column name
-        tidy = pd.DataFrame({"obj__logic_fidelity": lf, tidy_col: y_plot})
+        tidy = pd.DataFrame({"source": "predictions", "obj__logic_fidelity": lf, tidy_col: y_plot})
+        if sfxi_reference_overlay_enabled(params):
+            reference_rows = pd.DataFrame(
+                {
+                    "source": "sfxi_ref",
+                    "obj__logic_fidelity": reference_x,
+                    tidy_col: reference_y,
+                }
+            )
+            tidy = pd.concat([tidy, reference_rows], ignore_index=True)
         context.save_df(tidy)

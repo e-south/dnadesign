@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/storage/test_parquet_io_roundtrip.py
+
+Regression tests for parquet IO roundtrip OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

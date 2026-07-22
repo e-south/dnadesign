@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_motif_logo_alignment.py
 
 Regression tests for motif-logo alignment and overlap lane behavior.

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/views/plots.py
 
-Prepares dashboard plot data for UMAP and cluster visualizations. Provides
-pure-data view objects for chart builders.
+Prepares dashboard plot data for UMAP and cluster visualizations. Provides.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

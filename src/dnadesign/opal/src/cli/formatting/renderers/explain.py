@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/explain.py
 
-Renders explain command output for OPAL CLI. Formats explain summaries for
-readable text display.
+Renders explain command output for OPAL CLI. Formats explain summaries for.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

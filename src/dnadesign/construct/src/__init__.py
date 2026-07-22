@@ -15,7 +15,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .api import PreflightResult, RunResult, load_job_config, preflight_from_config, run_from_config
+    from .interfaces.api import PreflightResult, RunResult, load_job_config, preflight_from_config, run_from_config
 
 __all__ = ["PreflightResult", "RunResult", "load_job_config", "preflight_from_config", "run_from_config"]
 
@@ -25,7 +25,7 @@ _API_EXPORTS = frozenset(__all__)
 def __getattr__(name: str):
     if name not in _API_EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    value = getattr(import_module(".api", __name__), name)
+    value = getattr(import_module(".interfaces.api", __name__), name)
     globals()[name] = value
     return value
 

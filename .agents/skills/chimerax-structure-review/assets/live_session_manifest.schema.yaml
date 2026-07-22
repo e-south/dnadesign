@@ -1,0 +1,29 @@
+schema_id: chimerax_live_session_manifest_v1
+required_fields:
+  - schema_version
+  - control_session_id
+  - pause_point
+  - started_at_utc
+  - chimerax_executable
+  - chimerax_pid
+  - source_structure_path
+  - source_structure_sha256
+  - control
+  - outputs
+control_required_fields:
+  - host
+  - port
+  - rest_stopped
+  - gui_left_open
+outputs_required_fields:
+  - output_dir
+  - command_log_path
+  - command_log_sha256
+  - capture_manifest_path
+  - capture_manifest_sha256
+  - capture_image_path
+  - capture_session_path
+notes:
+  - The live-session manifest records one visible ChimeraX session.
+  - The live-session dogfood should prove view, side-chain, surface, and capture commands in one process.
+  - Collaboration sessions should report the next pause point to the user.

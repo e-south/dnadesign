@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/workspaces/__init__.py
+
 Workspace helpers for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from ..contracts.errors import CoordinateSpaceError, WorkspaceValidationError

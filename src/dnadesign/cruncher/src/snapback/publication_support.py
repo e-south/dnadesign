@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/publication_support.py
 
 Shared helpers for snapback QA/public publication geometry.

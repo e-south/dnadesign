@@ -1,7 +1,15 @@
+---
+doc_id: baserender-reference
+title: BaseRender reference
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-07-19
+---
+
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-04
+**Last verified:** 2026-07-19
 
 
 Single technical reference for operators and integrators.
@@ -236,6 +244,13 @@ Sequence-panel contract:
 - default profile: `promoter_compact_slide.v1`
 - supported adapters: `densegen_tfbs` and `usr_genbank_annotations_v1`
 - failure mode: unsupported adapters, unknown profiles, malformed annotation rows, and invalid target dimensions raise `SchemaError`
+
+Sequence-panel layout:
+- `vertical_anchor="center"` places the midpoint between the forward and reverse sequence rows at the canvas midpoint. Annotation lanes, titles, and legends do not redefine that anchor.
+- `title` accepts caller-owned context as plain text. BaseRender renders the text but does not interpret rank, selection, study, or campaign semantics.
+- An adapter-provided `display.overlay_text` remains visible beneath a caller title. `SequencePanelDiagnostics.title` and `record_label` report the two inputs separately.
+- A bottom legend follows the lowest occupied sequence or annotation row with the profile's declared content gap. Synthetic space used to balance annotation lanes does not add a second visual gap.
+- Panel normalization preserves font sizes and aspect ratio. It scales the complete visible envelope only when needed to fit the declared pixel dimensions.
 
 `render(...)` grid default:
 - record list input defaults to a single-row layout (`ncols = len(records)`).

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/parquet_io.py
+
+Storage helpers for parquet IO OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

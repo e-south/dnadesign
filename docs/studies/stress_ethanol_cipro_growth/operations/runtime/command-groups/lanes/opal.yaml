@@ -1,0 +1,21 @@
+contract: study_runtime_command_group_lane_v1
+schema_version: 1
+study_id: stress_ethanol_cipro_growth
+lane_id: opal
+owner: opal
+last_verified: 2026-07-21
+surface_role: decision
+current_state: assay_b1_order_ready
+route_detail: repo:docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md
+canonical_payload:
+  path: repo:docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml
+  keys:
+    - study_pipeline.opal
+entry_artifacts:
+  - usr_prom_eth_cip_opal_candidates
+  - opal_response_window_label_promotion
+exit_artifacts:
+  - opal_round0_run_context
+  - opal_round0_selection_batch
+  - stress-opal-assay-b1-r0-msrb-v1
+navigation_note: The exact MSRB assay-batch-1 handoff is accepted for order. Use the handoff record and generated exports for order review; vendor submission remains separate.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/study/schema_models.py
 
 Defines the strict schema for Study sweep specifications.

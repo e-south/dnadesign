@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/infer/src/presets/registry.py
 
+Registry helpers for infer presets.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

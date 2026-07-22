@@ -1,7 +1,7 @@
 ## Notify Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-07-14
 
 `notify` sends webhook notifications from Universal Sequence Record (USR) `.events.log` streams.
 Start here for setup, watching, and recovery. Use [Notify USR events operator manual](usr-events.md) when you want the full ordered procedure.
@@ -25,11 +25,11 @@ If you already have a workspace and a webhook secret file, jump to [Quick path](
 | Need | Start here | First command | Verify next |
 | --- | --- | --- | --- |
 | Start local watcher loops | [Notify USR events operator manual](usr-events.md) | `notify setup slack --tool <tool> --workspace <workspace> --secret-source file --secret-ref file://<abs-path-to-webhook-secret>` | `notify profile doctor --profile <profile.json>` |
-| Follow a multi-source shared dataset into Notify and Infer | [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md) | `notify setup resolve-events --tool construct --config "$CONSTRUCT_CONFIG" --json` | `notify usr-events watch --events "$USR_ROOT/$DOWNSTREAM_DATASET/.events.log" --dry-run --no-advance-cursor-on-dry-run` |
-| Follow a construct-backed shared dataset into Notify and Infer | [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md) | `notify setup resolve-events --tool construct --config "$CONSTRUCT_CONFIG" --json` | `notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --dry-run --no-advance-cursor-on-dry-run` |
+| Follow a multi-source shared dataset into Notify and Infer | [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md) | `notify setup resolve-events --tool construct --config "$CONSTRUCT_CONFIG" --json` | `notify usr-events watch --events "$USR_ROOT/$DOWNSTREAM_DATASET/.events.log" --dry-run --no-advance-cursor-on-dry-run` |
+| Follow a construct-backed shared dataset into Notify and Infer | [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | `notify setup resolve-events --tool construct --config "$CONSTRUCT_CONFIG" --json` | `notify usr-events watch --events "$USR_ROOT/$DATASET_ID/.events.log" --dry-run --no-advance-cursor-on-dry-run` |
 | Send one-off status messages | [notify send contract](../../src/dnadesign/notify/docs/reference/command-contracts.md#notify-send) | `notify send --status <status> --tool <tool> --run-id <id> --provider <provider> ...` | `notify send --dry-run ...` |
 | Recover failed deliveries | [Recover flow](usr-events.md#recover-flow) | `notify spool drain --profile <profile.json>` | `notify spool drain --profile <profile.json> --fail-fast` |
-| Run scheduler-managed Notify workflows | [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md) | follow scheduler runbook command chain | `notify profile doctor --profile <profile.json>` |
+| Run scheduler-managed Notify workflows | [BU SCC Batch + Notify runbook](../bu-scc/runbooks/batch-notify.md) | follow scheduler runbook command chain | `notify profile doctor --profile <profile.json>` |
 | Inspect internals and extension seams | [Notify package docs index](../../src/dnadesign/notify/docs/README.md) | read the maintainer architecture map | [Maintainer architecture map](../../src/dnadesign/notify/docs/dev/architecture.md) |
 
 ### Quick path
@@ -60,8 +60,8 @@ Infer config when Notify and resume posture matter.
 
 - Watcher onboarding and lifecycle: [Notify USR events operator manual](usr-events.md).
 - Command contracts: [Notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md).
-- Multi-source downstream handoff: [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md).
-- Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md).
-- Downstream feature and learning steps after watcher validation: [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md).
-- Scheduler workflows: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
+- Multi-source downstream handoff: [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md).
+- Construct-backed consolidated dataset handoff: [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).
+- Downstream feature and learning steps after watcher validation: [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md).
+- Scheduler workflows: [BU SCC Batch + Notify runbook](../bu-scc/runbooks/batch-notify.md).
 - Package docs index: [src/dnadesign/notify/docs/README.md](../../src/dnadesign/notify/docs/README.md).

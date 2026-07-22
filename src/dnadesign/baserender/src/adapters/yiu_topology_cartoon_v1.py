@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/adapters/yiu_topology_cartoon_v1.py
 
 Adapter from YIU topology-cartoon contracts to baserender Record v1.

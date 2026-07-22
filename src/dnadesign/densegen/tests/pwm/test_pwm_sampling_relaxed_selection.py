@@ -4,7 +4,6 @@ dnadesign
 src/dnadesign/densegen/tests/pwm/test_pwm_sampling_relaxed_selection.py
 
 Stage-A PWM sampling relaxed selection rules.
-Dunlop Lab.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/export_sequences_service.py
 
 Export sequence-oriented run artifacts for downstream operators.

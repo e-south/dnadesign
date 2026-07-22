@@ -1,9 +1,11 @@
 ## How to use Ops
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-25
+**Last verified:** 2026-06-24
 
-Use this page when you already know you need Ops and want the next command. Start with `uv run ops catalog list --simple` if you are still choosing a route.
+When Ops is already the right surface, start with the next command below. Use
+`uv run ops catalog list --simple` if the route is still unknown.
+
 Treat the shell surfaces explicitly: `ops catalog` discovers routes, `ops progress` reads observation/status surfaces, and `ops runbook` owns control-plane execution.
 
 Once you know the route, use `uv run ops progress explain <registry-id>` to see the required status inputs before you touch artifacts.
@@ -24,7 +26,7 @@ Once you know the route, use `uv run ops progress explain <registry-id>` to see 
 
 ### Check status or build a manifest
 
-- `uv run ops progress explain <registry-id>`: print the required status flags, a ready-to-paste `progress show` command, and any adapter-specific notes before you touch artifacts.
+- `uv run ops progress explain <registry-id>`: print the required status flags, a ready-to-paste `progress show` command, and any provider-specific notes before you touch artifacts.
 - `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: summarize one status surface once you have the explicit artifact inputs.
 - `uv run ops catalog show <registry-id>`: inspect the required status flags before you run `progress show` if you do not already know the artifact contract.
 - `uv run ops progress scaffold <registry-id> ...`: emit an explicit manifest skeleton for one or more registered procedures. It prints YAML to stdout unless you pass `--out`.
@@ -37,5 +39,5 @@ Once you know the route, use `uv run ops progress explain <registry-id>` to see 
 
 - [Runbook catalog](../../../../docs/runbooks/README.md): repo-wide command index for procedures and tool docs.
 - [Ops orchestration index](../../../../docs/operations/README.md): choose the right lifecycle route for init, plan, execute, and verification.
-- [Orchestration runbooks](../../../../docs/operations/orchestration-runbooks.md): runbook schema, command order, and contract rules.
+- [Orchestration runbooks](../../../../docs/operations/orchestration/runbooks.md): runbook schema, command order, and contract rules.
 - [Packaged runbook presets](../runbooks/presets): checked-in starting points for common orchestration routes.

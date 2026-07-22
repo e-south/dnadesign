@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/analysis/test_sfxi_diagnostics_math.py
 
-Tests core SFXI diagnostics math utilities (factorial effects, gates, support,
-and intensity scaling).
+Tests core SFXI diagnostics math utilities (factorial effects, gates, support,.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

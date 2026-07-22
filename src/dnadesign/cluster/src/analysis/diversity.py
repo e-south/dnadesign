@@ -3,8 +3,9 @@
 dnadesign
 src/dnadesign/cluster/src/analysis/diversity.py
 
+Analysis helpers for diversity cluster analysis.
+
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

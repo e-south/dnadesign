@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/storage/test_ledger_strict.py
+
+Regression tests for ledger strict OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

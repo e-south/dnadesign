@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/study/metrics.py
 
 Metric extraction utilities for Study trial run directories.

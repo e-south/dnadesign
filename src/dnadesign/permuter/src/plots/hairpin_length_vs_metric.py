@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/hairpin_length_vs_metric.py
+
+Plot builders for hairpin length vs metric Permuter plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -15,11 +17,13 @@ from typing import Optional, Tuple
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from dnadesign.permuter.src.contracts.metrics import observed_metric_column
+
 
 def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
-        raise RuntimeError("metric_id is required (expects a column permuter__metric__<id>)")
-    col = f"permuter__metric__{metric_id}"
+        raise RuntimeError("metric_id is required (expects a column permuter__observed__<id>)")
+    col = observed_metric_column(metric_id)
     if col not in df.columns:
         raise RuntimeError(f"Metric column not found: {col}")
     return df[col].astype("float64"), str(metric_id)
@@ -29,7 +33,7 @@ def plot(
     elite_df: pd.DataFrame,
     all_df: pd.DataFrame,
     output_path: Path,
-    job_name: str,
+    scope_name: str,
     ref_sequence: Optional[str] = None,  # unused
     metric_id: Optional[str] = None,
     evaluators: str = "",
@@ -132,7 +136,7 @@ def plot(
 
     # titles
     ref_name = df["permuter__ref"].iloc[0] if "permuter__ref" in df.columns and not df.empty else ""
-    title = f"{job_name}{f' ({ref_name})' if ref_name else ''}"
+    title = f"{scope_name}{f' ({ref_name})' if ref_name else ''}"
     fig.suptitle(title, fontsize=int(round(14 * fs)), y=1.075)
     if evaluators:
         fig.text(

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/postprocess/gap_fill.py
+dnadesign
+src/dnadesign/densegen/src/core/postprocess/gap_fill.py
 
 Pad policy implementation (fills remaining length budget).
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

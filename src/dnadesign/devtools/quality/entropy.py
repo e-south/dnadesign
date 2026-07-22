@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/devtools/quality/entropy.py
 
-Builds a quality entropy report for stale SOR metadata, unresolved gaps, and evidence links.
+Builds a quality entropy report for review-age advisories, unresolved gaps, and evidence links.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.devtools.docs.checks import LAST_VERIFIED_PATTERN, OWNER_PATTERN, SOR_MARKDOWN_FILES
+from dnadesign.devtools.docs.metadata import LAST_VERIFIED_PATTERN, OWNER_PATTERN, SOR_MARKDOWN_FILES
 
 _SECTION_HEADER_PATTERN = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 _TABLE_ROW_PATTERN = re.compile(r"^\|(.+)\|\s*$")
@@ -27,14 +27,14 @@ _URL_PATTERN = re.compile(r"https?://[^\s|)]+")
 
 @dataclass(frozen=True)
 class EntropyReport:
-    stale_sor_docs: list[str]
+    review_age_advisories: list[str]
     unresolved_gaps: list[str]
     scorecard_contract_issues: list[str]
     broken_evidence_links: list[str]
 
     @property
     def has_critical_findings(self) -> bool:
-        return bool(self.stale_sor_docs or self.scorecard_contract_issues or self.broken_evidence_links)
+        return bool(self.scorecard_contract_issues or self.broken_evidence_links)
 
 
 def _extract_metadata_field(text: str, pattern: re.Pattern[str]) -> str | None:
@@ -108,7 +108,7 @@ def _quality_scorecard_rows(quality_score_text: str) -> list[list[str]]:
     return rows
 
 
-def _find_stale_sor_docs(repo_root: Path, *, max_sor_age_days: int) -> list[str]:
+def _find_sor_review_age_advisories(repo_root: Path, *, review_age_advisory_days: int) -> list[str]:
     issues: list[str] = []
     today = dt.date.today()
     for doc_name in SOR_MARKDOWN_FILES:
@@ -134,8 +134,8 @@ def _find_stale_sor_docs(repo_root: Path, *, max_sor_age_days: int) -> list[str]
             continue
 
         age_days = (today - last_verified).days
-        if age_days > max_sor_age_days:
-            issues.append(f"{path}: stale ({age_days} days old; max {max_sor_age_days}).")
+        if age_days > review_age_advisory_days:
+            issues.append(f"{path}: review age is {age_days} days (advisory after {review_age_advisory_days}).")
     return issues
 
 
@@ -165,7 +165,7 @@ def _extract_evidence_tokens(cell: str) -> tuple[list[str], list[str]]:
     return code_tokens, url_tokens
 
 
-def _find_scorecard_contract_issues(*, rows: list[list[str]], max_sor_age_days: int) -> list[str]:
+def _find_scorecard_contract_issues(*, rows: list[list[str]]) -> list[str]:
     issues: list[str] = []
     today = dt.date.today()
     for index, row in enumerate(rows, start=1):
@@ -208,11 +208,6 @@ def _find_scorecard_contract_issues(*, rows: list[list[str]], max_sor_age_days: 
             else:
                 if row_date > today:
                     issues.append(f"row {index} ({area}): last verified cannot be in the future.")
-                age_days = (today - row_date).days
-                if age_days > max_sor_age_days:
-                    issues.append(
-                        f"row {index} ({area}): last verified is stale by {age_days} days (max {max_sor_age_days})."
-                    )
 
         if not evidence:
             issues.append(f"row {index} ({area}): evidence must not be empty.")
@@ -225,6 +220,32 @@ def _find_scorecard_contract_issues(*, rows: list[list[str]], max_sor_age_days: 
             issues.append(f"row {index} ({area}): next action must not be empty.")
 
     return issues
+
+
+def _find_scorecard_review_age_advisories(
+    *,
+    rows: list[list[str]],
+    review_age_advisory_days: int,
+) -> list[str]:
+    advisories: list[str] = []
+    today = dt.date.today()
+    for index, row in enumerate(rows, start=1):
+        if len(row) != 9:
+            continue
+        area = _scorecard_area(row)
+        try:
+            row_date = dt.date.fromisoformat(row[7].strip())
+        except ValueError:
+            continue
+        if row_date > today:
+            continue
+        age_days = (today - row_date).days
+        if age_days > review_age_advisory_days:
+            advisories.append(
+                f"scorecard row {index} ({area}): review age is {age_days} days "
+                f"(advisory after {review_age_advisory_days})."
+            )
+    return advisories
 
 
 def _find_broken_evidence_links(repo_root: Path, rows: list[list[str]]) -> list[str]:
@@ -244,7 +265,7 @@ def _find_broken_evidence_links(repo_root: Path, rows: list[list[str]]) -> list[
     return broken
 
 
-def build_entropy_report(*, repo_root: Path, max_sor_age_days: int) -> EntropyReport:
+def build_entropy_report(*, repo_root: Path, review_age_advisory_days: int) -> EntropyReport:
     quality_score_path = repo_root / "QUALITY_SCORE.md"
     if not quality_score_path.exists():
         raise FileNotFoundError(f"Expected quality score document at {quality_score_path}")
@@ -252,11 +273,18 @@ def build_entropy_report(*, repo_root: Path, max_sor_age_days: int) -> EntropyRe
     quality_score_text = quality_score_path.read_text(encoding="utf-8")
     scorecard_rows = _quality_scorecard_rows(quality_score_text)
     return EntropyReport(
-        stale_sor_docs=_find_stale_sor_docs(repo_root, max_sor_age_days=max_sor_age_days),
+        review_age_advisories=[
+            *_find_sor_review_age_advisories(
+                repo_root,
+                review_age_advisory_days=review_age_advisory_days,
+            ),
+            *_find_scorecard_review_age_advisories(
+                rows=scorecard_rows,
+                review_age_advisory_days=review_age_advisory_days,
+            ),
+        ],
         unresolved_gaps=_find_unresolved_gaps(quality_score_text),
-        scorecard_contract_issues=_find_scorecard_contract_issues(
-            rows=scorecard_rows, max_sor_age_days=max_sor_age_days
-        ),
+        scorecard_contract_issues=_find_scorecard_contract_issues(rows=scorecard_rows),
         broken_evidence_links=_find_broken_evidence_links(repo_root, scorecard_rows),
     )
 
@@ -266,16 +294,16 @@ def _render_report_markdown(report: EntropyReport) -> str:
         "# Quality entropy report",
         "",
         f"- Generated at (UTC): `{dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace('+00:00', 'Z')}`",
-        f"- Stale SOR docs: {len(report.stale_sor_docs)}",
+        f"- Review-age advisories: {len(report.review_age_advisories)}",
         f"- Unresolved gaps: {len(report.unresolved_gaps)}",
         f"- Scorecard contract issues: {len(report.scorecard_contract_issues)}",
         f"- Broken evidence links: {len(report.broken_evidence_links)}",
         "",
     ]
 
-    lines.append("## Stale SOR docs")
-    if report.stale_sor_docs:
-        lines.extend(f"- {item}" for item in report.stale_sor_docs)
+    lines.append("## Review-age advisories")
+    if report.review_age_advisories:
+        lines.extend(f"- {item}" for item in report.review_age_advisories)
     else:
         lines.append("- none")
     lines.append("")
@@ -307,7 +335,7 @@ def _render_report_markdown(report: EntropyReport) -> str:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate quality entropy report.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
-    parser.add_argument("--max-sor-age-days", type=int, default=90)
+    parser.add_argument("--review-age-advisory-days", type=int, default=180)
     parser.add_argument("--report-file", type=Path, required=True)
     return parser
 
@@ -315,7 +343,10 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
-        report = build_entropy_report(repo_root=args.repo_root, max_sor_age_days=args.max_sor_age_days)
+        report = build_entropy_report(
+            repo_root=args.repo_root,
+            review_age_advisory_days=args.review_age_advisory_days,
+        )
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1

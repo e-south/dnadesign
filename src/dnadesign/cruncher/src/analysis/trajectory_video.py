@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/trajectory_video.py
 
 Build short chain-trajectory motif videos via the public baserender job API.

@@ -63,4 +63,4 @@ plot_details_md: |
 limitations_md: Both axes are annotation-conditioned centroid margins. They are useful for orientation and communication, but they do not replace the higher-dimensional summary metrics or imply promoter activity.
 failure_modes_md: Strong overplotting can still hide minority subcohorts, and any regression in leave-one-out handling would make in-cohort points look artificially cleaner than they are.
 docs_refs:
-  - src/dnadesign/studies/stress_ethanol_cipro_growth/notes/2026-05-10-candidate-x-rationale-and-story-surfaces.md
+  - src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/notes/rationale/2026-05-10-candidate-x-story-surfaces.md

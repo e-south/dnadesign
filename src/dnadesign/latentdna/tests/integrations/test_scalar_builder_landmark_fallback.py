@@ -1,4 +1,13 @@
-"""Integration coverage for same-source landmark selection without selector columns in view rows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/integrations/test_scalar_builder_landmark_fallback.py
+
+Integration coverage for same-source landmark selection without selector columns in view rows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

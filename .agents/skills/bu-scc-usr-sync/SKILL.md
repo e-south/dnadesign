@@ -1,8 +1,8 @@
 ---
 name: bu-scc-usr-sync
-description: Operate dnadesign USR dataset sync against BU SCC using the repo's canonical USR roots, explicit remotes config, doctor and warm-auth preflight, pullable-dataset inventory checks, and no-delete safety. Use when the user wants to diff, pull, push, or bootstrap USR datasets between the local dnadesign clone and BU SCC. Do not use for generic scheduler submission tasks, non-USR file transfer plans, or repo changes with no sync workflow scope.
+description: Sync dnadesign USR datasets with BU SCC. Use for usr diff/pull/push/bootstrap, remotes doctor, warm-auth, and audit-json loops. Do not use for scheduler jobs, arbitrary file transfer, or code changes.
 metadata:
-  version: 0.2.0
+  version: 0.2.1
   category: workflow-automation
   tags: [usr, bu-scc, sync, datasets, dnadesign]
 ---
@@ -44,10 +44,10 @@ Out of scope:
 ## Workflow
 
 1. Load the canonical sync surfaces.
-- Start at `src/dnadesign/usr/docs/operations/sync.md`.
-- Use `src/dnadesign/usr/docs/operations/sync-setup.md` for SSH keys, remote
+- Start at `src/dnadesign/usr/docs/operations/sync/README.md`.
+- Use `src/dnadesign/usr/docs/operations/sync/setup.md` for SSH keys, remote
   profiles, and auth posture.
-- Use `docs/bu-scc/README.md` and `docs/bu-scc/quickstart.md` for SCC-specific
+- Use `docs/bu-scc/README.md` and `docs/bu-scc/setup/quickstart.md` for SCC-specific
   storage and environment context.
 - Use [sync-loop.md](references/sync-loop.md) for the short operator ladder.
 

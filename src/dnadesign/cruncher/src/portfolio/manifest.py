@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/portfolio/manifest.py
 
 Manifest and status models for Portfolio aggregation runs.

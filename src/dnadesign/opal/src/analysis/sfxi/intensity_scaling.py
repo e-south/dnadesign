@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/sfxi/intensity_scaling.py
 
 Intensity scaling diagnostics for SFXI (denom, clipping, distributions).

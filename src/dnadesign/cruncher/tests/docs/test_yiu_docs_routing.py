@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_yiu_docs_routing.py
 
 Routing contracts for payload-centric YIU docs surfaces.
@@ -25,14 +25,15 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "Cruncher is the DNA design package in `dnadesign`." in package_readme
+    assert "Cruncher solves workspace-based sequence optimization" in package_readme
+    assert "DNA design package in `dnadesign`" not in package_readme
     assert "workspace-based" in package_readme
     assert "docs/README.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme
     assert "docs/demos/demo_cassette_workspace.md" in package_readme
     assert "This README stays light on purpose." not in package_readme
-    assert "sequence optimization, cassette design, and YIU payload work" in package_readme
+    assert "sequence optimization, cassette design, YIU payload windows" in package_readme
 
     assert "Payload-Centric YIU Workflows" in docs_readme
     assert "demos/demo_yiu_workspace.md" in docs_readme

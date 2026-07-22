@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/infer/tests/test_extract_execution.py
+dnadesign
+src/dnadesign/infer/tests/runtime/test_extract_execution.py
 
 Chunk-execution contract tests for infer extract execution.
 

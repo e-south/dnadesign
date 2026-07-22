@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_prune_source.py
+
+Regression tests for CLI prune source OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

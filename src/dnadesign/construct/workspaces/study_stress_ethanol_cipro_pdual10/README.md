@@ -7,7 +7,7 @@ It is not a demo. It assumes:
 - the shared USR root is `src/dnadesign/usr/datasets`
 - the merged anchor dataset is `usr_prom_eth_cip_anchor`
 - the template dataset is `usr_pdual10_plasmid_template`
-- the pDual-10 template record id is `c4f17db3c2dbc17c5cb32c5eec785ea4f091e51d`
+- the pDual-10 template record id is `55e46be6e47613d42f38607d57b78496423418ee`
 - the shared context project writes paired forward and reverse-complement rows into `construct_prom_eth_cip_context`
 - the study anchor is always placed on the template forward strand at
   `3574..3666`, with upstream flank `CGCCAGCAACCGGGATCC` and downstream flank
@@ -19,8 +19,8 @@ same shared datasets skips already-present output ids, appends missing Construct
 contexts, and writes sequence-view rows for already-existing semantic variants.
 The supporting study record lives under:
 
-- `docs/studies/stress_ethanol_cipro_growth/pipeline.yaml`
-- `docs/studies/stress_ethanol_cipro_growth/status.md`
+- `docs/studies/stress_ethanol_cipro_growth/operations/runtime/command-groups/pipeline.yaml`
+- `docs/studies/stress_ethanol_cipro_growth/record/status.md`
 
 Validate and preview before any write:
 

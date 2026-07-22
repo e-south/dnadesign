@@ -18,8 +18,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from dnadesign.ops.orchestrator import build_batch_plan
-from dnadesign.ops.orchestrator import gates as gates_module
+import dnadesign.ops.orchestrator.gates as gates_module
+from dnadesign.ops.orchestrator.plan import build_batch_plan
 from dnadesign.ops.orchestrator.state import resolve_active_job_resolution
 from dnadesign.ops.runbooks.schema import load_orchestration_runbook
 from dnadesign.ops.status.artifacts import load_yaml_mapping

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/infer/tests/cli/test_requests.py
 
 Characterization tests for infer CLI request assembly helpers.

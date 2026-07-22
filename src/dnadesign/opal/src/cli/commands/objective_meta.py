@@ -1,302 +1,179 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/objective_meta.py
 
-CLI command to inspect objective metadata and diagnostics for runs. Reads
-outputs/ledger predictions and run metadata for reporting.
+Inspect one selection view's objective metadata and prediction diagnostics.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from __future__ import annotations
 
+import json
+from pathlib import Path
+from typing import Any, Optional
+
+import numpy as np
+import pandas as pd
+import polars as pl
 import typer
 
+from ...analysis.ledger import read_selection_view_predictions
 from ...core.config_resolve import resolve_campaign_config_path
 from ...core.rounds import resolve_round_index_from_runs
 from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...reporting.summary import select_run_meta
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
 from ..registry import cli_command
-from ._common import (
-    internal_error,
-    json_out,
-    load_cli_config,
-    opal_error,
-    print_config_context,
-    store_from_cfg,
-)
+from ._common import internal_error, json_out, load_cli_config, opal_error, print_config_context
 
 
-@cli_command(
-    "objective-meta",
-    help="List objective metadata and diagnostic keys for a campaign/round.",
-)
+def _definitions(raw: Any, *, field: str) -> list[dict[str, Any]]:
+    try:
+        value = raw if isinstance(raw, list) else json.loads(str(raw))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise OpalError(f"Run metadata field {field} is invalid JSON: {exc}") from exc
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise OpalError(f"Run metadata field {field} must contain a list of objects.")
+    return [dict(item) for item in value]
+
+
+def _view_definition(run_row: pd.Series, *, view_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    objectives = _definitions(run_row["objective__defs_json"], field="objective__defs_json")
+    selections = _definitions(run_row["selection_views__defs_json"], field="selection_views__defs_json")
+    objective_matches = [row for row in objectives if row.get("selection_view_id") == view_id]
+    selection_matches = [row for row in selections if row.get("selection_view_id") == view_id]
+    if len(objective_matches) != 1 or len(selection_matches) != 1:
+        raise OpalError(f"Selection view {view_id!r} is not defined exactly once in run metadata.")
+    return objective_matches[0], selection_matches[0]
+
+
+def _diagnostic_items(value: Any) -> list[Any] | tuple[Any, ...]:
+    items = value.tolist() if isinstance(value, np.ndarray) else value
+    if isinstance(items, (list, tuple)):
+        return items
+    return []
+
+
+def _diagnostic_keys(frame: pd.DataFrame) -> list[str]:
+    keys: set[str] = set()
+    for diagnostics in frame["view__diagnostics"].tolist():
+        for item in _diagnostic_items(diagnostics):
+            if isinstance(item, dict) and item.get("name"):
+                keys.add(str(item["name"]))
+    return sorted(keys)
+
+
+def _profile(frame: pd.DataFrame, diagnostic_keys: list[str]) -> dict[str, Any]:
+    expanded = frame.copy()
+    for key in diagnostic_keys:
+        expanded[f"diagnostic/{key}"] = [
+            next(
+                (
+                    float(item["value"])
+                    for item in _diagnostic_items(items)
+                    if isinstance(item, dict) and item.get("name") == key
+                ),
+                np.nan,
+            )
+            for items in expanded["view__diagnostics"]
+        ]
+    columns = [
+        "view__score",
+        "view__selection_score",
+        "view__rank_competition",
+        "view__uncertainty",
+        *[f"diagnostic/{key}" for key in diagnostic_keys],
+    ]
+    rows = []
+    for column in columns:
+        if column not in expanded.columns:
+            continue
+        values = pd.to_numeric(expanded[column], errors="coerce")
+        finite = values[np.isfinite(values)]
+        rows.append(
+            {
+                "column": column,
+                "count": int(values.notna().sum()),
+                "finite_count": int(finite.size),
+                "min": None if finite.empty else float(finite.min()),
+                "median": None if finite.empty else float(finite.median()),
+                "max": None if finite.empty else float(finite.max()),
+            }
+        )
+    return {"columns": rows}
+
+
+@cli_command("objective-meta", help="Inspect objective metadata for one selection view and run.")
 def cmd_objective_meta(
     config: Optional[Path] = typer.Option(
-        None, "--config", "-c", help="campaign.yaml or directory", envvar="OPAL_CONFIG"
-    ),
-    round: Optional[str] = typer.Option(
         None,
-        "--round",
-        "-r",
-        help="Round selector: integer or 'latest' (default: latest)",
+        "--config",
+        "-c",
+        help="campaign.yaml or directory",
+        envvar="OPAL_CONFIG",
     ),
+    view: str = typer.Option(..., "--view", help="Selection view ID."),
+    round: Optional[str] = typer.Option(None, "--round", "-r", help="Round selector: integer or 'latest'."),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Explicit run_id to inspect."),
-    json: bool = typer.Option(False, "--json/--text", help="Output as JSON"),
-    profile: bool = typer.Option(
-        False,
-        "--profile/--no-profile",
-        help="Profile candidate hue/size fields (dtype, coverage, range, suitability).",
-    ),
+    json_output: bool = typer.Option(False, "--json/--text", help="Output as JSON."),
+    profile: bool = typer.Option(False, "--profile/--no-profile", help="Profile numeric view fields."),
 ) -> None:
     try:
-        import numpy as np
-        import pandas as pd
-
-        from ...core.stderr_filter import maybe_install_pyarrow_sysctl_filter
-
-        maybe_install_pyarrow_sysctl_filter()
-        import pyarrow.compute as pc
-        from pyarrow import dataset as ds
-
+        if round and run_id:
+            raise OpalError("Provide only one of --round or --run-id.")
         cfg_path = resolve_campaign_config_path(config, allow_dir=True)
         cfg = load_cli_config(cfg_path)
-        store = store_from_cfg(cfg)
-        if not json:
-            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
+        configured = [selection_view.id for selection_view in cfg.selection_views]
+        if view not in configured:
+            raise OpalError(f"Unknown selection view {view!r}. Available: {configured}")
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
-        base = ws.outputs_dir
-        pred_dir = base / "ledger" / "predictions"
-
-        # Load runs metadata (strict; no legacy fallbacks)
         reader = LedgerReader(ws)
-        rtab = reader.read_runs(
+        runs = reader.read_runs(
             columns=[
                 "run_id",
                 "as_of_round",
-                "objective__name",
-                "objective__params",
-                "objective__summary_stats",
+                "objective__defs_json",
+                "selection_views__defs_json",
             ]
         )
-        if rtab.empty:
-            raise OpalError("No runs found in outputs/ledger/runs.parquet. Run `opal run ...` first.")
-
-        if round and run_id:
-            raise OpalError("Provide only one of --round or --run-id.")
-
-        if run_id:
-            rsel = rtab[rtab["run_id"].astype(str) == str(run_id)]
-            if rsel.empty:
-                raise OpalError(f"run_id not found in ledger: {run_id}")
-            rsel = rsel.iloc[0]
-            as_of = int(rsel["as_of_round"])
-        else:
-            # Pick round (supports 'latest' or an integer)
-            as_of = resolve_round_index_from_runs(rtab, round)
-            rsel = rtab[rtab["as_of_round"] == int(as_of)]
-            if rsel.empty:
-                raise OpalError(f"No runs found for as_of_round={int(as_of)}.")
-            if rsel["run_id"].nunique() > 1:
-                raise OpalError(
-                    f"Multiple run_id values found for round {int(as_of)}. Specify --run-id to disambiguate."
-                )
-            # Use last (most recent) run_id at that round
-            rsel = rsel.sort_values(["run_id"]).tail(1).iloc[0]
-
-        # Row-level diagnostic schema from predictions
-        if not pred_dir.exists():
-            raise OpalError("Missing outputs/ledger/predictions sink. Run a round to produce it.")
-        pdset = ds.dataset(str(pred_dir))
-        pred_schema = [f.name for f in pdset.schema]
-        obj_diag_cols = sorted([c for c in pred_schema if c.startswith("obj__")])
-
-        out: Dict[str, Any] = {
-            "round": as_of,
-            "objective": {
-                "name": rsel["objective__name"],
-                "params_keys": sorted(list((rsel["objective__params"] or {}).keys())),
-                "summary_stats_keys": (
-                    sorted(list((rsel["objective__summary_stats"] or {}).keys()))
-                    if isinstance(rsel["objective__summary_stats"], dict)
-                    else []
-                ),
-            },
-            "row_level_diagnostics_columns": obj_diag_cols,
+        round_index = resolve_round_index_from_runs(runs, round, allow_none=True) if run_id is None else None
+        run_row = select_run_meta(runs, round_sel=round_index, run_id=run_id)
+        resolved_run_id = str(run_row["run_id"])
+        as_of_round = int(run_row["as_of_round"])
+        objective, selection = _view_definition(run_row, view_id=view)
+        frame = read_selection_view_predictions(
+            ws.ledger_predictions_dir,
+            selection_view_id=view,
+            round_selector=as_of_round,
+            run_id=resolved_run_id,
+            runs_df=pl.from_pandas(runs),
+        ).to_pandas()
+        diagnostic_keys = _diagnostic_keys(frame)
+        out = {
+            "schema_version": "opal.objective_meta.v2",
+            "round": as_of_round,
+            "run_id": resolved_run_id,
+            "selection_view_id": view,
+            "objective": objective,
+            "selection": selection,
+            "diagnostic_keys": diagnostic_keys,
         }
-
-        # ---- Optional profiling of columns for hue/size candicates ----
         if profile:
-            run_id = str(rsel["run_id"])
-            # Candidate columns: objective row-level diagnostics plus commonly useful fields
-            extras = ["pred__score_selected", "sel__rank_competition", "sel__is_selected"]
-            cand_cols = sorted(list(set(obj_diag_cols + [c for c in extras if c in pred_schema])))
-            need = ["id"] + cand_cols + ["as_of_round", "run_id"]
-
-            # Read only the selected run rows
-            filt = (pc.field("run_id") == run_id) & (pc.field("as_of_round") == as_of)
-            dfp = pdset.to_table(columns=need, filter=filt).to_pandas()
-            if dfp.empty:
-                raise RuntimeError("No prediction rows found for selected run_id/round.")
-
-            # Universe size (for coverage vs. dataset)
-            df_records = store.load()
-            total_records = int(len(df_records))
-            unique_ids_records = int(df_records["id"].astype(str).nunique())
-
-            # Helper: profile a single numeric column
-            def _profile_numeric(col: str) -> Dict[str, Any]:
-                s = pd.to_numeric(dfp[col], errors="coerce")
-                present_ids = dfp.loc[s.notna(), "id"].astype(str).nunique()
-                pred_ids = dfp["id"].astype(str).nunique()
-                cov_pred = (present_ids / pred_ids) if pred_ids > 0 else 0.0
-                cov_vs_records = (present_ids / unique_ids_records) if unique_ids_records > 0 else 0.0
-                finite = s[np.isfinite(s)]
-                stats = {
-                    "count": int(s.notna().sum()),
-                    "finite_count": int(finite.size),
-                    "non_finite_count": int(s.size - finite.size - s.isna().sum()),
-                    "unique": int(pd.Series(finite).nunique()),
-                    "min": (float(np.min(finite)) if finite.size else None),
-                    "median": (float(np.median(finite)) if finite.size else None),
-                    "max": (float(np.max(finite)) if finite.size else None),
-                    "coverage_in_predictions": float(cov_pred),
-                    "coverage_vs_records": float(cov_vs_records),
-                    "bounded_0_1": bool(
-                        finite.size > 0 and np.nanmin(finite) >= -1e-12 and np.nanmax(finite) <= 1.0 + 1e-12
-                    ),
-                    "non_negative": bool(finite.size > 0 and np.nanmin(finite) >= 0.0 - 1e-12),
-                }
-                # Suitability (assertive rules; easy to tweak)
-                variable = stats["unique"] > 1
-                hue_ok = variable and stats["finite_count"] > 0 and stats["coverage_in_predictions"] >= 0.8
-                size_ok = variable and stats["finite_count"] > 0 and stats["coverage_in_predictions"] >= 0.8
-                stats["hue_ok"] = bool(hue_ok)
-                stats["size_ok"] = bool(size_ok)
-                return stats
-
-            # Prepare per-column profiles with dtype judgement
-            prof_rows: List[Dict[str, Any]] = []
-            hue_recs: List[Tuple[str, float]] = []
-            size_recs: List[Tuple[str, float]] = []
-            for c in cand_cols:
-                dtype = str(dfp[c].dtype)
-                is_bool = dtype.startswith("bool") or (set(pd.unique(dfp[c].dropna())) <= {True, False})
-                is_num = pd.api.types.is_numeric_dtype(dfp[c]) or pd.api.types.is_bool_dtype(dfp[c])
-                row: Dict[str, Any] = {"column": c, "dtype": dtype}
-                if is_num:
-                    pr = _profile_numeric(c)
-                    row.update(pr)
-                    # Rank recommendations by variance proxy (range) and coverage
-                    rng = (pr["max"] - pr["min"]) if (pr["max"] is not None and pr["min"] is not None) else 0.0
-                    score = float(rng) * pr["coverage_in_predictions"]
-                    if pr.get("hue_ok") and not is_bool:
-                        hue_recs.append((c, score))
-                    if pr.get("size_ok"):
-                        size_recs.append((c, score))
-                else:
-                    # Non-numeric: never suitable for numeric hue/size
-                    row.update(
-                        {
-                            "count": int(dfp[c].notna().sum()),
-                            "finite_count": 0,
-                            "non_finite_count": 0,
-                            "unique": int(dfp[c].dropna().nunique()),
-                            "min": None,
-                            "median": None,
-                            "max": None,
-                            "coverage_in_predictions": float(
-                                dfp.loc[dfp[c].notna(), "id"].astype(str).nunique()
-                                / max(1, dfp["id"].astype(str).nunique())
-                            ),
-                            "coverage_vs_records": float(
-                                dfp.loc[dfp[c].notna(), "id"].astype(str).nunique() / max(1, unique_ids_records)
-                            ),
-                            "bounded_0_1": False,
-                            "non_negative": False,
-                            "hue_ok": False,
-                            "size_ok": False,
-                        }
-                    )
-                prof_rows.append(row)
-            # Rank recommendations (best first)
-            hue_recs.sort(key=lambda t: t[1], reverse=True)
-            size_recs.sort(key=lambda t: t[1], reverse=True)
-            out["profile"] = {
-                "records_total": total_records,
-                "records_unique_ids": unique_ids_records,
-                "columns": prof_rows,
-                "recommendations": {
-                    "hue": [name for name, _ in hue_recs],
-                    "size": [name for name, _ in size_recs],
-                },
-            }
-
-        if json:
+            out["profile"] = _profile(frame, diagnostic_keys)
+        if json_output:
             json_out(out)
-        else:
-            print_stdout(f"[bold cyan]Round:[/] {out['round']}")
-            print_stdout(f"[bold cyan]Objective:[/] {out['objective']['name']}")
-            print_stdout("[bold]  params keys:[/] " + (", ".join(out["objective"]["params_keys"]) or "(none)"))
-            print_stdout("[bold]  summary stats:[/] " + (", ".join(out["objective"]["summary_stats_keys"]) or "(none)"))
-            print_stdout("[bold cyan]Row-level diagnostics:[/]")
-            for c in out["row_level_diagnostics_columns"]:
-                print_stdout(f"  • {c}")
-
-            if profile:
-                p = out.get("profile", {}) or {}
-                cols = p.get("columns", [])
-                rec_hue = p.get("recommendations", {}).get("hue", [])
-                rec_size = p.get("recommendations", {}).get("size", [])
-                if rec_hue:
-                    print_stdout("\n[bold cyan]Recommended hue fields (best-first):[/]")
-                    for n in rec_hue[:8]:
-                        print_stdout(f"  • {n}")
-                else:
-                    print_stdout("\n[bold cyan]Recommended hue fields:[/] (none)")
-                if rec_size:
-                    print_stdout("\n[bold cyan]Recommended size fields (best-first):[/]")
-                    for n in rec_size[:8]:
-                        print_stdout(f"  • {n}")
-                else:
-                    print_stdout("\n[bold cyan]Recommended size fields:[/] (none)")
-
-                # Compact column table (subset of stats)
-                if cols:
-                    print_stdout("\n[bold cyan]Column profiles (subset):[/]")
-                    for r in cols:
-                        name = r["column"]
-                        dtype = r["dtype"]
-                        covp = r["coverage_in_predictions"]
-                        covd = r["coverage_vs_records"]
-                        mn, md, mx = r["min"], r["median"], r["max"]
-                        flags = []
-                        if r.get("bounded_0_1"):
-                            flags.append("0..1")
-                        if r.get("non_negative") and not r.get("bounded_0_1"):
-                            flags.append("≥0")
-                        if r.get("hue_ok"):
-                            flags.append("hue✓")
-                        if r.get("size_ok"):
-                            flags.append("size✓")
-                        flag_str = (" [" + ", ".join(flags) + "]") if flags else ""
-                        rng_str = (
-                            "range: n/a" if mn is None or mx is None else f"range: {mn:.4g}..{mx:.4g}; median: {md:.4g}"
-                        )
-                        print_stdout(
-                            f"  • {name:24s} dtype={dtype:8s} cov_pred={covp:6.2%} cov_ds={covd:6.2%}  {rng_str}{flag_str}"  # noqa
-                        )
-
-    except OpalError as e:
-        opal_error("objective-meta", e)
-        raise typer.Exit(code=e.exit_code)
-    except typer.Exit:
-        raise
-    except Exception as e:
-        # Preserve pattern of other commands
-        internal_error("objective-meta", e)
+            return
+        print_config_context(cfg_path, cfg=cfg)
+        print_stdout(f"Round: {as_of_round}  run_id: {resolved_run_id}  selection view: {view}")
+        print_stdout(f"Objective: {objective.get('objective_name')}")
+        print_stdout("Diagnostics: " + (", ".join(diagnostic_keys) or "(none)"))
+    except OpalError as exc:
+        opal_error("objective-meta", exc)
+        raise typer.Exit(code=exc.exit_code)
+    except Exception as exc:
+        internal_error("objective-meta", exc)
         raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)

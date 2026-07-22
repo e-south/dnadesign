@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/views/materialize.py
+
 View materialization helpers for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -214,7 +221,7 @@ def _lookup_metadata_array(
         )
         if left_key not in mapping:
             missing_keys.append(left_key)
-            values.append(None)
+            values.append(derivation.default)
             continue
         values.append(mapping[left_key])
     if missing_keys and derivation.missing_policy == "error":

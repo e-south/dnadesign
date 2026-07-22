@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/tests/core/test_pwm_window.py
+
+Regression tests for PWM window Cruncher core.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 import numpy as np
 
 from dnadesign.cruncher.core.pwm import PWM

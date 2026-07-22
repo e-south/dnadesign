@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/scaffold_selectors.py
+
 Selector and bootstrap cell templates for generated latentdna marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -286,11 +293,9 @@ def render_selector_cells() -> tuple[str, ...]:
             """\
             @app.cell
             def _(runtime):
-                _geometry = runtime.geometry
                 _support = runtime.support
 
-                reference_hue_values = set((_geometry.reference_hue_options or {"Black stars": ""}).values())
-                default_reference_hue = "" if "" in reference_hue_values else next(iter(reference_hue_values), "")
+                default_reference_hue = ""
                 get_requested_reference_hue, set_requested_reference_hue = _support.mo.state(default_reference_hue)
                 return (get_requested_reference_hue, set_requested_reference_hue)
             """

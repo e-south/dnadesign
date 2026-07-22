@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/usr/src/genbank/importer.py
 
-Manifest-driven GenBank import into USR datasets with annotation overlays and
-sequence-view sidecars.
+Manifest-driven GenBank import into USR datasets with annotation overlays and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

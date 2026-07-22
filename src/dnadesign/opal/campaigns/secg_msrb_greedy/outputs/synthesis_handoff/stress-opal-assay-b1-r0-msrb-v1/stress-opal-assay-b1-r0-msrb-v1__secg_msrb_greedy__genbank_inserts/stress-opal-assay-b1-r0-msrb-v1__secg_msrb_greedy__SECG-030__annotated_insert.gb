@@ -1,0 +1,237 @@
+LOCUS       SECG-030                  90 bp    DNA     linear   SYN 01-JAN-2000
+DEFINITION  SECG-030 secg_msrb_greedy stress-opal-assay-b1-r0-msrb-v1.
+ACCESSION   SECG-030
+VERSION     SECG-030
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     source          1..90
+                     /label="SECG-030"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:source"
+                     /dnadesign_source="synthesis_handoff"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     misc_feature    1..15
+                     /label="5' cloning flank"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:left_flank"
+                     /dnadesign_source="cloning_strategy"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     promoter        16..75
+                     /label="60 nt promoter core"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:promoter_core"
+                     /dnadesign_source="opal_candidate"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     misc_feature    76..90
+                     /label="3' cloning flank"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:right_flank"
+                     /dnadesign_source="cloning_strategy"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+     misc_feature    complement(21..38)
+                     /label="LexA TFBS"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:tfbs:0"
+                     /dnadesign_source="densegen_tfbs"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+                     /dg_coord_key="offset"
+                     /dg_offset="5"
+                     /dg_offset_raw="5"
+                     /dg_orientation="rev"
+                     /dg_expected_seq="AACTGTATAAACGTACAT"
+                     /dg_part_kind="tfbs"
+                     /regulator="lexA"
+                     /motif_id="5f10d2e24e44d05f59e20122f7aa7156dec2e939f50114c0
+                     d482dc692158c8a6"
+                     /tfbs_id="8eded1763d2b83da63a7032ae70592f965841dad5e2587407
+                     3f1defc55fb7289"
+                     /dg_rel_score="0.7108755857871244"
+                     /tier="2.0"
+     misc_feature    complement(43..59)
+                     /label="LexA TFBS"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:tfbs:1"
+                     /dnadesign_source="densegen_tfbs"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+                     /dg_coord_key="offset"
+                     /dg_offset="27"
+                     /dg_offset_raw="27"
+                     /dg_orientation="rev"
+                     /dg_expected_seq="AACTGTATTTTTTCACA"
+                     /dg_part_kind="tfbs"
+                     /regulator="lexA"
+                     /motif_id="5f10d2e24e44d05f59e20122f7aa7156dec2e939f50114c0
+                     d482dc692158c8a6"
+                     /tfbs_id="f5d51f46acae2cfadb3b72dab63477ece96090a316ec32462
+                     5dc78babd086a4b"
+                     /dg_rel_score="0.6853365975217728"
+                     /tier="2.0"
+     misc_feature    16..21
+                     /label="-35 (e)"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:sigma70:upstream"
+                     /dnadesign_source="densegen_fixed_element"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+                     /dg_coord_key="offset_raw"
+                     /dg_offset="0"
+                     /dg_offset_raw="0"
+                     /dg_expected_seq="TAGACA"
+                     /dg_part_kind="fixed_element"
+                     /role="upstream"
+                     /dg_constraint="sigma70_core"
+                     /variant_id="e"
+                     /spacer_len="16.0"
+                     /sigma35_variant="e"
+                     /sigma35_sequence="TAGACA"
+     misc_feature    38..43
+                     /label="-10 (consensus)"
+                     /campaign_slug="secg_msrb_greedy"
+                     /selection_views="ciprofloxacin"
+                     /selection_membership="view=ciprofloxacin|rank=6|score=0.84
+                     76429499618856|score_ref=ciprofloxacin/behavior_score"
+                     /batch_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /handoff_id="stress-opal-assay-b1-r0-msrb-v1"
+                     /synthesis_name="SECG-030"
+                     /canonical_id="eec0452293f311a213e4113610bf87f522f8fb85"
+                     /strategy_id="stress_promoter_insert:v1"
+                     /core_sha256="5d210a867e7969fa65dc74d76ead5cf764b384f116d1c
+                     e09cd98036623b921bf"
+                     /final_sha256="3d79838aa9ad32f6fcd26163c0ca7e72c864d683808f
+                     7dd498325b1dd88257fb"
+                     /dnadesign_feature_id="SECG-030:sigma70:downstream"
+                     /dnadesign_source="densegen_fixed_element"
+                     /selection_epoch="opal_model_round"
+                     /assay_batch_index="1"
+                     /model_as_of_round="0"
+                     /run_id="r0-2026-07-19T22:21:41+00:00-01784499701298508000-
+                     24e5927eb1ce4d0daf013dc0c352c584"
+                     /dg_coord_key="offset_raw"
+                     /dg_offset="22"
+                     /dg_offset_raw="22"
+                     /dg_expected_seq="TATAAT"
+                     /dg_part_kind="fixed_element"
+                     /role="downstream"
+                     /dg_constraint="sigma70_core"
+                     /variant_id="consensus"
+                     /spacer_len="16.0"
+                     /sigma10_variant="consensus"
+                     /sigma10_sequence="TATAAT"
+ORIGIN
+        1 accgggatcc tgcagtagac atgtacgttt atacagttat aatgtgaaaa aatacagttg
+       61 ccattactaa acacctgagg gaattcgcga
+//

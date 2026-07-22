@@ -7,6 +7,7 @@
   "contracts": 0.0,
   "cruncher": 74.0,
   "densegen": 70.0,
+  "folding": 0.0,
   "infer": 32.0,
   "latentdna": 0.0,
   "libshuffle": 0.0,
@@ -16,6 +17,7 @@
   "opal": 64.0,
   "permuter": 42.0,
   "studies": 0.0,
+  "thread": 0.0,
   "tfkdanalysis": 0.0,
   "usr": 57.0
 }

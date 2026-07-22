@@ -1,0 +1,30 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/models.py
+
+Data models for Eco1 panel-selection materialization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class MaterializedSelectionReadiness:
+    """Paths emitted by panel-selection materialization."""
+
+    candidate_triage_table_path: Path
+    local_structure_region_metrics_path: Path
+    local_structure_threshold_sensitivity_path: Path
+    region_msa_support_path: Path
+    hypothesis_panel_selection_trace_path: Path
+    candidate_selection_panel_path: Path
+    candidate_handoff_sequence_csv_path: Path
+    plots_root: Path
+    manifest_path: Path

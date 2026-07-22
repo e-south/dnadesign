@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/run_state.py
+dnadesign
+src/dnadesign/densegen/src/core/run_state.py
 
 Run-state checkpoints for resumable DenseGen runs.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

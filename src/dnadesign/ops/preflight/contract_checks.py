@@ -133,6 +133,7 @@ def build_contract_preflight_checks(
                     required=required,
                     artifact_id=artifact_id,
                     target_rows=int(spec.get("target_rows") or 0),
+                    row_count_mode=str(spec.get("row_count_mode") or "at_least").strip(),
                     contract=contract,
                     repo_root=repo_root,
                     study_root=study_root,
@@ -542,12 +543,15 @@ def _build_dataset_snapshot_check(
     required: bool,
     artifact_id: str,
     target_rows: int,
+    row_count_mode: str,
     contract: _StudyOpsContractLike,
     repo_root: Path,
     study_root: Path,
     dataset_index: Mapping[str, Mapping[str, object]],
     base_details: Mapping[str, object],
 ) -> PreflightCheck:
+    if row_count_mode not in {"at_least", "exact"}:
+        raise ValueError(f"dataset_snapshot check {check_id!r} has unsupported row_count_mode {row_count_mode!r}")
     artifact_state = _resolve_artifact_state(
         artifact_id=artifact_id,
         contract=contract,
@@ -565,7 +569,10 @@ def _build_dataset_snapshot_check(
         resolved_summary = f"{summary.rstrip('.')} Row count is not available."
     else:
         row_count = int(rows)
-        if row_count >= target_rows:
+        if row_count_mode == "exact" and row_count != target_rows:
+            state = "attention"
+            resolved_summary = f"{summary.rstrip('.')}. Current rows {row_count} do not equal expected {target_rows}."
+        elif row_count >= target_rows:
             state = "ok"
             resolved_summary = summary
         else:
@@ -585,6 +592,8 @@ def _build_dataset_snapshot_check(
             **dict(base_details),
             **artifact_state,
             "target_rows": target_rows,
+            "row_count_mode": row_count_mode,
+            "row_delta": int(rows) - target_rows if isinstance(rows, int) else None,
             "row_gap": max(target_rows - int(rows), 0) if isinstance(rows, int) else None,
         },
     )

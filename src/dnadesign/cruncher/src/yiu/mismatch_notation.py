@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/mismatch_notation.py
 
 Compact operator-facing mismatch notation helpers for YIU.

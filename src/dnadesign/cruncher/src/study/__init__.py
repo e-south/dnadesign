@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/study/__init__.py
 
 Study workflow package for sweep-style diagnostics and aggregate reporting.

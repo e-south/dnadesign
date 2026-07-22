@@ -1,5 +1,12 @@
 """
-DenseGen output sinks package.
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/__init__.py
+
+Exports DenseGen output sink adapters.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from .base import DEFAULT_NAMESPACE, SinkBase, USRSink

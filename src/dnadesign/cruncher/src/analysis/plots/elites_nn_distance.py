@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/elites_nn_distance.py
 
 Render elite diversity panels that relate joint score to sequence diversity.

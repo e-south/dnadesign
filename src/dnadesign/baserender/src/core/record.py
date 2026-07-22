@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/core/record.py
 
 Record v1 dataclasses and strict validation for features, effects, and display metadata.

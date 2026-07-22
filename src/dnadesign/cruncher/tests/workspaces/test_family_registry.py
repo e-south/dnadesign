@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/workspaces/test_family_registry.py
 
-Contracts for typed workflow-family registration and family-aware workspace
-discovery.
+Contracts for typed workflow-family registration and family-aware workspace.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -79,6 +78,40 @@ def test_infer_runbook_workflow_families_reports_snapback() -> None:
     families = infer_runbook_workflow_families(payload)
 
     assert families == ("snapback",)
+
+
+def test_workflow_family_descriptor_registers_scar_nick_as_runbook_family() -> None:
+    descriptor = workflow_family_descriptor("scar_nick")
+
+    assert descriptor.id == "scar_nick"
+    assert descriptor.workspace_kind == "runbook_family"
+    assert descriptor.runbook_command_roots == ("scar-nick",)
+    assert descriptor.spec_globs == ("configs/scar_nick/*.scar_nick.yaml",)
+    assert descriptor.default_output_root == "outputs/scar_nick"
+
+
+def test_infer_runbook_workflow_families_reports_scar_nick() -> None:
+    payload = {
+        "runbook": {
+            "schema_version": 1,
+            "name": "demo_scar_nick",
+            "steps": [
+                {
+                    "id": "scar_nick_validate",
+                    "run": [
+                        "scar-nick",
+                        "validate",
+                        "--spec",
+                        "configs/scar_nick/example.scar_nick.yaml",
+                    ],
+                }
+            ],
+        }
+    }
+
+    families = infer_runbook_workflow_families(payload)
+
+    assert families == ("scar_nick",)
 
 
 def test_workspace_kind_from_presence_formalizes_registry_kinds() -> None:

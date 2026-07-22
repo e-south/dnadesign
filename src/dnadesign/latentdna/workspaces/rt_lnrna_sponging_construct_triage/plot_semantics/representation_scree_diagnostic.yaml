@@ -1,0 +1,24 @@
+plot_id: representation_scree_diagnostic
+question: How concentrated is retained PCA variance for each RT-lnRNA candidate representation?
+decision_role: appendix
+encoding: Multi-panel explained-variance and cumulative-variance scree curves for the RT-lnRNA PCA reducer summaries.
+scope: The diagnostic covers full 2,000 bp construct, lnRNA span, RT CDS span, paired-span, and output-layer companion views.
+guardrails:
+  - Use this as the transparent PCA-spectrum companion to the condensed representation-health gate.
+  - Read the curves as representation-collapse diagnostics, not evidence of RT-lnRNA sponging function.
+  - Interpret Khan and Crawford overlays only on construct-projected rows that entered the same Infer sidecar lane.
+caption: PCA scree diagnostic for the RT-lnRNA intermediate and output-layer gallery views.
+alt_text: Eight-panel scree curve grid showing explained and cumulative retained variance for full construct, lnRNA span, RT CDS span, paired-span, and output-layer RT-lnRNA representation views.
+preprocessing_md: Each panel uses the persisted sampled PCA reducer summary for one declared LatentDNA view. Source vectors come from explicit Infer sidecars or block-normalized forward and reverse-complement concatenations.
+math_md: |
+  Each scree panel shows retained PCA variance ratios
+  $$
+  p_i = \frac{\lambda_i}{\sum_j \lambda_j}
+  $$
+  and cumulative retained variance
+  $$
+  \sum_{k \le i} p_k.
+  $$
+rationale_md: The RT-lnRNA construct has multiple plausible view contracts; the scree grid exposes whether any candidate view is dominated by a small number of axes before OPAL X selection.
+limitations_md: The reducer summaries are sample-based and only reflect the retained low-dimensional PCA summary. They do not expose the full Evo2 token grid or prove biological relevance.
+failure_modes_md: Low row counts, duplicated controls, unresolved source overlays, or saturated output-layer means can make the scree look deceptively healthy or collapsed.

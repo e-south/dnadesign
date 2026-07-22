@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/models/__init__.py
+
+Package exports for OPAL models.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

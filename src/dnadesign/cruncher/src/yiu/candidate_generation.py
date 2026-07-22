@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/candidate_generation.py
 
 Deterministic candidate enumeration for YIU v4 optimization.

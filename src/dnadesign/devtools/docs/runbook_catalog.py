@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/devtools/docs/runbook_catalog.py
 
-Regenerates the shared runbook catalog procedure and tool-source sections from
-owner-local metadata sidecars.
+Regenerates the shared runbook catalog procedure and tool-source sections from.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

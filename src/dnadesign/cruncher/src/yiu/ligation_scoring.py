@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/ligation_scoring.py
 
 Ligation-aware ranking helpers for YIU 4-bp junction mismatch selection.

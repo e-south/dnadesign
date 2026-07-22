@@ -1,0 +1,20 @@
+default_scope: next
+scopes:
+  next:
+    include_phases:
+      - current_phase
+      - next_in_progress_phase
+  full:
+    include_phases:
+      - all
+scope:
+  kind: providerless_readiness_plan
+  study_id: rt_lnrna_sponging_construct_triage
+  applies_to:
+    - phase_0_contracts
+    - phase_1_candidate_table
+  excludes:
+    - construct_runtime_projection
+    - infer_gpu_execution
+    - latentdna_materialization
+    - opal_run_or_explain

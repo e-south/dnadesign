@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/io/json_source.py
 
 Strict JSON and JSONL row readers for contract-first baserender inputs.

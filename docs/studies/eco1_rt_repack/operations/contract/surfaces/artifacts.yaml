@@ -1,0 +1,109 @@
+status_note:
+  ref: repo:docs/studies/eco1_rt_repack/record/status.md
+datasets_registry:
+  ref: repo:docs/studies/eco1_rt_repack/record/datasets.yaml
+campaign_record:
+  ref: repo:docs/studies/eco1_rt_repack/record/campaign.yaml
+routes_doc:
+  ref: repo:docs/studies/eco1_rt_repack/routes/README.md
+fixed_backbone_method:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/fixed-backbone-method.md
+implementation_roadmap:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/implementation-roadmap.md
+residue_mask_policy:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/residue-mask-policy.md
+fold_validation_policy:
+  ref: repo:docs/studies/eco1_rt_repack/contexts/fold-validation-policy.md
+eco1_rt_profile_fixture:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/eco1_rt_v1.profile.yaml
+conservative_mask_cases:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/fixtures/thread/conservative_mask_cases.yaml
+eco1_rt_profile_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/eco1-rt-profile.schema.yaml
+thread_candidate_handoff_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/thread-candidate-handoff.schema.yaml
+thread_artifact_chain_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/thread-artifact-chain.schema.yaml
+rt_lnrna_candidate_acceptance_schema:
+  ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml
+structure_sources:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
+residue_numbering_audit:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-audit.md
+residue_numbering_policy:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/residue-numbering-policy.yaml
+structure_preprocessing_policy:
+  ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/structure-preprocessing.yaml
+rt_lnrna_route_map:
+  ref: repo:docs/studies/rt_lnrna_sponging_construct_triage/routes/README.md
+planned_runtime_root:
+  status: partially_materialized
+  root_ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread
+  commit_policy: ask_before_commit
+planned_backbone_bundle:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/backbone_bundle.yaml
+planned_residue_map:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/residue_map.parquet
+planned_structure_preprocessing_manifest:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/structure_preprocessing_manifest.yaml
+planned_conservation_profile:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
+planned_contact_profile:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_profile.parquet
+planned_contact_geometry_profile:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_geometry_profile.parquet
+planned_manual_mask_authority:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/manual_mask_authority.yaml
+planned_mask_set:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/mask_set.yaml
+planned_contact_risk_profile:
+  status: materialized_audit_only
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/contact_risk_profile.yaml
+thread_plan_artifact:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/thread_plan.yaml
+planned_proteinmpnn_request:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/proteinmpnn_request/request_manifest.yaml
+planned_sample_table:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/sample_table.parquet
+planned_candidate_table:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_table.parquet
+planned_foldcheck_request:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
+planned_foldcheck_input_fasta:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/input_sequences.fasta
+planned_foldcheck_report:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_report.parquet
+  coverage: full WT plus 1007-candidate v3 ColabFold report materialized.
+candidate_triage_table:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_triage_table.parquet
+candidate_selection_panel:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_selection_panel.parquet
+candidate_handoff_sequences:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/candidate_handoff_sequences.csv
+twist_full_cds_handoff:
+  status: materialized_quote_and_upload_ready
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/twist_handoff/twist_handoff_manifest.yaml
+review_deliverable_manifest:
+  status: materialized
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/review_deliverable_manifest.yaml
+planned_candidate_handoff:
+  status: planned
+  ref: repo:src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/candidate_handoff.yaml

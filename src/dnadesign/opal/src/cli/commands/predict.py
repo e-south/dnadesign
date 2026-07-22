@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/predict.py
 
-CLI command for running ephemeral predictions from saved models. Resolves model
-artifacts and outputs prediction tables.
+CLI command for running ephemeral predictions from saved models. Resolves model.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/snapback.py
 
 CLI entrypoints for explicit v2 and co-design solve v3 snapback workflows.
@@ -67,7 +67,7 @@ app.command(
     "released-target-search",
     help=(
         "Search paired nickase plus release-enzyme combinations for released-product snapback targets. "
-        "Legacy defaults evaluate the exposed post-release bottom strand, while optional route-policy flags "
+        "By default, the search evaluates the exposed post-release bottom strand; route-policy flags "
         "expand the search to retained active top or bottom strands."
     ),
 )(released_target_search_cmd)

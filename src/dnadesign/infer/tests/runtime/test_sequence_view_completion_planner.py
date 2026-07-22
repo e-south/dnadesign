@@ -17,10 +17,15 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from dnadesign.infer.src.features import completion_planner
+from dnadesign.infer.src.features import aliases, completion_planner
 from dnadesign.infer.src.features.aliases import (
+    FEATURE_ALIAS_INVENTORY_COLUMNS,
+    FEATURE_SCALAR_ALIAS_INVENTORY_COLUMNS,
     feature_alias_path,
+    load_feature_alias_inventory_rows,
+    load_feature_scalar_alias_inventory_rows,
     persist_feature_alias_rows,
+    persist_feature_scalar_alias_rows,
     persist_feature_scalar_rows,
     persist_feature_vector_rows,
 )
@@ -31,6 +36,7 @@ from dnadesign.infer.src.features.completion_planner import (
 from dnadesign.infer.src.features.contracts import SequenceFeatureBundleConfig
 from dnadesign.infer.src.features.execution import (
     _sequence_view_feature_alias_rows,
+    _sequence_view_feature_scalar_alias_rows,
     _sequence_view_feature_scalar_specs,
     _sequence_view_feature_vector_specs,
     build_feature_metadata_rows,
@@ -467,6 +473,153 @@ def test_sequence_view_completion_planner_uses_key_only_vector_inventory(
     assert key_only_calls == 1
     assert plan.persisted_vector_reusable == 2
     assert plan.missing_vectors == 0
+
+
+def test_feature_alias_inventory_loaders_project_narrow_columns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usr_root, dataset = _dataset_with_sequence_view(tmp_path)
+    bundle = SequenceFeatureBundleConfig(
+        collect_log_likelihood=True,
+        sequence_view_inputs=[
+            {
+                "dataset": dataset,
+                "root": usr_root.as_posix(),
+                "view_selector": {"product_kind": "analysis_window"},
+                "pooling": {"operation": "core60_mean"},
+            }
+        ],
+    )
+    records = load_sequence_view_input_records(bundle=bundle)
+    contexts = resolve_sequence_view_contexts(records=records)
+    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id="evo2_7b")
+    selector = resolve_intermediate_selector(model_id="evo2_7b", intermediate_block=bundle.intermediate_block)
+    persist_feature_alias_rows(
+        _sequence_view_feature_alias_rows(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            bundle=bundle,
+            selector=selector.intermediate_selector,
+            model_id="evo2_7b",
+        )
+    )
+    persist_feature_scalar_alias_rows(
+        _sequence_view_feature_scalar_alias_rows(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            bundle=bundle,
+            model_id="evo2_7b",
+        )
+    )
+
+    captured_columns: list[tuple[str, ...]] = []
+    real_read_table = aliases.pq.read_table
+
+    def track_read_table(*args: object, **kwargs: object):
+        captured_columns.append(tuple(str(column) for column in (kwargs.get("columns") or ())))
+        return real_read_table(*args, **kwargs)
+
+    monkeypatch.setattr(aliases.pq, "read_table", track_read_table)
+
+    vector_rows = load_feature_alias_inventory_rows(dataset_root=usr_root, dataset_id=dataset)
+    scalar_rows = load_feature_scalar_alias_inventory_rows(dataset_root=usr_root, dataset_id=dataset)
+
+    assert captured_columns == [
+        FEATURE_ALIAS_INVENTORY_COLUMNS,
+        FEATURE_SCALAR_ALIAS_INVENTORY_COLUMNS,
+    ]
+    assert set(vector_rows[0]) == set(FEATURE_ALIAS_INVENTORY_COLUMNS)
+    assert set(scalar_rows[0]) == set(FEATURE_SCALAR_ALIAS_INVENTORY_COLUMNS)
+    assert "sequence_id" not in vector_rows[0]
+    assert "sequence_id" not in scalar_rows[0]
+
+
+def test_sequence_view_inventory_completion_reuses_dataset_inventory_cache(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usr_root, dataset = _dataset_with_sequence_view(tmp_path)
+    bundle = SequenceFeatureBundleConfig(
+        collect_log_likelihood=True,
+        sequence_view_inputs=[
+            {
+                "dataset": dataset,
+                "root": usr_root.as_posix(),
+                "view_selector": {"product_kind": "analysis_window"},
+                "pooling": {"operation": "core60_mean"},
+            }
+        ],
+    )
+    records = load_sequence_view_input_records(bundle=bundle)
+    contexts = resolve_sequence_view_contexts(records=records)
+    metadata_rows = build_feature_metadata_rows(contexts=contexts, bundle=bundle, model_id="evo2_7b")
+    selector = resolve_intermediate_selector(model_id="evo2_7b", intermediate_block=bundle.intermediate_block)
+    persist_feature_alias_rows(
+        _sequence_view_feature_alias_rows(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            bundle=bundle,
+            selector=selector.intermediate_selector,
+            model_id="evo2_7b",
+        )
+    )
+    persist_feature_scalar_alias_rows(
+        _sequence_view_feature_scalar_alias_rows(
+            contexts=contexts,
+            metadata_rows=metadata_rows,
+            bundle=bundle,
+            model_id="evo2_7b",
+        )
+    )
+
+    call_counts = {
+        "vector_alias": 0,
+        "vector_keys": 0,
+        "scalar_alias": 0,
+        "scalar_keys": 0,
+    }
+    real_vector_alias_loader = completion_planner.load_feature_alias_inventory_rows
+    real_vector_key_loader = completion_planner._load_feature_vector_key_inventory
+    real_scalar_alias_loader = completion_planner.load_feature_scalar_alias_inventory_rows
+    real_scalar_key_loader = completion_planner._load_feature_scalar_key_inventory
+
+    def track_vector_alias_loader(*args: object, **kwargs: object) -> list[dict[str, object]]:
+        call_counts["vector_alias"] += 1
+        return real_vector_alias_loader(*args, **kwargs)
+
+    def track_vector_key_loader(*args: object, **kwargs: object) -> set[str]:
+        call_counts["vector_keys"] += 1
+        return real_vector_key_loader(*args, **kwargs)
+
+    def track_scalar_alias_loader(*args: object, **kwargs: object) -> list[dict[str, object]]:
+        call_counts["scalar_alias"] += 1
+        return real_scalar_alias_loader(*args, **kwargs)
+
+    def track_scalar_key_loader(*args: object, **kwargs: object) -> set[str]:
+        call_counts["scalar_keys"] += 1
+        return real_scalar_key_loader(*args, **kwargs)
+
+    monkeypatch.setattr(completion_planner, "load_feature_alias_inventory_rows", track_vector_alias_loader)
+    monkeypatch.setattr(completion_planner, "_load_feature_vector_key_inventory", track_vector_key_loader)
+    monkeypatch.setattr(completion_planner, "load_feature_scalar_alias_inventory_rows", track_scalar_alias_loader)
+    monkeypatch.setattr(completion_planner, "_load_feature_scalar_key_inventory", track_scalar_key_loader)
+
+    inventory_cache: dict[tuple[str, ...], object] = {}
+    for job_id in ("reference_views_forward", "reference_views_repeat"):
+        plan_sequence_view_feature_inventory_completion(
+            bundle=bundle,
+            model_id="evo2_7b",
+            job_id=job_id,
+            inventory_cache=inventory_cache,
+        )
+
+    assert call_counts == {
+        "vector_alias": 1,
+        "vector_keys": 1,
+        "scalar_alias": 1,
+        "scalar_keys": 1,
+    }
 
 
 def test_sequence_view_inventory_completion_reuses_aliases_and_reports_stale_payloads(tmp_path: Path) -> None:

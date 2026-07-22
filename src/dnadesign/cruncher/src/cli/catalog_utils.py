@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/catalog_utils.py
 
 Utility functions used by catalog CLI commands for target resolution and assets.

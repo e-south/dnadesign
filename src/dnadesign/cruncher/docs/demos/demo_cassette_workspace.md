@@ -5,7 +5,7 @@
 **Audience:** cassette workflow users and maintainers
 **Last updated by:** cruncher-maintainers on 2026-04-05
 **Applies to:** `uv run cruncher cassette init-workspace|solve` plus `uv run baserender job validate|run`
-**Last verified:** 2026-03-25
+**Last verified:** 2026-06-24
 **Primary artifacts:** `cassette_workspace_manifest.json`, `outputs/cassette_solves/<solve_id>/views/*.jsonl`, `baserender_jobs/*.job.yaml`, and workspace-local `renders/*.pdf`
 
 ### Contents

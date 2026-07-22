@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_meme.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_meme.py
 
 PWM input source (MEME format) with explicit Stage-A sampling policies.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

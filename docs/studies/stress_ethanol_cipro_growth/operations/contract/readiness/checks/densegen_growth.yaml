@@ -1,0 +1,21 @@
+checks:
+  densegen_growth:
+  - kind: runbook_plan
+    check_id: densegen.batch.plan
+    check_group: densegen
+    summary: DenseGen batch runbook renders cleanly.
+    required: true
+    surface: densegen_batch
+  - kind: dataset_snapshot
+    check_id: densegen.anchor.rows
+    check_group: densegen
+    summary: DenseGen anchor dataset row count is visible.
+    required: true
+    artifact: densegen_anchor_source
+    target_rows: 100000
+  - kind: command
+    check_id: densegen.config.probe_solver
+    check_group: densegen
+    summary: DenseGen config probe completed.
+    required: true
+    surface: densegen_probe_solver

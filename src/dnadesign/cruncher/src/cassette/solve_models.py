@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cassette/solve_models.py
 
 Schema and report contracts for cassette solve/search workflows.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/overlays/test_overlays.py
 
 Tests overlay-first attach and materialize behavior.

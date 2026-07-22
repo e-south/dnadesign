@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/models/test_gaussian_process_model.py
 
 Regression tests for GaussianProcess model prediction and load semantics.

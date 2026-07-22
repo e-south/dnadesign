@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/util/slug.py
 
+Utility helpers for slug cluster util.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

@@ -3,6 +3,8 @@
 dnadesign
 src/dnadesign/cluster/src/opal/join.py
 
+Focused helpers for join cluster OPAL.
+
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

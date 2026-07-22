@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/runs.py
 
 Renders runs list output for OPAL CLI. Formats list of run metadata entries.
@@ -30,8 +30,7 @@ def render_runs_list_text(rows: Sequence[Mapping[str, object]]) -> str:
         table.add_column("r", style="bold")
         table.add_column("run_id")
         table.add_column("model")
-        table.add_column("objective")
-        table.add_column("selection")
+        table.add_column("views")
         table.add_column("n_train")
         table.add_column("n_scored")
         for r in rows:
@@ -39,8 +38,7 @@ def render_runs_list_text(rows: Sequence[Mapping[str, object]]) -> str:
                 str(r.get("as_of_round")),
                 _truncate(r.get("run_id", ""), 18),
                 str(r.get("model")),
-                str(r.get("objective")),
-                str(r.get("selection")),
+                str(r.get("selection_view_count")),
                 str(r.get("stats_n_train")),
                 str(r.get("stats_n_scored")),
             )
@@ -53,8 +51,7 @@ def render_runs_list_text(rows: Sequence[Mapping[str, object]]) -> str:
             f"r={r.get('as_of_round')}",
             f"run_id={_truncate(r.get('run_id', ''), 18)}",
             f"model={r.get('model')}",
-            f"objective={r.get('objective')}",
-            f"selection={r.get('selection')}",
+            f"views={r.get('selection_view_count')}",
             f"n_train={r.get('stats_n_train')}",
             f"n_scored={r.get('stats_n_scored')}",
         ]

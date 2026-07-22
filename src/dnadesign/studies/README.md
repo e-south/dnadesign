@@ -1,22 +1,29 @@
 ![Studies banner](assets/studies-banner.svg)
 
-Study-family packages keep domain-specific study semantics outside `ops` core.
-They read checked-in study records from [Study records](../../../docs/studies/README.md),
-assemble family-owned snapshot or preflight logic, and expose provider-owned
-registry fragments that `ops progress` can discover lazily.
+`studies` contains narrow helpers for checked-in study records that need code
+without becoming generic tool features. Ops owns the status and preflight APIs;
+this package keeps concrete study logic inside the owning study unit and shared
+record parsing under `core`.
 
-Use this package when:
-- you are adding or changing family-specific study snapshot or preflight logic
-- you need to register a new study-owned status surface without editing OPS core
+## Documentation
 
-Do not use this package when:
-- the change belongs to neutral OPS control-plane or observation-shell code
-- the change only touches checked-in study records under `docs/studies/`
+- [Study records index](../../../docs/studies/README.md): checked-in study
+  manifests, routes, and status notes.
+- [Ops README](../ops/README.md): status, preflight, and orchestration entry
+  points.
+- [Repository docs index](../../../docs/README.md): cross-tool workflow routing.
 
-Current families:
-- `promoter`: promoter-study snapshot and preflight adapters
-- `cruncher`: command-centric Cruncher study snapshot and preflight adapters
+## Source Layout
 
-See also:
-- [Ops README](../ops/README.md)
-- [Study records](../../../docs/studies/README.md)
+- `assets/`: study-package visual/static assets.
+- `core/`: study-record contracts, loaders, selectors, and preflight planning
+  primitives that are not tied to one study.
+- `units/<study-id>/`: concrete study source units. Study-specific status,
+  preflight, compiler, or handoff logic stays inside the owning study.
+- `units/<study-id>/tests/`: concrete study tests. Study-specific tests stay
+  inside the owning unit instead of a parallel package-level test tree.
+- `tests/test_*.py`: shared `studies.core` and package-level contract tests
+  only. Do not put concrete study tests at the package-level test root.
+
+Do not add a generic cross-study status layer for one study's behavior. Extract
+shared code only after a second real study proves the contract.

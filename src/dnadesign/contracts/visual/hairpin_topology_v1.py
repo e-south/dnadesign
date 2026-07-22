@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/hairpin_topology_v1.py
 
 Shared ssDNA hairpin visual contract for cassette QA rendering.

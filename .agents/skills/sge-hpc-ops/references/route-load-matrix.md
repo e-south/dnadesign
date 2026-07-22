@@ -18,7 +18,7 @@ Load when needed by task scope:
 - user status communication: `session-status-reporting.md`, `user-status-contract.md`
 - submit-shape and submit readiness: `submission-shape-advisor.md`, `operator-brief.md`
 - command-first Ops runbooks: `runbook-entrypoints.md`
-- BU SCC policy claims: `bu-scc-system-usage.md`, `source-evidence.md`
+- BU SCC policy claims: `bu-scc-system-usage.md`, `external-sources.md`
 - automation/policy mechanics: `ci-mechanical-gates.md`
 
 ### Route packs
@@ -46,16 +46,16 @@ Load when needed by task scope:
 ### Script map by concern
 
 status and pressure:
-- `scripts/sge-session-status.sh`
-- `scripts/sge-active-jobs.sh`
-- `scripts/sge-status-card.sh`
+- `$SKILL_DIR/scripts/sge-session-status.sh`
+- `$SKILL_DIR/scripts/sge-active-jobs.sh`
+- `$SKILL_DIR/scripts/sge-status-card.sh`
 
 submit-shape and readiness:
-- `scripts/sge-submit-shape-advisor.sh`
-- `scripts/sge-operator-brief.sh`
+- `$SKILL_DIR/scripts/sge-submit-shape-advisor.sh`
+- `$SKILL_DIR/scripts/sge-operator-brief.sh`
 
 submit artifact checks:
-- `scripts/qa-sge-submit-preflight.sh`
+- `$SKILL_DIR/scripts/qa-sge-submit-preflight.sh`
 
 ### Minimal loading examples
 

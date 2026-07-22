@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/topology_cartoon.py
 
-QA-oriented topology-cartoon renderer for YIU circular, branched, and retained
-states.
+QA-oriented topology-cartoon renderer for YIU circular, branched, and retained.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

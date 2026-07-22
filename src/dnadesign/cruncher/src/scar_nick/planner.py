@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/planner.py
 
 Deterministic planning and ranking for scar-nick candidates.
@@ -32,6 +32,7 @@ from dnadesign.cruncher.scar_nick.geometry import (
     placements_for_entry,
 )
 from dnadesign.cruncher.scar_nick.models import (
+    CandidateRankingContext,
     JunctionSpec,
     NickaseGeometryAuditEntry,
     NickasePlacement,
@@ -43,6 +44,8 @@ from dnadesign.cruncher.scar_nick.models import (
     SearchSpec,
     ValidationIssue,
 )
+from dnadesign.cruncher.scar_nick.policy import classify_profile_policy
+from dnadesign.cruncher.scar_nick.profiles import profile_label_s3s2s1s0
 from dnadesign.cruncher.scar_nick.ranking import (
     rank_pair_candidates,
     ranking_key,
@@ -293,6 +296,20 @@ def _candidate_inputs(
     return [seed, *pairs]
 
 
+def _candidate_profile_needed_for_report(
+    profile: str,
+    *,
+    context: CandidateRankingContext,
+    s0_match_required: bool,
+) -> bool:
+    decision = classify_profile_policy(profile, context=context, s0_match_required=s0_match_required)
+    if decision.status == "reserve":
+        return True
+    if context.target_profile_buckets:
+        return profile in context.target_profile_buckets
+    return decision.status == "active"
+
+
 def build_scar_nick_report(
     spec: ScarNickSpecDocument,
     *,
@@ -373,12 +390,30 @@ def build_scar_nick_report(
     enumerated_count = 0
     if not issues and release_placement is not None:
         evaluated: list[ScarNickCandidate] = []
-        for left_base, right_base in _candidate_inputs(
+        candidate_inputs = _candidate_inputs(
             spec.search,
             spec.junction,
             left_bases=compatible_scar_sequences,
-        ):
-            enumerated_count += 1
+        )
+        enumerated_count = len(candidate_inputs)
+        profile_needed: dict[str, bool] = {}
+        for left_base, right_base in candidate_inputs:
+            seed_candidate = (left_base, right_base) == (spec.junction.left_base, spec.junction.right_base)
+            profile = profile_label_s3s2s1s0(
+                left_base,
+                right_base,
+                allow_gt_wobble=spec.ranking_context.allow_gt_wobble,
+            )
+            needed = profile_needed.get(profile)
+            if needed is None:
+                needed = _candidate_profile_needed_for_report(
+                    profile,
+                    context=spec.ranking_context,
+                    s0_match_required=spec.junction.s0_match_required,
+                )
+                profile_needed[profile] = needed
+            if not needed and not seed_candidate:
+                continue
             nickase_placement = _best_nickase_placement_for_candidate(
                 left_base,
                 right_base,
@@ -405,7 +440,7 @@ def build_scar_nick_report(
                     }
                 )
             evaluated.append(candidate)
-            if (left_base, right_base) == (spec.junction.left_base, spec.junction.right_base):
+            if seed_candidate:
                 rejected_controls.append(candidate)
 
         ranked = rank_pair_candidates(evaluated, context=spec.ranking_context)

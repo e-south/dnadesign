@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_docs_path_contracts.py
 
 Validate public docs against the current run-artifact path contract.
@@ -94,7 +94,7 @@ def test_readme_omits_repo_contract_docs_block() -> None:
 
 def test_root_dependencies_doc_references_existing_cruncher_workspace_config() -> None:
     repo_root = _package_root().parents[2]
-    deps_doc = (repo_root / "docs" / "dependencies.md").read_text()
+    deps_doc = (repo_root / "docs" / "setup" / "dependencies.md").read_text()
     expected = "src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml"
     stale = "src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml"
     assert expected in deps_doc

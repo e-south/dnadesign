@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/job_contracts.py
 
 Explicit render-contract descriptors for BaseRender job-like YAML contracts.

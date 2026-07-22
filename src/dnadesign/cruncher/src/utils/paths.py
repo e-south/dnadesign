@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/utils/paths.py
 
-Author(s): Eric J. South
+Utility helpers for paths Cruncher utils.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

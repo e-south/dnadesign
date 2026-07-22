@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/round/__init__.py
 
-Round-level orchestration helpers and contracts for OPAL runs. Exposes round
-stage contracts and reusable stage utilities.
+Round-level orchestration helpers and contracts for OPAL runs. Exposes round.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

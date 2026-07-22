@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/latentdna/tests/integrations/test_multiview_extensions_workflow.py
 
-Workflow tests for matrix-bundle views and extended derived/scalar
-operations.
+Workflow tests for matrix-bundle views and extended derived/scalar.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -142,6 +141,33 @@ def test_block_normalized_concatenate_projection_indices_preserve_reference_row_
     )
 
     np.testing.assert_allclose(output, _manual_block_normalized(matrix)[projection_indices])
+
+
+def test_concatenate_uses_manifest_declared_record_key() -> None:
+    reference_rows = pa.table(
+        {
+            "construct_subject__id": ["subject_a", "subject_b"],
+            "parent_sequence_id": ["forward_a", "forward_b"],
+        }
+    )
+    candidate_rows = pa.table(
+        {
+            "construct_subject__id": ["subject_b", "subject_a"],
+            "parent_sequence_id": ["reverse_b", "reverse_a"],
+        }
+    )
+    candidate_matrix = np.asarray([[2.0, 20.0], [1.0, 10.0]], dtype=np.float32)
+
+    projected = _project_matrix_to_reference_rows(
+        reference_rows,
+        candidate_rows,
+        candidate_matrix,
+        input_view="reverse_construct_view",
+        reference_manifest={"params": {"record_key": "construct_subject__id"}},
+        candidate_manifest={"params": {"record_key": "construct_subject__id"}},
+    )
+
+    np.testing.assert_array_equal(projected, np.asarray([[1.0, 10.0], [2.0, 20.0]], dtype=np.float32))
 
 
 def _write_workspace_config(workspace_dir: Path, bundle_dir: Path, context_path: Path) -> None:

@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/views/derive.py
+
 Derived view builders for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -76,14 +83,46 @@ def _resolve_join_keys(left_rows: pa.Table, right_rows: pa.Table) -> tuple[str, 
     return None
 
 
-def _candidate_join_keys(left_rows: pa.Table, right_rows: pa.Table) -> list[tuple[str, str]]:
+def _manifest_declared_key_candidates(
+    left_rows: pa.Table,
+    right_rows: pa.Table,
+    *,
+    left_manifest: dict[str, Any] | None,
+    right_manifest: dict[str, Any] | None,
+) -> list[tuple[str, str]]:
     left_columns = set(left_rows.column_names)
     right_columns = set(right_rows.column_names)
-    return [
-        (left_key, right_key)
-        for left_key, right_key in _JOIN_KEY_CANDIDATES
-        if left_key in left_columns and right_key in right_columns
-    ]
+    candidates: list[tuple[str, str]] = []
+
+    def append_candidate(left_key: object, right_key: object) -> None:
+        if not isinstance(left_key, str) or not isinstance(right_key, str) or not left_key or not right_key:
+            return
+        candidate = (left_key, right_key)
+        if left_key in left_columns and right_key in right_columns and candidate not in candidates:
+            candidates.append(candidate)
+
+    left_params = left_manifest.get("params", {}) if left_manifest else {}
+    right_params = right_manifest.get("params", {}) if right_manifest else {}
+    for key_name in ("record_key", "subject_key", "context_key"):
+        append_candidate(left_params.get(key_name), right_params.get(key_name))
+    for left_key, right_key in _JOIN_KEY_CANDIDATES:
+        append_candidate(left_key, right_key)
+    return candidates
+
+
+def _candidate_join_keys(
+    left_rows: pa.Table,
+    right_rows: pa.Table,
+    *,
+    left_manifest: dict[str, Any] | None = None,
+    right_manifest: dict[str, Any] | None = None,
+) -> list[tuple[str, str]]:
+    return _manifest_declared_key_candidates(
+        left_rows,
+        right_rows,
+        left_manifest=left_manifest,
+        right_manifest=right_manifest,
+    )
 
 
 def _project_matrix_to_reference_rows_for_keys(
@@ -189,8 +228,15 @@ def _projection_indices_to_reference_rows(
     candidate_rows: pa.Table,
     *,
     input_view: str,
+    reference_manifest: dict[str, Any] | None = None,
+    candidate_manifest: dict[str, Any] | None = None,
 ) -> np.ndarray:
-    candidates = _candidate_join_keys(reference_rows, candidate_rows)
+    candidates = _candidate_join_keys(
+        reference_rows,
+        candidate_rows,
+        left_manifest=reference_manifest,
+        right_manifest=candidate_manifest,
+    )
     if not candidates:
         raise ContractViolationError(
             f"concatenate requires matching rows or joinable key support; {input_view!r} shares no supported join key"
@@ -220,8 +266,15 @@ def _project_matrix_to_reference_rows(
     candidate_matrix: np.ndarray,
     *,
     input_view: str,
+    reference_manifest: dict[str, Any] | None = None,
+    candidate_manifest: dict[str, Any] | None = None,
 ) -> np.ndarray:
-    candidates = _candidate_join_keys(reference_rows, candidate_rows)
+    candidates = _candidate_join_keys(
+        reference_rows,
+        candidate_rows,
+        left_manifest=reference_manifest,
+        right_manifest=candidate_manifest,
+    )
     if not candidates:
         raise ContractViolationError(
             f"concatenate requires matching rows or joinable key support; {input_view!r} shares no supported join key"
@@ -472,6 +525,7 @@ def _derive_concatenate_artifact(
 ) -> tuple[Path, int, int, str, list[str]]:
     matrices: list[np.ndarray] = []
     rows_table: pa.Table | None = None
+    rows_manifest: dict[str, Any] | None = None
     record_key: str | None = None
     row_columns: list[str] | None = None
     input_spaces = {
@@ -488,6 +542,7 @@ def _derive_concatenate_artifact(
         matrix, candidate_rows, manifest = _load_view_artifact(context, input_view)
         if rows_table is None:
             rows_table = candidate_rows
+            rows_manifest = manifest
             record_key = str(manifest["params"]["record_key"])
             row_columns = list(candidate_rows.column_names)
         elif not rows_table.equals(candidate_rows, check_metadata=False):
@@ -496,6 +551,8 @@ def _derive_concatenate_artifact(
                 candidate_rows,
                 matrix,
                 input_view=input_view,
+                reference_manifest=rows_manifest,
+                candidate_manifest=manifest,
             )
         matrices.append(matrix)
     assert rows_table is not None and record_key is not None and row_columns is not None
@@ -514,6 +571,7 @@ def _derive_block_normalized_concatenate_artifact(
 ) -> tuple[Path, int, int, str, list[str]]:
     loaded_inputs: list[tuple[str, np.ndarray, pa.Table, dict[str, Any], np.ndarray | None]] = []
     rows_table: pa.Table | None = None
+    rows_manifest: dict[str, Any] | None = None
     record_key: str | None = None
     row_columns: list[str] | None = None
     total_dims = 0
@@ -522,6 +580,7 @@ def _derive_block_normalized_concatenate_artifact(
         projection_indices: np.ndarray | None = None
         if rows_table is None:
             rows_table = candidate_rows
+            rows_manifest = manifest
             record_key = str(manifest["params"]["record_key"])
             row_columns = list(candidate_rows.column_names)
         elif not rows_table.equals(candidate_rows, check_metadata=False):
@@ -529,6 +588,8 @@ def _derive_block_normalized_concatenate_artifact(
                 rows_table,
                 candidate_rows,
                 input_view=input_view,
+                reference_manifest=rows_manifest,
+                candidate_manifest=manifest,
             )
         loaded_inputs.append((input_view, matrix, candidate_rows, manifest, projection_indices))
         total_dims += int(matrix.shape[1])

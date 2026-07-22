@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/tests/scripts/test_build_reader_sfxi_reference_overlay.py
+
+Regression tests for build reader SFXI reference overlay USR scripts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import math
@@ -141,6 +152,49 @@ def test_reader_sfxi_overlay_table_uses_registered_contract_types() -> None:
     assert table.schema.field("sfxi_ref__metric_value").type == pa.float64()
     assert table.schema.field("sfxi_ref__setpoint_vector").type == pa.list_(pa.float64())
     assert table.schema.field("sfxi_ref__clip_lo_mask").type == pa.bool_()
+
+
+def test_reader_sfxi_overlay_records_canonical_vec8_source_ref(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    captured: dict[str, Path] = {}
+
+    def fake_read_usr_base_records(usr_root: Path, dataset_name: str) -> pd.DataFrame:
+        del usr_root, dataset_name
+        return _base_records()
+
+    def fake_read_reader_vec8(vec8_path: Path) -> pd.DataFrame:
+        captured["vec8_path"] = vec8_path
+        return pd.DataFrame({"placeholder": [1]})
+
+    def fake_score_reader_vec8(
+        vec8: pd.DataFrame,
+        *,
+        reader_root: Path,
+        setpoint_name: str,
+        setpoint_vector,
+    ) -> pd.DataFrame:
+        del vec8, reader_root, setpoint_name, setpoint_vector
+        return _scored_rows()
+
+    monkeypatch.setattr(overlay, "read_usr_base_records", fake_read_usr_base_records)
+    monkeypatch.setattr(overlay, "read_reader_vec8", fake_read_reader_vec8)
+    monkeypatch.setattr(overlay, "score_reader_vec8", fake_score_reader_vec8)
+
+    frame = overlay.build_overlay_from_reader(
+        usr_root=tmp_path / "usr",
+        dataset_name="usr_prom_eth_cip_anchor",
+        reader_root=Path("reader"),
+        vec8_path=Path("reader_outputs/vec8.parquet"),
+        collection_id="reader_sfxi_pdual10_latest",
+        campaign_id="20260501_sfxi_promoter_setpoint_scatter",
+    )
+
+    expected_vec8_path = (tmp_path / "reader_outputs/vec8.parquet").resolve()
+    assert captured["vec8_path"] == expected_vec8_path
+    assert frame["sfxi_ref__source_ref"].unique().tolist() == [str(expected_vec8_path)]
 
 
 def test_reader_sfxi_overlay_validates_against_packaged_usr_registry() -> None:

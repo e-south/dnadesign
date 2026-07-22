@@ -1,0 +1,20 @@
+checks:
+  phase_1_construct_subject_table:
+    - kind: path_exists
+      check_id: rt_lnrna.construct_subject.schema
+      check_group: construct_subject_contract
+      summary: Construct-subject table schema is present.
+      required: true
+      artifact: construct_subject_schema
+    - kind: path_exists
+      check_id: rt_lnrna.construct_subject.retron26_fixture
+      check_group: construct_subject_contract
+      summary: Working-anchor construct-subject fixture is present.
+      required: true
+      artifact: construct_subject_fixture_retron26
+    - kind: path_exists
+      check_id: rt_lnrna.construct_subject.retron43_fixture
+      check_group: construct_subject_contract
+      summary: Failed-anchor construct-subject fixture is present.
+      required: true
+      artifact: construct_subject_fixture_retron43

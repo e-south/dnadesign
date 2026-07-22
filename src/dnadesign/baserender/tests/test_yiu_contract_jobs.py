@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_yiu_contract_jobs.py
 
-Tests for direct YIU evidence-contract rendering through the public baserender
-job surface.
+Tests for direct YIU evidence-contract rendering through the public baserender.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

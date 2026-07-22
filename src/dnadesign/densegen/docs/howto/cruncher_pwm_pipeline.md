@@ -1,7 +1,7 @@
 ## Cruncher to DenseGen PWM handoff
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 This how-to guide explains the current handoff contract from Cruncher motif artifacts into DenseGen PWM-driven workspaces. Read it when you need a reproducible path from motif discovery to Stage-A pools, Stage-B libraries, and solve-to-quota outputs.
@@ -17,7 +17,7 @@ This section clarifies what DenseGen expects from upstream Cruncher outputs.
 
 DenseGen consumes PWM artifacts as explicit per-input files. Do not assume a single aggregated set contract unless your workspace schema explicitly defines one.
 
-For exact JSON field requirements, use **[motif artifact JSON contract](../reference/motif_artifacts.md)**. For sampling behavior after ingest, use **[sampling model](../concepts/sampling.md)**.
+For exact JSON field requirements, use **[motif artifact JSON contract](../reference/motif_artifacts.md)**. For sampling behavior after ingest, use **[sampling model](../concepts/generation/sampling.md)**.
 
 For packaged workspace refresh from Cruncher:
 

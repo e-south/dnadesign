@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/contracts/visual/cassette_views_manifest_v1.py
 
 Discovery manifest for cassette visual-contract bundles.

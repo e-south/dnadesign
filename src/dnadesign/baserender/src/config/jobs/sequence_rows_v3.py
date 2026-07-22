@@ -1,11 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/jobs/sequence_rows_v3.py
 
 Sequence Rows v3 job contract exports.
-This module is the organized job-schema namespace; implementation currently lives
-in config/cruncher_showcase_job.py for compatibility.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

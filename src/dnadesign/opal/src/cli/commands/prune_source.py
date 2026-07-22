@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/prune_source.py
+
+CLI wiring for prune source OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

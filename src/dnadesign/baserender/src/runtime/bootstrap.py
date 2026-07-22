@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/runtime/bootstrap.py
 
 Explicit runtime bootstrap for baserender contracts and effect drawers.

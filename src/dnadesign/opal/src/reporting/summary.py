@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/reporting/summary.py
 
-Summarizes run logs and run metadata for reporting commands. Provides helpers
-for CLI status and log summaries.
+Summarizes run logs and run metadata for reporting commands. Provides helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -20,6 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional
 import pandas as pd
 
 from ..core.utils import OpalError
+from ..storage.artifacts import validate_progress_event
 from ..storage.ledger import LedgerReader
 
 
@@ -29,12 +30,11 @@ def list_runs(reader: LedgerReader, *, round_selector: Optional[int] = None) -> 
             "run_id",
             "as_of_round",
             "model__name",
-            "objective__name",
-            "selection__name",
+            "objective__defs_json",
+            "selection_views__defs_json",
             "training__y_ops",
             "stats__n_train",
             "stats__n_scored",
-            "objective__summary_stats",
         ]
     )
     if round_selector is not None:
@@ -54,6 +54,14 @@ def select_run_meta(
         sel = df_runs[df_runs["run_id"].astype(str) == str(run_id)]
         if sel.empty:
             raise OpalError(f"run_id not found in ledger: {run_id}")
+        if round_sel is not None:
+            round_matches = sel[sel["as_of_round"] == int(round_sel)]
+            if round_matches.empty:
+                rounds = sorted({int(value) for value in sel["as_of_round"].dropna().tolist()})
+                raise OpalError(
+                    f"run_id {run_id!r} belongs to round(s) {rounds}, but --round selected {int(round_sel)}."
+                )
+            sel = round_matches
         return sel.sort_values(["run_id"]).tail(1).iloc[0]
     if round_sel is None:
         round_sel = int(df_runs["as_of_round"].max())
@@ -66,17 +74,38 @@ def select_run_meta(
 
 
 def summarize_run_meta(row: pd.Series) -> Dict[str, Any]:
+    selection_views = _json_list(row.get("selection_views__defs_json"))
+    objectives = _json_list(row.get("objective__defs_json"))
     return {
         "run_id": str(row.get("run_id", "")),
         "as_of_round": int(row.get("as_of_round", -1)),
         "model": row.get("model__name"),
-        "objective": row.get("objective__name"),
-        "selection": row.get("selection__name"),
+        "selection_views": selection_views,
+        "objectives": objectives,
+        "selection_view_count": len(selection_views),
         "y_ops": row.get("training__y_ops") or [],
         "stats_n_train": int(row.get("stats__n_train", 0)),
         "stats_n_scored": int(row.get("stats__n_scored", 0)),
-        "objective_summary_stats": row.get("objective__summary_stats") or {},
+        "objective_summary_stats_by_view": {
+            str(view.get("selection_view_id")): view.get("objective_summary_stats") or {}
+            for view in selection_views
+            if isinstance(view, dict)
+        },
     }
+
+
+def _json_list(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [dict(item) for item in value if isinstance(item, dict)]
+    if not value:
+        return []
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise OpalError(f"Run metadata contains invalid JSON: {exc}") from exc
+    if not isinstance(parsed, list) or not all(isinstance(item, dict) for item in parsed):
+        raise OpalError("Run metadata JSON must contain a list of objects.")
+    return [dict(item) for item in parsed]
 
 
 def _parse_ts(val: Any) -> Optional[datetime]:
@@ -103,13 +132,28 @@ def load_round_log(path: Path) -> List[Dict[str, Any]]:
     return events
 
 
-def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+def summarize_round_log(events: Iterable[Dict[str, Any]], *, run_id: Optional[str] = None) -> Dict[str, Any]:
     events = list(events)
     if not events:
-        return {"events": 0, "events_total": 0, "run_count": 0}
+        return {"events": 0, "events_total": 0, "run_count": 0, "run_id": run_id}
+    for position, event in enumerate(events):
+        validate_progress_event(event, position=position)
+    event_ids = [str(event["event_id"]) for event in events]
+    duplicate_event_ids = sorted(event_id for event_id, count in Counter(event_ids).items() if count > 1)
+    if duplicate_event_ids:
+        raise OpalError(f"round.log.jsonl contains duplicate event_id values: {duplicate_event_ids}")
 
     run_count = sum(1 for e in events if e.get("stage") == "start")
     events_total = len(events)
+    all_run_ids = sorted({str(e.get("run_id")) for e in events if e.get("run_id") not in (None, "")})
+    run_id_filter_applied = False
+    if run_id is not None:
+        run_events = [e for e in events if str(e.get("run_id", "")) == str(run_id)]
+        if run_events:
+            events = run_events
+            run_id_filter_applied = True
+        else:
+            raise OpalError(f"round.log.jsonl has no events for run_id={run_id}")
     if run_count > 1:
         last_start_idx = None
         for i, e in enumerate(events):
@@ -119,10 +163,13 @@ def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             events = events[last_start_idx:]
 
     stages: Dict[str, int] = {}
+    phases: Dict[str, int] = {}
     ts_list: List[datetime] = []
     for e in events:
         stage = str(e.get("stage", "unknown"))
         stages[stage] = stages.get(stage, 0) + 1
+        phase = str(e["phase"])
+        phases[phase] = phases.get(phase, 0) + 1
         ts = _parse_ts(e.get("ts"))
         if ts is not None:
             ts_list.append(ts)
@@ -139,13 +186,21 @@ def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 return _parse_ts(e.get("ts"))
         return None
 
-    start_ts = _first_ts("start")
+    start_ts = _first_ts("start") or _first_ts("command_start") or _first_ts("run_context")
     done_ts = _last_ts("done")
     fit_start = _first_ts("fit_start")
     fit_done = _last_ts("fit")
 
     predict_batches = sum(1 for e in events if e.get("stage") == "predict_batch")
     predict_rows = int(sum(int(e.get("rows", 0)) for e in events if e.get("stage") == "predict_batch"))
+    command_events = sum(1 for e in events if e.get("phase") == "command")
+    preflight_events = sum(1 for e in events if e.get("phase") == "preflight")
+    run_events = sum(1 for e in events if e.get("phase") == "run")
+    abort_events = sum(1 for e in events if e.get("phase") == "abort" or e.get("stage") in {"abort", "aborted"})
+    finalize_events = sum(1 for e in events if e.get("phase") == "finalize")
+    aborted = any(e.get("phase") == "abort" or e.get("stage") in {"abort", "aborted"} for e in events)
+    scoped_run_ids = sorted({str(e.get("run_id")) for e in events if e.get("run_id") not in (None, "")})
+    attempt_ids = sorted({str(e.get("attempt_id")) for e in events if e.get("attempt_id") not in (None, "")})
 
     total_sec = (done_ts - start_ts).total_seconds() if start_ts and done_ts else None
     fit_sec = (fit_done - fit_start).total_seconds() if fit_start and fit_done else None
@@ -154,7 +209,23 @@ def summarize_round_log(events: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         "events": len(events),
         "events_total": events_total,
         "run_count": run_count,
+        "run_id": run_id,
+        "run_id_filter_applied": run_id_filter_applied,
+        "run_scope": {
+            "requested_run_id": run_id,
+            "resolved_run_id": run_id if run_id_filter_applied else None,
+            "run_ids": scoped_run_ids or all_run_ids,
+            "attempt_ids": attempt_ids,
+            "ambiguous_run_scope": run_id is None and len(all_run_ids) > 1,
+        },
         "stage_counts": stages,
+        "phase_counts": phases,
+        "command_events": command_events,
+        "preflight_events": preflight_events,
+        "run_events": run_events,
+        "abort_events": abort_events,
+        "finalize_events": finalize_events,
+        "aborted": aborted,
         "predict_batches": predict_batches,
         "predict_rows": predict_rows,
         "start_ts": start_ts.isoformat() if start_ts else None,

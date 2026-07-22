@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/ingest/test_ingest_duplicate_policy.py
+
+Regression tests for ingest duplicate policy OPAL ingest.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

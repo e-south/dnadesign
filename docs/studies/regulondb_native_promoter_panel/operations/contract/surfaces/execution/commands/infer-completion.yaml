@@ -1,0 +1,28 @@
+infer_completion_native_full_7b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - infer
+  - validate
+  - sequence-view-completion
+  - --config
+  - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.native_full.evo2_7b.yaml
+  - --format
+  - json
+  - --mode
+  - inventory
+infer_completion_core60_7b:
+  surface_type: command
+  argv:
+  - uv
+  - run
+  - infer
+  - validate
+  - sequence-view-completion
+  - --config
+  - src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel/config.sequence_views.core60_tss_upstream.evo2_7b.yaml
+  - --format
+  - json
+  - --mode
+  - inventory

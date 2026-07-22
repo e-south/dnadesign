@@ -1,0 +1,543 @@
+contract: retron_msd_compiler_spec_v1
+schema_version: 1
+allow_non_ligatable_s0: true
+designs:
+- construct_id: pES-retron-26
+  payload_id: MSDRegion26_payload
+  cap_id: C26_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-26-msd-region.yaml.
+- construct_id: pES-retron-43
+  payload_id: MSDRegion43_payload
+  cap_id: C43_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-43-msd-region.yaml.
+- construct_id: pES-retron-45
+  payload_id: MSDRegion45_payload
+  cap_id: C45_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-45-msd-region.yaml.
+- construct_id: pES-retron-46
+  payload_id: MSDRegion46_payload
+  cap_id: C46_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-46-msd-region.yaml.
+- construct_id: pES-retron-47
+  payload_id: MSDRegion47_payload
+  cap_id: C47_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-47-msd-region.yaml.
+- construct_id: pES-retron-48
+  payload_id: MSDRegion48_payload
+  cap_id: C48_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-48-msd-region.yaml.
+- construct_id: pES-retron-49
+  payload_id: MSDRegion49_payload
+  cap_id: C49_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-49-msd-region.yaml.
+- construct_id: pES-retron-50
+  payload_id: MSDRegion50_payload
+  cap_id: C50_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-50-msd-region.yaml.
+- construct_id: pES-retron-51
+  payload_id: MSDRegion51_payload
+  cap_id: C51_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-51-msd-region.yaml.
+- construct_id: pES-retron-52
+  payload_id: MSDRegion52_payload
+  cap_id: C52_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-52-msd-region.yaml.
+- construct_id: pES-retron-53
+  payload_id: MSDRegion53_payload
+  cap_id: C53_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-53-msd-region.yaml.
+- construct_id: pES-retron-54
+  payload_id: MSDRegion54_payload
+  cap_id: C54_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-54-msd-region.yaml.
+- construct_id: pES-retron-55
+  payload_id: MSDRegion55_payload
+  cap_id: C55_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-55-msd-region.yaml.
+- construct_id: pES-retron-56
+  payload_id: MSDRegion56_payload
+  cap_id: C56_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-56-msd-region.yaml.
+- construct_id: pES-retron-170
+  payload_id: MSDRegion170_payload
+  cap_id: C170_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-170-msd-region.yaml.
+- construct_id: pES-retron-171
+  payload_id: MSDRegion171_payload
+  cap_id: C171_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-171-msd-region.yaml.
+- construct_id: pES-retron-172
+  payload_id: MSDRegion172_payload
+  cap_id: C172_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-172-msd-region.yaml.
+- construct_id: pES-retron-173
+  payload_id: MSDRegion173_payload
+  cap_id: C173_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-173-msd-region.yaml.
+- construct_id: pES-retron-174
+  payload_id: MSDRegion174_payload
+  cap_id: C174_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-174-msd-region.yaml.
+- construct_id: pES-retron-175
+  payload_id: MSDRegion175_payload
+  cap_id: C175_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-175-msd-region.yaml.
+- construct_id: pES-retron-177
+  payload_id: MSDRegion177_payload
+  cap_id: C177_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-177-msd-region.yaml.
+- construct_id: pES-retron-178
+  payload_id: MSDRegion178_payload
+  cap_id: C178_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-178-msd-region.yaml.
+- construct_id: pES-retron-179
+  payload_id: MSDRegion179_payload
+  cap_id: C179_msd_region
+  left_base: AGTG
+  right_base: CAAT
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-179-msd-region.yaml.
+- construct_id: pES-retron-180
+  payload_id: MSDRegion180_payload
+  cap_id: C180_msd_region
+  left_base: AGTG
+  right_base: CATG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-180-msd-region.yaml.
+- construct_id: pES-retron-181
+  payload_id: MSDRegion181_payload
+  cap_id: C181_msd_region
+  left_base: AGTG
+  right_base: CTTT
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-181-msd-region.yaml.
+- construct_id: pES-retron-182
+  payload_id: MSDRegion182_payload
+  cap_id: C182_msd_region
+  left_base: AGTG
+  right_base: CGAT
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-182-msd-region.yaml.
+- construct_id: pES-retron-183
+  payload_id: MSDRegion183_payload
+  cap_id: C183_msd_region
+  left_base: AATG
+  right_base: CGTG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-183-msd-region.yaml.
+- construct_id: pES-retron-184
+  payload_id: MSDRegion184_payload
+  cap_id: C184_msd_region
+  left_base: AGTG
+  right_base: CATT
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-184-msd-region.yaml.
+- construct_id: pES-retron-185
+  payload_id: MSDRegion185_payload
+  cap_id: C185_msd_region
+  left_base: AATG
+  right_base: CGTT
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-185-msd-region.yaml.
+- construct_id: pES-retron-186
+  payload_id: MSDRegion186_payload
+  cap_id: C186_msd_region
+  left_base: AGTG
+  right_base: CGTT
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-186-msd-region.yaml.
+- construct_id: pES-retron-195
+  payload_id: MSDRegion195_payload
+  cap_id: C195_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-195-msd-region.yaml.
+- construct_id: pES-retron-196
+  payload_id: MSDRegion196_payload
+  cap_id: C196_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-196-msd-region.yaml.
+- construct_id: pES-retron-197
+  payload_id: MSDRegion197_payload
+  cap_id: C197_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-197-msd-region.yaml.
+- construct_id: pES-retron-198
+  payload_id: MSDRegion198_payload
+  cap_id: C198_msd_region
+  left_base: CAAG
+  right_base: CTCG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-198-msd-region.yaml.
+- construct_id: pES-retron-199
+  payload_id: MSDRegion199_payload
+  cap_id: C199_msd_region
+  left_base: AGTG
+  right_base: CATG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-199-msd-region.yaml.
+- construct_id: pES-retron-200
+  payload_id: MSDRegion200_payload
+  cap_id: C200_msd_region
+  left_base: AGTG
+  right_base: CATG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-200-msd-region.yaml.
+- construct_id: pES-retron-201
+  payload_id: MSDRegion201_payload
+  cap_id: C201_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-201-msd-region.yaml.
+- construct_id: pES-retron-202
+  payload_id: MSDRegion202_payload
+  cap_id: C202_msd_region
+  left_base: CGGG
+  right_base: ACAG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-202-msd-region.yaml.
+- construct_id: pES-retron-203
+  payload_id: MSDRegion203_payload
+  cap_id: C203_msd_region
+  left_base: AGTG
+  right_base: CATG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-203-msd-region.yaml.
+- construct_id: pES-retron-204
+  payload_id: MSDRegion204_payload
+  cap_id: C204_msd_region
+  left_base: AGTG
+  right_base: CATG
+  source_notes: Generated from decomposed retron-hairpin MSD-region source record
+    pes-retron-204-msd-region.yaml.
+payload_sequences:
+  MSDRegion26_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-26 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion43_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-43 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion45_payload:
+    sequence: TTTCCAAGTCCCTATCAGTGATAGAGA
+    display_name: pES-retron-45 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion46_payload:
+    sequence: TTTCAGATCAAGTCCCTATCAGTGATAGAGA
+    display_name: pES-retron-46 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion47_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-47 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion48_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-48 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion49_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-49 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion50_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-50 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion51_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-51 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion52_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-52 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion53_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-53 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion54_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-54 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion55_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-55 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion56_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-56 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion170_payload:
+    sequence: TCCCTATTAGTGATAGAGA
+    display_name: pES-retron-170 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion171_payload:
+    sequence: CTCTATATTTGATATAGAG
+    display_name: pES-retron-171 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion172_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-172 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion173_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-173 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion174_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-174 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion175_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-175 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion177_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-177 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion178_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-178 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion179_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-179 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion180_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-180 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion181_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-181 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion182_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-182 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion183_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-183 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion184_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-184 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion185_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-185 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion186_payload:
+    sequence: TCCCTATCAGTGATAGAGA
+    display_name: pES-retron-186 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion195_payload:
+    sequence: CTATATCTGATATAG
+    display_name: pES-retron-195 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion196_payload:
+    sequence: TATATCTGATATA
+    display_name: pES-retron-196 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion197_payload:
+    sequence: CTATATCTGATATAG
+    display_name: pES-retron-197 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion198_payload:
+    sequence: TATATCTGATATA
+    display_name: pES-retron-198 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion199_payload:
+    sequence: CTATATCTGATATAG
+    display_name: pES-retron-199 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion200_payload:
+    sequence: TATATCTGATATA
+    display_name: pES-retron-200 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion201_payload:
+    sequence: CCTATCAGTGATAGA
+    display_name: pES-retron-201 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion202_payload:
+    sequence: CTATCAGTGATAG
+    display_name: pES-retron-202 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion203_payload:
+    sequence: CCTATCAGTGATAGA
+    display_name: pES-retron-203 source primary arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion204_payload:
+    sequence: CTATCAGTGATAG
+    display_name: pES-retron-204 source primary arm
+    selection_basis: msd_region_canonical_interval
+payload_complement_sequences:
+  MSDRegion45_payload:
+    sequence: TCTCTATCACTGATAGGGACTCGGAAA
+    display_name: pES-retron-45 source complement arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion46_payload:
+    sequence: TCTCTATCACTGATAGGGACTCGAGATGAAA
+    display_name: pES-retron-46 source complement arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion170_payload:
+    sequence: TCTCTATCGCTGATAGGGA
+    display_name: pES-retron-170 source complement arm
+    selection_basis: msd_region_canonical_interval
+  MSDRegion171_payload:
+    sequence: CTCTATATTAGATATAGAG
+    display_name: pES-retron-171 source complement arm
+    selection_basis: msd_region_canonical_interval
+cap_sequences:
+  C26_msd_region:
+    sequence: AGGC
+  C43_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C45_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C46_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C47_msd_region:
+    sequence: AGGC
+  C48_msd_region:
+    sequence: AGGC
+  C49_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C50_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C51_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C52_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C53_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C54_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C55_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C56_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C170_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C171_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C172_msd_region:
+    sequence: GAGAGACTC
+  C173_msd_region:
+    sequence: GGAAGATCC
+  C174_msd_region:
+    sequence: AGAGACTCT
+  C175_msd_region:
+    sequence: GTAACGTAC
+  C177_msd_region:
+    sequence: GAGAGACTC
+  C178_msd_region:
+    sequence: AGGC
+  C179_msd_region:
+    sequence: GAGAGACTC
+  C180_msd_region:
+    sequence: GAGAGACTC
+  C181_msd_region:
+    sequence: GAGAGACTC
+  C182_msd_region:
+    sequence: GAGAGACTC
+  C183_msd_region:
+    sequence: GAGAGACTC
+  C184_msd_region:
+    sequence: GAGAGACTC
+  C185_msd_region:
+    sequence: GAGAGACTC
+  C186_msd_region:
+    sequence: GAGAGACTC
+  C195_msd_region:
+    sequence: AGGC
+  C196_msd_region:
+    sequence: AGGC
+  C197_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C198_msd_region:
+    sequence: TCCTCAGCCCGCTGAGGA
+  C199_msd_region:
+    sequence: GAGAGACTC
+  C200_msd_region:
+    sequence: GAGAGACTC
+  C201_msd_region:
+    sequence: AGGC
+  C202_msd_region:
+    sequence: AGGC
+  C203_msd_region:
+    sequence: GAGAGACTC
+  C204_msd_region:
+    sequence: GAGAGACTC

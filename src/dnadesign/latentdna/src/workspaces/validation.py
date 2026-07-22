@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/workspaces/validation.py
+
 Workspace config validation helpers for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -277,6 +284,10 @@ def _validate_recipe(recipe_id: str, recipe: RecipeConfig) -> None:
         step_ids.add(step.id)
         if step.op not in SUPPORTED_RECIPE_OPS:
             raise WorkspaceValidationError(f"recipe {recipe_id} uses unsupported op {step.op!r}")
+        if step.op == "projection.fit" and "seed" not in step.params:
+            raise WorkspaceValidationError(
+                f"recipe {recipe_id} step {step.id} projection.fit must declare an explicit seed"
+            )
 
     for step in recipe.steps:
         for dependency in step.depends_on:
@@ -391,6 +402,9 @@ def _validate_plot(config: WorkspaceConfig, plot_id: str, plot: Any) -> None:
             validate_identifier(scalar_id, label=f"plot {plot_id} scalar")
         return
     if plot.kind == "categorical_count":
+        validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
+        return
+    if plot.kind == "categorical_enrichment_summary":
         validate_identifier(plot.scalar, label=f"plot {plot_id} scalar")
         return
     if plot.kind == "metric_panel_grid":

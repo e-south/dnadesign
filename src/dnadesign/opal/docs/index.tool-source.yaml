@@ -10,4 +10,4 @@ keywords:
 routes:
   - id: usr-infer-x-active-learning
     path: workflows/usr-infer-x-active-learning.md
-    summary: OPAL-owned active-learning route once one infer-derived X column or exported matrix already exists.
+    summary: OPAL-owned active-learning route once one candidate table with an explicit infer-derived X column exists.

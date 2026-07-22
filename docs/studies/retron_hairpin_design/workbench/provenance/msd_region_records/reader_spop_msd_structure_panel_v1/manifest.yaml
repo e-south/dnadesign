@@ -1,0 +1,3583 @@
+contract: retron_msd_region_record_bundle_v1
+schema_version: 1
+source_policy: per_variant_genbank_sources_are_authority
+source_kind: variant_genbank_dir
+source_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants
+source_sha256: 049752ad2d1b94cdc19ae889cd1efccf338a46dda7ad66e517ab6d59bcd0b049  # pragma: allowlist secret
+source_inputs:
+- variant_id: retron26
+  display_id: pES-retron-26
+  source_file: variants/pes-retron-026.gb
+  source_sha256: 8d366d2b7d93405ffee3f75b96aa22368ade29ce9535d50fb0ed6b3141f97c3e  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron43
+  display_id: pES-retron-43
+  source_file: variants/pes-retron-043.gb
+  source_sha256: 5233db6186030999f039ff5704bc222789814b5781b8e148f6080c29121fe3b2  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron45
+  display_id: pES-retron-45
+  source_file: variants/pes-retron-045.gb
+  source_sha256: 1c79db743842bb98906bcdd8fd64fe0d547b32078cdcbaebfcd332146eb7613c  # pragma: allowlist secret
+  source_role: replacement_overlay
+- variant_id: retron46
+  display_id: pES-retron-46
+  source_file: variants/pes-retron-046.gb
+  source_sha256: f6eabdc2c1e0c59002466ea2f4a71227bec11dd0c48f8b432d69a804bbecd753  # pragma: allowlist secret
+  source_role: replacement_overlay
+- variant_id: retron47
+  display_id: pES-retron-47
+  source_file: variants/pes-retron-047.gb
+  source_sha256: 51d5739934b6a3b46d16bbef99238c4aa7a73c997d4ca77fbe9573a10900a43e  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron48
+  display_id: pES-retron-48
+  source_file: variants/pes-retron-048.gb
+  source_sha256: 204a4d548cb35dca920b73840cb27295ddad1d1be15c64b083bfc502be29f2ce  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron49
+  display_id: pES-retron-49
+  source_file: variants/pes-retron-049.gb
+  source_sha256: 25e80cf682e73d410d4e61a5d99f8e666b6e5b1c6a5c434556267fcf57fc2d54  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron50
+  display_id: pES-retron-50
+  source_file: variants/pes-retron-050.gb
+  source_sha256: ef7259045851d4305feaadac1992751581a864876139e84d4db937dbd7dde680  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron51
+  display_id: pES-retron-51
+  source_file: variants/pes-retron-051.gb
+  source_sha256: 9c88b4e9869bf10c9666539925f94beb22b6886a9ec3febdbdcf8d9832dbbd18  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron52
+  display_id: pES-retron-52
+  source_file: variants/pes-retron-052.gb
+  source_sha256: c5fca000815565b662bd0cd5060c936273b30756979146f93d27e07ce68b63a0  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron53
+  display_id: pES-retron-53
+  source_file: variants/pes-retron-053.gb
+  source_sha256: 85778dac17daf1c62d4d34c2e26d2afbc8c96e4fefce4bbae7c64c06d745b9fe  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron54
+  display_id: pES-retron-54
+  source_file: variants/pes-retron-054.gb
+  source_sha256: 377db6165c717b09b885bb7c2d11adf2a04f0ad9f3aa46d3d0a10e36e41c34c9  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron55
+  display_id: pES-retron-55
+  source_file: variants/pes-retron-055.gb
+  source_sha256: 7c7aa11a120c52a67ea8b4dc9b5f8c975b94539f669f831d2b20f57c973f95a2  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron56
+  display_id: pES-retron-56
+  source_file: variants/pes-retron-056.gb
+  source_sha256: 077aa013c8c9570c3664bd79c2b22dd0dffb7c1d83494305c4772bf3e39cdfce  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron170
+  display_id: pES-retron-170
+  source_file: variants/pes-retron-170.gb
+  source_sha256: bde5ef202ed75e7e66ef16fe4050cb85ccb848c37737b4b10e95084e663ba4ae  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron171
+  display_id: pES-retron-171
+  source_file: variants/pes-retron-171.gb
+  source_sha256: cb85326cd0b3c76613b1853429faf81a3b77f5279f9c23e9d32c023885666221  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron172
+  display_id: pES-retron-172
+  source_file: variants/pes-retron-172.gb
+  source_sha256: f834d444fbe21223959e09e195d529926a19a73543d509ee721cd9c07adf8188  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron173
+  display_id: pES-retron-173
+  source_file: variants/pes-retron-173.gb
+  source_sha256: 9df3efd5d0d45454525cb847a7b0f34ed419c04a2cf92b71aed9ca091c2f081a  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron174
+  display_id: pES-retron-174
+  source_file: variants/pes-retron-174.gb
+  source_sha256: cb459eecb2eb8dc00e104c7570442b4b0c541e9ade6261a1d65a7d3fe35c95bd  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron175
+  display_id: pES-retron-175
+  source_file: variants/pes-retron-175.gb
+  source_sha256: 950451fde0d0f550983ffd2fd75665e870a49583e4b46a507453544a7403f495  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron177
+  display_id: pES-retron-177
+  source_file: variants/pes-retron-177.gb
+  source_sha256: 072ed88118cf54c47b509d93348cb90412535d1b27e605b2d48ee2c1b3a9292c  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron178
+  display_id: pES-retron-178
+  source_file: variants/pes-retron-178.gb
+  source_sha256: faf230770f1399624c84a1de82b4d8ee383a94794475ded88acf1a5c3dff80bc  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron179
+  display_id: pES-retron-179
+  source_file: variants/pes-retron-179.gb
+  source_sha256: 825c1e0adbcae9ff4787e6b14d9d0028c8b1acbccbe82f558ecce7b9b4a80898  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron180
+  display_id: pES-retron-180
+  source_file: variants/pes-retron-180.gb
+  source_sha256: 86f0ff8a697e8383080746b62ae9549b32a0109c02b6a7856a000a25d5db072c  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron181
+  display_id: pES-retron-181
+  source_file: variants/pes-retron-181.gb
+  source_sha256: 2e47d28b4b98168b2e771da8136e4307c671f61e866dfd456396e030e343d5c4  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron182
+  display_id: pES-retron-182
+  source_file: variants/pes-retron-182.gb
+  source_sha256: 5485f2b78009cb108cd41d5e44de5f5021c0458ead5d7fe148e2bca8f8f3d92b  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron183
+  display_id: pES-retron-183
+  source_file: variants/pes-retron-183.gb
+  source_sha256: 96db1e0f6a8971fb209fc6061ac3dc1b8a4ba95ac9f7b5add65e76bcc8f4caa7  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron184
+  display_id: pES-retron-184
+  source_file: variants/pes-retron-184.gb
+  source_sha256: e9dd1f5ed1094ff6c5b9fe5e3fa738e9ff9ff06695e651665ef3ae175950c2d8  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron185
+  display_id: pES-retron-185
+  source_file: variants/pes-retron-185.gb
+  source_sha256: 6b62f020c6bd51656d4c8f0c5162a344d89dbeb3b85a9e606085e1a01d6ce3d9  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron186
+  display_id: pES-retron-186
+  source_file: variants/pes-retron-186.gb
+  source_sha256: 1415d0dd3271aa12b34c125f74960a5026bb458025f6f8ab01f3d45607592169  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron195
+  display_id: pES-retron-195
+  source_file: variants/pes-retron-195.gb
+  source_sha256: 915cc882452e7b97e4bc081ebcb3548a3e0ec06fd1045e37f1188822228d3b85  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron196
+  display_id: pES-retron-196
+  source_file: variants/pes-retron-196.gb
+  source_sha256: 38754922c1b2e06e38f991a36d8fd2b67dbf69ce7ea7a68798140f51dc4e7664  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron197
+  display_id: pES-retron-197
+  source_file: variants/pes-retron-197.gb
+  source_sha256: 6aebb1ac8ae8e6751ab1f523f096467794f197b21bef84e69e154eca782d9218  # pragma: allowlist secret
+  source_role: replacement_overlay
+- variant_id: retron198
+  display_id: pES-retron-198
+  source_file: variants/pes-retron-198.gb
+  source_sha256: 478b714055701560a6fd3d8444a5c2c280eca15ae28d3be59290bb1584fe11c5  # pragma: allowlist secret
+  source_role: replacement_overlay
+- variant_id: retron199
+  display_id: pES-retron-199
+  source_file: variants/pes-retron-199.gb
+  source_sha256: a0cf1bd1404ae2ac44bfa519fe1a294fcd892cd4d37138bc9b00659647b40d86  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron200
+  display_id: pES-retron-200
+  source_file: variants/pes-retron-200.gb
+  source_sha256: 6b0946697247437ac23272f834e3379a837d28c4b359791011d6d8f4bf8112df  # pragma: allowlist secret
+  source_role: bulk_migration_input
+- variant_id: retron201
+  display_id: pES-retron-201
+  source_file: variants/pes-retron-201.gb
+  source_sha256: ad766f117866923a71f01e00081d1469473388ffb450b499a10b7957ea38f778  # pragma: allowlist secret
+  source_role: variant_genbank_source
+- variant_id: retron202
+  display_id: pES-retron-202
+  source_file: variants/pes-retron-202.gb
+  source_sha256: d99ed25d9c515a3ac6b94fe24c2fc668ec4da186941b543f7668efdcf18dffce  # pragma: allowlist secret
+  source_role: variant_genbank_source
+- variant_id: retron203
+  display_id: pES-retron-203
+  source_file: variants/pes-retron-203.gb
+  source_sha256: 8ca96dfb613a9e4a1014b034de15f926c49a1298384053d9a2709d9940817102  # pragma: allowlist secret
+  source_role: variant_genbank_source
+- variant_id: retron204
+  display_id: pES-retron-204
+  source_file: variants/pes-retron-204.gb
+  source_sha256: e025748cdcd30159de2cb3f76145c22214e17460f4932d6089f56ba2d312e3d1  # pragma: allowlist secret
+  source_role: variant_genbank_source
+retired_sources:
+- source_name: msd-regions - all DNA RNA.gb
+  source_sha256: 69ee73a9e6e83cee8c6047f9938832456562ec82a0f78144e6810c4465b1db75  # pragma: allowlist secret
+  source_record_count: 41
+  source_role: retired_bulk_migration_input
+  active_source: false
+replacement_sources: []
+source_record_count: 40
+included_record_count: 40
+skipped_record_count: 0
+skipped_records: []
+compiler_spec: compiler/reader_spop_msd_structure_panel_v1.spec.yaml
+discrepancy_report: reports/discrepancies.yaml
+records:
+- variant_id: retron26
+  display_id: pES-retron-26
+  record: variants/pes-retron-26-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf  # pragma: allowlist secret
+- variant_id: retron43
+  display_id: pES-retron-43
+  record: variants/pes-retron-43-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron45
+  display_id: pES-retron-45
+  record: variants/pes-retron-45-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 4
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 45
+    - 61
+    display_span_0:
+    - 43
+    - 59
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  - kind: payload_primary_boundary_extends_to_stem_context
+    role: payload_primary
+    label: tet operator
+    source_span_0:
+    - 62
+    - 81
+    display_span_0:
+    - 23
+    - 42
+    annotated_sequence_5to3: TCCCTATCAGTGATAGAGA
+    compiler_sequence_5to3: TTTCCAAGTCCCTATCAGTGATAGAGA
+    severity: info
+    note: Source payload annotation marks the payload proper; compiler-facing primary
+      arm uses the full paired interval from the left stem base to the cap.
+  - kind: payload_complement_boundary_extends_to_stem_context
+    role: payload_complement
+    label: tet operator
+    source_span_0:
+    - 25
+    - 44
+    display_span_0:
+    - 60
+    - 79
+    annotated_sequence_5to3: TCTCTATCACTGATAGGGA
+    compiler_sequence_5to3: TCTCTATCACTGATAGGGACTCGGAAA
+    severity: info
+    note: Source payload-complement annotation marks the payload proper; compiler-facing
+      complement arm uses the full paired interval from the cap to the right stem
+      base.
+  - kind: payload_complement_sequence_is_source_explicit
+    role: payload_complement
+    label: tet operator
+    source_span_0:
+    - 25
+    - 44
+    display_span_0:
+    - 60
+    - 79
+    annotated_sequence_5to3: TCTCTATCACTGATAGGGA
+    compiler_sequence_5to3: TCTCTATCACTGATAGGGACTCGGAAA
+    severity: info
+    note: Source complement arm is not the reverse complement of the source primary
+      arm; this is represented as an explicit source arm and classified through pairing_segments.
+  pairing_segments:
+  - segment: stem_extension
+    left_role: stem_extension_left
+    right_role: stem_extension_right
+    left_sequence_5to3: TTTCCAAG
+    right_sequence_5to3: CTCGGAAA
+    length_bp: 8
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 1
+    unpaired_nt: 0
+    pairing_status: intentional_mismatch
+    intent: declared_design
+    note: Non-payload paired stem context between the 4 nt stem bases and payload
+      annotation.
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: e9358ed99682e7184b90aaee6d9391130eab16e55f367a46f13c111fa74cf444  # pragma: allowlist secret
+- variant_id: retron46
+  display_id: pES-retron-46
+  record: variants/pes-retron-46-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 4
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 49
+    - 65
+    display_span_0:
+    - 47
+    - 63
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  - kind: payload_primary_boundary_extends_to_stem_context
+    role: payload_primary
+    label: tet operator
+    source_span_0:
+    - 66
+    - 85
+    display_span_0:
+    - 27
+    - 46
+    annotated_sequence_5to3: TCCCTATCAGTGATAGAGA
+    compiler_sequence_5to3: TTTCAGATCAAGTCCCTATCAGTGATAGAGA
+    severity: info
+    note: Source payload annotation marks the payload proper; compiler-facing primary
+      arm uses the full paired interval from the left stem base to the cap.
+  - kind: payload_complement_boundary_extends_to_stem_context
+    role: payload_complement
+    label: tet operator
+    source_span_0:
+    - 29
+    - 48
+    display_span_0:
+    - 64
+    - 83
+    annotated_sequence_5to3: TCTCTATCACTGATAGGGA
+    compiler_sequence_5to3: TCTCTATCACTGATAGGGACTCGAGATGAAA
+    severity: info
+    note: Source payload-complement annotation marks the payload proper; compiler-facing
+      complement arm uses the full paired interval from the cap to the right stem
+      base.
+  - kind: payload_complement_sequence_is_source_explicit
+    role: payload_complement
+    label: tet operator
+    source_span_0:
+    - 29
+    - 48
+    display_span_0:
+    - 64
+    - 83
+    annotated_sequence_5to3: TCTCTATCACTGATAGGGA
+    compiler_sequence_5to3: TCTCTATCACTGATAGGGACTCGAGATGAAA
+    severity: info
+    note: Source complement arm is not the reverse complement of the source primary
+      arm; this is represented as an explicit source arm and classified through pairing_segments.
+  pairing_segments:
+  - segment: stem_extension
+    left_role: stem_extension_left
+    right_role: stem_extension_right
+    left_sequence_5to3: TTTCAGATCAAG
+    right_sequence_5to3: CTCGAGATGAAA
+    length_bp: 12
+    watson_crick_bp: 9
+    wobble_bp: 0
+    mismatch_bp: 3
+    unpaired_nt: 0
+    pairing_status: intentional_mismatch
+    intent: declared_design
+    note: Non-payload paired stem context between the 4 nt stem bases and payload
+      annotation.
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 4eb08e288727ec03a280219457bd53e0660aa32ea5b608064b5b2c3fc305112b  # pragma: allowlist secret
+- variant_id: retron47
+  display_id: pES-retron-47
+  record: variants/pes-retron-47-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf  # pragma: allowlist secret
+- variant_id: retron48
+  display_id: pES-retron-48
+  record: variants/pes-retron-48-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf  # pragma: allowlist secret
+- variant_id: retron49
+  display_id: pES-retron-49
+  record: variants/pes-retron-49-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron50
+  display_id: pES-retron-50
+  record: variants/pes-retron-50-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron51
+  display_id: pES-retron-51
+  record: variants/pes-retron-51-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron52
+  display_id: pES-retron-52
+  record: variants/pes-retron-52-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron53
+  display_id: pES-retron-53
+  record: variants/pes-retron-53-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron54
+  display_id: pES-retron-54
+  record: variants/pes-retron-54-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron55
+  display_id: pES-retron-55
+  record: variants/pes-retron-55-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron56
+  display_id: pES-retron-56
+  record: variants/pes-retron-56-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 1
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+- variant_id: retron170
+  display_id: pES-retron-170
+  record: variants/pes-retron-170-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 2
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  - kind: payload_complement_sequence_is_source_explicit
+    role: payload_complement
+    label: tet operator [complement]
+    source_span_0:
+    - 17
+    - 36
+    display_span_0:
+    - 52
+    - 71
+    annotated_sequence_5to3: TCTCTATCGCTGATAGGGA
+    compiler_sequence_5to3: TCTCTATCGCTGATAGGGA
+    severity: info
+    note: Source complement arm is not the reverse complement of the source primary
+      arm; this is represented as an explicit source arm and classified through pairing_segments.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATTAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCGCTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 17
+    wobble_bp: 2
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: intentional_mismatch
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATTAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCGCTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: null
+    parent_payload_id: null
+    payload_member_id: null
+    payload_class: motif_congruent_uncataloged_payload
+    retained_parent_span_0: null
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATTAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 14.488965
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.841091
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATTAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 1
+      identity_fraction: 0.941176
+      comparison_class: single_edit
+  msd_sequence_sha256: 04d3b7f42e6801fe3e029a525f033ef3dac2e54ef3a2f32314a51fbc40511c69  # pragma: allowlist secret
+- variant_id: retron171
+  display_id: pES-retron-171
+  record: variants/pes-retron-171-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 2
+  annotation_notes:
+  - kind: foldback_feature_boundary_granularity
+    role: snapback_foldback_geometry
+    label: Foldback
+    source_span_0:
+    - 37
+    - 53
+    display_span_0:
+    - 35
+    - 51
+    annotated_sequence_5to3: CCTCAGCCCGCTGAGG
+    compiler_sequence_5to3: TCCTCAGCCCGCTGAGGA
+    severity: info
+    note: Source foldback annotation is a narrower subfeature; compiler-facing snapback
+      geometry uses the full interval between payload_primary and payload_complement.
+  - kind: payload_complement_sequence_is_source_explicit
+    role: payload_complement
+    label: tetO2-CR-2x-S9C>T,AS11C>T
+    source_span_0:
+    - 17
+    - 36
+    display_span_0:
+    - 52
+    - 71
+    annotated_sequence_5to3: CTCTATATTAGATATAGAG
+    compiler_sequence_5to3: CTCTATATTAGATATAGAG
+    severity: info
+    note: Source complement arm is not the reverse complement of the source primary
+      arm; this is represented as an explicit source arm and classified through pairing_segments.
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CTCTATATTTGATATAGAG
+    right_sequence_5to3: CTCTATATTAGATATAGAG
+    length_bp: 19
+    watson_crick_bp: 17
+    wobble_bp: 2
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: intentional_mismatch
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CTCTATATTTGATATAGAG
+    complement_sequence_5to3: CTCTATATTAGATATAGAG
+    payload_length_nt: 19
+    payload_family_id: null
+    parent_payload_id: null
+    payload_member_id: null
+    payload_class: motif_congruent_uncataloged_payload
+    retained_parent_span_0: null
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 0
+        end: 17
+      strand: +
+      sequence_5to3: CTCTATATTTGATATAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 11.877123
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.689473
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CTCTATATTTGATATAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 5
+      identity_fraction: 0.705882
+      comparison_class: moderate_difference
+  msd_sequence_sha256: 7bf99fa973a5427f6864348335bae02ec94166c2824cfcb2cba552eecbf6bd36  # pragma: allowlist secret
+- variant_id: retron172
+  display_id: pES-retron-172
+  record: variants/pes-retron-172-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: dcb500d4a90ad99855d29a18fbab20a944fbce4a9a06c9a173e76796c21cc3cf  # pragma: allowlist secret
+- variant_id: retron173
+  display_id: pES-retron-173
+  record: variants/pes-retron-173-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GGA
+    right_sequence_5to3: TCC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 4dd5bec93c39b48bae1effa76cd384ae0a6a5b34a848f4da8285e85aa195e9ae  # pragma: allowlist secret
+- variant_id: retron174
+  display_id: pES-retron-174
+  record: variants/pes-retron-174-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: AGA
+    right_sequence_5to3: TCT
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: e1bf3cb311877a8f85994e3b068c362685d9e48992d034b8922aa2a4ee07e597  # pragma: allowlist secret
+- variant_id: retron175
+  display_id: pES-retron-175
+  record: variants/pes-retron-175-msd-region.yaml
+  annotation_status: label_only_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GTA
+    right_sequence_5to3: TAC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: f06255ec32718e9a4d8fdc9cde9d74a1585b9e91d48762da856d73bc7b19fa84  # pragma: allowlist secret
+- variant_id: retron177
+  display_id: pES-retron-177
+  record: variants/pes-retron-177-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 3193a1df6e6bef88a236fc53c7fe1e5191849dd686ecfa725aea5305ab9337d4  # pragma: allowlist secret
+- variant_id: retron178
+  display_id: pES-retron-178
+  record: variants/pes-retron-178-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 742082e0b546f6b7dc9682564e74d506722941a1163f87ab24a7e41dca8f82ab  # pragma: allowlist secret
+- variant_id: retron179
+  display_id: pES-retron-179
+  record: variants/pes-retron-179-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 4fbb790743b0b13d3db0ed03c59c867b399dec63ac7f0da3a1921e043084e04a  # pragma: allowlist secret
+- variant_id: retron180
+  display_id: pES-retron-180
+  record: variants/pes-retron-180-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: c286ec719e5e5de2256f335959f0ed5e286ba3111d0f8830ee6d844eab5aed19  # pragma: allowlist secret
+- variant_id: retron181
+  display_id: pES-retron-181
+  record: variants/pes-retron-181-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: e00daa5b7d7e3f9b5e0c29e17f3e4034e32b57f505d69ada87b4234d85f1606a  # pragma: allowlist secret
+- variant_id: retron182
+  display_id: pES-retron-182
+  record: variants/pes-retron-182-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 3024ceeec0140b48dcdf84314520128fbd6ece682bc0cb74272856ae5a87acc7  # pragma: allowlist secret
+- variant_id: retron183
+  display_id: pES-retron-183
+  record: variants/pes-retron-183-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 6f3f32b7111a69a564ef8a03655f44324816d519f2cd1ec6d7219da43ed2b48a  # pragma: allowlist secret
+- variant_id: retron184
+  display_id: pES-retron-184
+  record: variants/pes-retron-184-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 4eb46f2808298f5bb02305cc8bf657075d5adaaaacad7ec056148e6eff626317  # pragma: allowlist secret
+- variant_id: retron185
+  display_id: pES-retron-185
+  record: variants/pes-retron-185-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 2385daa2a070124fe70019b7461b3b4a1819d404266aa2a42288abfb0df85c33  # pragma: allowlist secret
+- variant_id: retron186
+  display_id: pES-retron-186
+  record: variants/pes-retron-186-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TCCCTATCAGTGATAGAGA
+    right_sequence_5to3: TCTCTATCACTGATAGGGA
+    length_bp: 19
+    watson_crick_bp: 19
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TCCCTATCAGTGATAGAGA
+    complement_sequence_5to3: TCTCTATCACTGATAGGGA
+    payload_length_nt: 19
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w00_19
+    payload_class: catalog_parent_payload
+    retained_parent_span_0:
+      start: 0
+      end: 19
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 0
+        end: 17
+      payload_window_0:
+        start: 1
+        end: 18
+      strand: +
+      sequence_5to3: CCCTATCAGTGATAGAG
+      consensus_sequence_5to3: CTCTATCGCCGATAGAG
+      score_bits: 16.70845
+      consensus_score_bits: 17.22639
+      consensus_score_fraction: 0.969933
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 0
+        end: 17
+      query_span_0:
+        start: 0
+        end: 17
+      query_sequence_5to3: CCCTATCAGTGATAGAG
+      reference_sequence_5to3: CCCTATCAGTGATAGAG
+      compared_nt: 17
+      mismatch_count: 0
+      identity_fraction: 1.0
+      comparison_class: identical
+  msd_sequence_sha256: 51e9d90c2b4b3b45467c4e5834d931199114d09d1a7c0bf1f179d62331e9c9ec  # pragma: allowlist secret
+- variant_id: retron195
+  display_id: pES-retron-195
+  record: variants/pes-retron-195-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CTATATCTGATATAG
+    right_sequence_5to3: CTATATCAGATATAG
+    length_bp: 15
+    watson_crick_bp: 15
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CTATATCTGATATAG
+    complement_sequence_5to3: CTATATCAGATATAG
+    payload_length_nt: 15
+    payload_family_id: tetr_pwm_elite
+    parent_payload_id: TetR_w00_19
+    payload_member_id: TetR_w02_17
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 2
+      end: 17
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 2
+        end: 17
+      payload_window_0:
+        start: 0
+        end: 15
+      strand: +
+      sequence_5to3: CTATATCTGATATAG
+      consensus_sequence_5to3: CTATCGCCGATAGAG
+      score_bits: 11.134619
+      consensus_score_bits: 16.084373
+      consensus_score_fraction: 0.692263
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 2
+        end: 17
+      query_span_0:
+        start: 2
+        end: 17
+      query_sequence_5to3: CTATATCTGATATAG
+      reference_sequence_5to3: CTATCAGTGATAGAG
+      compared_nt: 15
+      mismatch_count: 4
+      identity_fraction: 0.733333
+      comparison_class: moderate_difference
+  msd_sequence_sha256: fd494658da0c4c75a7877a9f7216a3738e891e9aba0018bcfc3af2d235ae8a5b  # pragma: allowlist secret
+- variant_id: retron196
+  display_id: pES-retron-196
+  record: variants/pes-retron-196-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TATATCTGATATA
+    right_sequence_5to3: TATATCAGATATA
+    length_bp: 13
+    watson_crick_bp: 13
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TATATCTGATATA
+    complement_sequence_5to3: TATATCAGATATA
+    payload_length_nt: 13
+    payload_family_id: tetr_pwm_elite
+    parent_payload_id: TetR_w00_19
+    payload_member_id: TetR_w03_16
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 3
+      end: 16
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 3
+        end: 16
+      payload_window_0:
+        start: 0
+        end: 13
+      strand: +
+      sequence_5to3: TATATCTGATATA
+      consensus_sequence_5to3: TATCGCCGATAGA
+      score_bits: 9.481631
+      consensus_score_bits: 14.431385
+      consensus_score_fraction: 0.657015
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 3
+        end: 16
+      query_span_0:
+        start: 3
+        end: 16
+      query_sequence_5to3: TATATCTGATATA
+      reference_sequence_5to3: TATCAGTGATAGA
+      compared_nt: 13
+      mismatch_count: 4
+      identity_fraction: 0.692308
+      comparison_class: moderate_difference
+  msd_sequence_sha256: 7c1cb0f4fad74c41f94fc83d49ba6a8d8245c6d1af2cb9d35905a33be1264e03  # pragma: allowlist secret
+- variant_id: retron197
+  display_id: pES-retron-197
+  record: variants/pes-retron-197-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CTATATCTGATATAG
+    right_sequence_5to3: CTATATCAGATATAG
+    length_bp: 15
+    watson_crick_bp: 15
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CTATATCTGATATAG
+    complement_sequence_5to3: CTATATCAGATATAG
+    payload_length_nt: 15
+    payload_family_id: tetr_pwm_elite
+    parent_payload_id: TetR_w00_19
+    payload_member_id: TetR_w02_17
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 2
+      end: 17
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 2
+        end: 17
+      payload_window_0:
+        start: 0
+        end: 15
+      strand: +
+      sequence_5to3: CTATATCTGATATAG
+      consensus_sequence_5to3: CTATCGCCGATAGAG
+      score_bits: 11.134619
+      consensus_score_bits: 16.084373
+      consensus_score_fraction: 0.692263
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 2
+        end: 17
+      query_span_0:
+        start: 2
+        end: 17
+      query_sequence_5to3: CTATATCTGATATAG
+      reference_sequence_5to3: CTATCAGTGATAGAG
+      compared_nt: 15
+      mismatch_count: 4
+      identity_fraction: 0.733333
+      comparison_class: moderate_difference
+  msd_sequence_sha256: 52a4a742d4368d2e4f4df2753db385701d1debd586dc7c7ae56fe9018ee3d60d  # pragma: allowlist secret
+- variant_id: retron198
+  display_id: pES-retron-198
+  record: variants/pes-retron-198-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TATATCTGATATA
+    right_sequence_5to3: TATATCAGATATA
+    length_bp: 13
+    watson_crick_bp: 13
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: TCCTCAG
+    right_sequence_5to3: CTGAGGA
+    length_bp: 7
+    watson_crick_bp: 7
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TATATCTGATATA
+    complement_sequence_5to3: TATATCAGATATA
+    payload_length_nt: 13
+    payload_family_id: tetr_pwm_elite
+    parent_payload_id: TetR_w00_19
+    payload_member_id: TetR_w03_16
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 3
+      end: 16
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 3
+        end: 16
+      payload_window_0:
+        start: 0
+        end: 13
+      strand: +
+      sequence_5to3: TATATCTGATATA
+      consensus_sequence_5to3: TATCGCCGATAGA
+      score_bits: 9.481631
+      consensus_score_bits: 14.431385
+      consensus_score_fraction: 0.657015
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 3
+        end: 16
+      query_span_0:
+        start: 3
+        end: 16
+      query_sequence_5to3: TATATCTGATATA
+      reference_sequence_5to3: TATCAGTGATAGA
+      compared_nt: 13
+      mismatch_count: 4
+      identity_fraction: 0.692308
+      comparison_class: moderate_difference
+  msd_sequence_sha256: bc7f600260e5009049e261a02028452c8179c28ad2c5d947ffa40f2cae5e2309  # pragma: allowlist secret
+- variant_id: retron199
+  display_id: pES-retron-199
+  record: variants/pes-retron-199-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CTATATCTGATATAG
+    right_sequence_5to3: CTATATCAGATATAG
+    length_bp: 15
+    watson_crick_bp: 15
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CTATATCTGATATAG
+    complement_sequence_5to3: CTATATCAGATATAG
+    payload_length_nt: 15
+    payload_family_id: tetr_pwm_elite
+    parent_payload_id: TetR_w00_19
+    payload_member_id: TetR_w02_17
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 2
+      end: 17
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 2
+        end: 17
+      payload_window_0:
+        start: 0
+        end: 15
+      strand: +
+      sequence_5to3: CTATATCTGATATAG
+      consensus_sequence_5to3: CTATCGCCGATAGAG
+      score_bits: 11.134619
+      consensus_score_bits: 16.084373
+      consensus_score_fraction: 0.692263
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 2
+        end: 17
+      query_span_0:
+        start: 2
+        end: 17
+      query_sequence_5to3: CTATATCTGATATAG
+      reference_sequence_5to3: CTATCAGTGATAGAG
+      compared_nt: 15
+      mismatch_count: 4
+      identity_fraction: 0.733333
+      comparison_class: moderate_difference
+  msd_sequence_sha256: 904c499c2e4eca7363e085c3e5045c9676e7776ab9f603876859acf840e30848  # pragma: allowlist secret
+- variant_id: retron200
+  display_id: pES-retron-200
+  record: variants/pes-retron-200-msd-region.yaml
+  annotation_status: mixed_typed_and_label_normalized
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: TATATCTGATATA
+    right_sequence_5to3: TATATCAGATATA
+    length_bp: 13
+    watson_crick_bp: 13
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: TATATCTGATATA
+    complement_sequence_5to3: TATATCAGATATA
+    payload_length_nt: 13
+    payload_family_id: tetr_pwm_elite
+    parent_payload_id: TetR_w00_19
+    payload_member_id: TetR_w03_16
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 3
+      end: 16
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 3
+        end: 16
+      payload_window_0:
+        start: 0
+        end: 13
+      strand: +
+      sequence_5to3: TATATCTGATATA
+      consensus_sequence_5to3: TATCGCCGATAGA
+      score_bits: 9.481631
+      consensus_score_bits: 14.431385
+      consensus_score_fraction: 0.657015
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 3
+        end: 16
+      query_span_0:
+        start: 3
+        end: 16
+      query_sequence_5to3: TATATCTGATATA
+      reference_sequence_5to3: TATCAGTGATAGA
+      compared_nt: 13
+      mismatch_count: 4
+      identity_fraction: 0.692308
+      comparison_class: moderate_difference
+  msd_sequence_sha256: d336af2e8b2f541c7d79cfb5ae39dccbaf4d785765c721cfa10ba2684f5b6aec  # pragma: allowlist secret
+- variant_id: retron201
+  display_id: pES-retron-201
+  record: variants/pes-retron-201-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CCTATCAGTGATAGA
+    right_sequence_5to3: TCTATCACTGATAGG
+    length_bp: 15
+    watson_crick_bp: 15
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CCTATCAGTGATAGA
+    complement_sequence_5to3: TCTATCACTGATAGG
+    payload_length_nt: 15
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w02_17
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 2
+      end: 17
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 2
+        end: 17
+      payload_window_0:
+        start: 0
+        end: 15
+      strand: '-'
+      sequence_5to3: TCTATCACTGATAGG
+      consensus_sequence_5to3: CTATCGCCGATAGAG
+      score_bits: -10.002544
+      consensus_score_bits: 16.084373
+      consensus_score_fraction: -0.62188
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 2
+        end: 17
+      query_span_0:
+        start: 2
+        end: 17
+      query_sequence_5to3: TCTATCACTGATAGG
+      reference_sequence_5to3: CTATCAGTGATAGAG
+      compared_nt: 15
+      mismatch_count: 14
+      identity_fraction: 0.066667
+      comparison_class: large_difference
+  msd_sequence_sha256: 9df5398c93af1b581315817e4526a5ad661f4465af663fc6e728455fc7ed3bc4  # pragma: allowlist secret
+- variant_id: retron202
+  display_id: pES-retron-202
+  record: variants/pes-retron-202-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CTATCAGTGATAG
+    right_sequence_5to3: CTATCACTGATAG
+    length_bp: 13
+    watson_crick_bp: 13
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CTATCAGTGATAG
+    complement_sequence_5to3: CTATCACTGATAG
+    payload_length_nt: 13
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w03_16
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 3
+      end: 16
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 3
+        end: 16
+      payload_window_0:
+        start: 0
+        end: 13
+      strand: '-'
+      sequence_5to3: CTATCACTGATAG
+      consensus_sequence_5to3: TATCGCCGATAGA
+      score_bits: -10.694633
+      consensus_score_bits: 14.431385
+      consensus_score_fraction: -0.741068
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 3
+        end: 16
+      query_span_0:
+        start: 3
+        end: 16
+      query_sequence_5to3: CTATCACTGATAG
+      reference_sequence_5to3: TATCAGTGATAGA
+      compared_nt: 13
+      mismatch_count: 13
+      identity_fraction: 0.0
+      comparison_class: large_difference
+  msd_sequence_sha256: 32f9cd2dc5ff6e4d3d3d7a5373afb9fa9b371f5e209315398a52663d29d23703  # pragma: allowlist secret
+- variant_id: retron203
+  display_id: pES-retron-203
+  record: variants/pes-retron-203-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CCTATCAGTGATAGA
+    right_sequence_5to3: TCTATCACTGATAGG
+    length_bp: 15
+    watson_crick_bp: 15
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CCTATCAGTGATAGA
+    complement_sequence_5to3: TCTATCACTGATAGG
+    payload_length_nt: 15
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w02_17
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 2
+      end: 17
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 2
+        end: 17
+      payload_window_0:
+        start: 0
+        end: 15
+      strand: '-'
+      sequence_5to3: TCTATCACTGATAGG
+      consensus_sequence_5to3: CTATCGCCGATAGAG
+      score_bits: -10.002544
+      consensus_score_bits: 16.084373
+      consensus_score_fraction: -0.62188
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 2
+        end: 17
+      query_span_0:
+        start: 2
+        end: 17
+      query_sequence_5to3: TCTATCACTGATAGG
+      reference_sequence_5to3: CTATCAGTGATAGAG
+      compared_nt: 15
+      mismatch_count: 14
+      identity_fraction: 0.066667
+      comparison_class: large_difference
+  msd_sequence_sha256: 36f2f8b6620549bb949594d6d3140c2d18c3d6a51f974951ce26818293b7b2ca  # pragma: allowlist secret
+- variant_id: retron204
+  display_id: pES-retron-204
+  record: variants/pes-retron-204-msd-region.yaml
+  annotation_status: typed_dnadesign_roles
+  annotation_warning_count: 0
+  annotation_warnings: []
+  annotation_note_count: 0
+  annotation_notes: []
+  pairing_segments:
+  - segment: payload_stem
+    left_role: payload_primary
+    right_role: payload_complement
+    left_sequence_5to3: CTATCAGTGATAG
+    right_sequence_5to3: CTATCACTGATAG
+    length_bp: 13
+    watson_crick_bp: 13
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Payload-bearing stem segment, usually tetO or a tetO-derived payload.
+  - segment: foldback_stem
+    left_role: snapback_retained_stem
+    right_role: snapback_foldback_return
+    left_sequence_5to3: GAG
+    right_sequence_5to3: CTC
+    length_bp: 3
+    watson_crick_bp: 3
+    wobble_bp: 0
+    mismatch_bp: 0
+    unpaired_nt: 0
+    pairing_status: canonical_wc
+    intent: declared_design
+    note: Foldback stem/return segment between payload stem and snapback cap.
+  payload_binding_sites:
+  - segment: payload_stem
+    primary_sequence_5to3: CTATCAGTGATAG
+    complement_sequence_5to3: CTATCACTGATAG
+    payload_length_nt: 13
+    payload_family_id: tetO_ecoli_working
+    parent_payload_id: tetO_ecoli_working_w00_19
+    payload_member_id: tetO_ecoli_working_w03_16
+    payload_class: catalog_trim_payload
+    retained_parent_span_0:
+      start: 3
+      end: 16
+    motif_alignments:
+    - motif_model_id: tetr_westmann
+      motif_source_ref: cruncher:westmann_tetr_mitomi:tetR
+      motif_width_nt: 17
+      motif_span_0:
+        start: 3
+        end: 16
+      payload_window_0:
+        start: 0
+        end: 13
+      strand: '-'
+      sequence_5to3: CTATCACTGATAG
+      consensus_sequence_5to3: TATCGCCGATAGA
+      score_bits: -10.694633
+      consensus_score_bits: 14.431385
+      consensus_score_fraction: -0.741068
+    reference_comparisons:
+    - reference_payload_id: tetO_ecoli_working_w00_19
+      reference_payload_family_id: tetO_ecoli_working
+      reference_span_0:
+        start: 3
+        end: 16
+      query_span_0:
+        start: 3
+        end: 16
+      query_sequence_5to3: CTATCACTGATAG
+      reference_sequence_5to3: TATCAGTGATAGA
+      compared_nt: 13
+      mismatch_count: 13
+      identity_fraction: 0.0
+      comparison_class: large_difference
+  msd_sequence_sha256: 26d27aece2bf97d59a6430938620457e09e31262ff5af86bfbab6ee1ba2fba8d  # pragma: allowlist secret

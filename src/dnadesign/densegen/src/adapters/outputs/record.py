@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/outputs/record.py
+dnadesign
+src/dnadesign/densegen/src/adapters/outputs/record.py
 
-Canonical output record for DenseGen outputs.
+Defines canonical DenseGen output records.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

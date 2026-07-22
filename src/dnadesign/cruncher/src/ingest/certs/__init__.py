@@ -1,8 +1,10 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/ingest/certs/__init__.py
 
-Author(s): Eric J. South
+Package exports for Cruncher ingest certs.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """

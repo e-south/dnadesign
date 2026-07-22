@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/io/parsers/backend.py
 
-Author(s): Eric J. South
+I/O helpers for backend Cruncher I/O parsers.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

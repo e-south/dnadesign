@@ -1,7 +1,7 @@
 # latentdna CLI Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-15
+**Last verified:** 2026-07-14
 
 ### Common flags
 
@@ -78,7 +78,7 @@ Workspace-specific flags:
 - Mutating commands emit `latentdna.command_result.v1`.
 - Artifact directories carry `latentdna.manifest.v1` manifests.
 - `latentdna deliverable status` emits `latentdna.deliverable_status.v1`.
-- `latentdna workspace snapshot` emits `latentdna.workspace_snapshot.v1` and writes `outputs/status/workspace_snapshot.json`.
+- `latentdna workspace snapshot` emits `latentdna.workspace_snapshot.v1` and writes `outputs/status/workspace_snapshot.json`; add `--dry-run` for read-only inspection without modifying the tracked study snapshot.
 - `latentdna neighbors fit` and `latentdna cluster fit` require exactly one of `--view` or `--reduced-view`; reduced views are already scope-fixed and cannot be combined with `--sample` or `--alignment`.
 - `latentdna workspace init --json` emits `latentdna.command_result.v1` with `artifact_kind=workspace`.
 - `latentdna notebook generate` may emit `status=attention` when the notebook artifact exists but the default deliverable plot has not been rendered yet.
@@ -122,7 +122,7 @@ Workspace-specific flags:
 
 - Use `latentdna workspace init --from-study-dir docs/studies/stress_ethanol_cipro_growth --template promoter_reference_margin_benchmark` to hydrate the promoter-study pre-assay representation-triage ladder from the checked-in study record.
 - Use `latentdna workspace refresh` to clear workspace-local LatentDNA artifacts without touching upstream `usr/datasets`.
-- Use `latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json` before study-status or promoter-study tooling inspects LatentDNA state.
+- Use `latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run` before study-status or promoter-study tooling inspects LatentDNA state.
 - Use `latentdna validate workspace --deep` to confirm the declared source keys, view vector columns, cohort columns, landmark selector columns, and study-binding files against the live study data without materializing embedding matrices.
 - Use `latentdna deliverable status <deliverable-id>` after recipe or deliverable runs to surface freshness drift from recorded input-path digests rather than only presence/absence checks.
 - Canonical runtime artifacts live directly under `outputs/`. Nested output roots are rejected.

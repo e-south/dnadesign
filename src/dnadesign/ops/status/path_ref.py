@@ -44,9 +44,7 @@ def resolve_path_ref(
             raise ValueError(f"{label} uses manifest: but manifest_dir is not available")
         return _resolve_from_base(base_dir=manifest_dir, relative_path=path_text.removeprefix("manifest:"), label=label)
 
-    if path_text.startswith("./") or path_text.startswith("../"):
-        if manifest_dir is None:
-            raise ValueError(f"{label} uses a manifest-relative path but manifest_dir is not available")
+    if manifest_dir is not None and (path_text.startswith("./") or path_text.startswith("../")):
         return _resolve_from_base(base_dir=manifest_dir, relative_path=path_text, label=label)
 
     base = _normalize_path_base(default_base)

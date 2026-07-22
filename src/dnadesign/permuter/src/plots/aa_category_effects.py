@@ -1,12 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/aa_category_effects.py
 
 Category-level summary for amino-acid substitutions.
-
-Top: mean Δ per biochemical class (IQR whiskers) + fraction |Δ| ≥ thresh.
-Bottom: mean Δ per residue (grouped by class order).
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,6 +19,8 @@ from typing import Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
+from dnadesign.permuter.src.contracts.metrics import observed_metric_column
 
 # Reuse the same category order as the heatmap
 AA_CAT_ORDER: list[tuple[str, list[str]]] = [
@@ -70,7 +69,7 @@ def _has_aa_signals(df: pd.DataFrame) -> bool:
 def _series_for_metric(df: pd.DataFrame, metric_id: Optional[str]) -> Tuple[pd.Series, str]:
     if not metric_id:
         raise RuntimeError("metric_id must be provided for aa_category_effects")
-    col = f"permuter__metric__{metric_id}"
+    col = observed_metric_column(metric_id)
     if col not in df.columns:
         raise RuntimeError(f"Metric column not found: {col}")
     return df[col].astype("float64"), str(metric_id)
@@ -83,7 +82,7 @@ def plot(
     elite_df: pd.DataFrame,
     all_df: pd.DataFrame,
     output_path: Path,
-    job_name: str,
+    scope_name: str,
     ref_sequence: Optional[str] = None,  # unused
     metric_id: Optional[str] = None,
     evaluators: str = "",
@@ -207,7 +206,7 @@ def plot(
     # Title & subtitle
     ref_name = df["permuter__ref"].iloc[0] if "permuter__ref" in df.columns and not df.empty else ""
     fig.suptitle(
-        f"{job_name}{f' ({ref_name})' if ref_name else ''}",
+        f"{scope_name}{f' ({ref_name})' if ref_name else ''}",
         fontsize=int(round(12 * fs * TITLE_BOOST)),
         y=0.995,
     )

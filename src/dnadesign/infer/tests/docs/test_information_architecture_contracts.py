@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_docs_information_architecture_contracts.py
+src/dnadesign/infer/tests/docs/test_information_architecture_contracts.py
 
 Information-architecture contract tests for infer docs progressive disclosure.
 
@@ -82,9 +82,9 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "reference/feature-schema.md" in docs_readme
     assert "../workspaces/evo2_feature_bundle_smoke/README.md" in docs_readme
     assert "tutorials/demo_pressure_test_usr_ops_notify.md" in docs_readme
-    assert "../../usr/docs/operations/multi-source-shared-dataset-assembly.md" in docs_readme
-    assert "../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" in docs_readme
-    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in docs_readme
+    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" in docs_readme
+    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_readme
+    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" in docs_readme
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_readme
     assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_readme
     assert "file or USR dataset" in docs_readme
@@ -98,17 +98,17 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "dev/journal.md" in docs_readme
     pressure_test_section = docs_readme.split("#### Pressure-test agnostic model writes into USR", maxsplit=1)[1]
     pressure_test_section = pressure_test_section.split("#### Continue after infer-derived `X` exists", maxsplit=1)[0]
-    assert "../../usr/docs/operations/multi-source-shared-dataset-assembly.md" not in pressure_test_section
-    assert "../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" not in pressure_test_section
-    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" not in pressure_test_section
+    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" not in pressure_test_section
+    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" not in pressure_test_section
+    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" not in pressure_test_section
     shared_handoff_section = docs_readme.split("### Shared dataset handoffs into infer", maxsplit=1)[1]
     shared_handoff_section = shared_handoff_section.split("### Documentation by type", maxsplit=1)[0]
     assert "../../cluster/docs/workflows/exploratory-clustering.md" not in shared_handoff_section
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" not in shared_handoff_section
     by_type = docs_readme.split("### Documentation by type", maxsplit=1)[1]
-    assert "../../usr/docs/operations/multi-source-shared-dataset-assembly.md" not in by_type
-    assert "../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" not in by_type
-    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" not in by_type
+    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" not in by_type
+    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" not in by_type
+    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" not in by_type
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" not in by_type
     assert "../../cluster/docs/workflows/exploratory-clustering.md" not in by_type
     assert "[Section index](index.md)" in docs_readme
@@ -124,9 +124,9 @@ def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:
     assert "### Operations" in docs_index
     assert "### Reference" in docs_index
     assert "### Developer notes" in docs_index
-    assert "../../usr/docs/operations/multi-source-shared-dataset-assembly.md" in docs_index
-    assert "../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" in docs_index
-    assert "../../usr/docs/operations/promoter-characterization-feature-matrix.md" in docs_index
+    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" in docs_index
+    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_index
+    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" in docs_index
     assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_index
     assert "cluster exploratory workflow" in docs_index
     assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_index
@@ -141,7 +141,7 @@ def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
     assert "pressure-test-agnostic-models.md" in ops_index
     assert "../tutorials/demo_pressure_test_usr_ops_notify.md" in ops_index
     assert "scc-evo2-gpu-uv-runbook.md" in ops_index
-    assert "../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md" in ops_index
+    assert "../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in ops_index
 
 
 def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:

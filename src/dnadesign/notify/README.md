@@ -1,7 +1,6 @@
 ![Notify banner](assets/notify-banner.svg)
 
-Notify watches Universal Sequence Record events and sends webhook notifications.
-Use it when you need status delivery from local workspaces or scheduler-managed runs.
+Notify watches Universal Sequence Record events and sends webhook notifications for local workspaces or scheduler-managed runs.
 
 ## Documentation
 

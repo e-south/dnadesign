@@ -26,6 +26,6 @@ dataset assertions, so `workspace doctor` can fail on drift before a run.
   - [config.slot_a.window.yaml](config.slot_a.window.yaml)
   - [config.slot_b.window.yaml](config.slot_b.window.yaml)
 - Inputs notes: [inputs/README.md](inputs/README.md)
-- Shared cross-tool runbook: [../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md](../../../usr/docs/operations/construct-infer-shared-dataset-runbook.md)
-- Broader feature-matrix runbook: [../../../usr/docs/operations/promoter-characterization-feature-matrix.md](../../../usr/docs/operations/promoter-characterization-feature-matrix.md)
+- Shared cross-tool runbook: [../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- Broader feature-matrix runbook: [../../../usr/docs/operations/promoter/characterization-feature-matrix.md](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
 - All workspaces: [../README.md](../README.md)

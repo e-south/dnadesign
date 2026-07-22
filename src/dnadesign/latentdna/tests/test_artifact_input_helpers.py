@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_artifact_input_helpers.py
+
+Regression tests for artifact input helpers LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json
@@ -162,6 +173,79 @@ def _write_scalar_build_artifact(workspace_dir: Path, *, pairwise_max_rows: int)
     return scalar_dir / "manifest.json"
 
 
+def _write_sample_build_recipe_workspace(workspace_dir: Path, *, source_classes: list[str]) -> None:
+    source_class_values = "[" + ", ".join(repr(value) for value in source_classes) + "]"
+    (workspace_dir / "config.yaml").write_text(
+        f"""
+schema_version: latentdna.workspace.v1
+workspace:
+  id: sample_build_freshness_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+sources: {{}}
+recipes:
+  demo_recipe:
+    steps:
+      - id: build_demo_sample
+        op: sample.build
+        params:
+          sample: demo_sample
+          view: demo_view
+          strategy: stratified
+          n: 10
+          group_column: design_family
+          seed: 17
+          where:
+            column: source_class
+            in: {source_class_values}
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_sample_build_artifact(workspace_dir: Path, *, source_classes: list[str]) -> Path:
+    stable_input = workspace_dir / "inputs" / "stable-source.txt"
+    stable_input.parent.mkdir(parents=True, exist_ok=True)
+    stable_input.write_text("stable\n", encoding="utf-8")
+    sample_dir = workspace_dir / "outputs" / "samples" / "demo_sample"
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.table({"id": ["row0"]}), sample_dir / "rows.parquet")
+    (sample_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "artifact_kind": "sample_set",
+                "artifact_id": "demo_sample",
+                "status": "ok",
+                "inputs": [
+                    {
+                        "kind": "source",
+                        "id": "stable-source",
+                        "path": stable_input.as_posix(),
+                        "digest": sha256_file(stable_input),
+                    }
+                ],
+                "params": {
+                    "strategy": "stratified",
+                    "n": 10,
+                    "group_column": "design_family",
+                    "seed": 17,
+                    "reference_set": None,
+                    "explicit_ids": [],
+                    "input_sample_ids": [],
+                    "where": {"column": "source_class", "in": source_classes},
+                },
+                "outputs": [{"path": "rows.parquet", "media_type": "application/x-parquet"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return sample_dir / "manifest.json"
+
+
 def test_dependency_artifact_input_uses_manifest_for_managed_artifacts(tmp_path: Path) -> None:
     context = SimpleNamespace(output_root=tmp_path)
     manifest_path = tmp_path / "views" / "demo_view" / "manifest.json"
@@ -259,6 +343,24 @@ def test_scalar_freshness_detects_build_recipe_param_drift(tmp_path: Path) -> No
 
     assert drifted["status"] == "attention"
     assert "stale scalar build config for scalar_table:demo_scalar" in str(drifted["reason"])
+
+
+def test_sample_freshness_detects_build_recipe_param_drift(tmp_path: Path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    _write_sample_build_recipe_workspace(workspace_dir, source_classes=["densegen"])
+    _write_sample_build_artifact(workspace_dir, source_classes=["densegen"])
+
+    context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    freshness = evaluate_artifact_freshness(context, artifact_kind="sample_set", artifact_id="demo_sample")
+    assert freshness["status"] == "ok"
+
+    _write_sample_build_recipe_workspace(workspace_dir, source_classes=["densegen", "reference_control"])
+    drifted_context = load_workspace_config(workspace_dir, validate_plot_semantics=False)
+    drifted = evaluate_artifact_freshness(drifted_context, artifact_kind="sample_set", artifact_id="demo_sample")
+
+    assert drifted["status"] == "attention"
+    assert "stale sample build config for sample_set:demo_sample" in str(drifted["reason"])
 
 
 def test_freshness_accepts_legacy_managed_input_paths_via_upstream_manifest(tmp_path: Path) -> None:

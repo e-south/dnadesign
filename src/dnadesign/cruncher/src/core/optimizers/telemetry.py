@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/optimizers/telemetry.py
 
 Send optimizer telemetry updates to a caller-supplied sink.

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_import_contract.py
 
-Guards study import order so Matplotlib cache setup happens before plot modules
-load.
+Guards study import order so Matplotlib cache setup happens before plot modules.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

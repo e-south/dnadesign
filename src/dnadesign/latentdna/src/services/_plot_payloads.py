@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/_plot_payloads.py
+
 Payload and manifest helpers for plot services.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -96,7 +103,7 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
             )
             for scalar_id in spec.scalar_ids
         ]
-    if spec.kind in {"categorical_count", "metric_panel_grid"}:
+    if spec.kind in {"categorical_count", "categorical_enrichment_summary", "metric_panel_grid"}:
         assert spec.scalar_id is not None
         return [
             _artifact_input(
@@ -262,12 +269,30 @@ def plot_input_payload(spec: ResolvedPlotSpec) -> dict[str, object]:
         payload["y_axis_label"] = spec.y_axis_label
     if spec.colorbar_label is not None:
         payload["colorbar_label"] = spec.colorbar_label
+    if spec.value_column is not None:
+        payload["value_column"] = spec.value_column
+    if spec.count_column is not None:
+        payload["count_column"] = spec.count_column
+    if spec.total_column is not None:
+        payload["total_column"] = spec.total_column
+    if spec.p_value_column is not None:
+        payload["p_value_column"] = spec.p_value_column
+    if spec.q_value_column is not None:
+        payload["q_value_column"] = spec.q_value_column
+    if spec.common_feature_column is not None:
+        payload["common_feature_column"] = spec.common_feature_column
     if spec.direction_column is not None:
         payload["direction_column"] = spec.direction_column
     if spec.unit_column is not None:
         payload["unit_column"] = spec.unit_column
     if spec.reference_line is not None:
         payload["reference_line"] = spec.reference_line
+    if spec.static_filters:
+        payload["static_filters"] = [item.model_dump(mode="json") for item in spec.static_filters]
+    if spec.group_order:
+        payload["group_order"] = spec.group_order
+    if spec.max_features_per_group is not None:
+        payload["max_features_per_group"] = spec.max_features_per_group
     if spec.row_column is not None:
         payload["row_column"] = spec.row_column
     if spec.column_column is not None:
@@ -313,6 +338,16 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["right_cluster_id"] = spec.right_cluster_id
     if spec.value_column is not None:
         params["value_column"] = spec.value_column
+    if spec.count_column is not None:
+        params["count_column"] = spec.count_column
+    if spec.total_column is not None:
+        params["total_column"] = spec.total_column
+    if spec.p_value_column is not None:
+        params["p_value_column"] = spec.p_value_column
+    if spec.q_value_column is not None:
+        params["q_value_column"] = spec.q_value_column
+    if spec.common_feature_column is not None:
+        params["common_feature_column"] = spec.common_feature_column
     if spec.value_columns:
         params["value_columns"] = spec.value_columns
     if spec.metric_columns:
@@ -357,6 +392,12 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["unit_column"] = spec.unit_column
     if spec.reference_line is not None:
         params["reference_line"] = spec.reference_line
+    if spec.static_filters:
+        params["static_filters"] = [item.model_dump(mode="json") for item in spec.static_filters]
+    if spec.group_order:
+        params["group_order"] = spec.group_order
+    if spec.max_features_per_group is not None:
+        params["max_features_per_group"] = spec.max_features_per_group
     if spec.pair_id_column is not None:
         params["pair_id_column"] = spec.pair_id_column
     if spec.render_mode is not None:
@@ -385,7 +426,7 @@ def manifest_params_for_plot(spec: ResolvedPlotSpec) -> dict[str, object]:
         params["hide_repeated_y_axis"] = True
     if spec.filter_options:
         params["filter_options"] = [option.model_dump(mode="json") for option in spec.filter_options]
-    if spec.kind in {"categorical_count", "metric_panel_grid", "distribution"}:
+    if spec.kind in {"categorical_count", "categorical_enrichment_summary", "metric_panel_grid", "distribution"}:
         if spec.scalar_id is not None:
             params["input_kind"] = "scalar_table"
             params["input_id"] = spec.scalar_id

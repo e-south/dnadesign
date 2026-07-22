@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/view_registry.py
 
-Canonical view registry for payload-centric YIU bundle publication and render
-planning.
+Canonical view registry for payload-centric YIU bundle publication and render.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

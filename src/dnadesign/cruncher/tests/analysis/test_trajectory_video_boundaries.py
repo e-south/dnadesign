@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_trajectory_video_boundaries.py
 
 Characterization tests for trajectory-video timeline and render contract seams.

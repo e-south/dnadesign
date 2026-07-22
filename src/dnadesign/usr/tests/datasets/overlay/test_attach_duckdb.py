@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/tests/datasets/overlay/test_attach_duckdb.py
 
 DuckDB backend attach behavior.

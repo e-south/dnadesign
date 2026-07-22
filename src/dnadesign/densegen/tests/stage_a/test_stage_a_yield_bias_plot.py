@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import matplotlib
+import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
 
@@ -124,7 +125,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
         x_label_size = axes_right[-1].xaxis.label.get_size()
         assert entropy_labels[0].get_fontsize() == pytest.approx(x_label_size)
     finally:
-        fig.clf()
+        plt.close(fig)
 
 
 def test_stage_a_yield_bias_requires_iupac_consensus() -> None:

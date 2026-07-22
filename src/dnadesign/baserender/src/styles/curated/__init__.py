@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/styles/curated/__init__.py
 
 Curated BaseRender style presets/helpers.

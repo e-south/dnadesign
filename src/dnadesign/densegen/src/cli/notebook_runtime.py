@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/src/cli/notebook_runtime.py
+dnadesign
+src/dnadesign/densegen/src/cli/notebook_runtime.py
 
 Runtime helpers for DenseGen notebook launch behavior.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

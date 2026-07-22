@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/runtime/test_pipeline_round_ctx.py
+
+Regression tests for pipeline round ctx OPAL runtime.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -19,12 +21,13 @@ from dnadesign.opal.src.config.types import (
     DataBlock,
     IngestBlock,
     LocationLocal,
-    ObjectivesBlock,
+    OwnershipBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
     ScoringBlock,
-    SelectionBlock,
+    SelectionBatchBlock,
+    SelectionView,
     TrainingBlock,
 )
 from dnadesign.opal.src.core.round_context import roundctx_contract
@@ -123,7 +126,9 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
     df.to_parquet(records_path, index=False)
 
     cfg = RootConfig(
+        schema_version="opal.campaign.v3",
         campaign=CampaignBlock(name="Demo", slug="demo", workdir=str(workdir)),
+        ownership=OwnershipBlock(owner_scope="opal_demo"),
         data=DataBlock(
             location=LocationLocal(kind="local", path=str(records_path)),
             x_column_name="X",
@@ -133,25 +138,22 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
             y_expected_length=8,
         ),
         model=PluginRef(name="random_forest", params={"n_estimators": 5, "random_state": 0}),
-        selection=SelectionBlock(
-            selection=PluginRef(
-                name="top_n",
-                params={
-                    "top_k": 1,
-                    "score_ref": "sfxi_v1/sfxi",
-                    "objective_mode": "maximize",
-                    "tie_handling": "competition_rank",
-                },
+        selection_views=[
+            SelectionView(
+                id="primary",
+                objective=PluginRef(name="sfxi_v1", params={"scaling": {"min_n": 1}}),
+                selection=PluginRef(
+                    name="top_n",
+                    params={
+                        "top_k": 1,
+                        "score_ref": "sfxi",
+                        "objective_mode": "maximize",
+                        "tie_handling": "competition_rank",
+                    },
+                ),
             )
-        ),
-        objectives=ObjectivesBlock(
-            objectives=[
-                PluginRef(
-                    name="sfxi_v1",
-                    params={"scaling": {"min_n": 1}},
-                )
-            ]
-        ),
+        ],
+        selection_batch=SelectionBatchBlock(),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
         scoring=ScoringBlock(score_batch_size=1000),
@@ -274,7 +276,9 @@ def test_run_round_commits_stage_buffered_predict_summary(tmp_path):
     df.to_parquet(records_path, index=False)
 
     cfg = RootConfig(
+        schema_version="opal.campaign.v3",
         campaign=CampaignBlock(name="Demo", slug="demo", workdir=str(workdir)),
+        ownership=OwnershipBlock(owner_scope="opal_demo"),
         data=DataBlock(
             location=LocationLocal(kind="local", path=str(records_path)),
             x_column_name="X",
@@ -284,25 +288,22 @@ def test_run_round_commits_stage_buffered_predict_summary(tmp_path):
             y_expected_length=8,
         ),
         model=PluginRef(name="test_stage_buffer_model", params={}),
-        selection=SelectionBlock(
-            selection=PluginRef(
-                name="top_n",
-                params={
-                    "top_k": 1,
-                    "score_ref": "sfxi_v1/sfxi",
-                    "objective_mode": "maximize",
-                    "tie_handling": "competition_rank",
-                },
+        selection_views=[
+            SelectionView(
+                id="primary",
+                objective=PluginRef(name="sfxi_v1", params={"scaling": {"min_n": 1}}),
+                selection=PluginRef(
+                    name="top_n",
+                    params={
+                        "top_k": 1,
+                        "score_ref": "sfxi",
+                        "objective_mode": "maximize",
+                        "tie_handling": "competition_rank",
+                    },
+                ),
             )
-        ),
-        objectives=ObjectivesBlock(
-            objectives=[
-                PluginRef(
-                    name="sfxi_v1",
-                    params={"scaling": {"min_n": 1}},
-                )
-            ]
-        ),
+        ],
+        selection_batch=SelectionBatchBlock(),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
         scoring=ScoringBlock(score_batch_size=2),

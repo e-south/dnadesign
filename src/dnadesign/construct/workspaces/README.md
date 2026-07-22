@@ -97,5 +97,5 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - External/shared USR roots remain allowed, but only through explicit `root:` fields or `construct seed --root <path>`.
 - One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
 - The packaged local demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.
-- The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/construct-infer-shared-dataset-runbook.md`.
+- The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md`.
 - The study-owned pDual-10 surface is a checked-in execution surface, not a demo profile; use its tracked workspace artifact/config contract when the question is about the live promoter study rather than generic Construct behavior.

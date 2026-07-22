@@ -1,4 +1,13 @@
-"""RegulonDB Construct workspace contract tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/construct/tests/test_regulondb_workspace_contract.py
+
+RegulonDB Construct workspace contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -6,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.construct.src.config import SequenceOffsetSelectorConfig, load_job_config
+from dnadesign.construct.src.contracts.config import SequenceOffsetSelectorConfig, load_job_config
 
 WORKSPACE = Path("src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel")
 

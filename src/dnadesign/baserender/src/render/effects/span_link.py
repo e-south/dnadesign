@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/effects/span_link.py
 
 Generic span-link effect drawer connecting feature ids or explicit spans.

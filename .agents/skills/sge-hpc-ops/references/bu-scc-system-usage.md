@@ -57,7 +57,7 @@ Use this reference when BU SCC policy claims are part of the task.
 - For output placement and quota issues, route to file-system-structure and require `groups` plus `pquota` checks.
 - For process-reaper incidents, route to process-reaper plus tracking-jobs before proposing retries.
 - For transfer workflows, consult transferring-files pages before suggesting download-node jobs.
-- Record URL and retrieval date for each claim in `source-evidence.md`.
+- Record URL and retrieval date for each claim in `external-sources.md`.
 
 ### Freshness rules
 

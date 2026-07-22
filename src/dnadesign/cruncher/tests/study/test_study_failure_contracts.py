@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_failure_contracts.py
 
 Validate Study failure contracts (replay errors, summarize ordering, partial data).

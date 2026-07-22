@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/projection_service.py
+
 Projection services for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -94,6 +101,7 @@ def fit_projection(
                 "metric": metric_value,
                 "random_seed": seed,
                 "dimensionality": 2,
+                "n_neighbors": max(2, min(15, rows - 1)),
                 "sampling_strategy": sample_params.get("strategy", "unknown"),
                 "projection_role": ("primary" if rows == population_rows else "appendix"),
                 "default_rank": 0 if rows == population_rows else 100,

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_fimo_concordance.py
 
 Validates optimizer-vs-FIMO concordance diagnostics and plotting behavior.

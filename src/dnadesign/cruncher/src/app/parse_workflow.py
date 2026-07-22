@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/parse_workflow.py
 
 Parse locked motifs into normalized catalog artifacts.

@@ -1,4 +1,13 @@
-"""Small state objects shared by plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/render_state.py
+
+Small state objects shared by plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

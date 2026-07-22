@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/analysis/test_analyze_import_contract.py
 
 Guards analyze import order so Matplotlib cache setup happens before plot modules load.

@@ -1,0 +1,199 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/response_metastudy/test_response_uncertainty.py
+
+Tests for target uncertainty derived from Reader bootstrap records.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
+    StressTargetView,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.evaluation import (
+    response_uncertainty,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.runtime import (
+    campaign_calibration,
+)
+
+
+def test_reader_joint_draws_produce_finite_constraint_scales() -> None:
+    labels, draws = _reader_records(samples=100)
+    ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
+
+    result = response_uncertainty.estimate_response_calibration_from_reader_draws(
+        labels,
+        draws,
+        target_views=(ethanol,),
+        scale_quantile=0.9,
+        expected_bootstrap_samples=100,
+    )
+
+    assert set(result.calibration["component"]) == {
+        "response_separation",
+        "on_magnitude_floor",
+        "off_magnitude_ceiling",
+    }
+    assert (result.calibration["scale"] > 0.0).all()
+    assert result.rows["feasibility_margin"].notna().all()
+    assert set(result.calibration["scale_basis"]) == {"reader_joint_bootstrap_plus_conservative_event_bound"}
+
+
+def test_reader_joint_draws_fail_on_incomplete_candidate_draws() -> None:
+    labels, draws = _reader_records(samples=99)
+    ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
+
+    with pytest.raises(ValueError, match="99 bootstrap draws; expected 100"):
+        response_uncertainty.estimate_response_calibration_from_reader_draws(
+            labels,
+            draws,
+            target_views=(ethanol,),
+            scale_quantile=0.9,
+            expected_bootstrap_samples=100,
+        )
+
+
+def test_reader_joint_draws_fail_when_a_candidate_is_missing() -> None:
+    labels, draws = _reader_records(samples=100)
+    draws = draws.loc[~draws["id"].eq("b")]
+    ethanol = StressTargetView("ethanol", "Ethanol", (0.0, 1.0, 0.0, 1.0))
+
+    with pytest.raises(ValueError, match="lack one or more joint bootstrap summaries"):
+        response_uncertainty.estimate_response_calibration_from_reader_draws(
+            labels,
+            draws,
+            target_views=(ethanol,),
+            scale_quantile=0.9,
+            expected_bootstrap_samples=100,
+        )
+
+
+def test_campaign_to_screen_calibration_comparison_accepts_only_rounding_error() -> None:
+    calibration, configured = _campaign_calibration(scale=0.1234564)
+
+    result = campaign_calibration.compare_campaign_to_screen_calibration(
+        calibration,
+        configured_by_view=configured,
+    )
+
+    assert result["matches_screen_calibration"] is True
+    assert result["comparison_role"] == "diagnostic_only"
+    assert float(result["max_abs_error"]) == pytest.approx(4.0e-7)
+
+
+def test_campaign_to_screen_calibration_comparison_reports_drift_without_blocking() -> None:
+    calibration, configured = _campaign_calibration(scale=0.1238)
+
+    result = campaign_calibration.compare_campaign_to_screen_calibration(
+        calibration,
+        configured_by_view=configured,
+    )
+
+    assert result["matches_screen_calibration"] is False
+    assert len(result["differences"]) == 9
+
+
+def test_fold_calibration_is_invariant_to_held_out_experiment_uncertainty() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "selection_view_id": view_id,
+                "reader_experiment_id": experiment_id,
+                **{
+                    f"{component}__combined_sd": value
+                    for component in ("response_separation", "on_magnitude_floor", "off_magnitude_ceiling")
+                },
+            }
+            for view_id in ("ethanol", "ciprofloxacin", "and")
+            for experiment_id, value in (("e1", 0.2), ("e2", 0.3))
+        ]
+    )
+    changed = rows.copy()
+    held_out = changed["reader_experiment_id"].eq("e2")
+    combined = [column for column in changed.columns if column.endswith("__combined_sd")]
+    changed.loc[held_out, combined] = 1_000.0
+
+    baseline = response_uncertainty.build_calibration_table(
+        rows,
+        scale_quantile=0.9,
+        bootstrap_samples=100,
+        exclude_experiment="e2",
+    )
+    perturbed = response_uncertainty.build_calibration_table(
+        changed,
+        scale_quantile=0.9,
+        bootstrap_samples=100,
+        exclude_experiment="e2",
+    )
+
+    pd.testing.assert_frame_equal(baseline, perturbed)
+    assert set(baseline["excluded_experiment"]) == {"e2"}
+
+
+def _reader_records(*, samples: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    labels = pd.DataFrame([_state_row(candidate_id) for candidate_id in ("a", "b")])
+    rng = np.random.default_rng(7)
+    rows: list[dict[str, object]] = []
+    for candidate_id in ("a", "b"):
+        base = _state_row(candidate_id)
+        for draw_index in range(samples):
+            row = {"id": candidate_id, "draw_index": draw_index}
+            for column in ("r00", "r10", "r01", "r11", "b00", "b10", "b01", "b11"):
+                row[column] = float(base[column]) + float(rng.normal(0.0, 0.05))
+            rows.append(row)
+    return labels, pd.DataFrame(rows)
+
+
+def _campaign_calibration(*, scale: float) -> tuple[pd.DataFrame, dict[str, dict[str, float]]]:
+    rows: list[dict[str, object]] = []
+    configured: dict[str, dict[str, float]] = {}
+    for view_id in ("ethanol", "ciprofloxacin", "and"):
+        configured[view_id] = {
+            "response_separation_min": 0.0,
+            "on_magnitude_min": 0.0,
+            "off_magnitude_max": 0.0,
+            "response_separation_scale": 0.123456,
+            "on_magnitude_scale": 0.123456,
+            "off_magnitude_scale": 0.123456,
+        }
+        for component in ("response_separation", "on_magnitude_floor", "off_magnitude_ceiling"):
+            rows.append(
+                {
+                    "selection_view_id": view_id,
+                    "component": component,
+                    "threshold": 0.0,
+                    "scale": scale,
+                    "scale_basis": "reader_joint_bootstrap_plus_conservative_event_bound",
+                }
+            )
+    return pd.DataFrame.from_records(rows), configured
+
+
+def _state_row(candidate_id: str) -> dict[str, object]:
+    row: dict[str, object] = {
+        "id": candidate_id,
+        "design_id": candidate_id,
+        "reader_experiment_id": "reader-exp",
+        "reduction_id": "primary",
+        "r00": 0.0,
+        "r10": 2.0,
+        "r01": 0.5,
+        "r11": 2.5,
+        "b00": -0.5,
+        "b10": 0.5,
+        "b01": -0.25,
+        "b11": 0.75,
+    }
+    for prefix in ("r", "b"):
+        for corner in ("00", "10", "01", "11"):
+            row[f"{prefix}{corner}_event_half_range"] = 0.05
+    return row

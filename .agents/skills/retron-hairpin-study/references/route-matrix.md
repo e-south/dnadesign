@@ -1,24 +1,54 @@
 # Route Matrix
 
-Use this matrix when the question starts near the retron hairpin study but
-quickly turns into a different surface.
+Use this matrix to route Retron MSD compiler tasks without defaulting to
+study-phase reporting.
 
 | User question | Primary surface | Why |
 | --- | --- | --- |
-| Fresh thread or skill not visible. | `docs/studies/README.md`, then `cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json` | The direct command path is canonical even when project-scope skill discovery is absent. |
-| Where is the hairpin study now? | `cruncher.data-plane.cruncher-study-status --study-dir docs/studies/retron_hairpin_design --json` | Cheap record-backed snapshot of the pinned checked-in study id. |
-| What blocks the next study step on this host? | `cruncher.data-plane.cruncher-study-preflight --study-dir docs/studies/retron_hairpin_design --scope next --json` | Command-level readiness for the current study phase. |
-| Which command group or workspace should I open next? | `docs/studies/retron_hairpin_design/routes.md` | The study owns the human handoff; open `pipeline.yaml` only when machine-readable command-group or bootstrap metadata is the real need. |
-| Which surface owns cap/shortening geometry? | `routes.md`, then the released-product Snapback route | Snapback owns the cap/shortening lane and 0/3/3 retained-active route. |
-| Which surface owns base-junction or B26/B43 scar logic? | `docs/studies/retron_hairpin_design/scar-nick-base-junction.md`, then the scar-nick route in `routes.md` | Scar-nick owns Type IIS scar plus terminal nick geometry; the context page owns the strict top/bottom policy snapshot. |
-| Is YIU the shortening engine here? | `status.md`, `routes.md`, and `yiu_workflow.md` | The checked-in study keeps YIU contrast-only and mismatch-centric. |
-| I need to harden the study status, preflight, or automation bootstrap. | `retron-hairpin-study` plus `harness-engineering` | This is a harness problem, rather than a prose-only edit. |
-| I need to change lane boundaries, ontologies, or fail-fast behavior. | `retron-hairpin-study` plus `code-change-discipline` | This is a boundary and contract problem. |
+| "Here is an MSD ID." | `msd-design-references.md` | Complete labels should lint/compile directly. |
+| "I have payload, cap, left base, and right base." | `msd-design-references.md`, then compiler CLI | User supplied reference parts; do not run solvers unless validation fails or metadata is missing. |
+| "Here is a compiler spec or solved primitive rank." | `msd-design-references.md`, then `lint --spec` | Specs parse explicit parts and public primitive selectors without depending on manual label syntax. |
+| "Here is a tetO trim spec." | `workbench/design_sets/`, then `lint --spec` | Payload trimming is source-backed design-set meaning; the compiler consumes literal sequences and typed metadata. |
+| "Why are these variants in the experiment?" | `docs/studies/retron_hairpin_design/workbench/` | Persistent hypotheses, effect tags, and design-set membership live in the workbench, not generated compiler output. |
+| "Where do the tetO PWM panel, sequence stills, video, and GenBank handoff outputs belong?" | `workbench/deliverables/`, then materialize and `review-outputs` | Deliverable expectations are persistent study contracts; bulky renders and exports remain generated output. |
+| "Generate the tetO trim PWM triptych and sequence montage." | `workbench/deliverables/`, then `review-outputs --deliverable-plan <plan.yaml>` | The deliverable plan owns expected rows, pES review ids, and MSD-only `record_ids`; the renderer consumes `sequence_index.tsv` and does not scan generated directories ad hoc. |
+| "I have left/right bases but no profile." | compiler parser | The profile is derived from bases and fails fast if `S0` is not `M`. |
+| "I have a profile but not bases." | scar-nick route in `routes/README.md` / `routes/product/scar-nick-base-junction.md` | Base feasibility is a primitive search problem. |
+| "I need a cap or shortening geometry." | released-product Snapback route in `routes/README.md` / `routes/product/released-product-snapback.md` | Cap/shortening is solved by Snapback, not the compiler. |
+| "I need mismatch/boundary illustration." | YIU route in `routes/README.md` / `routes/quality/yiu-boundary-check.md` | YIU is contrast-only. |
+| "I need sequence, SVG, PNG, or GenBank for selected parts." | compile reference, then materialize single-unit sequence bundle | The compiler emits one MSD unit per design and does not accept a repeat count. |
+| "Open a transient Finder window with these outputs/deliverables." | materialize single-unit sequence bundle, then open the bundle root | Finder/output wording implies concrete artifacts; catalog JSONs alone are not the requested deliverable. |
+| "Where is the Retron study status?" | `uv run ops progress show studies.retron-hairpin-design.status --study-dir docs/studies/retron_hairpin_design --json` | Use only for progress/history questions. |
+| "What blocks the Retron study run?" | `uv run ops progress show studies.retron-hairpin-design.preflight --study-dir docs/studies/retron_hairpin_design --scope next --json` | Use only for blocker/readiness questions. |
 
-Status-first routing boundary:
+## Compiler-First Boundary
 
-- Use study status for the record-backed answer.
-- Use study preflight for blockers.
-- Use `routes.md` for the next command surface.
-- Use `pipeline.yaml` only for machine-readable command-group or bootstrap support.
-- Do not reconstruct the study plan from generic Cruncher docs alone.
+- Start with input completeness, not study phase.
+- If all required parts are present, validate and compile.
+- Preserve exact user-specified labels. Checked-in cohorts are examples or named
+  study fixtures, not replacements for live user input.
+- If a part is missing, route to the smallest primitive solver.
+- If sequence or visual artifacts are requested, materialize one MSD unit per
+  design and keep complete-unit repeat expansion out of the compiler.
+- If Finder/output/deliverable language is present, verify
+  `manifest/indexes/sequence_index.tsv`, per-design GenBank files,
+  `plots/secondary_structure.native.png`, `plots/composition_overview.svg`, and
+  `plots/composition_overview.png` before reporting success.
+- If a review package is requested after materialization, run `review-outputs`
+  with the relevant deliverable plan and verify `reviews/review_manifest.json`,
+  the logo-style PWM triptych, semantic still PNGs, the montage MP4, the
+  montage manifest, the plan-owned `benchling_genbank/` import folder with
+  `msd-retron-*.gb` files, and reverse-complement plus folding evidence.
+- If primitive sources select multiple ranks, fail fast unless a future
+  expansion contract is explicit; the preferred product surface is one selected
+  cap rank plus one selected stem-base rank per design.
+- If payload-trim metadata is present, keep it attached to literal payload
+  sequences and reference rows; do not make the compiler infer payload sequence
+  from PWM labels.
+- Use `operations/runtime/command-groups/pipeline.yaml` only when a machine-readable command group is needed.
+- Use `workbench/` when the question is persistent provenance rather than
+  transient output generation.
+- Use `workbench/deliverables/` when the question is the expected PWM,
+  sequence-review, video, GenBank, review manifest, or outcome-overlay artifact
+  map for a hypothesis.
+- Do not reconstruct compiler behavior from generic Cruncher docs.

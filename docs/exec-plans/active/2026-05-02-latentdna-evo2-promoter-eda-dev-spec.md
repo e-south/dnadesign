@@ -62,7 +62,7 @@ reference and UMAP surfaces.
 
 Evidence: `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/config.yaml`
 defines the current candidate sets, plot semantics, deliverables, and notebook
-control defaults; `docs/studies/stress_ethanol_cipro_growth/status.md` says
+control defaults; `docs/studies/stress_ethanol_cipro_growth/record/status.md` says
 these primary surfaces are current except for the costly UMAP appendix.
 
 Observation: RegulonDB has complete local 7B sidecars for native/full and
@@ -70,7 +70,7 @@ derived core60 lanes, including output-layer means and log-likelihood scalars,
 but the checked-in LatentDNA deliverable is still mostly a two-plot sigma UMAP
 panel over intermediate embeddings.
 
-Evidence: `docs/studies/regulondb_native_promoter_panel/status.md` reports
+Evidence: `docs/studies/regulondb_native_promoter_panel/record/status.md` reports
 `local_infer_complete_7b`; `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/config.yaml`
 declares native/core60 intermediate and output-layer views but only renders two
 intermediate sigma UMAP plots.
@@ -347,8 +347,8 @@ Primary repo surfaces:
 - Plot semantics contract:
   `src/dnadesign/latentdna/src/contracts/plot_semantics.py`
 - Study records:
-  `docs/studies/stress_ethanol_cipro_growth/status.md` and
-  `docs/studies/regulondb_native_promoter_panel/status.md`
+  `docs/studies/stress_ethanol_cipro_growth/record/status.md` and
+  `docs/studies/regulondb_native_promoter_panel/record/status.md`
 
 Current stress study facts to preserve:
 
@@ -773,7 +773,7 @@ approves.
    Add plot semantics YAML for each new plot under
    `src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel/plot_semantics/`.
    Add or update study deliverable markdown under
-   `src/dnadesign/studies/regulondb_native_promoter_panel/deliverables/`.
+   `src/dnadesign/studies/units/regulondb_native_promoter_panel/deliverables/`.
 
 9. Update `src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/config.yaml`
    without broad churn:
@@ -834,7 +834,7 @@ approves.
 14. Update docs after behavior is stable:
 
     - `src/dnadesign/latentdna/docs/reference/workspace-schema.md`
-    - `src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md`
+    - `src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md`
     - `src/dnadesign/latentdna/docs/reference/performance-budgets.md` if live
       pressure timings change materially
     - study deliverable markdown for any plot whose interpretation changed
@@ -923,12 +923,12 @@ Repo acceptance:
 
 - Proposal: this document
 - Related design spec:
-  [sequence-view ontology and Infer completion hardening](../../dev/plans/2026-04-28-sequence-view-ontology-and-infer-completion-hardening-spec.md)
+  [sequence-view ontology and Infer completion hardening](../../dev/plans/cross-tool/sequence-view/2026-04-28-ontology-and-infer-completion-hardening.md)
 - LatentDNA workflow:
-  [promoter-study representation comparison](../../../src/dnadesign/latentdna/docs/workflows/promoter-study-representation-comparison.md)
+  [promoter-study representation comparison](../../../src/dnadesign/latentdna/docs/workflows/stress-ethanol-cipro-representation-comparison.md)
 - Stress study record:
-  [stress ethanol cipro growth status](../../studies/stress_ethanol_cipro_growth/status.md)
+  [stress ethanol cipro growth status](../../studies/stress_ethanol_cipro_growth/record/status.md)
 - RegulonDB study record:
-  [RegulonDB native promoter panel status](../../studies/regulondb_native_promoter_panel/status.md)
+  [RegulonDB native promoter panel status](../../studies/regulondb_native_promoter_panel/record/status.md)
 - PR: pending
 - ADR: pending

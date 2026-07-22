@@ -1,0 +1,16 @@
+plot_id: rt_lnrna_reference_compiler_axis_projection
+question: Where do fit, eval, reference, compiler, and DMS sensitivity populations fall on the selected fitted trait axis?
+decision_role: primary
+encoding: Distribution grid of trait-axis projection and endpoint margin by scored population role.
+scope: Row-level projections from the generic trait_axis_projection_rows scalar, filtered to one configured trait axis at a time.
+guardrails:
+  - Reference, compiler, and DMS rows are projected for placement and sensitivity review only.
+  - DMS rows are not fitted endpoints and should not be read as measured abundance labels.
+caption: Population placement on the selected Crawford or Khan fitted trait axis.
+alt_text: Violin and box distributions comparing trait-axis projection and endpoint margin across fit, eval, reference, and sensitivity roles.
+preprocessing_md: Uses the scalar table emitted by trait_axis_projection_rows; the renderer samples dense categories only for display.
+math_md: |
+  Axis projection is the signed row projection onto the fitted high-minus-low axis. Endpoint margin is similarity to the high endpoint centroid minus similarity to the low endpoint centroid.
+rationale_md: Shows whether references, compiler designs, and DMS sensitivity rows occupy expected neighborhoods after the abundance axis is fitted.
+limitations_md: The default static rendering filters to the first configured axis; notebook controls can switch to the paired Khan axis.
+failure_modes_md: Missing role labels or stale row artifacts can collapse categories or hide intended populations.

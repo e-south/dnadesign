@@ -1,7 +1,7 @@
 # Performance Budgets
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-02
+**Last verified:** 2026-07-14
 
 The package currently treats promoter-study scale as a normal operating target, but checked-in verification remains contract-first and fixture-scale.
 
@@ -71,4 +71,4 @@ Interpretation:
 See also:
 
 - [../dev/journal.md](../dev/journal.md)
-- [../workflows/promoter-study-representation-comparison.md](../workflows/promoter-study-representation-comparison.md)
+- [../workflows/stress-ethanol-cipro-representation-comparison.md](../workflows/stress-ethanol-cipro-representation-comparison.md)

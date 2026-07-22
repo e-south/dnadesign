@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/released_snapback/test_explicit_evaluation.py
 
 Focused tests for released explicit evaluation seams.

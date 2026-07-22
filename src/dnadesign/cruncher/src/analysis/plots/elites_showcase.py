@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/analysis/plots/elites_showcase.py
 
 Render elite-focused motif placement showcase panels via the public baserender API.

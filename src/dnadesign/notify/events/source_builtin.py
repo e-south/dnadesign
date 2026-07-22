@@ -40,7 +40,7 @@ def _resolve_infer_events_from_config(config_path: Path) -> Path:
 
 
 def _resolve_construct_events_from_config(config_path: Path) -> Path:
-    from dnadesign.construct.contracts import resolve_construct_usr_output_contract
+    from dnadesign.construct import resolve_construct_usr_output_contract
 
     try:
         contract = resolve_construct_usr_output_contract(config_path)

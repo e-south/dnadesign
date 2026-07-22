@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/plotting.py
 
 Compose analysis plot rendering helpers from focused plotting submodules.

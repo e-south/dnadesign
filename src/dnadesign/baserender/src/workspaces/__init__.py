@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/workspaces/__init__.py
 
 Workspace discovery, scaffolding, and strict workspace job-path resolution.

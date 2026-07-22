@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/cli/commands/workspaces.py
 
-Author(s): Eric J. South
+CLI wiring for workspaces Cruncher CLI commands.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

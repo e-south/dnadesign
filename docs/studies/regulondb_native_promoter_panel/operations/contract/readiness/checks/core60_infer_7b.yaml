@@ -1,0 +1,34 @@
+checks:
+  core60_infer_7b:
+  - kind: path_exists
+    check_id: infer.config.core60_7b.present
+    check_group: infer
+    summary: Core60 TSS-upstream 7B Infer sequence-view config is present.
+    required: true
+    artifact: infer_core60_config_7b
+  - kind: path_exists
+    check_id: infer.runbook.core60_7b.present
+    check_group: infer
+    summary: Core60 TSS-upstream 7B Infer batch runbook is present.
+    required: true
+    artifact: infer_core60_runbook_7b
+  - kind: command
+    check_id: infer.config.core60_7b.validates
+    check_group: infer
+    summary: Core60 TSS-upstream 7B Infer config validates without loading Evo2.
+    required: true
+    surface: infer_validate_core60_7b
+  - kind: command
+    check_id: infer.core60_7b.completion.inventory
+    check_group: infer
+    summary: Core60 TSS-upstream 7B sequence-view completion inventory is inspectable
+      after Construct materializes the dataset.
+    required: false
+    surface: infer_completion_core60_7b
+  - kind: command
+    check_id: notify.events.core60_7b.resolve
+    check_group: notify
+    summary: Notify can resolve the core60 7B Infer event path after the core60 dataset
+      exists.
+    required: false
+    surface: notify_resolve_events_core60_7b

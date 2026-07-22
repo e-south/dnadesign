@@ -1,4 +1,13 @@
-"""Table-loading and schema contracts for plot rendering."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/tables.py
+
+Table-loading and schema contracts for plot rendering.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

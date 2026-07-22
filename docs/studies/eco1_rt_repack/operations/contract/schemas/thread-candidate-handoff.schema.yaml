@@ -1,0 +1,158 @@
+version: 1
+schema_id: thread_candidate_handoff_v1
+status: scaffold
+required_fields:
+  - schema_id
+  - schema_version
+  - handoff_id
+  - handoff_kind
+  - study_id
+  - subject_kind
+  - construct_subject_created
+  - downstream_acceptance_required
+  - source_artifacts
+  - selection_policy
+  - candidates
+field_contract:
+  root:
+    required:
+      - schema_id
+      - schema_version
+      - handoff_id
+      - handoff_kind
+      - study_id
+      - subject_kind
+      - construct_subject_created
+      - downstream_acceptance_required
+      - source_artifacts
+      - selection_policy
+      - candidates
+  handoff_kind:
+    required_value: rt_only_candidate_handoff
+  study_id:
+    required_value: eco1_rt_repack
+  subject_kind:
+    required_value: reverse_transcriptase_protein_only
+  construct_subject_created:
+    required_value: false
+  downstream_acceptance_required:
+    required_value: true
+  source_artifacts:
+    required:
+      - candidate_table
+      - foldcheck_report
+      - foldcheck_review
+      - candidate_triage_table
+      - candidate_selection_panel
+      - candidate_handoff_sequences
+      - upstream_artifact_hashes
+  selection_policy:
+    required:
+      - eligibility_rule
+      - sae_acceptance_gate
+    required_values:
+      sae_acceptance_gate: false
+  candidates:
+    required_fields:
+      - candidate_id
+      - sequence_hash
+      - candidate_handoff_sequence_csv_hash
+      - eligible_for_handoff
+      - foldcheck_status
+      - selection_slot
+  candidate_table:
+    required_columns:
+      - candidate_id
+      - sequence_hash
+      - parent_sample_ids
+      - mutation_count
+      - mutation_list
+      - mutation_windows
+      - mask_violation_count
+      - backend_kind
+      - backend_run_id
+      - rank
+      - status
+  foldcheck_report:
+    required_columns:
+      - candidate_id
+      - runtime_kind
+      - runtime_version
+      - input_sequence_hash
+      - reference_structure_id
+      - wt_baseline_artifact_id
+      - runtime_parameters_hash
+      - threshold_id
+      - threshold_values
+      - plddt
+      - pae_summary
+      - wt_runtime_ca_rmsd
+      - cryoem_mapped_ca_rmsd
+      - cryoem_mapped_ca_rmsd_status
+      - protected_contact_retention
+      - status
+      - rejection_reason
+      - missing_metric_reason
+  candidate_triage_table:
+    required_columns:
+      - candidate_id
+      - sequence_hash
+      - policy_id
+      - fold_review_class
+      - hard_gate_status
+  candidate_selection_panel:
+    required_columns:
+      - candidate_id
+      - sequence_hash
+      - policy_id
+      - selection_slot
+      - selection_rank
+      - design_group_id
+      - within_group_rank
+      - eligible_for_handoff
+      - selection_reason
+      - input_candidate_triage_table_hash
+  candidate_handoff_sequences:
+    required_columns:
+      - candidate_id
+      - selection_slot
+      - selection_rank
+      - policy_id
+      - design_group_id
+      - within_group_rank
+      - protein_sequence
+      - mapped_protein_sequence
+      - sequence_hash
+      - amino_acid_length
+      - protein_sequence_sha256
+      - mapped_protein_sequence_sha256
+      - canonical_sequence_status
+      - canonical_sequence_sha256
+      - canonical_mutations
+      - fold_review_class
+      - eligible_for_handoff
+      - codon_policy_id
+      - dna_design_status
+      - restriction_site_screen_status
+      - source_foldcheck_input_sequences_sha256
+invariants:
+  - candidates_must_exist_in_candidate_table
+  - candidates_must_have_zero_mask_violations
+  - candidates_must_have_nonfixture_foldcheck_acceptance
+  - candidates_must_exist_in_candidate_selection_panel
+  - candidates_must_exist_in_candidate_handoff_sequences
+  - candidate_handoff_sequences_must_match_candidate_sequence_hashes
+  - candidate_handoff_sequences_must_be_protein_only_until_downstream_acceptance
+  - upstream_artifact_hashes_must_cover_profile_backbone_residue_map_evidence_mask_plan_samples_candidates_foldcheck_triage_selection
+  - handoff_kind_must_be_rt_only_candidate_handoff
+  - construct_subject_created_must_be_false_before_downstream_acceptance
+  - downstream_acceptance_must_reference_rt_lnrna_candidate_acceptance_schema_or_successor
+  - sae_features_must_not_be_an_acceptance_gate
+forbidden_fields:
+  - permuter__var_id
+  - construct_subject_id
+  - downstream_target
+  - acceptance_summary
+notes:
+  - This is a study-local schema stub until a reusable `thread` package owns the neutral contract.
+  - The handoff is RT-only candidate evidence; downstream construct semantics remain out of scope.

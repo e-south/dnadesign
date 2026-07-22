@@ -1,4 +1,13 @@
-"""Reference-set selector coverage for promoted promoter controls."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_reference_sets.py
+
+Reference-set selector coverage for promoted promoter controls.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -6,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.latentdna.src.reference_sets import resolve_reference_set_ids_from_columns, resolve_reference_set_rows
+from dnadesign.latentdna.src.references.sets import resolve_reference_set_ids_from_columns, resolve_reference_set_rows
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
@@ -28,8 +37,9 @@ def _row(
     collection_id: str | None = None,
     selection_basis: str = "template_window_center",
     source_family: str = "construct_derived",
+    **extra: object,
 ) -> dict[str, object]:
-    return {
+    row = {
         "usr_label__primary": label,
         "source_family": source_family,
         "selection_basis": selection_basis,
@@ -38,6 +48,8 @@ def _row(
         .replace("_context1kb_rc", "")
         .replace("_core60", ""),
     }
+    row.update(extra)
+    return row
 
 
 def _matched(reference_set_id: str, rows: list[dict[str, object]]) -> list[str]:
@@ -52,6 +64,13 @@ def _matched_from_columns(reference_set_id: str, rows: list[dict[str, object]]) 
         column: [row.get(column) for row in rows]
         for column in {
             "usr_label__primary",
+            "sfxi_ref__reference_instance_id",
+            "derived__parent_id",
+            "derived__parent_dataset",
+            "regulondb__primary_promoter_name",
+            "has_BaeR",
+            "has_CpxR",
+            "has_LexA",
             "promoter_standard__collection_id",
             "promoter_standard__display_name",
             "selection_basis",
@@ -160,6 +179,82 @@ def test_stress_reference_sets_resolve_native_core60_and_context_rows_without_mi
         "W1_core60_context1kb_forward",
         "W1_core60_context1kb_rc",
     ]
+
+
+def test_sfxi_archive_reference_set_is_backed_by_sfxi_overlay_metadata() -> None:
+    rows = [
+        _row("renamed_design", sfxi_ref__reference_instance_id="pDual-10-ES19p"),
+        _row("pDual-10-ES99p", sfxi_ref__reference_instance_id=None),
+    ]
+
+    assert _matched("reference_sfxi_archive", rows) == ["pDual-10-ES19p"]
+
+
+def test_regulondb_reference_sets_separate_full_native_cohort_from_tf_axis_subset() -> None:
+    rows = [
+        _row(
+            "native_a_core60",
+            source_family="regulondb_native_promoter",
+            source_class="native_regulondb",
+            derived__parent_id="usr_native_a",
+            derived__parent_dataset="usr_regulondb_native_promoters",
+            regulondb__primary_promoter_name="nativeA",
+            has_BaeR=False,
+            has_CpxR=False,
+            has_LexA=False,
+        ),
+        _row(
+            "native_b_core60",
+            source_family="regulondb_native_promoter",
+            source_class="native_regulondb",
+            derived__parent_id="usr_native_b",
+            derived__parent_dataset="usr_regulondb_native_promoters",
+            regulondb__primary_promoter_name="nativeB",
+            has_BaeR=False,
+            has_CpxR=True,
+            has_LexA=False,
+        ),
+        _row(
+            "native_b_core60_context1kb_forward",
+            source_family="construct_derived",
+            source_class="manual_or_wildtype",
+            derived__parent_id="usr_native_b",
+            derived__parent_dataset="usr_regulondb_native_promoters",
+            regulondb__primary_promoter_name="nativeB",
+            has_BaeR=False,
+            has_CpxR=True,
+            has_LexA=False,
+        ),
+        _row(
+            "native_c_core60_context1kb_forward",
+            source_family="construct_derived",
+            source_class="manual_or_wildtype",
+            derived__parent_id="usr_native_c",
+            derived__parent_dataset="usr_regulondb_native_promoters",
+            regulondb__primary_promoter_name="nativeC",
+            has_BaeR=False,
+            has_CpxR=False,
+            has_LexA=False,
+        ),
+        _row(
+            "densegen_control",
+            source_family="densegen_generated",
+            source_class="densegen",
+            derived__parent_id=None,
+            derived__parent_dataset=None,
+            regulondb__primary_promoter_name=None,
+            has_BaeR=False,
+            has_CpxR=False,
+            has_LexA=False,
+        ),
+    ]
+
+    assert _matched("reference_regulondb_native_core60_all", rows) == [
+        "usr_native_a",
+        "usr_native_b",
+        "usr_native_c",
+    ]
+    assert _matched("reference_regulondb_tf_axis_targets", rows) == ["usr_native_b"]
 
 
 def test_reference_set_column_resolution_matches_row_resolution_for_selector_sets() -> None:

@@ -5,8 +5,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: "15 07 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -56,48 +54,6 @@ jobs:
             --changed-files-file .ci_changed_files.txt \
             --github-output "$GITHUB_OUTPUT"
 
-  quality-entropy:
-    name: Quality entropy report
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: ".python-version"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-
-      - name: Install dependencies (locked)
-        run: uv sync --locked --dev
-
-      - name: Build quality entropy report
-        id: entropy
-        continue-on-error: true
-        run: |
-          uv run python -m dnadesign.devtools.quality.entropy \
-            --repo-root . \
-            --max-sor-age-days 90 \
-            --report-file quality-entropy-report.md
-
-      - name: Upload quality entropy artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: quality-entropy-report
-          path: quality-entropy-report.md
-
-      - name: Enforce quality entropy checks
-        if: steps.entropy.outcome == 'failure'
-        run: exit 1
-
   secrets-hygiene:
     name: Secrets hygiene
     runs-on: ubuntu-latest
@@ -117,16 +73,16 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies (locked)
-        run: uv sync --locked --dev
+        run: uv sync --locked --only-group lint --no-install-project
 
       - name: Detect-secrets baseline path hygiene
         run: |
-          uv run python -m dnadesign.devtools.security.secrets_baseline \
+          PYTHONPATH=src uv run --no-sync python -m dnadesign.devtools.security.secrets_baseline \
             --repo-root . \
             --baseline .secrets.baseline
 
       - name: Detect-secrets full-tree check
-        run: uv run pre-commit run detect-secrets --all-files
+        run: uv run --no-sync pre-commit run detect-secrets --all-files
 
   core-lint-test-build:
     name: Core lint/test/build lane
@@ -137,15 +93,27 @@ jobs:
       contents: read
       id-token: write
     env:
+      COVERAGE_CORE: sysmon
       MPLCONFIGDIR: ${{ github.workspace }}/.tmp/matplotlib
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version-file: ".python-version"
+
+      - name: Collect changed files for test target resolution
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
+            --event-name "${{ github.event_name }}" \
+            --repo-root . \
+            --base-ref "${{ github.base_ref }}" \
+            --head-sha "${{ github.sha }}" \
+            --output-file .ci_changed_files.txt
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -154,6 +122,33 @@ jobs:
 
       - name: Install dependencies (locked)
         run: uv sync --locked --dev
+
+      - name: Docs checks (links + naming)
+        run: |
+          uv run python -m dnadesign.devtools.docs.checks \
+            --changed-files-file .ci_changed_files.txt
+
+      - name: Architecture boundary checks
+        run: uv run python -m dnadesign.devtools.architecture.boundaries
+
+      - name: Pre-commit (non-Ruff hooks)
+        env:
+          SKIP: ruff-check,ruff-format,detect-secrets
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            uv run pre-commit run --all-files
+            exit 0
+          fi
+
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          uv run pre-commit run --from-ref "origin/${{ github.base_ref }}" --to-ref "${{ github.sha }}"
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Format check
+        run: uv run ruff format --check .
 
       - name: Install FFmpeg
         if: >
@@ -174,43 +169,19 @@ jobs:
 
           echo "FFmpeg install timed out or failed; continuing without video-output coverage."
 
-      - name: Docs checks (links + naming)
-        run: uv run python -m dnadesign.devtools.docs.checks
-
-      - name: Architecture boundary checks
-        run: uv run python -m dnadesign.devtools.architecture.boundaries
-
-      - name: Pre-commit (non-Ruff hooks)
-        env:
-          SKIP: ruff-check,ruff-format
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            uv run pre-commit run --all-files
-            exit 0
-          fi
-
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          uv run pre-commit run --from-ref "origin/${{ github.base_ref }}" --to-ref "${{ github.sha }}"
-
-      - name: Lint
-        run: uv run ruff check .
-
-      - name: Format check
-        run: uv run ruff format --check .
-
       - name: Tests (core lane) + coverage report
         shell: bash
         run: |
           marker_expr="not fimo and not integration"
           run_coverage_gate="${{ needs.detect-ci-scope.outputs.run-coverage-gate }}"
           smoke_targets=(
+            src/dnadesign/devtools/tests/ci/test_workflow_contract.py
             src/dnadesign/devtools/tests/docs/test_checks.py
             src/dnadesign/usr/tests/test_cli_command_surface.py
           )
 
           if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" = "true" ]; then
-            uv run pytest -q -m "$marker_expr" --maxfail=1 --durations=25 \
+            uv run pytest -q -m "$marker_expr" --durations=25 \
               --cov=src/dnadesign \
               --cov-report=json:coverage-core.json \
               --cov-report=xml:coverage-core.xml
@@ -224,26 +195,27 @@ jobs:
               exit 1
             fi
             echo "No affected tools in PR scope; running core-lane smoke tests without coverage upload."
-            uv run pytest -q --maxfail=1 --durations=25 "${smoke_targets[@]}"
+            uv run pytest -q --durations=25 "${smoke_targets[@]}"
             exit 0
           fi
 
           mapfile -t targets < <(
             PYTHONPATH=src python3 -m dnadesign.devtools.ci.test_targets \
               --repo-root . \
-              --affected-tools-csv "$affected_csv"
+              --affected-tools-csv "$affected_csv" \
+              --changed-files-file .ci_changed_files.txt
           )
 
           if [ "${#targets[@]}" -eq 0 ]; then
             echo "No test directories found for affected tools: $affected_csv; running core-lane smoke tests."
-            uv run pytest -q --maxfail=1 --durations=25 "${smoke_targets[@]}" \
+            uv run pytest -q --durations=25 "${smoke_targets[@]}" \
               --cov=src/dnadesign \
               --cov-report=json:coverage-core.json \
               --cov-report=xml:coverage-core.xml
             exit 0
           fi
 
-          uv run pytest -q -m "$marker_expr" --maxfail=1 --durations=25 "${targets[@]}" \
+          uv run pytest -q -m "$marker_expr" --durations=25 "${targets[@]}" \
             --cov=src/dnadesign \
             --cov-report=json:coverage-core.json \
             --cov-report=xml:coverage-core.xml
@@ -301,15 +273,27 @@ jobs:
       contents: read
       id-token: write
     env:
+      COVERAGE_CORE: sysmon
       MPLCONFIGDIR: ${{ github.workspace }}/.tmp/matplotlib
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version-file: ".python-version"
+
+      - name: Collect changed files for test target resolution
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
+            --event-name "${{ github.event_name }}" \
+            --repo-root . \
+            --base-ref "${{ github.base_ref }}" \
+            --head-sha "${{ github.sha }}" \
+            --output-file .ci_changed_files.txt
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -333,7 +317,7 @@ jobs:
             --github-path "$GITHUB_PATH"
 
       - name: Install dependencies (locked)
-        run: uv sync --locked --dev
+        run: uv sync --locked --group test
 
       - name: Verify FIMO availability
         run: fimo --version
@@ -359,7 +343,8 @@ jobs:
             mapfile -t targets < <(
               PYTHONPATH=src python3 -m dnadesign.devtools.ci.test_targets \
                 --repo-root . \
-                --affected-tools-csv "$affected_csv"
+                --affected-tools-csv "$affected_csv" \
+                --changed-files-file .ci_changed_files.txt
             )
 
             if [ "${#targets[@]}" -eq 0 ]; then

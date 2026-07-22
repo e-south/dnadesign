@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/view_contracts.py
 
 QA view and BaseRender contract publication for scar-nick candidates.

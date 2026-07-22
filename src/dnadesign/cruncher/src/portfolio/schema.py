@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/portfolio/schema.py
 
 Schema registry and validation entrypoint for Portfolio specs.

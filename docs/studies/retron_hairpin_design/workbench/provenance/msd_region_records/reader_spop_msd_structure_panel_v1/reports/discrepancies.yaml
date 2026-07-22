@@ -1,0 +1,98 @@
+contract: retron_msd_region_discrepancy_report_v1
+schema_version: 1
+comparison_count: 25
+discrepancy_count: 6
+discrepancies:
+- kind: sequence_mismatch
+  variant_id: retron26
+  compared_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized/variants/pES-tetr-r26-w00-19__msd-tetr-w00-19-C26-LCGGG-RACAG-MXMX/sequences/forward.gb
+  details:
+    canonical_sha256: df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf  # pragma: allowlist secret
+    existing_sha256: a83a189aeabf4639c8935ba2d345e888bc087cafcff98331df3928ba2edbce26  # pragma: allowlist secret
+    canonical_length_nt: 74
+    existing_length_nt: 74
+- kind: annotation_mismatch
+  variant_id: retron26
+  compared_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized/variants/pES-tetr-r26-w00-19__msd-tetr-w00-19-C26-LCGGG-RACAG-MXMX/sequences/features.csv
+  details:
+    mismatches:
+    - role: payload_complement
+      expected:
+        start_0: 38
+        end_0: 57
+        sequence: TCTCTATCACTGATAGGGA
+      observed:
+        start_0: 38
+        end_0: 57
+        sequence: CTCTATATCAGATATAGAG
+    - role: payload_primary
+      expected:
+        start_0: 15
+        end_0: 34
+        sequence: TCCCTATCAGTGATAGAGA
+      observed:
+        start_0: 15
+        end_0: 34
+        sequence: CTCTATATCTGATATAGAG
+- kind: sequence_mismatch
+  variant_id: retron43
+  compared_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized/variants/pES-tetr-r43-w00-19__msd-tetr-w00-19-C43-LCAAG-RCTCG-MXMM/sequences/forward.gb
+  details:
+    canonical_sha256: 8eab4aef99caec105d66826d41d9fa7b64d944226c17283ea951d312282cb2a1  # pragma: allowlist secret
+    existing_sha256: 11acb2a1fbaf1f03deb7e7f668cf947bc6d4b8df9770a8a3259f05597e2e9bd5  # pragma: allowlist secret
+    canonical_length_nt: 88
+    existing_length_nt: 88
+- kind: annotation_mismatch
+  variant_id: retron43
+  compared_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized/variants/pES-tetr-r43-w00-19__msd-tetr-w00-19-C43-LCAAG-RCTCG-MXMM/sequences/features.csv
+  details:
+    mismatches:
+    - role: payload_complement
+      expected:
+        start_0: 52
+        end_0: 71
+        sequence: TCTCTATCACTGATAGGGA
+      observed:
+        start_0: 52
+        end_0: 71
+        sequence: CTCTATATCAGATATAGAG
+    - role: payload_primary
+      expected:
+        start_0: 15
+        end_0: 34
+        sequence: TCCCTATCAGTGATAGAGA
+      observed:
+        start_0: 15
+        end_0: 34
+        sequence: CTCTATATCTGATATAGAG
+- kind: sequence_mismatch
+  variant_id: retron180
+  compared_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized/variants/pES-tetr-r180-w00-19__msd-tetr-w00-19-C172-LAGTG-RCATG-XWMM/sequences/forward.gb
+  details:
+    canonical_sha256: c286ec719e5e5de2256f335959f0ed5e286ba3111d0f8830ee6d844eab5aed19  # pragma: allowlist secret
+    existing_sha256: bc79ff54abfb79cdd1c27f659eb7ee53c20a4809a81f42013427cd48ce9c5e21  # pragma: allowlist secret
+    canonical_length_nt: 79
+    existing_length_nt: 79
+- kind: annotation_mismatch
+  variant_id: retron180
+  compared_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/outputs/teto_retained_span_trim_tetr_pwm_elite_v1/materialized/variants/pES-tetr-r180-w00-19__msd-tetr-w00-19-C172-LAGTG-RCATG-XWMM/sequences/features.csv
+  details:
+    mismatches:
+    - role: payload_complement
+      expected:
+        start_0: 43
+        end_0: 62
+        sequence: TCTCTATCACTGATAGGGA
+      observed:
+        start_0: 43
+        end_0: 62
+        sequence: CTCTATATCAGATATAGAG
+    - role: payload_primary
+      expected:
+        start_0: 15
+        end_0: 34
+        sequence: TCCCTATCAGTGATAGAGA
+      observed:
+        start_0: 15
+        end_0: 34
+        sequence: CTCTATATCTGATATAGAG

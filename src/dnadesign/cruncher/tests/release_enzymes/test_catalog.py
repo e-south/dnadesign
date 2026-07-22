@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/release_enzymes/test_catalog.py
 
 Contract tests for release-enzyme catalog loading and cut normalization.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/bio/enzymes.py
 
 Shared recognition-site validation and duplex-cut geometry helpers.

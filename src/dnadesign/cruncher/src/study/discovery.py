@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/study/discovery.py
 
 Discover workspace-scoped Study specs and deterministic Study run directories.

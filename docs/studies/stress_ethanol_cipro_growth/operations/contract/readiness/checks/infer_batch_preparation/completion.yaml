@@ -1,0 +1,34 @@
+checks:
+  infer_batch_preparation:
+  - kind: infer_sequence_view_completion
+    check_id: infer.feature_completion.sequence_views_main_7b
+    check_group: infer
+    summary: Main sequence-view feature completion is classified before model execution.
+    required: false
+    phase_id: infer_sequence_views_context_forward_seq_and_anchor_mean_7b
+    surface: infer_completion_sequence_views_main_7b
+    expected:
+      max_missing_vectors: 0
+      max_missing_scalars: 0
+      max_stale_vectors: 0
+      max_stale_scalars: 0
+      max_missing_products: 0
+  - kind: infer_sequence_view_completion
+    check_id: infer.feature_completion.sequence_views_reference_7b
+    check_group: infer
+    summary: Reference sequence-view feature completion is classified before model execution.
+    required: false
+    phase_id: infer_reference_views_7b
+    surface: infer_completion_sequence_views_reference_7b
+    expected:
+      max_missing_vectors: 0
+      max_missing_scalars: 0
+      max_stale_vectors: 0
+      max_stale_scalars: 0
+      max_missing_products: 0
+  - kind: workspace_layout
+    check_id: infer.workspace.layout
+    check_group: infer
+    summary: Infer workspace root is present.
+    required: true
+    surface: infer_workspace

@@ -15,12 +15,15 @@ import argparse
 import datetime as dt
 import re
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import yaml
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
+from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
+from dnadesign.devtools.docs.metadata import LAST_VERIFIED_PATTERN, OWNER_PATTERN, SOR_MARKDOWN_FILES
 from dnadesign.ops.catalog import (
     CatalogProcedureEntry,
     load_runbook_catalog,
@@ -29,16 +32,27 @@ from dnadesign.ops.catalog import (
     resolve_catalog_doc_path,
     resolve_registry_metadata_path_for_doc_path,
 )
-from dnadesign.ops.runbooks.path_policy import (
+from dnadesign.ops.runbooks import (
     PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
     REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
 )
+from dnadesign.ops.status import list_status_kind_specs_for_repo
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
 README_COVERAGE_LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
 TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
+TOOL_README_BANNER_DIMENSION_PATTERN = re.compile(
+    r"<svg[^>]*\bwidth=\"1200\"[^>]*\bheight=\"180\"[^>]*\bviewBox=\"0 0 1200 180\"",
+    flags=re.IGNORECASE,
+)
+TOOL_README_SELF_REFERENTIAL_INTRO_PATTERN = re.compile(
+    r"\b[A-Za-z0-9_-]+\s+is\s+(?:the|a)\s+[^.]*\b(?:package|tool|layer)\b[^.]*\b(?:in|for)\s+`?dnadesign`?",
+    flags=re.IGNORECASE,
+)
+README_TOOL_CATALOG_EXCLUDED_TOOLS = {"studies"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+TOOL_README_MAX_LINES = 35
 TOOL_README_TOP_LINK_SCAN_LINES = 80
 RUNBOOK_DEMO_SHELL_LANGS = {"bash", "sh", "zsh"}
 RUNBOOK_DEMO_YAML_LANGS = {"yaml", "yml"}
@@ -69,16 +83,10 @@ ROOT_MARKDOWN_FILES = (
     "PLANS.md",
     "QUALITY_SCORE.md",
 )
-SOR_MARKDOWN_FILES = (
-    "ARCHITECTURE.md",
-    "DESIGN.md",
-    "SECURITY.md",
-    "RELIABILITY.md",
-    "PLANS.md",
-    "QUALITY_SCORE.md",
-)
 INDEX_MARKDOWN_FILES = (
     "docs/README.md",
+    "docs/setup/README.md",
+    "docs/notebooks/README.md",
     "docs/runbooks/README.md",
     "docs/architecture/README.md",
     "docs/architecture/decisions/README.md",
@@ -90,21 +98,20 @@ INDEX_MARKDOWN_FILES = (
     "docs/dev/README.md",
     "docs/bu-scc/README.md",
     "docs/notify/README.md",
+    "docs/studies/reference/README.md",
 )
 RUNBOOK_MARKDOWN_FILES = (
-    "docs/installation.md",
-    "docs/dependencies.md",
-    "docs/notebooks.md",
-    "docs/marimo-reference.md",
+    "docs/setup/installation.md",
+    "docs/setup/dependencies.md",
+    "docs/notebooks/README.md",
+    "docs/notebooks/marimo-reference.md",
     "docs/operations/README.md",
-    "docs/operations/orchestration-runbooks.md",
-    "docs/bu-scc/quickstart.md",
-    "docs/bu-scc/install.md",
-    "docs/bu-scc/batch-notify.md",
+    "docs/operations/orchestration/runbooks.md",
+    "docs/bu-scc/setup/quickstart.md",
+    "docs/bu-scc/setup/install.md",
+    "docs/bu-scc/runbooks/batch-notify.md",
     "docs/notify/usr-events.md",
 )
-OWNER_PATTERN = re.compile(r"^\*\*Owner:\*\*\s*(.+?)\s*$", re.MULTILINE)
-LAST_VERIFIED_PATTERN = re.compile(r"^\*\*Last verified:\*\*\s*(.+?)\s*$", re.MULTILINE)
 TYPE_PATTERN = re.compile(r"^\*\*Type:\*\*\s*(.+?)\s*$", re.MULTILINE)
 PLANE_PATTERN = re.compile(r"^\*\*Plane:\*\*\s*(.+?)\s*$", re.MULTILINE)
 OWNER_BOUNDARY_PATTERN = re.compile(r"^\*\*Owner-boundary:\*\*\s*(.+?)\s*$", re.MULTILINE)
@@ -133,6 +140,10 @@ _EXEC_PLAN_REQUIRED_SECTIONS = (
     "Validation and Acceptance",
 )
 PUBLIC_INTERFACE_DOC_PATHS = (
+    "docs/README.md",
+    "docs/dev/README.md",
+    "docs/runbooks/README.md",
+    "docs/studies/README.md",
     "src/dnadesign/cruncher/docs/demos",
     "src/dnadesign/cruncher/docs/reference/cli.md",
     "src/dnadesign/cruncher/workspaces",
@@ -140,6 +151,9 @@ PUBLIC_INTERFACE_DOC_PATHS = (
     "src/dnadesign/densegen/docs/howto",
     "src/dnadesign/densegen/docs/tutorials",
     "src/dnadesign/densegen/workspaces/README.md",
+    "src/dnadesign/ops/README.md",
+    "src/dnadesign/ops/docs",
+    "src/dnadesign/studies/README.md",
 )
 ABSOLUTE_DOC_PATH_TOKENS = ("/Users/", "/private/", "/tmp/", "/home/", "/var/", "C:\\")
 INTERNAL_SOURCE_INREACH_PATTERN = re.compile(r"(?:dnadesign\.[a-z0-9_]+\.src\.|src/dnadesign/[a-z0-9_-]+/src/)")
@@ -147,6 +161,27 @@ ENTRYPOINT_MARKDOWN_FILES = ("README.md", "docs/README.md")
 ENTRYPOINT_LOCAL_PATH_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_./-])(?P<path>(?:\.\./|\.\/)?(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+)(?![A-Za-z0-9_./-])"
 )
+AGENTS_CODE_SPAN_PATTERN = re.compile(r"`([^`\n]+)`")
+AGENTS_REPO_RELATIVE_PREFIXES = ("src/", "docs/", ".agents/", ".github/", "tests/", "scripts/")
+AGENTS_ROOT_FILENAMES = {
+    "AGENTS.md",
+    "ARCHITECTURE.md",
+    "DESIGN.md",
+    "README.md",
+    "RELIABILITY.md",
+    "SECURITY.md",
+    "PLANS.md",
+    "QUALITY_SCORE.md",
+    ".pre-commit-config.yaml",
+    "pyproject.toml",
+    "uv.lock",
+    "pixi.toml",
+    "pixi.lock",
+}
+AGENTS_PATH_LITERAL_EXCEPTIONS = {"./scripts/agent-verify", "scripts/agent-verify"}
+AGENTS_NEGATIVE_LINE_MARKERS = ("do not add", "does not ship", "does not exist")
+REPO_LOCAL_SKILLS_DIR = ".agents/skills"
+REPO_LOCAL_SKILL_DESCRIPTION_MAX_CHARS = 220
 DENSEGEN_DOC_LANGUAGE_PATHS = (
     "src/dnadesign/densegen/README.md",
     "src/dnadesign/densegen/AGENTS.md",
@@ -180,15 +215,68 @@ LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
     re.compile(r"src/dnadesign/ops/orchestrator/contracts\.py\b"),
 )
 STUDY_RECORD_REQUIRED_FILES = (
-    "campaign.yaml",
-    "datasets.yaml",
-    "status.md",
-    "ops.study.yaml",
+    "record/campaign.yaml",
+    "record/datasets.yaml",
+    "record/status.md",
+    "operations/ops.study.yaml",
 )
+STUDY_OPS_CONTRACT_PART_KEYS = {
+    "lifecycle",
+    "phases",
+    "tracks",
+    "artifacts",
+    "execution_surfaces",
+    "snapshot",
+    "preflight",
+}
+STUDY_OPS_CONTRACT_PARTS_DIR = "contract"
+STUDY_OPS_CONTRACT_PART_MAX_LINES = 180
+STUDY_README_FRONTMATTER_REQUIRED_KEYS = {
+    "doc_id",
+    "surface",
+    "study_id",
+    "owner",
+    "last_verified",
+}
+STUDY_RUNTIME_PIPELINE_REF = "manifest:operations/runtime/command-groups/pipeline.yaml"
+STUDY_LEGACY_PIPELINE_REFS = {
+    "manifest:operations/pipeline.yaml",
+    "manifest:operations/runtime/pipeline.yaml",
+    "operations/pipeline.yaml",
+    "operations/runtime/pipeline.yaml",
+}
 STUDY_RECORD_REQUIRED_READMES = ("docs/studies/README.md",)
 STUDY_RECORD_ROUTER_FILES = (
     "AGENTS.md",
     "src/dnadesign/usr/AGENTS.md",
+)
+STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
+    "ARCHITECTURE.md",
+    "docs/README.md",
+    "docs/studies/README.md",
+    "docs/studies/reference/study-status-ops-surfaces.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/README.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md",
+    "docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md",
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md",
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md",
+)
+LEGACY_STUDY_STATUS_SURFACE_TERMS = (
+    "Study status adapters",
+    "study-status adapter",
+    "status adapter policy",
+    "study-family policy",
+    "family routing resolves",
+    "src/dnadesign/studies/families/",
+    "Study-family adapters",
+    "family-specific execution taxonomy",
+    "family-owned status",
+    "`family`, and `record_root`",
+    "declare `family` and `record_root`",
+    "promoter-family code",
+    "promoter-family adapter",
 )
 ACTIVE_STUDY_INDEX_PATH = "docs/studies/index.yaml"
 LEGACY_STUDY_INDEX_PATH = "docs/studies/promoter/index.yaml"
@@ -216,7 +304,7 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "control-plane",
         "owner_boundary": "ops",
     },
-    "docs/operations/orchestration-runbooks.md": {
+    "docs/operations/orchestration/runbooks.md": {
         "type": "runbook",
         "plane": "control-plane",
         "owner_boundary": "ops",
@@ -226,60 +314,65 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/workflow-map.md": {
+    "src/dnadesign/usr/docs/operations/routes/workflow-map.md": {
         "type": "route",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/sync.md": {
+    "src/dnadesign/usr/docs/operations/sync/README.md": {
         "type": "route",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md": {
+    "src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/multi-source-shared-dataset-assembly.md": {
+    "src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-runbook.md": {
+    "src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/construct-infer-shared-dataset-runbook.md": {
+    "src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/promoter-characterization-feature-matrix.md": {
+    "src/dnadesign/usr/docs/operations/assembly/permuter-construct-infer-shared-dataset.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "src/dnadesign/usr/docs/operations/promoter-study-status-contract.md": {
+    "src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md": {
+        "type": "runbook",
+        "plane": "data-plane",
+        "owner_boundary": "usr",
+    },
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "studies",
     },
-    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md": {
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "studies",
     },
-    "src/dnadesign/cruncher/docs/operations/cruncher-study-status.md": {
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "cruncher",
+        "owner_boundary": "studies",
     },
-    "src/dnadesign/cruncher/docs/operations/cruncher-study-preflight.md": {
+    "docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md": {
         "type": "contract",
         "plane": "data-plane",
-        "owner_boundary": "cruncher",
+        "owner_boundary": "studies",
     },
     "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
         "type": "workflow",
@@ -309,22 +402,23 @@ OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS = (
 )
 TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES = REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
 DISALLOWED_SHARED_UTILS_PATHS = (Path("src/dnadesign/utils"),)
+DISALLOWED_REPO_ROOT_OUTPUT_DIR_NAMES = ("outputs",)
 OVERLAY_GUARD_DOC_PATHS = (
-    "docs/operations/orchestration-runbooks.md",
+    "docs/operations/orchestration/runbooks.md",
     "docs/bu-scc/jobs/README.md",
     "src/dnadesign/ops/README.md",
 )
 OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/operations/README.md",
-    "docs/operations/orchestration-runbooks.md",
+    "docs/operations/orchestration/runbooks.md",
     "docs/studies/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/status.md",
+    "docs/studies/stress_ethanol_cipro_growth/record/status.md",
     "src/dnadesign/ops/README.md",
-    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
 )
 STUDY_EXECUTION_SOURCE_DOC_PATHS = (
     "docs/studies/README.md",
-    "src/dnadesign/usr/docs/operations/promoter-study-preflight.md",
+    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -373,8 +467,10 @@ def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
 
     docs_md_files = sorted(docs_root.rglob("*.md"))
     tool_docs_md_files = _collect_tool_docs_markdown_files(repo_root)
+    tool_readme_md_files = _collect_tool_readme_markdown_files(repo_root)
     all_md_files = list(docs_md_files)
     all_md_files.extend(tool_docs_md_files)
+    all_md_files.extend(tool_readme_md_files)
     for name in ROOT_MARKDOWN_FILES:
         path = repo_root / name
         if path.exists():
@@ -398,6 +494,19 @@ def _collect_tool_docs_markdown_files(repo_root: Path) -> list[Path]:
     return sorted(tool_docs)
 
 
+def _collect_tool_readme_markdown_files(repo_root: Path) -> list[Path]:
+    src_root = repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        return []
+
+    files: list[Path] = []
+    for tool_name in sorted(discover_repo_tools(repo_root=repo_root)):
+        readme_path = src_root / tool_name / "README.md"
+        if readme_path.exists():
+            files.append(readme_path)
+    return files
+
+
 def _collect_markdown_files_from_relative_paths(repo_root: Path, *, relative_paths: tuple[str, ...]) -> list[Path]:
     files: set[Path] = set()
     for rel in relative_paths:
@@ -417,11 +526,12 @@ def _find_bad_doc_names(docs_md_files: list[Path]) -> list[Path]:
     return [path for path in docs_md_files if "_" in path.name]
 
 
-def _find_broken_links(md_files: list[Path]) -> list[tuple[Path, str]]:
+def _find_broken_links(md_files: list[Path], *, repo_root: Path | None = None) -> list[tuple[Path, str]]:
     broken: list[tuple[Path, str]] = []
     anchor_cache: dict[Path, set[str]] = {}
+    resolved_repo_root = repo_root.expanduser().resolve() if repo_root is not None else None
     for src in md_files:
-        text = src.read_text(encoding="utf-8")
+        text = _markdown_text_without_fenced_code(src.read_text(encoding="utf-8"))
         for raw in LINK_PATTERN.findall(text):
             link = raw.strip().split()[0]
             if link.startswith(("http://", "https://", "mailto:")):
@@ -431,6 +541,12 @@ def _find_broken_links(md_files: list[Path]) -> list[tuple[Path, str]]:
                 target = src.resolve()
             else:
                 target = (src.parent / target_rel).resolve()
+            if resolved_repo_root is not None:
+                try:
+                    target.relative_to(resolved_repo_root)
+                except ValueError:
+                    broken.append((src, f"{link} (local link escapes repository)"))
+                    continue
             if not target.exists():
                 broken.append((src, link))
                 continue
@@ -440,6 +556,32 @@ def _find_broken_links(md_files: list[Path]) -> list[tuple[Path, str]]:
                 if anchor not in anchor_cache[target]:
                     broken.append((src, f"{link} (missing anchor '{anchor}')"))
     return broken
+
+
+def _markdown_text_without_fenced_code(text: str) -> str:
+    lines: list[str] = []
+    in_fence = False
+    fence_marker: str | None = None
+    for raw_line in text.splitlines():
+        stripped = raw_line.lstrip()
+        marker = None
+        if stripped.startswith("```"):
+            marker = "```"
+        elif stripped.startswith("~~~"):
+            marker = "~~~"
+
+        if marker is not None:
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker
+            elif marker == fence_marker:
+                in_fence = False
+                fence_marker = None
+            lines.append("")
+            continue
+
+        lines.append("" if in_fence else raw_line)
+    return "\n".join(lines)
 
 
 def _collect_markdown_anchors(path: Path) -> set[str]:
@@ -527,7 +669,7 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
     if not readme_path.exists() or not src_root.exists():
         return []
 
-    repo_tools = discover_repo_tools(repo_root=repo_root)
+    repo_tools = discover_repo_tools(repo_root=repo_root) - README_TOOL_CATALOG_EXCLUDED_TOOLS
     if not repo_tools:
         return []
 
@@ -598,9 +740,6 @@ def _find_root_docs_entrypoint_issues(repo_root: Path) -> list[str]:
         return []
 
     text = readme_path.read_text(encoding="utf-8")
-    if "dnadesign banner" not in text.lower():
-        return []
-
     linked_targets: set[str] = set()
     for raw in LINK_PATTERN.findall(text):
         link = raw.strip().split()[0]
@@ -613,7 +752,7 @@ def _find_root_docs_entrypoint_issues(repo_root: Path) -> list[str]:
 
     issues: list[str] = []
     if "docs/README.md" not in linked_targets:
-        issues.append(f"{readme_path}: bannered root README must include a markdown link to docs/README.md.")
+        issues.append(f"{readme_path}: root README must include a markdown link to docs/README.md.")
     return issues
 
 
@@ -644,6 +783,8 @@ def _find_docs_root_heading_style_issues(repo_root: Path) -> list[str]:
 
     issues: list[str] = []
     for path in sorted(docs_root.rglob("*.md")):
+        if "outputs" in path.relative_to(repo_root).parts:
+            continue
         headings = _collect_markdown_headings_outside_fences(path)
         if not headings:
             continue
@@ -712,6 +853,85 @@ def _find_entrypoint_local_path_literal_issues(repo_root: Path) -> list[str]:
                     f"{path}:{line_no}: local path literal '{token}' should be a markdown hyperlink for navigation."
                 )
     return issues
+
+
+def _find_agents_path_reference_issues(repo_root: Path) -> list[str]:
+    resolved_repo_root = repo_root.expanduser().resolve()
+    issues: list[str] = []
+    skipped_dir_names = {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        ".worktrees",
+        "__pycache__",
+    }
+    for agents_path in sorted(resolved_repo_root.rglob("AGENTS.md")):
+        relative_agents_path = agents_path.relative_to(resolved_repo_root)
+        if any(part in skipped_dir_names for part in relative_agents_path.parts):
+            continue
+        for line_no, line in enumerate(agents_path.read_text(encoding="utf-8").splitlines(), start=1):
+            line_lower = line.lower()
+            if any(marker in line_lower for marker in AGENTS_NEGATIVE_LINE_MARKERS):
+                continue
+            for raw_value in AGENTS_CODE_SPAN_PATTERN.findall(line):
+                target_literal = raw_value.strip().strip("()[]{}<>,:;!?")
+                if not target_literal or target_literal in AGENTS_PATH_LITERAL_EXCEPTIONS:
+                    continue
+                if _should_skip_agents_path_literal(target_literal):
+                    continue
+
+                target_path = _resolve_agents_path_literal(
+                    target_literal,
+                    agents_path=agents_path,
+                    repo_root=resolved_repo_root,
+                )
+                if target_path is None:
+                    continue
+                if not target_path.exists():
+                    issues.append(f"{agents_path}:{line_no}: referenced path does not exist: `{target_literal}`")
+    return issues
+
+
+def _should_skip_agents_path_literal(value: str) -> bool:
+    if value.startswith(("http://", "https://", "mailto:", "#", "/Users/", "/private/", "/tmp/", "/home/", "/var/")):
+        return True
+    if any(char.isspace() for char in value):
+        return True
+    if any(char in value for char in "*?[]{}<>$|;&="):
+        return True
+    if "://" in value or ":" in value:
+        return True
+
+    path_part = value.split("#", 1)[0]
+    if path_part.startswith(AGENTS_REPO_RELATIVE_PREFIXES):
+        return False
+    if path_part in AGENTS_ROOT_FILENAMES:
+        return False
+    if path_part.startswith("./") and path_part[2:] in AGENTS_ROOT_FILENAMES:
+        return False
+    return True
+
+
+def _resolve_agents_path_literal(value: str, *, agents_path: Path, repo_root: Path) -> Path | None:
+    path_part = value.split("#", 1)[0]
+    if path_part.startswith("./") and path_part[2:] in AGENTS_ROOT_FILENAMES:
+        path_part = path_part[2:]
+    if path_part.startswith(AGENTS_REPO_RELATIVE_PREFIXES):
+        repo_target = repo_root / path_part
+        relative_target = agents_path.parent / path_part
+        target = relative_target if relative_target.exists() else repo_target
+    elif path_part in AGENTS_ROOT_FILENAMES:
+        target = repo_root / path_part
+    else:
+        target = agents_path.parent / path_part
+    resolved_target = target.resolve()
+    try:
+        resolved_target.relative_to(repo_root)
+    except ValueError:
+        return None
+    return resolved_target
 
 
 def _find_densegen_disallowed_term_issues(repo_root: Path) -> list[str]:
@@ -869,8 +1089,13 @@ def _parse_iso_date(value: str, *, field_name: str, path: Path) -> dt.date:
         raise ValueError(f"{path}: {field_name} must use YYYY-MM-DD.") from exc
 
 
-def _find_sor_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_sor_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     today = dt.date.today()
+    changed_dates = changed_doc_dates or {}
     issues: list[str] = []
 
     for name in SOR_MARKDOWN_FILES:
@@ -912,34 +1137,52 @@ def _find_sor_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str
             issues.append(f"{path}: Last verified date cannot be in the future ({last_verified.isoformat()}).")
             continue
 
-        age_days = (today - last_verified).days
-        if age_days > max_age_days:
-            issues.append(f"{path}: Last verified date is stale by {age_days} days (max allowed {max_age_days}).")
+        change_issue = verification_change_issue(
+            repo_root=repo_root,
+            path=path,
+            last_verified=last_verified,
+            changed_doc_dates=changed_dates,
+        )
+        if change_issue is not None:
+            issues.append(change_issue)
 
     return issues
 
 
-def _find_index_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_index_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     return _find_owner_last_verified_metadata_issues(
         repo_root,
         relative_paths=INDEX_MARKDOWN_FILES,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
-def _find_runbook_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_runbook_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     return _find_owner_last_verified_metadata_issues(
         repo_root,
         relative_paths=RUNBOOK_MARKDOWN_FILES,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
-def _find_tool_docs_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+def _find_tool_docs_metadata_issues(
+    repo_root: Path,
+    *,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
+) -> list[str]:
     tool_docs = _collect_tool_docs_markdown_files(repo_root)
     return _find_owner_last_verified_metadata_issues_for_files(
+        repo_root=repo_root,
         paths=tool_docs,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
@@ -947,21 +1190,24 @@ def _find_owner_last_verified_metadata_issues(
     repo_root: Path,
     *,
     relative_paths: tuple[str, ...],
-    max_age_days: int,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
 ) -> list[str]:
     files = [repo_root / relative_path for relative_path in relative_paths]
     return _find_owner_last_verified_metadata_issues_for_files(
+        repo_root=repo_root,
         paths=files,
-        max_age_days=max_age_days,
+        changed_doc_dates=changed_doc_dates,
     )
 
 
 def _find_owner_last_verified_metadata_issues_for_files(
     *,
+    repo_root: Path,
     paths: list[Path],
-    max_age_days: int,
+    changed_doc_dates: Mapping[str, dt.date] | None = None,
 ) -> list[str]:
     today = dt.date.today()
+    changed_dates = changed_doc_dates or {}
     issues: list[str] = []
 
     for path in paths:
@@ -999,9 +1245,14 @@ def _find_owner_last_verified_metadata_issues_for_files(
             issues.append(f"{path}: Last verified date cannot be in the future ({last_verified.isoformat()}).")
             continue
 
-        age_days = (today - last_verified).days
-        if age_days > max_age_days:
-            issues.append(f"{path}: Last verified date is stale by {age_days} days (max allowed {max_age_days}).")
+        change_issue = verification_change_issue(
+            repo_root=repo_root,
+            path=path,
+            last_verified=last_verified,
+            changed_doc_dates=changed_dates,
+        )
+        if change_issue is not None:
+            issues.append(change_issue)
 
     return issues
 
@@ -1130,6 +1381,8 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
 
     catalog_entries_by_path: dict[str, CatalogProcedureEntry] = {}
     catalog_status_kinds = {entry.status_kind for entry in catalog.procedures}
+    registered_status_kinds = {spec.status_kind for spec in list_status_kind_specs_for_repo(repo_root)}
+    expected_glossary_status_kinds = registered_status_kinds or catalog_status_kinds
     expected_catalog_paths: set[str] = set()
     for entry in catalog.procedures:
         resolved_path = resolve_catalog_doc_path(catalog_path=catalog.catalog_path, doc_path=entry.doc_path)
@@ -1251,9 +1504,9 @@ def _find_runbook_catalog_issues(repo_root: Path) -> list[str]:
         issues.append(f"{catalog_path}: status surface glossary section has no data table.")
         return issues
 
-    for status_kind in sorted(catalog_status_kinds - glossary_status_kinds):
+    for status_kind in sorted(expected_glossary_status_kinds - glossary_status_kinds):
         issues.append(f"{catalog_path}: missing status surface glossary entry for '{status_kind}'.")
-    for status_kind in sorted(glossary_status_kinds - catalog_status_kinds):
+    for status_kind in sorted(glossary_status_kinds - expected_glossary_status_kinds):
         issues.append(f"{catalog_path}: unexpected status surface glossary entry for '{status_kind}'.")
 
     return issues
@@ -1294,9 +1547,13 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
                 f"'{LEGACY_STUDY_RECORD_PREFIX}<study-id>/...' must not appear; "
                 "use 'docs/studies/<study-id>/...'."
             )
+        documented_references = _collect_markdown_reference_names(text)
         for required_name in STUDY_RECORD_REQUIRED_FILES:
-            if required_name not in text:
-                issues.append(f"{path}: missing study-record contract reference for '{required_name}'.")
+            if required_name not in documented_references:
+                issues.append(
+                    f"{path}: missing navigable study-record contract reference for '{required_name}' "
+                    "as a markdown link or code span."
+                )
 
     for relative_path in STUDY_RECORD_ROUTER_FILES:
         path = repo_root / relative_path
@@ -1321,6 +1578,7 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
     if not index_path.exists():
         return issues
 
+    study_records_root = (repo_root / "docs" / "studies").resolve()
     payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
         return [f"{index_path}: study index must be a mapping."]
@@ -1341,13 +1599,15 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
             issues.append(f"{index_path}: study entry {index} must be a mapping.")
             continue
         study_id = str(entry.get("study_id") or "").strip()
-        family = str(entry.get("family") or "").strip()
         raw_path = str(entry.get("record_root") or "").strip()
         if not study_id:
             issues.append(f"{index_path}: study entry {index} must define study_id.")
             continue
-        if not family:
-            issues.append(f"{index_path}: study entry {study_id!r} must define family.")
+        if "family" in entry:
+            issues.append(
+                f"{index_path}: study entry {study_id!r} must not define legacy family; "
+                "use the study record's explicit ops_surfaces instead."
+            )
             continue
         if not raw_path:
             issues.append(f"{index_path}: study entry {study_id!r} must define record_root.")
@@ -1360,6 +1620,14 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
         except ValueError:
             issues.append(f"{index_path}: study entry {study_id!r} path escapes the repository: {raw_path}")
             continue
+        try:
+            resolved_path.relative_to(study_records_root)
+        except ValueError:
+            issues.append(
+                f"{index_path}: study entry {study_id!r} record_root must live under "
+                f"docs/studies/<study-id> (path={raw_path!r})."
+            )
+            continue
         if resolved_path.name != study_id:
             issues.append(
                 f"{index_path}: study entry {study_id!r} path must end with the same study id (path={raw_path!r})."
@@ -1368,6 +1636,10 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
             issues.append(f"{index_path}: duplicate study_id {study_id!r}.")
             continue
         entries_by_id[study_id] = resolved_path
+
+    for study_id, study_root in sorted(entries_by_id.items()):
+        issues.extend(_find_study_readme_frontmatter_issues(study_root=study_root, study_id=study_id))
+        issues.extend(_find_study_ops_contract_layout_issues(study_root=study_root, study_id=study_id))
 
     active_study_text = str(active_study or "").strip() or None
     if active_study_text is None:
@@ -1390,6 +1662,204 @@ def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
             )
 
     return issues
+
+
+def _find_study_ops_contract_layout_issues(*, study_root: Path, study_id: str) -> list[str]:
+    issues: list[str] = []
+    operations_root = study_root / "operations"
+    ops_path = operations_root / "ops.study.yaml"
+    if not ops_path.exists():
+        return issues
+
+    try:
+        payload = yaml.safe_load(ops_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        return [f"{ops_path}: unable to parse ops.study.yaml ({exc})."]
+    if not isinstance(payload, dict):
+        return [f"{ops_path}: ops.study.yaml for study {study_id!r} must be a mapping."]
+
+    legacy_pipeline_paths = (
+        operations_root / "pipeline.yaml",
+        operations_root / "runtime" / "pipeline.yaml",
+    )
+    for legacy_pipeline_path in legacy_pipeline_paths:
+        if not legacy_pipeline_path.exists():
+            continue
+        issues.append(
+            f"{legacy_pipeline_path}: study pipeline belongs under operations/runtime/command-groups/pipeline.yaml "
+            "so OPS contracts, runtime plans, and contract fragments stay separate."
+        )
+
+    record_sources = payload.get("record_sources") or {}
+    if record_sources and not isinstance(record_sources, dict):
+        issues.append(f"{ops_path}: record_sources must be a mapping.")
+    elif isinstance(record_sources, dict):
+        pipeline_ref = str(record_sources.get("pipeline_ref") or "").strip()
+        if pipeline_ref in STUDY_LEGACY_PIPELINE_REFS:
+            issues.append(
+                f"{ops_path}: record_sources.pipeline_ref must use {STUDY_RUNTIME_PIPELINE_REF!r}, "
+                "not a legacy flat pipeline path."
+            )
+
+    parts = payload.get("parts")
+    if parts is None:
+        return issues
+    if not isinstance(parts, dict):
+        return [*issues, f"{ops_path}: parts must be a mapping."]
+
+    unknown_parts = sorted(str(key) for key in parts if str(key) not in STUDY_OPS_CONTRACT_PART_KEYS)
+    if unknown_parts:
+        issues.append(f"{ops_path}: parts contains unknown section(s): {', '.join(unknown_parts)}.")
+
+    for raw_section, raw_ref in parts.items():
+        section = str(raw_section or "").strip()
+        if section in payload:
+            issues.append(f"{ops_path}: parts.{section} duplicates an inline {section} section.")
+        if isinstance(raw_ref, list):
+            raw_refs = raw_ref
+            if not raw_refs:
+                issues.append(f"{ops_path}: parts.{section} must list at least one operations-relative path.")
+                continue
+        else:
+            raw_refs = [raw_ref]
+        for index, raw_part_ref in enumerate(raw_refs):
+            ref_label = f"parts.{section}" if len(raw_refs) == 1 else f"parts.{section}[{index}]"
+            ref = str(raw_part_ref or "").strip()
+            if not ref:
+                issues.append(f"{ops_path}: {ref_label} must be a non-empty operations-relative path.")
+                continue
+            if ref.startswith(("repo:", "manifest:")):
+                issues.append(f"{ops_path}: {ref_label} must be operations-relative, not a path ref.")
+                continue
+            part_rel = Path(ref)
+            if part_rel.is_absolute() or ".." in part_rel.parts:
+                issues.append(f"{ops_path}: {ref_label} must stay inside the operations directory.")
+                continue
+            if not part_rel.parts or part_rel.parts[0] != STUDY_OPS_CONTRACT_PARTS_DIR:
+                issues.append(
+                    f"{ops_path}: {ref_label} must live under operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/ "
+                    "to keep the root OPS record as a one-hop index."
+                )
+            part_path = operations_root / part_rel
+            if not part_path.exists():
+                issues.append(f"{ops_path}: {ref_label} references missing file {part_path}.")
+                continue
+            if part_path.suffix in {".yaml", ".yml"}:
+                line_count = len(part_path.read_text(encoding="utf-8").splitlines())
+                if line_count > STUDY_OPS_CONTRACT_PART_MAX_LINES:
+                    issues.append(
+                        f"{part_path}: ops contract part has {line_count} lines; split bulky owner lanes into "
+                        f"semantic fragments below operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/."
+                    )
+            continue
+
+    return issues
+
+
+def _find_study_readme_frontmatter_issues(*, study_root: Path, study_id: str) -> list[str]:
+    issues: list[str] = []
+    for relative_name, expected_surface, extra_key in (
+        ("README.md", "study-root", "first_hop"),
+        ("routes/README.md", "study-route-map", "entrypoint"),
+    ):
+        path = study_root / relative_name
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            issues.append(f"{path}: study navigation docs must start with YAML frontmatter.")
+            continue
+        try:
+            raw_frontmatter = text.split("---", 2)[1]
+            payload = yaml.safe_load(raw_frontmatter)
+        except (IndexError, yaml.YAMLError) as exc:
+            issues.append(f"{path}: unable to parse YAML frontmatter ({exc}).")
+            continue
+        if not isinstance(payload, dict):
+            issues.append(f"{path}: YAML frontmatter must be a mapping.")
+            continue
+        missing = sorted(
+            key
+            for key in (*STUDY_README_FRONTMATTER_REQUIRED_KEYS, extra_key)
+            if not str(payload.get(key) or "").strip()
+        )
+        if missing:
+            issues.append(f"{path}: missing study navigation frontmatter key(s): {', '.join(missing)}.")
+        if str(payload.get("study_id") or "").strip() != study_id:
+            issues.append(f"{path}: frontmatter study_id must be {study_id!r}.")
+        if str(payload.get("surface") or "").strip() != expected_surface:
+            issues.append(f"{path}: frontmatter surface must be {expected_surface!r}.")
+    return issues
+
+
+def _find_study_status_surface_semantics_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    target_files = _collect_markdown_files_from_relative_paths(
+        repo_root,
+        relative_paths=STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS,
+    )
+    for path in target_files:
+        content = _markdown_text_without_fenced_code(path.read_text(encoding="utf-8"))
+        for term in LEGACY_STUDY_STATUS_SURFACE_TERMS:
+            if term not in content:
+                continue
+            line_no = content[: content.index(term)].count("\n") + 1
+            issues.append(
+                f"{path}:{line_no}: stale study-status ontology term {term!r} is not allowed; "
+                "route studies through concrete study-owned providers only when those providers exist."
+            )
+    return issues
+
+
+def _find_repo_local_skill_frontmatter_issues(repo_root: Path) -> list[str]:
+    skills_root = repo_root / REPO_LOCAL_SKILLS_DIR
+    if not skills_root.exists():
+        return []
+
+    issues: list[str] = []
+    for skill_file in sorted(skills_root.glob("*/SKILL.md")):
+        text = skill_file.read_text(encoding="utf-8")
+        if not text.startswith("---\n"):
+            issues.append(f"{skill_file}: missing YAML frontmatter.")
+            continue
+        try:
+            raw_frontmatter = text.split("---", 2)[1]
+            payload = yaml.safe_load(raw_frontmatter)
+        except (IndexError, yaml.YAMLError) as exc:
+            issues.append(f"{skill_file}: unable to parse YAML frontmatter ({exc}).")
+            continue
+        if not isinstance(payload, dict):
+            issues.append(f"{skill_file}: YAML frontmatter must be a mapping.")
+            continue
+
+        description = payload.get("description")
+        if not isinstance(description, str) or not description.strip():
+            issues.append(f"{skill_file}: frontmatter description must be a non-empty string.")
+            continue
+        description_length = len(description)
+        if description_length > REPO_LOCAL_SKILL_DESCRIPTION_MAX_CHARS:
+            issues.append(
+                f"{skill_file}: frontmatter description length {description_length}/"
+                f"{REPO_LOCAL_SKILL_DESCRIPTION_MAX_CHARS}; keep repo-local skill discovery compact."
+            )
+
+    return issues
+
+
+def _collect_markdown_reference_names(text: str) -> set[str]:
+    references: set[str] = set()
+    for code_span in re.findall(r"`([^`\n]+)`", text):
+        normalized = code_span.strip()
+        if normalized:
+            references.add(normalized)
+            references.add(Path(normalized).name)
+    for raw in LINK_PATTERN.findall(text):
+        link = raw.strip().split()[0]
+        target_rel = link.split("#", 1)[0].strip()
+        if target_rel:
+            references.add(target_rel)
+            references.add(Path(target_rel).name)
+    return references
 
 
 def _find_active_shared_usr_dataset_id_issues(repo_root: Path) -> list[str]:
@@ -1428,7 +1898,7 @@ def _find_active_shared_usr_dataset_id_issues(repo_root: Path) -> list[str]:
     if study_root is None:
         return issues
 
-    datasets_path = study_root / "datasets.yaml"
+    datasets_path = study_root / "record" / "datasets.yaml"
     if not datasets_path.exists():
         return issues
 
@@ -1594,7 +2064,7 @@ def _extract_section_bodies(text: str) -> dict[str, str]:
 
 
 def _collect_public_interface_markdown_files(repo_root: Path) -> list[Path]:
-    files: set[Path] = set()
+    files: set[Path] = set(_collect_tool_readme_markdown_files(repo_root))
     for rel in PUBLIC_INTERFACE_DOC_PATHS:
         target = repo_root / rel
         if not target.exists():
@@ -1659,6 +2129,14 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
         target_path = (readme_path.parent / target_rel).resolve()
         if not target_path.exists():
             issues.append(f"{readme_path}: banner asset target does not exist: {target_rel}.")
+            continue
+
+        banner_text = target_path.read_text(encoding="utf-8")
+        if TOOL_README_BANNER_DIMENSION_PATTERN.search(banner_text) is None:
+            issues.append(
+                f"{target_path}: tool banner must use the low-clutter 1200x180 SVG contract "
+                'with viewBox="0 0 1200 180".'
+            )
 
         if "placeholder" in top_block.lower():
             issues.append(f"{readme_path}: banner copy must not use placeholder wording.")
@@ -1679,6 +2157,12 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
 
         text = readme_path.read_text(encoding="utf-8")
         lines = text.splitlines()
+        if len(lines) > TOOL_README_MAX_LINES:
+            issues.append(
+                f"{readme_path}: top-level tool README has {len(lines)} lines; "
+                f"keep it at or below {TOOL_README_MAX_LINES} lines and route detail into docs/."
+            )
+
         non_empty_indices = [idx for idx, line in enumerate(lines) if line.strip()]
         if not non_empty_indices:
             issues.append(f"{readme_path}: README is empty.")
@@ -1696,18 +2180,64 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
                 f"{readme_path}: line after the banner must be narrative text; avoid repeating a top title heading."
             )
 
+        first_heading_index = next(
+            (idx for idx in range(first_index + 1, len(lines)) if lines[idx].lstrip().startswith("#")),
+            len(lines),
+        )
+        intro_lines = lines[first_index + 1 : first_heading_index]
+        while intro_lines and not intro_lines[0].strip():
+            intro_lines.pop(0)
+        while intro_lines and not intro_lines[-1].strip():
+            intro_lines.pop()
+
+        if not intro_lines:
+            issues.append(f"{readme_path}: banner must be followed by one narrative paragraph before docs links.")
+        else:
+            if any(not line.strip() for line in intro_lines):
+                issues.append(
+                    f"{readme_path}: intro after the banner must be one paragraph; route extra setup into docs/."
+                )
+            intro_text = " ".join(line.strip() for line in intro_lines)
+            if TOOL_README_SELF_REFERENTIAL_INTRO_PATTERN.search(intro_text):
+                issues.append(
+                    f"{readme_path}: intro must describe what the tool does; avoid self-referential "
+                    "package/layer-in-dnadesign wording."
+                )
+
+        if first_heading_index == len(lines):
+            issues.append(f"{readme_path}: top-level tool README must include a '## Documentation' section.")
+        elif lines[first_heading_index].strip() != "## Documentation":
+            issues.append(f"{readme_path}: first heading after the intro must be '## Documentation' for the link map.")
+
         top_block = "\n".join(lines[:TOOL_README_TOP_LINK_SCAN_LINES])
-        has_local_markdown_link = False
+        first_local_markdown_link: str | None = None
         for raw in LINK_PATTERN.findall(top_block):
             link = raw.strip().split()[0]
             if link.startswith(("http://", "https://", "mailto:", "#")):
                 continue
             target_rel = link.split("#", 1)[0].strip()
             if target_rel.lower().endswith(".md"):
-                has_local_markdown_link = True
+                first_local_markdown_link = target_rel
                 break
-        if not has_local_markdown_link:
+        if first_local_markdown_link is None:
             issues.append(f"{readme_path}: top section must include a local markdown link to deeper documentation.")
+            continue
+
+        docs_index = None
+        for candidate in (readme_path.parent / "docs" / "README.md", readme_path.parent / "docs" / "index.md"):
+            if candidate.exists():
+                docs_index = candidate.resolve()
+                break
+        if docs_index is None:
+            continue
+
+        first_target = (readme_path.parent / first_local_markdown_link).resolve()
+        if first_target != docs_index:
+            expected_rel = docs_index.relative_to(readme_path.parent.resolve()).as_posix()
+            issues.append(
+                f"{readme_path}: first local markdown link must point to the tool docs index "
+                f"'{expected_rel}', not '{first_local_markdown_link}'."
+            )
 
     return issues
 
@@ -1855,8 +2385,10 @@ def _find_runbook_demo_snippet_issues(repo_root: Path) -> list[str]:
 def _is_ops_operational_runbook_contract(path: Path) -> bool:
     try:
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception:
-        return False
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{path}: operational runbook yaml is invalid: {exc}") from exc
+    except OSError as exc:
+        raise ValueError(f"{path}: operational runbook yaml is unreadable: {exc}") from exc
     if not isinstance(payload, dict):
         return False
     runbook = payload.get("runbook")
@@ -2005,6 +2537,18 @@ def _find_packaged_runbook_variant_issues(repo_root: Path) -> list[str]:
 
 def _find_transient_operational_artifact_path_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
+    for dir_name in DISALLOWED_REPO_ROOT_OUTPUT_DIR_NAMES:
+        candidate = repo_root / dir_name
+        if not candidate.exists():
+            continue
+        if not candidate.is_dir():
+            continue
+        if not any(candidate.iterdir()):
+            continue
+        issues.append(
+            f"{candidate}: generated artifact directory is not allowed at repository root; "
+            "use a tool or study workspace outputs/ root instead."
+        )
     for dir_name in TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES:
         candidate = repo_root / dir_name
         if not candidate.exists():
@@ -2085,10 +2629,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument(
-        "--max-sor-age-days",
-        type=int,
-        default=90,
-        help="Maximum allowed age in days for root system-of-record Last verified dates.",
+        "--changed-files-file",
+        type=Path,
+        default=None,
+        help=(
+            "Optional newline-delimited repository-relative change list. Verification dates must cover changes to "
+            "enforced docs; local dirty Markdown files are detected automatically."
+        ),
     )
     return parser
 
@@ -2099,7 +2646,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         docs_md_files, all_md_files = _collect_markdown_files(repo_root)
-    except FileNotFoundError as exc:
+        changed_doc_dates = collect_changed_doc_dates(
+            repo_root,
+            changed_files_file=args.changed_files_file,
+        )
+    except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1
 
@@ -2110,28 +2661,28 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {path}")
         return 1
 
-    sor_metadata_issues = _find_sor_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    sor_metadata_issues = _find_sor_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if sor_metadata_issues:
         print("Root system-of-record metadata check failed:")
         for issue in sor_metadata_issues:
             print(f" - {issue}")
         return 1
 
-    index_metadata_issues = _find_index_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    index_metadata_issues = _find_index_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if index_metadata_issues:
         print("Docs index metadata check failed:")
         for issue in index_metadata_issues:
             print(f" - {issue}")
         return 1
 
-    runbook_metadata_issues = _find_runbook_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    runbook_metadata_issues = _find_runbook_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if runbook_metadata_issues:
         print("Docs runbook metadata check failed:")
         for issue in runbook_metadata_issues:
             print(f" - {issue}")
         return 1
 
-    tool_docs_metadata_issues = _find_tool_docs_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    tool_docs_metadata_issues = _find_tool_docs_metadata_issues(repo_root, changed_doc_dates=changed_doc_dates)
     if tool_docs_metadata_issues:
         print("Tool docs metadata check failed:")
         for issue in tool_docs_metadata_issues:
@@ -2156,6 +2707,20 @@ def main(argv: list[str] | None = None) -> int:
     if study_record_doc_issues:
         print("Study record docs check failed:")
         for issue in study_record_doc_issues:
+            print(f" - {issue}")
+        return 1
+
+    study_status_surface_semantics_issues = _find_study_status_surface_semantics_issues(repo_root)
+    if study_status_surface_semantics_issues:
+        print("Study status surface semantics check failed:")
+        for issue in study_status_surface_semantics_issues:
+            print(f" - {issue}")
+        return 1
+
+    repo_local_skill_frontmatter_issues = _find_repo_local_skill_frontmatter_issues(repo_root)
+    if repo_local_skill_frontmatter_issues:
+        print("Repo-local skill frontmatter check failed:")
+        for issue in repo_local_skill_frontmatter_issues:
             print(f" - {issue}")
         return 1
 
@@ -2306,6 +2871,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
+    agents_path_reference_issues = _find_agents_path_reference_issues(repo_root)
+    if agents_path_reference_issues:
+        print("AGENTS path reference check failed:")
+        for issue in agents_path_reference_issues:
+            print(f" - {issue}")
+        return 1
+
     codecov_component_issues = _find_codecov_component_issues(repo_root)
     if codecov_component_issues:
         print("Codecov component contract check failed:")
@@ -2320,7 +2892,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
-    broken = _find_broken_links(all_md_files)
+    broken = _find_broken_links(all_md_files, repo_root=repo_root)
     if broken:
         print("Docs link check failed:")
         for src, link in broken:

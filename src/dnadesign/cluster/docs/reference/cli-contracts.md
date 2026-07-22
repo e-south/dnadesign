@@ -1,7 +1,7 @@
 ## Cluster CLI contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-16
+**Last verified:** 2026-07-14
 
 This page collects the stable command, layout, and data-shape contracts for `cluster`.
 
@@ -30,7 +30,7 @@ This page collects the stable command, layout, and data-shape contracts for `clu
 - `fit` can consume one vector column (`--x-col`) or a multi-column matrix (`--x-cols`).
 - `fit` is method-based: built-in method ids are `leiden` and `kmeans`, and method presets live under `presets/method/`.
 - Method-specific fit knobs flow through `presets/method/*.yaml`, workspace `method_params`, or repeated `--method-param key=value`.
-- Legacy top-level fit method keys are rejected; keep package-level I/O keys at the top level and method-specific keys under `method_params`.
+- Top-level fit method keys are rejected; keep package-level I/O keys at the top level and method-specific keys under `method_params`.
 - `cluster sweep` is method-scoped and requires `--method`; only methods that expose a sweep contract can run it.
 - `cluster` does not generate upstream feature columns. The infer-backed workflow is one common route, not the generic package input contract.
 

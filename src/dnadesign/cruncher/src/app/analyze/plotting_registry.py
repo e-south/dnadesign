@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/plotting_registry.py
 
 Track analysis plot artifacts and prepare the plot output directory.

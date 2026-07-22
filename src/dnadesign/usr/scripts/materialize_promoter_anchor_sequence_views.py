@@ -1,12 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/materialize_promoter_anchor_sequence_views.py
+
 Materialize merged promoter-anchor sequence views without inventing analysis windows.
 
-The merged study anchor handoff is a construct-ready collection of promoter
-inserts. Some rows are natively 60 bp; some are native biological inserts of
-other lengths; some are derived analysis-core rows. This helper writes one
-`construct_insert` sequence view per base row and preserves analysis-window
-lineage as metadata rather than duplicating native 60 bp rows as
-`analysis_window`.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/cli/notebook.py
+dnadesign
+src/dnadesign/densegen/src/cli/notebook.py
 
 Workspace-scoped notebook commands for DenseGen.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_video_frame_sizing.py
 
 Video writer sizing tests for mixed rendered frame dimensions.

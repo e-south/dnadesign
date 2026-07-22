@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.construct.src.output_store import (
+from dnadesign.construct.src.persistence.usr_registry import (
     _CONSTRUCT_COLUMNS,
     _CONSTRUCT_SEED_COLUMNS,
     _USR_LABEL_COLUMNS,

@@ -1,0 +1,191 @@
+version: 1
+study_id: eco1_rt_repack
+contract_id: eco1_rt_conservation_sources_v1
+status: selected
+last_verified: 2026-06-22
+
+source_method:
+  method_id: tao_plurality_frequency_mask_v1
+  method_ref: doi:10.1038/s41587-026-03149-6
+  conservation_rule: protected_when_clade9_wt_is_plurality_and_frequency_meets_threshold
+  threshold: 0.25
+  tested_reference_thresholds:
+    - 0.25
+    - 0.50
+  gap_denominator_policy: non_gap_count
+  plurality_rule: wt_aa_must_equal_plurality_aa
+  missing_evidence_policy: fail_closed_no_designability
+
+alignment_policy:
+  alignment_tool: clustalo
+  alignment_command: clustalo --force --outfmt=fasta --threads=1 -i <input_fasta> -o <output_fasta>
+  alignment_scope: protein
+  target_sequence_policy: ec86kit_reference_sequence_must_be_target_row
+  target_row_id: eco1_rt_ec86kit_reference
+  residue_map_join_key: canonical_position
+  output_profile_artifact: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/conservation_profile.parquet
+  row_count_guardrail:
+    declared_command_intended_max_records: 500
+    policy: allow_declared_mestre_clade_panel_reject_full_roster_census
+    note: >
+      Clustal Omega is selected for the Ec86 clade-level homolog panel because
+      it is the declared scalable backend for this MSA contract. Whole-roster
+      Mestre-scale alignments remain classification or visualization context,
+      not Phase 1 conservation evidence.
+  alternative_backend_policy:
+    status: explicit_contract_update_required
+    candidates:
+      - tool: mafft
+        role: high_accuracy_small_panel_candidate
+        selection_rule: requires_explicit_contract_update_and_benchmark_evidence
+    fallback_policy: no_silent_backend_fallback
+
+target_sequence:
+  authority: ec86kit_manifest_2025-10-09T17-47-31Z
+  reference_sequence_hash: sha256:429a9c9894501e04f48803b96307cea45955f63b85f1461dc25c017e94b7eaeb
+  reference_sequence_length: 320
+  canonical_position_basis: reference_sequence_1_based
+  source_ref: sibling:../ec86kit/out/ec86_prot1/runs/2025-10-09T17-47-31Z/manifest.json
+  known_public_accession:
+    accession: WP_099010551.1
+    provider: ncbi_protein_efetch
+    observed_sequence_hash: sha256:49220a2d5627a561264eca48027a7e943fe409d702e39799074120a63171a7db
+    mismatch:
+      canonical_position: 301
+      authority_aa: T
+      public_accession_aa: A
+      policy: reject_as_target_without_declared_substitution
+      note: Public NCBI WP_099010551.1 must not silently replace the ec86kit target sequence.
+
+sequence_providers:
+  - id: ncbi_protein_efetch
+    status: selected
+    accession_prefixes:
+      - WP_
+      - GenBank protein accession
+    accession_patterns:
+      - "WP_[0-9]+\\.[0-9]+"
+      - "[A-Z]{3,4}[0-9]+\\.[0-9]+"
+    retrieval: ncbi_eutils_protein_fasta
+    failure_policy: explicit_exclude_or_fail
+  - id: bv_brc_feature_protein_fasta
+    status: selected
+    accession_prefixes:
+      - fig|
+    accession_patterns:
+      - "fig\\|[0-9]+\\.[0-9]+\\.peg\\.[0-9]+"
+    retrieval: bv_brc_genome_feature_accept_application_protein_fasta
+    failure_policy: explicit_exclude_or_fail
+
+source_groups:
+  - profile_id: ec86_clade9_conservation_v1
+    status: selected
+    purpose: Protect broadly conserved Ec86-clade RT positions using a Mestre clade 9 homolog panel.
+    roster_source:
+      source_name: Mestre et al. 2020 Supplementary Table S1
+      source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
+      source_sha256: e85635f98ae07808e49b0042096313cd5b8422cdba62d3b200344f10af129aee # pragma: allowlist secret
+      accession_field: Accesione
+      total_roster_count: 1928
+    selection_rule:
+      included_records: mestre_s1_ec86_rt_clade9_after_qc
+      candidate_pool_records: mestre_s1_all_retron_rt_records_context
+      full_roster_role: context_only_not_conservation_denominator
+      method_prior: tao_homolog_msa_plurality_frequency_mask
+      parent_rt_clade: 9
+      query_coverage_minimum: 0.70
+      identity_range:
+        - 0.20
+        - 0.90
+      length_range_aa:
+        - 250
+        - 450
+      runtime_cap_policy:
+        status: not_selected
+        allowed_only_after: explicit_alignment_policy_benchmark
+      hard_reject_filters:
+        - missing_catalytic_rt_core
+        - below_query_coverage_minimum
+        - outside_identity_range
+        - outside_length_range
+        - obvious_fragment
+        - unresolved_long_fusion
+      motif_qc_markers:
+        - rt_catalytic_dd_or_yadd_like_region
+        - retron_x_naxxH_like_motif
+        - retron_y_vtg_like_motif
+      excluded_families:
+        - group_ii_intron_rt
+        - dgr_rt
+        - fragment
+        - unresolved_long_fusion
+    provider_ids:
+      - ncbi_protein_efetch
+      - bv_brc_feature_protein_fasta
+    min_non_gap_count: 20
+
+  - profile_id: ec86_iia3_cluster42_1_conservation_v1
+    status: selected
+    purpose: Protect Eco1-like retron RT recognition and scaffold positions.
+    roster_source:
+      source_name: Mestre et al. 2020 Supplementary Table S1
+      source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
+      source_sha256: e85635f98ae07808e49b0042096313cd5b8422cdba62d3b200344f10af129aee # pragma: allowlist secret
+      accession_field: Accesione
+      total_roster_count: 1928
+    selection_rule:
+      included_records: mestre_s1_ec86_iia3_cluster42_1_after_qc
+      fallback_rule: type_ii_a3_only_if_cluster_42_1_non_gap_support_fails
+      observed_roster_count: 47
+      broader_type_ii_a3_count: 59
+      parent_rt_clade: 9
+      retron_subtype: II-A3
+      cluster_domain: "42_1"
+      query_coverage_minimum: 0.70
+      identity_range:
+        - 0.20
+        - 0.90
+      length_range_aa:
+        - 250
+        - 450
+      hard_reject_filters:
+        - missing_catalytic_rt_core
+        - below_query_coverage_minimum
+        - outside_identity_range
+        - outside_length_range
+        - obvious_fragment
+        - unresolved_long_fusion
+      motif_qc_markers:
+        - rt_catalytic_dd_or_yadd_like_region
+        - retron_x_naxxH_like_motif
+        - retron_y_vtg_like_motif
+      excluded_families:
+        - group_ii_intron_rt
+        - dgr_rt
+        - fragment
+        - unresolved_long_fusion
+    provider_ids:
+      - ncbi_protein_efetch
+      - bv_brc_feature_protein_fasta
+    min_non_gap_count: 20
+
+context_rosters:
+  - roster_id: mestre_all_retron_rt_context
+    status: context_only
+    source_name: Mestre et al. 2020 Supplementary Table S1
+    source_ref: doi:10.1093/nar/gkaa1149#supplementary-data
+    source_sha256: e85635f98ae07808e49b0042096313cd5b8422cdba62d3b200344f10af129aee # pragma: allowlist secret
+    total_roster_count: 1928
+    role: classification_and_visual_context_not_phase1_conservation_denominator
+
+phase1_acceptance:
+  required_profile_ids:
+    - ec86_clade9_conservation_v1
+    - ec86_iia3_cluster42_1_conservation_v1
+  required_provider_ids:
+    - ncbi_protein_efetch
+    - bv_brc_feature_protein_fasta
+  fail_fast:
+    - no_conservation_profile_without_source_contract
+    - no_target_row_from_mismatched_public_accession
+    - no_missing_evidence_designability

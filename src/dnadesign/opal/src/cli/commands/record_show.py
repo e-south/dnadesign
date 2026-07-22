@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/commands/record_show.py
+
+CLI wiring for record show OPAL CLI commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,12 +13,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
 import typer
 
-from ...core.rounds import resolve_round_index_from_state
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...reporting.record_show import build_record_report
+from ...reporting.selection_set import load_selection_set
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
 from ..formatting import render_record_report_text
@@ -53,35 +54,47 @@ def _resolve_run_id_alias(*, run_id: str | None, ledger_reader: LedgerReader) ->
     return str(row["run_id"])
 
 
+def _resolve_selection_view_id(cfg, requested: str | None) -> str:
+    configured = [view.id for view in cfg.selection_views]
+    if requested is not None:
+        view_id = str(requested).strip()
+        if view_id not in configured:
+            raise OpalError(f"Unknown selection view {view_id!r}. Available: {configured}")
+        return view_id
+    if len(configured) == 1:
+        return configured[0]
+    raise OpalError(f"--view is required for this multi-view campaign. Available: {configured}")
+
+
 def _resolve_id_from_selection_rank(
     *,
-    ws: CampaignWorkspace,
+    config_path: Path,
+    selection_view_id: str,
     round_sel: str,
+    run_id: str | None,
     selected_rank: int,
 ) -> str:
-    round_index = resolve_round_index_from_state(ws.state_path, round_sel)
-    sel_path = ws.round_selection_dir(round_index) / "selection_top_k.csv"
-    if not sel_path.exists():
-        raise OpalError(f"Selection CSV not found for round {round_index}: {sel_path}")
-
-    sel_df = pd.read_csv(sel_path)
-    required = {"id", "sel__rank_competition"}
-    missing = sorted(required - set(sel_df.columns))
-    if missing:
-        raise OpalError(f"Selection CSV is missing required column(s) {missing}: {sel_path}")
-
-    ranks = pd.to_numeric(sel_df["sel__rank_competition"], errors="coerce")
-    if ranks.isna().any():
-        raise OpalError(f"Selection CSV contains non-numeric sel__rank_competition values: {sel_path}")
-    matches = sel_df.loc[ranks.astype(int) == int(selected_rank)]
-    if matches.empty:
-        raise OpalError(f"No selected record found at competition rank {selected_rank} in round {round_index}.")
+    payload = load_selection_set(
+        config_path,
+        selection_view_id=selection_view_id,
+        round_selector=round_sel,
+        run_id=run_id,
+        verify_artifact=False,
+    )
+    matches = [row for row in payload["rows"] if int(row["rank_competition"]) == int(selected_rank)]
+    if not matches:
+        raise OpalError(
+            f"No selected record found at competition rank {selected_rank} for selection view {selection_view_id!r}."
+        )
     if len(matches) > 1:
-        raise OpalError(f"Multiple records share competition rank {selected_rank} in round {round_index}; use --id.")
+        raise OpalError(
+            f"Multiple records share competition rank {selected_rank} "
+            f"for selection view {selection_view_id!r}; use --id."
+        )
 
-    resolved = str(matches.iloc[0]["id"]).strip()
+    resolved = str(matches[0]["id"]).strip()
     if not resolved:
-        raise OpalError(f"Resolved id at competition rank {selected_rank} is empty in selection CSV: {sel_path}")
+        raise OpalError("Resolved selection id is empty.")
     return resolved
 
 
@@ -98,7 +111,7 @@ def cmd_record_show(
         None,
         "--selected-rank",
         min=1,
-        help="Resolve id from selection_top_k.csv by competition rank (1-based).",
+        help="Resolve an ID from the named selection view by competition rank (1-based).",
     ),
     round: str = typer.Option(
         "latest",
@@ -106,6 +119,7 @@ def cmd_record_show(
         help="Round selector used with --selected-rank (int or 'latest').",
     ),
     run_id: str = typer.Option(None, "--run-id", help="Explicit run_id for ledger predictions (or 'latest')."),
+    view: str = typer.Option(None, "--view", help="Selection view ID; required for multi-view campaigns."),
     with_sequence: bool = typer.Option(True, "--with-sequence/--no-sequence"),
     json: bool = typer.Option(False, "--json"),
 ):
@@ -118,13 +132,17 @@ def cmd_record_show(
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
         ledger_reader = LedgerReader(ws)
+        selection_view_id = _resolve_selection_view_id(cfg, view)
+        run_id = _resolve_run_id_alias(run_id=run_id, ledger_reader=ledger_reader)
 
         if selected_rank is not None:
             if id is not None or sequence is not None or key:
                 raise OpalError("--selected-rank cannot be combined with key/--id/--sequence.")
             id = _resolve_id_from_selection_rank(
-                ws=ws,
+                config_path=cfg_path,
+                selection_view_id=selection_view_id,
                 round_sel=round,
+                run_id=run_id,
                 selected_rank=int(selected_rank),
             )
 
@@ -145,8 +163,6 @@ def cmd_record_show(
             else:
                 raise OpalError("Record not found for key; use --id or --sequence explicitly.")
 
-        run_id = _resolve_run_id_alias(run_id=run_id, ledger_reader=ledger_reader)
-
         report = build_record_report(
             df,
             cfg.campaign.slug,
@@ -156,6 +172,7 @@ def cmd_record_show(
             ledger_reader=ledger_reader,
             records_path=store.records_path,
             run_id=run_id,
+            selection_view_id=selection_view_id,
         )
         if "error" in report:
             raise OpalError(str(report["error"]))

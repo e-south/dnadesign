@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_support_diagnostics.py
 
 Logic-space support diagnostics for SFXI predictions.
@@ -16,14 +16,15 @@ import polars as pl
 
 from ..analysis.dashboard.charts import sfxi_support_diagnostics
 from ..analysis.dashboard.util import list_series_to_numpy
-from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_runs
+from ..analysis.ledger import load_predictions_with_setpoint, read_labels, read_runs
 from ..analysis.sfxi.state_order import STATE_ORDER
 from ..analysis.sfxi.support import dist_to_labeled_logic
 from ..core.utils import ExitCodes, OpalError
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
-from ._param_utils import get_int, get_str, normalize_metric_field, reject_params
-from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_round
+from ._param_utils import get_bool, get_int, get_str, normalize_metric_field, reject_params
+from ._run_resolution import resolve_run_id, resolve_single_round
+from .sfxi_diag_data import labels_asof_round
 
 
 @register_plot(
@@ -34,9 +35,21 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
             "y_axis": "Metric for Y-axis (default score).",
             "hue": "Metric for color (default effect_scaled).",
             "batch_size": "Batch size for distance computation (default 2048).",
+            "show_meta": "Draw small diagnostic text inside the axes (default false).",
         },
-        requires=["pred__y_hat_model", "pred__score_selected"],
+        requires=["pred__y_hat_model", "view__selection_score"],
         notes=["Uses labels-as-of round for support distances."],
+        data_shape="support distance scatter",
+        objective_family="sfxi",
+        data_layer="predictions_plus_labels",
+        round_scope="single_round",
+        label_requirement="required",
+        failure_modes=[
+            "missing predictions or labels ledger",
+            "invalid length-8 prediction or label vectors",
+            "missing y-axis or hue column",
+            "no labels available as of selected round",
+        ],
     ),
 )
 def render(context, params: dict) -> None:
@@ -48,9 +61,11 @@ def render(context, params: dict) -> None:
     y_axis = normalize_metric_field(get_str(params, ["y_axis", "y_field", "y"], "score"))
     hue = normalize_metric_field(get_str(params, ["hue", "color", "color_by"], "effect_scaled"))
     batch_size = get_int(params, ["batch_size"], 2048)
+    title = get_str(params, ["title"], "SFXI support diagnostics")
+    show_meta = get_bool(params, ["show_meta"], False)
     reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_support_diagnostics")
 
-    need = {"id", "pred__y_hat_model", "pred__score_selected"}
+    need = {"id", "pred__y_hat_model", "view__selection_score"}
     if y_axis:
         need.add(y_axis)
     if hue:
@@ -59,6 +74,7 @@ def render(context, params: dict) -> None:
     pred_df = load_predictions_with_setpoint(
         outputs_dir,
         need,
+        selection_view_id=context.selection_view_id,
         round_selector=round_k,
         run_id=run_id,
         require_run_id=False,
@@ -100,8 +116,13 @@ def render(context, params: dict) -> None:
         x_col="dist_to_labeled_logic",
         y_col=y_axis,
         hue_col=hue,
-        subtitle=None,
+        title=str(title),
+        subtitle=f"Round {round_k}; nearest-neighbor distance computed against {labels_vec.shape[0]} observed labels",
+        show_meta=show_meta,
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_dir / context.filename, dpi=context.dpi, format=context.format)
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)

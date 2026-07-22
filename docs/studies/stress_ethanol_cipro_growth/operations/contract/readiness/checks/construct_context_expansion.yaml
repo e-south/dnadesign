@@ -1,0 +1,26 @@
+checks:
+  construct_context_expansion:
+  - kind: path_exists
+    check_id: construct.anchor.dataset
+    check_group: construct
+    summary: Merged anchor dataset is materialized.
+    required: true
+    artifact: merged_anchor_dataset
+  - kind: workspace_layout
+    check_id: construct.workspace.layout
+    check_group: construct
+    summary: Construct workspace root is present.
+    required: true
+    surface: construct_workspace
+  - kind: command
+    check_id: construct.workspace.doctor
+    check_group: construct
+    summary: Construct workspace doctor completed.
+    required: true
+    surface: construct_workspace_doctor
+  - kind: command
+    check_id: construct.runtime.forward_anchor_window
+    check_group: construct
+    summary: Construct runtime validation completed.
+    required: true
+    surface: construct_runtime_forward_anchor_window

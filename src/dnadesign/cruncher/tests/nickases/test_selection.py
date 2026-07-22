@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/nickases/test_selection.py
 
 Contract tests for nickase selection ordering used by snapback solve.

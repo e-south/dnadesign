@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/sources/infer_feature_sidecar_source.py
+
 LatentDNA source adapter for canonical Infer feature-vector sidecars.
 
-This adapter exposes `_derived/infer/feature_aliases.parquet` joined to
-`feature_vectors.parquet`, USR sequence views, mutable view semantics, and the
-owning dataset rows.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

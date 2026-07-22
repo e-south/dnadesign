@@ -1,12 +1,10 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/__init__.py
 
-Analysis utilities for OPAL.
+Analysis package for OPAL campaign and ledger helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
-
-from .facade import CampaignAnalysis, load_predictions_with_setpoint  # noqa: F401

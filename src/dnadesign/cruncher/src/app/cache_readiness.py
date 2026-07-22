@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/cache_readiness.py
 
 Cache readiness hints for lock and target selection errors.

@@ -1,7 +1,7 @@
 # Development Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-17
+**Last verified:** 2026-07-14
 
 ## Active refactor
 
@@ -10,8 +10,10 @@ LatentDNA now treats the promoter-study workspace as a pre-assay representation-
 Current checked-in direction:
 
 - publish a sanctioned `workspace_snapshot.json` contract for study-facing status
-- keep latent-analysis primitives study-neutral and inject promoter-study semantics through `latentdna_binding.yaml`
-- restrict the active workspace to the canonical eight geometry spaces across `intermediate_embedding` and `output_layer_mean`
+- keep latent-analysis primitives study-neutral and inject promoter-study semantics through `contexts/latentdna/binding.yaml`
+- keep six first-class `intermediate_embedding` geometry candidates, a narrower
+  three-view candidate-X selection set, and separate `output_layer_mean`
+  diagnostics rather than conflating every representation with decision geometry
 - treat UMAP as appendix-only geometry context
 - keep plot semantics explicit and sidecar-backed
 

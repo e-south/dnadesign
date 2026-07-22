@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/infer/tests/test_usr_writeback_contract.py
+src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py
 
 USR write-back contract tests for Infer.
 

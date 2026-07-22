@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/artifacts/test_artifacts_ids.py
+
+Regression tests for artifacts ids DenseGen artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from dnadesign.densegen.src.core.artifacts.ids import hash_pwm_motif, hash_tfbs_id

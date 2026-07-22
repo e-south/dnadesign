@@ -1,9 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/store/test_lockfile_hashes.py
 
-Author(s): Eric J. South
+Regression tests for lockfile hashes Cruncher store.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

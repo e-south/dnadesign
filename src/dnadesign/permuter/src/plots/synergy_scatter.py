@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/synergy_scatter.py
+
+Plot builders for synergy scatter Permuter plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -33,7 +35,7 @@ def plot(
     elite_df: pd.DataFrame,
     all_df: pd.DataFrame,
     output_path: Path,
-    job_name: str,
+    scope_name: str,
     ref_sequence: Optional[str] = None,  # unused
     metric_id: Optional[str] = None,
     evaluators: str = "",
@@ -138,7 +140,7 @@ def plot(
     ax.spines["right"].set_visible(False)
 
     # Title + subtitle
-    title = f"{job_name}"
+    title = f"{scope_name}"
     fig.suptitle(title, fontsize=int(round(13 * fs)))
     if evaluators:
         fig.text(

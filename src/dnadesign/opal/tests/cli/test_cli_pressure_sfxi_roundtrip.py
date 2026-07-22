@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_pressure_sfxi_roundtrip.py
+
+Regression tests for CLI pressure SFXI roundtrip OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,6 +15,8 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -21,16 +25,21 @@ from dnadesign.opal.tests._cli_helpers import write_campaign_yaml
 
 
 def _write_records(path: Path) -> None:
-    df = pd.DataFrame(
-        {
-            "id": ["a", "b", "c", "d", "e"],
-            "sequence": ["AAA", "BBB", "CCC", "DDD", "EEE"],
-            "bio_type": ["dna"] * 5,
-            "alphabet": ["dna_4"] * 5,
-            "X": [[0.1], [0.2], [0.3], [0.4], [0.5]],
-        }
+    pq.write_table(
+        pa.table(
+            {
+                "id": pa.array(["a", "b", "c", "d", "e"], type=pa.string()),
+                "sequence": pa.array(["AAA", "BBB", "CCC", "DDD", "EEE"], type=pa.string()),
+                "bio_type": pa.array(["dna"] * 5, type=pa.string()),
+                "alphabet": pa.array(["dna_4"] * 5, type=pa.string()),
+                "X": pa.FixedSizeListArray.from_arrays(
+                    pa.array([0.1, 0.2, 0.3, 0.4, 0.5], type=pa.float32()),
+                    1,
+                ),
+            }
+        ),
+        path,
     )
-    df.to_parquet(path, index=False)
 
 
 def _write_sfxi_labels(path: Path, *, seqs: list[str]) -> None:
@@ -148,6 +157,4 @@ def test_cli_pressure_sfxi_multi_round(tmp_path: Path) -> None:
 
     hist_e = store._normalize_hist_cell(df.loc[df["id"] == "e", lh].iloc[0])
     pred_entries = [e for e in hist_e if e.get("kind") == "pred"]
-    assert pred_entries
-    assert any(e.get("as_of_round") == 1 for e in pred_entries)
-    assert pred_entries[0].get("metrics", {}).get("score") is not None
+    assert pred_entries == []

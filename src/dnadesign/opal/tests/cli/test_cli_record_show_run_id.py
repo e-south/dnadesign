@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/cli/test_cli_record_show_run_id.py
+
+Regression tests for CLI record show run id OPAL CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -9,7 +11,6 @@ Module Author(s): Eric J. South
 
 from pathlib import Path
 
-import pandas as pd
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -74,20 +75,10 @@ def test_record_show_missing_id_fails_fast(tmp_path: Path) -> None:
     assert "record not found" in res.output.lower()
 
 
-def test_record_show_selected_rank_resolves_id_from_selection_csv(tmp_path: Path) -> None:
+def test_record_show_selected_rank_resolves_id_from_named_view(tmp_path: Path) -> None:
     workdir, campaign, records = _setup_workspace(tmp_path)
     write_ledger(workdir, run_id="r0", round_index=0)
     write_state(workdir, records_path=records, run_id="r0", round_index=0)
-    sel_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
-    sel_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(
-        {
-            "id": ["a", "b"],
-            "sel__rank_competition": [1, 2],
-            "pred__score_selected": [0.2, 0.1],
-        }
-    ).to_csv(sel_dir / "selection_top_k.csv", index=False)
-
     app = _build()
     runner = CliRunner()
     res = runner.invoke(
@@ -99,6 +90,8 @@ def test_record_show_selected_rank_resolves_id_from_selection_csv(tmp_path: Path
             str(campaign),
             "--selected-rank",
             "1",
+            "--view",
+            "primary",
             "--round",
             "0",
             "--run-id",
@@ -114,16 +107,6 @@ def test_record_show_rejects_selected_rank_with_explicit_id(tmp_path: Path) -> N
     workdir, campaign, records = _setup_workspace(tmp_path)
     write_ledger(workdir, run_id="r0", round_index=0)
     write_state(workdir, records_path=records, run_id="r0", round_index=0)
-    sel_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
-    sel_dir.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(
-        {
-            "id": ["a"],
-            "sel__rank_competition": [1],
-            "pred__score_selected": [0.2],
-        }
-    ).to_csv(sel_dir / "selection_top_k.csv", index=False)
-
     app = _build()
     runner = CliRunner()
     res = runner.invoke(

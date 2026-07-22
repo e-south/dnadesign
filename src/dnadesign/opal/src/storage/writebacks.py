@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/storage/writebacks.py
+
+Storage helpers for writebacks OPAL storage.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -42,10 +44,19 @@ def _none_if_empty_seq(s: Optional[Sequence[Any]]) -> Optional[List[Any]]:
 # Selection emit payload
 # ---------------------------
 @dataclass(frozen=True)
-class SelectionEmit:
-    ranks_competition: np.ndarray  # (n,) int
-    selected_bool: np.ndarray  # (n,) bool
-    diagnostics: Optional[Dict[str, Any]] = None
+class SelectionViewEmit:
+    selection_view_id: str
+    objective_name: str
+    selection_name: str
+    score: np.ndarray
+    score_ref: str
+    selection_score: np.ndarray
+    ranks_competition: np.ndarray
+    selected_bool: np.ndarray
+    top_k: int
+    diagnostics: Dict[str, Any]
+    uncertainty: Optional[np.ndarray] = None
+    uncertainty_ref: Optional[str] = None
 
 
 # ---------------------------
@@ -85,14 +96,8 @@ def build_run_pred_events(
     ids: list[str],
     sequences: list[str | None],
     y_hat_model: np.ndarray,
-    selected_score: np.ndarray,
-    selected_score_ref: str,
     y_dim: int,
-    obj_diagnostics: dict[str, Any],
-    sel_emit: SelectionEmit,
-    selected_uncertainty: Optional[np.ndarray] = None,
-    selected_uncertainty_ref: Optional[str] = None,
-    selection_score: Optional[np.ndarray] = None,
+    selection_views: Sequence[SelectionViewEmit],
     score_channels: Optional[dict[str, np.ndarray]] = None,
     uncertainty_channels: Optional[dict[str, np.ndarray]] = None,
 ) -> pd.DataFrame:
@@ -103,75 +108,8 @@ def build_run_pred_events(
     if not np.all(np.isfinite(y_hat_model_arr)):
         raise ValueError("y_hat_model must be finite in run_pred events.")
 
-    selected_score_arr = np.asarray(selected_score, dtype=float).reshape(-1)
-    if selected_score_arr.size != n:
-        raise ValueError("selected_score length mismatch in run_pred events.")
-    if not np.all(np.isfinite(selected_score_arr)):
-        raise ValueError("selected_score must be finite in run_pred events.")
-    selected_score_ref_value = str(selected_score_ref).strip()
-    if not selected_score_ref_value:
-        raise ValueError("selected_score_ref is required in run_pred events.")
-
     if len(sequences) != n:
         raise ValueError("sequences length mismatch in run_pred events.")
-
-    ranks_competition = np.asarray(sel_emit.ranks_competition).reshape(-1)
-    selected_bool = np.asarray(sel_emit.selected_bool).reshape(-1)
-    if ranks_competition.size != n or selected_bool.size != n:
-        raise ValueError("selection emit length mismatch in run_pred events.")
-
-    selection_score_arr = None
-    if selection_score is not None:
-        selection_score_arr = np.asarray(selection_score, dtype=float).reshape(-1)
-        if selection_score_arr.size != n:
-            raise ValueError("selection_score length mismatch in run_pred events.")
-        if not np.all(np.isfinite(selection_score_arr)):
-            raise ValueError("selection_score must be finite in run_pred events.")
-
-    selected_uncertainty_arr = None
-    if selected_uncertainty is not None:
-        selected_uncertainty_arr = np.asarray(selected_uncertainty, dtype=float).reshape(-1)
-        if selected_uncertainty_arr.size != n:
-            raise ValueError("selected_uncertainty length mismatch in run_pred events.")
-        if not np.all(np.isfinite(selected_uncertainty_arr)):
-            raise ValueError("selected_uncertainty must be finite in run_pred events.")
-        if np.any(selected_uncertainty_arr < 0.0):
-            raise ValueError("selected_uncertainty must be non-negative in run_pred events.")
-    selected_uncertainty_ref_value = None
-    if selected_uncertainty_ref is not None:
-        selected_uncertainty_ref_value = str(selected_uncertainty_ref).strip() or None
-    if (selected_uncertainty_arr is None) != (selected_uncertainty_ref_value is None):
-        raise ValueError(
-            "selected_uncertainty and selected_uncertainty_ref must both be provided together in run_pred events."
-        )
-
-    # Row-level diagnostics subset only (avoid run-level constants/summaries here)
-    ROW_DIAG_KEYS = (
-        "logic_fidelity",
-        "effect_raw",
-        "effect_scaled",
-        "clip_lo_mask",
-        "clip_hi_mask",
-    )
-
-    def _flatten_row_diagnostics(diag: Dict[str, Any], n_rows: int) -> Dict[str, list]:
-        out: Dict[str, list] = {}
-        for k in ROW_DIAG_KEYS:
-            if k in diag:
-                v = np.asarray(diag[k])
-                if v.ndim == 0:
-                    out[f"obj__{k}"] = [float(v)] * n_rows
-                else:
-                    vv = v.reshape(-1)
-                    if vv.size != n_rows:
-                        raise ValueError(
-                            (
-                                f"objective diagnostic '{k}' length mismatch in run_pred events: "
-                                f"got {vv.size}, expected {n_rows}."
-                            )
-                        )
-                    out[f"obj__{k}"] = vv.astype(float).tolist()
-        return out
 
     def _prepare_channel_arrays(
         channels: Optional[dict[str, np.ndarray]],
@@ -193,10 +131,75 @@ def build_run_pred_events(
     score_channel_arrays = _prepare_channel_arrays(score_channels, channel_kind="score")
     uncertainty_channel_arrays = _prepare_channel_arrays(uncertainty_channels, channel_kind="uncertainty")
 
+    prepared_views: list[dict[str, Any]] = []
+    seen_view_ids: set[str] = set()
+    for view in selection_views:
+        view_id = str(view.selection_view_id).strip()
+        if not view_id or view_id in seen_view_ids:
+            raise ValueError(f"selection view ids must be unique and non-empty; observed {view_id!r}.")
+        seen_view_ids.add(view_id)
+        arrays = {
+            "score": np.asarray(view.score, dtype=float).reshape(-1),
+            "selection_score": np.asarray(view.selection_score, dtype=float).reshape(-1),
+            "rank": np.asarray(view.ranks_competition, dtype=int).reshape(-1),
+            "selected": np.asarray(view.selected_bool, dtype=bool).reshape(-1),
+        }
+        if any(arr.size != n for arr in arrays.values()):
+            raise ValueError(f"selection view {view_id!r} arrays must match {n} prediction rows.")
+        if not np.all(np.isfinite(arrays["score"])) or not np.all(np.isfinite(arrays["selection_score"])):
+            raise ValueError(f"selection view {view_id!r} scores must be finite.")
+        uncertainty = None
+        if view.uncertainty is not None:
+            uncertainty = np.asarray(view.uncertainty, dtype=float).reshape(-1)
+            if uncertainty.size != n or not np.all(np.isfinite(uncertainty)) or np.any(uncertainty < 0.0):
+                raise ValueError(f"selection view {view_id!r} uncertainty must be finite, non-negative, and aligned.")
+        if (uncertainty is None) != (view.uncertainty_ref is None):
+            raise ValueError(f"selection view {view_id!r} uncertainty and uncertainty_ref must be paired.")
+        diagnostics: dict[str, np.ndarray] = {}
+        for name, value in sorted((view.diagnostics or {}).items()):
+            arr = np.asarray(value)
+            if arr.ndim == 0 or arr.size != n or not np.issubdtype(arr.dtype, np.number):
+                continue
+            diagnostics[str(name)] = arr.astype(float).reshape(-1)
+        prepared_views.append(
+            {
+                "view": view,
+                "view_id": view_id,
+                "arrays": arrays,
+                "uncertainty": uncertainty,
+                "diagnostics": diagnostics,
+            }
+        )
+
     def _row_channel_payload(channels: dict[str, np.ndarray], idx: int) -> list[dict[str, Any]]:
         if not channels:
             return []
         return [{"name": name, "value": float(arr[idx])} for name, arr in channels.items()]
+
+    def _row_selection_payload(idx: int) -> list[dict[str, Any]]:
+        payload: list[dict[str, Any]] = []
+        for prepared in prepared_views:
+            view = prepared["view"]
+            arrays = prepared["arrays"]
+            uncertainty = prepared["uncertainty"]
+            diagnostics = prepared["diagnostics"]
+            payload.append(
+                {
+                    "selection_view_id": prepared["view_id"],
+                    "objective_name": str(view.objective_name),
+                    "selection_name": str(view.selection_name),
+                    "score": float(arrays["score"][idx]),
+                    "score_ref": str(view.score_ref),
+                    "selection_score": float(arrays["selection_score"][idx]),
+                    "rank_competition": int(arrays["rank"][idx]),
+                    "is_selected": bool(arrays["selected"][idx]),
+                    "top_k": int(view.top_k),
+                    "uncertainty": (None if uncertainty is None else float(uncertainty[idx])),
+                    "uncertainty_ref": view.uncertainty_ref,
+                    "diagnostics": [{"name": name, "value": float(arr[idx])} for name, arr in diagnostics.items()],
+                }
+            )
+        return payload
 
     rows: Dict[str, list] = {
         "event": ["run_pred"] * n,
@@ -206,22 +209,10 @@ def build_run_pred_events(
         "sequence": sequences,
         "pred__y_dim": [int(y_dim)] * n,
         "pred__y_hat_model": [list(map(float, row)) for row in y_hat_model_arr],
-        "pred__score_selected": list(map(float, selected_score_arr)),
-        "pred__score_ref": [selected_score_ref_value] * n,
-        "pred__selection_score": [
-            float(selection_score_arr[i]) if selection_score_arr is not None else None for i in range(n)
-        ],
-        "pred__uncertainty_selected": [
-            float(selected_uncertainty_arr[i]) if selected_uncertainty_arr is not None else None for i in range(n)
-        ],
-        "pred__uncertainty_ref": [selected_uncertainty_ref_value] * n,
         "pred__score_channels": [_row_channel_payload(score_channel_arrays, i) for i in range(n)],
         "pred__uncertainty_channels": [_row_channel_payload(uncertainty_channel_arrays, i) for i in range(n)],
-        "sel__rank_competition": ranks_competition.astype(int).tolist(),
-        "sel__is_selected": selected_bool.astype(bool).tolist(),
+        "pred__selection_views": [_row_selection_payload(i) for i in range(n)],
     }
-
-    rows.update(_flatten_row_diagnostics(obj_diagnostics or {}, n))
 
     return pd.DataFrame(rows)
 
@@ -241,44 +232,17 @@ def build_run_meta_event(
     x_transform_params: Dict[str, Any],
     y_ingest_transform_name: str,
     y_ingest_transform_params: Dict[str, Any],
-    objective_name: str,
-    objective_params: Dict[str, Any],
     objective_defs: list[dict[str, Any]],
-    selection_name: str,
-    selection_params: Dict[str, Any],
-    selection_score_ref: str,
-    selection_uncertainty_ref: Optional[str],
-    selection_objective_mode: str,
-    sel_tie_handling: str,
+    selection_view_defs: list[dict[str, Any]],
     stats_n_train: int,
     stats_n_scored: int,
-    unc_mean_sd: Optional[np.ndarray],
     pred_rows_df: pd.DataFrame,
     artifact_paths_and_hashes: Dict[str, tuple[str, str]],
-    objective_summary_stats: Dict[str, Any] | None,
 ) -> pd.DataFrame:
-    # Convenience mirrors of denominator info (ergonomic, avoid round_ctx.json reads)
-    denom_value = (
-        (objective_summary_stats or {}).get("denom_used") if isinstance(objective_summary_stats, dict) else None
-    )
-    denom_percentile = None
-    if isinstance(objective_summary_stats, dict) and objective_summary_stats.get("denom_percentile") is not None:
-        denom_percentile = int(objective_summary_stats["denom_percentile"])
-    elif isinstance(objective_params, dict):
-        scaling_cfg = objective_params.get("scaling")
-        if isinstance(scaling_cfg, dict) and scaling_cfg.get("percentile") is not None:
-            denom_percentile = int(scaling_cfg["percentile"])
-    if denom_percentile is not None and not (1 <= int(denom_percentile) <= 100):
-        raise ValueError("objective denominator percentile must be an integer in [1, 100].")
-
-    selection_score_ref_value = str(selection_score_ref).strip()
-    if not selection_score_ref_value:
-        raise ValueError("selection_score_ref is required in run_meta events.")
-    selection_uncertainty_ref_value = None
-    if selection_uncertainty_ref is not None:
-        selection_uncertainty_ref_value = str(selection_uncertainty_ref).strip()
-        if not selection_uncertainty_ref_value:
-            raise ValueError("selection_uncertainty_ref must be a non-empty string when provided.")
+    if not objective_defs:
+        raise ValueError("objective_defs must contain at least one selection view objective.")
+    if not selection_view_defs:
+        raise ValueError("selection_view_defs must contain at least one selection view.")
 
     return pd.DataFrame(
         {
@@ -292,22 +256,12 @@ def build_run_meta_event(
             "x_transform__params": [_none_if_empty_mapping(x_transform_params)],
             "y_ingest__name": [y_ingest_transform_name],
             "y_ingest__params": [_none_if_empty_mapping(y_ingest_transform_params)],
-            "objective__name": [objective_name],
-            "objective__params": [_none_if_empty_mapping(objective_params)],
             "objective__defs_json": [json.dumps(objective_defs or [], separators=(",", ":"), ensure_ascii=True)],
-            "objective__summary_stats": [_none_if_empty_mapping(objective_summary_stats)],
-            # Mirrors for easy access
-            "objective__denom_value": [float(denom_value) if denom_value is not None else None],
-            "objective__denom_percentile": [int(denom_percentile) if denom_percentile is not None else None],
-            "selection__name": [selection_name],
-            "selection__params": [_none_if_empty_mapping(selection_params)],
-            "selection__score_ref": [selection_score_ref_value],
-            "selection__uncertainty_ref": [selection_uncertainty_ref_value],
-            "selection__objective": [selection_objective_mode],
-            "selection__tie_handling": [sel_tie_handling],
+            "selection_views__defs_json": [
+                json.dumps(selection_view_defs or [], separators=(",", ":"), ensure_ascii=True)
+            ],
             "stats__n_train": [int(stats_n_train)],
             "stats__n_scored": [int(stats_n_scored)],
-            "stats__unc_mean_sd_targets": [float(np.nanmean(unc_mean_sd)) if unc_mean_sd is not None else None],
             "artifacts": [_none_if_empty_mapping(artifact_paths_and_hashes)],
             "pred__preview": [pred_rows_df.head(5).to_dict(orient="records")],
             "schema__version": [LEDGER_SCHEMA_VERSION],

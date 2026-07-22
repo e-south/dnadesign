@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/factory.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/factory.py
 
 Factory for DenseGen input sources.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

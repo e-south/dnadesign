@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/core/score_tiers.py
+dnadesign
+src/dnadesign/densegen/src/core/score_tiers.py
 
 Tier sizing helpers for Stage-A score-ranked sampling.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

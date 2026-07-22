@@ -1,8 +1,60 @@
 ## construct source tree
 
-- `api.py`: public run/load entrypoints
-- `config.py`: YAML schema and validation
-- `runtime.py`: template loading, sequence realization, and USR persistence
-- `seed.py`: demo and manifest-driven input dataset bootstrap helpers
-- `workspace.py`: workspace-root helpers, workspace registry parsing, doctoring, and scaffold templates
-- `cli/`: command-line surfaces
+- `interfaces/api.py`: public run/load entrypoints exported by `dnadesign.construct`
+- `interfaces/contracts.py`: public contract helpers exported by `dnadesign.construct`
+- `contracts/config.py`: compatibility facade for YAML config contracts
+- `contracts/base.py`: strict Pydantic model base shared by config contracts
+- `contracts/datasets.py`: USR dataset locators and input selection contracts
+- `contracts/templates.py`: literal, path, and USR-backed template source schemas
+- `contracts/parts.py`: part sequence, placement locator, and placement guard schemas
+- `contracts/realization.py`: realized-window and focal-part schemas
+- `contracts/normalize_anchor.py`: normalize-anchor selector, retention, and policy schemas
+- `contracts/output.py`: output dataset and emitted output-variant schemas
+- `contracts/job.py`: top-level job shape and cross-field job invariants
+- `contracts/loader.py`: YAML file loading and Pydantic error wrapping
+- `contracts/errors.py`: construct-specific exception types
+- `contracts/job_invariants.py`: cross-field job/focal-part invariants
+- `orchestration/runtime.py`: orchestration for record planning, realization calls, and run result assembly
+- `annotations/features.py`: annotation feature loading and canonicalization contracts
+- `annotations/focal.py`: focal feature selector parsing and resolution contracts
+- `annotations/retention.py`: normalize-anchor feature-retention classification contracts
+- `composition/runtime.py`: linear ssDNA composition config loading, assembly, and run orchestration
+- `composition/models.py`: composition result, span, and assembled-sequence value objects
+- `composition/bundle.py`: artifact-bundle publication, manifests, semantic mirrors, and deprecated-output cleanup contracts
+- `composition/folding_runtime.py`: folding request emission and ViennaRNA structure artifact publishing
+- `composition/baserender_jobs.py`: BaseRender job emission for component-span QA artifacts
+- `composition/exports.py`: linear ssDNA composition artifact export helpers
+- `composition/review.py`: stable composition-review publication facade
+- `composition/review_assets.py`: composition-review source loading and artifact writers
+- `composition/review_manifest.py`: composition-review manifest and bundle-index updates
+- `composition/review_svg.py`: composition-review SVG layout and panel normalization
+- `composition/svg_geometry.py`: SVG geometry, font-size, and style parsing helpers
+- `composition/visual.py`: component-span visualization primitives
+- `persistence/records.py`: output-record collision, duplicate-id, overlay, and conflict-policy contracts
+- `persistence/usr_registry.py`: USR output registry discovery and sequence-view index helpers
+- `persistence/write_session.py`: USR dataset write-session and sequence-view idempotence contracts
+- `products/classic.py`: template-backed emitted-record, slot-lineage, and output-variant builders
+- `products/normalize_anchor.py`: normalize-anchor emitted-record and derived-overlay builders
+- `products/sequence_views.py`: sequence-view builders for realized contexts and analysis windows
+- `products/specs.py`: stable specification-id hashing for emitted products
+- `realization/assembly.py`: template plus placement assembly and emitted-window extraction
+- `realization/normalize_anchor.py`: normalize-anchor trimming, expansion, focal, and retention contracts
+- `realization/parts.py`: realized part records shared by placement, slots, and windows
+- `realization/placement.py`: placement locator resolution and planned-placement summaries
+- `realization/placement_guards.py`: replacement-span, flank, and unique-match guard validation
+- `realization/placement_models.py`: placement site, plan, and preflight value objects
+- `realization/placement_search.py`: template context extraction and circular-aware kmer search
+- `realization/sequences.py`: shared DNA text and alphabet normalization contracts
+- `realization/slots.py`: named-slot lineage and emitted-coordinate checks
+- `realization/windows.py`: focal-window geometry and boundary checks
+- `sources/input_rows.py`: USR input-row scanning, scan-field selection, label carry-through, and recursive output guards
+- `sources/paths.py`: filesystem and USR root resolution helpers
+- `sources/templates.py`: literal, path, and USR-backed template loading contracts
+- `seeding/bootstrap.py`: demo and manifest-driven input dataset bootstrap helpers
+- `sequences/orientation.py`: sequence orientation and reverse-complement contracts
+- `workspaces/models.py`: typed workspace registry contracts
+- `workspaces/registry.py`: workspace-root helpers, workspace registry parsing, doctoring, and scaffold orchestration
+- `workspaces/templates.py`: workspace scaffold templates and default registry payloads
+- `seeds/`: packaged seed manifests and demo data
+- `cli/`: command-line surfaces used by the `construct` console script and
+  `python -m dnadesign.construct`

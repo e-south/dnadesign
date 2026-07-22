@@ -1,4 +1,13 @@
-"""Shared subplot layout policy for LatentDNA plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/layout.py
+
+Shared subplot layout policy for LatentDNA plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -77,24 +86,61 @@ def metric_panel_grid_layout(
     *,
     prefer_single_row: bool = False,
     square_panels: bool | None = None,
+    panel_width: float | None = None,
+    panel_height: float | None = None,
+    extra_width_per_column: float | None = None,
 ) -> tuple[int, int, tuple[float, float]]:
     resolved_square_panels = metric_panel_uses_square_axes(plot_id) if square_panels is None else bool(square_panels)
+
+    def _configured_size(
+        rows: int,
+        columns: int,
+        fallback: tuple[float, float],
+        *,
+        default_extra_width_per_column: float | None = None,
+    ) -> tuple[float, float]:
+        width, height = fallback
+        if panel_width is not None:
+            width = float(panel_width) * columns
+        if panel_height is not None:
+            height = float(panel_height) * rows
+        resolved_extra_width_per_column = extra_width_per_column
+        if (
+            resolved_extra_width_per_column is None
+            and panel_width is None
+            and panel_height is None
+            and default_extra_width_per_column is not None
+        ):
+            resolved_extra_width_per_column = default_extra_width_per_column
+        if resolved_extra_width_per_column is not None:
+            width += float(resolved_extra_width_per_column) * columns
+        return width, height
+
     if plot_id == "reference_alignment_summary" and panel_count > 8:
         columns = min(8, panel_count)
         rows = int(math.ceil(panel_count / columns))
-        return rows, columns, (3.45 * columns, 3.55 * rows)
+        return rows, columns, _configured_size(rows, columns, (3.45 * columns, 3.55 * rows))
     if (prefer_single_row or plot_id == "representation_health_summary") and panel_count > 1:
         rows, columns = _panel_grid_dimensions(panel_count, prefer_single_row=True)
         figsize = _grid_figure_size(panel_count, square_panels=resolved_square_panels, prefer_single_row=True)
-        extra_width_per_column = 0.34 if plot_id == "sigma35_ordinal_audit" else 0.72
+        legacy_extra_width_per_column = 0.34 if plot_id == "sigma35_ordinal_audit" else 0.72
         if plot_id == "representation_health_summary":
-            extra_width_per_column = 1.25
-        return rows, columns, (figsize[0] + (extra_width_per_column * columns), figsize[1])
+            legacy_extra_width_per_column = 1.25
+        return (
+            rows,
+            columns,
+            _configured_size(
+                rows,
+                columns,
+                figsize,
+                default_extra_width_per_column=legacy_extra_width_per_column,
+            ),
+        )
     rows, columns = _panel_grid_dimensions(panel_count)
     figsize = _grid_figure_size(panel_count, square_panels=resolved_square_panels)
     if plot_id == "representation_health_summary":
         figsize = (figsize[0] + (1.45 * columns), figsize[1])
-    return rows, columns, figsize
+    return rows, columns, _configured_size(rows, columns, figsize)
 
 
 def plot_tight_layout_kwargs(
@@ -102,6 +148,9 @@ def plot_tight_layout_kwargs(
     *,
     legend_bottom: float,
     legend_right: float = 0.0,
+    pad: float | None = None,
+    h_pad: float | None = None,
+    w_pad: float | None = None,
 ) -> dict[str, object]:
     kwargs: dict[str, object] = {
         "pad": 0.95,
@@ -112,13 +161,19 @@ def plot_tight_layout_kwargs(
         kwargs["w_pad"] = 2.05
     if plot_id == "representation_health_summary":
         kwargs["w_pad"] = 1.85
-    if plot_id == "dataset_overview":
-        kwargs["w_pad"] = 1.2
+    if plot_id == "dataset_overview" or str(plot_id or "").endswith("_dataset_overview"):
+        kwargs["w_pad"] = 1.8
     if plot_id == "sigma35_ordinal_audit":
         kwargs["w_pad"] = 0.32
     if plot_id == "appendix_umap_gallery":
         kwargs["pad"] = 0.65
         kwargs["h_pad"] = 0.24
+    if pad is not None:
+        kwargs["pad"] = float(pad)
+    if h_pad is not None:
+        kwargs["h_pad"] = float(h_pad)
+    if w_pad is not None:
+        kwargs["w_pad"] = float(w_pad)
     if legend_bottom > 0.0 or legend_right > 0.0:
         kwargs["rect"] = (0.0, legend_bottom, max(0.58, 1.0 - legend_right), 0.995)
     return kwargs

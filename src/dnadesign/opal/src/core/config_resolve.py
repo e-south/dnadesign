@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/config_resolve.py
+
+Core runtime primitives for config resolve OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,13 +13,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 from .utils import ExitCodes, OpalError
 
-
-def _candidate_names() -> tuple[str, ...]:
-    return tuple((os.getenv("OPAL_CONFIG_NAMES") or "campaign.yaml,campaign.yml,opal.yaml,opal.yml").split(","))
+_CAMPAIGN_CONFIG_RELATIVE_PATH = Path("configs/campaign.yaml")
 
 
 def _resolve_path(value: Path | str) -> Path:
@@ -38,26 +38,20 @@ def resolve_campaign_root(cfg_path: Path) -> Path:
     return p.parent
 
 
-def _iter_candidate_paths(path: Path, *, names: Iterable[str]) -> Iterable[Path]:
-    for name in names:
-        yield path / name
-    configs_dir = path / "configs"
-    for name in names:
-        yield configs_dir / name
-
-
-def _find_campaign_yaml_in_dir(path: Path, *, names: Iterable[str]) -> Path:
-    for cand in _iter_candidate_paths(path, names=names):
-        if cand.exists():
-            return cand.resolve()
-    raise OpalError(f"No campaign YAML found in directory: {path}", ExitCodes.BAD_ARGS)
+def _find_campaign_yaml_in_dir(path: Path) -> Path:
+    candidate = path / _CAMPAIGN_CONFIG_RELATIVE_PATH
+    if candidate.is_file():
+        return candidate.resolve()
+    raise OpalError(
+        f"Campaign directory must contain {_CAMPAIGN_CONFIG_RELATIVE_PATH}: {path}",
+        ExitCodes.BAD_ARGS,
+    )
 
 
 def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False) -> Path:
     """
     Resolve a campaign YAML path from explicit args or OPAL_CONFIG.
     """
-    names = _candidate_names()
     env = os.getenv("OPAL_CONFIG")
     env_path: Optional[Path] = _resolve_path(env) if env else None
 
@@ -67,7 +61,7 @@ def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False
             if env_path is not None and env_path == p:
                 raise OpalError(f"$OPAL_CONFIG points to a missing path: {p}", ExitCodes.BAD_ARGS)
             raise OpalError(
-                f"Config path not found: {p}. Tip: from a campaign folder run `opal <cmd>` or pass `-c campaign.yaml`.",
+                f"Config path not found: {p}. Pass `-c configs/campaign.yaml` from the campaign directory.",
                 ExitCodes.BAD_ARGS,
             )
         if p.is_dir():
@@ -76,10 +70,10 @@ def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False
                     msg = f"$OPAL_CONFIG points to a directory (expected campaign YAML): {p}"
                     raise OpalError(msg, ExitCodes.BAD_ARGS)
                 raise OpalError(
-                    f"Config path is a directory: {p}. Expected a campaign YAML (e.g., campaign.yaml).",
+                    f"Config path is a directory: {p}. Expected configs/campaign.yaml.",
                     ExitCodes.BAD_ARGS,
                 )
-            return _find_campaign_yaml_in_dir(p, names=names)
+            return _find_campaign_yaml_in_dir(p)
         return p
 
     if env:
@@ -88,7 +82,7 @@ def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False
             raise OpalError(f"$OPAL_CONFIG points to a missing path: {p}", ExitCodes.BAD_ARGS)
         if p.is_dir():
             if allow_dir:
-                return _find_campaign_yaml_in_dir(p, names=names)
+                return _find_campaign_yaml_in_dir(p)
             msg = f"$OPAL_CONFIG points to a directory (expected campaign YAML): {p}"
             raise OpalError(msg, ExitCodes.BAD_ARGS)
         return p

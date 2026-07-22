@@ -6,7 +6,6 @@ src/dnadesign/infer/src/cli/builders.py
 Shared builders for infer CLI model configuration and progress-managed execution.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/tests/predict/test_predict_yops_guard.py
+
+Regression tests for predict yops guard OPAL predict.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

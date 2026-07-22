@@ -1,4 +1,13 @@
-"""Plot-contract tests for hue configuration on live scatter surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/contracts/test_plot_shape_contract.py
+
+Plot-contract tests for hue configuration on live scatter surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -95,6 +104,21 @@ def test_plot_config_rejects_default_hue_not_declared_in_hue_options() -> None:
                 "default_hue": "design_family",
                 "hue_options": [
                     {"column": "sig35_variant", "label": "Sigma-35 variant", "type": "categorical"},
+                ],
+            }
+        )
+
+
+def test_plot_config_rejects_multiple_filter_options_until_multi_filter_ui_exists() -> None:
+    with pytest.raises(ValueError, match="filter_options currently supports at most one filter"):
+        _PLOT_CONFIG_ADAPTER.validate_python(
+            {
+                "kind": "distribution_grid",
+                "scalars": ["ordinal_ladder_rows"],
+                "metric_columns": ["ordinal_margin"],
+                "filter_options": [
+                    {"column": "ordinal_group_id", "label": "Ordinal source"},
+                    {"column": "candidate_source", "label": "Candidate source"},
                 ],
             }
         )

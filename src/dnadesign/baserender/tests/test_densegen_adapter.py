@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_densegen_adapter.py
 
 DenseGen adapter contract parity smoke test with rendering.
@@ -21,8 +21,15 @@ from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import SchemaError
 from dnadesign.baserender.src.render import Palette, legend_entries_for_record, render_record
 from dnadesign.baserender.src.render.layout import compute_layout
-from dnadesign.baserender.src.render.sequence_rows import _span_link_label_boxes
+from dnadesign.baserender.src.render.sequence_rows import _span_link_label_boxes, _text_px_width
 from dnadesign.baserender.src.runtime import initialize_runtime
+
+
+def _legend_text_right_edge(text, style) -> float:
+    coord_scale = max(1.0e-6, float(style.figure_scale))
+    font_size = int(round(float(text.get_fontsize())))
+    width = _text_px_width(text.get_text(), style.font_label, font_size, style.dpi) / coord_scale
+    return float(text.get_position()[0]) + width
 
 
 def test_densegen_adapter_accepts_regulator_sequence_contract() -> None:
@@ -1117,8 +1124,6 @@ def test_densegen_bottom_legend_stays_within_plot_width_with_large_requested_gap
     fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
     try:
         axis = fig.axes[0]
-        fig.canvas.draw()
-        renderer = fig.canvas.get_renderer()
         legend_patches = [
             patch for patch in axis.patches if isinstance(patch, FancyBboxPatch) and float(patch.get_zorder()) == 10.0
         ]
@@ -1126,10 +1131,7 @@ def test_densegen_bottom_legend_stays_within_plot_width_with_large_requested_gap
         assert legend_patches, "Expected bottom-legend patches."
         assert legend_texts, "Expected bottom-legend labels."
         max_patch_x = max(float(patch.get_x() + patch.get_width()) for patch in legend_patches)
-        max_text_x = max(
-            float(axis.transData.inverted().transform((text.get_window_extent(renderer=renderer).x1, 0.0))[0])
-            for text in legend_texts
-        )
+        max_text_x = max(_legend_text_right_edge(text, style) for text in legend_texts)
         x_max = float(axis.get_xlim()[1])
         assert max(max_patch_x, max_text_x) <= (x_max + 1e-6)
     finally:
@@ -1196,15 +1198,10 @@ def test_densegen_bottom_legend_wraps_rows_for_long_labels() -> None:
     fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
     try:
         axis = fig.axes[0]
-        fig.canvas.draw()
-        renderer = fig.canvas.get_renderer()
         legend_texts = [text for text in axis.texts if float(text.get_zorder()) == 10.0]
         assert legend_texts, "Expected bottom-legend labels."
 
-        max_text_x = max(
-            float(axis.transData.inverted().transform((text.get_window_extent(renderer=renderer).x1, 0.0))[0])
-            for text in legend_texts
-        )
+        max_text_x = max(_legend_text_right_edge(text, style) for text in legend_texts)
         x_max = float(axis.get_xlim()[1])
         assert max_text_x <= (x_max + 1e-6)
 

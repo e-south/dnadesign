@@ -3,8 +3,7 @@
 dnadesign
 src/dnadesign/notify/core/contracts.py
 
-Public notify contracts for webhook profile parsing and TLS CA bundle
-resolution.
+Public notify contracts for webhook profile parsing and TLS CA bundle.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

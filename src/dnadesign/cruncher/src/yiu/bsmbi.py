@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/bsmbi.py
 
 Shared BsmBI helpers for payload-centric YIU rendering.

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/config/__init__.py
 
 Config schema exports for BaseRender v3 jobs and Style v1.

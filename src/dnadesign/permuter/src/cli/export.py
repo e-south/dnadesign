@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/cli/export.py
+
+CLI wiring for export Permuter CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

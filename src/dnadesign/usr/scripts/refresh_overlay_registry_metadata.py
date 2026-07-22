@@ -1,9 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/scripts/refresh_overlay_registry_metadata.py
+
 Refresh compact USR overlay metadata through the registry-validating overlay writer.
 
-This is intentionally narrow maintenance tooling: it rewrites an existing compact
-overlay with identical rows and current registry metadata. It does not create
-missing overlays, alter base rows, or repair schema drift.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_workspace_runbook_contracts.py
 
-Validate that each workspace runbook encodes the canonical source-merging
-discovery lifecycle used for optimization.
+Validate that each workspace runbook encodes the canonical source-merging.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

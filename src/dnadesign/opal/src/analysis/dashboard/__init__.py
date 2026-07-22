@@ -1,13 +1,16 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/__init__.py
+
+Dashboard and diagnostic support helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 from . import (
+    api,
     artifacts,
     charts,
     datasets,
@@ -22,10 +25,10 @@ from . import (
     ui,
     util,
     views,
-    y_ops,
 )
 
 __all__ = [
+    "api",
     "artifacts",
     "charts",
     "datasets",
@@ -40,5 +43,4 @@ __all__ = [
     "ui",
     "util",
     "views",
-    "y_ops",
 ]

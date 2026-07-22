@@ -1,4 +1,13 @@
-"""Shared scatter encoding and drawing helpers for static plot renderers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/plots/renderers/scatter.py
+
+Shared scatter encoding and drawing helpers for static plot renderers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -9,15 +18,16 @@ from typing import Any
 import numpy as np
 
 from ...contracts.plot import ResolvedPlotSpec
-from ...metadata_axes import (
+from ...metadata.axes import (
     AxisStyle,
+    axis_category_alpha,
     axis_color_map,
     legend_categories,
     normalize_axis_categories,
     normalize_axis_category,
     ordered_categories_for_axis,
 )
-from ...visual_style import PUBLICATION_PALETTE, TEXT_COLOR, ZERO_LINE_COLOR, humanize_display_text
+from ...presentation.visual_style import PUBLICATION_PALETTE, TEXT_COLOR, ZERO_LINE_COLOR, humanize_display_text
 from ..axes import explicit_axis_label, resolved_axis_label
 from ..tables import require_row_columns
 
@@ -372,22 +382,57 @@ def scatter_points(
                     rasterized=rasterized,
                 )
         else:
-            colors, _ = color_series(
-                rows,
-                color_column,
-                color_map=color_map if color_map else None,
-                axis_styles=axis_styles,
-            )
-            axis.scatter(
-                [float(row[resolved_x]) for row in rows],
-                [float(row[resolved_y]) for row in rows],
-                c=colors,
-                s=sizes,
-                alpha=alpha,
-                edgecolors=edgecolors,
-                linewidths=linewidths,
-                rasterized=rasterized,
-            )
+            style = axis_style(axis_styles, color_column)
+            if color_column is not None and style is not None and (style.category_order or style.category_alpha):
+                require_row_columns(rows, [color_column], context="plot color encoding")
+                values = normalize_axis_categories(
+                    style,
+                    [row[color_column] for row in rows],
+                    rows=rows,
+                )
+                categories = axis_categories(values, column=color_column, axis_styles=axis_styles)
+                row_indices_by_category = {
+                    category: [index for index, value in enumerate(values) if value == category]
+                    for category in categories
+                }
+                for category in categories:
+                    group_indices = row_indices_by_category.get(category, [])
+                    if not group_indices:
+                        continue
+                    group_rows = [rows[index] for index in group_indices]
+                    group_colors, _ = color_series(
+                        group_rows,
+                        color_column,
+                        color_map=color_map if color_map else None,
+                        axis_styles=axis_styles,
+                    )
+                    axis.scatter(
+                        [float(row[resolved_x]) for row in group_rows],
+                        [float(row[resolved_y]) for row in group_rows],
+                        c=group_colors,
+                        s=sizes[np.asarray(group_indices, dtype=np.int64)],
+                        alpha=axis_category_alpha(style, category, default=alpha),
+                        edgecolors=edgecolors,
+                        linewidths=linewidths,
+                        rasterized=rasterized,
+                    )
+            else:
+                colors, _ = color_series(
+                    rows,
+                    color_column,
+                    color_map=color_map if color_map else None,
+                    axis_styles=axis_styles,
+                )
+                axis.scatter(
+                    [float(row[resolved_x]) for row in rows],
+                    [float(row[resolved_y]) for row in rows],
+                    c=colors,
+                    s=sizes,
+                    alpha=alpha,
+                    edgecolors=edgecolors,
+                    linewidths=linewidths,
+                    rasterized=rasterized,
+                )
         return
     require_row_columns(rows, [shape_column], context="plot shape encoding")
     for shape_category, marker in shape_map.items():

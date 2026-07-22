@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_snapback_released_docs.py
 
 Docs contracts for the released-product snapback lane.

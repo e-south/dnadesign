@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<densegen project>
+dnadesign
 src/dnadesign/densegen/tests/docs/test_workspace_runbook_contracts.py
 
 Contract checks for packaged DenseGen workspace runbooks.

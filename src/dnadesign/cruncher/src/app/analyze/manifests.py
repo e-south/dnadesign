@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/analyze/manifests.py
 
 Build analysis plot/table manifests for the curated v3 analysis suite.

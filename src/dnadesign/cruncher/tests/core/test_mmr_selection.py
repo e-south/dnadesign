@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/core/test_mmr_selection.py
 
 Unit tests for MMR-based elite selection utilities.

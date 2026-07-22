@@ -1,12 +1,11 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_fimo.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_fimo.py
 
 Helpers for MEME Suite FIMO-backed scoring of PWM-sampled candidates.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 

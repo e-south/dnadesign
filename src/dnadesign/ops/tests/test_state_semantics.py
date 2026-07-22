@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from dnadesign.ops.preflight import build_state_check, evaluate_preflight_checks
@@ -63,11 +63,13 @@ def test_combine_states_prefers_missing_for_longer_sequences() -> None:
     assert combine_states(()) == "ok"
 
 
+@settings(derandomize=True, max_examples=9, suppress_health_check=[HealthCheck.too_slow])
 @given(st.sampled_from(_STATES), st.sampled_from(_STATES))
 def test_combine_states_is_commutative(left: str, right: str) -> None:
     assert combine_states((left, right)) == combine_states((right, left))
 
 
+@settings(derandomize=True, max_examples=27, suppress_health_check=[HealthCheck.too_slow])
 @given(st.sampled_from(_STATES), st.sampled_from(_STATES), st.sampled_from(_STATES))
 def test_combine_states_is_associative(first: str, second: str, third: str) -> None:
     left = combine_states((combine_states((first, second)), third))
@@ -75,6 +77,7 @@ def test_combine_states_is_associative(first: str, second: str, third: str) -> N
     assert left == right
 
 
+@settings(derandomize=True, max_examples=3, suppress_health_check=[HealthCheck.too_slow])
 @given(st.sampled_from(_STATES))
 def test_combine_states_is_idempotent(state: str) -> None:
     assert combine_states((state, state, state)) == state
@@ -86,7 +89,7 @@ def test_campaign_overall_state_uses_shared_state_lattice() -> None:
         campaign_id="demo",
         steps=(
             _procedure_status(registry_id="ops.control-plane.orchestration", state="attention"),
-            _procedure_status(registry_id="usr.data-plane.promoter-study-status", state="missing"),
+            _procedure_status(registry_id="studies.stress-ethanol-cipro-growth.status", state="missing"),
         ),
     )
 

@@ -1,4 +1,13 @@
-"""Shared scalar-builder utilities for artifact-first latentdna workflows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/scalars/common.py
+
+Shared scalar-builder utilities for artifact-first latentdna workflows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -10,8 +19,8 @@ import numpy as np
 
 from ..contracts.errors import ContractViolationError, MissingArtifactError
 from ..geometry.preprocessing import standardize_and_l2_normalize
-from ..labels import humanize_candidate
 from ..metrics.definitions import resolve_metric_definition
+from ..presentation.labels import humanize_candidate
 from ..views.scopes import resolve_view_scope
 from ..workspaces.loader import WorkspaceContext
 
@@ -63,10 +72,30 @@ def _reducer_summary_path(context: WorkspaceContext, reducer_id: str) -> Path:
 
 
 def _workspace_input_path(context: WorkspaceContext, relative_path: str) -> Path:
-    path = (context.workspace_dir / relative_path).resolve()
+    workspace_dir = context.workspace_dir.resolve()
+    repo_root = next(
+        (
+            parent
+            for parent in [workspace_dir, *workspace_dir.parents]
+            if (parent / "pyproject.toml").is_file() and (parent / "src" / "dnadesign").is_dir()
+        ),
+        workspace_dir,
+    )
+    path = (workspace_dir / relative_path).resolve()
+    allowed_roots = (workspace_dir, repo_root / "src" / "dnadesign")
+    if not any(_is_relative_to(path, root.resolve()) for root in allowed_roots):
+        raise ContractViolationError(f"workspace input path escapes allowed scalar.build roots: {relative_path}")
     if not path.is_file():
         raise MissingArtifactError(f"workspace input is missing for scalar.build: {relative_path}")
     return path
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
 def _normalized_geometry_rows(matrix: np.ndarray) -> np.ndarray:
@@ -87,76 +116,6 @@ def _effective_rank(ratios: list[float]) -> float:
     probabilities = array / np.sum(array, dtype=np.float64)
     entropy = -np.sum(probabilities * np.log(probabilities), dtype=np.float64)
     return float(np.exp(entropy))
-
-
-def _rankdata_average(values: np.ndarray) -> np.ndarray:
-    if values.size == 0:
-        return np.asarray(values, dtype=np.float64)
-    order = np.argsort(values, kind="mergesort")
-    ranks = np.empty(values.size, dtype=np.float64)
-    sorted_values = np.asarray(values[order], dtype=np.float64)
-    start = 0
-    while start < values.size:
-        end = start
-        while end + 1 < values.size and sorted_values[end + 1] == sorted_values[start]:
-            end += 1
-        rank_value = (start + end + 2) / 2.0
-        ranks[order[start : end + 1]] = rank_value
-        start = end + 1
-    return ranks
-
-
-def _pearson_correlation(left: np.ndarray, right: np.ndarray) -> float:
-    x = np.asarray(left, dtype=np.float64)
-    y = np.asarray(right, dtype=np.float64)
-    if x.size == 0 or y.size == 0 or x.size != y.size:
-        return float("nan")
-    if x.size == 1:
-        return float("nan")
-    if np.std(x) < 1e-12 or np.std(y) < 1e-12:
-        return float("nan")
-    return float(np.corrcoef(x, y)[0, 1])
-
-
-def _spearman_correlation(left: np.ndarray, right: np.ndarray) -> float:
-    x = np.asarray(left, dtype=np.float64)
-    y = np.asarray(right, dtype=np.float64)
-    if x.size == 0 or y.size == 0 or x.size != y.size:
-        return float("nan")
-    if x.size == 1:
-        return float("nan")
-    return _pearson_correlation(_rankdata_average(x), _rankdata_average(y))
-
-
-def _kendall_tau(left: np.ndarray, right: np.ndarray) -> float:
-    x = np.asarray(left, dtype=np.float64)
-    y = np.asarray(right, dtype=np.float64)
-    if x.size == 0 or y.size == 0 or x.size != y.size:
-        return float("nan")
-    concordant = 0
-    discordant = 0
-    tie_x = 0
-    tie_y = 0
-    for i in range(x.size):
-        for j in range(i + 1, x.size):
-            dx = np.sign(x[i] - x[j])
-            dy = np.sign(y[i] - y[j])
-            if dx == 0 and dy == 0:
-                continue
-            if dx == 0:
-                tie_x += 1
-                continue
-            if dy == 0:
-                tie_y += 1
-                continue
-            if dx == dy:
-                concordant += 1
-            else:
-                discordant += 1
-    denominator = np.sqrt(float((concordant + discordant + tie_x) * (concordant + discordant + tie_y)))
-    if denominator < 1e-12:
-        return float("nan")
-    return float((concordant - discordant) / denominator)
 
 
 def _pairwise_cosine_distance_summary(

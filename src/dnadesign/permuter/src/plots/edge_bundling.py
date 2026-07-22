@@ -1,22 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/plots/edge_bundling.py
 
-Hierarchical edge-bundling style plot for AA mutation co-occurrence
-among selected multisite variants.
-
-Nodes: AA mutation tokens (e.g., G16F, L17I, N21H, …)
-Edges: undirected, token_a -- token_b if they co-occur in ≥1 selected variant
-       weight_count = number of variants where {a,b} ⊂ combo
-       avg_k       = mean mut_count across those variants
-
-Layout:
-  • circular node ring, ordered by position then alt AA (clockwise)
-  • simple spline-like chords; grouped by position to suggest hierarchy
-
-Color:
-  • configurable via `color_by` ('edge_avg_k' or 'node_avg_k') and `edge_cmap`
+Hierarchical edge-bundling style plot for AA mutation co-occurrence.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

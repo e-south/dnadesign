@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/core/paths.py
+
+Core runtime primitives for paths Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -9,24 +11,28 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, Optional
 
 try:
-    # Python 3.9+: importlib.resources.files gives us package install path
     from importlib.resources import files as _pkg_files  # type: ignore[attr-defined]
 except Exception:  # pragma: no cover
     _pkg_files = None
-_LOG = logging.getLogger("permuter.paths")
+
+CONFIG_NAME = "config.yaml"
+_PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+_RESOURCE_DIR = _PACKAGE_ROOT / "src" / "resources"
+_FLAT_LAYOUTS = {"flat"}
+_NESTED_LAYOUTS = {"nested"}
+_ALLOWED_LAYOUTS = _FLAT_LAYOUTS | _NESTED_LAYOUTS
 
 
 @dataclass(frozen=True)
-class JobPaths:
-    job_yaml: Path
-    job_dir: Path
+class WorkspacePaths:
+    config_yaml: Path
+    workspace_dir: Path
     refs_csv: Path
     output_root: Path
     dataset_dir: Path
@@ -35,27 +41,36 @@ class JobPaths:
     plots_dir: Path
 
 
-def _expand(s: str, *, job_dir: Path) -> Path:
-    # expand ~ and $VARS and ${JOB_DIR}
+def _workspaces_dir(workspace_dir: Path) -> Path:
+    if workspace_dir.parent.name == "workspaces":
+        return workspace_dir.parent.resolve()
+    return workspace_dir.parent.resolve()
+
+
+def _expand(s: str, *, workspace_dir: Path) -> Path:
     s = s or ""
-    s = s.replace("${JOB_DIR}", str(job_dir))
+    if "${JOB_DIR}" in s:
+        raise ValueError("${JOB_DIR} is not supported; use ${WORKSPACE_DIR} in Permuter workspace configs")
+    if "${PACKAGE_ROOT}" in s:
+        raise ValueError(
+            "${PACKAGE_ROOT} is not supported in Permuter workspace configs; "
+            "use ${WORKSPACE_DIR}, ${WORKSPACES_DIR}, or ${PERMUTER_RESOURCE_DIR}"
+        )
+    s = s.replace("${WORKSPACE_DIR}", str(workspace_dir))
+    s = s.replace("${WORKSPACES_DIR}", str(_workspaces_dir(workspace_dir)))
+    s = s.replace("${PERMUTER_RESOURCE_DIR}", str(_RESOURCE_DIR))
     s = os.path.expandvars(s)
     p = Path(os.path.expanduser(s))
-    return p if p.is_absolute() else (job_dir / p)
+    return p if p.is_absolute() else (workspace_dir / p)
 
 
-# Public helper: expand a string path using the job directory as the base.
-def expand_for_job(value: str | Path, *, job_dir: Path) -> Path:
-    """
-    Expand ${JOB_DIR}, ~, and $ENV within 'value', and make it absolute
-    relative to 'job_dir' when not already absolute.
-    """
-    return _expand(str(value), job_dir=job_dir).resolve()
+def expand_for_workspace(value: str | Path, *, workspace_dir: Path) -> Path:
+    return _expand(str(value), workspace_dir=workspace_dir).resolve()
 
 
-def _unique(seq: Iterable[Path]) -> List[Path]:
+def _unique(seq: Iterable[Path]) -> list[Path]:
     seen: set[str] = set()
-    out: List[Path] = []
+    out: list[Path] = []
     for p in seq:
         key = str(p.resolve())
         if key in seen:
@@ -65,13 +80,12 @@ def _unique(seq: Iterable[Path]) -> List[Path]:
     return out
 
 
-def _package_jobs_dir() -> Optional[Path]:
-    """Installed package jobs dir: .../site-packages/dnadesign/permuter/jobs"""
+def _package_workspaces_dir() -> Optional[Path]:
     try:
         if _pkg_files is None:
             return None
         base = Path(str(_pkg_files("dnadesign.permuter")))
-        cand = (base / "jobs").resolve()
+        cand = (base / "workspaces").resolve()
         return cand if cand.exists() else None
     except Exception:
         return None
@@ -91,66 +105,45 @@ def _repo_root_from(start: Path) -> Optional[Path]:
     return None
 
 
-def candidate_job_dirs() -> List[Path]:
-    """
-    Ordered search roots for preset YAMLs:
-      1) $PERMUTER_JOBS (':'-separated)
-      2) CWD and CWD/jobs
-      3) repo root (if found) and <root>/src/dnadesign/permuter/jobs
-      4) installed package jobs directory
-    """
-    out: List[Path] = []
-    env = os.environ.get("PERMUTER_JOBS", "")
+def candidate_workspace_roots() -> list[Path]:
+    out: list[Path] = []
+    env = os.environ.get("PERMUTER_WORKSPACES", "")
     for chunk in [x for x in env.split(":") if x.strip()]:
         out.append(Path(os.path.expanduser(chunk)).resolve())
     cwd = Path.cwd().resolve()
-    out += [cwd, cwd / "jobs"]
+    out += [cwd, cwd / "workspaces"]
     root = _repo_root_from(cwd)
     if root:
-        out.append(root)
-        out.append(root / "src" / "dnadesign" / "permuter" / "jobs")
-    pkg = _package_jobs_dir()
+        out.append(root / "src" / "dnadesign" / "permuter" / "workspaces")
+    pkg = _package_workspaces_dir()
     if pkg:
         out.append(pkg)
     return [p for p in _unique(out) if p.exists()]
 
 
-def resolve_job_hint(hint: str | Path) -> Path:
-    """
-    Resolve a job hint that can be:
-      • absolute/relative path to YAML
-      • bare preset name (we'll search candidate_job_dirs)
-    """
+def resolve_workspace_config_hint(hint: str | Path) -> Path:
     h = Path(str(hint))
-    # Direct file path?
-    if h.suffix.lower() in (".yaml", ".yml") and h.exists():
-        return h.resolve()
     if h.exists():
-        return h.resolve()
-    # Search as preset name
+        resolved = h.resolve()
+        if resolved.is_dir():
+            config = resolved / CONFIG_NAME
+            if config.exists():
+                return config
+            raise FileNotFoundError(f"Workspace directory does not contain {CONFIG_NAME}: {resolved}")
+        if resolved.name != CONFIG_NAME:
+            raise ValueError(f"Permuter workspace config must be named {CONFIG_NAME!r}: {resolved}")
+        return resolved
+
     base = h.name
-    names = [base, f"{base}.yaml", f"{base}.yml"]
-    tried: List[Path] = []
-    for d in candidate_job_dirs():
-        for nm in names:
-            cand = (d / nm).resolve()
-            tried.append(cand)
-            if cand.exists():
-                return cand
-    # Minimal message by default; detailed list only when DEBUG
-    # concise by default; show full tried list only in debug mode or when explicitly asked
-    dirs = "\n  - ".join(str(d) for d in candidate_job_dirs())
-    show_tried = os.environ.get("PERMUTER_DEBUG_HINTS") == "1" or _LOG.isEnabledFor(logging.DEBUG)
-    if show_tried:
-        tried_str = "\n  - ".join(str(p) for p in _unique(tried))
-        msg = f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}" + (
-            f"\nTried filenames:\n  - {tried_str}" if tried_str else ""
-        )
-    else:
-        msg = (
-            f"Job YAML '{hint}' not found.\nSearched directories:\n  - {dirs}\n"
-            "Tip: run with -vv for search details or set PERMUTER_DEBUG_HINTS=1."
-        )
+    tried: list[Path] = []
+    for root in candidate_workspace_roots():
+        cand = (root / base / CONFIG_NAME).resolve()
+        tried.append(cand)
+        if cand.exists():
+            return cand
+    dirs = "\n  - ".join(str(d) for d in candidate_workspace_roots())
+    tried_str = "\n  - ".join(str(p) for p in _unique(tried))
+    msg = f"Workspace '{hint}' not found.\nSearched workspace roots:\n  - {dirs}\nTried config paths:\n  - {tried_str}"
     raise FileNotFoundError(msg)
 
 
@@ -179,65 +172,84 @@ def _is_writable_dir(p: Path) -> bool:
         return False
 
 
+def _configured_output_root(
+    *,
+    output_dir: str,
+    workspace_dir: Path,
+    out_override: Path | None,
+) -> Path:
+    if out_override is not None:
+        return Path(out_override).expanduser().resolve()
+    configured = _expand(output_dir, workspace_dir=workspace_dir).resolve()
+    env_root = os.environ.get("PERMUTER_OUTPUT_ROOT", "").strip()
+    if not env_root:
+        return configured
+    scope = workspace_dir.name
+    if not scope:
+        raise ValueError(f"Cannot derive PERMUTER_OUTPUT_ROOT child name from output.dir={output_dir!r}")
+    return (Path(os.path.expandvars(env_root)).expanduser().resolve() / scope).resolve()
+
+
+def _normalize_layout(layout: str | None) -> str:
+    source = "output.layout" if layout else "PERMUTER_LAYOUT"
+    raw = str(layout or os.environ.get("PERMUTER_LAYOUT", "")).strip().lower()
+    if not raw:
+        return "flat"
+    if raw not in _ALLOWED_LAYOUTS:
+        raise ValueError(f"Invalid {source} {raw!r}. Allowed: {sorted(_ALLOWED_LAYOUTS)}")
+    return raw
+
+
 def resolve(
-    job_yaml: Path,
+    config_yaml: Path,
     *,
     refs: str,
     output_dir: str,
     ref_name: str,
     out_override: Path | None,
     layout: str | None = None,
-) -> JobPaths:
-    job_yaml = Path(job_yaml).expanduser().resolve()
-    job_dir = job_yaml.parent
+    require_writable_output: bool = True,
+) -> WorkspacePaths:
+    config_yaml = Path(config_yaml).expanduser().resolve()
+    if config_yaml.name != CONFIG_NAME:
+        raise ValueError(f"Permuter workspace config must be named {CONFIG_NAME!r}: {config_yaml}")
+    workspace_dir = config_yaml.parent
 
-    # Resolve refs CSV relative to YAML location, and assert it's a file
-    refs_csv = _expand(refs, job_dir=job_dir).resolve()
+    refs_csv = _expand(refs, workspace_dir=workspace_dir).resolve()
     if refs_csv.is_dir():
         example = refs_csv / "refs.csv"
         raise IsADirectoryError(
             "Refs path points to a directory; a CSV file is required.\n"
             f"Given: {refs_csv}\n"
-            f"Hint: set job.input.refs to the CSV (e.g., {example})"
+            f"Hint: set scope.input.refs to the CSV (e.g., {example})"
         )
     if not refs_csv.exists():
         raise FileNotFoundError(f"Refs CSV not found: {refs_csv}")
 
-    # Determine output root (strict: no silent fallbacks)
-    output_root = (
-        Path(out_override).expanduser().resolve()
-        if out_override is not None
-        else _expand(output_dir, job_dir=job_dir).resolve()
+    output_root = _configured_output_root(
+        output_dir=output_dir,
+        workspace_dir=workspace_dir,
+        out_override=out_override,
     )
-    if not _is_writable_dir(output_root):
+    if require_writable_output and not _is_writable_dir(output_root):
         raise PermissionError(
             f"Output root not writable: {output_root}. Use --out or set $PERMUTER_OUTPUT_ROOT to a writable location."
         )
 
-    # Dataset directory
-    # Layouts:
-    #   nested      → <output_root>/<ref>/
-    #   flat        → <output_root>/                      (one dataset per job)
     ref_dir = ref_name or "__PENDING__"
-    layout = (layout or os.environ.get("PERMUTER_LAYOUT", "")).strip().lower()
-    if not layout:
-        if os.environ.get("PERMUTER_FLAT_RESULTS", "") in ("1", "true", "True"):
-            layout = "flat_jobref"
+    layout = _normalize_layout(layout)
 
-    if layout in ("flat", "flat_job", "job"):
+    if layout in _FLAT_LAYOUTS:
         dataset_dir = output_root
-    elif layout in ("flat_jobref", "flat_ref", "jobref"):
-        base = output_root.parent
-        dataset_dir = (base / f"{output_root.name}__{ref_dir}").resolve()
-    else:  # "nested" (default) or unknown → nested
+    else:
         dataset_dir = (output_root / ref_dir).resolve()
     records_parquet = dataset_dir / "records.parquet"
     ref_fa = dataset_dir / "REF.fa"
     plots_dir = dataset_dir / "plots"
 
-    return JobPaths(
-        job_yaml=job_yaml,
-        job_dir=job_dir,
+    return WorkspacePaths(
+        config_yaml=config_yaml,
+        workspace_dir=workspace_dir,
         refs_csv=refs_csv,
         output_root=output_root,
         dataset_dir=dataset_dir,
@@ -284,22 +296,13 @@ def _looks_pathlike(s: str, *, key_hint: Optional[str] = None) -> bool:
     return False
 
 
-def expand_param_paths(params: dict | None, *, job_dir: Path) -> dict:
-    """
-    Deep-copy and expand any string values in a params mapping that appear to be paths.
-    Uses job_dir to resolve ${JOB_DIR}, $ENV, and ~, and to make relative paths absolute.
-    """
+def expand_param_paths(params: dict | None, *, workspace_dir: Path) -> dict:
+    """Deep-copy and expand string values that look like paths."""
 
     def _map(v: Any, key_hint: Optional[str] = None) -> Any:
         if isinstance(v, str) and _looks_pathlike(v, key_hint=key_hint):
-            try:
-                p = _expand(v, job_dir=job_dir).resolve()
-                if _LOG.isEnabledFor(logging.DEBUG):
-                    _LOG.debug("expand_param_paths: %r → %s", v, p)
-                return str(p)
-            except Exception:
-                # Leave unchanged; concrete validators will raise clear errors.
-                return v
+            p = _expand(v, workspace_dir=workspace_dir).resolve()
+            return str(p)
         if isinstance(v, list):
             return [_map(x, None) for x in v]
         if isinstance(v, dict):

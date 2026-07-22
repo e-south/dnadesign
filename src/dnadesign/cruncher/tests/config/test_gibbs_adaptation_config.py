@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/config/test_gibbs_adaptation_config.py
 
 Validates schema support for optimizer cooling and move/proposal tuning blocks.

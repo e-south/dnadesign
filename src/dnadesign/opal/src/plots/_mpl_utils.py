@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/_mpl_utils.py
+
+Plot builders for mpl utils OPAL plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,14 +13,136 @@ from __future__ import annotations
 
 import json as _json
 import os
+import re
+import textwrap
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Mapping
 
 from ..core.tmpdir import resolve_opal_tmpdir
 from ..core.utils import OpalError
 
 if TYPE_CHECKING:
     import numpy as np
+
+
+COLORBLIND_PALETTE: tuple[str, ...] = (
+    "#0072B2",  # blue
+    "#E69F00",  # orange
+    "#009E73",  # green
+    "#D55E00",  # vermillion
+    "#CC79A7",  # reddish purple
+    "#56B4E9",  # sky blue
+    "#F0E442",  # yellow
+    "#000000",  # black
+)
+CATEGORY_MARKERS: tuple[str, ...] = ("o", "s", "^", "D", "P", "X", "v", "*")
+OBSERVED_BATCH_MARKERS: tuple[str, ...] = ("o", "s", "^", "v", "<", ">", "P", "X", "h", "p", "8", "*")
+CATEGORY_LINESTYLES: tuple[str, ...] = ("-", "--", "-.", ":")
+DEFAULT_SQUARE_FIGSIZE: tuple[float, float] = (7.2, 7.2)
+DEFAULT_LANDSCAPE_FIGSIZE: tuple[float, float] = (11.0, 3.8)
+DEFAULT_PANORAMA_FIGSIZE: tuple[float, float] = (12.0, 3.6)
+NOTEBOOK_TITLE_FONTSIZE = 18.0
+NOTEBOOK_SUBTITLE_FONTSIZE = 14.0
+NOTEBOOK_AXIS_LABEL_FONTSIZE = 15.0
+NOTEBOOK_TICK_FONTSIZE = 12.0
+NOTEBOOK_LEGEND_FONTSIZE = 12.0
+NOTEBOOK_COLORBAR_LABEL_FONTSIZE = 13.5
+NOTEBOOK_ANNOTATION_FONTSIZE = 10.5
+SIGNED_MARGIN_CMAP = "RdBu_r"
+
+_PRETTY_LABELS = {
+    "as_of_round": "Round",
+    "observed_round": "Observed round",
+    "round": "Round",
+    "id": "ID",
+    "run_id": "Run ID",
+    "view__selection_score": "Selected objective score",
+    "view__score_ref": "Predicted reference score",
+    "pred__y_hat_model": "Predicted response vector",
+    "obj__logic_fidelity": "Logic fidelity",
+    "obj__effect_raw": "Raw effect",
+    "obj__effect_scaled": "Scaled effect",
+    "obj__diag__setpoint": "Setpoint",
+    "view__is_selected": "Selected",
+    "view__rank_competition": "Selection rank",
+    "rank__sequential": "Sequential rank",
+    "logic_fidelity": "Logic fidelity",
+    "fold_change": "Fold change",
+    "effect_raw": "Raw effect",
+    "effect_scaled": "Scaled effect",
+    "score": "Score",
+    "dist_to_labeled_logic": "Distance to labeled logic",
+    "uncertainty": "Model uncertainty",
+    "denom_used": "Denominator used",
+    "clip_lo": "Lower clipping",
+    "clip_hi": "Upper clipping",
+    "clip_lo_fraction": "Lower clipping fraction",
+    "clip_hi_fraction": "Upper clipping fraction",
+    "E_raw": "Raw effect (E_raw)",
+    "e_raw": "Raw effect (E_raw)",
+    "mse": "MSE",
+    "msrb": "MSRB",
+    "iqr": "IQR",
+    "q25": "Q25",
+    "q75": "Q75",
+    "all_pool": "All pool",
+    "top_k": "Top K",
+    "selected": "Selected",
+    "mean": "Mean",
+    "median": "Median",
+    "count": "Count",
+    "importance": "Importance",
+    "rf_feature_importance": "RF importance",
+    "feature_index": "Feature index",
+    "feature_id": "Feature ID",
+    "AB interaction": "AB interaction",
+    "reference_mse": "MSE to reference vector",
+    "label_oracle_kind": "Label source",
+    "label_family_id": "Label family",
+    "label_split_id": "Label split",
+    "target_label": "Target",
+    "label_family_label": "Label family",
+    "random_id": "Random ID",
+    "leave_sigma35_variant": "Leave sigma35 variant",
+}
+
+_ACRONYMS = {
+    "ab": "AB",
+    "api": "API",
+    "dna": "DNA",
+    "id": "ID",
+    "iqr": "IQR",
+    "densegen": "DenseGen",
+    "logic4": "logic4",
+    "sigma35": "sigma35",
+    "mse": "MSE",
+    "opal": "OPAL",
+    "rf": "RF",
+    "rmf": "RMF",
+    "sfxi": "SFXI",
+    "and": "AND",
+    "vs": "vs",
+    "x": "X",
+    "y": "Y",
+}
+
+_MATH_LABELS = {
+    "view__selection_score": r"Predicted objective score, $\hat{S}$",
+    "obj__logic_fidelity": r"Logic fidelity, $F_{\ell}=1-\|\hat{\ell}-s\|_2/D$",
+    "obj__effect_scaled": r"Scaled effect, $E_{\mathrm{scaled}}=\mathrm{clip}(E_{\mathrm{raw}}/d,0,1)$",
+    "obj__effect_raw": r"Raw effect, $E_{\mathrm{raw}}=\sum_i w_i\,\max(0,2^{y_i^*}-\delta)$",
+    "logic_fidelity": r"Logic fidelity, $F_{\ell}=1-\|\hat{\ell}-s\|_2/D$",
+    "objective_score": r"Objective score, $S=F_{\ell}^{\beta}E_{\mathrm{scaled}}^{\gamma}$",
+    "effect_scaled": r"Scaled effect, $E_{\mathrm{scaled}}=\mathrm{clip}(E_{\mathrm{raw}}/d,0,1)$",
+    "effect_raw": r"Raw effect, $E_{\mathrm{raw}}=\sum_i w_i\,\max(0,2^{y_i^*}-\delta)$",
+    "mse_to_reference": r"MSE to reference, $d^{-1}\sum_i(\bar{y}_i-r_i)^2$",
+    "support_distance": r"Nearest labeled logic distance, $\min_j\|\hat{\ell}-\ell_j\|_2$",
+    "score_uncertainty": r"Score uncertainty, $\sigma(\hat{S}_{\mathrm{tree}})$",
+    "feasibility_margin": r"RMF feasibility margin, $S_{\mathrm{RMF}}$",
+    "factorial_a": r"A effect, $\frac{(v_{10}+v_{11})-(v_{00}+v_{01})}{2}$",
+    "factorial_b": r"B effect, $\frac{(v_{01}+v_{11})-(v_{00}+v_{10})}{2}$",
+    "factorial_ab": r"AB interaction, $\frac{v_{11}+v_{00}-v_{10}-v_{01}}{2}$",
+}
 
 
 def ensure_mpl_config_dir(*, workdir: Path | None = None) -> Path:
@@ -65,14 +189,15 @@ def apply_plot_style(*, variant: str = "diagnostic") -> None:
 
     plt.rcParams.update(
         {
-            "font.size": 10,
-            "axes.titlesize": 11,
-            "axes.labelsize": 10,
-            "xtick.labelsize": 9,
-            "ytick.labelsize": 9,
-            "legend.fontsize": 9,
-            "figure.titlesize": 12,
-            "axes.titlepad": 6,
+            "font.size": 13,
+            "axes.titlesize": NOTEBOOK_TITLE_FONTSIZE,
+            "axes.labelsize": NOTEBOOK_AXIS_LABEL_FONTSIZE,
+            "xtick.labelsize": NOTEBOOK_TICK_FONTSIZE,
+            "ytick.labelsize": NOTEBOOK_TICK_FONTSIZE,
+            "legend.fontsize": NOTEBOOK_LEGEND_FONTSIZE,
+            "legend.title_fontsize": NOTEBOOK_LEGEND_FONTSIZE,
+            "figure.titlesize": NOTEBOOK_TITLE_FONTSIZE,
+            "axes.titlepad": 8,
             "figure.facecolor": "white",
             "axes.facecolor": "white",
             "savefig.facecolor": "white",
@@ -83,8 +208,530 @@ def apply_plot_style(*, variant: str = "diagnostic") -> None:
             "ytick.color": "#111111",
             "axes.edgecolor": "#111111",
             "legend.frameon": False,
+            "axes.axisbelow": True,
+            "axes.grid": True,
+            "grid.color": "#E6E6E6",
+            "grid.linewidth": 0.8,
+            "grid.alpha": 0.85,
+            "axes.prop_cycle": plt.cycler(color=COLORBLIND_PALETTE),
         }
     )
+
+
+def apply_notebook_axes_style(ax, *, grid: bool = True, square: bool = False) -> None:
+    """Apply the notebook-review axes contract for static OPAL plot artifacts."""
+
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    for spine in ("left", "bottom"):
+        ax.spines[spine].set_color("#B8B8B8")
+        ax.spines[spine].set_linewidth(0.8)
+    ax.set_axisbelow(True)
+    if grid:
+        ax.grid(True, color="#E6E6E6", linewidth=0.8, alpha=0.85)
+    else:
+        ax.grid(False)
+    ax.tick_params(axis="both", direction="out", length=4, width=0.8)
+    if square:
+        try:
+            ax.set_box_aspect(1.0)
+        except Exception:
+            ax.set_aspect("equal", adjustable="box")
+
+
+def set_notebook_title(
+    ax,
+    title: str,
+    *,
+    subtitle: str | None = None,
+    location: str = "center",
+    title_fontsize: float = NOTEBOOK_TITLE_FONTSIZE,
+    subtitle_fontsize: float = NOTEBOOK_SUBTITLE_FONTSIZE,
+):
+    """Render a compact title hierarchy without making context look like a second title.
+
+    The main premise stays semibold. Optional target, view, or round context is
+    placed immediately below it in regular weight. Both artists participate in
+    tight bounding-box export, so long subtitles are visible rather than clipped.
+    """
+
+    from matplotlib.transforms import ScaledTranslation
+
+    cleaned_title = str(title).strip()
+    if not cleaned_title:
+        raise ValueError("Plot title must be non-empty.")
+    cleaned_subtitle = None if subtitle is None else str(subtitle).strip()
+    if subtitle is not None and not cleaned_subtitle:
+        raise ValueError("Plot subtitle must be non-empty when provided.")
+    horizontal_alignment = {"left": "left", "center": "center", "right": "right"}.get(location)
+    horizontal_position = {"left": 0.0, "center": 0.5, "right": 1.0}.get(location)
+    if horizontal_alignment is None or horizontal_position is None:
+        raise ValueError("Plot title location must be 'left', 'center', or 'right'.")
+
+    subtitle_line_count = 0 if cleaned_subtitle is None else len(cleaned_subtitle.splitlines())
+    title_pad = 10.0 if cleaned_subtitle is None else subtitle_line_count * float(subtitle_fontsize) * 1.15 + 13.0
+    title_artist = ax.set_title(
+        cleaned_title,
+        loc=location,
+        fontweight="semibold",
+        fontsize=title_fontsize,
+        pad=title_pad,
+        linespacing=1.2,
+    )
+    subtitle_artist = None
+    if cleaned_subtitle is not None:
+        subtitle_transform = ax.transAxes + ScaledTranslation(0.0, 6.0 / 72.0, ax.figure.dpi_scale_trans)
+        subtitle_artist = ax.text(
+            horizontal_position,
+            1.0,
+            cleaned_subtitle,
+            transform=subtitle_transform,
+            ha=horizontal_alignment,
+            va="bottom",
+            fontsize=subtitle_fontsize,
+            fontweight="normal",
+            color="#333333",
+            linespacing=1.15,
+            clip_on=False,
+        )
+        subtitle_artist.set_gid("notebook-plot-subtitle")
+    return title_artist, subtitle_artist
+
+
+def save_notebook_square_figure(fig, out: Path, *, dpi: int, tight: bool = True) -> None:
+    """Save a square notebook artifact without legend/crop-driven shape drift."""
+
+    if tight:
+        try:
+            fig.tight_layout(pad=0.35)
+        except Exception:
+            pass
+    fig.savefig(out, dpi=dpi, facecolor="white")
+
+
+def categorical_color(index: int) -> str:
+    return COLORBLIND_PALETTE[int(index) % len(COLORBLIND_PALETTE)]
+
+
+def categorical_marker(index: int) -> str:
+    return CATEGORY_MARKERS[int(index) % len(CATEGORY_MARKERS)]
+
+
+def categorical_linestyle(index: int) -> str:
+    return CATEGORY_LINESTYLES[int(index) % len(CATEGORY_LINESTYLES)]
+
+
+def categorical_style(index: int) -> dict[str, str]:
+    return {
+        "color": categorical_color(index),
+        "marker": categorical_marker(index),
+        "linestyle": categorical_linestyle(index),
+    }
+
+
+def observed_batch_marker_map(
+    batch_ids: list[str] | tuple[str, ...],
+    *,
+    universe_batch_ids: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, str]:
+    """Assign stable, non-repeating markers to a bounded observed-batch set."""
+
+    canonical = [str(value).strip() for value in batch_ids]
+    if any(not value for value in canonical):
+        raise ValueError("Observed batch IDs must be non-empty strings.")
+    if len(canonical) != len(set(canonical)):
+        raise ValueError("Observed batch IDs must be unique before marker assignment.")
+    universe = canonical if universe_batch_ids is None else [str(value).strip() for value in universe_batch_ids]
+    if any(not value for value in universe) or len(universe) != len(set(universe)):
+        raise ValueError("The observed-batch marker universe must contain unique non-empty IDs.")
+    if universe_batch_ids is not None and len(universe) > len(OBSERVED_BATCH_MARKERS):
+        raise ValueError(
+            f"The observed-batch marker universe contains {len(universe)} batches; "
+            f"at most {len(OBSERVED_BATCH_MARKERS)} are supported."
+        )
+    if unknown := sorted(set(canonical) - set(universe)):
+        raise ValueError(f"Observed batches are absent from the marker universe: {unknown[:5]}.")
+    if len(canonical) > len(OBSERVED_BATCH_MARKERS):
+        raise ValueError(
+            f"Cannot distinguish {len(canonical)} observed batches in one scatter; "
+            f"filter to at most {len(OBSERVED_BATCH_MARKERS)} batches."
+        )
+    universe_positions = {value: index for index, value in enumerate(universe)}
+    assignments: dict[str, str] = {}
+    unused = list(OBSERVED_BATCH_MARKERS)
+    for batch_id in canonical:
+        preferred = OBSERVED_BATCH_MARKERS[universe_positions[batch_id] % len(OBSERVED_BATCH_MARKERS)]
+        marker = preferred if preferred in unused else unused[0]
+        assignments[batch_id] = marker
+        unused.remove(marker)
+    return assignments
+
+
+def categorical_colormap(name: str | None = None, *, n: int | None = None):
+    """Return a categorical colormap, defaulting to the OPAL colorblind palette."""
+
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import ListedColormap
+
+    label = str(name or "okabe_ito").strip().lower().replace("-", "_")
+    if label in {"okabe_ito", "okabeito", "colorblind", "opal"}:
+        size = max(int(n or len(COLORBLIND_PALETTE)), 1)
+        colors = [categorical_color(index) for index in range(size)]
+        return ListedColormap(colors, name="opal_okabe_ito")
+    return plt.get_cmap(str(name), n) if n is not None else plt.get_cmap(str(name))
+
+
+def sequential_colormap(name: str | None = None, *, n: int | None = None):
+    """Return an OPAL sequential colormap with quiet low values and readable highs."""
+
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap
+
+    label = str(name or "opal_importance").strip().lower().replace("-", "_")
+    palettes = {
+        "opal_importance": ("#FFFFFF", "#E7F0F7", "#9EC2DE", "#2E75B6", "#073B5B"),
+        "importance": ("#FFFFFF", "#E7F0F7", "#9EC2DE", "#2E75B6", "#073B5B"),
+        "rf_importance": ("#FFFFFF", "#E7F0F7", "#9EC2DE", "#2E75B6", "#073B5B"),
+        "seafoam": ("#FFFFFF", "#DDF5ED", "#93D8C6", "#2CA58D", "#005F56"),
+        "opal_seafoam": ("#FFFFFF", "#DDF5ED", "#93D8C6", "#2CA58D", "#005F56"),
+        "round_progression": ("#0072B2", "#009E73", "#E69F00", "#D55E00", "#CC79A7"),
+    }
+    if label in palettes:
+        cmap = LinearSegmentedColormap.from_list(f"opal_{label}", palettes[label], N=int(n or 256))
+        cmap.set_bad(color="#F2F2F2")
+        return cmap
+    return plt.get_cmap(str(name), n) if n is not None else plt.get_cmap(str(name))
+
+
+def math_label(key: str, *, fallback: object | None = None) -> str:
+    """Return a compact math-aware label for objective quantities."""
+
+    token = str(key or "").strip()
+    if token in _MATH_LABELS:
+        return _MATH_LABELS[token]
+    if fallback is not None:
+        return pretty_label(fallback)
+    return pretty_label(token)
+
+
+def plot_metric_label(params: Mapping[str, Any] | None, field: object) -> str:
+    """Return the campaign-declared axis label for an objective metric."""
+
+    params_map = params or {}
+    for key in ("metric_label", "score_label", "y_label", "axis_label"):
+        value = params_map.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return pretty_label(field)
+
+
+def plot_metric_short_label(params: Mapping[str, Any] | None, field: object) -> str:
+    """Return a compact legend label for an objective metric."""
+
+    params_map = params or {}
+    for key in ("legend_metric_label", "metric_short_label", "score_short_label"):
+        value = params_map.get(key)
+        if value not in (None, ""):
+            return str(value)
+    return plot_metric_label(params_map, field)
+
+
+def plot_metric_expression(params: Mapping[str, Any] | None) -> str:
+    """Return the declared score/loss expression for a plotted objective metric."""
+
+    params_map = params or {}
+    for key in ("metric_expression", "score_expression", "loss_expression"):
+        value = params_map.get(key)
+        if value not in (None, ""):
+            return str(value).strip()
+    return ""
+
+
+def pretty_label(value: object, *, raw: bool = False) -> str:
+    """Humanize OPAL field slugs while optionally retaining the exact raw token."""
+
+    token = str(value or "").strip()
+    if not token:
+        return ""
+    pretty = _PRETTY_LABELS.get(token)
+    if pretty is None:
+        pretty = _PRETTY_LABELS.get(token.replace(".", "__"))
+    if pretty is None:
+        pretty = _humanize_slug(token)
+    if raw and token and token != pretty:
+        return f"{pretty} ({token})"
+    return pretty
+
+
+def pretty_batch_label(value: object) -> str:
+    """Humanize an exact batch identifier without discarding its version or window."""
+
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"^pre[_-]?round[_-]?(\d+)", r"Pre-round \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?<![A-Za-z])batch[_-]?(\d+)", r"Batch \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?<!\d)(\d+)[_-](\d+)[_-]?h(?=$|[_-])", r"\1–\2 h", text, flags=re.IGNORECASE)
+    text = re.sub(r"[_-]v(\d+)$", r" · v\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"[_-]+", " ", text)
+    label = " ".join(text.split()).replace("Pre round", "Pre-round")
+    return f"{label[:1].upper()}{label[1:]}"
+
+
+def compact_batch_label(value: object) -> str:
+    """Project a standardized batch identifier into a compact static label."""
+
+    token = str(value or "").strip()
+    pre_round = re.match(r"^pre[_-]?round[_-]?(\d+)(?:$|[_-])", token, flags=re.IGNORECASE)
+    if pre_round:
+        return f"Pre-round {pre_round.group(1)}"
+    batch = re.match(r"^batch[_-]?(\d+)(?:$|[_-])", token, flags=re.IGNORECASE)
+    if batch:
+        return f"Batch {batch.group(1)}"
+    return pretty_batch_label(token)
+
+
+def pretty_title(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if _looks_like_expression_title(text):
+        return text
+    if "_" not in text and "__" not in text and "-" not in text:
+        words = [_ACRONYMS.get(word.lower(), word) for word in text.split()]
+        label = " ".join(words)
+        return label[:1].upper() + label[1:] if text.islower() else label
+    text = text.replace("__", " ").replace("_", " ").replace("-", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    words = []
+    for word in text.split(" "):
+        lower = word.lower()
+        if lower in _ACRONYMS:
+            words.append(_ACRONYMS[lower])
+        elif len(lower) == 1 and lower.isalpha():
+            words.append(lower.upper())
+        elif lower == "vec8":
+            words.append("vec8")
+        else:
+            words.append(lower)
+    label = " ".join(words)
+    label = re.sub(r"\btop n\b", "top-N", label, flags=re.IGNORECASE)
+    return label[:1].upper() + label[1:]
+
+
+def wrap_plot_title(value: object, *, width: int = 42, max_lines: int = 2) -> str:
+    """Wrap long subplot titles without changing short or expression-like labels."""
+
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "\n" in text:
+        return text
+    wrapped = textwrap.wrap(text, width=max(int(width), 12), break_long_words=False, break_on_hyphens=False)
+    if not wrapped:
+        return text
+    if len(wrapped) <= max_lines:
+        return "\n".join(wrapped)
+    kept = wrapped[: max(int(max_lines), 1)]
+    kept[-1] = kept[-1].rstrip(".") + "..."
+    return "\n".join(kept)
+
+
+def _looks_like_expression_title(text: str) -> bool:
+    return any(char in text for char in ("=", "[", "]", "(", ")", "^"))
+
+
+def apply_y_axis_scale(
+    ax,
+    *,
+    limits: object | None = None,
+    reference_lines: object | None = None,
+    include_zero_tick: bool = False,
+) -> None:
+    """Apply explicit y-axis limits and reference-line semantics to a plot."""
+
+    parsed_limits = _y_limit_pair(limits)
+    parsed_references = _y_reference_lines(reference_lines)
+    for line in parsed_references:
+        value = float(line["value"])
+        ax.axhline(value, color="#666666", linestyle="--", linewidth=1.0, alpha=0.82, zorder=0)
+        label = str(line.get("label") or "").strip()
+        if label:
+            ax.text(
+                0.985,
+                value,
+                label,
+                transform=ax.get_yaxis_transform(),
+                ha="right",
+                va="bottom",
+                fontsize=NOTEBOOK_ANNOTATION_FONTSIZE,
+                color="#4D4D4D",
+                bbox={"facecolor": "white", "alpha": 0.78, "edgecolor": "none", "pad": 1.5},
+            )
+    if parsed_limits is not None:
+        current_low, current_high = ax.get_ylim()
+        low = current_low if parsed_limits[0] is None else parsed_limits[0]
+        high = current_high if parsed_limits[1] is None else parsed_limits[1]
+        if low == high:
+            pad = max(abs(low) * 0.05, 1.0)
+            low -= pad
+            high += pad
+        ax.set_ylim(float(low), float(high))
+    if include_zero_tick or any(abs(float(line["value"])) <= 1e-12 for line in parsed_references):
+        low, high = ax.get_ylim()
+        if min(low, high) <= 0.0 <= max(low, high):
+            ticks = list(ax.get_yticks())
+            if not any(abs(float(tick)) <= 1e-12 for tick in ticks):
+                ax.set_yticks(sorted([*ticks, 0.0]))
+
+
+def _y_limit_pair(value: object | None) -> tuple[float | None, float | None] | None:
+    if value in (None, "", False):
+        return None
+    raw: object
+    if isinstance(value, Mapping):
+        raw = value.get("limits", value.get("ylim", value.get("range")))
+        if raw in (None, ""):
+            raw = [value.get("min", value.get("y_min")), value.get("max", value.get("y_max"))]
+    else:
+        raw = value
+    if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+        raise ValueError("y-axis limits must be a two-item sequence.")
+    return _optional_float(raw[0], field="y-axis lower limit"), _optional_float(raw[1], field="y-axis upper limit")
+
+
+def _y_reference_lines(value: object | None) -> list[dict[str, object]]:
+    if value in (None, "", False):
+        return []
+    raw_lines = value
+    if isinstance(value, Mapping):
+        raw_lines = value.get("reference_lines", value.get("lines", []))
+    if isinstance(raw_lines, (str, bytes)) or not isinstance(raw_lines, (list, tuple)):
+        raise ValueError("y-axis reference lines must be a list.")
+    lines: list[dict[str, object]] = []
+    for index, raw in enumerate(raw_lines):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"y-axis reference line {index} must be a mapping.")
+        if "value" not in raw:
+            raise ValueError(f"y-axis reference line {index} must declare value.")
+        lines.append(
+            {
+                "value": _required_float(raw.get("value"), field=f"y-axis reference line {index}"),
+                "label": str(raw.get("label") or ""),
+            }
+        )
+    return lines
+
+
+def _optional_float(value: object, *, field: str) -> float | None:
+    if value in (None, ""):
+        return None
+    return _required_float(value, field=field)
+
+
+def _required_float(value: object, *, field: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be numeric.") from exc
+    import math
+
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be finite.")
+    return number
+
+
+def legend_below_single_row(
+    fig,
+    ax,
+    *,
+    handles=None,
+    labels=None,
+    bottom: float = 0.11,
+    fontsize: float = NOTEBOOK_LEGEND_FONTSIZE,
+) -> bool:
+    """Place a legend below the plot as one compact row and reserve minimal space."""
+
+    if handles is None or labels is None:
+        handles, labels = ax.get_legend_handles_labels()
+    pairs = [(handle, label) for handle, label in zip(handles, labels) if str(label) and not str(label).startswith("_")]
+    if not pairs:
+        return False
+    handles, labels = zip(*pairs)
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=len(labels),
+        frameon=False,
+        fontsize=fontsize,
+        columnspacing=0.9,
+        handletextpad=0.4,
+        borderaxespad=0.0,
+    )
+    fig.tight_layout(rect=(0, bottom, 1, 1), pad=0.35)
+    return True
+
+
+def add_flush_colorbar(
+    fig,
+    ax,
+    mappable,
+    *,
+    label: str | None = None,
+    size: str = "4%",
+    pad: float = 0.08,
+    ticklabelsize: float | None = None,
+    extend: str = "neither",
+    extendrect: bool = False,
+):
+    """Add a vertical colorbar whose top and bottom align with the target axes."""
+
+    from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
+    cax = inset_axes(
+        ax,
+        width=size,
+        height="100%",
+        loc="lower left",
+        bbox_to_anchor=(1.0 + float(pad), 0.0, 1.0, 1.0),
+        bbox_transform=ax.transAxes,
+        borderpad=0.0,
+    )
+    cax.set_in_layout(False)
+    if extend not in {"neither", "both", "min", "max"}:
+        raise ValueError(f"Unsupported colorbar extension: {extend!r}.")
+    cbar = fig.colorbar(mappable, cax=cax, extend=extend, extendrect=extendrect)
+    if label:
+        cbar.set_label(label)
+    if ticklabelsize is not None:
+        cbar.ax.tick_params(labelsize=ticklabelsize)
+    try:
+        from matplotlib.ticker import MaxNLocator
+
+        cbar.ax.yaxis.set_major_locator(MaxNLocator(nbins=4))
+    except Exception:
+        pass
+    return cbar
+
+
+def _humanize_slug(value: str) -> str:
+    text = value
+    for prefix in ("records.", "sfxi_ref__", "obj__diag__", "obj__", "pred__", "sel__", "opal__"):
+        if text.startswith(prefix):
+            text = text[len(prefix) :]
+            break
+    text = text.replace("__", "_")
+    parts = [part for part in text.replace("-", "_").split("_") if part]
+    if not parts:
+        return value
+    words = []
+    for part in parts:
+        lower = part.lower()
+        words.append(_ACRONYMS.get(lower, part.upper() if part.startswith("v") and part[1:].isdigit() else lower))
+    label = " ".join(words)
+    return label[:1].upper() + label[1:]
 
 
 def scatter_smart(ax, x, y, *, s=16, alpha=0.85, rasterize_at=None, edgecolors="none", **kw):

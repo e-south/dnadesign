@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/scar_nick/candidates.py
 
 Candidate construction and per-pair policy annotation for scar_nick.

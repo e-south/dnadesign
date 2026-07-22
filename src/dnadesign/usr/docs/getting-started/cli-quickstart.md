@@ -1,7 +1,7 @@
 # USR CLI quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-24
+**Last verified:** 2026-07-14
 
 
 Run commands from repo root with `uv run usr ...`.
@@ -88,5 +88,5 @@ uv run usr validate usr_demo_cli_examples --registry-mode namespace-current
 
 ## Next steps
 
-- Remote and iterative batch workflows: [../operations/workflow-map.md](../operations/workflow-map.md)
+- Remote and iterative batch workflows: [USR workflow map](../operations/routes/workflow-map.md)
 - Schema and overlay contracts: [../reference/README.md](../reference/README.md)

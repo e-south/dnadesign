@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/solver.py
 
 Bounded co-design solve/search for v3 snapback workflows.

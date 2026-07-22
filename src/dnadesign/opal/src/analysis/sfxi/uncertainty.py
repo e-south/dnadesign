@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/sfxi/uncertainty.py
 
 Model-agnostic uncertainty contract and RF adapter for SFXI diagnostics.

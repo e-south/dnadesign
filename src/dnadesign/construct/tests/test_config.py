@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from dnadesign.construct.src.config import (
+from dnadesign.construct.src.contracts.config import (
     InputConfig,
     JobConfig,
     OutputConfig,
@@ -241,6 +241,262 @@ def test_job_config_normalize_anchor_rejects_template_realization_fields() -> No
                     },
                     "output": {
                         "target": {"kind": "usr", "dataset": "anchors_norm", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_unknown_full_construct_focal_part() -> None:
+    with pytest.raises(PydanticValidationError, match="realize.focal_part 'missing_anchor' is not defined"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_anchor_demo",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "anchors", "root": "/tmp/usr"},
+                        "field": "sequence",
+                    },
+                    "template": {
+                        "id": "template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "anchor",
+                            "role": "anchor",
+                            "sequence": {"source": "input_field", "field": "sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        }
+                    ],
+                    "realize": {"mode": "full_construct", "focal_part": "missing_anchor"},
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_implicit_focal_part_when_multiple_anchor_parts_exist() -> None:
+    with pytest.raises(PydanticValidationError, match="multiple anchor parts"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_anchor_demo",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "anchors", "root": "/tmp/usr"},
+                        "field": "sequence",
+                    },
+                    "template": {
+                        "id": "template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "anchor_a",
+                            "role": "anchor",
+                            "sequence": {"source": "input_field", "field": "sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        },
+                        {
+                            "name": "anchor_b",
+                            "role": "anchor",
+                            "sequence": {"source": "literal", "literal": "GG"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 12, "end": 16},
+                            },
+                        },
+                    ],
+                    "realize": {"mode": "full_construct"},
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_output_variants_without_anchor_handoff_part() -> None:
+    with pytest.raises(PydanticValidationError, match="job.output_variants requires realize.focal_part"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_slot_missing_handoff",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "rt_lnrna_candidates", "root": "/tmp/usr"},
+                        "field": None,
+                    },
+                    "template": {
+                        "id": "dual_cassette_template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "lnrna",
+                            "role": "lnrna_cassette",
+                            "sequence": {"source": "input_field", "field": "candidate__lnrna_sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        },
+                        {
+                            "name": "rt_cds",
+                            "role": "rt_cds",
+                            "sequence": {"source": "input_field", "field": "candidate__rt_cds_sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 12, "end": 16},
+                            },
+                        },
+                    ],
+                    "realize": {"mode": "full_construct", "required_slots": ["lnrna", "rt_cds"]},
+                    "output_variants": [
+                        {
+                            "product_kind": "realized_context",
+                            "orientation": "forward",
+                            "recommended_pooling": "anchor_mean",
+                        }
+                    ],
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "rt_lnrna_constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_output_variant_anchor_part_missing_from_parts() -> None:
+    with pytest.raises(PydanticValidationError, match="anchor_part 'missing_slot' is not defined"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_slot_missing_variant_anchor",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "rt_lnrna_candidates", "root": "/tmp/usr"},
+                        "field": None,
+                    },
+                    "template": {
+                        "id": "dual_cassette_template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "lnrna",
+                            "role": "lnrna_cassette",
+                            "sequence": {"source": "input_field", "field": "candidate__lnrna_sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        }
+                    ],
+                    "realize": {"mode": "full_construct", "required_slots": ["lnrna"]},
+                    "output_variants": [
+                        {
+                            "product_kind": "realized_context",
+                            "orientation": "forward",
+                            "recommended_pooling": "anchor_mean",
+                            "anchor_part": "missing_slot",
+                        }
+                    ],
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "rt_lnrna_constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_anchor_window_without_explicit_anchor_part() -> None:
+    with pytest.raises(PydanticValidationError, match="anchor_window_size_bp requires anchor_part"):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_slot_missing_variant_anchor_window_part",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "rt_lnrna_candidates", "root": "/tmp/usr"},
+                        "field": None,
+                    },
+                    "template": {
+                        "id": "dual_cassette_template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "lnrna",
+                            "role": "lnrna_cassette",
+                            "sequence": {"source": "input_field", "field": "candidate__lnrna_sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        }
+                    ],
+                    "realize": {"mode": "full_construct", "required_slots": ["lnrna"]},
+                    "output_variants": [
+                        {
+                            "product_kind": "realized_context",
+                            "orientation": "forward",
+                            "recommended_pooling": "anchor_mean",
+                            "anchor_window_size_bp": 256,
+                        }
+                    ],
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "rt_lnrna_constructs", "root": "/tmp/usr"},
+                    },
+                }
+            }
+        )
+
+
+def test_job_config_rejects_anchor_window_without_anchor_mean_pooling() -> None:
+    with pytest.raises(
+        PydanticValidationError, match="anchor_window_size_bp requires recommended_pooling='anchor_mean'"
+    ):
+        JobConfig.model_validate(
+            {
+                "job": {
+                    "id": "multi_slot_anchor_window_wrong_pooling",
+                    "input": {
+                        "source": {"kind": "usr", "dataset": "rt_lnrna_candidates", "root": "/tmp/usr"},
+                        "field": None,
+                    },
+                    "template": {
+                        "id": "dual_cassette_template",
+                        "source": {"kind": "literal", "sequence": "AAAATTTTCCCCGGGG"},
+                    },
+                    "parts": [
+                        {
+                            "name": "lnrna",
+                            "role": "lnrna_cassette",
+                            "sequence": {"source": "input_field", "field": "candidate__lnrna_sequence"},
+                            "placement": {
+                                "kind": "replace",
+                                "locator": {"kind": "coordinates", "start": 4, "end": 8},
+                            },
+                        }
+                    ],
+                    "realize": {"mode": "full_construct", "required_slots": ["lnrna"]},
+                    "output_variants": [
+                        {
+                            "product_kind": "realized_context",
+                            "orientation": "forward",
+                            "recommended_pooling": "seq_mean",
+                            "anchor_part": "lnrna",
+                            "anchor_window_size_bp": 256,
+                        }
+                    ],
+                    "output": {
+                        "target": {"kind": "usr", "dataset": "rt_lnrna_constructs", "root": "/tmp/usr"},
                     },
                 }
             }

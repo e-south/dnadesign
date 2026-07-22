@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/notebooks/browser_runtime_projection.py
+
 Projection rendering helpers for generated latentdna marimo notebooks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -12,8 +19,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from ..metadata_axes import axis_display_text, axis_style_map_from_payload
-from ..visual_style import (
+from ..metadata.axes import axis_display_text, axis_style_map_from_payload
+from ..presentation.visual_style import (
     PLOT_TITLE_FONT_SIZE,
     PUBLICATION_PALETTE,
     TEXT_COLOR,
@@ -21,7 +28,7 @@ from ..visual_style import (
     legend_layout,
     wrap_plot_title,
 )
-from ..visual_style import (
+from ..presentation.visual_style import (
     scatter_style as shared_scatter_style,
 )
 from .browser_runtime_support import (
@@ -40,6 +47,7 @@ from .browser_runtime_support import (
     load_table,
     load_view_rows,
     normalize_categorical_hue_series,
+    normalize_hue_kind,
     reference_hue_coverage_warnings,
     reference_hue_render_params,
     resolve_join_keys,
@@ -133,6 +141,14 @@ def _table_view_ids(item: dict[str, object]) -> set[str]:
     return {str(view_id) for view_id in item.get("view_ids", []) if isinstance(view_id, str) and str(view_id).strip()}
 
 
+def _table_compatible_view_ids(item: dict[str, object]) -> set[str]:
+    return {
+        str(view_id)
+        for view_id in item.get("compatible_view_ids", [])
+        if isinstance(view_id, str) and str(view_id).strip()
+    }
+
+
 def _equivalent_sequence_feature_view_ids(view_id: str | None) -> set[str]:
     if not view_id:
         return set()
@@ -150,7 +166,7 @@ def _equivalent_sequence_feature_view_ids(view_id: str | None) -> set[str]:
 def _table_matches_view(item: dict[str, object], view_id: str | None) -> bool:
     if not view_id:
         return True
-    explicit_view_ids = _table_view_ids(item)
+    explicit_view_ids = _table_compatible_view_ids(item) or _table_view_ids(item)
     if explicit_view_ids:
         artifact_id = str(item.get("artifact_id") or "artifact")
         if artifact_id.startswith("sequence_features_"):
@@ -565,6 +581,7 @@ def render_projection_grid(
     reference_display_labels: dict[str, str] | None = None,
     reference_label_limit: int | None = None,
     reference_hue_column: str | None = None,
+    reference_hue_kind: str | None = None,
     hue_options: list[dict[str, object]] | None = None,
     alt_text: str | None = None,
     prefer_single_row: bool = False,
@@ -620,6 +637,7 @@ def render_projection_grid(
             effective_hue = None
 
     effective_reference_hue = str(reference_hue_column or "").strip()
+    effective_reference_hue_kind = normalize_hue_kind(reference_hue_kind) or "continuous"
     if effective_reference_hue and reference_labels:
         reference_warnings.extend(
             reference_hue_coverage_warnings(
@@ -627,6 +645,7 @@ def render_projection_grid(
                 reference_labels=reference_labels,
                 reference_match_column=reference_match_column,
                 reference_hue_column=effective_reference_hue,
+                reference_hue_kind=effective_reference_hue_kind,
             )
         )
     reference_hue_params = (
@@ -635,6 +654,8 @@ def render_projection_grid(
             reference_labels=reference_labels,
             reference_match_column=reference_match_column,
             reference_hue_column=effective_reference_hue,
+            reference_hue_kind=effective_reference_hue_kind,
+            axis_styles=axis_styles,
         )
         if effective_reference_hue and reference_labels
         else None
@@ -642,7 +663,7 @@ def render_projection_grid(
     if reference_hue_params is None:
         if effective_reference_hue and reference_labels:
             reference_warnings.append(
-                f"reference hue `{effective_reference_hue}` has no finite values for selected reference rows"
+                f"reference hue `{effective_reference_hue}` has no values for selected reference rows"
             )
         effective_reference_hue = ""
 
@@ -943,6 +964,9 @@ def render_projection_grid(
     if scatter_artist is not None and effective_hue is not None and hue_kind == "continuous":
         colorbar_bottom = 0.08 if n_panels > 1 else 0.10
         label_right_padding_px = 28.0
+    reference_hue_params_kind = (
+        normalize_hue_kind(reference_hue_params.get("kind")) if reference_hue_params is not None else None
+    )
     if reference_hue_params is not None:
         label_right_padding_px = max(label_right_padding_px, 42.0)
     top_margin = max(0.8, 0.96 - (0.042 * max(max_title_lines - 1, 0)))
@@ -1011,7 +1035,7 @@ def render_projection_grid(
         colorbar.ax.xaxis.set_label_position("bottom")
         colorbar.ax.xaxis.set_ticks_position("bottom")
 
-    if reference_hue_params is not None and effective_reference_hue:
+    if reference_hue_params is not None and effective_reference_hue and reference_hue_params_kind == "continuous":
         from matplotlib.cm import ScalarMappable
         from matplotlib.colors import Normalize
 
@@ -1032,6 +1056,36 @@ def render_projection_grid(
             fontsize=11.0,
             color=TEXT_COLOR,
         )
+    elif reference_hue_params is not None and effective_reference_hue and reference_hue_params_kind != "continuous":
+        from matplotlib.lines import Line2D
+
+        categories = [str(value) for value in list(reference_hue_params.get("categories") or []) if str(value).strip()]
+        color_map = {str(key): str(value) for key, value in dict(reference_hue_params.get("color_map") or {}).items()}
+        if categories:
+            legend_handles = [
+                Line2D(
+                    [0],
+                    [0],
+                    marker="*",
+                    linestyle="",
+                    markersize=9.0,
+                    markerfacecolor=color_map.get(category, "#111111"),
+                    markeredgecolor="white",
+                    label=category,
+                )
+                for category in categories[:8]
+            ]
+            legend = fig.legend(
+                legend_handles,
+                [handle.get_label() for handle in legend_handles],
+                loc="center left",
+                bbox_to_anchor=(0.925, 0.5),
+                frameon=False,
+                title=display_hue_label(effective_reference_hue, axis_styles=axis_styles),
+                borderaxespad=0.0,
+                handletextpad=0.45,
+            )
+            style_notebook_legend(legend)
 
     default_alt_text = _default_projection_alt_text(
         panel_count=n_panels,

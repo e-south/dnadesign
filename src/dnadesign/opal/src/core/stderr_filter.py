@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/core/stderr_filter.py
+
+Core runtime primitives for stderr filter OPAL core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

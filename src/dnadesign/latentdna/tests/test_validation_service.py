@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_validation_service.py
+
+Regression tests for validation service LatentDNA.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -6,6 +17,7 @@ import pyarrow.parquet as pq
 
 from dnadesign.latentdna.src.contracts.errors import WorkspaceValidationError
 from dnadesign.latentdna.src.services.validation_service import validate_workspace
+from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
 
 
 def _write_validation_workspace(tmp_path, *, role: str) -> tuple[object, object]:
@@ -382,6 +394,66 @@ views:
     assert source_detail["validation_status"] == "skipped_planned"
     view_detail = next(item for item in payload["view_details"] if item["view_id"] == "future_core60_geometry")
     assert view_detail["validation_status"] == "skipped_planned"
+
+
+def test_deep_validate_workspace_allows_empty_planned_infer_source_with_sequence_semantics(tmp_path) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    usr_root = workspace_dir / "usr"
+    ensure_sequence_contract_namespaces(usr_root)
+    dataset = Dataset(usr_root, "planned_infer_sidecar")
+    dataset.init(source="test", notes="planned infer sidecar validation test")
+    dataset.add_sequences(["ACGT" * 15], bio_type="dna", alphabet="dna_4", source="test")
+    (workspace_dir / "config.yaml").write_text(
+        """
+schema_version: latentdna.workspace.v1
+workspace:
+  id: validation_planned_infer_source_demo
+  output_root: ./outputs
+defaults:
+  analysis_dtype: float32
+  metric: cosine
+  random_seed: 17
+  plot_formats: [svg]
+  neighbor_backend: auto
+sources:
+  future_infer_features:
+    kind: infer_feature_sidecar
+    root: ./usr
+    dataset: planned_infer_sidecar
+    record_key: id
+    subject_key: id
+    role: planned
+    sequence_scope: source_record
+    emitted_length_bp: 60
+    where:
+      model_name: evo2_7b
+      representation_kind: intermediate_embedding
+      pooling_operation: seq_mean
+      view_name: future_view
+views:
+  future_geometry:
+    source: future_infer_features
+    vector:
+      kind: column
+      name: value
+    coordinate_space_id: demo_space
+    tags: {model: demo}
+    role: planned
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    payload = validate_workspace(workspace_dir, deep=True)
+
+    assert payload["status"] == "ok"
+    semantic_detail = next(
+        item for item in payload["sequence_semantic_details"] if item["source_id"] == "future_infer_features"
+    )
+    assert semantic_detail["materialization_status"] == "planned_empty"
+    assert semantic_detail["row_count"] == 0
+    assert semantic_detail["length_counts"] == {}
 
 
 def test_deep_validate_workspace_fails_for_malformed_planned_source(tmp_path) -> None:

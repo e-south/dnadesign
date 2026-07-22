@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/core/errors.py
 
 Error types for baserender contract, schema, rendering, and export failures.

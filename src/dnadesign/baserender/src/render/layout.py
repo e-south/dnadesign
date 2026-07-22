@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/layout.py
 
 Layout math and generic track assignment for sequence-row rendering.

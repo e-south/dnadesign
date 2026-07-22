@@ -1,13 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/permuter/src/protocols/combine/combine_aa.py
 
-Takes a dataset of single-AA DMS results, selects an elite set of single AA
-events under strict rules, samples multi-AA combinations from that elite,
-converts AAs to codons (top or weighted policy) while preserving DNA letter-case,
-and emits rows with a canonical AA combo string plus an additive “expected” score
-equal to the sum of the single scores.
+Takes a dataset of single-AA DMS results, selects an elite set of single AA.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -21,7 +17,8 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
-from dnadesign.permuter.src.core.paths import expand_for_job
+from dnadesign.permuter.src.contracts.metrics import interaction_metric_column, observed_metric_column
+from dnadesign.permuter.src.core.paths import expand_for_workspace
 from dnadesign.permuter.src.core.storage import read_parquet
 from dnadesign.permuter.src.protocols.base import Protocol, assert_dna
 from dnadesign.permuter.src.protocols.combine.builders import (
@@ -78,7 +75,7 @@ class CombineAA(Protocol):
                 raise ValueError(f"combine_aa: params.{req} is required")
         # Robust resolution: allow dataset *dir* or explicit records.parquet.
         raw_ds = str(params["from_dataset"])
-        job_dir = Path(str(params.get("_job_dir"))) if params.get("_job_dir") else None
+        workspace_dir = Path(str(params.get("_workspace_dir"))) if params.get("_workspace_dir") else None
 
         def _coerce_records(p: Path) -> Path:
             if p.is_dir():
@@ -91,21 +88,21 @@ class CombineAA(Protocol):
             return p
 
         p_ds = Path(raw_ds).expanduser()
-        if job_dir:
-            p_ds = expand_for_job(raw_ds, job_dir=job_dir)
+        if workspace_dir:
+            p_ds = expand_for_workspace(raw_ds, workspace_dir=workspace_dir)
         p_ds = _coerce_records(p_ds).resolve()
         if not p_ds.exists():
             raise ValueError(
                 "combine_aa: from_dataset not found.\n"
                 f"  given: {raw_ds!r}\n"
                 f"  resolved: {p_ds}\n"
-                "Hint: use job‑relative paths (with ${JOB_DIR}) or pass the dataset directory."
+                "Hint: use workspace-relative paths (with ${WORKSPACE_DIR}) or pass the dataset directory."
             )
-        # codon table (also allow job-relative)
+        # codon table (also allow workspace-relative)
         raw_ct = str(params["codon_table"])
         p_ct = Path(raw_ct).expanduser()
-        if job_dir:
-            p_ct = expand_for_job(raw_ct, job_dir=job_dir)
+        if workspace_dir:
+            p_ct = expand_for_workspace(raw_ct, workspace_dir=workspace_dir)
         p_ct = p_ct.resolve()
         if not p_ct.exists():
             raise ValueError(f"combine_aa: codon_table not found.\n  given: {raw_ct!r}\n  resolved: {p_ct}")
@@ -170,7 +167,7 @@ class CombineAA(Protocol):
 
         # Load singles dataset and validate schema
         metric_id = str(params["singles_metric_id"]).strip()
-        metric_col = f"permuter__metric__{metric_id}"
+        metric_col = observed_metric_column(metric_id)
         # Accept from_dataset as dir or file (already expanded by CLI; still robust here).
         p_ds = Path(str(params["from_dataset"])).expanduser()
         if p_ds.is_dir():
@@ -326,5 +323,7 @@ def attach_epistasis(df, metric_id: str):
         )
 
     out = df.copy()
-    out["epistasis"] = out[canonical_obs].astype("float64") - out[canonical_exp].astype("float64")
+    out[interaction_metric_column("epistasis", metric_id)] = out[canonical_obs].astype("float64") - out[
+        canonical_exp
+    ].astype("float64")
     return out

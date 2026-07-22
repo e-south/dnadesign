@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_motif_logo_coloring.py
 
 Tests for motif-logo observed-sequence coloring and left-adjacent scale-bar placement.

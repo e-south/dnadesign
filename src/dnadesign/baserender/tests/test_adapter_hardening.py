@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/tests/test_adapter_hardening.py
 
 Adapter hardening tests for strict error typing and schema validation.

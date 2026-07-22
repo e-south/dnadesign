@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/snapback/artifacts.py
 
 Artifact paths and persistence helpers for explicit and solve snapback runs.

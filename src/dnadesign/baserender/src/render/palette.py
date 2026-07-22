@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/palette.py
 
 Tag-based palette with stable hash colors and optional explicit overrides.

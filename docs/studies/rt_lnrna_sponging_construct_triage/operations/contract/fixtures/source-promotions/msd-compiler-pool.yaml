@@ -1,0 +1,71 @@
+contract: rt_lnrna_msd_variant_pool_spec_v1
+schema_version: 1
+pool_id: rt_lnrna_sponging_construct_triage_compiler_msd_variant_pool_v1
+study_id: rt_lnrna_sponging_construct_triage
+payload_program_id: tetO_sponging_v1
+max_variant_count: 80
+expected_variant_count: 80
+dedupe_policy: fail
+template_lnrna:
+  sequence_ref: genbank:pes-retron-26-a1-a2.gb#a1-a2
+  genbank_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-26-a1-a2.gb
+  sequence_span_0: [0, 173]
+template_msd_design:
+  construct_id: rt-lnrna-template-retron26
+  payload_id: TetR
+  cap_id: C26
+  left_base: CGGG
+  right_base: ACAG
+  profile_s3s2s1s0: MXMX
+placement:
+  expected_5p_flank: TCCTGCATTGAA
+  expected_3p_flank: GTAAGGGTGCGC
+compiler_inputs:
+  payload_sequences:
+    TetR:
+      sequence: TCCCTATCAGTGATAGAGA
+  cap_sequences:
+    C26:
+      sequence: AGGC
+design_space:
+  construct_id_prefix: rt-lnrna-yiu-compatible-compiler
+  payload_ids:
+    - TetR
+  cap_primitives:
+    - source_id: de033_released_snapback_cap_primitives_v1
+      kind: snapback_released_solve_cap
+      run_dir: src/dnadesign/cruncher/workspaces/de033/outputs/released_solve
+      cap_id_prefix: CDE033R
+      ranks:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+      expected_primitive_count: 5
+  stem_base_primitives:
+    - source_id: scar_nick_teto_bbsI_hf_stem_base_primitives_v1
+      kind: scar_nick_stem_bases
+      run_dir: src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf
+      stem_base_id_prefix: scar_nick_teto_rank
+      ranks:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+      expected_primitive_count: 16
+source_refs:
+  - src/dnadesign/cruncher/workspaces/de033/outputs/released_solve
+  - src/dnadesign/cruncher/workspaces/scar_nick_teto/outputs/scar_nick/teto_upstream_processing_bbsI_hf

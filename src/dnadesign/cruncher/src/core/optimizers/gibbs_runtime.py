@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/core/optimizers/gibbs_runtime.py
 
 Provide runtime controls and progress accounting for Gibbs annealing.

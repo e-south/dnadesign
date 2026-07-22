@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/snapback/test_artifacts.py
 
 Snapback artifact layout contracts.

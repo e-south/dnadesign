@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/guide.py
 
 Renders guided workflow reports and next-step recommendations for OPAL CLI.
@@ -28,12 +28,18 @@ def render_guide_text(report: GuidanceReport) -> str:
     lines.append(f"Workflow: {report.workflow_key}")
     lines.append(f"Config: {report.campaign['config_path']}")
     lines.append(f"Workdir: {report.campaign['workdir']}")
+    lines.append(f"Records: {report.campaign['records_path']}")
+    label_source = report.campaign.get("label_source") or {}
+    label_source_ref = label_source.get("path") or label_source.get("column") or "(unknown)"
+    lines.append(f"Label source: {label_source.get('kind')} ({label_source_ref})")
     lines.append("")
     lines.append("Plugin wiring")
     lines.append(f"- model: {report.plugins['model']['name']}")
-    objective_names = [str(row.get("name")) for row in report.plugins["objectives"]]
-    lines.append(f"- objectives: {', '.join(objective_names)}")
-    lines.append(f"- selection: {report.plugins['selection']['name']}")
+    view_rows = list(report.plugins["selection_views"])
+    lines.append(
+        "- selection views: "
+        + ", ".join(f"{row['id']} ({row['objective']['name']} -> {row['selection']['name']})" for row in view_rows)
+    )
     lines.append("")
     lines.append("Round semantics")
     lines.append(f"- observed_round: {report.round_semantics['observed_round']}")
@@ -63,18 +69,26 @@ def render_guide_markdown(report: GuidanceReport) -> str:
     lines.append(f"- **Campaign:** `{report.campaign['name']}` (`{report.campaign['slug']}`)")
     lines.append(f"- **Workflow key:** `{report.workflow_key}`")
     lines.append(f"- **Config:** `{report.campaign['config_path']}`")
+    lines.append(f"- **Records:** `{report.campaign['records_path']}`")
+    label_source = report.campaign.get("label_source") or {}
+    label_source_ref = label_source.get("path") or label_source.get("column") or "(unknown)"
+    lines.append(f"- **Label source:** `{label_source.get('kind')}` (`{label_source_ref}`)")
     lines.append("")
     lines.append("### Plugin Wiring")
     lines.append("")
     lines.append(f"- model: `{report.plugins['model']['name']}`")
-    objective_names = [str(row.get("name")) for row in report.plugins["objectives"]]
-    lines.append(f"- objectives: `{', '.join(objective_names)}`")
-    lines.append(f"- selection: `{report.plugins['selection']['name']}`")
+    view_rows = list(report.plugins["selection_views"])
+    lines.append(
+        "- selection views: "
+        + ", ".join(
+            f"`{row['id']}` (`{row['objective']['name']}` -> `{row['selection']['name']}`)" for row in view_rows
+        )
+    )
     lines.append("")
     lines.append("### Round Semantics")
     lines.append("")
-    lines.append(f"- `--observed-round`: {report.round_semantics['observed_round']}")
-    lines.append(f"- `--labels-as-of`: {report.round_semantics['labels_as_of']}")
+    lines.append(f"- `ingest-y --round`: {report.round_semantics['observed_round']}")
+    lines.append(f"- `run --round`: {report.round_semantics['labels_as_of']}")
     lines.append("")
     lines.append("### Runbook")
     lines.append("")
@@ -113,6 +127,12 @@ def render_next_text(next_report: NextGuidance) -> str:
         f"observed_round={next_report.observed_round}, "
         f"labels_in_observed_round={next_report.labels_in_observed_round}"
     )
+    if next_report.records_path:
+        lines.append(f"records: {next_report.records_path} (exists={next_report.records_exists})")
+    if next_report.label_source:
+        source = next_report.label_source
+        source_ref = source.get("path") or source.get("column") or "(unknown)"
+        lines.append(f"label source: {source.get('kind')} ({source_ref})")
     lines.append("")
     lines.append("Next commands")
     lines.extend([f"- {cmd}" for cmd in next_report.next_commands])

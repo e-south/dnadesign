@@ -553,7 +553,7 @@ def test_source_builtin_module_uses_public_tool_contracts_only() -> None:
         if isinstance(node, ast.ImportFrom):
             imported_modules.add(str(node.module or ""))
 
-    assert "dnadesign.construct.contracts" in imported_modules
+    assert "dnadesign.construct" in imported_modules
     assert "dnadesign.densegen.contracts" in imported_modules
     assert "dnadesign.infer.contracts" in imported_modules
     assert not any(module.startswith("dnadesign.construct.src") for module in imported_modules)

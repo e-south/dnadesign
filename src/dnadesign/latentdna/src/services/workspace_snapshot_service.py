@@ -1,5 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/src/services/workspace_snapshot_service.py
+
 Study-facing workspace snapshot service for latentdna.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -141,7 +148,7 @@ def _deliverable_snapshots(context) -> dict[str, WorkspaceSnapshotDeliverable]:
     return snapshots
 
 
-def _decision_ladder(context) -> list[str]:
+def decision_ladder(context) -> list[str]:
     ladder: list[str] = []
     for deliverable_id, deliverable in context.config.deliverables.items():
         section = str(getattr(deliverable, "section", "") or "").strip().lower()
@@ -182,7 +189,7 @@ def _export_snapshots(context) -> dict[str, WorkspaceSnapshotExport]:
     return snapshots
 
 
-def workspace_snapshot(workspace: str | Path) -> dict[str, object]:
+def workspace_snapshot(workspace: str | Path, *, write: bool = True) -> dict[str, object]:
     context = load_workspace_config(workspace, validate_plot_semantics=False)
     payload = WorkspaceSnapshot(
         schema_version="latentdna.workspace_snapshot.v1",
@@ -195,8 +202,9 @@ def workspace_snapshot(workspace: str | Path) -> dict[str, object]:
         deliverables=_deliverable_snapshots(context),
         exports=_export_snapshots(context),
         browser=_browser_snapshot(context),
-        decision_ladder=_decision_ladder(context),
+        decision_ladder=decision_ladder(context),
         last_updated_at=datetime.now(UTC).isoformat(),
     ).model_dump(mode="json")
-    write_json(context.output_root / "status" / "workspace_snapshot.json", payload)
+    if write:
+        write_json(context.output_root / "status" / "workspace_snapshot.json", payload)
     return payload

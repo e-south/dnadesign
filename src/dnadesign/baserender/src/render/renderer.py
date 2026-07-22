@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/baserender/src/render/renderer.py
 
 Renderer registry and pre-render contract enforcement for Record v1.

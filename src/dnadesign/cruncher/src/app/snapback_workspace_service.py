@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/app/snapback_workspace_service.py
 
 Scaffold v2 explicit and v3 co-design solve snapback workspaces.

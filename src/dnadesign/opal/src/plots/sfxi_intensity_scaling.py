@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/plots/sfxi_intensity_scaling.py
 
 Intensity scaling diagnostics for SFXI setpoints.
@@ -15,7 +15,7 @@ import polars as pl
 
 from ..analysis.dashboard.charts import sfxi_intensity_scaling
 from ..analysis.dashboard.util import list_series_to_numpy
-from ..analysis.facade import load_predictions_with_setpoint, read_labels, read_runs
+from ..analysis.ledger import load_predictions_with_setpoint, read_labels, read_runs
 from ..analysis.sfxi.setpoint_sweep import sweep_setpoints
 from ..analysis.sfxi.state_order import STATE_ORDER
 from ..core.utils import ExitCodes, OpalError
@@ -23,12 +23,11 @@ from ..objectives import sfxi_math
 from ..registries.plots import PlotMeta, register_plot
 from ._events_util import resolve_outputs_dir
 from ._param_utils import get_bool, get_float, get_int, get_str
+from ._run_resolution import resolve_run_id, resolve_single_round
 from .sfxi_diag_data import (
     labels_current_round,
     parse_exponents_from_runs,
     parse_setpoint_from_runs,
-    resolve_run_id,
-    resolve_single_round,
 )
 
 
@@ -46,6 +45,17 @@ from .sfxi_diag_data import (
         },
         requires=["labels.parquet", "runs.parquet"],
         notes=["Uses current-round labels for scaling; pool optional."],
+        data_shape="objective scaling diagnostics",
+        objective_family="sfxi",
+        data_layer="labels_objective",
+        round_scope="single_round",
+        label_requirement="required",
+        failure_modes=[
+            "missing labels or runs ledger",
+            "invalid length-8 label vectors",
+            "insufficient labels for denominator percentile",
+            "invalid pool prediction vectors when include_pool is true",
+        ],
     ),
 )
 def render(context, params: dict) -> None:
@@ -60,6 +70,7 @@ def render(context, params: dict) -> None:
     eps = get_float(params, ["eps"], 1.0e-8)
     delta = get_float(params, ["delta", "intensity_log2_offset_delta"], 0.0)
     include_pool = get_bool(params, ["include_pool", "pool"], False)
+    title = get_str(params, ["title"], "SFXI intensity scaling diagnostics")
 
     labels_df = read_labels(outputs_dir / "ledger" / "labels.parquet")
     labels_df = labels_current_round(labels_df, round_k=round_k)
@@ -72,14 +83,16 @@ def render(context, params: dict) -> None:
     if labels_vec is None:
         raise OpalError("Invalid label vectors (expected length-8 values).", ExitCodes.CONTRACT_VIOLATION)
 
-    setpoint = parse_setpoint_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
-    beta, gamma = parse_exponents_from_runs(runs_df.filter(pl.col("as_of_round") == int(round_k)))
+    run_rows = runs_df.filter(pl.col("as_of_round") == int(round_k))
+    setpoint = parse_setpoint_from_runs(run_rows, selection_view_id=context.selection_view_id)
+    beta, gamma = parse_exponents_from_runs(run_rows, selection_view_id=context.selection_view_id)
 
     pool_vec = None
     if include_pool:
         pred_df = load_predictions_with_setpoint(
             outputs_dir,
             {"pred__y_hat_model"},
+            selection_view_id=context.selection_view_id,
             round_selector=round_k,
             run_id=run_id,
             require_run_id=False,
@@ -124,8 +137,12 @@ def render(context, params: dict) -> None:
         sweep_df,
         label_effect_raw=label_effect_raw,
         pool_effect_raw=pool_effect_raw,
+        title=str(title),
         subtitle=f"R={round_k} · labels={labels_vec.shape[0]} · {denom_note}",
     )
     out_dir = context.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_dir / context.filename, dpi=context.dpi, format=context.format)
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)

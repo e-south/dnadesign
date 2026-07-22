@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/cli/formatting/renderers/log.py
 
 Renders round log summaries for OPAL CLI. Formats log event counts and durations.

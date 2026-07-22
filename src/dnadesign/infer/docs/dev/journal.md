@@ -1,7 +1,7 @@
 ## Infer Development Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-03-15
+**Last verified:** 2026-07-14
 
 This journal tracks `dnadesign.infer` refactor work over time: scope, decisions, evidence, tasks, and validation outcomes.
 
@@ -2226,11 +2226,11 @@ Build the infer GPU environment deterministically, then run one bounded pressure
 - `uv run ops runbook diagnostics submit-shape-advisor --planned-submits 1 --warn-over-running 3`
 - `uv run ops runbook diagnostics operator-brief --planned-submits 1 --warn-over-running 3`
 - `sed -n '1,260p' pyproject.toml`
-- `sed -n '1,260p' docs/installation.md`
-- `sed -n '1,340p' docs/bu-scc/install.md`
-- `sed -n '1,320p' docs/bu-scc/quickstart.md`
+- `sed -n '1,260p' docs/setup/installation.md`
+- `sed -n '1,340p' docs/bu-scc/setup/install.md`
+- `sed -n '1,320p' docs/bu-scc/setup/quickstart.md`
 - `sed -n '1,260p' docs/bu-scc/jobs/evo2-gpu-infer.qsub`
-- `sed -n '1,340p' docs/operations/orchestration-runbooks.md`
+- `sed -n '1,340p' docs/operations/orchestration/runbooks.md`
 - `git ls-remote --heads --tags https://github.com/ArcInstitute/evo2.git`
 - `curl -L https://raw.githubusercontent.com/ArcInstitute/evo2/main/README.md`
 - `curl -L https://raw.githubusercontent.com/ArcInstitute/evo2/main/pyproject.toml`
@@ -2300,8 +2300,8 @@ Yes, a proper SCC toolchain context is required for reliable infer-evo2 build co
 2. Infer GPU qsub contract:
    - `docs/bu-scc/jobs/evo2-gpu-infer.qsub` now requires `INFER_CONFIG`, runs infer config validation, then runs infer config execution.
 3. SCC docs hardening:
-   - added transient-path guidance and model-lane guidance to `docs/bu-scc/install.md`,
-   - updated infer submit examples in `docs/bu-scc/quickstart.md`, `docs/bu-scc/jobs/README.md`, and `docs/bu-scc/batch-notify.md`.
+   - added transient-path guidance and model-lane guidance to `docs/bu-scc/setup/install.md`,
+   - updated infer submit examples in `docs/bu-scc/setup/quickstart.md`, `docs/bu-scc/jobs/README.md`, and `docs/bu-scc/runbooks/batch-notify.md`.
 
 ### Verification evidence for landed changes
 
@@ -2318,7 +2318,7 @@ Align real SCC GPU build behavior with documented install flow and `pyproject.to
 ### Top-level sequence audit (docs + pyproject)
 
 1. Top-level route map is coherent:
-   - `README.md` -> `docs/README.md` -> `docs/installation.md` -> `docs/bu-scc/{quickstart,install}.md`.
+   - `README.md` -> `docs/README.md` -> `docs/setup/installation.md` -> `docs/bu-scc/{quickstart,install}.md`.
 2. Packaging contract in `pyproject.toml` matches intent:
    - `infer-evo2` extra includes `torch` + `flash-attn` + `transformer-engine[pytorch]` + `evo2`.
    - uv is configured with `no-build-isolation-package = ["flash-attn", "transformer-engine-torch"]`.
@@ -2365,9 +2365,9 @@ Align real SCC GPU build behavior with documented install flow and `pyproject.to
 
 ### Commands executed for this slice
 
-- `sed -n ... README.md docs/README.md docs/installation.md docs/bu-scc/install.md docs/bu-scc/quickstart.md docs/bu-scc/jobs/README.md`
+- `sed -n ... README.md docs/README.md docs/setup/installation.md docs/bu-scc/setup/install.md docs/bu-scc/setup/quickstart.md docs/bu-scc/jobs/README.md`
 - `sed -n ... pyproject.toml`
-- `nl -ba ... pyproject.toml docs/installation.md docs/bu-scc/install.md docs/bu-scc/quickstart.md`
+- `nl -ba ... pyproject.toml docs/setup/installation.md docs/bu-scc/setup/install.md docs/bu-scc/setup/quickstart.md`
 - `ldd --version`
 - `getconf GNU_LIBC_VERSION`
 - `strings .venv-infer-evo2-gpu/lib/python3.12/site-packages/flash_attn_2_cuda*.so | rg GLIBC_`
@@ -2402,19 +2402,19 @@ Harden documentation so a human or machine can deterministically bootstrap Evo2 
    - `src/dnadesign/infer/README.md`
    - `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
 3. Hardened BU SCC + top-level docs:
-   - `docs/bu-scc/install.md`
+   - `docs/bu-scc/setup/install.md`
      - added `### Deterministic GPU build runbook (copy/paste lane)`
      - added didactic rationale section
      - documented `FLASH_ATTENTION_FORCE_BUILD`, `FLASH_ATTN_CUDA_ARCHS`, `CPATH`, `CPLUS_INCLUDE_PATH`
-   - `docs/installation.md`
+   - `docs/setup/installation.md`
      - added explicit UV lane model (`default-groups`, `--group dev`, `--extra infer-evo2`)
      - linked deterministic SCC GPU lane + infer runbook
    - cross-link updates:
      - `docs/README.md`
      - `docs/bu-scc/README.md`
-     - `docs/bu-scc/quickstart.md`
+     - `docs/bu-scc/setup/quickstart.md`
      - `docs/bu-scc/jobs/README.md`
-     - `docs/bu-scc/batch-notify.md`
+     - `docs/bu-scc/runbooks/batch-notify.md`
 4. Added/updated doc contract tests (TDD):
    - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
      - new deterministic flash-attn control assertions
@@ -2457,8 +2457,8 @@ Correct the environment-repair workflow to stay on canonical UV project commands
 2. Replaced active rebuild path with lock-driven sync:
    - `uv sync --locked --extra infer-evo2 --reinstall-package flash-attn --refresh --refresh-package flash-attn --no-binary-package flash-attn --no-cache`
 3. Updated docs to encode UV policy explicitly:
-   - `docs/installation.md`
-   - `docs/bu-scc/install.md`
+   - `docs/setup/installation.md`
+   - `docs/bu-scc/setup/install.md`
    - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
 4. Updated docs contract tests to enforce UV policy wording:
    - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
@@ -2483,11 +2483,11 @@ Rewrite installation and infer SCC documentation to use plain, direct language w
 ### Changes applied
 
 1. Updated top-level installation guidance:
-   - `docs/installation.md`
+   - `docs/setup/installation.md`
    - renamed lane/branch framing to direct section titles (`Platform support`, `UV dependency model`, `Development tools (when needed)`).
    - preserved UV policy clarity (`uv add/remove` for declaration changes, `uv sync` for realization/rebuilds).
 2. Updated BU SCC install/runbook wording:
-   - `docs/bu-scc/install.md`
+   - `docs/bu-scc/setup/install.md`
    - replaced `At a glance`/`Choose your path` with direct scope language.
    - renamed runbook sections to:
      - `GPU setup and verification runbook`
@@ -2501,8 +2501,8 @@ Rewrite installation and infer SCC documentation to use plain, direct language w
 4. Updated cross-links to new BU SCC install anchor:
    - `docs/README.md`
    - `docs/bu-scc/README.md`
-   - `docs/bu-scc/quickstart.md`
-   - `docs/bu-scc/batch-notify.md`
+   - `docs/bu-scc/setup/quickstart.md`
+   - `docs/bu-scc/runbooks/batch-notify.md`
    - `docs/bu-scc/jobs/README.md`
 5. Added/updated docs contracts to enforce style and structure:
    - `src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py`
@@ -2531,12 +2531,12 @@ Run a strict language pass on installation + BU SCC + infer pressure-test docs s
    - `src/dnadesign/infer/tests/docs/test_pressure_runbook_docs_contract.py`
    - Added forbidden phrasing gates for lane/agent labels and branch-labeled `Path A/B/C` sections.
 2. Rewrote wording in installation and BU SCC index/bootstrap docs:
-   - `docs/installation.md`
+   - `docs/setup/installation.md`
    - `docs/bu-scc/README.md`
-   - `docs/bu-scc/install.md`
-   - `docs/bu-scc/batch-notify.md`
+   - `docs/bu-scc/setup/install.md`
+   - `docs/bu-scc/runbooks/batch-notify.md`
    - `docs/README.md`
-   - renamed `docs/bu-scc/agent-cheatsheet.md` -> `docs/bu-scc/submission-reference.md` and updated links.
+   - renamed `docs/bu-scc/agent-cheatsheet.md` -> `docs/bu-scc/reference/submission.md` and updated links.
 3. Rewrote infer docs wording and pressure runbook structure:
    - `src/dnadesign/infer/docs/README.md`
    - `src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md`
@@ -2644,7 +2644,7 @@ Implication on one L40S (`~45.0 GiB` total):
 1. Added `Capacity and build profile gate` to:
    - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
 2. Added mirrored `6.4 Capacity gate and resource profile` to:
-   - `docs/bu-scc/install.md`
+   - `docs/bu-scc/setup/install.md`
 3. Gate behavior:
    - derives `FLASH_ATTN_CUDA_ARCHS` from detected compute capability (`8.9 -> 89`),
    - derives build jobs from `NSLOTS` (`1/2/4` cap),
@@ -2770,10 +2770,10 @@ Land the first implementation increment for flexible multi-GPU infer behavior wi
 1. Gap found:
    - Ops runbook docs did not describe `resources.gpu_memory_gib` or infer model.parallelism/resource preflight interaction.
 2. Fixes:
-   - `docs/operations/orchestration-runbooks.md`
+   - `docs/operations/orchestration/runbooks.md`
      - added infer route support for `resources.gpu_memory_gib`;
      - added explicit infer planner contract rules for model.parallelism/resource validation and capability fallback.
-   - `docs/bu-scc/quickstart.md`
+   - `docs/bu-scc/setup/quickstart.md`
      - added runbook guidance to set `resources.gpus`, `resources.gpu_capability`, and optional `resources.gpu_memory_gib` for deterministic infer preflight.
    - `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
      - clarified that `infer validate config` on GPU-less hosts reports capacity-check skip and points to `ops runbook plan` for declared scheduler-resource preflight.
@@ -4930,9 +4930,9 @@ Make the repo-wide storage policy explicit after the infer pressure-workspace le
    - added the explicit default-vs-external USR root policy to the cross-tool IA section.
 2. `DESIGN.md`
    - added the same rule to information-architecture invariants.
-3. `src/dnadesign/usr/docs/operations/sync-setup.md`
+3. `src/dnadesign/usr/docs/operations/sync/setup.md`
    - clarified workspace-scoped defaults versus explicit external roots.
-4. `src/dnadesign/usr/docs/operations/sync-quickstart.md`
+4. `src/dnadesign/usr/docs/operations/sync/quickstart.md`
    - clarified that workspace `outputs/usr_datasets` is the curated default.
 5. `src/dnadesign/usr/tests/test_usr_docs_contract.py`
    - added docs contract coverage for the policy wording.
@@ -5022,21 +5022,21 @@ Align the SCC docs, runbooks, and actual model cache state to the intended defau
 
 ### Changes applied
 
-1. `docs/bu-scc/install.md`
+1. `docs/bu-scc/setup/install.md`
    - replaced `HF_HOME_LARGE` with `HF_HOME_20B`.
    - documented `TARGET_MODEL_ID` selection of `HF_HOME`.
    - documented `gpu_c=9.0` / Hopper / H200 for `evo2_20b`.
    - added `snapshot_download(...)` prefetch commands for `evo2_7b` and `evo2_20b`.
-2. `docs/bu-scc/quickstart.md`
+2. `docs/bu-scc/setup/quickstart.md`
    - aligned the cache/export sequence with `HF_HOME_7B` + `HF_HOME_20B`.
    - documented runbook resource values for `7b` vs `20b`.
-3. `docs/installation.md`
+3. `docs/setup/installation.md`
    - aligned the top-level SCC path policy summary with model-specific `/project` caches.
 4. `docs/bu-scc/jobs/README.md`
    - documented direct template usage as the default `7b` lane and `gpu_c=9.0` override / runbook path for `20b`.
-5. `docs/bu-scc/submission-reference.md`
+5. `docs/bu-scc/reference/submission.md`
    - split `evo2_7b` and `evo2_20b` into separate scheduler resource rows.
-6. `docs/operations/orchestration-runbooks.md`
+6. `docs/operations/orchestration/runbooks.md`
    - added `gpu_capability=9.0 -> 80.0 GiB` to the infer capacity preflight contract docs.
 7. `src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md`
    - aligned path policy, capacity gate, and setup steps to `7b` / `20b`.

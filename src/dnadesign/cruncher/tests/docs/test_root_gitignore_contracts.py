@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/docs/test_root_gitignore_contracts.py
 
 Validate root .gitignore contracts needed for clean Cruncher workspace/docs UX.

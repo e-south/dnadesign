@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/study/test_study_workflow_hardening.py
 
-Focused hardening checks for Study workflow state transitions and run-path
-contracts.
+Focused hardening checks for Study workflow state transitions and run-path.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

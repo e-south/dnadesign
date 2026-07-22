@@ -1,6 +1,9 @@
 ![baserender banner](assets/baserender-banner.svg)
 
-`baserender` is a contract-first sequence rendering runtime with strict schemas, explicit adapters, and a stable public API at `dnadesign.baserender`. Use it when you want one tool-agnostic rendering surface across multiple upstream records and no silent fallback behavior. The generic orchestration schema is `BaseRenderJobV3` / `RenderJobV3`; explicit render-contract descriptors such as `sequence_rows_render_v3` and `nucleotide_evidence_map_render_v3` name the concrete visualization use case. Historical job names remain compatibility aliases.
+`baserender` renders schema-backed sequence visuals from explicit job files or
+the stable `dnadesign.baserender` API. It is the linear/component evidence
+renderer for producer-owned contracts; it does not solve biological designs or
+own secondary-structure layout.
 
 ## Documentation
 

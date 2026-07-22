@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/tests/released_snapback/test_app_catalogs.py
 
 Shared app-side catalog resolution tests for released-product Snapback.

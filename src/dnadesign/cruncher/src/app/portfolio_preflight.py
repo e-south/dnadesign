@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-cruncher
+dnadesign
 src/dnadesign/cruncher/src/app/portfolio_preflight.py
 
 Preflight readiness checks and preparation command helpers for portfolio workflows.

@@ -1,0 +1,26 @@
+next_scope:
+  target_track_groups:
+    context_consolidation:
+    - study_record
+    msd_design_reference_catalog:
+    - study_record
+    - msd_reference_compile
+    - msd_materialize_readiness
+    scar_nick_base_junction_context:
+    - study_record
+    snapback_released_probe:
+    - study_record
+    - snapback_workspace
+    - snapback_probe
+    snapback_released_solve:
+    - study_record
+    - snapback_workspace
+    - snapback_probe
+    yiu_boundary_check:
+    - study_record
+    - yiu_workspace
+    - yiu_validate
+    sequence_trace_followup:
+    - study_record
+  runtime_track_groups: []
+  runtime_shared_groups: []

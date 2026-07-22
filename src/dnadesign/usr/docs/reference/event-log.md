@@ -1,7 +1,7 @@
 # USR event log contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-06-02
 
 
 `.events.log` is newline-delimited JSON and is the operator integration boundary.
@@ -34,5 +34,5 @@ See: [../../../../../docs/notify/usr-events.md](../../../../../docs/notify/usr-e
 
 ## Next steps
 
-- Sync and audit workflows: [../operations/sync-audit-loop.md](../operations/sync-audit-loop.md)
+- Sync and audit workflows: [USR sync audit loop](../operations/sync/audit-loop.md)
 - Overlay and registry contract: [overlay-and-registry.md](overlay-and-registry.md)

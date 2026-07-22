@@ -1,10 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/analysis/dashboard/theme.py
 
-Shared notebook helpers for OPAL marimo dashboards. Defines theme setup and
-chart title utilities.
+Shared notebook helpers for OPAL marimo dashboards. Defines theme setup and.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<cruncher project>
+dnadesign
 src/dnadesign/cruncher/src/yiu/bundle_surface.py
 
 Shared bundle-artifact surfaces for YIU app and CLI boundaries.

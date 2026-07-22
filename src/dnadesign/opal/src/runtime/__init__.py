@@ -1,6 +1,6 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/opal/src/runtime/__init__.py
 
 Runtime pipeline steps and orchestration for OPAL.
