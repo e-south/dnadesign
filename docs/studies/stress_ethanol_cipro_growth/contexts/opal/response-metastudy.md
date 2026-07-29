@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-response-metastudy
 title: Response assay and objective comparison
 owner: dnadesign-maintainers
 status: source_evidence
-last_verified: 2026-07-21
+last_verified: 2026-07-28
 audience:
   - scientist
   - maintainer
@@ -274,7 +274,7 @@ From `dnadesign/`:
 ```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --reader-bundle ../reader/experiments/2026/20260717_stress_response_window_aggregate/outputs \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --overwrite \
   --json

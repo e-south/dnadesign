@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-metastudy-package
 title: Response assay and objective comparison package
 owner: stress_ethanol_cipro_growth
 status: source_evidence
-last_verified: 2026-07-21
+last_verified: 2026-07-28
 ---
 
 # Response assay and objective comparison
@@ -78,7 +78,7 @@ publisher:
 BUNDLE=src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest
 PREDICTION_RUN_ID=$(jq -r '.source.prediction.run_id' "$BUNDLE/manifest.json")
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.multistate_behavior_cli publish \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --reader-bundle ../reader/experiments/2026/20260717_stress_response_window_aggregate/outputs \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --prediction-run-id "$PREDICTION_RUN_ID" \
   --out-dir "$BUNDLE" \
@@ -105,20 +105,28 @@ is hand-edited.
 First materialize the Reader bundle from `reader/`:
 
 ```bash
+uv run reader init \
+  experiments/2026/20260717_stress_response_window_aggregate \
+  --protocol workbench/generic \
+  --title "Stress response-window cross-experiment aggregate"
+
 uv run reader response-window build \
   ../dnadesign/src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/config/reader_response_window.yaml \
   --reader-root . \
-  --out-dir outputs/reviews/stress_response_window/latest \
+  --output-experiment experiments/2026/20260717_stress_response_window_aggregate \
   --overwrite \
   --format json
 ```
+
+The `init` command is a one-time step. On later runs, reuse the existing output
+experiment and rebuild its generated `outputs/`.
 
 Then run the metastudy from `dnadesign/`:
 
 ```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --reader-bundle ../reader/experiments/2026/20260717_stress_response_window_aggregate/outputs \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --calibration-preview \
   --json
@@ -136,7 +144,7 @@ Publish the complete review bundle:
 ```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
-  --reader-bundle ../reader/outputs/reviews/stress_response_window/latest \
+  --reader-bundle ../reader/experiments/2026/20260717_stress_response_window_aggregate/outputs \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --overwrite \
   --json
