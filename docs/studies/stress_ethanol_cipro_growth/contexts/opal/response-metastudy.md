@@ -14,7 +14,7 @@ audience:
 
 **Status:** frozen comparative evidence
 **Owner:** `stress_ethanol_cipro_growth` study
-**Last verified:** 2026-07-21
+**Last verified:** 2026-07-28
 **Implementation:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy`
 **Generated evidence:** `src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_metastudy/latest`
 
