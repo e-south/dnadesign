@@ -29,7 +29,7 @@ def _required_text(value: object, *, error_message: str) -> str:
 
 def _existing_triptych_render(artifacts: SnapbackExplicitShowArtifacts) -> str | None:
     for fmt in ("png", "svg", "pdf"):
-        candidate = artifacts.renders_dir_path / f"snapback_triptych.{fmt}"
+        candidate = artifacts.renders_dir_path / "snapback_triptych.render-v1" / f"snapback_triptych.{fmt}"
         if candidate.exists():
             return str(candidate.resolve())
     return None

@@ -17,9 +17,9 @@ import pytest
 from typer.testing import CliRunner
 
 from dnadesign.baserender.src.cli import app
-from dnadesign.baserender.src.config import load_cruncher_showcase_job
+from dnadesign.baserender.src.config import load_render_job
 from dnadesign.baserender.src.core import SchemaError
-from dnadesign.baserender.src.public import run_cruncher_showcase_job
+from dnadesign.baserender.src.public import run_render_job
 from dnadesign.baserender.src.workspaces import discover_workspaces, init_workspace, resolve_workspace_job_path
 
 from .conftest import write_job, write_parquet
@@ -27,8 +27,9 @@ from .conftest import write_job, write_parquet
 
 def _workspace_job_payload() -> dict:
     return {
-        "version": 3,
+        "version": 4,
         "contract": {"kind": "sequence_rows_render_v3"},
+        "bundle": {"path": "outputs/render-v1"},
         "input": {
             "kind": "parquet",
             "path": "inputs/input.parquet",
@@ -92,8 +93,8 @@ def test_workspace_job_uses_workspace_outputs_by_default(tmp_path: Path) -> None
     )
     write_job(workspace.job_path, _workspace_job_payload())
 
-    parsed = load_cruncher_showcase_job(workspace.job_path)
-    assert parsed.results_root == (workspace.root / "outputs").resolve()
+    parsed = load_render_job(workspace.job_path)
+    assert parsed.bundle.path == (workspace.root / "outputs" / "render-v1").resolve()
 
 
 def test_workspace_selector_resolves_in_cli_and_validate_passes(tmp_path: Path) -> None:
@@ -191,9 +192,9 @@ def test_unmarked_job_yaml_with_inputs_outputs_uses_job_local_results(tmp_path: 
     )
     write_job(candidate / "job.yaml", _workspace_job_payload())
 
-    parsed = load_cruncher_showcase_job(candidate / "job.yaml")
+    parsed = load_render_job(candidate / "job.yaml")
 
-    assert parsed.results_root == (candidate / "results").resolve()
+    assert parsed.bundle.path == (candidate / "outputs" / "render-v1").resolve()
 
 
 def test_job_validate_requires_exactly_one_job_source() -> None:
@@ -241,6 +242,6 @@ def test_workspace_run_defaults_outputs_to_workspace_outputs_root(tmp_path: Path
     )
     write_job(workspace.job_path, _workspace_job_payload())
 
-    report = run_cruncher_showcase_job(str(workspace.job_path))
-    assert Path(report.outputs["images_dir"]) == (workspace.root / "outputs" / "plots").resolve()
-    assert "report_path" not in report.outputs
+    report = run_render_job(str(workspace.job_path))
+    assert Path(report.outputs["images_dir"]) == (workspace.root / "outputs" / "render-v1" / "images").resolve()
+    assert Path(report.outputs["manifest_path"]).is_file()

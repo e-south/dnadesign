@@ -63,8 +63,8 @@ def test_readme_stays_tool_agnostic() -> None:
 
 def test_workspace_demo_guide_matches_output_contract() -> None:
     text = (_pkg_root() / "docs" / "demos" / "workspaces.md").read_text()
-    assert "outputs/plots/" in text
-    assert "run.emit_report: true" in text
+    assert "outputs/render-v1/plots/" in text
+    assert "manifest.json" in text
     assert "workspace init --root /path/to/workspaces demo_run" in text
     assert "inputs/input.parquet" in text
     assert "not BaseRender workspaces" in text
@@ -82,9 +82,8 @@ def test_reference_and_cruncher_integration_docs_cover_cassette_json_contract_pa
     reference = (_pkg_root() / "docs" / "reference.md").read_text()
     cruncher = (_pkg_root() / "docs" / "integrations" / "cruncher.md").read_text()
 
-    assert "src/config/jobs/base_render_v3.py" in reference
-    assert "src/config/jobs/sequence_rows_v3.py" in reference
-    assert "src/config/cruncher_showcase_job.py" in reference
+    assert "src/config/jobs/base_render_v4.py" in reference
+    assert "src/config/render_job_v4.py" in reference
     assert "src/config/job_contracts.py" in reference
     assert "src/public/" in reference
     assert "src/execution/" in reference

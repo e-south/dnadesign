@@ -56,13 +56,15 @@ def test_sequence_rows_video_job_contract_is_strict_and_explicit(tmp_path: Path)
         title_text="Best-so-far motif placement improves over sweeps",
     )
 
-    assert int(job["version"]) == 3
+    assert int(job["version"]) == 4
+    assert Path(str(job["bundle"]["path"])) == tmp_path / "plots" / "chain_trajectory_video.render-v1"
     assert str(job["input"]["kind"]) == "parquet"
     assert str(job["input"]["adapter"]["kind"]) == "generic_features"
     assert str(job["render"]["renderer"]) == "sequence_rows"
     assert bool(job["run"]["strict"]) is True
     assert bool(job["run"]["fail_on_skips"]) is True
     output_cfg = dict(job["outputs"][0])
+    assert str(output_cfg["path"]) == "chain_trajectory_video.mp4"
     assert str(output_cfg["fmt"]) == "mp4"
     assert int(output_cfg["fps"]) == 10
     assert float(output_cfg["total_duration"]) == 6.0

@@ -483,7 +483,7 @@ def test_cassette_init_workspace_solve_and_baserender_cli_render_in_place(tmp_pa
         color=False,
     )
     assert solve_run.exit_code == 0
-    solve_render = run_dir / "renders" / "top_hits_duplex_qa_sheet.pdf"
+    solve_render = run_dir / "renders" / "top_hits_duplex_qa_sheet.render-v1" / "top_hits_duplex_qa_sheet.pdf"
     assert solve_render.exists()
     solve_render.resolve().relative_to(scaffold_root.resolve())
 
@@ -501,7 +501,7 @@ def test_cassette_init_workspace_solve_and_baserender_cli_render_in_place(tmp_pa
         color=False,
     )
     assert hairpin_run.exit_code == 0
-    hit_render = first_hit_dir / "renders" / "ssdna_hairpin.pdf"
+    hit_render = first_hit_dir / "renders" / "ssdna_hairpin.render-v1" / "ssdna_hairpin.pdf"
     assert hit_render.exists()
     hit_render.resolve().relative_to(scaffold_root.resolve())
 

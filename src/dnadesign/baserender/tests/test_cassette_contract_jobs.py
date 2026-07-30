@@ -175,8 +175,8 @@ def test_run_job_renders_linear_duplex_contract_from_json_path(tmp_path: Path) -
     job_path = write_job(
         tmp_path / "jobs" / "linear_duplex.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../inputs/linear_duplex.v1.json",
@@ -190,14 +190,14 @@ def test_run_job_renders_linear_duplex_contract_from_json_path(tmp_path: Path) -
                     "overrides": {"show_reverse_complement": True, "show_coordinate_ticks": True},
                 },
             },
-            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
     report = baserender.run_job(job_path, caller_root=tmp_path)
 
-    assert Path(report.outputs["images_path"]) == (tmp_path / "renders" / "linear_duplex.pdf").resolve()
+    assert Path(report.outputs["images_path"]) == (tmp_path / "renders" / "render-v1" / "linear_duplex.pdf").resolve()
     assert Path(report.outputs["images_path"]).exists()
 
 
@@ -206,8 +206,8 @@ def test_run_job_renders_hairpin_contract_from_json_path(tmp_path: Path) -> None
     job_path = write_job(
         tmp_path / "jobs" / "ssdna_hairpin.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../inputs/ssdna_hairpin.v1.json",
@@ -221,14 +221,14 @@ def test_run_job_renders_hairpin_contract_from_json_path(tmp_path: Path) -> None
                     "overrides": {"show_pair_rungs": True, "show_loop_label": True},
                 },
             },
-            "outputs": [{"kind": "images", "path": "../renders/ssdna_hairpin.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "ssdna_hairpin.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
     report = baserender.run_job(job_path, caller_root=tmp_path)
 
-    assert Path(report.outputs["images_path"]) == (tmp_path / "renders" / "ssdna_hairpin.pdf").resolve()
+    assert Path(report.outputs["images_path"]) == (tmp_path / "renders" / "render-v1" / "ssdna_hairpin.pdf").resolve()
     assert Path(report.outputs["images_path"]).exists()
 
 
@@ -251,8 +251,8 @@ def test_run_job_renders_duplex_contact_sheet_from_jsonl_path(tmp_path: Path) ->
     job_path = write_job(
         tmp_path / "jobs" / "top_hits_duplex.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "jsonl",
                 "path": "../inputs/top_hits.linear_duplex.v1.jsonl",
@@ -266,14 +266,17 @@ def test_run_job_renders_duplex_contact_sheet_from_jsonl_path(tmp_path: Path) ->
                     "overrides": {"show_reverse_complement": True, "show_coordinate_ticks": True},
                 },
             },
-            "outputs": [{"kind": "images", "path": "../renders/top_hits_duplex_qa_sheet.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "top_hits_duplex_qa_sheet.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
     report = baserender.run_job(job_path, caller_root=tmp_path)
 
-    assert Path(report.outputs["images_path"]) == (tmp_path / "renders" / "top_hits_duplex_qa_sheet.pdf").resolve()
+    assert (
+        Path(report.outputs["images_path"])
+        == (tmp_path / "renders" / "render-v1" / "top_hits_duplex_qa_sheet.pdf").resolve()
+    )
     assert Path(report.outputs["images_path"]).exists()
 
 
@@ -296,8 +299,8 @@ def test_run_job_rejects_zero_length_bounded_segment_contract(tmp_path: Path) ->
     job_path = write_job(
         tmp_path / "jobs" / "linear_duplex.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../inputs/linear_duplex.v1.json",
@@ -308,8 +311,8 @@ def test_run_job_rejects_zero_length_bounded_segment_contract(tmp_path: Path) ->
                 "renderer": "sequence_rows",
                 "style": {"preset": "cassette_duplex_qa", "overrides": {}},
             },
-            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
@@ -331,8 +334,8 @@ def test_run_job_rejects_out_of_range_nick_boundary_contract(tmp_path: Path) -> 
     job_path = write_job(
         tmp_path / "jobs" / "linear_duplex.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../inputs/linear_duplex.v1.json",
@@ -343,8 +346,8 @@ def test_run_job_rejects_out_of_range_nick_boundary_contract(tmp_path: Path) -> 
                 "renderer": "sequence_rows",
                 "style": {"preset": "cassette_duplex_qa", "overrides": {}},
             },
-            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
@@ -356,8 +359,8 @@ def test_run_job_rejects_missing_json_contract_input(tmp_path: Path) -> None:
     job_path = write_job(
         tmp_path / "jobs" / "missing.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../inputs/missing_linear_duplex.v1.json",
@@ -368,8 +371,8 @@ def test_run_job_rejects_missing_json_contract_input(tmp_path: Path) -> None:
                 "renderer": "sequence_rows",
                 "style": {"preset": "cassette_duplex_qa", "overrides": {}},
             },
-            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
@@ -392,8 +395,8 @@ def test_run_job_rejects_json_array_with_non_object_row(tmp_path: Path) -> None:
     job_path = write_job(
         tmp_path / "jobs" / "linear_duplex_rows.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../inputs/linear_duplex_rows.json",
@@ -404,8 +407,8 @@ def test_run_job_rejects_json_array_with_non_object_row(tmp_path: Path) -> None:
                 "renderer": "sequence_rows",
                 "style": {"preset": "cassette_duplex_qa", "overrides": {}},
             },
-            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
@@ -435,8 +438,8 @@ def test_run_job_rejects_malformed_jsonl_contract_input(tmp_path: Path) -> None:
     job_path = write_job(
         tmp_path / "jobs" / "top_hits_duplex.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "jsonl",
                 "path": "../inputs/top_hits.linear_duplex.v1.jsonl",
@@ -447,8 +450,8 @@ def test_run_job_rejects_malformed_jsonl_contract_input(tmp_path: Path) -> None:
                 "renderer": "sequence_rows",
                 "style": {"preset": "cassette_duplex_contact_sheet", "overrides": {}},
             },
-            "outputs": [{"kind": "images", "path": "../renders/top_hits_duplex_qa_sheet.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "top_hits_duplex_qa_sheet.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 
@@ -469,8 +472,8 @@ def test_cassette_job_normalize_cli_resolves_json_contract_paths(tmp_path: Path)
     job_path = write_job(
         run_root / "baserender_jobs" / "linear_duplex.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../views/linear_duplex.v1.json",
@@ -481,8 +484,8 @@ def test_cassette_job_normalize_cli_resolves_json_contract_paths(tmp_path: Path)
                 "renderer": "sequence_rows",
                 "style": {"preset": "cassette_duplex_qa", "overrides": {}},
             },
-            "outputs": [{"kind": "images", "path": "../renders/linear_duplex.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "linear_duplex.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
     normalized_path = tmp_path / "normalized" / "linear_duplex.job.yaml"

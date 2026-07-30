@@ -1,16 +1,5 @@
-"""
---------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/baserender/src/execution/__init__.py
+"""Render-job execution orchestration."""
 
-Job execution orchestration package.
+from .runner import run_render_job
 
-Module Author(s): Eric J. South
---------------------------------------------------------------------------------
-"""
-
-from __future__ import annotations
-
-from .runner import run_cruncher_showcase_job, run_sequence_rows_job
-
-__all__ = ["run_cruncher_showcase_job", "run_sequence_rows_job"]
+__all__ = ["run_render_job"]

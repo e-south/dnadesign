@@ -185,7 +185,7 @@ def snapback_triptych_job_path(run_dir: Path) -> Path:
 
 
 def snapback_triptych_render_path(run_dir: Path, *, fmt: str) -> Path:
-    return renders_dir(run_dir) / f"snapback_triptych.{fmt}"
+    return renders_dir(run_dir) / "snapback_triptych.render-v1" / f"snapback_triptych.{fmt}"
 
 
 def candidate_table_path(run_dir: Path) -> Path:

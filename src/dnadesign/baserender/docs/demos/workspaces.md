@@ -1,7 +1,7 @@
 # Workspace And Demo Guide
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-07-30
 
 
 This guide defines workspace operations and the curated demo entrypoints.
@@ -18,9 +18,9 @@ Each workspace contains:
 Operational behavior:
 - BaseRender only applies workspace output/path scoping when the workspace marker is present; this prevents accidental inference from arbitrary `job.yaml` directories.
 - `job.yaml` relative paths resolve from the workspace root.
-- If `results_root` is omitted, runtime defaults to `outputs/`.
-- For `images` output with no explicit `dir`, workspace jobs default to `outputs/plots/`.
-- `run_report.json` is optional and emitted only when `run.emit_report: true`.
+- `job.yaml` declares an explicit versioned `bundle.path`, such as `outputs/render-v1`.
+- For `images` output with no explicit `dir`, files publish under `<bundle.path>/images/`.
+- Every successful bundle includes `manifest.json`; existing bundles are immutable.
 - `workspace init` creates an empty generic scaffold on purpose; populate `inputs/input.parquet` or edit `job.yaml` before validate/run.
 
 ## Workspace Commands
@@ -54,12 +54,12 @@ uv run baserender job run --workspace demo_run --workspace-root /path/to/workspa
 
 ### `demo_densegen_render`
 - input: `inputs/input.parquet`
-- output: PNG files under `outputs/plots/`
+- output: PNG files under `outputs/render-v1/plots/`
 - integration contract: `docs/integrations/densegen.md`
 
 ### `demo_cruncher_render`
 - input: `inputs/elites_showcase_records.parquet`
-- output: PDF files under `outputs/plots/`
+- output: PDF files under `outputs/render-v1/plots/`
 - integration contract: `docs/integrations/cruncher.md`
 
 Demo packaging rule:

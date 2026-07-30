@@ -20,8 +20,8 @@ from ..adapters import build_adapter, list_adapter_descriptors, required_source_
 from ..adapters import get_adapter_descriptor as _get_adapter_descriptor
 from ..config import (
     AdapterCfg,
-    RenderJobV3,
-    load_sequence_rows_job_from_mapping,
+    RenderJobV4,
+    load_render_job_from_mapping,
     render_contract_descriptor,
     render_contract_descriptors,
     render_contract_kinds,
@@ -31,12 +31,9 @@ from ..config import (
 from ..config import (
     validate_render_job as _validate_render_job,
 )
-from ..config import (
-    validate_sequence_rows_job as _validate_sequence_rows_job,
-)
 from ..config.adapter_contracts import normalize_adapter_config
 from ..core import Record, SchemaError, ensure
-from ..execution import run_sequence_rows_job as _run_sequence_rows_job
+from ..execution import run_render_job as _run_render_job
 from ..io import iter_parquet_rows
 from ..render.renderer import get_renderer_descriptor as _get_renderer_descriptor
 from ..render.renderer import renderer_descriptors
@@ -447,42 +444,16 @@ def render_parquet_record_figure(
     )
 
 
-def validate_sequence_rows_job(
-    job_or_path: str,
-    *,
-    caller_root: str | Path | None = None,
-) -> RenderJobV3:
-    return _validate_sequence_rows_job(job_or_path, caller_root=caller_root)
-
-
-def run_sequence_rows_job(job_or_path: RenderJobV3 | str, *, caller_root: str | Path | None = None):
-    return _run_sequence_rows_job(job_or_path, caller_root=caller_root)
-
-
 def validate_render_job(
     job_or_path: str,
     *,
     caller_root: str | Path | None = None,
-) -> RenderJobV3:
+) -> RenderJobV4:
     return _validate_render_job(job_or_path, caller_root=caller_root)
 
 
-def run_render_job(job_or_path: RenderJobV3 | str, *, caller_root: str | Path | None = None):
-    return run_sequence_rows_job(job_or_path, caller_root=caller_root)
-
-
-def validate_cruncher_showcase_job(
-    job_or_path: str,
-    *,
-    caller_root: str | Path | None = None,
-) -> RenderJobV3:
-    # Backward-compatible alias; BaseRenderJobV3 / RenderJobV3 is canonical.
-    return validate_sequence_rows_job(job_or_path, caller_root=caller_root)
-
-
-def run_cruncher_showcase_job(job_or_path: RenderJobV3 | str, *, caller_root: str | Path | None = None):
-    # Backward-compatible alias; BaseRenderJobV3 / RenderJobV3 is canonical.
-    return run_sequence_rows_job(job_or_path, caller_root=caller_root)
+def run_render_job(job_or_path: RenderJobV4 | str, *, caller_root: str | Path | None = None):
+    return _run_render_job(job_or_path, caller_root=caller_root)
 
 
 def _check_job_kind(kind: str | None) -> str | None:
@@ -495,7 +466,7 @@ def _check_job_kind(kind: str | None) -> str | None:
         raise SchemaError(f"kind must be one of: {allowed}") from exc
 
 
-def _validate_requested_job_kind(job: RenderJobV3, kind: str | None) -> None:
+def _validate_requested_job_kind(job: RenderJobV4, kind: str | None) -> None:
     contract_kind = _check_job_kind(kind)
     if contract_kind is not None:
         validate_render_contract_renderer(contract_kind, job.render.renderer, field="kind")
@@ -506,9 +477,9 @@ def validate_job(
     *,
     kind: str | None = None,
     caller_root: str | Path | None = None,
-) -> RenderJobV3:
+) -> RenderJobV4:
     if isinstance(path_or_dict, Mapping):
-        job = load_sequence_rows_job_from_mapping(path_or_dict, caller_root=caller_root)
+        job = load_render_job_from_mapping(path_or_dict, caller_root=caller_root)
     else:
         job = validate_render_job(path_or_dict, caller_root=caller_root)
     _validate_requested_job_kind(job, kind)
@@ -516,23 +487,23 @@ def validate_job(
 
 
 def run_job(
-    path_or_dict: RenderJobV3 | str | Path | Mapping[str, object],
+    path_or_dict: RenderJobV4 | str | Path | Mapping[str, object],
     *,
     kind: str | None = None,
     strict: bool | None = None,
     caller_root: str | Path | None = None,
 ):
-    if isinstance(path_or_dict, RenderJobV3):
+    if isinstance(path_or_dict, RenderJobV4):
         job = path_or_dict
     elif isinstance(path_or_dict, Mapping):
-        job = load_sequence_rows_job_from_mapping(path_or_dict, caller_root=caller_root)
+        job = load_render_job_from_mapping(path_or_dict, caller_root=caller_root)
     else:
         job = validate_render_job(path_or_dict, caller_root=caller_root)
     _validate_requested_job_kind(job, kind)
 
     if strict is not None:
         job = replace(job, run=replace(job.run, strict=bool(strict)))
-    return run_sequence_rows_job(job, caller_root=caller_root)
+    return run_render_job(job, caller_root=caller_root)
 
 
 def list_adapters() -> tuple[str, ...]:

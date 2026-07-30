@@ -477,8 +477,8 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     job_path.write_text(
         yaml.safe_dump(
             {
-                "version": 3,
-                "results_root": ".",
+                "version": 4,
+                "bundle": {"path": "payload_replay.render-v1"},
                 "input": {
                     "kind": "json",
                     "path": "payload_view.json",
@@ -487,7 +487,7 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
                 },
                 "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
                 "outputs": [{"kind": "images", "path": "payload_replay.pdf", "fmt": "pdf"}],
-                "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+                "run": {"strict": True, "fail_on_skips": True},
             },
             sort_keys=False,
         ),
@@ -519,4 +519,4 @@ def test_checked_in_yiu_demo_runbook_executes_end_to_end_without_matplotlib_cach
     assert "MPLCONFIGDIR" not in validate_proc.stderr
     assert "Matplotlib" not in render_proc.stderr
     assert "MPLCONFIGDIR" not in render_proc.stderr
-    assert (bundle_dir / "payload.job" / "payload_replay.pdf").exists()
+    assert (bundle_dir / "payload_replay.render-v1" / "payload_replay.pdf").exists()

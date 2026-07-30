@@ -1,6 +1,8 @@
-version: 3
+version: 4
 contract:
   kind: sequence_rows_render_v3
+bundle:
+  path: results/cruncher-v1
 input:
   kind: parquet
   path: data/cruncher_demo_elites.parquet
@@ -45,4 +47,3 @@ outputs:
 run:
   strict: false
   fail_on_skips: false
-  emit_report: true

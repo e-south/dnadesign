@@ -135,8 +135,8 @@ def build_views_manifest(*, solution_id: str, include_jobs: bool) -> dict[str, A
 
 def build_triptych_job(*, output_format: str) -> dict[str, object]:
     return {
-        "version": 3,
-        "results_root": "..",
+        "version": 4,
+        "bundle": {"path": "../renders/snapback_triptych.render-v1"},
         "input": {
             "kind": "jsonl",
             "path": f"../analysis/views/{_TRIPTYCH_VISUAL_FILENAME}",
@@ -160,14 +160,13 @@ def build_triptych_job(*, output_format: str) -> dict[str, object]:
         "outputs": [
             {
                 "kind": "images",
-                "path": f"../plots/snapback_triptych.{output_format}",
+                "path": f"snapback_triptych.{output_format}",
                 "fmt": output_format,
             }
         ],
         "run": {
             "strict": True,
             "fail_on_skips": True,
-            "emit_report": False,
         },
     }
 

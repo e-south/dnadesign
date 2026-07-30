@@ -357,7 +357,7 @@ def test_scar_nick_design_writes_unique_terminal_nick_visuals_and_baserender_job
     assert len(jsonl_records) == 2
     assert {record["state_kind"] for record in jsonl_records} == {"pre_post_terminal_nick"}
     assert len({record["primary_sequence"] for record in jsonl_records}) == len(jsonl_records)
-    assert baserender.validate_job(job_path, kind="render_job_v3", caller_root=job_path.parent)
+    assert baserender.validate_job(job_path, kind="render_job_v4", caller_root=job_path.parent)
 
     show_result = runner.invoke(app, ["scar-nick", "show", "--run", str(run_dir)], color=False)
     assert show_result.exit_code == 0

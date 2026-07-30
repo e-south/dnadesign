@@ -140,6 +140,8 @@ def plot_dense_array_video_showcase(
 
     out_file = _output_path(out_path, video_cfg=video_cfg)
     out_file.parent.mkdir(parents=True, exist_ok=True)
+    bundle_root = out_file.parent / f"{out_file.stem}.render-v1"
+    published_file = bundle_root / out_file.name
     contract = densegen_notebook_render_contract()
     style_overrides = dict(contract.style_overrides)
     presentation = video_cfg.presentation
@@ -171,7 +173,8 @@ def plot_dense_array_video_showcase(
             adapter_columns["video_subtitle"] = _VIDEO_SUBTITLE_COLUMN
 
         job_mapping: dict[str, object] = {
-            "version": 3,
+            "version": 4,
+            "bundle": {"path": str(bundle_root)},
             "input": {
                 "kind": "parquet",
                 "path": str(records_path),
@@ -192,7 +195,7 @@ def plot_dense_array_video_showcase(
             "outputs": [
                 {
                     "kind": "video",
-                    "path": str(out_file),
+                    "path": out_file.name,
                     "fmt": "mp4",
                     "fps": int(video_cfg.playback.fps),
                     "frames_per_record": 1,
@@ -202,7 +205,7 @@ def plot_dense_array_video_showcase(
                     "title_font_size": title_font_size,
                 }
             ],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "run": {"strict": True, "fail_on_skips": True},
         }
         if bool(video_cfg.show_subtitle):
             job_mapping["selection"] = {
@@ -214,8 +217,8 @@ def plot_dense_array_video_showcase(
             }
         if "densegen__promoter_detail" in sampled.columns:
             job_mapping["input"]["adapter"]["columns"]["promoter_detail"] = "densegen__promoter_detail"
-        run_job(job_mapping, kind="sequence_rows_v3", caller_root=tmp_root)
+        run_job(job_mapping, kind="sequence_rows_render_v3", caller_root=tmp_root)
 
-    if not out_file.exists():
-        raise ValueError(f"Dense-array video output was not created: {out_file}")
-    return out_file
+    if not published_file.exists():
+        raise ValueError(f"Dense-array video output was not created: {published_file}")
+    return published_file

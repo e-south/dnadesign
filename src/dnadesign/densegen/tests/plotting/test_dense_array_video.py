@@ -158,7 +158,7 @@ def _patch_video_job_capture(monkeypatch, captured: dict[str, object]) -> None:
             captured["selection_ids"] = [str(row["id"]) for row in rows]
         else:
             captured["selection_ids"] = captured["records_df"]["id"].astype(str).tolist()
-        out_path = Path(str(job_mapping["outputs"][0]["path"]))
+        out_path = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"fake-mp4")
 
@@ -184,17 +184,17 @@ def test_dense_array_video_round_robin_single_output(monkeypatch, tmp_path: Path
     loaded = load_config(cfg_path)
     run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
-    assert captured["kind"] == "sequence_rows_v3"
+    assert captured["kind"] == "sequence_rows_render_v3"
     assert captured["selection_ids"] == ["rec_a_1", "rec_b_1", "rec_a_2", "rec_b_2"]
 
-    video_path = run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.mp4"
+    video_path = run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.render-v1" / "showcase.mp4"
     assert video_path.exists()
 
     manifest_path = run_root / "outputs" / "plots" / "plot_manifest.json"
     payload = json.loads(manifest_path.read_text())
     entries = [item for item in payload.get("plots", []) if item.get("name") == "dense_array_showcase_video"]
     assert len(entries) == 1
-    assert entries[0]["path"] == "stage_b/all_plans/showcase.mp4"
+    assert entries[0]["path"] == "stage_b/all_plans/showcase.render-v1/showcase.mp4"
 
 
 def test_dense_array_video_runs_when_enabled_without_only(monkeypatch, tmp_path: Path) -> None:
@@ -216,7 +216,7 @@ def test_dense_array_video_runs_when_enabled_without_only(monkeypatch, tmp_path:
     run_plots_from_config(loaded.root, cfg_path)
 
     assert captured["selection_ids"] == ["rec_a_1", "rec_b_1", "rec_a_2", "rec_b_2"]
-    assert (run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.mp4").exists()
+    assert (run_root / "outputs" / "plots" / "stage_b" / "all_plans" / "showcase.render-v1" / "showcase.mp4").exists()
 
 
 def test_dense_array_video_plan_snapshot_counts_bias_selection(monkeypatch, tmp_path: Path) -> None:
@@ -357,7 +357,7 @@ playback:
     run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
     assert captured["selection_ids"] == ["rec_b_1", "rec_b_2"]
-    assert (run_root / "outputs" / "plots" / "stage_b" / "plan_b" / "showcase.mp4").exists()
+    assert (run_root / "outputs" / "plots" / "stage_b" / "plan_b" / "showcase.render-v1" / "showcase.mp4").exists()
 
 
 def test_dense_array_video_caps_snapshots_by_frame_budget(monkeypatch, tmp_path: Path) -> None:
@@ -872,6 +872,6 @@ playback:
     loaded = load_config(cfg_path)
     run_plots_from_config(loaded.root, cfg_path, only="dense_array_showcase_video")
 
-    out_path = Path(str(captured["job_mapping"]["outputs"][0]["path"]))
+    out_path = Path(str(captured["job_mapping"]["bundle"]["path"])) / str(captured["job_mapping"]["outputs"][0]["path"])
     expected_prefix = run_root / "outputs" / "plots" / "stage_b"
     assert out_path.resolve().is_relative_to(expected_prefix.resolve())

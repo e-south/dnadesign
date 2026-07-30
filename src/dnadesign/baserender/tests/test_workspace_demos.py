@@ -18,8 +18,8 @@ from pathlib import Path
 import yaml
 
 from dnadesign.baserender import cruncher_showcase_style_overrides
-from dnadesign.baserender.src.config import load_cruncher_showcase_job
-from dnadesign.baserender.src.public import run_cruncher_showcase_job
+from dnadesign.baserender.src.config import load_render_job
+from dnadesign.baserender.src.public import run_render_job
 
 
 def _pkg_root() -> Path:
@@ -47,7 +47,7 @@ def test_curated_workspace_demos_are_self_contained() -> None:
         assert raw["contract"]["kind"] == "sequence_rows_render_v3", f"{name} must declare explicit contract kind"
         assert raw["render"]["style"]["overrides"], f"{name} must define style overrides"
 
-        job = load_cruncher_showcase_job(job_path, caller_root=root)
+        job = load_render_job(job_path, caller_root=root)
         assert _is_under(job.input.path, ws / "inputs"), f"{name} input path must be within workspace inputs/"
 
         if name == "demo_cruncher_render":
@@ -108,7 +108,7 @@ def test_docs_cruncher_example_uses_local_examples_data() -> None:
     job_path = root / "docs" / "examples" / "cruncher_job.yaml"
     raw = yaml.safe_load(job_path.read_text())
     assert raw["contract"]["kind"] == "sequence_rows_render_v3"
-    job = load_cruncher_showcase_job(job_path, caller_root=root)
+    job = load_render_job(job_path, caller_root=root)
     docs_data = root / "docs" / "examples" / "data"
 
     assert _is_under(job.input.path, docs_data)
@@ -124,7 +124,7 @@ def test_docs_densegen_example_matches_notebook_contract() -> None:
     job_path = root / "docs" / "examples" / "densegen_job.yaml"
     raw = yaml.safe_load(job_path.read_text())
     assert raw["contract"]["kind"] == "sequence_rows_render_v3"
-    job = load_cruncher_showcase_job(job_path, caller_root=root)
+    job = load_render_job(job_path, caller_root=root)
 
     cols = job.input.adapter.columns
     assert job.input.adapter.kind == "densegen_tfbs"
@@ -161,7 +161,7 @@ def test_curated_workspace_demos_run_in_isolated_copy(tmp_path: Path) -> None:
         dst_ws = copied_root / name
         shutil.copytree(src_ws, dst_ws)
 
-        report = run_cruncher_showcase_job(dst_ws / "job.yaml", caller_root=tmp_path)
+        report = run_render_job(dst_ws / "job.yaml", caller_root=tmp_path)
         images_dir = Path(report.outputs["images_dir"])
         assert images_dir.exists()
         assert any(p.suffix.lower() == suffix for p in images_dir.iterdir())

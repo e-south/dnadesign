@@ -17,7 +17,7 @@ from typing import Any
 import yaml
 
 from ..config import (
-    RenderJobV3,
+    RenderJobV4,
     list_style_presets,
     resolve_preset_path,
 )
@@ -42,10 +42,10 @@ def validate_job_action(
     workspace_root: Path | None,
     *,
     caller_root: Path | None = None,
-) -> RenderJobV3:
+) -> RenderJobV4:
     return validate_job_public(
         resolve_job_spec(job, workspace, workspace_root),
-        kind="render_job_v3",
+        kind="render_job_v4",
         caller_root=caller_root,
     )
 
@@ -59,16 +59,16 @@ def run_job_action(
 ):
     return run_job_public(
         resolve_job_spec(job, workspace, workspace_root),
-        kind="render_job_v3",
+        kind="render_job_v4",
         caller_root=caller_root,
     )
 
 
-def _job_to_mapping(parsed: RenderJobV3) -> dict[str, Any]:
+def _job_to_mapping(parsed: RenderJobV4) -> dict[str, Any]:
     return {
-        "version": 3,
+        "version": 4,
         "contract": {"kind": parsed.contract.kind},
-        "results_root": str(parsed.results_root),
+        "bundle": {"path": str(parsed.bundle.path)},
         "input": {
             "kind": parsed.input.kind,
             "path": str(parsed.input.path),
@@ -117,14 +117,14 @@ def _job_to_mapping(parsed: RenderJobV3) -> dict[str, Any]:
             (
                 {
                     "kind": "images",
-                    "dir": (str(cfg.dir) if cfg.dir is not None else None),
-                    "path": (str(cfg.path) if cfg.path is not None else None),
+                    "dir": (str(cfg.dir.relative_to(parsed.bundle.path)) if cfg.dir is not None else None),
+                    "path": (str(cfg.path.relative_to(parsed.bundle.path)) if cfg.path is not None else None),
                     "fmt": cfg.fmt,
                 }
                 if cfg.kind == "images"
                 else {
                     "kind": "video",
-                    "path": str(cfg.path),
+                    "path": str(cfg.path.relative_to(parsed.bundle.path)),
                     "fmt": cfg.fmt,
                     "fps": cfg.fps,
                     "frames_per_record": cfg.frames_per_record,
@@ -141,8 +141,6 @@ def _job_to_mapping(parsed: RenderJobV3) -> dict[str, Any]:
         "run": {
             "strict": parsed.run.strict,
             "fail_on_skips": parsed.run.fail_on_skips,
-            "emit_report": parsed.run.emit_report,
-            "report_path": str(parsed.run.report_path) if parsed.run.report_path else None,
         },
     }
 
@@ -157,7 +155,7 @@ def normalize_job_action(
 ) -> Path:
     parsed = validate_job_public(
         resolve_job_spec(job, workspace, workspace_root),
-        kind="render_job_v3",
+        kind="render_job_v4",
         caller_root=caller_root,
     )
     data = _job_to_mapping(parsed)

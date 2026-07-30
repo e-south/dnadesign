@@ -136,8 +136,8 @@ def test_run_job_renders_sequence_evidence_map_contract(tmp_path: Path) -> None:
     job_path = write_job(
         tmp_path / "jobs" / "hairpin_pcr_linear_insert.job.yaml",
         {
-            "version": 3,
-            "results_root": "..",
+            "version": 4,
+            "bundle": {"path": "../renders/render-v1"},
             "input": {
                 "kind": "json",
                 "path": "../inputs/hairpin_pcr_linear_insert.json",
@@ -145,8 +145,8 @@ def test_run_job_renders_sequence_evidence_map_contract(tmp_path: Path) -> None:
                 "alphabet": "iupac_dna",
             },
             "render": {"renderer": "nucleotide_evidence_map", "style": {"preset": None, "overrides": {}}},
-            "outputs": [{"kind": "images", "path": "../renders/hairpin_pcr_linear_insert.pdf", "fmt": "pdf"}],
-            "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+            "outputs": [{"kind": "images", "path": "hairpin_pcr_linear_insert.pdf", "fmt": "pdf"}],
+            "run": {"strict": True, "fail_on_skips": True},
         },
     )
 

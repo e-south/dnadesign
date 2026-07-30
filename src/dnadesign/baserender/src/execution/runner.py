@@ -11,13 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import os
 import shutil
 import stat
-import unicodedata
+import sys
+import tempfile
 import uuid
 from dataclasses import dataclass, replace
-from hashlib import sha256
 from itertools import islice
 from pathlib import Path
 from typing import Iterable, Iterator
@@ -25,9 +27,9 @@ from typing import Iterable, Iterator
 from ..adapters import build_adapter, required_source_columns
 from ..config import (
     ImagesOutputCfg,
-    RenderJobV3,
+    RenderJobV4,
     VideoOutputCfg,
-    load_sequence_rows_job,
+    load_render_job,
     output_kind,
     resolve_style,
 )
@@ -39,104 +41,11 @@ from ..runtime import initialize_runtime
 
 
 @dataclass(frozen=True)
-class _PublicationTarget:
+class _BundlePublication:
     final: Path
-    staging: Path
-    is_directory: bool = False
-    parent_descriptor: int | None = None
-    publication_staging_name: str | None = None
-
-
-@dataclass(frozen=True)
-class _PublicationLock:
-    descriptor: int
-
-
-@dataclass(frozen=True)
-class _PublicationClaim:
-    path: Path
-    key: str
-    exclusive: bool
-
-
-_LOCK_REGISTRY_ROOT = Path("/var/tmp")
-
-
-def _case_variant(name: str) -> str | None:
-    for index, character in enumerate(name):
-        if character.isalpha():
-            replacement = character.upper() if character != character.upper() else character.lower()
-            if replacement != character:
-                return f"{name[:index]}{replacement}{name[index + 1 :]}"
-    return None
-
-
-def _filesystem_is_case_sensitive(path: Path) -> bool:
-    existing = path.resolve(strict=False)
-    while not existing.exists():
-        if existing.parent == existing:
-            return False
-        existing = existing.parent
-
-    variant_name = _case_variant(existing.name)
-    if variant_name is None:
-        return False
-    variant = existing.with_name(variant_name)
-    try:
-        return not os.path.samefile(existing, variant)
-    except FileNotFoundError:
-        return True
-    except OSError:
-        return False
-
-
-def _canonical_path_key(path: Path) -> str:
-    normalized = unicodedata.normalize("NFC", path.resolve(strict=False).as_posix())
-    return normalized if _filesystem_is_case_sensitive(path) else normalized.casefold()
-
-
-def _registry_name() -> str:
-    if not hasattr(os, "getuid"):
-        raise SchemaError("Transactional publication locking requires a POSIX runtime")
-    return f"dnadesign-baserender-locks-{os.getuid()}"
-
-
-def _publication_lock_registry_path(*, root: Path = _LOCK_REGISTRY_ROOT) -> Path:
-    return root / _registry_name()
-
-
-def _open_publication_lock_registry(*, root: Path = _LOCK_REGISTRY_ROOT) -> int:
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY
-    if hasattr(os, "O_NOFOLLOW"):
-        directory_flags |= os.O_NOFOLLOW
-    root_descriptor = os.open(root, directory_flags)
-    namespace_name = _registry_name()
-    try:
-        created = False
-        try:
-            os.mkdir(namespace_name, mode=0o700, dir_fd=root_descriptor)
-            created = True
-        except FileExistsError:
-            pass
-        try:
-            descriptor = os.open(namespace_name, directory_flags, dir_fd=root_descriptor)
-        except OSError as exc:
-            raise SchemaError("Publication lock registry must be a trusted directory") from exc
-    finally:
-        os.close(root_descriptor)
-
-    registry_stat = os.fstat(descriptor)
-    if created:
-        os.fchmod(descriptor, 0o700)
-        registry_stat = os.fstat(descriptor)
-    if (
-        not stat.S_ISDIR(registry_stat.st_mode)
-        or registry_stat.st_uid != os.getuid()
-        or stat.S_IMODE(registry_stat.st_mode) != 0o700
-    ):
-        os.close(descriptor)
-        raise SchemaError("Publication lock registry must be owned by the current user with mode 0700")
-    return descriptor
+    render_stage: Path
+    adjacent_stage_name: str
+    parent_descriptor: int
 
 
 def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
@@ -146,116 +55,6 @@ def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
         assert output.dir is not None
         return output.dir
     return output.path
-
-
-def _publication_targets(job: RenderJobV3) -> tuple[_PublicationTarget, ...]:
-    destinations = [
-        (_output_destination(output).resolve(), isinstance(output, ImagesOutputCfg) and output.dir is not None)
-        for output in job.outputs
-    ]
-    if job.run.emit_report and job.run.report_path is not None:
-        destinations.append((job.run.report_path.resolve(), False))
-
-    for index, (left, _left_is_dir) in enumerate(destinations):
-        left_key = Path(_canonical_path_key(left))
-        for right, _right_is_dir in destinations[index + 1 :]:
-            right_key = Path(_canonical_path_key(right))
-            if left_key == right_key or left_key in right_key.parents or right_key in left_key.parents:
-                raise SchemaError(f"Batch output destinations must not overlap: {left} and {right}")
-
-    token = uuid.uuid4().hex
-    return tuple(
-        _PublicationTarget(
-            final=destination,
-            staging=(
-                destination.parent / f".{destination.name}.staging-{token}"
-                if is_directory
-                else destination.parent / f".{destination.stem}.staging-{token}{destination.suffix}"
-            ),
-            is_directory=is_directory,
-            publication_staging_name=f".{destination.name}.staging-{token}",
-        )
-        for destination, is_directory in destinations
-    )
-
-
-def _validate_publication_conflicts(
-    targets: tuple[_PublicationTarget, ...],
-    *,
-    conflict_policy: str,
-) -> None:
-    if conflict_policy == "replace":
-        return
-    conflicts = [target.final for target in targets if target.final.exists() or target.final.is_symlink()]
-    if conflicts:
-        rendered = ", ".join(str(path) for path in conflicts)
-        raise SchemaError(
-            f"Batch output already exists: {rendered}; set run.conflict_policy to 'replace' to replace it"
-        )
-
-
-def _publication_lock_name(key: str) -> str:
-    return f"{sha256(key.encode()).hexdigest()}.lock"
-
-
-def _publication_claims(targets: tuple[_PublicationTarget, ...]) -> tuple[_PublicationClaim, ...]:
-    claims: dict[str, _PublicationClaim] = {}
-    for target in targets:
-        destination = target.final.resolve(strict=False)
-        for path, exclusive in [(ancestor, False) for ancestor in destination.parents] + [(destination, True)]:
-            key = _canonical_path_key(path)
-            existing = claims.get(key)
-            claims[key] = _PublicationClaim(
-                path=path,
-                key=key,
-                exclusive=exclusive or (existing.exclusive if existing is not None else False),
-            )
-    return tuple(claims[key] for key in sorted(claims))
-
-
-def _reserve_publication_targets(targets: tuple[_PublicationTarget, ...]) -> tuple[_PublicationLock, ...]:
-    try:
-        import fcntl
-    except ImportError as exc:  # pragma: no cover - guarded above on supported runtimes
-        raise SchemaError("Transactional publication locking requires POSIX file locks") from exc
-
-    locks: list[_PublicationLock] = []
-    registry_descriptor = _open_publication_lock_registry()
-    try:
-        for claim in _publication_claims(targets):
-            lock_name = _publication_lock_name(claim.key)
-            flags = os.O_CREAT | os.O_RDWR
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            descriptor = os.open(lock_name, flags, 0o600, dir_fd=registry_descriptor)
-            try:
-                mode = fcntl.LOCK_EX if claim.exclusive else fcntl.LOCK_SH
-                fcntl.flock(descriptor, mode | fcntl.LOCK_NB)
-            except BlockingIOError as exc:
-                os.close(descriptor)
-                raise SchemaError(
-                    f"Batch publication is already in progress for an overlapping path: {claim.path}"
-                ) from exc
-            except Exception:
-                os.close(descriptor)
-                raise
-            locks.append(_PublicationLock(descriptor=descriptor))
-    except Exception:
-        _release_publication_locks(tuple(locks))
-        raise
-    finally:
-        os.close(registry_descriptor)
-    return tuple(locks)
-
-
-def _release_publication_locks(locks: tuple[_PublicationLock, ...]) -> None:
-    import fcntl
-
-    for lock in reversed(locks):
-        try:
-            fcntl.flock(lock.descriptor, fcntl.LOCK_UN)
-        finally:
-            os.close(lock.descriptor)
 
 
 def _open_or_create_directory(path: Path) -> int:
@@ -283,62 +82,16 @@ def _open_or_create_directory(path: Path) -> int:
     return descriptor
 
 
-def _anchor_publication_targets(targets: tuple[_PublicationTarget, ...]) -> tuple[_PublicationTarget, ...]:
-    anchored: list[_PublicationTarget] = []
+def _target_parent_matches_anchor(publication: _BundlePublication) -> bool:
     try:
-        for target in targets:
-            anchored.append(
-                replace(
-                    target,
-                    parent_descriptor=_open_or_create_directory(target.final.parent),
-                )
-            )
-    except Exception:
-        _close_publication_target_anchors(tuple(anchored))
-        raise
-    return tuple(anchored)
-
-
-def _close_publication_target_anchors(targets: tuple[_PublicationTarget, ...]) -> None:
-    for target in targets:
-        if target.parent_descriptor is not None:
-            os.close(target.parent_descriptor)
-
-
-def _target_parent_matches_anchor(target: _PublicationTarget) -> bool:
-    assert target.parent_descriptor is not None
-    try:
-        current = os.stat(target.final.parent, follow_symlinks=False)
+        current = os.stat(publication.final.parent, follow_symlinks=False)
     except FileNotFoundError:
         return False
-    anchored = os.fstat(target.parent_descriptor)
+    anchored = os.fstat(publication.parent_descriptor)
     return stat.S_ISDIR(current.st_mode) and (current.st_dev, current.st_ino) == (
         anchored.st_dev,
         anchored.st_ino,
     )
-
-
-def _prepare_render_staging(targets: tuple[_PublicationTarget, ...]) -> tuple[tuple[_PublicationTarget, ...], Path]:
-    registry_descriptor = _open_publication_lock_registry()
-    staging_name = f"staging-{uuid.uuid4().hex}"
-    try:
-        os.mkdir(staging_name, mode=0o700, dir_fd=registry_descriptor)
-    finally:
-        os.close(registry_descriptor)
-    staging_root = _publication_lock_registry_path() / staging_name
-    prepared = tuple(
-        replace(
-            target,
-            staging=staging_root
-            / (
-                f"{index}-{target.final.name}"
-                if target.is_directory
-                else f"{index}-{target.final.stem}{target.final.suffix}"
-            ),
-        )
-        for index, target in enumerate(targets)
-    )
-    return prepared, staging_root
 
 
 def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
@@ -349,31 +102,26 @@ def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
     return True
 
 
-def _validate_anchored_publication_conflicts(
-    targets: tuple[_PublicationTarget, ...],
-    *,
-    conflict_policy: str,
-) -> None:
-    if conflict_policy == "replace":
-        return
-    conflicts = []
-    for target in targets:
-        assert target.parent_descriptor is not None
-        if _entry_exists_at(target.parent_descriptor, target.final.name):
-            conflicts.append(target.final)
-    if conflicts:
-        rendered = ", ".join(str(path) for path in conflicts)
-        raise SchemaError(
-            f"Batch output already exists: {rendered}; set run.conflict_policy to 'replace' to replace it"
-        )
+def _prepare_bundle_publication(bundle_root: Path) -> _BundlePublication:
+    final = bundle_root.resolve(strict=False)
+    parent_descriptor = _open_or_create_directory(final.parent)
+    if _entry_exists_at(parent_descriptor, final.name):
+        os.close(parent_descriptor)
+        raise SchemaError(f"Render bundle already exists and is immutable: {final}")
+    render_stage = Path(tempfile.mkdtemp(prefix="dnadesign-baserender-stage-"))
+    return _BundlePublication(
+        final=final,
+        render_stage=render_stage,
+        adjacent_stage_name=f".{final.name}.staging-{uuid.uuid4().hex}",
+        parent_descriptor=parent_descriptor,
+    )
 
 
-def _staged_job(job: RenderJobV3, targets: tuple[_PublicationTarget, ...]) -> RenderJobV3:
-    by_final = {target.final: target.staging for target in targets}
+def _staged_job(job: RenderJobV4, publication: _BundlePublication) -> RenderJobV4:
     staged_outputs: list[ImagesOutputCfg | VideoOutputCfg] = []
     for output in job.outputs:
         final = _output_destination(output).resolve()
-        staging = by_final[final]
+        staging = publication.render_stage / final.relative_to(publication.final)
         if isinstance(output, ImagesOutputCfg):
             staged_outputs.append(
                 replace(
@@ -384,14 +132,7 @@ def _staged_job(job: RenderJobV3, targets: tuple[_PublicationTarget, ...]) -> Re
             )
         else:
             staged_outputs.append(replace(output, path=staging))
-    staged_report = None
-    if job.run.emit_report and job.run.report_path is not None:
-        staged_report = by_final[job.run.report_path.resolve()]
-    return replace(
-        job,
-        outputs=tuple(staged_outputs),
-        run=replace(job.run, report_path=staged_report),
-    )
+    return replace(job, outputs=tuple(staged_outputs))
 
 
 def _remove_path(path: Path) -> None:
@@ -399,11 +140,6 @@ def _remove_path(path: Path) -> None:
         shutil.rmtree(path)
     elif path.exists() or path.is_symlink():
         path.unlink()
-
-
-def _cleanup_staging(targets: tuple[_PublicationTarget, ...]) -> None:
-    for target in targets:
-        _remove_path(target.staging)
 
 
 def _remove_entry_at(parent_descriptor: int, name: str) -> None:
@@ -465,82 +201,59 @@ def _copy_directory_to_directory(source: Path, parent_descriptor: int, name: str
         os.close(destination_descriptor)
 
 
-def _materialize_adjacent_staging(target: _PublicationTarget) -> None:
-    assert target.parent_descriptor is not None
-    assert target.publication_staging_name is not None
-    if _entry_exists_at(target.parent_descriptor, target.publication_staging_name):
-        raise SchemaError(f"Batch publication staging already exists: {target.publication_staging_name}")
-    if target.is_directory:
-        if not target.staging.is_dir() or target.staging.is_symlink():
-            raise SchemaError(f"Batch output staging is incomplete: {target.staging}")
-        _copy_directory_to_directory(target.staging, target.parent_descriptor, target.publication_staging_name)
+def _rename_directory_create_only(parent_descriptor: int, source: str, destination: str) -> None:
+    """Atomically install one directory without replacing an existing entry."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    source_bytes = os.fsencode(source)
+    destination_bytes = os.fsencode(destination)
+    if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
+        rename = libc.renameatx_np
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x00000004)
+    elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
+        rename = libc.renameat2
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x1)
     else:
-        if not target.staging.is_file() or target.staging.is_symlink():
-            raise SchemaError(f"Batch output staging is incomplete: {target.staging}")
-        _copy_file_to_directory(target.staging, target.parent_descriptor, target.publication_staging_name)
+        raise SchemaError("This platform does not support atomic create-only bundle publication")
+    if result == 0:
+        return
+    error = ctypes.get_errno()
+    if error in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise SchemaError(f"Render bundle already exists and is immutable: {destination}")
+    raise OSError(error, os.strerror(error), destination)
 
 
-def _publish_batch(targets: tuple[_PublicationTarget, ...], *, conflict_policy: str) -> None:
-    missing = [target.staging for target in targets if not target.staging.exists()]
-    if missing:
-        rendered = ", ".join(str(path) for path in missing)
-        raise SchemaError(f"Batch output staging is incomplete: {rendered}")
+def _publish_bundle(publication: _BundlePublication) -> None:
+    manifest = publication.render_stage / "manifest.json"
+    if not manifest.is_file() or manifest.is_symlink():
+        raise SchemaError(f"Render bundle staging is incomplete: {manifest}")
+    if not _target_parent_matches_anchor(publication):
+        raise SchemaError(f"Render bundle parent changed during publication: {publication.final.parent}")
+    if _entry_exists_at(publication.parent_descriptor, publication.adjacent_stage_name):
+        raise SchemaError(f"Render bundle staging already exists: {publication.adjacent_stage_name}")
 
-    token = uuid.uuid4().hex
-    backups: list[tuple[_PublicationTarget, str]] = []
-    published: list[_PublicationTarget] = []
     try:
-        for target in targets:
-            if not _target_parent_matches_anchor(target):
-                raise SchemaError(f"Batch output parent changed during publication: {target.final.parent}")
-            _materialize_adjacent_staging(target)
-        if conflict_policy == "replace":
-            for target in targets:
-                assert target.parent_descriptor is not None
-                if not _entry_exists_at(target.parent_descriptor, target.final.name):
-                    continue
-                backup_name = f".{target.final.name}.backup-{token}"
-                os.replace(
-                    target.final.name,
-                    backup_name,
-                    src_dir_fd=target.parent_descriptor,
-                    dst_dir_fd=target.parent_descriptor,
-                )
-                backups.append((target, backup_name))
-        for target in targets:
-            assert target.parent_descriptor is not None
-            assert target.publication_staging_name is not None
-            os.replace(
-                target.publication_staging_name,
-                target.final.name,
-                src_dir_fd=target.parent_descriptor,
-                dst_dir_fd=target.parent_descriptor,
-            )
-            published.append(target)
+        _copy_directory_to_directory(
+            publication.render_stage,
+            publication.parent_descriptor,
+            publication.adjacent_stage_name,
+        )
+        if not _target_parent_matches_anchor(publication):
+            raise SchemaError(f"Render bundle parent changed during publication: {publication.final.parent}")
+        _rename_directory_create_only(
+            publication.parent_descriptor,
+            publication.adjacent_stage_name,
+            publication.final.name,
+        )
     except Exception:
-        for target in reversed(published):
-            assert target.parent_descriptor is not None
-            _remove_entry_at(target.parent_descriptor, target.final.name)
-        for target, backup_name in backups:
-            assert target.parent_descriptor is not None
-            if _entry_exists_at(target.parent_descriptor, backup_name):
-                os.replace(
-                    backup_name,
-                    target.final.name,
-                    src_dir_fd=target.parent_descriptor,
-                    dst_dir_fd=target.parent_descriptor,
-                )
-        for target in targets:
-            if target.parent_descriptor is not None and target.publication_staging_name is not None:
-                _remove_entry_at(target.parent_descriptor, target.publication_staging_name)
+        _remove_entry_at(publication.parent_descriptor, publication.adjacent_stage_name)
         raise
-    else:
-        for target, backup_name in backups:
-            assert target.parent_descriptor is not None
-            _remove_entry_at(target.parent_descriptor, backup_name)
 
 
-def _iter_records(job: RenderJobV3, report: RunReport) -> Iterator[Record]:
+def _iter_records(job: RenderJobV4, report: RunReport) -> Iterator[Record]:
     adapter = build_adapter(job.input.adapter, alphabet=job.input.alphabet)
     transforms = load_transforms(job.pipeline.plugins)
     if job.input.kind == "parquet":
@@ -560,7 +273,7 @@ def _iter_records(job: RenderJobV3, report: RunReport) -> Iterator[Record]:
             report.note_skip_row(str(skip) or "skip_record")
 
 
-def _sample_or_limit_unselected(records: Iterable[Record], job: RenderJobV3) -> Iterable[Record] | list[Record]:
+def _sample_or_limit_unselected(records: Iterable[Record], job: RenderJobV4) -> Iterable[Record] | list[Record]:
     sample = job.input.sample
     if sample is not None:
         if sample.mode == "first_n":
@@ -581,7 +294,7 @@ def _sample_or_limit_unselected(records: Iterable[Record], job: RenderJobV3) -> 
 
 def _materialize_before_strict_outputs(
     records: Iterable[Record] | list[Record],
-    job: RenderJobV3,
+    job: RenderJobV4,
     report: RunReport,
 ) -> list[Record] | Iterable[Record]:
     if not (job.run.strict or job.run.fail_on_skips):
@@ -594,16 +307,16 @@ def _materialize_before_strict_outputs(
     return materialized
 
 
-def run_sequence_rows_job(
-    job_or_path: RenderJobV3 | str,
+def run_render_job(
+    job_or_path: RenderJobV4 | str,
     *,
     caller_root: str | Path | None = None,
 ) -> RunReport:
     initialize_runtime()
     job = (
         job_or_path
-        if isinstance(job_or_path, RenderJobV3)
-        else load_sequence_rows_job(
+        if isinstance(job_or_path, RenderJobV4)
+        else load_render_job(
             job_or_path,
             caller_root=caller_root,
         )
@@ -632,21 +345,15 @@ def run_sequence_rows_job(
 
     records = _materialize_before_strict_outputs(records, job, report)
 
-    targets = _publication_targets(job)
-    _validate_publication_conflicts(targets, conflict_policy=job.run.conflict_policy)
-    publication_locks = _reserve_publication_targets(targets)
-    staging_root: Path | None = None
+    publication = _prepare_bundle_publication(job.bundle.path)
+    original_job = job
     try:
-        targets = _anchor_publication_targets(targets)
-        _validate_anchored_publication_conflicts(targets, conflict_policy=job.run.conflict_policy)
-        targets, staging_root = _prepare_render_staging(targets)
-        original_job = job
-        job = _staged_job(job, targets)
+        job = _staged_job(job, publication)
         img_output = output_kind(job, "images")
         vid_output = output_kind(job, "video")
     except Exception:
-        _close_publication_target_anchors(targets)
-        _release_publication_locks(publication_locks)
+        _remove_path(publication.render_stage)
+        os.close(publication.parent_descriptor)
         raise
 
     try:
@@ -734,27 +441,12 @@ def run_sequence_rows_job(
         else:
             raise SchemaError("No supported outputs configured")
 
-        if job.run.emit_report and job.run.report_path is not None:
-            original_report = original_job.run.report_path
-            assert original_report is not None
-            report.outputs["report_path"] = str(original_report.resolve())
-            report.write(job.run.report_path)
-
-        _publish_batch(targets, conflict_policy=job.run.conflict_policy)
+        report.outputs["bundle_root"] = str(original_job.bundle.path)
+        report.outputs["manifest_path"] = str(original_job.bundle.path / "manifest.json")
+        report.write(publication.render_stage / "manifest.json")
+        _publish_bundle(publication)
     finally:
-        _cleanup_staging(targets)
-        if staging_root is not None:
-            _remove_path(staging_root)
-        _close_publication_target_anchors(targets)
-        _release_publication_locks(publication_locks)
+        _remove_path(publication.render_stage)
+        os.close(publication.parent_descriptor)
 
     return report
-
-
-def run_cruncher_showcase_job(
-    job_or_path: RenderJobV3 | str,
-    *,
-    caller_root: str | Path | None = None,
-) -> RunReport:
-    # Backward-compatible alias; sequence_rows_v3 is the canonical contract surface.
-    return run_sequence_rows_job(job_or_path, caller_root=caller_root)

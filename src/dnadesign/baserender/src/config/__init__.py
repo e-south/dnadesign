@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/config/__init__.py
 
-Config schema exports for BaseRender v3 jobs and Style v1.
+Config schema exports for BaseRender v4 jobs and Style v1.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,10 +16,9 @@ from .job_contracts import (
     render_contract_kinds,
     validate_render_contract_renderer,
 )
-from .jobs.base_render_v3 import (
+from .jobs.base_render_v4 import (
     AdapterCfg,
-    BaseRenderJobV3,
-    CruncherShowcaseJob,
+    BundleCfg,
     ImagesOutputCfg,
     InputCfg,
     OutputCfg,
@@ -27,23 +26,18 @@ from .jobs.base_render_v3 import (
     PluginSpec,
     RenderCfg,
     RenderContractCfg,
-    RenderJobV3,
+    RenderJobV4,
     RunCfg,
     SampleCfg,
     SelectionCfg,
-    SequenceRowsJobV3,
     VideoOutputCfg,
-    load_cruncher_showcase_job,
     load_job,
     load_render_job,
-    load_sequence_rows_job,
-    load_sequence_rows_job_from_mapping,
+    load_render_job_from_mapping,
     output_kind,
     resolve_job_path,
-    validate_cruncher_showcase_job,
     validate_job,
     validate_render_job,
-    validate_sequence_rows_job,
 )
 from .style_v1 import (
     GlyphStyle,
@@ -69,10 +63,8 @@ __all__ = [
     "list_style_presets",
     "resolve_preset_path",
     "resolve_style",
-    "BaseRenderJobV3",
-    "CruncherShowcaseJob",
-    "RenderJobV3",
-    "SequenceRowsJobV3",
+    "BundleCfg",
+    "RenderJobV4",
     "RenderContractCfg",
     "RenderContractDescriptor",
     "InputCfg",
@@ -86,14 +78,10 @@ __all__ = [
     "VideoOutputCfg",
     "OutputCfg",
     "RunCfg",
-    "load_cruncher_showcase_job",
     "load_render_job",
-    "load_sequence_rows_job",
-    "load_sequence_rows_job_from_mapping",
+    "load_render_job_from_mapping",
     "load_job",
-    "validate_cruncher_showcase_job",
     "validate_render_job",
-    "validate_sequence_rows_job",
     "validate_job",
     "resolve_job_path",
     "output_kind",

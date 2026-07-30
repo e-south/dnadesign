@@ -842,7 +842,7 @@ def test_run_linear_ssdna_composition_writes_baserender_component_span_job(tmp_p
         caller_root=bundle,
     )
     svg_path = Path(report.outputs["images_path"])
-    assert svg_path == bundle / "visual" / "renders" / "component_span_qa_svg" / "component_span_qa.svg"
+    assert svg_path == (bundle / "visual" / "renders" / "component_span_qa_svg.render-v1" / "component_span_qa.svg")
     svg_text = svg_path.read_text(encoding="utf-8")
     assert "<svg" in svg_text
     assert svg_text.count('id="sequence_pair_connector:') == 88

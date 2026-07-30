@@ -595,7 +595,7 @@ def _render_video_job(
     pauses: dict[str, float],
     title_text: str,
     tmp_root: Path,
-) -> None:
+) -> Path:
     scratch_parent = tmp_root.parent if tmp_root.parent.exists() else tmp_root
     scratch_parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="_trajectory_video_tmp_", dir=scratch_parent) as tmp_dir:
@@ -610,9 +610,11 @@ def _render_video_job(
             pauses=pauses,
             title_text=title_text,
         )
-        run_job(job_mapping, kind="sequence_rows_v3", caller_root=work_root)
-    if not out_path.exists():
-        raise ValueError(f"Trajectory video output was not created: {out_path}")
+        run_job(job_mapping, kind="sequence_rows_render_v3", caller_root=work_root)
+    published_path = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
+    if not published_path.exists():
+        raise ValueError(f"Trajectory video output was not created: {published_path}")
+    return published_path
 
 
 def render_chain_trajectory_video(
@@ -715,7 +717,7 @@ def render_chain_trajectory_video(
         target_total_frames=int(frame_budget.target_total_frames),
     )
 
-    _render_video_job(
+    published_path = _render_video_job(
         snapshot_rows=snapshot_rows,
         out_path=out_path,
         config=config,
@@ -725,6 +727,8 @@ def render_chain_trajectory_video(
     )
 
     return {
+        "artifact_path": str(published_path),
+        "bundle_root": str(published_path.parent),
         "chain_1based": int(selected_chain) + 1,
         "timeline_mode": str(config.timeline_mode),
         "objective_column": objective_column,

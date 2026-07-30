@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/baserender/src/config/cruncher_showcase_job.py
+src/dnadesign/baserender/src/config/render_job_v4.py
 
-Generic Render Job v3 schema and loader with strict nested key validation.
+Generic Render Job v4 schema and loader with strict nested key validation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Mapping
 
 import yaml
 
@@ -125,29 +125,26 @@ OutputCfg = ImagesOutputCfg | VideoOutputCfg
 class RunCfg:
     strict: bool
     fail_on_skips: bool
-    emit_report: bool
-    report_path: Path | None
-    conflict_policy: Literal["error", "replace"] = "error"
 
 
 @dataclass(frozen=True)
-class RenderJobV3:
+class BundleCfg:
+    path: Path
+
+
+@dataclass(frozen=True)
+class RenderJobV4:
     version: int
     contract: RenderContractCfg
     name: str
     path: Path
-    results_root: Path
+    bundle: BundleCfg
     input: InputCfg
     selection: SelectionCfg | None
     pipeline: PipelineCfg
     render: RenderCfg
     outputs: tuple[OutputCfg, ...]
     run: RunCfg
-
-
-SequenceRowsJobV3 = RenderJobV3
-CruncherShowcaseJob = RenderJobV3
-BaseRenderJobV3 = RenderJobV3
 
 
 def _baserender_root() -> Path:
@@ -233,7 +230,9 @@ def _inline_mapping_allowed_roots(
         if candidate.is_absolute():
             _append_allowed_root(roots, candidate)
 
-    _append_if_absolute(mapping.get("results_root"))
+    bundle_data = mapping.get("bundle")
+    if isinstance(bundle_data, Mapping):
+        _append_if_absolute(bundle_data.get("path"))
 
     input_data = mapping.get("input")
     if isinstance(input_data, Mapping):
@@ -262,18 +261,6 @@ def _inline_mapping_allowed_roots(
                 for key in ("config_path", "library_path", "run_manifest_path", "lockfile_path", "motif_store_root"):
                     _append_if_absolute(params.get(key))
 
-    outputs_data = mapping.get("outputs")
-    if isinstance(outputs_data, (list, tuple)):
-        for output in outputs_data:
-            if not isinstance(output, Mapping):
-                continue
-            _append_if_absolute(output.get("dir"))
-            _append_if_absolute(output.get("path"))
-
-    run_data = mapping.get("run")
-    if isinstance(run_data, Mapping):
-        _append_if_absolute(run_data.get("report_path"))
-
     return tuple(roots)
 
 
@@ -289,18 +276,20 @@ def _ensure_within_allowed_roots(candidate: Path, *, field: str, allowed_roots: 
     raise SchemaError(f"{field} must stay within {roots}: {resolved}")
 
 
-def _default_results_root(job_path: Path, *, caller_root: Path) -> Path:
-    workspace_root = _workspace_root_from_job_path(job_path)
-    if workspace_root is not None:
-        return workspace_root / "outputs"
-    return caller_root / "results"
-
-
-def _job_output_root(job_path: Path, results_root: Path) -> Path:
-    workspace_root = _workspace_root_from_job_path(job_path)
-    if workspace_root is not None and results_root.resolve() == (workspace_root / "outputs").resolve():
-        return results_root.resolve()
-    return (results_root / job_path.stem).resolve()
+def _parse_bundle(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> BundleCfg:
+    ensure(raw is not None, "bundle.path is required", SchemaError)
+    data = require_mapping(raw, "bundle")
+    reject_unknown_keys(data, {"path"}, "bundle")
+    raw_path = str(data.get("path", "")).strip()
+    ensure(raw_path != "", "bundle.path is required", SchemaError)
+    path = Path(raw_path)
+    resolved = _ensure_within_allowed_roots(
+        path if path.is_absolute() else job_path.parent / path,
+        field="bundle.path",
+        allowed_roots=allowed_roots,
+    )
+    ensure(resolved != resolved.parent, "bundle.path must name an owned directory", SchemaError)
+    return BundleCfg(path=resolved)
 
 
 def resolve_job_path(spec: str | Path) -> Path:
@@ -636,52 +625,46 @@ def _parse_render(raw: Any) -> RenderCfg:
 
 
 def _resolve_output_dir(
-    job: Path,
-    results_root: Path,
+    bundle_root: Path,
     raw_dir: str | None,
     *,
     field: str,
-    allowed_roots: tuple[Path, ...],
 ) -> Path:
-    root = _job_output_root(job, results_root)
-    workspace_root = _workspace_root_from_job_path(job)
-    if workspace_root is not None and results_root.resolve() == (workspace_root / "outputs").resolve():
-        default = root / "plots"
-    else:
-        default = root / "images"
-    if raw_dir is None:
-        return _ensure_within_allowed_roots(default, field=field, allowed_roots=allowed_roots)
-    p = Path(raw_dir)
-    if p.is_absolute():
-        return _ensure_within_allowed_roots(p, field=field, allowed_roots=allowed_roots)
-    return _ensure_within_allowed_roots(root / p, field=field, allowed_roots=allowed_roots)
+    relative = Path("images" if raw_dir is None else raw_dir)
+    ensure(not relative.is_absolute(), f"{field} must be relative to bundle.path", SchemaError)
+    resolved = (bundle_root / relative).resolve()
+    try:
+        resolved.relative_to(bundle_root)
+    except ValueError as exc:
+        raise SchemaError(f"{field} must stay inside bundle.path: {relative}") from exc
+    ensure(resolved != bundle_root / "manifest.json", f"{field} is reserved for the bundle manifest", SchemaError)
+    return resolved
 
 
 def _resolve_output_file(
     job: Path,
-    results_root: Path,
+    bundle_root: Path,
     raw_path: str | None,
     *,
     field: str,
-    allowed_roots: tuple[Path, ...],
 ) -> Path:
     job_name = job.stem
-    root = _job_output_root(job, results_root)
-    default = root / f"{job_name}.mp4"
-    if raw_path is None:
-        return _ensure_within_allowed_roots(default, field=field, allowed_roots=allowed_roots)
-    p = Path(raw_path)
-    if p.is_absolute():
-        return _ensure_within_allowed_roots(p, field=field, allowed_roots=allowed_roots)
-    return _ensure_within_allowed_roots(root / p, field=field, allowed_roots=allowed_roots)
+    relative = Path(f"{job_name}.mp4" if raw_path is None else raw_path)
+    ensure(not relative.is_absolute(), f"{field} must be relative to bundle.path", SchemaError)
+    resolved = (bundle_root / relative).resolve()
+    try:
+        resolved.relative_to(bundle_root)
+    except ValueError as exc:
+        raise SchemaError(f"{field} must stay inside bundle.path: {relative}") from exc
+    ensure(resolved != bundle_root, f"{field} must name a file inside bundle.path", SchemaError)
+    ensure(resolved != bundle_root / "manifest.json", f"{field} is reserved for the bundle manifest", SchemaError)
+    return resolved
 
 
 def _parse_outputs(
     job_path: Path,
-    results_root: Path,
+    bundle_root: Path,
     raw: Any,
-    *,
-    allowed_roots: tuple[Path, ...],
 ) -> tuple[OutputCfg, ...]:
     if not isinstance(raw, (list, tuple)):
         raise SchemaError("outputs must be a non-empty list")
@@ -711,27 +694,22 @@ def _parse_outputs(
             out_path = None
             if raw_dir is not None:
                 out_dir = _resolve_output_dir(
-                    job_path,
-                    results_root,
+                    bundle_root,
                     str(raw_dir),
                     field=f"outputs[{i}].dir",
-                    allowed_roots=allowed_roots,
                 )
             elif raw_path is not None:
                 out_path = _resolve_output_file(
                     job_path,
-                    results_root,
+                    bundle_root,
                     str(raw_path),
                     field=f"outputs[{i}].path",
-                    allowed_roots=allowed_roots,
                 )
             else:
                 out_dir = _resolve_output_dir(
-                    job_path,
-                    results_root,
+                    bundle_root,
                     None,
                     field=f"outputs[{i}].dir",
-                    allowed_roots=allowed_roots,
                 )
             outputs.append(ImagesOutputCfg(kind="images", dir=out_dir, path=out_path, fmt=fmt))
             continue
@@ -828,10 +806,9 @@ def _parse_outputs(
         raw_path = data.get("path")
         out_path = _resolve_output_file(
             job_path,
-            results_root,
+            bundle_root,
             None if raw_path is None else str(raw_path),
             field=f"outputs[{i}].path",
-            allowed_roots=allowed_roots,
         )
 
         outputs.append(
@@ -853,51 +830,36 @@ def _parse_outputs(
             )
         )
 
+    destinations = [_output_destination_for_validation(output) for output in outputs]
+    ensure(
+        len(destinations) == len(set(destinations)),
+        "outputs must resolve to distinct bundle paths",
+        SchemaError,
+    )
     return tuple(outputs)
 
 
-def _parse_run(job_path: Path, results_root: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) -> RunCfg:
+def _output_destination_for_validation(output: OutputCfg) -> Path:
+    if isinstance(output, ImagesOutputCfg):
+        if output.path is not None:
+            return output.path
+        assert output.dir is not None
+        return output.dir
+    return output.path
+
+
+def _parse_run(raw: Any) -> RunCfg:
     if raw is None:
         data = {}
     else:
         data = require_mapping(raw, "run")
-    reject_unknown_keys(
-        data,
-        {"strict", "fail_on_skips", "emit_report", "report_path", "conflict_policy"},
-        "run",
-    )
+    reject_unknown_keys(data, {"strict", "fail_on_skips"}, "run")
 
     strict = _parse_bool(data.get("strict"), field="run.strict", default=False)
     fail_on_skips = _parse_bool(data.get("fail_on_skips"), field="run.fail_on_skips", default=False)
-    emit_report = _parse_bool(data.get("emit_report"), field="run.emit_report", default=False)
-    conflict_policy = str(data.get("conflict_policy", "error")).strip().lower()
-    require_one_of(conflict_policy, {"error", "replace"}, "run.conflict_policy")
-
-    raw_report_path = data.get("report_path")
-    if raw_report_path is None:
-        report_path = (
-            _ensure_within_allowed_roots(
-                _job_output_root(job_path, results_root) / "run_report.json",
-                field="run.report_path",
-                allowed_roots=allowed_roots,
-            )
-            if emit_report
-            else None
-        )
-    else:
-        rp = Path(str(raw_report_path))
-        report_path = _ensure_within_allowed_roots(
-            rp if rp.is_absolute() else (_job_output_root(job_path, results_root) / rp),
-            field="run.report_path",
-            allowed_roots=allowed_roots,
-        )
-
     return RunCfg(
         strict=strict,
         fail_on_skips=fail_on_skips,
-        emit_report=emit_report,
-        report_path=report_path,
-        conflict_policy=conflict_policy,
     )
 
 
@@ -907,34 +869,21 @@ def _parse_sequence_rows_job_mapping(
     job_path: Path,
     caller_scope: Path,
     allowed_roots: tuple[Path, ...] | None = None,
-) -> RenderJobV3:
+) -> RenderJobV4:
     if allowed_roots is None:
         allowed_roots = _allowed_path_roots(job_path, caller_scope=caller_scope)
     data = require_mapping(raw_mapping, "top-level")
     reject_unknown_keys(
         data,
-        {"version", "contract", "results_root", "input", "selection", "pipeline", "render", "outputs", "run"},
+        {"version", "contract", "bundle", "input", "selection", "pipeline", "render", "outputs", "run"},
         "top-level",
     )
 
     version = data.get("version")
-    ensure(version == 3, "Job YAML must specify version: 3", SchemaError)
+    ensure(version == 4, "Job YAML must specify version: 4", SchemaError)
     contract_cfg = _parse_contract(data.get("contract"))
 
-    results_root_raw = data.get("results_root")
-    if results_root_raw is None:
-        results_root = _ensure_within_allowed_roots(
-            _default_results_root(job_path, caller_root=caller_scope),
-            field="results_root",
-            allowed_roots=allowed_roots,
-        )
-    else:
-        p = Path(str(results_root_raw))
-        results_root = _ensure_within_allowed_roots(
-            p if p.is_absolute() else (job_path.parent / p),
-            field="results_root",
-            allowed_roots=allowed_roots,
-        )
+    bundle_cfg = _parse_bundle(job_path, data.get("bundle"), allowed_roots=allowed_roots)
 
     input_cfg = _parse_input(job_path, data.get("input"), allowed_roots=allowed_roots)
 
@@ -952,15 +901,15 @@ def _parse_sequence_rows_job_mapping(
     render_cfg = _parse_render(data.get("render"))
     validate_render_contract_renderer(contract_cfg.kind, render_cfg.renderer, field="contract.kind")
     _validate_adapter_compatibility(input_cfg, render_cfg)
-    outputs_cfg = _parse_outputs(job_path, results_root, data.get("outputs"), allowed_roots=allowed_roots)
-    run_cfg = _parse_run(job_path, results_root, data.get("run"), allowed_roots=allowed_roots)
+    outputs_cfg = _parse_outputs(job_path, bundle_cfg.path, data.get("outputs"))
+    run_cfg = _parse_run(data.get("run"))
 
-    return RenderJobV3(
-        version=3,
+    return RenderJobV4(
+        version=4,
         contract=contract_cfg,
         name=job_path.stem,
         path=job_path,
-        results_root=results_root,
+        bundle=bundle_cfg,
         input=input_cfg,
         selection=selection_cfg,
         pipeline=pipeline_cfg,
@@ -970,7 +919,7 @@ def _parse_sequence_rows_job_mapping(
     )
 
 
-def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
+def load_render_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV4:
     try:
         job_path = resolve_job_path(path)
         if caller_root is None:
@@ -987,12 +936,12 @@ def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | No
         raise SchemaError(str(exc)) from exc
 
 
-def load_sequence_rows_job_from_mapping(
+def load_render_job_from_mapping(
     mapping: Mapping[str, Any],
     *,
     caller_root: str | Path | None = None,
     source_name: str = "inline_job.yaml",
-) -> RenderJobV3:
+) -> RenderJobV4:
     try:
         caller_scope = Path.cwd().resolve() if caller_root is None else Path(caller_root).expanduser().resolve()
         name = str(source_name).strip()
@@ -1018,36 +967,20 @@ def load_sequence_rows_job_from_mapping(
         raise SchemaError(str(exc)) from exc
 
 
-def output_kind(job: CruncherShowcaseJob, kind: str) -> OutputCfg | None:
+def output_kind(job: RenderJobV4, kind: str) -> OutputCfg | None:
     for entry in job.outputs:
         if entry.kind == kind:
             return entry
     return None
 
 
-def validate_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> CruncherShowcaseJob:
-    return load_cruncher_showcase_job(path, caller_root=caller_root)
-
-
-def load_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
-    return load_cruncher_showcase_job(path, caller_root=caller_root)
-
-
-def validate_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
-    return load_sequence_rows_job(path, caller_root=caller_root)
-
-
-def load_render_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
-    return load_sequence_rows_job(path, caller_root=caller_root)
-
-
-def validate_render_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
-    return validate_sequence_rows_job(path, caller_root=caller_root)
-
-
-def load_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
+def validate_render_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV4:
     return load_render_job(path, caller_root=caller_root)
 
 
-def validate_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV3:
+def load_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV4:
+    return load_render_job(path, caller_root=caller_root)
+
+
+def validate_job(path: str | Path, *, caller_root: str | Path | None = None) -> RenderJobV4:
     return validate_render_job(path, caller_root=caller_root)

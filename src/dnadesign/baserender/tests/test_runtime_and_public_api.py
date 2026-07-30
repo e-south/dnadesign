@@ -485,16 +485,16 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     )
     payload = densegen_job_payload(
         parquet_path=parquet,
-        results_root=tmp_path / "outputs",
+        bundle_path=tmp_path / "outputs",
         outputs=[{"kind": "images", "fmt": "png"}],
     )
     job_path = write_job(tmp_path / "job.yaml", payload)
 
     assert hasattr(baserender, "validate_job")
     assert hasattr(baserender, "run_job")
-    assert hasattr(baserender, "RenderJobV3")
-    assert hasattr(baserender, "validate_sequence_rows_job")
-    assert hasattr(baserender, "run_sequence_rows_job")
+    assert hasattr(baserender, "RenderJobV4")
+    assert hasattr(baserender, "validate_render_job")
+    assert hasattr(baserender, "run_render_job")
     assert hasattr(baserender, "adapt_record")
     assert hasattr(baserender, "adapt_records")
     assert hasattr(baserender, "list_adapters")
@@ -507,8 +507,8 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
 
     validated = baserender.validate_job(job_path, caller_root=tmp_path)
     report = baserender.run_job(job_path, caller_root=tmp_path)
-    assert validated.version == 3
-    assert isinstance(validated, baserender.RenderJobV3)
+    assert validated.version == 4
+    assert isinstance(validated, baserender.RenderJobV4)
     assert "images_dir" in report.outputs
 
     adapter_kinds = baserender.list_adapters()
@@ -537,15 +537,15 @@ def test_public_api_exposes_generic_job_entrypoints(tmp_path) -> None:
     assert snapback_renderer_descriptor.name == "snapback_map"
 
     contract_kinds = baserender.list_render_contracts()
-    assert "base_render_job_v3" in contract_kinds
+    assert "render_job_v4" in contract_kinds
     assert "sequence_rows_render_v3" in contract_kinds
     assert "usr_genbank_annotation_render_v1" in contract_kinds
     assert "nucleotide_evidence_map_render_v3" in contract_kinds
-    sequence_contract = baserender.get_render_contract_descriptor("sequence_rows_v3")
-    generic_contract = baserender.get_render_contract_descriptor("render_job_v3")
+    sequence_contract = baserender.get_render_contract_descriptor("sequence_rows_render_v3")
+    generic_contract = baserender.get_render_contract_descriptor("render_job_v4")
     assert sequence_contract.kind == "sequence_rows_render_v3"
     assert sequence_contract.accepted_renderers == ("sequence_rows",)
-    assert generic_contract.kind == "base_render_job_v3"
+    assert generic_contract.kind == "render_job_v4"
     assert "nucleotide_evidence_map" in generic_contract.accepted_renderers
 
 
@@ -574,7 +574,7 @@ def test_public_api_accepts_in_memory_job_mapping(tmp_path) -> None:
     )
     payload = densegen_job_payload(
         parquet_path=Path("input.parquet"),
-        results_root=Path("results"),
+        bundle_path=Path("results"),
         outputs=[{"kind": "images", "fmt": "png"}],
     )
 
@@ -679,7 +679,7 @@ def test_public_api_rejects_unknown_kind() -> None:
         baserender.validate_job("densegen_job", kind="v4")
 
 
-def test_public_api_accepts_render_job_v3_kind_alias(tmp_path: Path) -> None:
+def test_public_api_accepts_canonical_render_job_v4_kind(tmp_path: Path) -> None:
     parquet = write_parquet(
         tmp_path / "input.parquet",
         [
@@ -695,15 +695,15 @@ def test_public_api_accepts_render_job_v3_kind_alias(tmp_path: Path) -> None:
     )
     payload = densegen_job_payload(
         parquet_path=parquet,
-        results_root=tmp_path / "outputs",
+        bundle_path=tmp_path / "outputs",
         outputs=[{"kind": "images", "fmt": "png"}],
     )
     job_path = write_job(tmp_path / "job.yaml", payload)
 
-    validated = baserender.validate_job(job_path, kind="render_job_v3", caller_root=tmp_path)
-    report = baserender.run_job(job_path, kind="render_job_v3", caller_root=tmp_path)
+    validated = baserender.validate_job(job_path, kind="render_job_v4", caller_root=tmp_path)
+    report = baserender.run_job(job_path, kind="render_job_v4", caller_root=tmp_path)
 
-    assert validated.version == 3
+    assert validated.version == 4
     assert "images_dir" in report.outputs
 
 
@@ -711,8 +711,8 @@ def test_public_api_kind_descriptor_rejects_incompatible_renderer(tmp_path: Path
     json_path = tmp_path / "input.json"
     json_path.write_text("[]")
     payload = {
-        "version": 3,
-        "results_root": str(tmp_path / "outputs"),
+        "version": 4,
+        "bundle": {"path": str(tmp_path / "outputs" / "render-v1")},
         "input": {
             "kind": "json",
             "path": str(json_path),
@@ -725,10 +725,10 @@ def test_public_api_kind_descriptor_rejects_incompatible_renderer(tmp_path: Path
     job_path = write_job(tmp_path / "job.yaml", payload)
 
     with pytest.raises(baserender.SchemaError, match="kind.*render.renderer"):
-        baserender.validate_job(job_path, kind="sequence_rows_v3", caller_root=tmp_path)
+        baserender.validate_job(job_path, kind="sequence_rows_render_v3", caller_root=tmp_path)
 
 
-def test_public_api_exposes_render_job_alias(tmp_path: Path) -> None:
+def test_public_api_exposes_render_job_surface(tmp_path: Path) -> None:
     parquet = write_parquet(
         tmp_path / "input.parquet",
         [
@@ -744,7 +744,7 @@ def test_public_api_exposes_render_job_alias(tmp_path: Path) -> None:
     )
     payload = densegen_job_payload(
         parquet_path=parquet,
-        results_root=tmp_path / "outputs",
+        bundle_path=tmp_path / "outputs",
         outputs=[{"kind": "images", "fmt": "png"}],
     )
     job_path = write_job(tmp_path / "job.yaml", payload)
@@ -752,7 +752,7 @@ def test_public_api_exposes_render_job_alias(tmp_path: Path) -> None:
     validated = baserender.validate_render_job(job_path, caller_root=tmp_path)
     report = baserender.run_render_job(job_path, caller_root=tmp_path)
 
-    assert validated.version == 3
+    assert validated.version == 4
     assert "images_dir" in report.outputs
 
 
@@ -768,20 +768,22 @@ def test_public_api_runs_densegen_and_cruncher_contracts_end_to_end(tmp_path: Pa
         shutil.copytree(src_ws, dst_ws)
         job_path = dst_ws / "job.yaml"
 
-        validated = baserender.validate_job(job_path, kind="sequence_rows_v3", caller_root=tmp_path)
-        report = baserender.run_job(job_path, kind="sequence_rows_v3", caller_root=tmp_path)
-        assert validated.version == 3
+        validated = baserender.validate_job(job_path, kind="sequence_rows_render_v3", caller_root=tmp_path)
+        report = baserender.run_job(job_path, kind="sequence_rows_render_v3", caller_root=tmp_path)
+        assert validated.version == 4
         expected_ext = next(cfg.fmt for cfg in validated.outputs if cfg.kind == "images")
         images_dir = Path(report.outputs["images_dir"])
         assert images_dir.exists()
         assert any(p.suffix.lower() == f".{expected_ext.lower()}" for p in images_dir.iterdir())
 
     # Contract examples: ensure source-like cruncher and densegen paths still work through stable API.
+    examples_root = tmp_path / "examples"
+    shutil.copytree(pkg_root / "docs" / "examples", examples_root)
     for example in ("densegen_job.yaml", "cruncher_job.yaml"):
-        job_path = pkg_root / "docs" / "examples" / example
-        validated = baserender.validate_job(job_path, kind="cruncher_showcase_v3", caller_root=tmp_path)
-        report = baserender.run_job(job_path, kind="cruncher_showcase_v3", caller_root=tmp_path)
-        assert validated.version == 3
+        job_path = examples_root / example
+        validated = baserender.validate_job(job_path, kind="sequence_rows_render_v3", caller_root=tmp_path)
+        report = baserender.run_job(job_path, kind="sequence_rows_render_v3", caller_root=tmp_path)
+        assert validated.version == 4
         expected_ext = next(cfg.fmt for cfg in validated.outputs if cfg.kind == "images")
         images_dir = Path(report.outputs["images_dir"])
         assert images_dir.exists()
