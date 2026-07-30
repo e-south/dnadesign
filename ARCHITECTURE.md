@@ -2,14 +2,14 @@
 doc_id: architecture
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-07-14
+last_verified: 2026-07-30
 ---
 
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-30
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -26,7 +26,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## Repository shape
 - Code: `src/dnadesign/`
-- Top-level `src/dnadesign/` is a controlled namespace: boundary-owning packages plus shared infrastructure (`contracts`, `devtools`) and reserved legacy buckets (`archived`, `prototypes`) only.
+- Top-level `src/dnadesign/` is a controlled namespace: boundary-owning packages plus shared infrastructure (`artifacts`, `contracts`, `devtools`) and reserved legacy buckets (`archived`, `prototypes`) only.
 - Runbooks and references: `docs/`
 - CI/test/devtool orchestration: `.github/workflows/ci.yaml` and `src/dnadesign/devtools/`
 - Package/dependency contracts: `pyproject.toml`, `uv.lock`, `pixi.toml`, `pixi.lock`
@@ -34,6 +34,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 ## System boundaries
 - Tool packages: each top-level tool under `src/dnadesign/<tool>/` owns its CLI behavior, configs, and tests.
 - Shared artifact schemas live under `src/dnadesign/contracts/` when a producer and consumer need a neutral, versioned handoff model without importing either tool's internals.
+- Shared create-only filesystem publication mechanics live under `src/dnadesign/artifacts/`; producing tools still own their artifact schemas and manifest meaning.
 - Shared test infrastructure lives under `src/dnadesign/devtools/tests/support/` and is test-only by contract; production code must not depend on it.
 - OPS core is a neutral shell around discovery, observation/status, orchestration,
   and generic readiness evaluation; it must not own sibling-specific provider

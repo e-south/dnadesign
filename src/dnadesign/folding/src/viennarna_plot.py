@@ -14,9 +14,6 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
-import os
-import shutil
-import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +21,7 @@ from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
+from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 from dnadesign.contracts.folding import SecondaryStructurePredictionV1
 from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructurePairingSummaryV1
 from dnadesign.contracts.visual import SequenceEvidenceMapV1, ViennaRNAStructureSvgV1
@@ -100,10 +98,11 @@ def publish_viennarna_structure_svg(
         raise FoldingConfigError(f"ViennaRNA Python module '{python_module}' is not available: {exc}") from exc
 
     output_path = Path(output_dir).expanduser().resolve()
-    if output_path.exists():
-        raise FoldingConfigError(f"ViennaRNA plot output already exists: {output_path}")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    staging_path = Path(tempfile.mkdtemp(prefix=f".{output_path.name}.staging-", dir=output_path.parent))
+    try:
+        publication = CreateOnlyDirectoryPublication.prepare(output_path)
+    except PublicationError as exc:
+        raise FoldingConfigError(str(exc)) from exc
+    staging_path = publication.stage
     native_svg_path = staging_path / _VIENNARNA_NATIVE_SVG_FILENAME
     annotated_svg_path = staging_path / _VIENNARNA_ANNOTATED_SVG_FILENAME
     annotation_manifest_path = staging_path / _VIENNARNA_ANNOTATION_MANIFEST_FILENAME
@@ -166,11 +165,13 @@ def publish_viennarna_structure_svg(
             layout_algorithm=layout_algorithm,
             command=command,
             source_prediction=(
-                Path(source_prediction_ref).expanduser().resolve().as_posix()
+                _portable_source_ref(source_prediction_ref)
                 if source_prediction_ref is not None
-                else prediction_ref
+                else _portable_source_ref(prediction_ref)
             ),
-            source_visual_contract=Path(visual_contract_path).as_posix() if visual_contract_path is not None else None,
+            source_visual_contract=(
+                _portable_source_ref(visual_contract_path) if visual_contract_path is not None else None
+            ),
             artifacts={
                 "native_svg": _VIENNARNA_NATIVE_SVG_FILENAME,
                 "annotated_svg": _VIENNARNA_ANNOTATED_SVG_FILENAME,
@@ -186,11 +187,22 @@ def publish_viennarna_structure_svg(
             },
         )
         _write_json(manifest_path, manifest.model_dump(mode="json"))
-        os.replace(staging_path, output_path)
+        publication.publish(required_manifest=_VIENNARNA_PLOT_MANIFEST_FILENAME)
         return manifest
-    except Exception:
-        shutil.rmtree(staging_path, ignore_errors=True)
-        raise
+    except PublicationError as exc:
+        raise FoldingConfigError(str(exc)) from exc
+    finally:
+        publication.close()
+
+
+def _portable_source_ref(source: str | Path) -> str:
+    text = str(source)
+    if text == "in_memory":
+        return text
+    path = Path(source).expanduser()
+    if not path.is_file() or path.is_symlink():
+        raise FoldingConfigError(f"ViennaRNA plot source is unavailable or unsafe: {path}")
+    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
 
 
 def enrich_prediction_pairing_qa(

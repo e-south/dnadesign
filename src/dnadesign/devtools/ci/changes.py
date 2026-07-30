@@ -39,6 +39,7 @@ _FULL_CORE_EXACT_FILES = {
 _SHARED_PACKAGE_TOOLS = {"contracts", "thread"}
 _STUDIES_TOOL_NAME = "studies"
 _NON_TOOL_DIRS = {
+    "artifacts",
     "devtools",
     "__pycache__",
     "archived",

@@ -11,18 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import ctypes
-import errno
-import os
-import shutil
-import stat
-import sys
-import tempfile
-import uuid
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from itertools import islice
 from pathlib import Path
 from typing import Iterable, Iterator
+
+from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 
 from ..adapters import build_adapter, required_source_columns
 from ..config import (
@@ -39,13 +33,7 @@ from ..pipeline import apply_selection, apply_transforms, enforce_selection_poli
 from ..reporting import RunReport
 from ..runtime import initialize_runtime
 
-
-@dataclass(frozen=True)
-class _BundlePublication:
-    final: Path
-    render_stage: Path
-    adjacent_stage_name: str
-    parent_descriptor: int
+_BundlePublication = CreateOnlyDirectoryPublication
 
 
 def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
@@ -57,71 +45,18 @@ def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
     return output.path
 
 
-def _open_or_create_directory(path: Path) -> int:
-    if not path.is_absolute():
-        raise SchemaError(f"Publication output parent must be absolute: {path}")
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY
-    if hasattr(os, "O_NOFOLLOW"):
-        directory_flags |= os.O_NOFOLLOW
-    descriptor = os.open(path.anchor, directory_flags)
-    try:
-        for part in path.parts[1:]:
-            try:
-                child_descriptor = os.open(part, directory_flags, dir_fd=descriptor)
-            except FileNotFoundError:
-                try:
-                    os.mkdir(part, dir_fd=descriptor)
-                except FileExistsError:
-                    pass
-                child_descriptor = os.open(part, directory_flags, dir_fd=descriptor)
-            os.close(descriptor)
-            descriptor = child_descriptor
-    except Exception:
-        os.close(descriptor)
-        raise
-    return descriptor
-
-
-def _target_parent_matches_anchor(publication: _BundlePublication) -> bool:
-    try:
-        current = os.stat(publication.final.parent, follow_symlinks=False)
-    except FileNotFoundError:
-        return False
-    anchored = os.fstat(publication.parent_descriptor)
-    return stat.S_ISDIR(current.st_mode) and (current.st_dev, current.st_ino) == (
-        anchored.st_dev,
-        anchored.st_ino,
-    )
-
-
-def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
-    try:
-        os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
-    except FileNotFoundError:
-        return False
-    return True
-
-
 def _prepare_bundle_publication(bundle_root: Path) -> _BundlePublication:
-    final = bundle_root.resolve(strict=False)
-    parent_descriptor = _open_or_create_directory(final.parent)
-    if _entry_exists_at(parent_descriptor, final.name):
-        os.close(parent_descriptor)
-        raise SchemaError(f"Render bundle already exists and is immutable: {final}")
-    render_stage = Path(tempfile.mkdtemp(prefix="dnadesign-baserender-stage-"))
-    return _BundlePublication(
-        final=final,
-        render_stage=render_stage,
-        adjacent_stage_name=f".{final.name}.staging-{uuid.uuid4().hex}",
-        parent_descriptor=parent_descriptor,
-    )
+    try:
+        return CreateOnlyDirectoryPublication.prepare(bundle_root)
+    except PublicationError as exc:
+        raise SchemaError(str(exc).replace("Artifact bundle", "Render bundle")) from exc
 
 
 def _staged_job(job: RenderJobV4, publication: _BundlePublication) -> RenderJobV4:
     staged_outputs: list[ImagesOutputCfg | VideoOutputCfg] = []
     for output in job.outputs:
         final = _output_destination(output).resolve()
-        staging = publication.render_stage / final.relative_to(publication.final)
+        staging = publication.stage / final.relative_to(publication.final)
         if isinstance(output, ImagesOutputCfg):
             staged_outputs.append(
                 replace(
@@ -135,122 +70,11 @@ def _staged_job(job: RenderJobV4, publication: _BundlePublication) -> RenderJobV
     return replace(job, outputs=tuple(staged_outputs))
 
 
-def _remove_path(path: Path) -> None:
-    if path.is_dir() and not path.is_symlink():
-        shutil.rmtree(path)
-    elif path.exists() or path.is_symlink():
-        path.unlink()
-
-
-def _remove_entry_at(parent_descriptor: int, name: str) -> None:
-    try:
-        entry_stat = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
-    except FileNotFoundError:
-        return
-    if stat.S_ISDIR(entry_stat.st_mode):
-        shutil.rmtree(name, dir_fd=parent_descriptor)
-    else:
-        os.unlink(name, dir_fd=parent_descriptor)
-
-
-def _copy_file_to_directory(source: Path, parent_descriptor: int, name: str) -> None:
-    source_flags = os.O_RDONLY
-    destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        source_flags |= os.O_NOFOLLOW
-        destination_flags |= os.O_NOFOLLOW
-    source_descriptor = os.open(source, source_flags)
-    try:
-        source_stat = os.fstat(source_descriptor)
-        if not stat.S_ISREG(source_stat.st_mode):
-            raise SchemaError(f"Batch output staging must contain regular files: {source}")
-        destination_descriptor = os.open(
-            name,
-            destination_flags,
-            stat.S_IMODE(source_stat.st_mode),
-            dir_fd=parent_descriptor,
-        )
-        try:
-            with os.fdopen(os.dup(source_descriptor), "rb") as source_handle:
-                with os.fdopen(os.dup(destination_descriptor), "wb") as destination_handle:
-                    shutil.copyfileobj(source_handle, destination_handle)
-        finally:
-            os.close(destination_descriptor)
-    finally:
-        os.close(source_descriptor)
-
-
-def _copy_directory_to_directory(source: Path, parent_descriptor: int, name: str) -> None:
-    os.mkdir(name, dir_fd=parent_descriptor)
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY
-    if hasattr(os, "O_NOFOLLOW"):
-        directory_flags |= os.O_NOFOLLOW
-    destination_descriptor = os.open(name, directory_flags, dir_fd=parent_descriptor)
-    try:
-        for entry in os.scandir(source):
-            entry_path = Path(entry.path)
-            if entry.is_symlink():
-                raise SchemaError(f"Batch output staging must not contain symlinks: {entry_path}")
-            if entry.is_dir(follow_symlinks=False):
-                _copy_directory_to_directory(entry_path, destination_descriptor, entry.name)
-            elif entry.is_file(follow_symlinks=False):
-                _copy_file_to_directory(entry_path, destination_descriptor, entry.name)
-            else:
-                raise SchemaError(f"Batch output staging contains an unsupported entry: {entry_path}")
-    finally:
-        os.close(destination_descriptor)
-
-
-def _rename_directory_create_only(parent_descriptor: int, source: str, destination: str) -> None:
-    """Atomically install one directory without replacing an existing entry."""
-    libc = ctypes.CDLL(None, use_errno=True)
-    source_bytes = os.fsencode(source)
-    destination_bytes = os.fsencode(destination)
-    if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
-        rename = libc.renameatx_np
-        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
-        rename.restype = ctypes.c_int
-        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x00000004)
-    elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
-        rename = libc.renameat2
-        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
-        rename.restype = ctypes.c_int
-        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x1)
-    else:
-        raise SchemaError("This platform does not support atomic create-only bundle publication")
-    if result == 0:
-        return
-    error = ctypes.get_errno()
-    if error in {errno.EEXIST, errno.ENOTEMPTY}:
-        raise SchemaError(f"Render bundle already exists and is immutable: {destination}")
-    raise OSError(error, os.strerror(error), destination)
-
-
 def _publish_bundle(publication: _BundlePublication) -> None:
-    manifest = publication.render_stage / "manifest.json"
-    if not manifest.is_file() or manifest.is_symlink():
-        raise SchemaError(f"Render bundle staging is incomplete: {manifest}")
-    if not _target_parent_matches_anchor(publication):
-        raise SchemaError(f"Render bundle parent changed during publication: {publication.final.parent}")
-    if _entry_exists_at(publication.parent_descriptor, publication.adjacent_stage_name):
-        raise SchemaError(f"Render bundle staging already exists: {publication.adjacent_stage_name}")
-
     try:
-        _copy_directory_to_directory(
-            publication.render_stage,
-            publication.parent_descriptor,
-            publication.adjacent_stage_name,
-        )
-        if not _target_parent_matches_anchor(publication):
-            raise SchemaError(f"Render bundle parent changed during publication: {publication.final.parent}")
-        _rename_directory_create_only(
-            publication.parent_descriptor,
-            publication.adjacent_stage_name,
-            publication.final.name,
-        )
-    except Exception:
-        _remove_entry_at(publication.parent_descriptor, publication.adjacent_stage_name)
-        raise
+        publication.publish(required_manifest="manifest.json")
+    except PublicationError as exc:
+        raise SchemaError(str(exc).replace("Artifact bundle", "Render bundle")) from exc
 
 
 def _iter_records(job: RenderJobV4, report: RunReport) -> Iterator[Record]:
@@ -352,8 +176,7 @@ def run_render_job(
         img_output = output_kind(job, "images")
         vid_output = output_kind(job, "video")
     except Exception:
-        _remove_path(publication.render_stage)
-        os.close(publication.parent_descriptor)
+        publication.close()
         raise
 
     try:
@@ -443,10 +266,13 @@ def run_render_job(
 
         report.outputs["bundle_root"] = str(original_job.bundle.path)
         report.outputs["manifest_path"] = str(original_job.bundle.path / "manifest.json")
-        report.write(publication.render_stage / "manifest.json")
+        report.write_portable_manifest(
+            publication.stage / "manifest.json",
+            bundle_root=original_job.bundle.path,
+            staging_root=publication.stage,
+        )
         _publish_bundle(publication)
     finally:
-        _remove_path(publication.render_stage)
-        os.close(publication.parent_descriptor)
+        publication.close()
 
     return report

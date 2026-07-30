@@ -836,6 +836,17 @@ def _parse_outputs(
         "outputs must resolve to distinct bundle paths",
         SchemaError,
     )
+    manifest_path = bundle_root / "manifest.json"
+    for index, destination in enumerate(destinations):
+        if manifest_path == destination or manifest_path in destination.parents:
+            raise SchemaError(f"outputs[{index}] must not place an artifact beneath the bundle manifest")
+    for left_index, left in enumerate(destinations):
+        for right_index, right in enumerate(destinations[left_index + 1 :], start=left_index + 1):
+            if left in right.parents or right in left.parents:
+                raise SchemaError(
+                    f"outputs[{left_index}] and outputs[{right_index}] have an impossible "
+                    "file/directory prefix collision"
+                )
     return tuple(outputs)
 
 

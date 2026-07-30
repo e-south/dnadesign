@@ -12,6 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
+import hashlib
+import json
 import re
 import tempfile
 from pathlib import Path
@@ -34,6 +36,14 @@ from dnadesign.densegen.src.viz.dense_array_video_source import (
 
 _VIDEO_SUBTITLE_COLUMN = "densegen__video_subtitle"
 _SAFE_SEGMENT_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _safe_segment(text: str) -> str:
@@ -91,6 +101,30 @@ def _write_selection_csv(path: Path, *, ids: list[str]) -> None:
             writer.writerow({"id": str(record_id)})
 
 
+def _published_video_is_complete(bundle_root: Path, published_file: Path) -> bool:
+    manifest_path = bundle_root / "manifest.json"
+    if not manifest_path.is_file() or not published_file.is_file():
+        return False
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if payload.get("schema") != "dnadesign.baserender.render_bundle_manifest.v1":
+        return False
+    inventory = payload.get("artifact_inventory")
+    if not isinstance(inventory, dict):
+        return False
+    artifacts = inventory.get("artifacts")
+    if not isinstance(artifacts, list):
+        return False
+    expected_path = published_file.relative_to(bundle_root).as_posix()
+    expected_digest = _sha256_file(published_file)
+    return any(
+        isinstance(item, dict) and item.get("path") == expected_path and item.get("sha256") == expected_digest
+        for item in artifacts
+    )
+
+
 def plot_dense_array_video_showcase(
     dense_arrays_df: pd.DataFrame,
     out_path: Path,
@@ -140,8 +174,6 @@ def plot_dense_array_video_showcase(
 
     out_file = _output_path(out_path, video_cfg=video_cfg)
     out_file.parent.mkdir(parents=True, exist_ok=True)
-    bundle_root = out_file.parent / f"{out_file.stem}.render-v1"
-    published_file = bundle_root / out_file.name
     contract = densegen_notebook_render_contract()
     style_overrides = dict(contract.style_overrides)
     presentation = video_cfg.presentation
@@ -160,6 +192,27 @@ def plot_dense_array_video_showcase(
             style_overrides.get("legend_font_size", 18),
         )
     )
+    render_identity_payload = {
+        "records": sampled.to_json(orient="split", date_format="iso"),
+        "video": video_cfg.model_dump(mode="json"),
+        "style": style_overrides,
+        "workspace_title": workspace_title,
+        "contract": {
+            "adapter_kind": contract.adapter_kind,
+            "adapter_columns": dict(contract.adapter_columns),
+            "adapter_policies": dict(contract.adapter_policies),
+            "style_preset": contract.style_preset,
+        },
+    }
+    render_identity = hashlib.sha256(
+        json.dumps(render_identity_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:12]
+    bundle_root = out_file.parent / f"{out_file.stem}.render-v1-{render_identity}"
+    published_file = bundle_root / out_file.name
+    if bundle_root.exists():
+        if _published_video_is_complete(bundle_root, published_file):
+            return published_file
+        raise ValueError(f"Dense-array video bundle exists but is incomplete or invalid: {bundle_root}")
     with tempfile.TemporaryDirectory(prefix="dense-video-", dir=str(out_path.parent)) as tmpdir:
         tmp_root = Path(tmpdir)
         records_path = tmp_root / "records.parquet"

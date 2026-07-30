@@ -1,0 +1,333 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/artifacts/publication.py
+
+Publish immutable directory artifacts atomically and without replacement.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import ctypes
+import errno
+import hashlib
+import json
+import os
+import re
+import shutil
+import socket
+import stat
+import sys
+import tempfile
+import time
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
+
+
+class PublicationError(RuntimeError):
+    """Raised when an immutable artifact bundle cannot be published safely."""
+
+
+_OWNER_FILE = ".dnadesign-publication-owner.json"
+_MAX_STALE_CANDIDATES = 64
+
+
+def _open_or_create_directory(path: Path) -> int:
+    if not path.is_absolute():
+        raise PublicationError(f"Publication output parent must be absolute: {path}")
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path.anchor, flags)
+    try:
+        for part in path.parts[1:]:
+            try:
+                child = os.open(part, flags, dir_fd=descriptor)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(part, dir_fd=descriptor)
+                except FileExistsError:
+                    pass
+                child = os.open(part, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+    except Exception:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _remove_entry_at(parent_descriptor: int, name: str) -> None:
+    try:
+        entry_stat = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if stat.S_ISDIR(entry_stat.st_mode):
+        shutil.rmtree(name, dir_fd=parent_descriptor)
+    else:
+        os.unlink(name, dir_fd=parent_descriptor)
+
+
+def _copy_file(source: Path, parent_descriptor: int, name: str) -> None:
+    source_flags = os.O_RDONLY
+    destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        source_flags |= os.O_NOFOLLOW
+        destination_flags |= os.O_NOFOLLOW
+    source_descriptor = os.open(source, source_flags)
+    try:
+        source_stat = os.fstat(source_descriptor)
+        if not stat.S_ISREG(source_stat.st_mode):
+            raise PublicationError(f"Bundle staging must contain regular files: {source}")
+        destination_descriptor = os.open(
+            name,
+            destination_flags,
+            stat.S_IMODE(source_stat.st_mode),
+            dir_fd=parent_descriptor,
+        )
+        try:
+            with os.fdopen(os.dup(source_descriptor), "rb") as source_handle:
+                with os.fdopen(os.dup(destination_descriptor), "wb") as destination_handle:
+                    shutil.copyfileobj(source_handle, destination_handle)
+        finally:
+            os.close(destination_descriptor)
+    finally:
+        os.close(source_descriptor)
+
+
+def _copy_directory(source: Path, parent_descriptor: int, name: str) -> None:
+    os.mkdir(name, dir_fd=parent_descriptor)
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    destination_descriptor = os.open(name, flags, dir_fd=parent_descriptor)
+    try:
+        for entry in os.scandir(source):
+            entry_path = Path(entry.path)
+            if entry.is_symlink():
+                raise PublicationError(f"Bundle staging must not contain symlinks: {entry_path}")
+            if entry.is_dir(follow_symlinks=False):
+                _copy_directory(entry_path, destination_descriptor, entry.name)
+            elif entry.is_file(follow_symlinks=False):
+                _copy_file(entry_path, destination_descriptor, entry.name)
+            else:
+                raise PublicationError(f"Bundle staging contains an unsupported entry: {entry_path}")
+    finally:
+        os.close(destination_descriptor)
+
+
+def _rename_create_only(parent_descriptor: int, source: str, destination: str) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    source_bytes = os.fsencode(source)
+    destination_bytes = os.fsencode(destination)
+    if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
+        rename = libc.renameatx_np
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x00000004)
+    elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
+        rename = libc.renameat2
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x1)
+    else:
+        raise PublicationError("This platform does not support atomic create-only directory publication")
+    if result == 0:
+        return
+    error = ctypes.get_errno()
+    if error in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise PublicationError(f"Artifact bundle already exists and is immutable: {destination}")
+    raise OSError(error, os.strerror(error), destination)
+
+
+def _pid_is_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _owner_payload(final: Path) -> dict[str, object]:
+    return {
+        "schema": "dnadesign.artifact_publication_owner.v1",
+        "target_sha256": hashlib.sha256(os.fsencode(final)).hexdigest(),
+        "uid": os.getuid() if hasattr(os, "getuid") else None,
+        "pid": os.getpid(),
+        "host": socket.gethostname(),
+        "created_unix": time.time(),
+    }
+
+
+def _write_owner(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _is_recoverable_stale_stage(path: Path, *, final: Path, uid: int | None) -> bool:
+    try:
+        entry_stat = path.lstat()
+        if not stat.S_ISDIR(entry_stat.st_mode) or (uid is not None and entry_stat.st_uid != uid):
+            return False
+        owner_path = path / _OWNER_FILE
+        owner_stat = owner_path.lstat()
+        if not stat.S_ISREG(owner_stat.st_mode):
+            return False
+        payload = json.loads(owner_path.read_text(encoding="utf-8"))
+        owner_pid = int(payload.get("pid", -1))
+    except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
+    expected = hashlib.sha256(os.fsencode(final)).hexdigest()
+    return (
+        payload.get("schema") == "dnadesign.artifact_publication_owner.v1"
+        and payload.get("target_sha256") == expected
+        and payload.get("uid") == uid
+        and payload.get("host") == socket.gethostname()
+        and not _pid_is_alive(owner_pid)
+    )
+
+
+def _bounded_named_candidates(directory: Path, *, prefix: str) -> list[Path]:
+    candidates: list[Path] = []
+    for candidate in directory.iterdir():
+        if not candidate.name.startswith(prefix):
+            continue
+        candidates.append(candidate)
+        if len(candidates) >= _MAX_STALE_CANDIDATES:
+            break
+    return candidates
+
+
+def _is_recoverable_adjacent_stage(path: Path, *, final: Path, uid: int | None, prefix: str) -> bool:
+    if _is_recoverable_stale_stage(path, final=final, uid=uid):
+        return True
+    if uid is None:
+        return False
+    try:
+        entry_stat = path.lstat()
+    except OSError:
+        return False
+    if not stat.S_ISDIR(entry_stat.st_mode) or entry_stat.st_uid != uid:
+        return False
+    match = re.fullmatch(rf"{re.escape(prefix)}u(?P<uid>\d+)-p(?P<pid>\d+)-[0-9a-f]{{32}}", path.name)
+    return match is not None and int(match.group("uid")) == uid and not _pid_is_alive(int(match.group("pid")))
+
+
+@dataclass
+class CreateOnlyDirectoryPublication:
+    """One bounded transaction that publishes a new immutable directory."""
+
+    final: Path
+    stage: Path
+    adjacent_stage_name: str
+    parent_descriptor: int
+    _owner: dict[str, object]
+    _closed: bool = False
+
+    @classmethod
+    def prepare(cls, bundle_root: str | Path) -> CreateOnlyDirectoryPublication:
+        final = Path(bundle_root).expanduser().resolve(strict=False)
+        parent_descriptor = _open_or_create_directory(final.parent)
+        try:
+            if _entry_exists_at(parent_descriptor, final.name):
+                raise PublicationError(f"Artifact bundle already exists and is immutable: {final}")
+            owner = _owner_payload(final)
+            uid = owner["uid"]
+            target_digest = str(owner["target_sha256"])
+            adjacent_prefix = f".{final.name}.staging-"
+            for candidate in _bounded_named_candidates(final.parent, prefix=adjacent_prefix):
+                if _is_recoverable_adjacent_stage(
+                    candidate,
+                    final=final,
+                    uid=uid if isinstance(uid, int) else None,
+                    prefix=adjacent_prefix,
+                ):
+                    _remove_entry_at(parent_descriptor, candidate.name)
+            private_parent = Path(tempfile.gettempdir()) / f"dnadesign-artifact-publication-{uid}"
+            try:
+                private_parent.mkdir(mode=0o700)
+            except FileExistsError:
+                private_stat = private_parent.lstat()
+                if (
+                    not stat.S_ISDIR(private_stat.st_mode)
+                    or (isinstance(uid, int) and private_stat.st_uid != uid)
+                    or stat.S_IMODE(private_stat.st_mode) & 0o077
+                ):
+                    raise PublicationError(f"Private publication staging root is not owner-only: {private_parent}")
+            private_prefix = f"stage-{target_digest[:16]}-"
+            for candidate in _bounded_named_candidates(private_parent, prefix=private_prefix):
+                if _is_recoverable_stale_stage(candidate, final=final, uid=uid if isinstance(uid, int) else None):
+                    shutil.rmtree(candidate)
+            stage = Path(tempfile.mkdtemp(prefix=private_prefix, dir=private_parent))
+            _write_owner(stage / _OWNER_FILE, owner)
+            return cls(
+                final=final,
+                stage=stage,
+                adjacent_stage_name=f"{adjacent_prefix}u{uid}-p{os.getpid()}-{uuid.uuid4().hex}",
+                parent_descriptor=parent_descriptor,
+                _owner=owner,
+            )
+        except Exception:
+            os.close(parent_descriptor)
+            raise
+
+    def _parent_matches_anchor(self) -> bool:
+        try:
+            current = os.stat(self.final.parent, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        anchored = os.fstat(self.parent_descriptor)
+        return stat.S_ISDIR(current.st_mode) and (current.st_dev, current.st_ino) == (
+            anchored.st_dev,
+            anchored.st_ino,
+        )
+
+    def publish(self, *, required_manifest: str) -> None:
+        manifest = self.stage / required_manifest
+        if not manifest.is_file() or manifest.is_symlink():
+            raise PublicationError(f"Artifact bundle staging is incomplete: {manifest}")
+        if not self._parent_matches_anchor():
+            raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
+        if _entry_exists_at(self.parent_descriptor, self.adjacent_stage_name):
+            raise PublicationError(f"Artifact bundle staging already exists: {self.adjacent_stage_name}")
+        try:
+            _copy_directory(self.stage, self.parent_descriptor, self.adjacent_stage_name)
+            if not self._parent_matches_anchor():
+                raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
+            os.unlink(f"{self.adjacent_stage_name}/{_OWNER_FILE}", dir_fd=self.parent_descriptor)
+            _rename_create_only(self.parent_descriptor, self.adjacent_stage_name, self.final.name)
+        except Exception:
+            _remove_entry_at(self.parent_descriptor, self.adjacent_stage_name)
+            raise
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        try:
+            shutil.rmtree(self.stage, ignore_errors=True)
+            _remove_entry_at(self.parent_descriptor, self.adjacent_stage_name)
+        finally:
+            os.close(self.parent_descriptor)
+            self._closed = True
+
+    def __enter__(self) -> CreateOnlyDirectoryPublication:
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        del exc_type, exc, traceback
+        self.close()

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -74,6 +75,71 @@ def test_images_output_publishes_one_manifested_bundle(tmp_path: Path) -> None:
     assert Path(report.outputs["manifest_path"]) == bundle / "manifest.json"
     assert (bundle / "manifest.json").is_file()
     assert not (bundle / f"{job_path.stem}.mp4").exists()
+    manifest_text = (bundle / "manifest.json").read_text(encoding="utf-8")
+    manifest = json.loads(manifest_text)
+    assert str(tmp_path) not in manifest_text
+    assert manifest["schema"] == "dnadesign.baserender.render_bundle_manifest.v1"
+    artifacts = manifest["artifact_inventory"]["artifacts"]
+    assert {item["path"] for item in artifacts} == {
+        path.relative_to(bundle).as_posix()
+        for path in bundle.rglob("*")
+        if path.is_file() and path.name != "manifest.json"
+    }
+    assert all(len(item["sha256"]) == 64 and item["bytes"] > 0 for item in artifacts)
+
+
+def test_portable_manifest_fails_when_source_evidence_is_unavailable(tmp_path: Path) -> None:
+    from dnadesign.baserender.src.reporting import RunReport
+
+    bundle = tmp_path / "render-v1"
+    staging = tmp_path / "stage"
+    staging.mkdir()
+    report = RunReport(job_name="missing-source", input_path=str(tmp_path / "missing.parquet"), selection_path=None)
+
+    with pytest.raises(ValueError, match="Render source is unavailable or unsafe"):
+        report.write_portable_manifest(staging / "manifest.json", bundle_root=bundle, staging_root=staging)
+
+    assert not (staging / "manifest.json").exists()
+
+
+@pytest.mark.parametrize(
+    "outputs, message",
+    [
+        ([{"kind": "images", "dir": "manifest.json/images", "fmt": "png"}], "beneath the bundle manifest"),
+        (
+            [
+                {"kind": "images", "dir": "artifacts", "fmt": "png"},
+                {"kind": "video", "path": "artifacts/movie.mp4", "fmt": "mp4"},
+            ],
+            "prefix collision",
+        ),
+    ],
+)
+def test_impossible_output_topologies_fail_before_rendering(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    outputs: list[dict[str, object]],
+    message: str,
+) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    bundle = tmp_path / "results" / "render-v1"
+    job_path = write_job(
+        tmp_path / "invalid-topology.yaml",
+        densegen_job_payload(parquet_path=parquet, bundle_path=bundle, outputs=outputs),
+    )
+    writer_called = False
+
+    def _unexpected_writer(*args, **kwargs):
+        nonlocal writer_called
+        writer_called = True
+        del args, kwargs
+
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _unexpected_writer)
+    with pytest.raises(SchemaError, match=message):
+        run_render_job(str(job_path))
+
+    assert not writer_called
+    assert not bundle.parent.exists()
 
 
 def test_video_output_does_not_produce_images(tmp_path: Path) -> None:
@@ -230,7 +296,7 @@ def test_copy_failure_removes_adjacent_stage_and_never_exposes_final(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    from dnadesign.baserender.src.execution import runner as runner_module
+    from dnadesign.artifacts import publication as publication_module
 
     parquet = _make_input_parquet(tmp_path)
     bundle = tmp_path / "results" / "render-v1"
@@ -241,13 +307,13 @@ def test_copy_failure_removes_adjacent_stage_and_never_exposes_final(
     )
     job_path = write_job(tmp_path / "copy-failure.yaml", payload)
     monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _fake_image_writer)
-    real_copy = runner_module._copy_directory_to_directory
+    real_copy = publication_module._copy_directory
 
     def _copy_then_fail(source: Path, parent_descriptor: int, name: str) -> None:
         real_copy(source, parent_descriptor, name)
         raise OSError("simulated copy interruption")
 
-    monkeypatch.setattr(runner_module, "_copy_directory_to_directory", _copy_then_fail)
+    monkeypatch.setattr(publication_module, "_copy_directory", _copy_then_fail)
     with pytest.raises(OSError, match="simulated copy interruption"):
         run_render_job(str(job_path))
 
@@ -317,7 +383,7 @@ from dnadesign.baserender.src.execution.runner import _prepare_bundle_publicatio
 
 publication = _prepare_bundle_publication(Path(sys.argv[1]))
 try:
-    (publication.render_stage / "manifest.json").write_text(sys.argv[2], encoding="utf-8")
+    (publication.stage / "manifest.json").write_text(sys.argv[2], encoding="utf-8")
     Path(sys.argv[3]).write_text("ready", encoding="utf-8")
     while not Path(sys.argv[4]).exists():
         time.sleep(0.01)
@@ -328,7 +394,7 @@ try:
     else:
         print("ok")
 finally:
-    shutil.rmtree(publication.render_stage, ignore_errors=True)
+    shutil.rmtree(publication.stage, ignore_errors=True)
     os.close(publication.parent_descriptor)
 """
     processes: list[subprocess.Popen[str]] = []
@@ -376,20 +442,23 @@ def test_killed_copy_never_exposes_final_and_stale_stage_cannot_block_retry(tmp_
 
     bundle = tmp_path / "results" / "render-v1"
     child_code = """
+import os
 import signal
 import sys
 from pathlib import Path
-from dnadesign.baserender.src.execution.runner import (
-    _copy_directory_to_directory,
-    _prepare_bundle_publication,
-)
+from dnadesign.artifacts.publication import _copy_directory
+from dnadesign.baserender.src.execution.runner import _prepare_bundle_publication
 
 publication = _prepare_bundle_publication(Path(sys.argv[1]))
-(publication.render_stage / "manifest.json").write_text("interrupted", encoding="utf-8")
-_copy_directory_to_directory(
-    publication.render_stage,
+(publication.stage / "manifest.json").write_text("interrupted", encoding="utf-8")
+_copy_directory(
+    publication.stage,
     publication.parent_descriptor,
     publication.adjacent_stage_name,
+)
+os.unlink(
+    f"{publication.adjacent_stage_name}/.dnadesign-publication-owner.json",
+    dir_fd=publication.parent_descriptor,
 )
 print("copied", flush=True)
 signal.pause()
@@ -411,14 +480,14 @@ signal.pause()
 
         retry = _prepare_bundle_publication(bundle)
         try:
-            (retry.render_stage / "manifest.json").write_text("retry", encoding="utf-8")
+            (retry.stage / "manifest.json").write_text("retry", encoding="utf-8")
             _publish_bundle(retry)
         finally:
-            shutil.rmtree(retry.render_stage, ignore_errors=True)
+            shutil.rmtree(retry.stage, ignore_errors=True)
             os.close(retry.parent_descriptor)
 
         assert (bundle / "manifest.json").read_text(encoding="utf-8") == "retry"
-        assert stale[0].is_dir()
+        assert not stale[0].exists()
     finally:
         if process.poll() is None:
             process.kill()
@@ -496,7 +565,7 @@ def test_case_aliases_obey_destination_filesystem_semantics(tmp_path: Path) -> N
     lower = _prepare_bundle_publication(parent / "render-v1")
     try:
         for publication, marker in ((upper, "upper"), (lower, "lower")):
-            (publication.render_stage / "manifest.json").write_text(marker, encoding="utf-8")
+            (publication.stage / "manifest.json").write_text(marker, encoding="utf-8")
         _publish_bundle(upper)
         if (parent / "render-v1").exists():
             with pytest.raises(SchemaError, match="already exists and is immutable"):
@@ -507,6 +576,6 @@ def test_case_aliases_obey_destination_filesystem_semantics(tmp_path: Path) -> N
             assert (parent / "render-v1" / "manifest.json").read_text(encoding="utf-8") == "lower"
     finally:
         for publication in (upper, lower):
-            if publication.render_stage.exists():
-                shutil.rmtree(publication.render_stage)
+            if publication.stage.exists():
+                shutil.rmtree(publication.stage)
             os.close(publication.parent_descriptor)

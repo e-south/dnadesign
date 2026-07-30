@@ -560,6 +560,13 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert plot.qa.nucleotide_node_count == 4
     assert plot.qa.cross_copy_pair_count == 1
     assert plot.qa.length_matches_svg_nodes is True
+    published_manifest = (
+        tmp_path / "visual" / "viennarna_secondary_structure" / "viennarna_secondary_structure_svg_v1.json"
+    ).read_text(encoding="utf-8")
+    assert str(tmp_path) not in published_manifest
+    assert plot.source_prediction == "in_memory"
+    assert plot.source_visual_contract is not None
+    assert plot.source_visual_contract.startswith("sha256:")
     annotated = (tmp_path / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg").read_text(
         encoding="utf-8"
     )
@@ -590,6 +597,13 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert annotation_manifest["basepairs"][0]["right_copy_index"] == 1
     assert annotation_manifest["section_annotations"][0]["label"] == "Payload primary"
     assert annotation_manifest["layout_normalization"]["requested_orientation"] == "cap_right"
+
+
+def test_portable_plot_source_reference_fails_when_evidence_is_unavailable(tmp_path: Path) -> None:
+    from dnadesign.folding.src.viennarna_plot import _portable_source_ref
+
+    with pytest.raises(FoldingConfigError, match="ViennaRNA plot source is unavailable or unsafe"):
+        _portable_source_ref(tmp_path / "missing-prediction.json")
 
 
 def test_publish_viennarna_structure_svg_requires_section_edge_colors(
