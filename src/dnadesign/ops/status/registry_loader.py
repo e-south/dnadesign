@@ -16,6 +16,8 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.ops.discovery import discover_named_files
+
 from .models import InputFieldSpec, StatusKindSpec
 
 _STATUS_REGISTRY_FILENAME = "status.registry.yaml"
@@ -243,11 +245,11 @@ def _iter_status_registry_fragment_paths() -> tuple[Path, ...]:
 
 
 def _iter_status_registry_fragment_paths_for_root(*, dnadesign_root: Path) -> tuple[Path, ...]:
-    fragment_paths = [
+    fragment_paths = tuple(
         path
-        for path in dnadesign_root.rglob(_STATUS_REGISTRY_FILENAME)
-        if path.is_file() and _is_status_registry_fragment_path(path=path, dnadesign_root=dnadesign_root)
-    ]
+        for path in discover_named_files(roots=(dnadesign_root,), names=frozenset({_STATUS_REGISTRY_FILENAME}))
+        if _is_status_registry_fragment_path(path=path, dnadesign_root=dnadesign_root)
+    )
     return tuple(sorted(fragment_paths))
 
 

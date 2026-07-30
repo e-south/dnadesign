@@ -11,9 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+
+from dnadesign.ops.discovery import discover_suffixed_files
 
 from .constants import (
     ALLOWED_RELATION_TYPES,
@@ -30,6 +33,7 @@ from .models import (
     CatalogToolSourceEntry,
 )
 from .paths import (
+    catalog_metadata_search_roots,
     load_catalog_doc_title,
     relative_catalog_doc_link,
     resolve_doc_path_for_metadata,
@@ -61,12 +65,33 @@ _RELATED_TOOL_ROUTE_KEYS = frozenset({"tool", "route"})
 _TOOL_SOURCE_ROUTE_KEYS = frozenset({"id", "path", "summary"})
 
 
+@dataclass(frozen=True)
+class CatalogMetadataPaths:
+    registry_paths: tuple[Path, ...]
+    tool_source_paths: tuple[Path, ...]
+
+
+def discover_catalog_metadata_paths(repo_root: Path) -> CatalogMetadataPaths:
+    """Discover both catalog sidecar kinds in one bounded traversal."""
+
+    candidates = discover_suffixed_files(
+        roots=catalog_metadata_search_roots(repo_root),
+        suffixes=(REGISTRY_METADATA_SUFFIX, TOOL_SOURCE_METADATA_SUFFIX),
+    )
+    return CatalogMetadataPaths(
+        registry_paths=tuple(path for path in candidates if path.name.endswith(REGISTRY_METADATA_SUFFIX)),
+        tool_source_paths=tuple(path for path in candidates if path.name.endswith(TOOL_SOURCE_METADATA_SUFFIX)),
+    )
+
+
 def load_catalog_procedures(
     *,
     repo_root: Path,
     catalog_path: Path,
+    metadata_paths: tuple[Path, ...] | None = None,
 ) -> tuple[tuple[CatalogProcedureEntry, ...], dict[str, tuple[CatalogProcedureRelation, ...]]]:
-    metadata_paths = tuple(sorted(_discover_registry_metadata_paths(repo_root)))
+    if metadata_paths is None:
+        metadata_paths = discover_catalog_metadata_paths(repo_root).registry_paths
     if not metadata_paths:
         raise ValueError("runbook catalog requires at least one '*.registry.yaml' procedure metadata file")
 
@@ -105,8 +130,10 @@ def load_catalog_tool_sources(
     *,
     repo_root: Path,
     catalog_path: Path,
+    metadata_paths: tuple[Path, ...] | None = None,
 ) -> tuple[CatalogToolSourceEntry, ...]:
-    metadata_paths = tuple(sorted(_discover_tool_source_metadata_paths(repo_root)))
+    if metadata_paths is None:
+        metadata_paths = discover_catalog_metadata_paths(repo_root).tool_source_paths
     if not metadata_paths:
         return ()
 
@@ -208,43 +235,6 @@ def validate_related_tool_routes(
                     "registry related tool route missing from catalog: "
                     f"{entry.registry_id} -> {reference.tool}/{reference.route_id}"
                 )
-
-
-def _discover_registry_metadata_paths(repo_root: Path) -> list[Path]:
-    candidates: list[Path] = []
-    for search_root in _registry_metadata_search_roots(repo_root):
-        for metadata_path in search_root.rglob(f"*{REGISTRY_METADATA_SUFFIX}"):
-            if any(segment in {"archived", "prototypes", "__pycache__"} for segment in metadata_path.parts):
-                continue
-            candidates.append(metadata_path.resolve())
-    return candidates
-
-
-def _discover_tool_source_metadata_paths(repo_root: Path) -> list[Path]:
-    candidates: list[Path] = []
-    for search_root in _registry_metadata_search_roots(repo_root):
-        for metadata_path in search_root.rglob(f"*{TOOL_SOURCE_METADATA_SUFFIX}"):
-            if any(segment in {"archived", "prototypes", "__pycache__"} for segment in metadata_path.parts):
-                continue
-            candidates.append(metadata_path.resolve())
-    return candidates
-
-
-def _registry_metadata_search_roots(repo_root: Path) -> tuple[Path, ...]:
-    search_roots: list[Path] = []
-
-    top_level_docs_root = (repo_root / "docs").resolve()
-    if top_level_docs_root.exists():
-        search_roots.append(top_level_docs_root)
-
-    tool_src_root = (repo_root / "src" / "dnadesign").resolve()
-    if tool_src_root.exists():
-        for tool_root in sorted(path for path in tool_src_root.iterdir() if path.is_dir()):
-            docs_root = (tool_root / "docs").resolve()
-            if docs_root.exists():
-                search_roots.append(docs_root)
-
-    return tuple(search_roots)
 
 
 def _load_registry_metadata_file(

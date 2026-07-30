@@ -939,6 +939,51 @@ def test_mode_auto_with_active_jobs_normalizes_comma_delimited_ids(tmp_path: Pat
     assert decision.hold_jid == "81001,81002"
 
 
+def test_mode_auto_blocks_partial_active_job_matches_when_discovery_is_unknown(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    runtime_visibility = orchestrator_state.RuntimeVisibility(
+        scheduler_probe_state=orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED,
+        active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+        degraded=True,
+        degraded_reasons=("active-job discovery budget exhausted",),
+    )
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81001",),
+        runtime_visibility=runtime_visibility,
+    )
+
+    assert decision.submit_behavior == "blocked"
+    assert decision.hold_jid is None
+    assert "submission_blocked_by_runtime_visibility" in decision.reason
+
+
+def test_mode_auto_chains_partial_active_job_matches_only_with_unknown_override(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    runtime_visibility = orchestrator_state.RuntimeVisibility(
+        scheduler_probe_state=orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED,
+        active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+        degraded=True,
+        degraded_reasons=("active-job discovery budget exhausted",),
+    )
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81001",),
+        runtime_visibility=runtime_visibility,
+        allow_unknown_active_jobs=True,
+    )
+
+    assert decision.submit_behavior == "hold_jid"
+    assert decision.hold_jid == "81001"
+    assert "submission_override_allow_unknown_active_jobs=true" in decision.reason
+
+
 def test_mode_auto_blocks_submit_when_current_host_is_not_submit_host_even_with_override(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
@@ -1410,7 +1455,8 @@ job-ID prior name user state submit/start at queue slots ja-task-ID
         ),
     }
 
-    def _probe(argv: tuple[str, ...]) -> tuple[int, str, str]:
+    def _probe(argv: tuple[str, ...], *, timeout_seconds: float | None = None) -> tuple[int, str, str]:
+        assert timeout_seconds is None or timeout_seconds > 0
         if argv[:2] == ("qstat", "-u"):
             return 0, qstat_table, ""
         if argv[:2] == ("qstat", "-j"):
@@ -1423,7 +1469,7 @@ job-ID prior name user state submit/start at queue slots ja-task-ID
     assert discovered == ("81001", "81002")
 
 
-def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches(
+def test_probe_active_jobs_caps_inspected_jobs_and_reports_unknown_visibility(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     runbook_path = _write_runbook(tmp_path)
@@ -1448,7 +1494,8 @@ def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches
     qstat_table = "\n".join(qstat_lines)
     seen_job_probes: list[str] = []
 
-    def _probe(argv: tuple[str, ...]) -> tuple[int, str, str]:
+    def _probe(argv: tuple[str, ...], *, timeout_seconds: float | None = None) -> tuple[int, str, str]:
+        assert timeout_seconds is None or timeout_seconds > 0
         if argv[:2] == ("qstat", "-u"):
             return 0, qstat_table, ""
         if argv[:2] == ("qstat", "-j"):
@@ -1458,11 +1505,152 @@ def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches
 
     monkeypatch.setattr(orchestrator_state, "_run_probe", _probe)
 
-    discovered = discover_active_job_ids_for_runbook(runbook, max_jobs=1)
+    resolution = orchestrator_state.probe_active_jobs_for_runbook(runbook, max_jobs=1)
 
-    assert discovered == ("81025",)
-    assert seen_job_probes[-1] == "81025"
-    assert "81026" not in seen_job_probes
+    assert resolution.discovered_job_ids == ()
+    assert seen_job_probes == ["81001"]
+    assert resolution.runtime_visibility.scheduler_probe_state == (
+        orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED
+    )
+    assert (
+        resolution.runtime_visibility.active_job_resolution_state == orchestrator_state.ActiveJobResolutionState.UNKNOWN
+    )
+    assert resolution.runtime_visibility.degraded is True
+    assert resolution.runtime_visibility.degraded_reasons == (
+        "active-job discovery inspected 1 of 26 queued jobs; --max-discovery-jobs=1 exhausted",
+    )
+
+
+def test_probe_active_jobs_enforces_overall_time_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    qstat_table = "\n".join(
+        (
+            "job-ID prior name user state submit/start at queue slots ja-task-ID",
+            "--------------------------------------------------------------------------------",
+            "81001 0.555 a b qw 03/01/2026 queueA 1",
+            "81002 0.555 a b qw 03/01/2026 queueA 1",
+        )
+    )
+    clock = iter((100.0, 100.0, 100.4, 101.1, 101.1))
+    seen_job_probes: list[str] = []
+
+    def _probe(argv: tuple[str, ...], *, timeout_seconds: float | None = None) -> tuple[int, str, str]:
+        assert timeout_seconds is not None
+        if argv[:2] == ("qstat", "-u"):
+            return 0, qstat_table, ""
+        seen_job_probes.append(str(argv[2]))
+        return 0, "context: ops_run_group_id=foreign", ""
+
+    monkeypatch.setattr(orchestrator_state.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(orchestrator_state, "_run_probe", _probe)
+
+    resolution = orchestrator_state.probe_active_jobs_for_runbook(runbook, max_jobs=10, budget_seconds=1.0)
+
+    assert seen_job_probes == ["81001"]
+    assert resolution.discovered_job_ids == ()
+    assert resolution.runtime_visibility.scheduler_probe_state == (
+        orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED
+    )
+    assert (
+        resolution.runtime_visibility.active_job_resolution_state == orchestrator_state.ActiveJobResolutionState.UNKNOWN
+    )
+    assert resolution.runtime_visibility.degraded_reasons == (
+        "active-job discovery exceeded its 1 second overall probe budget after inspecting 1 of 2 queued jobs",
+    )
+
+
+def test_active_job_resolution_preserves_confirmed_matches_when_discovery_is_incomplete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    partial_resolution = orchestrator_state.ActiveJobResolution(
+        explicit_job_ids=(),
+        discovered_job_ids=("81001",),
+        effective_job_ids=("81001",),
+        runtime_visibility=orchestrator_state.RuntimeVisibility(
+            scheduler_probe_state=orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED,
+            active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+            degraded=True,
+            degraded_reasons=("active-job discovery budget exhausted",),
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_state,
+        "probe_active_jobs_for_runbook",
+        lambda runbook, max_jobs: partial_resolution,
+    )
+
+    resolution = orchestrator_state.resolve_active_job_resolution(
+        runbook=runbook,
+        explicit_job_ids=(),
+        discover_active_jobs=True,
+        max_jobs=1,
+    )
+
+    assert resolution.discovered_job_ids == ("81001",)
+    assert resolution.effective_job_ids == ("81001",)
+    assert resolution.runtime_visibility == partial_resolution.runtime_visibility
+
+
+def test_explicit_job_ids_do_not_mask_incomplete_active_job_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    partial_resolution = orchestrator_state.ActiveJobResolution(
+        explicit_job_ids=(),
+        discovered_job_ids=("81001",),
+        effective_job_ids=("81001",),
+        runtime_visibility=orchestrator_state.RuntimeVisibility(
+            scheduler_probe_state=orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED,
+            active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+            degraded=True,
+            degraded_reasons=("active-job discovery budget exhausted",),
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_state,
+        "probe_active_jobs_for_runbook",
+        lambda runbook, max_jobs: partial_resolution,
+    )
+
+    resolution = orchestrator_state.resolve_active_job_resolution(
+        runbook=runbook,
+        explicit_job_ids=("81002",),
+        discover_active_jobs=True,
+        max_jobs=1,
+    )
+
+    assert resolution.explicit_job_ids == ("81002",)
+    assert resolution.discovered_job_ids == ("81001",)
+    assert resolution.effective_job_ids == ("81002", "81001")
+    assert resolution.runtime_visibility == partial_resolution.runtime_visibility
+
+
+def test_explicit_job_ids_do_not_mask_disabled_active_job_discovery(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    resolution = orchestrator_state.resolve_active_job_resolution(
+        runbook=runbook,
+        explicit_job_ids=("81002", "81001"),
+        discover_active_jobs=False,
+    )
+
+    assert resolution.explicit_job_ids == ("81002", "81001")
+    assert resolution.discovered_job_ids == ()
+    assert resolution.effective_job_ids == ("81002", "81001")
+    assert resolution.runtime_visibility.scheduler_probe_state == orchestrator_state.SchedulerProbeState.SKIPPED
+    assert (
+        resolution.runtime_visibility.active_job_resolution_state == orchestrator_state.ActiveJobResolutionState.UNKNOWN
+    )
+    assert resolution.runtime_visibility.degraded is True
+    assert resolution.runtime_visibility.degraded_reasons == (
+        "active-job discovery skipped while mode_policy.on_active_job=hold_jid; "
+        "manual job ids do not prove complete queue visibility",
+    )
 
 
 def test_batch_plan_submit_commands_include_explicit_job_identity_tags(tmp_path: Path) -> None:
@@ -1491,7 +1679,11 @@ def test_discover_active_job_ids_raises_when_qstat_snapshot_fails(
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
 
-    monkeypatch.setattr(orchestrator_state, "_run_probe", lambda argv: (1, "", "qstat unavailable"))
+    monkeypatch.setattr(
+        orchestrator_state,
+        "_run_probe",
+        lambda argv, *, timeout_seconds=None: (1, "", "qstat unavailable"),
+    )
 
     with pytest.raises(RuntimeError, match="qstat unavailable"):
         discover_active_job_ids_for_runbook(runbook, max_jobs=12)
@@ -1536,7 +1728,11 @@ def test_probe_active_jobs_for_runbook_classifies_submit_host_denial(
     monkeypatch.setattr(
         orchestrator_state,
         "_run_probe",
-        lambda argv: (1, "", 'error: denied: host "scc1.bu.edu" is neither submit nor admin host'),
+        lambda argv, *, timeout_seconds=None: (
+            1,
+            "",
+            'error: denied: host "scc1.bu.edu" is neither submit nor admin host',
+        ),
     )
 
     resolution = orchestrator_state.probe_active_jobs_for_runbook(runbook, max_jobs=12)
@@ -3685,6 +3881,42 @@ def test_cli_execute_blocks_submit_when_active_job_visibility_is_unknown(
     assert execute_called is False
 
 
+def test_cli_execute_blocks_manual_job_ids_when_discovery_is_disabled_without_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
+    execute_called = False
+
+    def _fake_execute_batch_plan(*, plan, audit_json_path, submit, command_timeout_seconds):
+        nonlocal execute_called
+        execute_called = True
+        raise AssertionError("execute_batch_plan should not be called when active-job visibility is unknown")
+
+    monkeypatch.setattr("dnadesign.ops.api.execute_batch_plan", _fake_execute_batch_plan)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "execute",
+            "--runbook",
+            str(runbook_path),
+            "--audit-json",
+            str(audit_path),
+            "--submit",
+            "--no-discover-active-jobs",
+            "--active-job-id",
+            "81001",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "active-job visibility is unavailable" in result.output
+    assert execute_called is False
+
+
 def test_cli_execute_blocks_submit_when_current_host_is_not_submit_host(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4328,7 +4560,7 @@ def test_cli_plan_chains_all_discovered_active_job_ids(tmp_path: Path, monkeypat
     assert payload["hold_jid"] == "93331,93332"
 
 
-def test_cli_plan_accepts_comma_delimited_active_job_ids(tmp_path: Path) -> None:
+def test_cli_plan_blocks_manual_job_ids_when_discovery_is_disabled_without_override(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runner = CliRunner()
 
@@ -4349,8 +4581,38 @@ def test_cli_plan_accepts_comma_delimited_active_job_ids(tmp_path: Path) -> None
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
+    assert payload["submit_behavior"] == "blocked"
+    assert payload["hold_jid"] is None
+    assert payload["runtime_visibility"]["active_job_resolution_state"] == "unknown"
+    assert payload["runtime_visibility"]["degraded"] is True
+
+
+def test_cli_plan_accepts_manual_job_ids_with_disabled_discovery_override(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_path),
+            "--no-discover-active-jobs",
+            "--active-job-id",
+            "93332,93331",
+            "--active-job-id",
+            "93332",
+            "--allow-unknown-active-jobs",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
     assert payload["submit_behavior"] == "hold_jid"
     assert payload["hold_jid"] == "93331,93332"
+    assert payload["runtime_visibility"]["active_job_resolution_state"] == "unknown"
+    assert payload["allow_unknown_active_jobs"] is True
 
 
 def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4378,7 +4640,10 @@ def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytes
     assert payload["active_job_count"] == 2
     assert payload["active_job_ids_csv"] == "95001,95002"
     assert payload["active_job_id_args"] == "--active-job-id 95001 --active-job-id 95002"
-    assert "--no-discover-active-jobs --active-job-id 95001 --active-job-id 95002" in payload["plan_command_hint"]
+    assert (
+        "--no-discover-active-jobs --active-job-id 95001 --active-job-id 95002 --allow-unknown-active-jobs"
+        in payload["plan_command_hint"]
+    )
 
 
 def test_packaged_runbook_presets_exist_and_load() -> None:

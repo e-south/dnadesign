@@ -11,7 +11,7 @@
 **Status-kind:** ops-audit-json
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-07-30
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
 It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next procedure is about shared datasets rather than scheduler sequencing.
@@ -341,6 +341,9 @@ uv run ops runbook active-jobs --runbook <path-to-runbook.yaml> --repo-root <rep
 `active-jobs` emits `active_job_ids` plus ready-to-paste chaining hints: `active_job_ids_csv`, `active_job_id_args`, and `plan_command_hint`.
 OPS-submitted jobs also carry explicit scheduler identity tags so automatic matching does not rely on workspace-path token scraping alone. The visible job name remains operator-friendly, while the machine-readable identity carries the stable run-group and workspace ids used by active-job discovery and audit correlation.
 The payload also includes `runtime_visibility` so `no_match`, `multiple_matches`, and degraded scheduler visibility stay explicit in both JSON and CLI-adjacent tooling.
+Discovery bounds both the number of `qstat -j` detail probes and their combined
+wall-clock budget. If either bound prevents a complete queue inspection, OPS
+reports degraded `unknown` visibility instead of claiming that no job matched.
 
 Supported scheduler diagnostics:
 
@@ -390,12 +393,12 @@ uv run ops runbook execute \
 2. DenseGen `mode=auto` uses explicit workspace-state classification: `none -> fresh`, `resume_ready -> resume`, `partial -> contract error`; `resume_ready` includes run manifest, non-empty DenseGen attempts artifacts (`attempts.parquet` or `attempts_part-*.parquet`), or non-empty DenseGen-shaped records (`records.parquet` or `records__part-*.parquet`) validated against Arrow logical field names.
 3. DenseGen `mode=auto` treats registry-only reset state (`outputs/usr_datasets/registry.yaml` with no run manifest and no non-empty records) as `none`, so dry-run scaffolds can proceed without an explicit mode override.
 4. Active-job behavior is explicit from `mode_policy.on_active_job` (`hold_jid` or `stop`), never implicit.
-5. `ops runbook plan` and `ops runbook execute` auto-discover matching active jobs by default from explicit OPS scheduler identity tags carried in job metadata; disable with `--no-discover-active-jobs`.
+5. `ops runbook plan` and `ops runbook execute` auto-discover matching active jobs by default from explicit OPS scheduler identity tags carried in job metadata; disabling discovery with `--no-discover-active-jobs` leaves visibility `unknown` even when manual job ids are supplied.
 6. The scheduler-visible job name is for operators; automatic matching uses the machine-readable run-group and workspace identity tags rather than name or path heuristics alone.
 7. `ops runbook plan` and `ops runbook active-jobs` expose `runtime_visibility` with explicit `scheduler_probe_state` and `active_job_resolution_state` values.
 8. `ops runbook plan` may still return a useful dry-run plan when runtime visibility is degraded, but it records that degraded posture explicitly, emits an operator-visible warning, and does not silently collapse `unknown` into `no_match`.
 9. `ops runbook execute --submit` fails closed by default when `runtime_visibility.active_job_resolution_state=unknown`; use `--allow-unknown-active-jobs` only when degraded submit is intentionally accepted and audit JSON should record that override.
-10. Manual active-job input (`--active-job-id`) accepts repeat flags or comma-delimited values and normalizes to a deduplicated job-id set before `-hold_jid` chaining.
+10. Manual active-job input (`--active-job-id`) accepts repeat flags or comma-delimited values and normalizes to a deduplicated candidate set. It does not replace queue discovery; with discovery disabled, `--allow-unknown-active-jobs` is required before those ids may be used for `-hold_jid` chaining.
 11. Execution is fail-fast by phase: `preflight`, optional `notify_smoke`, then optional `submit`.
 12. `--command-timeout-seconds` applies per command and fails phase on timeout; default is `300`.
 13. DenseGen `mode=fresh` is blocked when resume artifacts already exist unless `--allow-fresh-reset` is explicitly provided.

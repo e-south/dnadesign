@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -31,27 +32,33 @@ SubmitBehavior = Literal["submit", "hold_jid", "blocked"]
 ResumeState = Literal["none", "resume_ready", "partial"]
 _OPS_IDENTITY_KEYS = ("ops_run_group_id", "ops_workspace_id", "ops_workflow_id")
 _SCHEDULER_PROBE_TIMEOUT_SECONDS = 10.0
+_SCHEDULER_DISCOVERY_BUDGET_SECONDS = 10.0
 _SUBMIT_HOST_DENIED_TOKENS = (
     "is no submit host",
     "neither submit nor admin host",
 )
 
 
-def _run_probe(argv: Sequence[str]) -> tuple[int, str, str]:
+def _run_probe(
+    argv: Sequence[str],
+    *,
+    timeout_seconds: float | None = None,
+) -> tuple[int, str, str]:
+    effective_timeout = _SCHEDULER_PROBE_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
     try:
         result = subprocess.run(
             list(argv),
             check=False,
             capture_output=True,
             text=True,
-            timeout=_SCHEDULER_PROBE_TIMEOUT_SECONDS,
+            timeout=effective_timeout,
         )
     except OSError as exc:
         cmd = str(argv[0]) if argv else "command"
         return 127, "", f"{cmd} unavailable: {exc}"
     except subprocess.TimeoutExpired:
         cmd = str(argv[0]) if argv else "command"
-        return 124, "", f"{cmd} unavailable: timed out after {_SCHEDULER_PROBE_TIMEOUT_SECONDS:g} seconds"
+        return 124, "", f"{cmd} unavailable: timed out after {effective_timeout:g} seconds"
     return int(result.returncode), result.stdout, result.stderr
 
 
@@ -82,6 +89,7 @@ class SchedulerProbeState(StrEnum):
     UNAVAILABLE = "unavailable"
     UNSUPPORTED = "unsupported"
     ERROR = "error"
+    BUDGET_EXHAUSTED = "budget_exhausted"
 
 
 class ActiveJobResolutionState(StrEnum):
@@ -295,6 +303,7 @@ def probe_active_jobs_for_runbook(
     runbook: OrchestrationRunbookV1,
     *,
     max_jobs: int = 24,
+    budget_seconds: float = _SCHEDULER_DISCOVERY_BUDGET_SECONDS,
 ) -> ActiveJobResolution:
     if max_jobs <= 0:
         return ActiveJobResolution(
@@ -308,15 +317,36 @@ def probe_active_jobs_for_runbook(
             ),
         )
 
+    if budget_seconds <= 0:
+        return ActiveJobResolution(
+            explicit_job_ids=(),
+            discovered_job_ids=(),
+            effective_job_ids=(),
+            runtime_visibility=RuntimeVisibility(
+                scheduler_probe_state=SchedulerProbeState.BUDGET_EXHAUSTED,
+                active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
+                degraded=True,
+                degraded_reasons=("active-job discovery requires an overall probe budget greater than zero",),
+            ),
+        )
+
     identity = resolve_ops_job_identity(runbook)
+    deadline = time.monotonic() + budget_seconds
     user = os.environ.get("USER", "")
-    return_code, stdout, stderr = _run_probe(("qstat", "-u", user))
+    return_code, stdout, stderr = _run_probe(
+        ("qstat", "-u", user),
+        timeout_seconds=max(0.001, deadline - time.monotonic()),
+    )
     if return_code != 0:
         message = stderr.strip() or stdout.strip() or "qstat -u failed"
         probe_state = (
-            SchedulerProbeState.HOST_DENIED
-            if _is_submit_host_denied_message(message)
-            else SchedulerProbeState.UNAVAILABLE
+            SchedulerProbeState.BUDGET_EXHAUSTED
+            if return_code == 124
+            else (
+                SchedulerProbeState.HOST_DENIED
+                if _is_submit_host_denied_message(message)
+                else SchedulerProbeState.UNAVAILABLE
+            )
         )
         return ActiveJobResolution(
             explicit_job_ids=(),
@@ -333,13 +363,39 @@ def probe_active_jobs_for_runbook(
     active_job_ids: list[str] = []
     degraded_reasons: list[str] = []
     scheduler_probe_state = SchedulerProbeState.OK
-    for job_id in _parse_job_ids_from_qstat_output(stdout):
-        if len(active_job_ids) >= max_jobs:
+    queued_job_ids = _parse_job_ids_from_qstat_output(stdout)
+    inspected_jobs = 0
+    for job_id in queued_job_ids:
+        if inspected_jobs >= max_jobs:
+            degraded_reasons.append(
+                f"active-job discovery inspected {inspected_jobs} of {len(queued_job_ids)} queued jobs; "
+                f"--max-discovery-jobs={max_jobs} exhausted"
+            )
+            scheduler_probe_state = SchedulerProbeState.BUDGET_EXHAUSTED
             break
-        rc, job_stdout, job_stderr = _run_probe(("qstat", "-j", str(job_id)))
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            degraded_reasons.append(
+                f"active-job discovery exceeded its {budget_seconds:g} second overall probe budget "
+                f"after inspecting {inspected_jobs} of {len(queued_job_ids)} queued jobs"
+            )
+            scheduler_probe_state = SchedulerProbeState.BUDGET_EXHAUSTED
+            break
+        inspected_jobs += 1
+        rc, job_stdout, job_stderr = _run_probe(
+            ("qstat", "-j", str(job_id)),
+            timeout_seconds=max(0.001, remaining_seconds),
+        )
         if rc != 0:
             message = job_stderr.strip() or job_stdout.strip() or f"qstat -j {job_id} failed"
             degraded_reasons.append(f"active-job detail probe failed for job {job_id}: {message}")
+            if rc == 124:
+                degraded_reasons.append(
+                    f"active-job discovery exceeded its {budget_seconds:g} second overall probe budget "
+                    f"after inspecting {inspected_jobs} of {len(queued_job_ids)} queued jobs"
+                )
+                scheduler_probe_state = SchedulerProbeState.BUDGET_EXHAUSTED
+                break
             scheduler_probe_state = SchedulerProbeState.ERROR
             continue
         job_name, tags = _parse_qstat_job_metadata(job_stdout)
@@ -379,50 +435,26 @@ def resolve_active_job_resolution(
 ) -> ActiveJobResolution:
     normalized_explicit_job_ids = _dedupe_job_ids(explicit_job_ids)
     if not discover_active_jobs:
-        if normalized_explicit_job_ids:
-            return ActiveJobResolution(
-                explicit_job_ids=normalized_explicit_job_ids,
-                discovered_job_ids=(),
-                effective_job_ids=normalized_explicit_job_ids,
-                runtime_visibility=RuntimeVisibility(
-                    scheduler_probe_state=SchedulerProbeState.SKIPPED,
-                    active_job_resolution_state=_active_job_resolution_state_for_job_ids(normalized_explicit_job_ids),
-                    degraded=False,
-                ),
-            )
+        manual_ids_reason = (
+            "; manual job ids do not prove complete queue visibility" if normalized_explicit_job_ids else ""
+        )
         return ActiveJobResolution(
-            explicit_job_ids=(),
+            explicit_job_ids=normalized_explicit_job_ids,
             discovered_job_ids=(),
-            effective_job_ids=(),
+            effective_job_ids=normalized_explicit_job_ids,
             runtime_visibility=RuntimeVisibility(
                 scheduler_probe_state=SchedulerProbeState.SKIPPED,
                 active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
                 degraded=True,
                 degraded_reasons=(
-                    f"active-job discovery skipped while mode_policy.on_active_job={runbook.mode_policy.on_active_job}",
+                    "active-job discovery skipped while "
+                    f"mode_policy.on_active_job={runbook.mode_policy.on_active_job}{manual_ids_reason}",
                 ),
             ),
         )
 
     try:
-        discovered_job_ids = discover_active_job_ids_for_runbook(runbook, max_jobs=max_jobs)
-        auto_resolution = ActiveJobResolution(
-            explicit_job_ids=(),
-            discovered_job_ids=discovered_job_ids,
-            effective_job_ids=discovered_job_ids,
-            runtime_visibility=RuntimeVisibility(
-                scheduler_probe_state=SchedulerProbeState.OK,
-                active_job_resolution_state=_active_job_resolution_state_for_job_ids(discovered_job_ids),
-                degraded=False,
-            ),
-        )
-    except ActiveJobProbeError as exc:
-        auto_resolution = ActiveJobResolution(
-            explicit_job_ids=(),
-            discovered_job_ids=(),
-            effective_job_ids=(),
-            runtime_visibility=exc.runtime_visibility,
-        )
+        auto_resolution = probe_active_jobs_for_runbook(runbook, max_jobs=max_jobs)
     except RuntimeError as exc:
         probe_state = (
             SchedulerProbeState.HOST_DENIED
@@ -442,7 +474,10 @@ def resolve_active_job_resolution(
         )
     effective_job_ids = _dedupe_job_ids((*normalized_explicit_job_ids, *auto_resolution.discovered_job_ids))
     runtime_visibility = auto_resolution.runtime_visibility
-    if normalized_explicit_job_ids:
+    if (
+        normalized_explicit_job_ids
+        and auto_resolution.runtime_visibility.active_job_resolution_state is not ActiveJobResolutionState.UNKNOWN
+    ):
         runtime_visibility = RuntimeVisibility(
             scheduler_probe_state=auto_resolution.runtime_visibility.scheduler_probe_state,
             active_job_resolution_state=_active_job_resolution_state_for_job_ids(effective_job_ids),
@@ -732,7 +767,21 @@ def resolve_mode_decision(
 
     selected_runtime_visibility = runtime_visibility or _default_runtime_visibility_for_job_ids(active_job_ids)
     hold_jid_candidates = _normalize_hold_jid(active_job_ids)
-    if hold_jid_candidates is not None:
+    active_job_visibility_unknown = (
+        selected_runtime_visibility.active_job_resolution_state == ActiveJobResolutionState.UNKNOWN
+    )
+    if (
+        active_job_visibility_unknown
+        and selected_runtime_visibility.scheduler_probe_state == SchedulerProbeState.HOST_DENIED
+    ):
+        submit_behavior = "blocked"
+        reason = f"{reason}; current_host_not_submit_host"
+    elif active_job_visibility_unknown and not allow_unknown_active_jobs:
+        submit_behavior = "blocked"
+        reason = f"{reason}; active_job_visibility_unknown; submission_blocked_by_runtime_visibility"
+    elif hold_jid_candidates is not None:
+        if active_job_visibility_unknown:
+            reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
         if runbook.mode_policy.on_active_job == "hold_jid":
             submit_behavior = "hold_jid"
             hold_jid = hold_jid_candidates
@@ -740,15 +789,8 @@ def resolve_mode_decision(
         else:
             submit_behavior = "blocked"
             reason = f"{reason}; active_jobs_detected; submission_blocked_by_policy"
-    elif selected_runtime_visibility.active_job_resolution_state == ActiveJobResolutionState.UNKNOWN:
-        if selected_runtime_visibility.scheduler_probe_state == SchedulerProbeState.HOST_DENIED:
-            submit_behavior = "blocked"
-            reason = f"{reason}; current_host_not_submit_host"
-        elif allow_unknown_active_jobs:
-            reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
-        else:
-            submit_behavior = "blocked"
-            reason = f"{reason}; active_job_visibility_unknown; submission_blocked_by_runtime_visibility"
+    elif active_job_visibility_unknown:
+        reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
     else:
         reason = f"{reason}; active_job_visibility={selected_runtime_visibility.active_job_resolution_state.value}"
 

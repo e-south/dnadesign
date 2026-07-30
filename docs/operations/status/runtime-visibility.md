@@ -1,7 +1,7 @@
 ## OPS runtime visibility
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-07-30
 
 Scheduler probes, active-job resolution, and degraded submit behavior in
 `ops runbook` follow this contract.
@@ -57,10 +57,13 @@ workspace-path token guessing.
 
 ### Manual overrides
 
-- `--active-job-id` remains the safe manual fallback when operators already know
-  the job ids that should be chained or blocked against.
-- `--no-discover-active-jobs` with no manual ids leaves active-job posture
-  unknown, so submit is blocked by default.
+- `--active-job-id` records job ids already known to the operator. Manual ids are
+  candidates for chaining or blocking; they do not prove that the queue contains
+  no other matching jobs.
+- `--no-discover-active-jobs` always leaves active-job posture unknown, including
+  when manual ids are supplied. Submission is blocked unless the operator also
+  supplies `--allow-unknown-active-jobs`; known ids remain available for an
+  explicitly authorized `hold_jid` chain.
 
 ### Supported diagnostics
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .metadata import (
+    discover_catalog_metadata_paths,
     index_catalog_procedures,
     index_catalog_tool_routes,
     index_catalog_tool_sources,
@@ -32,13 +33,17 @@ def load_runbook_catalog(*, repo_root: Path | None = None) -> RunbookCatalog:
     if not catalog_path.exists():
         raise ValueError("runbook catalog missing: docs/runbooks/README.md")
 
+    metadata_paths = discover_catalog_metadata_paths(resolved_repo_root)
+
     procedures, procedure_relations = load_catalog_procedures(
         repo_root=resolved_repo_root,
         catalog_path=catalog_path,
+        metadata_paths=metadata_paths.registry_paths,
     )
     tool_sources = load_catalog_tool_sources(
         repo_root=resolved_repo_root,
         catalog_path=catalog_path,
+        metadata_paths=metadata_paths.tool_source_paths,
     )
     procedure_index = index_catalog_procedures(procedures)
     tool_source_index = index_catalog_tool_sources(tool_sources)
