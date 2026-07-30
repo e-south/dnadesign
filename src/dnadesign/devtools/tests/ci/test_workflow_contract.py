@@ -141,6 +141,22 @@ def test_third_party_workflow_actions_are_pinned_to_full_commit_shas() -> None:
     assert unpinned == []
 
 
+def test_dependency_review_workflow_is_pr_only_and_least_privilege() -> None:
+    workflow = _workflow("dependency-review.yaml")
+    triggers = workflow.get("on", workflow.get(True))
+
+    assert set(triggers) == {"pull_request"}
+    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["concurrency"]["cancel-in-progress"] is True
+    assert "pull_request.number" in workflow["concurrency"]["group"]
+    assert set(workflow["jobs"]) == {"dependency-review"}
+
+    job = workflow["jobs"]["dependency-review"]
+    assert "permissions" not in job
+    review_step = next(step for step in job["steps"] if step["uses"].startswith("actions/dependency-review-action@"))
+    assert review_step["with"]["fail-on-severity"] == "moderate"
+
+
 def test_codecov_uploads_use_node24_compatible_action() -> None:
     workflow = _workflow()
     expected_ref = "codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f"
