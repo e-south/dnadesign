@@ -150,6 +150,9 @@ jobs:
       - name: Format check
         run: uv run ruff format --check .
 
+      - name: Dependency security contracts
+        run: uv run pytest -q src/dnadesign/devtools/tests/security/test_dependency_security_contract.py
+
       - name: Install FFmpeg
         if: >
           needs.detect-ci-scope.outputs.run-full-core == 'true' ||

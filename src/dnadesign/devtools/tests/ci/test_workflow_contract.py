@@ -89,6 +89,16 @@ def test_core_precommit_defers_detect_secrets_to_dedicated_lane() -> None:
     assert set(precommit_step["env"]["SKIP"].split(",")) == {"ruff-check", "ruff-format", "detect-secrets"}
 
 
+def test_core_lane_always_runs_dependency_security_contract() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["core-lint-test-build"]["steps"]
+    security_step = next(step for step in steps if step.get("name") == "Dependency security contracts")
+
+    assert security_step["run"] == (
+        "uv run pytest -q src/dnadesign/devtools/tests/security/test_dependency_security_contract.py"
+    )
+
+
 def test_scope_outputs_expose_core_external_integration_keys() -> None:
     workflow = _workflow()
     outputs = workflow["jobs"]["detect-ci-scope"]["outputs"]

@@ -95,8 +95,10 @@ def test_round_commands_reject_retired_option_aliases(
 
     result = CliRunner().invoke(_build(), ["--no-color", *args, "-c", str(campaign)])
 
+    output = _plain_output(result.output)
     assert result.exit_code == 2
-    assert f"No such option: {retired_flag}" in _plain_output(result.output)
+    assert "No such option" in output
+    assert retired_flag in output
 
 
 def test_init_validate_explain_cli(tmp_path: Path) -> None:

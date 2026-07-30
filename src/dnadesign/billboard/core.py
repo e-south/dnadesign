@@ -38,7 +38,7 @@ def load_pt_files(paths):
     logger.info(f"Loading .pt files: {paths}")
     seqs = []
     for p in paths:
-        data = torch.load(p, map_location="cpu", weights_only=False)
+        data = torch.load(p, map_location="cpu", weights_only=True)
         if not isinstance(data, list):
             raise ValueError(f"Expected list in {p}, got {type(data)}")
         seqs.extend(data)

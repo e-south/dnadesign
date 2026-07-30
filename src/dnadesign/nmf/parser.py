@@ -53,7 +53,7 @@ def load_pt_file(pt_path: str) -> List[Dict]:
     Load a .pt file that contains a list of sequence dictionaries.
     """
     try:
-        data = torch.load(pt_path, map_location="cpu")
+        data = torch.load(pt_path, map_location="cpu", weights_only=True)
     except Exception as e:
         raise ValueError(f"Failed to load .pt file {pt_path}: {str(e)}")
     if not isinstance(data, list):
