@@ -11,6 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
+import shutil
+import uuid
+from dataclasses import dataclass, replace
 from itertools import islice
 from pathlib import Path
 from typing import Iterable, Iterator
@@ -29,6 +33,133 @@ from ..io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
 from ..pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
 from ..reporting import RunReport
 from ..runtime import initialize_runtime
+
+
+@dataclass(frozen=True)
+class _PublicationTarget:
+    final: Path
+    staging: Path
+
+
+def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
+    if isinstance(output, ImagesOutputCfg):
+        if output.path is not None:
+            return output.path
+        assert output.dir is not None
+        return output.dir
+    return output.path
+
+
+def _publication_targets(job: RenderJobV3) -> tuple[_PublicationTarget, ...]:
+    destinations = [
+        (_output_destination(output).resolve(), isinstance(output, ImagesOutputCfg) and output.dir is not None)
+        for output in job.outputs
+    ]
+    if job.run.emit_report and job.run.report_path is not None:
+        destinations.append((job.run.report_path.resolve(), False))
+
+    for index, (left, _left_is_dir) in enumerate(destinations):
+        for right, _right_is_dir in destinations[index + 1 :]:
+            if left == right or left in right.parents or right in left.parents:
+                raise SchemaError(f"Batch output destinations must not overlap: {left} and {right}")
+
+    token = uuid.uuid4().hex
+    return tuple(
+        _PublicationTarget(
+            final=destination,
+            staging=(
+                destination.parent / f".{destination.name}.staging-{token}"
+                if is_directory
+                else destination.parent / f".{destination.stem}.staging-{token}{destination.suffix}"
+            ),
+        )
+        for destination, is_directory in destinations
+    )
+
+
+def _validate_publication_conflicts(
+    targets: tuple[_PublicationTarget, ...],
+    *,
+    conflict_policy: str,
+) -> None:
+    if conflict_policy == "replace":
+        return
+    conflicts = [target.final for target in targets if target.final.exists() or target.final.is_symlink()]
+    if conflicts:
+        rendered = ", ".join(str(path) for path in conflicts)
+        raise SchemaError(
+            f"Batch output already exists: {rendered}; set run.conflict_policy to 'replace' to replace it"
+        )
+
+
+def _staged_job(job: RenderJobV3, targets: tuple[_PublicationTarget, ...]) -> RenderJobV3:
+    by_final = {target.final: target.staging for target in targets}
+    staged_outputs: list[ImagesOutputCfg | VideoOutputCfg] = []
+    for output in job.outputs:
+        final = _output_destination(output).resolve()
+        staging = by_final[final]
+        if isinstance(output, ImagesOutputCfg):
+            staged_outputs.append(
+                replace(
+                    output,
+                    dir=staging if output.dir is not None else None,
+                    path=staging if output.path is not None else None,
+                )
+            )
+        else:
+            staged_outputs.append(replace(output, path=staging))
+    staged_report = None
+    if job.run.emit_report and job.run.report_path is not None:
+        staged_report = by_final[job.run.report_path.resolve()]
+    return replace(
+        job,
+        outputs=tuple(staged_outputs),
+        run=replace(job.run, report_path=staged_report),
+    )
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
+
+
+def _cleanup_staging(targets: tuple[_PublicationTarget, ...]) -> None:
+    for target in targets:
+        _remove_path(target.staging)
+
+
+def _publish_batch(targets: tuple[_PublicationTarget, ...], *, conflict_policy: str) -> None:
+    missing = [target.staging for target in targets if not target.staging.exists()]
+    if missing:
+        rendered = ", ".join(str(path) for path in missing)
+        raise SchemaError(f"Batch output staging is incomplete: {rendered}")
+
+    token = uuid.uuid4().hex
+    backups: dict[Path, Path] = {}
+    published: list[Path] = []
+    try:
+        if conflict_policy == "replace":
+            for target in targets:
+                if not (target.final.exists() or target.final.is_symlink()):
+                    continue
+                backup = target.final.parent / f".{target.final.name}.backup-{token}"
+                os.replace(target.final, backup)
+                backups[target.final] = backup
+        for target in targets:
+            os.replace(target.staging, target.final)
+            published.append(target.final)
+    except Exception:
+        for path in reversed(published):
+            _remove_path(path)
+        for final, backup in backups.items():
+            if backup.exists() or backup.is_symlink():
+                os.replace(backup, final)
+        raise
+    else:
+        for backup in backups.values():
+            _remove_path(backup)
 
 
 def _iter_records(job: RenderJobV3, report: RunReport) -> Iterator[Record]:
@@ -123,86 +254,109 @@ def run_sequence_rows_job(
 
     records = _materialize_before_strict_outputs(records, job, report)
 
+    targets = _publication_targets(job)
+    _validate_publication_conflicts(targets, conflict_policy=job.run.conflict_policy)
+    original_job = job
+    job = _staged_job(job, targets)
+
     img_output = output_kind(job, "images")
     vid_output = output_kind(job, "video")
 
-    if isinstance(vid_output, VideoOutputCfg):
-        from ..outputs import effective_video_frames_per_record, planned_video_frame_count, write_images, write_video
+    try:
+        if isinstance(vid_output, VideoOutputCfg):
+            from ..outputs import (
+                effective_video_frames_per_record,
+                planned_video_frame_count,
+                write_images,
+                write_video,
+            )
 
-        materialized = list(records)
-        report.yielded_records = len(materialized)
-        if not materialized:
-            raise SchemaError("No records to render after adapter, transforms, and selection")
-        planned_frame_count = planned_video_frame_count(materialized, output=vid_output)
-        effective_frames_per_record = effective_video_frames_per_record(materialized, output=vid_output)
-        if isinstance(img_output, ImagesOutputCfg):
-            out_dir = write_images(
+            materialized = list(records)
+            report.yielded_records = len(materialized)
+            if not materialized:
+                raise SchemaError("No records to render after adapter, transforms, and selection")
+            planned_frame_count = planned_video_frame_count(materialized, output=vid_output)
+            effective_frames_per_record = effective_video_frames_per_record(materialized, output=vid_output)
+            if isinstance(img_output, ImagesOutputCfg):
+                write_images(
+                    materialized,
+                    output=img_output,
+                    renderer_name=job.render.renderer,
+                    style=style,
+                    palette=palette,
+                )
+                original_images = output_kind(original_job, "images")
+                assert isinstance(original_images, ImagesOutputCfg)
+                final_images = _output_destination(original_images).resolve()
+                report.outputs["images_path" if original_images.path is not None else "images_dir"] = str(final_images)
+            write_video(
+                materialized,
+                output=vid_output,
+                renderer_name=job.render.renderer,
+                style=style,
+                palette=palette,
+            )
+            original_video = output_kind(original_job, "video")
+            assert isinstance(original_video, VideoOutputCfg)
+            report.outputs["video_path"] = str(original_video.path.resolve())
+            report.output_metrics["video"] = {
+                "record_count": len(materialized),
+                "planned_frame_count": planned_frame_count,
+                "fps": int(vid_output.fps),
+                "frames_per_record": effective_frames_per_record,
+            }
+        elif isinstance(img_output, ImagesOutputCfg):
+            from ..outputs import write_images
+
+            if isinstance(records, list):
+                materialized = records
+            else:
+                iterator = iter(records)
+                try:
+                    first = next(iterator)
+                except StopIteration as exc:
+                    raise SchemaError("No records to render after adapter, transforms, and selection") from exc
+
+                emitted = 0
+
+                def _counted_records() -> Iterator[Record]:
+                    nonlocal emitted
+                    emitted += 1
+                    yield first
+                    for record in iterator:
+                        emitted += 1
+                        yield record
+
+                materialized = list(_counted_records())
+                report.yielded_records = emitted
+
+            if not materialized:
+                raise SchemaError("No records to render after adapter, transforms, and selection")
+            write_images(
                 materialized,
                 output=img_output,
                 renderer_name=job.render.renderer,
                 style=style,
                 palette=palette,
             )
-            report.outputs["images_dir"] = str(out_dir)
-        out_path = write_video(
-            materialized,
-            output=vid_output,
-            renderer_name=job.render.renderer,
-            style=style,
-            palette=palette,
-        )
-        report.outputs["video_path"] = str(out_path)
-        report.output_metrics["video"] = {
-            "record_count": len(materialized),
-            "planned_frame_count": planned_frame_count,
-            "fps": int(vid_output.fps),
-            "frames_per_record": effective_frames_per_record,
-        }
-    elif isinstance(img_output, ImagesOutputCfg):
-        from ..outputs import write_images
-
-        if isinstance(records, list):
-            materialized = records
+            report.yielded_records = len(materialized)
+            original_images = output_kind(original_job, "images")
+            assert isinstance(original_images, ImagesOutputCfg)
+            final_images = _output_destination(original_images).resolve()
+            report.outputs["images_path" if original_images.path is not None else "images_dir"] = str(final_images)
         else:
-            iterator = iter(records)
-            try:
-                first = next(iterator)
-            except StopIteration as exc:
-                raise SchemaError("No records to render after adapter, transforms, and selection") from exc
+            raise SchemaError("No supported outputs configured")
 
-            emitted = 0
+        if job.run.emit_report and job.run.report_path is not None:
+            original_report = original_job.run.report_path
+            assert original_report is not None
+            report.outputs["report_path"] = str(original_report.resolve())
+            report.write(job.run.report_path)
 
-            def _counted_records() -> Iterator[Record]:
-                nonlocal emitted
-                emitted += 1
-                yield first
-                for record in iterator:
-                    emitted += 1
-                    yield record
-
-            materialized = list(_counted_records())
-            report.yielded_records = emitted
-
-        if not materialized:
-            raise SchemaError("No records to render after adapter, transforms, and selection")
-        out_path_or_dir = write_images(
-            materialized,
-            output=img_output,
-            renderer_name=job.render.renderer,
-            style=style,
-            palette=palette,
-        )
-        report.yielded_records = len(materialized)
-        if img_output.path is not None:
-            report.outputs["images_path"] = str(out_path_or_dir)
-        else:
-            report.outputs["images_dir"] = str(out_path_or_dir)
-    else:
-        raise SchemaError("No supported outputs configured")
-
-    if job.run.emit_report and job.run.report_path is not None:
-        report.write(job.run.report_path)
-        report.outputs["report_path"] = str(job.run.report_path)
+        _publish_batch(targets, conflict_policy=job.run.conflict_policy)
+    except Exception:
+        _cleanup_staging(targets)
+        raise
 
     return report
 

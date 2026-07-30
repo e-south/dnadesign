@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 
 import yaml
 
@@ -127,6 +127,7 @@ class RunCfg:
     fail_on_skips: bool
     emit_report: bool
     report_path: Path | None
+    conflict_policy: Literal["error", "replace"] = "error"
 
 
 @dataclass(frozen=True)
@@ -860,11 +861,17 @@ def _parse_run(job_path: Path, results_root: Path, raw: Any, *, allowed_roots: t
         data = {}
     else:
         data = require_mapping(raw, "run")
-    reject_unknown_keys(data, {"strict", "fail_on_skips", "emit_report", "report_path"}, "run")
+    reject_unknown_keys(
+        data,
+        {"strict", "fail_on_skips", "emit_report", "report_path", "conflict_policy"},
+        "run",
+    )
 
     strict = _parse_bool(data.get("strict"), field="run.strict", default=False)
     fail_on_skips = _parse_bool(data.get("fail_on_skips"), field="run.fail_on_skips", default=False)
     emit_report = _parse_bool(data.get("emit_report"), field="run.emit_report", default=False)
+    conflict_policy = str(data.get("conflict_policy", "error")).strip().lower()
+    require_one_of(conflict_policy, {"error", "replace"}, "run.conflict_policy")
 
     raw_report_path = data.get("report_path")
     if raw_report_path is None:
@@ -890,6 +897,7 @@ def _parse_run(job_path: Path, results_root: Path, raw: Any, *, allowed_roots: t
         fail_on_skips=fail_on_skips,
         emit_report=emit_report,
         report_path=report_path,
+        conflict_policy=conflict_policy,
     )
 
 

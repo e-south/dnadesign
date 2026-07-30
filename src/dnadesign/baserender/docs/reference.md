@@ -3,13 +3,13 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-19
+last_verified: 2026-07-30
 ---
 
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-19
+**Last verified:** 2026-07-30
 
 
 Single technical reference for operators and integrators.
@@ -213,6 +213,11 @@ Run reports:
 - workspace jobs default to `outputs/run_report.json`
 - non-workspace jobs default to `<results_root>/<job_name>/run_report.json`
 - there is no required `reports/` directory contract
+
+Publication:
+- `run.conflict_policy` defaults to `error`; an existing image, video, or report destination blocks the batch before rendering
+- set `run.conflict_policy: replace` only when the caller explicitly intends to replace the complete published batch
+- outputs are rendered to sibling staging paths and published only after every declared output succeeds
 
 Default `results_root`:
 - workspace jobs: `<workspace>/outputs`

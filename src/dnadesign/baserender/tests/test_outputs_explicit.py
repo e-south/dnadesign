@@ -181,3 +181,154 @@ def test_strict_skip_failure_happens_before_artifact_writes(tmp_path: Path) -> N
 
     assert not (results_root / job_path.stem / "images").exists()
     assert not report_path.exists()
+
+
+def test_existing_batch_output_fails_without_mutation_by_default(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    results_root = tmp_path / "results"
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=results_root,
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(tmp_path / "conflict.yaml", payload)
+    images_dir = results_root / job_path.stem / "images"
+    images_dir.mkdir(parents=True)
+    sentinel = images_dir / "keep.txt"
+    sentinel.write_text("original\n", encoding="utf-8")
+
+    with pytest.raises(SchemaError, match="already exists.*conflict_policy.*replace"):
+        run_cruncher_showcase_job(str(job_path))
+
+    assert sentinel.read_text(encoding="utf-8") == "original\n"
+    assert list(images_dir.iterdir()) == [sentinel]
+
+
+def test_replace_conflict_policy_replaces_complete_batch_output(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    results_root = tmp_path / "results"
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=results_root,
+        outputs=[{"kind": "images", "fmt": "png"}],
+        extra={
+            "run": {
+                "strict": False,
+                "fail_on_skips": False,
+                "emit_report": False,
+                "report_path": None,
+                "conflict_policy": "replace",
+            }
+        },
+    )
+    job_path = write_job(tmp_path / "replace.yaml", payload)
+    images_dir = results_root / job_path.stem / "images"
+    images_dir.mkdir(parents=True)
+    (images_dir / "stale.txt").write_text("stale\n", encoding="utf-8")
+
+    report = run_cruncher_showcase_job(str(job_path))
+
+    assert Path(report.outputs["images_dir"]) == images_dir.resolve()
+    assert not (images_dir / "stale.txt").exists()
+    assert [path.name for path in images_dir.iterdir()] == ["r1.png"]
+
+
+def test_output_failure_publishes_no_partial_batch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    results_root = tmp_path / "results"
+    report_path = results_root / "partial_report.json"
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=results_root,
+        outputs=[
+            {"kind": "images", "fmt": "png"},
+            {"kind": "video", "fmt": "mp4", "fps": 2, "frames_per_record": 1},
+        ],
+        extra={
+            "run": {
+                "strict": False,
+                "fail_on_skips": False,
+                "emit_report": True,
+                "report_path": str(report_path),
+            }
+        },
+    )
+    job_path = write_job(tmp_path / "partial.yaml", payload)
+
+    def _fail_video(*args, **kwargs):
+        del args, kwargs
+        raise SchemaError("simulated video failure")
+
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.write_video", _fail_video)
+
+    with pytest.raises(SchemaError, match="simulated video failure"):
+        run_cruncher_showcase_job(str(job_path))
+
+    batch_root = results_root / job_path.stem
+    assert not (batch_root / "images").exists()
+    assert not (batch_root / f"{job_path.stem}.mp4").exists()
+    assert not report_path.exists()
+    assert not list(results_root.rglob("*.staging-*"))
+
+
+def test_publication_failure_restores_replaced_batch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dnadesign.baserender.src.execution import runner as runner_module
+
+    parquet = _make_input_parquet(tmp_path)
+    results_root = tmp_path / "results"
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=results_root,
+        outputs=[
+            {"kind": "images", "fmt": "png"},
+            {"kind": "video", "fmt": "mp4", "fps": 2, "frames_per_record": 1},
+        ],
+        extra={
+            "run": {
+                "strict": False,
+                "fail_on_skips": False,
+                "emit_report": False,
+                "report_path": None,
+                "conflict_policy": "replace",
+            }
+        },
+    )
+    job_path = write_job(tmp_path / "rollback.yaml", payload)
+    batch_root = results_root / job_path.stem
+    images_dir = batch_root / "images"
+    video_path = batch_root / f"{job_path.stem}.mp4"
+    images_dir.mkdir(parents=True)
+    (images_dir / "original.txt").write_text("original images\n", encoding="utf-8")
+    video_path.write_bytes(b"original video")
+
+    def _fake_write_video(records, *, output, renderer_name, style, palette):
+        del records, renderer_name, style, palette
+        output.path.parent.mkdir(parents=True, exist_ok=True)
+        output.path.write_bytes(b"replacement video")
+        return output.path
+
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.write_video", _fake_write_video)
+    real_replace = runner_module.os.replace
+
+    def _fail_second_publication(source, destination):
+        source_path = Path(source)
+        destination_path = Path(destination)
+        if ".staging-" in source_path.name and destination_path == video_path.resolve():
+            raise OSError("simulated publication failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(runner_module.os, "replace", _fail_second_publication)
+
+    with pytest.raises(OSError, match="simulated publication failure"):
+        run_cruncher_showcase_job(str(job_path))
+
+    assert (images_dir / "original.txt").read_text(encoding="utf-8") == "original images\n"
+    assert video_path.read_bytes() == b"original video"
+    assert not list(batch_root.glob(".*.staging-*"))
+    assert not list(batch_root.glob(".*.backup-*"))
