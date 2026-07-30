@@ -12,7 +12,22 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1  # noqa: F401
+    from .sequence import LinearSsdnaCompositionV1, MsdDesignCatalogV1, MsdDesignReferenceV1  # noqa: F401
+    from .visual import (  # noqa: F401
+        CassetteViewsManifestV1,
+        CompositionReviewSvgV1,
+        HairpinTopologyViewV1,
+        LinearDuplexViewV1,
+        SequenceEvidenceMapV1,
+        ViennaRNAStructureSvgV1,
+        YiuHairpinTopologyV1,
+        YiuLinearStateV1,
+        YiuTopologyCartoonV1,
+    )
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "CassetteViewsManifestV1": (".visual", "CassetteViewsManifestV1"),

@@ -12,7 +12,23 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .core.contracts import (  # noqa: F401
+        DEFAULT_NOTIFY_WEBHOOK_SOURCES,
+        DEFAULT_SYSTEM_TLS_CA_BUNDLE_CANDIDATES,
+        TLSCABundleResolutionError,
+        parse_notify_profile_webhook,
+        resolve_file_secret_ref_path,
+        resolve_tls_ca_bundle_path,
+    )
+    from .core.errors import (  # noqa: F401
+        NotifyConfigError,
+        NotifyDeliveryError,
+        NotifyError,
+        NotifyValidationError,
+    )
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "DEFAULT_NOTIFY_WEBHOOK_SOURCES": (".core.contracts", "DEFAULT_NOTIFY_WEBHOOK_SOURCES"),

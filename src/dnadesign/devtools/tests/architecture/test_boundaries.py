@@ -551,7 +551,22 @@ def test_find_undeclared_cross_tool_imports_rejects_construct_contract_module_su
     assert violations[0].import_target == "dnadesign.construct.contracts"
 
 
-def test_find_undeclared_cross_tool_imports_allows_ops_to_notify_core_contracts(tmp_path: Path) -> None:
+def test_find_undeclared_cross_tool_imports_allows_ops_to_notify_public_package(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "ops" / "notify.py",
+        "from dnadesign.notify import run\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "notify" / "__init__.py",
+        "def run():\n    return 1\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_ops_to_notify_internal_core_surface(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "ops" / "notify.py",
         "from dnadesign.notify.core.contracts import run\n",
@@ -563,25 +578,10 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_notify_core_contracts(
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
-    assert violations == []
-
-
-def test_find_undeclared_cross_tool_imports_rejects_ops_to_notify_non_contract_surface(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "src" / "dnadesign" / "ops" / "notify.py",
-        "from dnadesign.notify.contracts import run\n",
-    )
-    _write(
-        tmp_path / "src" / "dnadesign" / "notify" / "contracts.py",
-        "def run():\n    return 1\n",
-    )
-
-    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
-
     assert len(violations) == 1
     assert violations[0].owner_tool == "ops"
     assert violations[0].imported_tool == "notify"
-    assert violations[0].import_target == "dnadesign.notify.contracts"
+    assert violations[0].import_target == "dnadesign.notify.core.contracts"
 
 
 def test_find_undeclared_cross_tool_imports_rejects_internal_src_target_even_for_allowed_edge(tmp_path: Path) -> None:

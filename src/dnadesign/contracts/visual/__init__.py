@@ -12,7 +12,21 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .cassette_views_manifest_v1 import CassetteViewsManifestV1  # noqa: F401
+    from .composition_review_svg_v1 import CompositionReviewSvgV1  # noqa: F401
+    from .hairpin_topology_v1 import HairpinTopologyViewV1  # noqa: F401
+    from .linear_duplex_v1 import LinearDuplexViewV1  # noqa: F401
+    from .scar_nick_visual_v1 import ScarNickVisualV1  # noqa: F401
+    from .sequence_evidence_map_v1 import SequenceEvidenceMapV1  # noqa: F401
+    from .snapback_visual_v1 import SnapbackVisualV1  # noqa: F401
+    from .viennarna_secondary_structure_svg_v1 import ViennaRNAStructureSvgV1  # noqa: F401
+    from .yiu_hairpin_topology_v1 import YiuHairpinTopologyV1  # noqa: F401
+    from .yiu_linear_state_v1 import YiuLinearStateV1  # noqa: F401
+    from .yiu_payload_visual_v1 import YiuPayloadVisualV1  # noqa: F401
+    from .yiu_topology_cartoon_v1 import YiuTopologyCartoonV1  # noqa: F401
 
 _LAZY_EXPORTS = {
     "CassetteViewsManifestV1": (".cassette_views_manifest_v1", "CassetteViewsManifestV1"),

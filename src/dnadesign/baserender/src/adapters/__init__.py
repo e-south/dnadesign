@@ -12,7 +12,29 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .cruncher_best_window import CruncherBestWindowAdapter  # noqa: F401
+    from .densegen_tfbs import DensegenTfbsAdapter  # noqa: F401
+    from .duplex_sequence_v1 import DuplexSequenceV1Adapter  # noqa: F401
+    from .generic_features import GenericFeaturesAdapter  # noqa: F401
+    from .hairpin_topology_v1 import HairpinTopologyV1Adapter  # noqa: F401
+    from .registry import (  # noqa: F401
+        Adapter,
+        build_adapter,
+        get_adapter_descriptor,
+        list_adapter_descriptors,
+        required_source_columns,
+    )
+    from .sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter  # noqa: F401
+    from .sequence_windows_v1 import SequenceWindowsV1Adapter  # noqa: F401
+    from .snapback_visual_v1 import SnapbackVisualV1Adapter  # noqa: F401
+    from .usr_genbank_annotations_v1 import UsrGenbankAnnotationsV1Adapter  # noqa: F401
+    from .yiu_hairpin_topology_v1 import YiuHairpinTopologyV1Adapter  # noqa: F401
+    from .yiu_linear_state_v1 import YiuLinearStateV1Adapter  # noqa: F401
+    from .yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter  # noqa: F401
+    from .yiu_topology_cartoon_v1 import YiuTopologyCartoonV1Adapter  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Adapter": (".registry", "Adapter"),

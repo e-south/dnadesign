@@ -15,6 +15,20 @@ import subprocess
 import sys
 
 
+def test_public_api_catalog_names_are_exact_reexports() -> None:
+    from dnadesign.baserender.src.public import api, catalog
+
+    for name in (
+        "get_adapter_descriptor",
+        "get_render_contract_descriptor",
+        "get_renderer_descriptor",
+        "list_adapters",
+        "list_render_contracts",
+        "list_renderers",
+    ):
+        assert getattr(api, name) is getattr(catalog, name)
+
+
 def test_api_module_import_does_not_preload_matplotlib() -> None:
     code = "import sys\nimport dnadesign.baserender.src.public.api\nprint('matplotlib' in sys.modules)\n"
     proc = subprocess.run(

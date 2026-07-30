@@ -12,7 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .linear_ssdna_composition_v1 import LinearSsdnaCompositionV1  # noqa: F401
+    from .msd_design_reference_v1 import MsdDesignCatalogV1, MsdDesignReferenceV1  # noqa: F401
 
 _LAZY_EXPORTS = {
     "LinearSsdnaCompositionV1": (".linear_ssdna_composition_v1", "LinearSsdnaCompositionV1"),

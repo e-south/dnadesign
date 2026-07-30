@@ -12,7 +12,21 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .api import (  # noqa: F401
+        FoldingPreflightResult,
+        load_prediction_request,
+        preflight_request,
+        run_prediction_request,
+    )
+    from .errors import FoldingConfigError, FoldingError, FoldingExecutionError  # noqa: F401
+    from .rnafold import parse_rnafold_stdout  # noqa: F401
+    from .viennarna_plot import (  # noqa: F401
+        enrich_prediction_pairing_qa,
+        publish_viennarna_structure_svg,
+    )
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "FoldingConfigError": (".errors", "FoldingConfigError"),

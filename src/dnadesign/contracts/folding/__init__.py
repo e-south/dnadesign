@@ -12,7 +12,13 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .secondary_structure_prediction_v1 import (  # noqa: F401
+        SecondaryStructurePredictionRequestV1,
+        SecondaryStructurePredictionV1,
+    )
 
 __all__ = ["SecondaryStructurePredictionRequestV1", "SecondaryStructurePredictionV1"]
 

@@ -16,14 +16,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from ..adapters import build_adapter, list_adapter_descriptors, required_source_columns
-from ..adapters import get_adapter_descriptor as _get_adapter_descriptor
+from ..adapters import build_adapter, required_source_columns
 from ..config import (
     AdapterCfg,
     RenderJobV4,
     load_render_job_from_mapping,
     render_contract_descriptor,
-    render_contract_descriptors,
     render_contract_kinds,
     resolve_style,
     validate_render_contract_renderer,
@@ -35,10 +33,9 @@ from ..config.adapter_contracts import normalize_adapter_config
 from ..core import Record, SchemaError, ensure
 from ..execution import run_render_job as _run_render_job
 from ..io import iter_parquet_rows
-from ..render.renderer import get_renderer_descriptor as _get_renderer_descriptor
-from ..render.renderer import renderer_descriptors
 from ..runtime import initialize_runtime
 from ..styles.curated import cruncher_showcase_style_overrides as _cruncher_showcase_style_overrides
+from . import catalog as _catalog
 from .sequence_panel import (
     BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
     BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION,
@@ -49,6 +46,13 @@ from .sequence_panel import (
     sequence_panel_config_for_adapter,
 )
 from .sequence_panel_layout import normalize_panel_image, sequence_center_y_px
+
+get_adapter_descriptor = _catalog.get_adapter_descriptor
+get_render_contract_descriptor = _catalog.get_render_contract_descriptor
+get_renderer_descriptor = _catalog.get_renderer_descriptor
+list_adapters = _catalog.list_adapters
+list_render_contracts = _catalog.list_render_contracts
+list_renderers = _catalog.list_renderers
 
 
 def _legend_tags(record: Record) -> tuple[str, ...]:
@@ -504,30 +508,6 @@ def run_job(
     if strict is not None:
         job = replace(job, run=replace(job.run, strict=bool(strict)))
     return run_render_job(job, caller_root=caller_root)
-
-
-def list_adapters() -> tuple[str, ...]:
-    return tuple(descriptor.kind for descriptor in list_adapter_descriptors())
-
-
-def get_adapter_descriptor(kind: str):
-    return _get_adapter_descriptor(kind)
-
-
-def list_renderers() -> tuple[str, ...]:
-    return tuple(descriptor.name for descriptor in renderer_descriptors())
-
-
-def get_renderer_descriptor(name: str):
-    return _get_renderer_descriptor(name)
-
-
-def list_render_contracts() -> tuple[str, ...]:
-    return tuple(descriptor.kind for descriptor in render_contract_descriptors())
-
-
-def get_render_contract_descriptor(kind: str):
-    return render_contract_descriptor(kind)
 
 
 def render(

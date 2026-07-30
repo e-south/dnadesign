@@ -12,7 +12,47 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dnadesign.baserender.src.config import BaseRenderJobV3, RenderContractDescriptor, RenderJobV3  # noqa: F401
+    from dnadesign.baserender.src.contracts import DENSEGEN_TFBS_REQUIRED_KEYS  # noqa: F401
+    from dnadesign.baserender.src.core import (  # noqa: F401
+        ContractError,
+        Display,
+        Effect,
+        Feature,
+        LayoutError,
+        Record,
+        SchemaError,
+        Span,
+    )
+    from dnadesign.baserender.src.public import (  # noqa: F401
+        adapt_record,
+        adapt_records,
+        cruncher_showcase_style_overrides,
+        get_adapter_descriptor,
+        get_render_contract_descriptor,
+        get_renderer_descriptor,
+        list_adapters,
+        list_render_contracts,
+        list_renderers,
+        load_record_from_parquet,
+        load_records_from_parquet,
+        render,
+        render_parquet_record_figure,
+        render_record_figure,
+        render_record_grid_figure,
+        run_cruncher_showcase_job,
+        run_job,
+        run_render_job,
+        run_sequence_rows_job,
+        validate_cruncher_showcase_job,
+        validate_job,
+        validate_render_job,
+        validate_sequence_rows_job,
+    )
+    from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
