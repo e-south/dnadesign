@@ -512,12 +512,8 @@ class LinearSsdnaCompositionV1(SequenceContractModel):
         return self
 
 
-LinearSsDnaCompositionV1 = LinearSsdnaCompositionV1
-
-
 __all__ = [
     "LinearSsdnaCompositionV1",
-    "LinearSsDnaCompositionV1",
     "LinearSsdnaUnitV1",
     "LinearSsdnaSegmentV1",
     "LinearSsdnaAnnotationV1",
