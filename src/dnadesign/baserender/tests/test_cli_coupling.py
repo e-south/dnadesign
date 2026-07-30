@@ -16,15 +16,24 @@ import sys
 from pathlib import Path
 
 
-def test_cli_module_import_does_not_preload_matplotlib() -> None:
-    code = "import sys\nimport dnadesign.baserender.src.cli\nprint('matplotlib' in sys.modules)\n"
+def test_cli_module_import_does_not_preload_numeric_or_render_stacks() -> None:
+    code = "\n".join(
+        [
+            "import sys",
+            "import dnadesign.baserender.src.cli",
+            "print('matplotlib' in sys.modules)",
+            "print('numpy' in sys.modules)",
+            "print('dnadesign.baserender.src.adapters.densegen_tfbs' in sys.modules)",
+            "print('dnadesign.baserender.src.public.api' in sys.modules)",
+        ]
+    )
     proc = subprocess.run(
         [sys.executable, "-c", code],
         check=True,
         capture_output=True,
         text=True,
     )
-    assert proc.stdout.strip().endswith("False")
+    assert proc.stdout.splitlines() == ["False", "False", "False", "False"]
 
 
 def test_cli_source_has_no_plotting_tokens() -> None:

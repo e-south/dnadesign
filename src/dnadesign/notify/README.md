@@ -10,3 +10,13 @@ Notify watches Universal Sequence Record events and sends webhook notifications 
 - [Reference index](docs/reference/README.md): strict command, profile, and boundary contracts.
 - [Maintainer architecture map](docs/dev/architecture.md): package module map and extension seams.
 - [Repository docs index](../../../docs/README.md): repo-wide docs index for cross-tool workflows.
+
+## Python integration
+
+Import stable configuration, validation, and webhook-profile contracts from
+`dnadesign.notify`. Command handlers and watcher runtimes remain internal
+implementation surfaces and are loaded only when invoked.
+
+```python
+from dnadesign.notify import NotifyConfigError, parse_notify_profile_webhook
+```

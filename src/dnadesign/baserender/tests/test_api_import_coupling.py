@@ -44,3 +44,24 @@ def test_package_root_import_does_not_preload_render_stack() -> None:
         text=True,
     )
     assert proc.stdout.splitlines() == ["False", "False", "False", "False"]
+
+
+def test_catalog_access_does_not_preload_adapters_or_numpy() -> None:
+    code = "\n".join(
+        [
+            "import sys",
+            "import dnadesign.baserender as baserender",
+            "print('densegen_tfbs' in baserender.list_adapters())",
+            "print('numpy' in sys.modules)",
+            "print('dnadesign.baserender.src.adapters.densegen_tfbs' in sys.modules)",
+            "print('dnadesign.baserender.src.public.api' in sys.modules)",
+        ]
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert proc.stdout.splitlines() == ["True", "False", "False", "False"]
