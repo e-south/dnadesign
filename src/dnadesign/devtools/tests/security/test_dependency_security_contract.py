@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/tests/security/test_dependency_security_contract.py
+
+Security contract tests for dependency floors and safe artifact loading.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import ast

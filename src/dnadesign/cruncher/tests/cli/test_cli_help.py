@@ -293,8 +293,10 @@ def test_fetch_motifs_requires_tf_or_motif_id() -> None:
 
 def test_fetch_motifs_rejects_campaign_option() -> None:
     result = invoke_cli(["fetch", "motifs", "--campaign", "demo_pair", str(CONFIG_PATH)])
-    assert result.exit_code != 0
-    assert "No such option: --campaign" in combined_output(result)
+    output = combined_output(result)
+    assert result.exit_code == 2
+    assert "No such option" in output
+    assert "--campaign" in output
 
 
 def test_global_config_option_resolves_workspace() -> None:
