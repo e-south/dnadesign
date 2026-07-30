@@ -54,7 +54,10 @@ def _load_yaml(path: Path) -> Dict:
         with path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except FileNotFoundError:
-        raise RemoteConfigError(f"Remote config not found: {path}")
+        raise RemoteConfigError(
+            f"Remote config not found: {path}. "
+            "Copy remotes.example.yaml to a private path and select it with --remotes-config or USR_REMOTES_PATH."
+        ) from None
     except (OSError, yaml.YAMLError) as e:
         raise RemoteConfigError(f"Failed to read config {path}: {e}") from e
 
@@ -63,10 +66,6 @@ def _dump_yaml(path: Path, obj: Dict) -> None:
     _ensure_parent(path)
     with path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(obj, f, sort_keys=True)
-
-
-def default_config_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "remotes.yaml"
 
 
 def locate_config(custom: Optional[Path] = None) -> Path:

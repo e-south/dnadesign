@@ -60,6 +60,31 @@ def test_remotes_wizard_bu_scc_writes_remote_and_prints_ssh_snippet(tmp_path: Pa
     assert payload["remotes"]["bu-scc"]["batch_mode"] is True
 
 
+def test_remotes_wizard_requires_copy_first_config(tmp_path: Path, monkeypatch) -> None:
+    remotes_path = tmp_path / "config" / "usr-remotes.yaml"
+    monkeypatch.setenv("USR_REMOTES_PATH", str(remotes_path))
+
+    result = CliRunner().invoke(
+        cli_module.app,
+        [
+            "remotes",
+            "wizard",
+            "--preset",
+            "bu-scc",
+            "--user",
+            "alice",
+            "--base-dir",
+            "/project/alice/usr_datasets",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert result.exception is not None
+    assert "Remote config not found" in str(result.exception)
+    assert "Copy remotes.example.yaml" in str(result.exception)
+    assert not remotes_path.exists()
+
+
 def test_remotes_add_can_disable_batch_mode(tmp_path: Path, monkeypatch) -> None:
     remotes_path = tmp_path / "config" / "usr-remotes.yaml"
     _write_remotes(remotes_path)

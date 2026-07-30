@@ -1,0 +1,20 @@
+# USR remote configuration example.
+#
+# Copy this file to an untracked location, replace the example values, and set
+# USR_REMOTES_PATH to that file before running remote commands.
+
+remotes:
+  cluster:
+    type: ssh
+    host: scc1.example.edu
+    user: example-user
+    base_dir: /project/example-lab/example-user/dnadesign/src/dnadesign/usr/datasets
+    repo_root: /project/example-lab/example-user/dnadesign
+    local_repo_root: /Users/example/projects/dnadesign
+
+  # Optional staging endpoint.
+  cluster-staging:
+    type: ssh
+    host: scc2.example.edu
+    user: example-user
+    base_dir: /project/example-lab/example-user/dnadesign/src/dnadesign/usr/datasets

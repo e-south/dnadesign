@@ -1,7 +1,7 @@
 ## Stress Record
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-07-30
 
 This lane is the factual checked-in record for the stress/ethanol/cipro growth
 study.
@@ -17,3 +17,9 @@ study.
 
 Use `../routes/README.md` for owner-surface navigation and
 `../operations/README.md` for Ops or command declarations.
+
+`usr_remotes_path` is `n/a` because this checked-in record does not own an
+operator remote profile. Remote-enabled commands select the untracked runtime
+configuration through `--remotes-config` or `USR_REMOTES_PATH`; follow the
+[USR sync setup](../../../../src/dnadesign/usr/docs/operations/sync/setup.md)
+for that operator-local configuration.

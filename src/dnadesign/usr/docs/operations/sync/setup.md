@@ -1,7 +1,7 @@
 # USR sync setup
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-30
 
 
 Use this page for one-time setup and periodic key hygiene.
@@ -74,8 +74,15 @@ Prefer `--remotes-config <path>` for each `usr` command so the chosen remotes
 file is explicit in the command line. `USR_REMOTES_PATH` is the fallback for a
 shell session that will reuse the same remotes file repeatedly.
 
+Remote commands do not create an implicit config. Copy the tracked example to
+a private file first; `install -m 600` keeps it owner-readable and
+owner-writable:
+
 ```bash
-# Create remote profile in an explicit remotes file.
+mkdir -p "$HOME/.config/dnadesign" # Create the private operator-config directory.
+install -m 600 src/dnadesign/usr/remotes.example.yaml "$HOME/.config/dnadesign/usr-remotes.yaml" # Copy with owner-only permissions.
+
+# Replace or add a profile in the explicit remotes file.
 uv run usr --remotes-config "$HOME/.config/dnadesign/usr-remotes.yaml" remotes wizard \
   --preset bu-scc \
   --name bu-scc \

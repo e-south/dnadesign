@@ -10,3 +10,20 @@ Universal Sequence Record (USR) stores sequence datasets with explicit overlay a
 - [Reference index](docs/reference/README.md): stable contracts for schema, overlays/registry, event payloads, and API usage.
 - [Architecture introspection](docs/architecture-introspection.md): package lifecycle, component boundaries, and interaction map.
 - [Repository docs index](../../../docs/README.md): cross-tool workflows that connect USR with DenseGen, Infer, and Notify.
+
+## Remote configuration
+
+Remote profiles are local operator configuration, not repository data. Copy
+[`remotes.example.yaml`](remotes.example.yaml) to a private, untracked path,
+replace the example values, and select it explicitly:
+
+```bash
+mkdir -p "$HOME/.config/dnadesign"
+install -m 600 src/dnadesign/usr/remotes.example.yaml "$HOME/.config/dnadesign/usr-remotes.yaml"
+# Edit usr-remotes.yaml and replace every example value before use.
+export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
+uv run usr remotes list
+```
+
+The loader does not fall back to the tracked example or to a repository-local
+active profile.
