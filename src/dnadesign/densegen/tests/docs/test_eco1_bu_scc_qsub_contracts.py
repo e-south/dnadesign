@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -47,7 +48,8 @@ def test_eco1_proteinmpnn_generation_policy_qsub_is_submit_ready() -> None:
     assert '--output-root "$policy_root"' in qsub_script
     assert '--proteinmpnn-root "$proteinmpnn_root"' in qsub_script
     assert "candidate_table.parquet" in qsub_script
-    assert "/project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs" in qsub_script
+    assert "/project/dunlop/esouth" not in qsub_script
+    assert "#$ -o" not in qsub_script
 
 
 def test_bu_scc_jobs_readme_documents_generation_policy_smoke_and_array_submit() -> None:
@@ -62,12 +64,32 @@ def test_bu_scc_jobs_readme_documents_generation_policy_smoke_and_array_submit()
     assert "candidate-pool" in jobs_readme
 
 
+def test_eco1_submission_and_log_pull_share_one_scc_log_root() -> None:
+    jobs_readme = _read(BU_SCC_JOBS / "README.md")
+
+    assert "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\\$JOB_ID.\\$TASK_ID.out" in jobs_readme
+    assert "${SCC_USER}@scc1.bu.edu:${SCC_LOG_ROOT}/eco1-rt-repack/" in jobs_readme
+    assert "${SCC_PROJECT_ROOT}/proteinmpnn/eco1_rt_generation_policies/sge_logs/" not in jobs_readme
+
+
+def test_bu_scc_readme_routes_every_qsub_to_a_parameterized_log_path() -> None:
+    jobs_readme = _read(BU_SCC_JOBS / "README.md")
+    bash_blocks = re.findall(r"```bash\n(.*?)```", jobs_readme, flags=re.DOTALL)
+    qsub_commands = re.findall(r"qsub(?: \\\n.*?)*?\.qsub", "\n".join(bash_blocks), flags=re.DOTALL)
+
+    assert qsub_commands
+    assert all(" -o " in command or "\n  -o " in command for command in qsub_commands)
+    assert all("${SCC_LOG_ROOT}/" in command and r"\$JOB_ID" in command for command in qsub_commands)
+
+
 def test_eco1_colabfold_qsub_requires_modern_gpu_capability() -> None:
     qsub_script = _read(BU_SCC_JOBS / "eco1-colabfold-foldcheck.qsub")
 
     assert "#$ -l gpus=1" in qsub_script
     assert "#$ -l gpu_compute_capability=6.0" in qsub_script
-    assert "$TASK_ID" in qsub_script
+    assert "/project/dunlop/esouth" not in qsub_script
+    assert "#$ -o" not in qsub_script
+    assert "foldcheck_scc_runs" in qsub_script
 
 
 def test_eco1_command_groups_include_scc_generation_policy_execution_lanes() -> None:
@@ -76,6 +98,12 @@ def test_eco1_command_groups_include_scc_generation_policy_execution_lanes() -> 
     by_id = {lane["id"]: lane for lane in pipeline["lanes"]}
 
     assert "docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub" in command_groups
+    command_group_blocks = re.findall(r"```bash\n(.*?)```", command_groups, flags=re.DOTALL)
+    documented_qsub = re.findall(r"qsub(?: \\\n.*?)*?\.qsub", "\n".join(command_group_blocks), flags=re.DOTALL)
+    assert documented_qsub
+    assert all("${SCC_LOG_ROOT}/" in command and r"\$JOB_ID" in command for command in documented_qsub)
+    assert "/project/dunlop/esouth" not in command_groups
+    assert "/projectnb/dunlop/esouth" not in command_groups
     assert "generation_policy_proteinmpnn_scc_smoke" in by_id
     assert "generation_policy_proteinmpnn_scc_array" in by_id
     assert by_id["generation_policy_proteinmpnn_scc_smoke"]["owner"] == "bu_scc_runtime"
@@ -87,3 +115,14 @@ def test_eco1_command_groups_include_scc_generation_policy_execution_lanes() -> 
     assert array_argv[:3] == ["qsub", "-t", "1-3"]
     assert any("PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn" in arg for arg in smoke_argv)
     assert "docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub" in array_argv
+
+    qsub_lanes = [lane for lane in pipeline["lanes"] if (lane.get("command") or {}).get("argv", [None])[0] == "qsub"]
+    assert qsub_lanes
+    for lane in qsub_lanes:
+        argv = lane["command"]["argv"]
+        assert "-o" in argv
+        assert argv[argv.index("-o") + 1].startswith("<scc_log_root>/")
+
+    serialized = yaml.safe_dump(pipeline)
+    assert "/project/dunlop/esouth" not in serialized
+    assert "/projectnb/dunlop/esouth" not in serialized

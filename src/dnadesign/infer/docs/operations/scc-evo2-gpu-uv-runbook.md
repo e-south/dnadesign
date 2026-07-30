@@ -1,7 +1,7 @@
 ## SCC Evo2 GPU Environment Runbook (UV + infer)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-07-30
 
 Use this page when you need a deterministic SCC GPU environment build for infer.
 
@@ -24,6 +24,14 @@ geometry and invalid rank diagnostics. Regenerate those sidecars.
 
 ### Path policy
 
+Set portable operator roots once before running the command blocks:
+
+```bash
+export SCC_PROJECT_ROOT="/project/<project>/<user>" # Set the operator-owned SCC project root.
+export DNADESIGN_REPO="${SCC_PROJECT_ROOT}/dnadesign" # Derive the repository checkout path.
+export SCC_MODEL_CACHE_ROOT="${SCC_PROJECT_ROOT}/cache/huggingface" # Derive the model-cache root.
+```
+
 - Keep one active uv environment at `<dnadesign_repo>/.venv` for the current
   GPU-family contract.
 - Keep `evo2_7b` and `evo2_20b` caches on `/project`, with one explicit root per model.
@@ -43,7 +51,7 @@ Pragmatic portability note:
 flash-attn is sdist-only in `uv.lock`, so this environment currently compiles flash-attn from source during `uv sync --locked --extra infer-evo2`.
 
 ```bash
-cd /project/dunlop/esouth/dnadesign # Move to repo root on SCC storage.
+cd "$DNADESIGN_REPO" # Move to repo root on SCC storage.
 sed -n '632,650p' uv.lock # Inspect locked flash-attn package entries.
 ```
 
@@ -171,18 +179,18 @@ the landed family before trusting batch portability.
 ### Setup and verification steps
 
 ```bash
-cd /project/dunlop/esouth/dnadesign # Enter repo root used for SCC setup.
+cd "$DNADESIGN_REPO" # Enter repo root used for SCC setup.
 
 module purge # Clear inherited module state before deterministic loads.
 module load cuda/12.8 # Load CUDA toolchain for torch/flash-attn builds.
 module load gcc/13.2.0 # Load compiler toolchain compatible with CUDA build flow.
 
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv" # Use the active uv environment path for the current GPU family.
-export INFER_WORKSPACE_ROOT=/project/dunlop/esouth/dnadesign/workspaces/demo_usr_pressure # Pin infer workspace root.
+export INFER_WORKSPACE_ROOT="$DNADESIGN_REPO/workspaces/demo_usr_pressure" # Pin infer workspace root.
 export INFER_RUNTIME_ROOT="${INFER_RUNTIME_ROOT:-$INFER_WORKSPACE_ROOT/outputs/runtime/evo2-gpu}" # Keep runtime artifacts workspace-scoped.
 export TARGET_MODEL_ID="${TARGET_MODEL_ID:-evo2_7b}" # Default to the 7B SCC lane.
-export HF_HOME_7B="${HF_HOME_7B:-/project/dunlop/esouth/cache/huggingface/evo2_7b}" # Define cache root for evo2_7b.
-export HF_HOME_20B="${HF_HOME_20B:-/project/dunlop/esouth/cache/huggingface/evo2_20b}" # Define cache root for evo2_20b.
+export HF_HOME_7B="${HF_HOME_7B:-$SCC_MODEL_CACHE_ROOT/evo2_7b}" # Define cache root for evo2_7b.
+export HF_HOME_20B="${HF_HOME_20B:-$SCC_MODEL_CACHE_ROOT/evo2_20b}" # Define cache root for evo2_20b.
 case "$TARGET_MODEL_ID" in # Select active HF cache by model lane.
   evo2_7b) export HF_HOME="${HF_HOME:-$HF_HOME_7B}" ;; # Resolve HF cache for evo2_7b.
   evo2_20b) export HF_HOME="${HF_HOME:-$HF_HOME_20B}" ;; # Resolve HF cache for evo2_20b.

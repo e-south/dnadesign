@@ -2,7 +2,7 @@
 doc_id: bu-scc-job-templates
 surface: ops-runbook
 owner: dnadesign-maintainers
-last_verified: 2026-07-09
+last_verified: 2026-07-30
 ---
 
 ## BU SCC job templates
@@ -22,28 +22,45 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 Use project (`-P`) and runtime/config overrides at submit time for reusable
 templates. The Eco1 ColabFold fold-check template is study-specific and pins
 `#$ -P dunlop` so the SCC smoke/full runs fail fast under the intended project.
+Set the operator-specific values once before using the examples below:
+
+```bash
+export SCC_USER="<scc_login>"
+export SCC_PROJECT_ROOT="/project/<project>/${SCC_USER}"
+export SCC_PROJECTNB_ROOT="/projectnb/<project>/${SCC_USER}"
+export SCC_LOG_ROOT="${SCC_PROJECT_ROOT}/dnadesign-sge-logs"
+mkdir -p "$SCC_LOG_ROOT" "${SCC_LOG_ROOT}/eco1-rt-repack"
+```
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/densegen-analysis.\$JOB_ID.out" \
   -hold_jid <densegen_cpu_job_name_or_id> \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/densegen-analysis.qsub
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/evo2-infer.\$JOB_ID.out" \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 qsub -t 1 \
+  -o "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
 qsub \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1' \
+  -o "${SCC_LOG_ROOT}/eco1-rt-repack/colabfold.\$JOB_ID.out" \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH="${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch",COLABFOLD_EXTRA_ARGS='--num-models 1' \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/permuter-evaluate.\$JOB_ID.out" \
   -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with smoke:placeholder:log_likelihood' \
   docs/bu-scc/jobs/permuter-evaluate.qsub
-qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
+qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/notify-watch.\$JOB_ID.out" \
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 ### DenseGen CPU submissions
@@ -52,6 +69,7 @@ Fresh-mode template run:
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
@@ -89,6 +107,7 @@ Resume + quota extension submission:
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
@@ -97,6 +116,7 @@ DenseGen + GUROBI with explicit 12-slot cap:
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
   -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
@@ -108,6 +128,7 @@ Override bootstrap values when needed:
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
   -pe omp 12 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
@@ -130,6 +151,7 @@ For large campaigns with `runtime.round_robin: true`, avoid tiny turn caps:
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/evo2-infer.\$JOB_ID.out" \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml,CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
@@ -171,8 +193,8 @@ If request sidecars are missing, the template materializes
 Use a one-policy smoke first:
 
 ```bash
-mkdir -p /project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs
 qsub -t 1 \
+  -o "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
 ```
@@ -182,6 +204,7 @@ the first policy, run the remaining policies:
 
 ```bash
 qsub -t 2-3 \
+  -o "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
   -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
 ```
@@ -222,12 +245,12 @@ transfer, not a USR dataset sync:
 
 ```bash
 rsync -avz \
-  esouth@scc1.bu.edu:/project/dunlop/esouth/dnadesign/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/ \
+  "${SCC_USER}@scc1.bu.edu:${SCC_PROJECT_ROOT}/dnadesign/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/" \
   src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
 
 mkdir -p src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/sge_logs
 rsync -avz \
-  esouth@scc1.bu.edu:/project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs/ \
+  "${SCC_USER}@scc1.bu.edu:${SCC_LOG_ROOT}/eco1-rt-repack/" \
   src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/sge_logs/
 ```
 
@@ -275,7 +298,7 @@ The runtime is the ColabFold `colabfold_batch` CLI. On BU SCC that command is
 currently exposed by a LocalColabFold pixi environment at:
 
 ```text
-/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch
+${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch
 ```
 
 LocalColabFold is the install path and environment wrapper. It should not be
@@ -285,20 +308,20 @@ run.
 Smoke run, WT plus the first five accepted ProteinMPNN candidates:
 
 ```bash
-mkdir -p /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs
 qsub \
+  -o "${SCC_LOG_ROOT}/eco1-colabfold-smoke.\$JOB_ID.out" \
   -l h_rt=04:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1' \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH="${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch",COLABFOLD_EXTRA_ARGS='--num-models 1' \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 ```
 
 Full current request, WT plus 96 accepted candidates:
 
 ```bash
-mkdir -p /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs
 qsub \
+  -o "${SCC_LOG_ROOT}/eco1-colabfold-full.\$JOB_ID.out" \
   -l h_rt=24:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,COLABFOLD_EXTRA_ARGS='--num-models 1',FOLDCHECK_RUN_ROOT=/project/dunlop/esouth/foldcheck/eco1_rt/full_96_<run_id> \
+  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_BATCH="${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch",COLABFOLD_EXTRA_ARGS='--num-models 1',FOLDCHECK_RUN_ROOT="${SCC_PROJECT_ROOT}/foldcheck/eco1_rt/full_96_<run_id>" \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 ```
 
@@ -326,10 +349,12 @@ qsub \
 - runtime args: pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` for fast
   preflight smoke runs and the first full coverage screen; reserve heavier
   multi-model checks for selected candidates after this first pass
-- durable output root: `FOLDCHECK_RUN_ROOT` defaults to
-  `/project/dunlop/esouth/foldcheck/eco1_rt/$JOB_NAME.$JOB_ID`
-- log path: array tasks write task-specific stdout/stderr files under
-  `/project/dunlop/esouth/foldcheck/eco1_rt/sge_logs/`
+- durable output root: set `FOLDCHECK_RUN_ROOT` to an SCC project path when
+  outputs should live outside the checkout. Otherwise the template writes to
+  the study's ignored `outputs/thread/foldcheck_scc_runs/` directory.
+- scheduler logs: every documented submission passes `qsub -o` with a path
+  under `SCC_LOG_ROOT`. Direct template use without `-o` falls back to SGE's
+  submission default.
 - compact run manifest: `colabfold_run_manifest.yaml` records the source
   request hash, selected sequence ids, input FASTA, and output directory
 
@@ -340,7 +365,7 @@ study wrapper around `dnadesign.thread.adapters.colabfold`:
 ```bash
 uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report \
   --repo-root . \
-  --colabfold-output-root /project/dunlop/esouth/foldcheck/eco1_rt/<run_id> \
+  --colabfold-output-root "${SCC_PROJECT_ROOT}/foldcheck/eco1_rt/<run_id>" \
   --runtime-version <colabfold_version>
 ```
 
@@ -351,6 +376,7 @@ back after validation.
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/permuter-evaluate.\$JOB_ID.out" \
   -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with llr:evo2_llr:log_likelihood_ratio' \
   docs/bu-scc/jobs/permuter-evaluate.qsub
 ```
@@ -397,6 +423,7 @@ uv run notify setup slack \
 export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/notify-watch.\$JOB_ID.out" \
   -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json",WEBHOOK_FILE="$WEBHOOK_FILE" \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
@@ -405,6 +432,7 @@ Explicit env mode (no profile):
 
 ```bash
 qsub -P <project> \
+  -o "${SCC_LOG_ROOT}/notify-watch.\$JOB_ID.out" \
   -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE",NOTIFY_TLS_CA_BUNDLE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
@@ -452,9 +480,12 @@ What it does:
 
 Scheduler stdout and runtime traces:
 
-- most templates write scheduler stdout to `outputs/logs/$JOB_NAME.$JOB_ID.out`
-- `permuter-evaluate.qsub` sets scheduler stdout to `/dev/null` and tees its
-  own runtime trace after it resolves the workspace
+- every command above overrides scheduler stdout with a deterministic path
+  under `SCC_LOG_ROOT`
+- templates with their own `#$ -o` value retain that fallback only for direct
+  invocations that omit the documented submit-time override
+- `permuter-evaluate.qsub` also tees its own runtime trace after it resolves
+  the workspace
 - DenseGen runtime traces: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
 - Permuter runtime traces: `<PERMUTER_WORKSPACE directory>/outputs/logs/ops/runtime/dnadesign_permuter_evaluate.$JOB_ID.trace.log`
 

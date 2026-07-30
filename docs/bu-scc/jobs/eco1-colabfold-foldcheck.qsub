@@ -7,7 +7,6 @@
 #$ -l gpus=1
 #$ -l gpu_compute_capability=6.0
 #$ -j y
-#$ -o /project/dunlop/esouth/foldcheck/eco1_rt/sge_logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
 
 set -euo pipefail
 
@@ -34,7 +33,7 @@ request_manifest="${FOLDCHECK_REQUEST_MANIFEST:-src/dnadesign/studies/units/eco1
 sequence_limit="${FOLDCHECK_SEQUENCE_LIMIT:-6}"
 sequence_start="${FOLDCHECK_SEQUENCE_START:-1}"
 shard_size="${FOLDCHECK_SHARD_SIZE:-}"
-run_root_base="${FOLDCHECK_RUN_ROOT:-/project/dunlop/esouth/foldcheck/eco1_rt/${JOB_NAME}.${JOB_ID:-manual}}"
+run_root_base="${FOLDCHECK_RUN_ROOT:-${repo_root}/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_scc_runs/${JOB_NAME}.${JOB_ID:-manual}}"
 subset_args=()
 
 if [[ -n "$shard_size" ]]; then
