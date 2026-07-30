@@ -481,7 +481,10 @@ def resolve_active_job_resolution(
         )
     effective_job_ids = _dedupe_job_ids((*normalized_explicit_job_ids, *auto_resolution.discovered_job_ids))
     runtime_visibility = auto_resolution.runtime_visibility
-    if normalized_explicit_job_ids:
+    if (
+        normalized_explicit_job_ids
+        and auto_resolution.runtime_visibility.active_job_resolution_state is not ActiveJobResolutionState.UNKNOWN
+    ):
         runtime_visibility = RuntimeVisibility(
             scheduler_probe_state=auto_resolution.runtime_visibility.scheduler_probe_state,
             active_job_resolution_state=_active_job_resolution_state_for_job_ids(effective_job_ids),
