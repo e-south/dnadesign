@@ -461,24 +461,7 @@ def resolve_active_job_resolution(
         )
 
     try:
-        discovered_job_ids = discover_active_job_ids_for_runbook(runbook, max_jobs=max_jobs)
-        auto_resolution = ActiveJobResolution(
-            explicit_job_ids=(),
-            discovered_job_ids=discovered_job_ids,
-            effective_job_ids=discovered_job_ids,
-            runtime_visibility=RuntimeVisibility(
-                scheduler_probe_state=SchedulerProbeState.OK,
-                active_job_resolution_state=_active_job_resolution_state_for_job_ids(discovered_job_ids),
-                degraded=False,
-            ),
-        )
-    except ActiveJobProbeError as exc:
-        auto_resolution = ActiveJobResolution(
-            explicit_job_ids=(),
-            discovered_job_ids=(),
-            effective_job_ids=(),
-            runtime_visibility=exc.runtime_visibility,
-        )
+        auto_resolution = probe_active_jobs_for_runbook(runbook, max_jobs=max_jobs)
     except RuntimeError as exc:
         probe_state = (
             SchedulerProbeState.HOST_DENIED

@@ -1515,6 +1515,40 @@ def test_probe_active_jobs_enforces_overall_time_budget(tmp_path: Path, monkeypa
     )
 
 
+def test_active_job_resolution_preserves_confirmed_matches_when_discovery_is_incomplete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    partial_resolution = orchestrator_state.ActiveJobResolution(
+        explicit_job_ids=(),
+        discovered_job_ids=("81001",),
+        effective_job_ids=("81001",),
+        runtime_visibility=orchestrator_state.RuntimeVisibility(
+            scheduler_probe_state=orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED,
+            active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+            degraded=True,
+            degraded_reasons=("active-job discovery budget exhausted",),
+        ),
+    )
+    monkeypatch.setattr(
+        orchestrator_state,
+        "probe_active_jobs_for_runbook",
+        lambda runbook, max_jobs: partial_resolution,
+    )
+
+    resolution = orchestrator_state.resolve_active_job_resolution(
+        runbook=runbook,
+        explicit_job_ids=(),
+        discover_active_jobs=True,
+        max_jobs=1,
+    )
+
+    assert resolution.discovered_job_ids == ("81001",)
+    assert resolution.effective_job_ids == ("81001",)
+    assert resolution.runtime_visibility == partial_resolution.runtime_visibility
+
+
 def test_batch_plan_submit_commands_include_explicit_job_identity_tags(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
