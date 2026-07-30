@@ -44,7 +44,12 @@ def _make_input_parquet(tmp_path: Path) -> Path:
     )
 
 
-def _start_reservation_process(final: Path, staging: Path) -> subprocess.Popen[str]:
+def _start_reservation_process(
+    final: Path,
+    staging: Path,
+    *,
+    env: dict[str, str] | None = None,
+) -> subprocess.Popen[str]:
     child_code = """
 import signal
 import sys
@@ -60,6 +65,7 @@ signal.pause()
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        env=env,
     )
 
 
@@ -340,12 +346,12 @@ def test_publication_failure_restores_replaced_batch(
     monkeypatch.setattr("dnadesign.baserender.src.outputs.write_video", _fake_write_video)
     real_replace = runner_module.os.replace
 
-    def _fail_second_publication(source, destination):
+    def _fail_second_publication(source, destination, **kwargs):
         source_path = Path(source)
         destination_path = Path(destination)
-        if ".staging-" in source_path.name and destination_path == video_path.resolve():
+        if ".staging-" in source_path.name and destination_path.name == video_path.name:
             raise OSError("simulated publication failure")
-        return real_replace(source, destination)
+        return real_replace(source, destination, **kwargs)
 
     monkeypatch.setattr(runner_module.os, "replace", _fail_second_publication)
 
@@ -495,3 +501,175 @@ def test_publication_reservation_allows_concurrent_sibling_destinations(tmp_path
         _release_publication_locks(right_locks)
     finally:
         _release_publication_locks(left_locks)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX process semantics")
+def test_publication_reservation_is_shared_across_process_temp_directories(tmp_path: Path) -> None:
+    from dnadesign.baserender.src.execution.runner import (
+        _PublicationTarget,
+        _release_publication_locks,
+        _reserve_publication_targets,
+    )
+
+    final = tmp_path / "results" / "images"
+    child_temp = tmp_path / "child-temp"
+    child_temp.mkdir()
+    child_env = dict(os.environ)
+    child_env["TMPDIR"] = str(child_temp)
+    process = _start_reservation_process(final, tmp_path / "child-staging", env=child_env)
+
+    def _reserve_same_destination() -> None:
+        locks = _reserve_publication_targets((_PublicationTarget(final=final, staging=tmp_path / "parent-staging"),))
+        _release_publication_locks(locks)
+
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "ready"
+        with pytest.raises(SchemaError, match="publication is already in progress"):
+            _reserve_same_destination()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX process semantics")
+def test_publication_reservation_rejects_case_alias_on_insensitive_filesystem(tmp_path: Path) -> None:
+    from dnadesign.baserender.src.execution.runner import (
+        _PublicationTarget,
+        _release_publication_locks,
+        _reserve_publication_targets,
+    )
+
+    probe = tmp_path / "CaseSensitivityProbe"
+    probe.write_text("probe\n", encoding="utf-8")
+    if not (tmp_path / "casesensitivityprobe").exists():
+        pytest.skip("requires a case-insensitive destination filesystem")
+
+    held_final = tmp_path / "results" / "Result.txt"
+    attempted_final = tmp_path / "results" / "result.txt"
+    process = _start_reservation_process(held_final, tmp_path / "held-staging")
+
+    def _reserve_case_alias() -> None:
+        locks = _reserve_publication_targets(
+            (_PublicationTarget(final=attempted_final, staging=tmp_path / "attempted-staging"),)
+        )
+        _release_publication_locks(locks)
+
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "ready"
+        with pytest.raises(SchemaError, match="publication is already in progress"):
+            _reserve_case_alias()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX process semantics")
+def test_publication_reservation_allows_case_distinct_siblings_on_sensitive_filesystem(tmp_path: Path) -> None:
+    from dnadesign.baserender.src.execution.runner import (
+        _PublicationTarget,
+        _release_publication_locks,
+        _reserve_publication_targets,
+    )
+
+    probe = tmp_path / "CaseSensitivityProbe"
+    probe.write_text("probe\n", encoding="utf-8")
+    if (tmp_path / "casesensitivityprobe").exists():
+        pytest.skip("requires a case-sensitive destination filesystem")
+
+    results_root = tmp_path / "results"
+    upper_locks = _reserve_publication_targets(
+        (_PublicationTarget(final=results_root / "Result.txt", staging=tmp_path / "upper-staging"),)
+    )
+    try:
+        lower_locks = _reserve_publication_targets(
+            (_PublicationTarget(final=results_root / "result.txt", staging=tmp_path / "lower-staging"),)
+        )
+        _release_publication_locks(lower_locks)
+    finally:
+        _release_publication_locks(upper_locks)
+
+
+def test_publication_does_not_retraverse_swapped_output_ancestor(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dnadesign.baserender.src.execution.runner import (
+        _PublicationTarget,
+        _release_publication_locks,
+        _reserve_publication_targets,
+    )
+
+    parquet = _make_input_parquet(tmp_path)
+    results_root = tmp_path / "results"
+    results_root.mkdir()
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=results_root,
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(tmp_path / "ancestor-swap.yaml", payload)
+    moved_root = tmp_path / "moved-results"
+    attacker_root = tmp_path / "attacker"
+    attacker_root.mkdir()
+    attacker_final = attacker_root / job_path.stem / "images"
+    attacker_locks = _reserve_publication_targets(
+        (_PublicationTarget(final=attacker_final, staging=tmp_path / "attacker-staging"),)
+    )
+
+    def _swap_then_write_images(records, *, output, renderer_name, style, palette):
+        del records, renderer_name, style, palette
+        results_root.rename(moved_root)
+        results_root.symlink_to(attacker_root, target_is_directory=True)
+        assert output.dir is not None
+        output.dir.mkdir(parents=True, exist_ok=True)
+        (output.dir / "rendered.png").write_bytes(b"redirected")
+        return output.dir
+
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _swap_then_write_images)
+    try:
+        with pytest.raises(SchemaError, match="output parent changed during publication"):
+            run_cruncher_showcase_job(str(job_path))
+    finally:
+        _release_publication_locks(attacker_locks)
+
+    assert not attacker_final.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX directory descriptors")
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "mode", "owner"])
+def test_publication_lock_registry_rejects_untrusted_preexisting_namespace(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    unsafe_kind: str,
+) -> None:
+    from dnadesign.baserender.src.execution import runner as runner_module
+
+    registry_root = tmp_path / "registry-root"
+    registry_root.mkdir()
+    namespace = registry_root / f"dnadesign-baserender-locks-{os.getuid()}"
+    if unsafe_kind == "symlink":
+        target = tmp_path / "attacker-registry"
+        target.mkdir()
+        namespace.symlink_to(target, target_is_directory=True)
+    else:
+        namespace.mkdir(mode=0o700)
+        if unsafe_kind == "mode":
+            namespace.chmod(0o755)
+        else:
+            real_fstat = runner_module.os.fstat
+
+            def _foreign_owner(descriptor: int):
+                result = real_fstat(descriptor)
+                values = list(result)
+                values[4] = os.getuid() + 1
+                return os.stat_result(values)
+
+            monkeypatch.setattr(runner_module.os, "fstat", _foreign_owner)
+
+    with pytest.raises(SchemaError, match="lock registry"):
+        descriptor = runner_module._open_publication_lock_registry(root=registry_root)
+        os.close(descriptor)
