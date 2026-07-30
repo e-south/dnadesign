@@ -115,11 +115,30 @@ def test_fresh_ci_lanes_recreate_changed_file_list_before_resolving_test_targets
             if "dnadesign.devtools.ci.test_targets" in str(step.get("run", ""))
         )
         collect_run = str(steps[collect_index].get("run", ""))
-        checkout_step = next(step for step in steps[:collect_index] if step.get("uses") == "actions/checkout@v5")
+        checkout_step = next(
+            step for step in steps[:collect_index] if str(step.get("uses", "")).startswith("actions/checkout@")
+        )
         assert checkout_step.get("with", {}).get("fetch-depth") == 0
         assert "dnadesign.devtools.ci.changed_files" in collect_run
         assert "--output-file .ci_changed_files.txt" in collect_run
         assert collect_index < target_index
+
+
+def test_third_party_workflow_actions_are_pinned_to_full_commit_shas() -> None:
+    current = Path(__file__).resolve()
+    repo_root = next(parent for parent in current.parents if (parent / "pyproject.toml").exists())
+    workflow_paths = sorted((repo_root / ".github" / "workflows").glob("*.yaml"))
+
+    unpinned: list[str] = []
+    for workflow_path in workflow_paths:
+        workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+        for job_id, job in workflow.get("jobs", {}).items():
+            for step in job.get("steps", ()):
+                action_ref = str(step.get("uses", "")).strip()
+                if action_ref and re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", action_ref) is None:
+                    unpinned.append(f"{workflow_path.name}:{job_id}:{action_ref}")
+
+    assert unpinned == []
 
 
 def test_quality_entropy_job_uses_stdlib_only_runtime() -> None:
