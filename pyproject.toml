@@ -1,18 +1,19 @@
 [build-system]
-requires = ["setuptools>=69", "wheel>=0.46.2", "setuptools_scm"]
+requires = ["setuptools>=83.0.0", "wheel>=0.46.2", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name            = "dnadesign"
 version         = "0.1.0"
 description     = "DNA sequence design pipelines and bioinformatics helpers."
-authors         = [{ name = "Eric South", email = "ericjohnsouth@gmail.com" }]
+authors         = [{ name = "Eric South" }]
 readme          = "README.md"
 requires-python = ">=3.12,<3.13"
 
 dependencies = [
   "arviz>=0.23.0",
   "biopython>=1.87",
+  "click>=8.3.3",
   "igraph",
   "leidenalg",
   "logomaker",
@@ -21,6 +22,7 @@ dependencies = [
   "openpyxl",
   "ortools>=9.9,<9.10",
   "pandas",
+  "pillow>=12.3.0",
   "pyarrow>=23.0.1",
   "pydantic",
   "pygments>=2.20.0",
@@ -36,7 +38,7 @@ dependencies = [
   "umap-learn>=0.5.11",
   "duckdb>=0.10.0",
   "xlrd",
-  # Torch 2.10 is the current patched floor for active PyTorch advisories with fixed releases.
+  # Compatibility-pinned for the Evo2/CUDA stack; the bounded security exception is documented in SECURITY.md.
   "torch>=2.10,<2.11; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "dense-arrays",
   "polars>=1.36.1",
@@ -51,7 +53,8 @@ dependencies = [
   "marimo>=0.23.9",
   "openai>=2.14.0",
   "viennarna>=2.7.2",
-  "zstd>=1.5",
+  # 1.5.7.3 is yanked for a thread-safety regression.
+  "zstd>=1.5.7.2,!=1.5.7.3",
   "py3dmol==2.5.5",
   "plotly>=6.9.0",
 ]
@@ -80,8 +83,8 @@ infer-evo2 = [
   "torchvision>=0.25,<0.26; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "torchaudio>=2.10,<2.11; sys_platform == 'linux' and platform_machine == 'x86_64'",
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
-  "pip>=26.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "pip>=26.1.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "setuptools>=83.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "wheel>=0.46.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -93,6 +96,7 @@ infer-evo2 = [
   # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0)
   "transformer-engine[pytorch]>=2.0,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "evo2>=0.5.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "onnx>=1.22.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "transformers; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
@@ -222,9 +226,10 @@ environments = [
 ]
 constraint-dependencies = [
   "cryptography>=48.0.1",
+  "click>=8.3.3",
   "idna>=3.15",
-  "onnx>=1.21.0",
-  "pillow>=12.2.0",
+  "onnx>=1.22.0",
+  "pillow>=12.3.0",
   "pymdown-extensions>=10.21.3",
   "starlette>=1.3.1",
 ]
