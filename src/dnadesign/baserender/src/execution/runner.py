@@ -92,6 +92,39 @@ def _validate_publication_conflicts(
         )
 
 
+def _publication_lock_path(target: _PublicationTarget) -> Path:
+    return target.final.parent / f".{target.final.name}.publication.lock"
+
+
+def _reserve_publication_targets(targets: tuple[_PublicationTarget, ...]) -> tuple[Path, ...]:
+    locks: list[Path] = []
+    try:
+        for target in sorted(targets, key=lambda item: item.final.as_posix()):
+            lock_path = _publication_lock_path(target)
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            except FileExistsError as exc:
+                raise SchemaError(f"Batch publication is already in progress for: {target.final}") from exc
+            try:
+                os.write(descriptor, f"pid={os.getpid()}\n".encode())
+            finally:
+                os.close(descriptor)
+            locks.append(lock_path)
+    except Exception:
+        _release_publication_locks(tuple(locks))
+        raise
+    return tuple(locks)
+
+
+def _release_publication_locks(locks: tuple[Path, ...]) -> None:
+    for lock_path in reversed(locks):
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            continue
+
+
 def _staged_job(job: RenderJobV3, targets: tuple[_PublicationTarget, ...]) -> RenderJobV3:
     by_final = {target.final: target.staging for target in targets}
     staged_outputs: list[ImagesOutputCfg | VideoOutputCfg] = []
@@ -256,11 +289,17 @@ def run_sequence_rows_job(
 
     targets = _publication_targets(job)
     _validate_publication_conflicts(targets, conflict_policy=job.run.conflict_policy)
-    original_job = job
-    job = _staged_job(job, targets)
-
-    img_output = output_kind(job, "images")
-    vid_output = output_kind(job, "video")
+    publication_locks = _reserve_publication_targets(targets)
+    try:
+        # Recheck after acquiring the reservation to close the preflight/publication race.
+        _validate_publication_conflicts(targets, conflict_policy=job.run.conflict_policy)
+        original_job = job
+        job = _staged_job(job, targets)
+        img_output = output_kind(job, "images")
+        vid_output = output_kind(job, "video")
+    except Exception:
+        _release_publication_locks(publication_locks)
+        raise
 
     try:
         if isinstance(vid_output, VideoOutputCfg):
@@ -357,6 +396,8 @@ def run_sequence_rows_job(
     except Exception:
         _cleanup_staging(targets)
         raise
+    finally:
+        _release_publication_locks(publication_locks)
 
     return report
 

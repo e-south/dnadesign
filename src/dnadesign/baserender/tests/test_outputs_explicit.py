@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import matplotlib.animation as animation
@@ -332,3 +334,51 @@ def test_publication_failure_restores_replaced_batch(
     assert video_path.read_bytes() == b"original video"
     assert not list(batch_root.glob(".*.staging-*"))
     assert not list(batch_root.glob(".*.backup-*"))
+
+
+def test_concurrent_error_policy_job_cannot_overwrite_reserved_batch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    results_root = tmp_path / "results"
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=results_root,
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(tmp_path / "concurrent.yaml", payload)
+    first_writer_entered = threading.Event()
+    release_first_writer = threading.Event()
+    call_lock = threading.Lock()
+    call_count = 0
+
+    def _controlled_write_images(records, *, output, renderer_name, style, palette):
+        nonlocal call_count
+        del records, renderer_name, style, palette
+        with call_lock:
+            call_count += 1
+            call_index = call_count
+        if call_index == 1:
+            first_writer_entered.set()
+            assert release_first_writer.wait(timeout=10)
+        assert output.dir is not None
+        output.dir.mkdir(parents=True, exist_ok=True)
+        (output.dir / "rendered.png").write_bytes(f"batch-{call_index}".encode())
+        return output.dir
+
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _controlled_write_images)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        first_run = executor.submit(run_cruncher_showcase_job, str(job_path))
+        assert first_writer_entered.wait(timeout=10)
+        try:
+            with pytest.raises(SchemaError, match="publication is already in progress"):
+                run_cruncher_showcase_job(str(job_path))
+        finally:
+            release_first_writer.set()
+        first_run.result(timeout=10)
+
+    images_dir = results_root / job_path.stem / "images"
+    assert (images_dir / "rendered.png").read_bytes() == b"batch-1"
+    assert not list(images_dir.parent.glob(".*.publication.lock"))
