@@ -1629,6 +1629,30 @@ def test_explicit_job_ids_do_not_mask_incomplete_active_job_discovery(
     assert resolution.runtime_visibility == partial_resolution.runtime_visibility
 
 
+def test_explicit_job_ids_do_not_mask_disabled_active_job_discovery(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+
+    resolution = orchestrator_state.resolve_active_job_resolution(
+        runbook=runbook,
+        explicit_job_ids=("81002", "81001"),
+        discover_active_jobs=False,
+    )
+
+    assert resolution.explicit_job_ids == ("81002", "81001")
+    assert resolution.discovered_job_ids == ()
+    assert resolution.effective_job_ids == ("81002", "81001")
+    assert resolution.runtime_visibility.scheduler_probe_state == orchestrator_state.SchedulerProbeState.SKIPPED
+    assert (
+        resolution.runtime_visibility.active_job_resolution_state == orchestrator_state.ActiveJobResolutionState.UNKNOWN
+    )
+    assert resolution.runtime_visibility.degraded is True
+    assert resolution.runtime_visibility.degraded_reasons == (
+        "active-job discovery skipped while mode_policy.on_active_job=hold_jid; "
+        "manual job ids do not prove complete queue visibility",
+    )
+
+
 def test_batch_plan_submit_commands_include_explicit_job_identity_tags(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
@@ -3857,6 +3881,42 @@ def test_cli_execute_blocks_submit_when_active_job_visibility_is_unknown(
     assert execute_called is False
 
 
+def test_cli_execute_blocks_manual_job_ids_when_discovery_is_disabled_without_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    audit_path = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "audit" / "result.json"
+    execute_called = False
+
+    def _fake_execute_batch_plan(*, plan, audit_json_path, submit, command_timeout_seconds):
+        nonlocal execute_called
+        execute_called = True
+        raise AssertionError("execute_batch_plan should not be called when active-job visibility is unknown")
+
+    monkeypatch.setattr("dnadesign.ops.api.execute_batch_plan", _fake_execute_batch_plan)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "execute",
+            "--runbook",
+            str(runbook_path),
+            "--audit-json",
+            str(audit_path),
+            "--submit",
+            "--no-discover-active-jobs",
+            "--active-job-id",
+            "81001",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "active-job visibility is unavailable" in result.output
+    assert execute_called is False
+
+
 def test_cli_execute_blocks_submit_when_current_host_is_not_submit_host(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4500,7 +4560,7 @@ def test_cli_plan_chains_all_discovered_active_job_ids(tmp_path: Path, monkeypat
     assert payload["hold_jid"] == "93331,93332"
 
 
-def test_cli_plan_accepts_comma_delimited_active_job_ids(tmp_path: Path) -> None:
+def test_cli_plan_blocks_manual_job_ids_when_discovery_is_disabled_without_override(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runner = CliRunner()
 
@@ -4521,8 +4581,38 @@ def test_cli_plan_accepts_comma_delimited_active_job_ids(tmp_path: Path) -> None
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
+    assert payload["submit_behavior"] == "blocked"
+    assert payload["hold_jid"] is None
+    assert payload["runtime_visibility"]["active_job_resolution_state"] == "unknown"
+    assert payload["runtime_visibility"]["degraded"] is True
+
+
+def test_cli_plan_accepts_manual_job_ids_with_disabled_discovery_override(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "runbook",
+            "plan",
+            "--runbook",
+            str(runbook_path),
+            "--no-discover-active-jobs",
+            "--active-job-id",
+            "93332,93331",
+            "--active-job-id",
+            "93332",
+            "--allow-unknown-active-jobs",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
     assert payload["submit_behavior"] == "hold_jid"
     assert payload["hold_jid"] == "93331,93332"
+    assert payload["runtime_visibility"]["active_job_resolution_state"] == "unknown"
+    assert payload["allow_unknown_active_jobs"] is True
 
 
 def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4550,7 +4640,10 @@ def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytes
     assert payload["active_job_count"] == 2
     assert payload["active_job_ids_csv"] == "95001,95002"
     assert payload["active_job_id_args"] == "--active-job-id 95001 --active-job-id 95002"
-    assert "--no-discover-active-jobs --active-job-id 95001 --active-job-id 95002" in payload["plan_command_hint"]
+    assert (
+        "--no-discover-active-jobs --active-job-id 95001 --active-job-id 95002 --allow-unknown-active-jobs"
+        in payload["plan_command_hint"]
+    )
 
 
 def test_packaged_runbook_presets_exist_and_load() -> None:

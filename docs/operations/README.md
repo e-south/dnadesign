@@ -7,7 +7,7 @@
 **Exit artifact:** Ops schema, plan, execute, or read-only progress docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-07-30
 
 Batch orchestration and read-only Ops status checks start here. Dataset
 assembly, construct realization, and infer write-back stay in the shared USR
@@ -120,8 +120,8 @@ uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>
 - The dry run above is the smallest working status example because it emits the audit JSON that `ops progress show ops.control-plane.orchestration` reads. On non-SCC workstations, add `--allow-missing-qstat` so queue readiness degrades explicitly instead of failing opaquely.
 - Keep `<project>` aligned with the scheduler account or project configured for the workspace or study. Presets are explicit shortcuts, not hidden defaults.
 - Do not create transient operational working directories at repo root (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`); use `/scratch` for disposable state.
-- For manual chaining, `--active-job-id` accepts repeat flags or a comma-delimited list and normalizes before `-hold_jid` submit wiring.
-- `ops runbook active-jobs` returns `runtime_visibility`, `plan_command_hint`, and active-job arg hints so you can paste manual chaining arguments directly.
+- For manual chaining, `--active-job-id` accepts repeat flags or a comma-delimited list and normalizes candidate ids before `-hold_jid` wiring. Manual ids do not replace queue discovery; disabling discovery leaves visibility unknown and requires `--allow-unknown-active-jobs` before submission.
+- `ops runbook active-jobs` returns `runtime_visibility`, `plan_command_hint`, and active-job arg hints. Its pasteable manual plan hint includes the explicit unknown-visibility acknowledgement required after discovery is disabled.
 - `ops runbook plan` may still return a usable dry-run plan when runtime visibility is degraded, but `ops runbook execute --submit` blocks by default when active-job posture is unknown.
 - Notify-enabled routes require a readable webhook file contract before `ops runbook execute`:
   `NOTIFY_WEBHOOK_FILE` (`<webhook_env>_FILE`) or a profile webhook `secret_ref` that resolves to `file://...`.

@@ -269,7 +269,10 @@ def _render_active_job_hints(*, runbook_path: Path, active_job_ids: Sequence[str
     repeat_args = " ".join(f"--active-job-id {shlex.quote(job_id)}" for job_id in deduped_job_ids)
     runbook_arg = shlex.quote(str(runbook_path.expanduser()))
     if repeat_args:
-        plan_hint = f"uv run ops runbook plan --runbook {runbook_arg} --no-discover-active-jobs {repeat_args}"
+        plan_hint = (
+            f"uv run ops runbook plan --runbook {runbook_arg} --no-discover-active-jobs "
+            f"{repeat_args} --allow-unknown-active-jobs"
+        )
     else:
         plan_hint = f"uv run ops runbook plan --runbook {runbook_arg}"
     return {
@@ -623,9 +626,7 @@ def runbook_plan(
         list[str] | None,
         typer.Option(
             "--active-job-id",
-            help=(
-                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
-            ),
+            help=("Known active job id(s) for hold_jid candidates; manual ids do not prove complete queue visibility."),
         ),
     ] = None,
     discover_active_jobs: Annotated[
@@ -644,6 +645,13 @@ def runbook_plan(
         typer.Option(
             "--allow-fresh-reset/--no-allow-fresh-reset",
             help="Allow --mode fresh when resume artifacts already exist in the workspace.",
+        ),
+    ] = False,
+    allow_unknown_active_jobs: Annotated[
+        bool,
+        typer.Option(
+            "--allow-unknown-active-jobs/--no-allow-unknown-active-jobs",
+            help="Allow a plan to chain known job ids despite incomplete active-job visibility.",
         ),
     ] = False,
     allow_missing_qstat: Annotated[
@@ -682,6 +690,7 @@ def runbook_plan(
             runtime_visibility=active_job_resolution.runtime_visibility,
             allow_fresh_reset=allow_fresh_reset,
             allow_missing_qstat=allow_missing_qstat,
+            allow_unknown_active_jobs=allow_unknown_active_jobs,
         )
     except ValueError as exc:
         raise_contract_error(f"Runbook contract error: {exc}")
@@ -726,9 +735,7 @@ def runbook_fill_infer(
         list[str] | None,
         typer.Option(
             "--active-job-id",
-            help=(
-                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
-            ),
+            help=("Known active job id(s) for hold_jid candidates; manual ids do not prove complete queue visibility."),
         ),
     ] = None,
     discover_active_jobs: Annotated[
@@ -910,9 +917,7 @@ def runbook_execute(
         list[str] | None,
         typer.Option(
             "--active-job-id",
-            help=(
-                "Existing active job id(s) for hold_jid policy decisions; repeat option or pass a comma-delimited list."
-            ),
+            help=("Known active job id(s) for hold_jid candidates; manual ids do not prove complete queue visibility."),
         ),
     ] = None,
     discover_active_jobs: Annotated[

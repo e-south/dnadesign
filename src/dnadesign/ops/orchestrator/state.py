@@ -435,27 +435,20 @@ def resolve_active_job_resolution(
 ) -> ActiveJobResolution:
     normalized_explicit_job_ids = _dedupe_job_ids(explicit_job_ids)
     if not discover_active_jobs:
-        if normalized_explicit_job_ids:
-            return ActiveJobResolution(
-                explicit_job_ids=normalized_explicit_job_ids,
-                discovered_job_ids=(),
-                effective_job_ids=normalized_explicit_job_ids,
-                runtime_visibility=RuntimeVisibility(
-                    scheduler_probe_state=SchedulerProbeState.SKIPPED,
-                    active_job_resolution_state=_active_job_resolution_state_for_job_ids(normalized_explicit_job_ids),
-                    degraded=False,
-                ),
-            )
+        manual_ids_reason = (
+            "; manual job ids do not prove complete queue visibility" if normalized_explicit_job_ids else ""
+        )
         return ActiveJobResolution(
-            explicit_job_ids=(),
+            explicit_job_ids=normalized_explicit_job_ids,
             discovered_job_ids=(),
-            effective_job_ids=(),
+            effective_job_ids=normalized_explicit_job_ids,
             runtime_visibility=RuntimeVisibility(
                 scheduler_probe_state=SchedulerProbeState.SKIPPED,
                 active_job_resolution_state=ActiveJobResolutionState.UNKNOWN,
                 degraded=True,
                 degraded_reasons=(
-                    f"active-job discovery skipped while mode_policy.on_active_job={runbook.mode_policy.on_active_job}",
+                    "active-job discovery skipped while "
+                    f"mode_policy.on_active_job={runbook.mode_policy.on_active_job}{manual_ids_reason}",
                 ),
             ),
         )
