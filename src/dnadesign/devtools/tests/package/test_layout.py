@@ -68,6 +68,7 @@ def test_devtools_domain_packages_importable() -> None:
     assert importlib.import_module("dnadesign.devtools.runtime.meme_env")
     assert importlib.import_module("dnadesign.devtools.runtime.pytest_gate")
     assert importlib.import_module("dnadesign.devtools.security.secrets_baseline")
+    assert importlib.import_module("dnadesign.devtools.security.tracked_text_privacy")
 
 
 def test_devtools_canonical_entrypoints_have_main() -> None:
@@ -84,6 +85,7 @@ def test_devtools_canonical_entrypoints_have_main() -> None:
         "dnadesign.devtools.quality.entropy",
         "dnadesign.devtools.quality.score",
         "dnadesign.devtools.security.secrets_baseline",
+        "dnadesign.devtools.security.tracked_text_privacy",
         "dnadesign.devtools.quality.tool_coverage",
     ]
     for module_path in canonical_entrypoints:

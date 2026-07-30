@@ -81,6 +81,16 @@ def test_secrets_hygiene_job_runs_baseline_and_full_tree_scans() -> None:
     assert "uv run --no-sync pre-commit run detect-secrets --all-files" in full_tree_run
 
 
+def test_secrets_hygiene_job_rejects_tracked_personal_operator_data() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["secrets-hygiene"]["steps"]
+    privacy_step = next(step for step in steps if step.get("name") == "Tracked text privacy check")
+
+    assert privacy_step["run"] == (
+        "PYTHONPATH=src uv run --no-sync python -m dnadesign.devtools.security.tracked_text_privacy --repo-root ."
+    )
+
+
 def test_core_precommit_defers_detect_secrets_to_dedicated_lane() -> None:
     workflow = _workflow()
     steps = workflow["jobs"]["core-lint-test-build"]["steps"]

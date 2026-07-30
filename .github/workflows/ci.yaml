@@ -81,6 +81,9 @@ jobs:
             --repo-root . \
             --baseline .secrets.baseline
 
+      - name: Tracked text privacy check
+        run: PYTHONPATH=src uv run --no-sync python -m dnadesign.devtools.security.tracked_text_privacy --repo-root .
+
       - name: Detect-secrets full-tree check
         run: uv run --no-sync pre-commit run detect-secrets --all-files
 
