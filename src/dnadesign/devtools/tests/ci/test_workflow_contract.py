@@ -141,6 +141,20 @@ def test_third_party_workflow_actions_are_pinned_to_full_commit_shas() -> None:
     assert unpinned == []
 
 
+def test_codecov_uploads_use_node24_compatible_action() -> None:
+    workflow = _workflow()
+    expected_ref = "codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f"
+
+    upload_refs = [
+        str(step.get("uses", ""))
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", ())
+        if str(step.get("uses", "")).startswith("codecov/codecov-action@")
+    ]
+
+    assert upload_refs == [expected_ref, expected_ref]
+
+
 def test_quality_entropy_job_uses_stdlib_only_runtime() -> None:
     workflow = _workflow("quality-entropy.yaml")
     steps = workflow["jobs"]["report"]["steps"]
