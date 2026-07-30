@@ -661,13 +661,52 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         encoding="utf-8",
     )
 
+    output_dir = tmp_path / "visual" / "viennarna_secondary_structure"
     with pytest.raises(FoldingConfigError, match="span_backdrops.*edge_color"):
         publish_viennarna_structure_svg(
             prediction,
             assembled_sequence_path=tmp_path / "assembled_sequence.json",
             visual_contract_path=visual_contract,
-            output_dir=tmp_path / "visual" / "viennarna_secondary_structure",
+            output_dir=output_dir,
         )
+
+    assert not output_dir.exists()
+
+
+def test_publish_viennarna_structure_svg_failure_leaves_no_partial_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "broken_plot.py").write_text(
+        """
+def plot_layout_naview(structure):
+    return {"layout": "naview", "structure": structure}
+
+def plot_structure_svg(filename, sequence, structure, layout=None):
+    with open(filename, "w", encoding="utf-8") as handle:
+        handle.write('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    return 1
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("broken_plot", None)
+    request = _python_api_request(tmp_path)
+    prediction = run_prediction_request(request, output_dir=tmp_path / "folding")
+    output_dir = tmp_path / "visual" / "viennarna_secondary_structure"
+
+    with pytest.raises(FoldingExecutionError, match="nucleotide node count"):
+        publish_viennarna_structure_svg(
+            prediction,
+            assembled_sequence_path=tmp_path / "assembled_sequence.json",
+            output_dir=output_dir,
+            python_module="broken_plot",
+        )
+
+    assert not output_dir.exists()
+    assert not list(output_dir.parent.glob(f".{output_dir.name}.staging-*"))
 
 
 def test_publish_viennarna_structure_svg_can_normalize_cap_orientation(

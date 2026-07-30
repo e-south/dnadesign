@@ -79,6 +79,14 @@ def load_svg_surface(path: Path) -> SvgSurface:
     )
 
 
+def validate_svg_annotation_contract(visual_contract: SequenceEvidenceMapV1 | None) -> None:
+    """Validate annotation inputs that do not depend on a rendered SVG."""
+
+    if visual_contract is None:
+        return
+    _span_backdrop_edge_spans(visual_contract)
+
+
 def annotate_svg_surface(
     surface: SvgSurface,
     *,

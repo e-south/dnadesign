@@ -14,6 +14,9 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import os
+import shutil
+import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +37,7 @@ from .pairing_qa import (
     unit_copy_spans,
 )
 from .viennarna_ontology import component_token, hue_for_owners
-from .viennarna_svg import SVG_NS, annotate_svg_surface, load_svg_surface
+from .viennarna_svg import SVG_NS, annotate_svg_surface, load_svg_surface, validate_svg_annotation_contract
 
 _VIENNARNA_PLOT_MANIFEST_FILENAME = "viennarna_secondary_structure_svg_v1.json"
 _VIENNARNA_NATIVE_SVG_FILENAME = "secondary_structure.native.svg"
@@ -59,6 +62,7 @@ def publish_viennarna_structure_svg(
     assembled_sequence_path: str | Path,
     visual_contract_path: str | Path | None = None,
     output_dir: str | Path,
+    source_prediction_ref: str | Path | None = None,
     python_module: str = "RNA",
     layout_algorithm: str = "naview",
     emphasize_stem_base_nucleotides: bool = True,
@@ -81,93 +85,112 @@ def publish_viennarna_structure_svg(
         assembled.sequence,
         dna_policy=prediction_model.dna_policy.mode,
     )
-    output_path = Path(output_dir).expanduser().resolve()
-    output_path.mkdir(parents=True, exist_ok=True)
-    native_svg_path = output_path / _VIENNARNA_NATIVE_SVG_FILENAME
-    annotated_svg_path = output_path / _VIENNARNA_ANNOTATED_SVG_FILENAME
-    annotation_manifest_path = output_path / _VIENNARNA_ANNOTATION_MANIFEST_FILENAME
-    manifest_path = output_path / _VIENNARNA_PLOT_MANIFEST_FILENAME
-
-    module = importlib.import_module(python_module)
-    # Folding may use a U-substituted RNA surrogate, but the published plot is a
-    # DNA artifact whose coordinates map to the original assembled sequence.
-    command = _write_native_viennarna_svg(
-        module,
-        sequence=assembled.sequence,
-        structure=prediction_model.result.dot_bracket,
-        output_path=native_svg_path,
-        layout_algorithm=layout_algorithm,
-    )
-    surface = load_svg_surface(native_svg_path)
-    if len(surface.nucleotide_nodes) != assembled.length:
-        raise FoldingExecutionError(
-            "ViennaRNA SVG nucleotide node count "
-            f"{len(surface.nucleotide_nodes)} does not match input length {assembled.length}."
-        )
-
     visual_contract = _optional_sequence_evidence_map(visual_contract_path)
     component_palette = _component_palette(visual_contract)
+    validate_svg_annotation_contract(visual_contract)
     nucleotide_annotations = _nucleotide_annotations(
         assembled=assembled,
         submitted_sequence=submitted_sequence,
         visual_contract=visual_contract,
         component_palette=component_palette,
     )
-    svg_annotations = annotate_svg_surface(
-        surface,
-        nucleotide_annotations=nucleotide_annotations,
-        unit_copy_spans=unit_copy_spans(visual_contract),
-        intended_pair_lookup=intended_pair_lookup(visual_contract),
-        intended_pairing_metrics=tuple(item.model_dump(mode="json") for item in prediction_model.qa.intended_pairings),
-        visual_contract=visual_contract,
-        emphasize_stem_base_nucleotides=emphasize_stem_base_nucleotides,
-    )
-    ET.register_namespace("", SVG_NS)
-    surface.tree.write(annotated_svg_path, encoding="utf-8", xml_declaration=True)
-    _write_json(
-        annotation_manifest_path,
-        {
-            "contract_kind": "viennarna_secondary_structure_annotation_manifest_v1",
-            "sequence_id": assembled.sequence_id,
-            "sequence_sha256": assembled.sequence_sha256,
-            "coordinate_system": "zero_based_half_open",
-            "viennarna_display_coordinates": "one_based",
-            "nucleotides": nucleotide_annotations,
-            "basepairs": svg_annotations.basepairs,
-            "section_annotations": svg_annotations.section_annotations,
-            "layout_normalization": svg_annotations.layout_normalization,
-            "palette": component_palette,
-        },
-    )
+    try:
+        module = importlib.import_module(python_module)
+    except ImportError as exc:
+        raise FoldingConfigError(f"ViennaRNA Python module '{python_module}' is not available: {exc}") from exc
 
-    manifest = ViennaRNAStructureSvgV1(
-        plot_id=f"{prediction_model.prediction_id}.viennarna_svg",
-        prediction_id=prediction_model.prediction_id,
-        sequence_id=assembled.sequence_id,
-        sequence_sha256=assembled.sequence_sha256,
-        length=assembled.length,
-        backend_name=prediction_model.backend.name,
-        backend_version=prediction_model.backend.version,
-        layout_algorithm=layout_algorithm,
-        command=command,
-        source_prediction=prediction_ref,
-        source_visual_contract=Path(visual_contract_path).as_posix() if visual_contract_path is not None else None,
-        artifacts={
-            "native_svg": _VIENNARNA_NATIVE_SVG_FILENAME,
-            "annotated_svg": _VIENNARNA_ANNOTATED_SVG_FILENAME,
-            "annotation_manifest": _VIENNARNA_ANNOTATION_MANIFEST_FILENAME,
-        },
-        qa={
-            "nucleotide_node_count": len(surface.nucleotide_nodes),
-            "basepair_node_count": len(surface.basepair_nodes),
-            "cross_copy_pair_count": sum(1 for pair in svg_annotations.basepairs if pair["is_cross_copy"]),
-            "length_matches_svg_nodes": True,
-            "warnings": [],
-            "errors": [],
-        },
-    )
-    _write_json(manifest_path, manifest.model_dump(mode="json"))
-    return manifest
+    output_path = Path(output_dir).expanduser().resolve()
+    if output_path.exists():
+        raise FoldingConfigError(f"ViennaRNA plot output already exists: {output_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    staging_path = Path(tempfile.mkdtemp(prefix=f".{output_path.name}.staging-", dir=output_path.parent))
+    native_svg_path = staging_path / _VIENNARNA_NATIVE_SVG_FILENAME
+    annotated_svg_path = staging_path / _VIENNARNA_ANNOTATED_SVG_FILENAME
+    annotation_manifest_path = staging_path / _VIENNARNA_ANNOTATION_MANIFEST_FILENAME
+    manifest_path = staging_path / _VIENNARNA_PLOT_MANIFEST_FILENAME
+
+    # Folding may use a U-substituted RNA surrogate, but the published plot is a
+    # DNA artifact whose coordinates map to the original assembled sequence.
+    try:
+        command = _write_native_viennarna_svg(
+            module,
+            sequence=assembled.sequence,
+            structure=prediction_model.result.dot_bracket,
+            output_path=native_svg_path,
+            layout_algorithm=layout_algorithm,
+        )
+        surface = load_svg_surface(native_svg_path)
+        if len(surface.nucleotide_nodes) != assembled.length:
+            raise FoldingExecutionError(
+                "ViennaRNA SVG nucleotide node count "
+                f"{len(surface.nucleotide_nodes)} does not match input length {assembled.length}."
+            )
+
+        svg_annotations = annotate_svg_surface(
+            surface,
+            nucleotide_annotations=nucleotide_annotations,
+            unit_copy_spans=unit_copy_spans(visual_contract),
+            intended_pair_lookup=intended_pair_lookup(visual_contract),
+            intended_pairing_metrics=tuple(
+                item.model_dump(mode="json") for item in prediction_model.qa.intended_pairings
+            ),
+            visual_contract=visual_contract,
+            emphasize_stem_base_nucleotides=emphasize_stem_base_nucleotides,
+        )
+        ET.register_namespace("", SVG_NS)
+        surface.tree.write(annotated_svg_path, encoding="utf-8", xml_declaration=True)
+        _write_json(
+            annotation_manifest_path,
+            {
+                "contract_kind": "viennarna_secondary_structure_annotation_manifest_v1",
+                "sequence_id": assembled.sequence_id,
+                "sequence_sha256": assembled.sequence_sha256,
+                "coordinate_system": "zero_based_half_open",
+                "viennarna_display_coordinates": "one_based",
+                "nucleotides": nucleotide_annotations,
+                "basepairs": svg_annotations.basepairs,
+                "section_annotations": svg_annotations.section_annotations,
+                "layout_normalization": svg_annotations.layout_normalization,
+                "palette": component_palette,
+            },
+        )
+
+        manifest = ViennaRNAStructureSvgV1(
+            plot_id=f"{prediction_model.prediction_id}.viennarna_svg",
+            prediction_id=prediction_model.prediction_id,
+            sequence_id=assembled.sequence_id,
+            sequence_sha256=assembled.sequence_sha256,
+            length=assembled.length,
+            backend_name=prediction_model.backend.name,
+            backend_version=prediction_model.backend.version,
+            layout_algorithm=layout_algorithm,
+            command=command,
+            source_prediction=(
+                Path(source_prediction_ref).expanduser().resolve().as_posix()
+                if source_prediction_ref is not None
+                else prediction_ref
+            ),
+            source_visual_contract=Path(visual_contract_path).as_posix() if visual_contract_path is not None else None,
+            artifacts={
+                "native_svg": _VIENNARNA_NATIVE_SVG_FILENAME,
+                "annotated_svg": _VIENNARNA_ANNOTATED_SVG_FILENAME,
+                "annotation_manifest": _VIENNARNA_ANNOTATION_MANIFEST_FILENAME,
+            },
+            qa={
+                "nucleotide_node_count": len(surface.nucleotide_nodes),
+                "basepair_node_count": len(surface.basepair_nodes),
+                "cross_copy_pair_count": sum(1 for pair in svg_annotations.basepairs if pair["is_cross_copy"]),
+                "length_matches_svg_nodes": True,
+                "warnings": [],
+                "errors": [],
+            },
+        )
+        _write_json(manifest_path, manifest.model_dump(mode="json"))
+        os.replace(staging_path, output_path)
+        return manifest
+    except Exception:
+        shutil.rmtree(staging_path, ignore_errors=True)
+        raise
 
 
 def enrich_prediction_pairing_qa(
