@@ -1410,7 +1410,8 @@ job-ID prior name user state submit/start at queue slots ja-task-ID
         ),
     }
 
-    def _probe(argv: tuple[str, ...]) -> tuple[int, str, str]:
+    def _probe(argv: tuple[str, ...], *, timeout_seconds: float | None = None) -> tuple[int, str, str]:
+        assert timeout_seconds is None or timeout_seconds > 0
         if argv[:2] == ("qstat", "-u"):
             return 0, qstat_table, ""
         if argv[:2] == ("qstat", "-j"):
@@ -1423,7 +1424,7 @@ job-ID prior name user state submit/start at queue slots ja-task-ID
     assert discovered == ("81001", "81002")
 
 
-def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches(
+def test_probe_active_jobs_caps_inspected_jobs_and_reports_unknown_visibility(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     runbook_path = _write_runbook(tmp_path)
@@ -1448,7 +1449,8 @@ def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches
     qstat_table = "\n".join(qstat_lines)
     seen_job_probes: list[str] = []
 
-    def _probe(argv: tuple[str, ...]) -> tuple[int, str, str]:
+    def _probe(argv: tuple[str, ...], *, timeout_seconds: float | None = None) -> tuple[int, str, str]:
+        assert timeout_seconds is None or timeout_seconds > 0
         if argv[:2] == ("qstat", "-u"):
             return 0, qstat_table, ""
         if argv[:2] == ("qstat", "-j"):
@@ -1458,11 +1460,59 @@ def test_discover_active_job_ids_scans_full_qstat_listing_before_capping_matches
 
     monkeypatch.setattr(orchestrator_state, "_run_probe", _probe)
 
-    discovered = discover_active_job_ids_for_runbook(runbook, max_jobs=1)
+    resolution = orchestrator_state.probe_active_jobs_for_runbook(runbook, max_jobs=1)
 
-    assert discovered == ("81025",)
-    assert seen_job_probes[-1] == "81025"
-    assert "81026" not in seen_job_probes
+    assert resolution.discovered_job_ids == ()
+    assert seen_job_probes == ["81001"]
+    assert resolution.runtime_visibility.scheduler_probe_state == (
+        orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED
+    )
+    assert (
+        resolution.runtime_visibility.active_job_resolution_state == orchestrator_state.ActiveJobResolutionState.UNKNOWN
+    )
+    assert resolution.runtime_visibility.degraded is True
+    assert resolution.runtime_visibility.degraded_reasons == (
+        "active-job discovery inspected 1 of 26 queued jobs; --max-discovery-jobs=1 exhausted",
+    )
+
+
+def test_probe_active_jobs_enforces_overall_time_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    qstat_table = "\n".join(
+        (
+            "job-ID prior name user state submit/start at queue slots ja-task-ID",
+            "--------------------------------------------------------------------------------",
+            "81001 0.555 a b qw 03/01/2026 queueA 1",
+            "81002 0.555 a b qw 03/01/2026 queueA 1",
+        )
+    )
+    clock = iter((100.0, 100.0, 100.4, 101.1, 101.1))
+    seen_job_probes: list[str] = []
+
+    def _probe(argv: tuple[str, ...], *, timeout_seconds: float | None = None) -> tuple[int, str, str]:
+        assert timeout_seconds is not None
+        if argv[:2] == ("qstat", "-u"):
+            return 0, qstat_table, ""
+        seen_job_probes.append(str(argv[2]))
+        return 0, "context: ops_run_group_id=foreign", ""
+
+    monkeypatch.setattr(orchestrator_state.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(orchestrator_state, "_run_probe", _probe)
+
+    resolution = orchestrator_state.probe_active_jobs_for_runbook(runbook, max_jobs=10, budget_seconds=1.0)
+
+    assert seen_job_probes == ["81001"]
+    assert resolution.discovered_job_ids == ()
+    assert resolution.runtime_visibility.scheduler_probe_state == (
+        orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED
+    )
+    assert (
+        resolution.runtime_visibility.active_job_resolution_state == orchestrator_state.ActiveJobResolutionState.UNKNOWN
+    )
+    assert resolution.runtime_visibility.degraded_reasons == (
+        "active-job discovery exceeded its 1 second overall probe budget after inspecting 1 of 2 queued jobs",
+    )
 
 
 def test_batch_plan_submit_commands_include_explicit_job_identity_tags(tmp_path: Path) -> None:
@@ -1491,7 +1541,11 @@ def test_discover_active_job_ids_raises_when_qstat_snapshot_fails(
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
 
-    monkeypatch.setattr(orchestrator_state, "_run_probe", lambda argv: (1, "", "qstat unavailable"))
+    monkeypatch.setattr(
+        orchestrator_state,
+        "_run_probe",
+        lambda argv, *, timeout_seconds=None: (1, "", "qstat unavailable"),
+    )
 
     with pytest.raises(RuntimeError, match="qstat unavailable"):
         discover_active_job_ids_for_runbook(runbook, max_jobs=12)
@@ -1536,7 +1590,11 @@ def test_probe_active_jobs_for_runbook_classifies_submit_host_denial(
     monkeypatch.setattr(
         orchestrator_state,
         "_run_probe",
-        lambda argv: (1, "", 'error: denied: host "scc1.bu.edu" is neither submit nor admin host'),
+        lambda argv, *, timeout_seconds=None: (
+            1,
+            "",
+            'error: denied: host "scc1.bu.edu" is neither submit nor admin host',
+        ),
     )
 
     resolution = orchestrator_state.probe_active_jobs_for_runbook(runbook, max_jobs=12)

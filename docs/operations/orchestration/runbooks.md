@@ -11,7 +11,7 @@
 **Status-kind:** ops-audit-json
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-07-30
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
 It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next procedure is about shared datasets rather than scheduler sequencing.
@@ -341,6 +341,9 @@ uv run ops runbook active-jobs --runbook <path-to-runbook.yaml> --repo-root <rep
 `active-jobs` emits `active_job_ids` plus ready-to-paste chaining hints: `active_job_ids_csv`, `active_job_id_args`, and `plan_command_hint`.
 OPS-submitted jobs also carry explicit scheduler identity tags so automatic matching does not rely on workspace-path token scraping alone. The visible job name remains operator-friendly, while the machine-readable identity carries the stable run-group and workspace ids used by active-job discovery and audit correlation.
 The payload also includes `runtime_visibility` so `no_match`, `multiple_matches`, and degraded scheduler visibility stay explicit in both JSON and CLI-adjacent tooling.
+Discovery bounds both the number of `qstat -j` detail probes and their combined
+wall-clock budget. If either bound prevents a complete queue inspection, OPS
+reports degraded `unknown` visibility instead of claiming that no job matched.
 
 Supported scheduler diagnostics:
 

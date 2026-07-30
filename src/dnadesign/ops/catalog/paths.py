@@ -64,6 +64,23 @@ def resolve_catalog_repo_root(repo_root: Path | None) -> Path:
     raise ValueError("runbook catalog requires a dnadesign repository checkout; pass --repo-root")
 
 
+def catalog_metadata_search_roots(repo_root: Path) -> tuple[Path, ...]:
+    """Return the checked-in documentation roots that may publish catalog metadata."""
+
+    search_roots: list[Path] = []
+    top_level_docs_root = (repo_root / "docs").resolve()
+    if top_level_docs_root.exists():
+        search_roots.append(top_level_docs_root)
+
+    tool_src_root = (repo_root / "src" / "dnadesign").resolve()
+    if tool_src_root.exists():
+        for tool_root in sorted(path for path in tool_src_root.iterdir() if path.is_dir()):
+            docs_root = (tool_root / "docs").resolve()
+            if docs_root.exists():
+                search_roots.append(docs_root)
+    return tuple(search_roots)
+
+
 def resolve_doc_path_for_metadata(*, metadata_path: Path, repo_root: Path) -> Path:
     relative_metadata = metadata_path.resolve().relative_to(repo_root.resolve())
     if relative_metadata.parent.name == "registry":
