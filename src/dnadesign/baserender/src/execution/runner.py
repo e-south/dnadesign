@@ -48,6 +48,12 @@ class _PublicationLock:
     descriptor: int
 
 
+@dataclass(frozen=True)
+class _PublicationClaim:
+    path: Path
+    exclusive: bool
+
+
 def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
     if isinstance(output, ImagesOutputCfg):
         if output.path is not None:
@@ -99,12 +105,24 @@ def _validate_publication_conflicts(
         )
 
 
-def _publication_lock_path(target: _PublicationTarget) -> Path:
+def _publication_lock_path(path: Path) -> Path:
     if not hasattr(os, "getuid"):
         raise SchemaError("Transactional publication locking requires a POSIX runtime")
     namespace = Path(tempfile.gettempdir()) / f"dnadesign-baserender-locks-{os.getuid()}"
-    destination = target.final.resolve(strict=False).as_posix()
-    return namespace / f"{sha256(destination.encode()).hexdigest()}.lock"
+    return namespace / f"{sha256(path.as_posix().encode()).hexdigest()}.lock"
+
+
+def _publication_claims(targets: tuple[_PublicationTarget, ...]) -> tuple[_PublicationClaim, ...]:
+    claims: dict[Path, bool] = {}
+    for target in targets:
+        destination = target.final.resolve(strict=False)
+        for ancestor in destination.parents:
+            claims.setdefault(ancestor, False)
+        claims[destination] = True
+    return tuple(
+        _PublicationClaim(path=path, exclusive=exclusive)
+        for path, exclusive in sorted(claims.items(), key=lambda item: item[0].as_posix())
+    )
 
 
 def _reserve_publication_targets(targets: tuple[_PublicationTarget, ...]) -> tuple[_PublicationLock, ...]:
@@ -115,18 +133,24 @@ def _reserve_publication_targets(targets: tuple[_PublicationTarget, ...]) -> tup
 
     locks: list[_PublicationLock] = []
     try:
-        for target in sorted(targets, key=lambda item: item.final.as_posix()):
-            lock_path = _publication_lock_path(target)
+        for claim in _publication_claims(targets):
+            lock_path = _publication_lock_path(claim.path)
             lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             flags = os.O_CREAT | os.O_RDWR
             if hasattr(os, "O_NOFOLLOW"):
                 flags |= os.O_NOFOLLOW
+            descriptor = os.open(lock_path, flags, 0o600)
             try:
-                descriptor = os.open(lock_path, flags, 0o600)
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                mode = fcntl.LOCK_EX if claim.exclusive else fcntl.LOCK_SH
+                fcntl.flock(descriptor, mode | fcntl.LOCK_NB)
             except BlockingIOError as exc:
                 os.close(descriptor)
-                raise SchemaError(f"Batch publication is already in progress for: {target.final}") from exc
+                raise SchemaError(
+                    f"Batch publication is already in progress for an overlapping path: {claim.path}"
+                ) from exc
+            except Exception:
+                os.close(descriptor)
+                raise
             locks.append(_PublicationLock(descriptor=descriptor))
     except Exception:
         _release_publication_locks(tuple(locks))

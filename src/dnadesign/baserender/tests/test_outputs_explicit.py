@@ -44,6 +44,25 @@ def _make_input_parquet(tmp_path: Path) -> Path:
     )
 
 
+def _start_reservation_process(final: Path, staging: Path) -> subprocess.Popen[str]:
+    child_code = """
+import signal
+import sys
+from pathlib import Path
+from dnadesign.baserender.src.execution.runner import _PublicationTarget, _reserve_publication_targets
+
+_reserve_publication_targets((_PublicationTarget(final=Path(sys.argv[1]), staging=Path(sys.argv[2])),))
+print("ready", flush=True)
+signal.pause()
+"""
+    return subprocess.Popen(
+        [sys.executable, "-c", child_code, str(final), str(staging)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
 def test_images_output_does_not_produce_video(tmp_path: Path) -> None:
     parquet = _make_input_parquet(tmp_path)
     results_root = tmp_path / "results"
@@ -397,22 +416,7 @@ def test_publication_reservation_is_released_when_worker_dies(tmp_path: Path) ->
 
     final = tmp_path / "results" / "images"
     targets = (_PublicationTarget(final=final, staging=tmp_path / "staging"),)
-    child_code = """
-import signal
-import sys
-from pathlib import Path
-from dnadesign.baserender.src.execution.runner import _PublicationTarget, _reserve_publication_targets
-
-_reserve_publication_targets((_PublicationTarget(final=Path(sys.argv[1]), staging=Path(sys.argv[2])),))
-print("ready", flush=True)
-signal.pause()
-"""
-    process = subprocess.Popen(
-        [sys.executable, "-c", child_code, str(final), str(tmp_path / "staging")],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    process = _start_reservation_process(final, tmp_path / "staging")
     try:
         assert process.stdout is not None
         assert process.stdout.readline().strip() == "ready"
@@ -428,3 +432,66 @@ signal.pause()
         if process.poll() is None:
             process.kill()
             process.wait(timeout=10)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX process semantics")
+@pytest.mark.parametrize(
+    ("held_relative", "attempted_relative"),
+    [("images", "images/plot.png"), ("images/plot.png", "images")],
+)
+def test_publication_reservation_rejects_concurrent_nested_destination(
+    tmp_path: Path,
+    held_relative: str,
+    attempted_relative: str,
+) -> None:
+    from dnadesign.baserender.src.execution.runner import (
+        _PublicationTarget,
+        _release_publication_locks,
+        _reserve_publication_targets,
+    )
+
+    results_root = tmp_path / "results"
+    held_final = results_root / held_relative
+    attempted_final = results_root / attempted_relative
+    process = _start_reservation_process(held_final, tmp_path / "held-staging")
+
+    def _reserve_nested_destination() -> None:
+        locks = _reserve_publication_targets(
+            (
+                _PublicationTarget(
+                    final=attempted_final,
+                    staging=tmp_path / "attempted-staging",
+                ),
+            )
+        )
+        _release_publication_locks(locks)
+
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "ready"
+        with pytest.raises(SchemaError, match="publication is already in progress"):
+            _reserve_nested_destination()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+
+
+def test_publication_reservation_allows_concurrent_sibling_destinations(tmp_path: Path) -> None:
+    from dnadesign.baserender.src.execution.runner import (
+        _PublicationTarget,
+        _release_publication_locks,
+        _reserve_publication_targets,
+    )
+
+    results_root = tmp_path / "results"
+    left_locks = _reserve_publication_targets(
+        (_PublicationTarget(final=results_root / "images", staging=tmp_path / "images-staging"),)
+    )
+    try:
+        right_locks = _reserve_publication_targets(
+            (_PublicationTarget(final=results_root / "video.mp4", staging=tmp_path / "video-staging"),)
+        )
+        _release_publication_locks(right_locks)
+    finally:
+        _release_publication_locks(left_locks)
