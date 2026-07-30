@@ -61,7 +61,7 @@ def load_records_jsonl_input(path: str, field: str) -> Tuple[List[str], List[Dic
 
 
 def load_pt_file_input(path: str, field: str) -> Tuple[List[str], List[Dict]]:
-    data = torch.load(path, map_location="cpu")
+    data = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(data, list) or not all(isinstance(x, dict) for x in data):
         raise ValidationError(".pt file must contain list[dict]")
     seqs = []

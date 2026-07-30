@@ -27,7 +27,7 @@ def validate_pt_file(file_path: str) -> bool:
     """
     pt_path = Path(file_path)
     assert pt_path.exists() and pt_path.is_file(), f"PT file {pt_path} does not exist."
-    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
+    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"), weights_only=True)
     assert isinstance(checkpoint, list) and len(checkpoint) > 0, f"{pt_path} must be a non-empty list."
     for i, entry in enumerate(checkpoint):
         assert isinstance(entry, dict), f"Entry {i} in {pt_path} is not a dictionary."
@@ -40,7 +40,7 @@ def inspect_entry(file_path: str, index: int) -> dict:
     Loads a .pt file and returns the entry (a dictionary) at the given index.
     """
     pt_path = Path(file_path)
-    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
+    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"), weights_only=True)
     if not (0 <= index < len(checkpoint)):
         raise IndexError(f"Index {index} is out of range for file {pt_path} (length {len(checkpoint)}).")
     return checkpoint[index]
@@ -74,7 +74,7 @@ def update_meta_part_type(file_path: str) -> None:
     The file is then saved in-place.
     """
     pt_path = Path(file_path)
-    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"))
+    checkpoint = torch.load(pt_path, map_location=torch.device("cpu"), weights_only=True)
     if not (isinstance(checkpoint, list) and len(checkpoint) > 0):
         print(f"File {pt_path} is not a valid .pt file format for meta update.")
         return

@@ -99,7 +99,7 @@ def _count_tf(parts: Sequence[str]) -> Dict[str, int]:
 
 def _ensure_pt_list_of_dicts(p: Path) -> List[dict]:
     torch = _require_torch()
-    checkpoint = torch.load(str(p), map_location=torch.device("cpu"))
+    checkpoint = torch.load(str(p), map_location=torch.device("cpu"), weights_only=True)
     if not isinstance(checkpoint, list) or not checkpoint:
         raise SchemaError(f"{p} must be a non-empty list.")
     for i, entry in enumerate(checkpoint):
