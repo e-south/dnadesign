@@ -774,7 +774,21 @@ def resolve_mode_decision(
 
     selected_runtime_visibility = runtime_visibility or _default_runtime_visibility_for_job_ids(active_job_ids)
     hold_jid_candidates = _normalize_hold_jid(active_job_ids)
-    if hold_jid_candidates is not None:
+    active_job_visibility_unknown = (
+        selected_runtime_visibility.active_job_resolution_state == ActiveJobResolutionState.UNKNOWN
+    )
+    if (
+        active_job_visibility_unknown
+        and selected_runtime_visibility.scheduler_probe_state == SchedulerProbeState.HOST_DENIED
+    ):
+        submit_behavior = "blocked"
+        reason = f"{reason}; current_host_not_submit_host"
+    elif active_job_visibility_unknown and not allow_unknown_active_jobs:
+        submit_behavior = "blocked"
+        reason = f"{reason}; active_job_visibility_unknown; submission_blocked_by_runtime_visibility"
+    elif hold_jid_candidates is not None:
+        if active_job_visibility_unknown:
+            reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
         if runbook.mode_policy.on_active_job == "hold_jid":
             submit_behavior = "hold_jid"
             hold_jid = hold_jid_candidates
@@ -782,15 +796,8 @@ def resolve_mode_decision(
         else:
             submit_behavior = "blocked"
             reason = f"{reason}; active_jobs_detected; submission_blocked_by_policy"
-    elif selected_runtime_visibility.active_job_resolution_state == ActiveJobResolutionState.UNKNOWN:
-        if selected_runtime_visibility.scheduler_probe_state == SchedulerProbeState.HOST_DENIED:
-            submit_behavior = "blocked"
-            reason = f"{reason}; current_host_not_submit_host"
-        elif allow_unknown_active_jobs:
-            reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
-        else:
-            submit_behavior = "blocked"
-            reason = f"{reason}; active_job_visibility_unknown; submission_blocked_by_runtime_visibility"
+    elif active_job_visibility_unknown:
+        reason = f"{reason}; active_job_visibility_unknown; submission_override_allow_unknown_active_jobs=true"
     else:
         reason = f"{reason}; active_job_visibility={selected_runtime_visibility.active_job_resolution_state.value}"
 

@@ -939,6 +939,51 @@ def test_mode_auto_with_active_jobs_normalizes_comma_delimited_ids(tmp_path: Pat
     assert decision.hold_jid == "81001,81002"
 
 
+def test_mode_auto_blocks_partial_active_job_matches_when_discovery_is_unknown(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    runtime_visibility = orchestrator_state.RuntimeVisibility(
+        scheduler_probe_state=orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED,
+        active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+        degraded=True,
+        degraded_reasons=("active-job discovery budget exhausted",),
+    )
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81001",),
+        runtime_visibility=runtime_visibility,
+    )
+
+    assert decision.submit_behavior == "blocked"
+    assert decision.hold_jid is None
+    assert "submission_blocked_by_runtime_visibility" in decision.reason
+
+
+def test_mode_auto_chains_partial_active_job_matches_only_with_unknown_override(tmp_path: Path) -> None:
+    runbook_path = _write_runbook(tmp_path)
+    runbook = load_orchestration_runbook(runbook_path)
+    runtime_visibility = orchestrator_state.RuntimeVisibility(
+        scheduler_probe_state=orchestrator_state.SchedulerProbeState.BUDGET_EXHAUSTED,
+        active_job_resolution_state=orchestrator_state.ActiveJobResolutionState.UNKNOWN,
+        degraded=True,
+        degraded_reasons=("active-job discovery budget exhausted",),
+    )
+
+    decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=None,
+        active_job_ids=("81001",),
+        runtime_visibility=runtime_visibility,
+        allow_unknown_active_jobs=True,
+    )
+
+    assert decision.submit_behavior == "hold_jid"
+    assert decision.hold_jid == "81001"
+    assert "submission_override_allow_unknown_active_jobs=true" in decision.reason
+
+
 def test_mode_auto_blocks_submit_when_current_host_is_not_submit_host_even_with_override(tmp_path: Path) -> None:
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
