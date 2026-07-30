@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 import uuid
 from dataclasses import dataclass, replace
+from hashlib import sha256
 from itertools import islice
 from pathlib import Path
 from typing import Iterable, Iterator
@@ -39,6 +41,11 @@ from ..runtime import initialize_runtime
 class _PublicationTarget:
     final: Path
     staging: Path
+
+
+@dataclass(frozen=True)
+class _PublicationLock:
+    descriptor: int
 
 
 def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
@@ -93,36 +100,48 @@ def _validate_publication_conflicts(
 
 
 def _publication_lock_path(target: _PublicationTarget) -> Path:
-    return target.final.parent / f".{target.final.name}.publication.lock"
+    if not hasattr(os, "getuid"):
+        raise SchemaError("Transactional publication locking requires a POSIX runtime")
+    namespace = Path(tempfile.gettempdir()) / f"dnadesign-baserender-locks-{os.getuid()}"
+    destination = target.final.resolve(strict=False).as_posix()
+    return namespace / f"{sha256(destination.encode()).hexdigest()}.lock"
 
 
-def _reserve_publication_targets(targets: tuple[_PublicationTarget, ...]) -> tuple[Path, ...]:
-    locks: list[Path] = []
+def _reserve_publication_targets(targets: tuple[_PublicationTarget, ...]) -> tuple[_PublicationLock, ...]:
+    try:
+        import fcntl
+    except ImportError as exc:  # pragma: no cover - guarded above on supported runtimes
+        raise SchemaError("Transactional publication locking requires POSIX file locks") from exc
+
+    locks: list[_PublicationLock] = []
     try:
         for target in sorted(targets, key=lambda item: item.final.as_posix()):
             lock_path = _publication_lock_path(target)
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            flags = os.O_CREAT | os.O_RDWR
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
             try:
-                descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            except FileExistsError as exc:
-                raise SchemaError(f"Batch publication is already in progress for: {target.final}") from exc
-            try:
-                os.write(descriptor, f"pid={os.getpid()}\n".encode())
-            finally:
+                descriptor = os.open(lock_path, flags, 0o600)
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
                 os.close(descriptor)
-            locks.append(lock_path)
+                raise SchemaError(f"Batch publication is already in progress for: {target.final}") from exc
+            locks.append(_PublicationLock(descriptor=descriptor))
     except Exception:
         _release_publication_locks(tuple(locks))
         raise
     return tuple(locks)
 
 
-def _release_publication_locks(locks: tuple[Path, ...]) -> None:
-    for lock_path in reversed(locks):
+def _release_publication_locks(locks: tuple[_PublicationLock, ...]) -> None:
+    import fcntl
+
+    for lock in reversed(locks):
         try:
-            lock_path.unlink()
-        except FileNotFoundError:
-            continue
+            fcntl.flock(lock.descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(lock.descriptor)
 
 
 def _staged_job(job: RenderJobV3, targets: tuple[_PublicationTarget, ...]) -> RenderJobV3:

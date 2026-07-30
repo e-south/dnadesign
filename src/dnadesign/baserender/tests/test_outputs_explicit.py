@@ -11,6 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -382,3 +385,46 @@ def test_concurrent_error_policy_job_cannot_overwrite_reserved_batch(
     images_dir = results_root / job_path.stem / "images"
     assert (images_dir / "rendered.png").read_bytes() == b"batch-1"
     assert not list(images_dir.parent.glob(".*.publication.lock"))
+
+
+@pytest.mark.skipif(os.name != "posix", reason="requires POSIX process semantics")
+def test_publication_reservation_is_released_when_worker_dies(tmp_path: Path) -> None:
+    from dnadesign.baserender.src.execution.runner import (
+        _PublicationTarget,
+        _release_publication_locks,
+        _reserve_publication_targets,
+    )
+
+    final = tmp_path / "results" / "images"
+    targets = (_PublicationTarget(final=final, staging=tmp_path / "staging"),)
+    child_code = """
+import signal
+import sys
+from pathlib import Path
+from dnadesign.baserender.src.execution.runner import _PublicationTarget, _reserve_publication_targets
+
+_reserve_publication_targets((_PublicationTarget(final=Path(sys.argv[1]), staging=Path(sys.argv[2])),))
+print("ready", flush=True)
+signal.pause()
+"""
+    process = subprocess.Popen(
+        [sys.executable, "-c", child_code, str(final), str(tmp_path / "staging")],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert process.stdout is not None
+        assert process.stdout.readline().strip() == "ready"
+        with pytest.raises(SchemaError, match="publication is already in progress"):
+            _reserve_publication_targets(targets)
+
+        process.kill()
+        process.wait(timeout=10)
+
+        locks = _reserve_publication_targets(targets)
+        _release_publication_locks(locks)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
