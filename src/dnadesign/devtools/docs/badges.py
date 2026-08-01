@@ -50,6 +50,12 @@ class _ImageOccurrence:
     spec: _ImageSpec
 
 
+@dataclass(frozen=True, slots=True)
+class _RelativeImageOccurrence:
+    line_offset: int
+    spec: _ImageSpec
+
+
 class _HTMLImageParser(HTMLParser):
     def __init__(self, *, anchor_depth: int, markdown_link_depth: int) -> None:
         super().__init__(convert_charrefs=True)
@@ -62,22 +68,23 @@ class _HTMLImageParser(HTMLParser):
         if normalized_tag == "a":
             self.anchor_depth += 1
             return
-        if normalized_tag != "img":
+        if normalized_tag not in {"img", "source"}:
             return
         attributes = {name.casefold(): value or "" for name, value in attrs}
+        sources = " ".join(value for name in ("src", "srcset") if (value := attributes.get(name, "")))
         self.images.append(
             (
                 self.getpos()[0] - 1,
                 _ImageSpec(
                     label=attributes.get("alt", ""),
-                    source=attributes.get("src", ""),
+                    source=sources,
                     linked=self.markdown_link_depth > 0 or self.anchor_depth > 0,
                 ),
             )
         )
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.casefold() == "img":
+        if tag.casefold() in {"a", "img", "source"}:
             self.handle_starttag(tag, attrs)
 
     def handle_endtag(self, tag: str) -> None:
@@ -103,9 +110,14 @@ def _html_fragment_image_specs(
     return tuple(parser.images), parser.anchor_depth
 
 
-def _inline_image_specs(children: Iterable[Token], *, anchor_depth: int) -> tuple[tuple[_ImageSpec, ...], int]:
-    images: list[_ImageSpec] = []
+def _inline_image_specs(
+    children: Iterable[Token],
+    *,
+    anchor_depth: int,
+) -> tuple[tuple[_RelativeImageOccurrence, ...], int]:
+    images: list[_RelativeImageOccurrence] = []
     markdown_link_depth = 0
+    line_offset = 0
     for token in children:
         if token.type == "link_open":
             markdown_link_depth += 1
@@ -115,33 +127,43 @@ def _inline_image_specs(children: Iterable[Token], *, anchor_depth: int) -> tupl
             continue
         if token.type == "image":
             images.append(
-                _ImageSpec(
-                    label=token.content,
-                    source=token.attrGet("src") or "",
-                    linked=markdown_link_depth > 0 or anchor_depth > 0,
+                _RelativeImageOccurrence(
+                    line_offset=line_offset,
+                    spec=_ImageSpec(
+                        label=token.content,
+                        source=token.attrGet("src") or "",
+                        linked=markdown_link_depth > 0 or anchor_depth > 0,
+                    ),
                 )
             )
-            continue
-        if token.type == "html_inline":
+        elif token.type == "html_inline":
             html_images, anchor_depth = _html_fragment_image_specs(
                 token.content,
                 markdown_link_depth=markdown_link_depth,
                 anchor_depth=anchor_depth,
             )
-            images.extend(spec for _offset, spec in html_images)
+            images.extend(
+                _RelativeImageOccurrence(line_offset=line_offset + relative_line, spec=spec)
+                for relative_line, spec in html_images
+            )
+        if token.type in {"softbreak", "hardbreak"}:
+            line_offset += 1
+        else:
+            line_offset += token.content.count("\n")
     return tuple(images), anchor_depth
 
 
 def _match_image_lines(
-    specs: tuple[_ImageSpec, ...],
+    relative_occurrences: tuple[_RelativeImageOccurrence, ...],
     *,
     line_candidates: list[tuple[int, _ImageSpec]],
-    fallback_line_no: int,
+    start_line_no: int,
 ) -> tuple[_ImageOccurrence, ...]:
     occurrences: list[_ImageOccurrence] = []
     candidate_cursor = 0
-    for spec in specs:
-        line_no = fallback_line_no
+    for relative_occurrence in relative_occurrences:
+        spec = relative_occurrence.spec
+        line_no = start_line_no + relative_occurrence.line_offset
         for candidate_index in range(candidate_cursor, len(line_candidates)):
             candidate_line_no, candidate_spec = line_candidates[candidate_index]
             if candidate_spec == spec:
@@ -161,8 +183,11 @@ def _rendered_image_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
     for token in tokens:
         if token.type == "inline" and token.map is not None:
             initial_anchor_depth = anchor_depth
-            specs, anchor_depth = _inline_image_specs(token.children or (), anchor_depth=anchor_depth)
-            if not specs:
+            relative_occurrences, anchor_depth = _inline_image_specs(
+                token.children or (),
+                anchor_depth=anchor_depth,
+            )
+            if not relative_occurrences:
                 continue
             start_line, end_line = token.map
             line_candidates: list[tuple[int, _ImageSpec]] = []
@@ -170,16 +195,18 @@ def _rendered_image_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
             for line_index in range(start_line, min(end_line, len(lines))):
                 line_tokens = MARKDOWN.parseInline(lines[line_index], environment)
                 for line_token in line_tokens:
-                    line_specs, candidate_anchor_depth = _inline_image_specs(
+                    line_occurrences, candidate_anchor_depth = _inline_image_specs(
                         line_token.children or (),
                         anchor_depth=candidate_anchor_depth,
                     )
-                    line_candidates.extend((line_index + 1, spec) for spec in line_specs)
+                    line_candidates.extend(
+                        (line_index + 1 + occurrence.line_offset, occurrence.spec) for occurrence in line_occurrences
+                    )
             occurrences.extend(
                 _match_image_lines(
-                    specs,
+                    relative_occurrences,
                     line_candidates=line_candidates,
-                    fallback_line_no=start_line + 1,
+                    start_line_no=start_line + 1,
                 )
             )
             continue

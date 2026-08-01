@@ -117,6 +117,17 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
         ('<img alt="quality > details" src="badge.svg">\n', 1),
         ('<a href="report">\n\n![Coverage](status.svg)\n\n</a>\n', 3),
         ('text <a href="report">\n<img alt="Coverage" src="status.svg">\n</a>\n', 2),
+        (
+            '<img alt="build" src="diagram.svg" srcset="https://img.shields.io/badge/build-passing.svg">\n',
+            1,
+        ),
+        (
+            '<picture><source srcset="https://img.shields.io/badge/build-passing.svg">'
+            '<img alt="build" src="diagram.svg"></picture>\n',
+            1,
+        ),
+        ('<a href="report" />\n\n<img alt="Coverage" src="status.svg">\n', 3),
+        ('intro\n<img\n alt="Coverage"\n src="badge.svg">\noutro\n', 2),
     ],
 )
 def test_badge_policy_rejects_alternate_badge_syntax_outside_root(
