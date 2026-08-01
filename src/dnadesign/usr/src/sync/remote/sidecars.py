@@ -104,7 +104,7 @@ def local_sidecar_state(dataset_dir: Path, *, include_derived_hashes: bool = Fal
                 continue
             rel = item.relative_to(dataset_dir)
             rel_text = rel.as_posix()
-            if rel_text in {"records.parquet", "meta.md", ".events.log", ".usr.lock"}:
+            if rel_text in {"records.parquet", "meta.md", ".events.log", ".events.lock", ".usr.lock"}:
                 continue
             if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
                 continue

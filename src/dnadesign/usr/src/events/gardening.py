@@ -21,6 +21,7 @@ from tempfile import NamedTemporaryFile
 from typing import Any
 
 from ..storage.parquet import now_utc
+from .append import event_log_lock
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,21 @@ class EventLogGardenResult:
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+def _empty_garden_result(dataset: Any, events_path: Path, *, mode: str) -> EventLogGardenResult:
+    return EventLogGardenResult(
+        dataset_id=str(dataset.name),
+        events_path=events_path.as_posix(),
+        archive_path=None,
+        total_lines=0,
+        retained_lines=0,
+        archived_lines=0,
+        before_size_bytes=0,
+        after_size_bytes=0,
+        source_sha256=None,
+        mode=mode,
+    )
 
 
 def garden_event_log(
@@ -59,24 +75,13 @@ def garden_event_log(
     if int(retain_last) < 1:
         raise ValueError("retain_last must be >= 1.")
     events_path = Path(dataset.events_path)
-    if not events_path.exists():
-        return EventLogGardenResult(
-            dataset_id=str(dataset.name),
-            events_path=events_path.as_posix(),
-            archive_path=None,
-            total_lines=0,
-            retained_lines=0,
-            archived_lines=0,
-            before_size_bytes=0,
-            after_size_bytes=0,
-            source_sha256=None,
-            mode="write" if write else "dry_run",
-        )
-    total_lines, source_sha256, tail_lines = _scan_event_log(events_path, retain_last=int(retain_last))
-    before_size = events_path.stat().st_size
-    retained_lines = min(total_lines, int(retain_last))
-    archived_lines = max(0, total_lines - retained_lines)
     if not write:
+        if not events_path.exists():
+            return _empty_garden_result(dataset, events_path, mode="dry_run")
+        total_lines, source_sha256, _tail_lines = _scan_event_log(events_path, retain_last=int(retain_last))
+        before_size = events_path.stat().st_size
+        retained_lines = min(total_lines, int(retain_last))
+        archived_lines = max(0, total_lines - retained_lines)
         return EventLogGardenResult(
             dataset_id=str(dataset.name),
             events_path=events_path.as_posix(),
@@ -95,14 +100,21 @@ def garden_event_log(
             "stop Notify watchers and reseed cursors after gardening."
         )
 
-    timestamp = _safe_timestamp(now_utc())
-    archive_dir = Path(dataset.dir) / archive_dir_name
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = archive_dir / f"events-{timestamp}-{source_sha256[:12]}.jsonl"
-    if archive_path.exists():
-        raise FileExistsError(f"Event archive already exists: {archive_path}")
-    shutil.copy2(events_path, archive_path)
-    _replace_event_log(events_path, tail_lines)
+    with event_log_lock(events_path):
+        if not events_path.exists():
+            return _empty_garden_result(dataset, events_path, mode="write")
+        total_lines, source_sha256, tail_lines = _scan_event_log(events_path, retain_last=int(retain_last))
+        before_size = events_path.stat().st_size
+        retained_lines = min(total_lines, int(retain_last))
+        archived_lines = max(0, total_lines - retained_lines)
+        timestamp = _safe_timestamp(now_utc())
+        archive_dir = Path(dataset.dir) / archive_dir_name
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        archive_path = archive_dir / f"events-{timestamp}-{source_sha256[:12]}.jsonl"
+        if archive_path.exists():
+            raise FileExistsError(f"Event archive already exists: {archive_path}")
+        shutil.copy2(events_path, archive_path)
+        _replace_event_log(events_path, tail_lines)
     dataset.log_event(
         "event_log_garden",
         args={

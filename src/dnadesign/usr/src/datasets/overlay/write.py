@@ -23,7 +23,7 @@ import pyarrow.parquet as pq
 from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 
 from ...contracts import NamespaceError, SchemaError
-from ...events import validate_event_metadata
+from ...events import EventAppendFailure, EventAppendState, validate_event_metadata
 from ...overlays import overlay_dir_path, overlay_path, with_overlay_metadata
 from ...overlays.support.digest_ledger import overlay_digest_ledger_path, update_overlay_digest_ledger
 from ...registry import namespace_contract_hash_for_entries
@@ -418,6 +418,8 @@ def write_overlay_part_dataset(
             try:
                 return _record_write(result, target_path=final_part)
             except BaseException as event_error:
+                if isinstance(event_error, EventAppendFailure) and event_error.state is not EventAppendState.RESTORED:
+                    raise
                 try:
                     rolled_back = publication.rollback()
                 except BaseException as rollback_error:

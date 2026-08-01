@@ -104,7 +104,7 @@ class _FilesystemRemote:
                     continue
                 rel = item.relative_to(dataset_dir)
                 rel_text = rel.as_posix()
-                if rel_text in {"records.parquet", "meta.md", ".events.log", ".usr.lock"}:
+                if rel_text in {"records.parquet", "meta.md", ".events.log", ".events.lock", ".usr.lock"}:
                     continue
                 if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
                     continue
@@ -142,6 +142,8 @@ class _FilesystemRemote:
         dst_dir.mkdir(parents=True, exist_ok=True)
         for item in src_dir.rglob("*"):
             rel = item.relative_to(src_dir)
+            if rel.as_posix() in {".events.lock", ".usr.lock"}:
+                continue
             if skip_snapshots and rel.parts and rel.parts[0] == "_snapshots":
                 continue
             target = dst_dir / rel

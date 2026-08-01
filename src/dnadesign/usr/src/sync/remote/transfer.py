@@ -50,7 +50,7 @@ def collect_staged_entries(staged: Path, *, skip_snapshots: bool) -> list[tuple[
         if not rel.parts:
             continue
         rel_text = rel.as_posix()
-        if rel_text in {"records.parquet", ".usr.lock"}:
+        if rel_text in {"records.parquet", ".events.lock", ".usr.lock"}:
             continue
         if skip_snapshots and rel.parts[0] == "_snapshots":
             continue
@@ -91,7 +91,7 @@ def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_sn
             continue
         copy_file_atomic(src_path, dst_path)
 
-    keep_with_parents: set[str] = {".usr.lock"}
+    keep_with_parents: set[str] = {".events.lock", ".usr.lock"}
     for rel_text in kept_paths:
         keep_with_parents.add(rel_text)
         parent = Path(rel_text).parent

@@ -1,7 +1,7 @@
 # USR sync quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-01
 
 
 Use this page for the minimum reliable loop: preflight diff, transfer, verify.
@@ -87,6 +87,7 @@ Safety guardrails:
 - `usr pull` fails fast when remote `records.parquet` is missing.
 - `usr push` fails fast when local `records.parquet` is missing.
 - Dataset transfers acquire the shared remote dataset lock (`.usr.lock`) to avoid cross-host write races.
+- Event writers use a host-local `.events.lock`; sync excludes it so a transfer cannot replace a live event lock.
 - The remote lock handshake tolerates benign shell noise before the lock marker, so SCC environment chatter does not break normal `usr pull` / `usr push`.
 - `usr pull` and `usr push` skip transfer when no changes are detected.
 - Pull transfers stage into a temporary directory and only promote after verification.

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 
 import pyarrow as pa
 import pytest
@@ -21,6 +22,8 @@ from dnadesign.artifacts import PublicationError
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import Dataset, SchemaError
 from dnadesign.usr.src.datasets.overlay import write as dataset_overlay_write_module
+from dnadesign.usr.src.events import EventAppendFailure, EventAppendState
+from dnadesign.usr.src.events import append as event_append_module
 from dnadesign.usr.src.events import recording as event_recording_module
 
 
@@ -256,6 +259,137 @@ def test_create_overlay_rolls_back_publication_when_event_recording_fails(
     assert dataset.create_overlay("mock", table, key="id") == 1
 
 
+def test_create_overlay_restores_partial_event_append_before_rollback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    write_all = event_append_module._write_all
+
+    def write_part_then_fail(descriptor: int, payload: bytes) -> None:
+        event_append_module.os.write(descriptor, payload[: max(1, len(payload) // 2)])
+        raise OSError("injected partial event append")
+
+    monkeypatch.setattr(event_append_module, "_write_all", write_part_then_fail)
+    with pytest.raises(EventAppendFailure, match="restored") as exc_info:
+        dataset.create_overlay("mock", table, key="id")
+
+    assert exc_info.value.state is EventAppendState.RESTORED
+    assert not final.exists()
+    assert dataset.events_path.read_bytes() == events_before
+
+    monkeypatch.setattr(event_append_module, "_write_all", write_all)
+    assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+def test_create_overlay_preserves_publication_after_committed_event_append(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    close_descriptor = event_append_module._close_descriptor
+
+    def close_then_fail(descriptor: int) -> None:
+        close_descriptor(descriptor)
+        raise OSError("injected close failure after durable append")
+
+    monkeypatch.setattr(event_append_module, "_close_descriptor", close_then_fail)
+    with pytest.raises(EventAppendFailure, match="committed") as exc_info:
+        dataset.create_overlay("mock", table, key="id")
+
+    assert exc_info.value.state is EventAppendState.COMMITTED
+    assert final.is_dir()
+    assert len(list(final.glob("part-*.parquet"))) == 1
+    assert dataset.events_path.read_bytes().startswith(events_before)
+    assert dataset.events_path.read_bytes() != events_before
+
+
+def test_create_overlay_preserves_publication_when_event_restore_is_indeterminate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+
+    def write_part_then_fail(descriptor: int, payload: bytes) -> None:
+        event_append_module.os.write(descriptor, payload[: max(1, len(payload) // 2)])
+        raise OSError("injected partial event append")
+
+    monkeypatch.setattr(event_append_module, "_write_all", write_part_then_fail)
+    monkeypatch.setattr(event_append_module, "_restore_prior_length", lambda *_args: False)
+    with pytest.raises(EventAppendFailure, match="indeterminate") as exc_info:
+        dataset.create_overlay("mock", table, key="id")
+
+    assert exc_info.value.state is EventAppendState.INDETERMINATE
+    assert final.is_dir()
+    assert len(list(final.glob("part-*.parquet"))) == 1
+
+
+def test_create_overlay_fails_loudly_when_live_event_log_is_replaced(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    displaced_events = dataset.dir / ".events.displaced.log"
+    events_before = dataset.events_path.read_bytes()
+    write_all = event_append_module._write_all
+
+    def write_then_replace(descriptor: int, payload: bytes) -> None:
+        write_all(descriptor, payload)
+        dataset.events_path.rename(displaced_events)
+        dataset.events_path.write_bytes(events_before)
+
+    monkeypatch.setattr(event_append_module, "_write_all", write_then_replace)
+    with pytest.raises(EventAppendFailure, match="indeterminate") as exc_info:
+        dataset.create_overlay("mock", table, key="id")
+
+    assert exc_info.value.state is EventAppendState.INDETERMINATE
+    assert final.is_dir()
+    assert dataset.events_path.read_bytes() == events_before
+    assert b'"action":"write_overlay_part"' in displaced_events.read_bytes()
+
+
+def test_create_overlay_opens_event_log_only_after_stable_sidecar_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    displaced_events = dataset.dir / ".events.displaced.log"
+    events_before = dataset.events_path.read_bytes()
+    reached_event_recording = Event()
+    record_event = dataset._record_event
+
+    def signal_then_record(*args, **kwargs) -> None:
+        reached_event_recording.set()
+        record_event(*args, **kwargs)
+
+    monkeypatch.setattr(dataset, "_record_event", signal_then_record)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with event_append_module.event_log_lock(dataset.events_path):
+            future = executor.submit(dataset.create_overlay, "mock", table, key="id")
+            assert reached_event_recording.wait(timeout=5)
+            assert final.is_dir()
+            dataset.events_path.rename(displaced_events)
+            dataset.events_path.write_bytes(events_before)
+        assert future.result(timeout=5) == 1
+
+    assert displaced_events.read_bytes() == events_before
+    live_events = dataset.events_path.read_bytes()
+    assert live_events.startswith(events_before)
+    assert b'"action":"write_overlay_part"' in live_events
+
+
 def test_create_overlay_rolls_back_when_event_fingerprinting_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -294,7 +428,7 @@ def test_event_failure_rollback_preserves_a_swapped_namespace(
         final.rename(displaced)
         final.mkdir()
         sentinel.write_text("keep\n", encoding="utf-8")
-        raise OSError("injected event write failure")
+        raise EventAppendFailure(dataset.events_path, state=EventAppendState.RESTORED)
 
     monkeypatch.setattr(dataset, "_record_event", swap_then_fail)
     with pytest.raises(PublicationError, match="could not be rolled back safely"):

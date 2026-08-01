@@ -19,6 +19,7 @@ from ..registry import registry_hash as _registry_hash
 from ..storage.parquet import now_utc
 from ..version import __version__
 from .actor import _normalize_actor
+from .append import append_event_line
 from .defaults import USR_EVENT_VERSION, _event_defaults
 from .fingerprint import fingerprint_parquet
 from .redaction import _redact_args
@@ -110,7 +111,4 @@ def record_event(
         "version": __version__,
     }
     encoded = json.dumps(payload, separators=(",", ":"))
-    event_path = Path(event_path)
-    event_path.parent.mkdir(parents=True, exist_ok=True)
-    with event_path.open("a", encoding="utf-8") as f:
-        f.write(encoded + "\n")
+    append_event_line(event_path, encoded)

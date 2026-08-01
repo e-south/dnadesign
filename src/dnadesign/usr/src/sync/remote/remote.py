@@ -425,6 +425,7 @@ class SSHRemote:
             + "! -path './records.parquet' "
             + "! -path './meta.md' "
             + "! -path './.events.log' "
+            + "! -path './.events.lock' "
             + "! -path './.usr.lock' "
             + "! -path './_snapshots/*' "
             + "! -path './_derived/*' "
@@ -568,7 +569,7 @@ class SSHRemote:
         src = self.cfg.rsync_url(dataset)
         rsync = self._rsync_cmd()
 
-        include_args: List[str] = []
+        include_args: List[str] = ["--exclude", ".events.lock", "--exclude", ".usr.lock"]
         if primary_only:
             include_args += ["--include", "records.parquet", "--exclude", "*"]
         else:
@@ -593,7 +594,7 @@ class SSHRemote:
         dst = self.cfg.rsync_url(dataset)
         rsync = self._rsync_cmd()
 
-        include_args: List[str] = []
+        include_args: List[str] = ["--exclude", ".events.lock", "--exclude", ".usr.lock"]
         if primary_only:
             include_args += ["--include", "records.parquet", "--exclude", "*"]
         else:
