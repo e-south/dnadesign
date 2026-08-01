@@ -155,6 +155,39 @@ def test_render_preflights_every_output_before_mutation(tmp_path: Path, monkeypa
     assert not (repo_root / REPOSITORY_BANNER_PATH).exists()
 
 
+def test_render_rejects_non_directory_output_parent_without_partial_mutation(tmp_path: Path) -> None:
+    repo_root = tmp_path / "dnadesign"
+    _write_repo_markers(repo_root)
+    repository_banner = repo_root / REPOSITORY_BANNER_PATH
+    repository_banner.parent.mkdir(parents=True)
+    repository_banner.write_text("preserve me", encoding="utf-8")
+    blocking_parent = repo_root / "src" / "dnadesign" / "aligner" / "assets"
+    blocking_parent.parent.mkdir(parents=True)
+    blocking_parent.write_text("blocking file", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="parent component is not a directory"):
+        render_banners(repo_root)
+
+    assert repository_banner.read_text(encoding="utf-8") == "preserve me"
+    assert blocking_parent.read_text(encoding="utf-8") == "blocking file"
+
+
+def test_render_rejects_non_file_output_without_partial_mutation(tmp_path: Path) -> None:
+    repo_root = tmp_path / "dnadesign"
+    _write_repo_markers(repo_root)
+    repository_banner = repo_root / REPOSITORY_BANNER_PATH
+    repository_banner.parent.mkdir(parents=True)
+    repository_banner.write_text("preserve me", encoding="utf-8")
+    blocking_output = repo_root / "src" / "dnadesign" / "aligner" / "assets" / "aligner-banner.svg"
+    blocking_output.mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="output is not a regular file"):
+        render_banners(repo_root)
+
+    assert repository_banner.read_text(encoding="utf-8") == "preserve me"
+    assert blocking_output.is_dir()
+
+
 def test_render_rejects_symlinked_output_parent_without_mutation(tmp_path: Path) -> None:
     repo_root = tmp_path / "dnadesign"
     _write_repo_markers(repo_root)
