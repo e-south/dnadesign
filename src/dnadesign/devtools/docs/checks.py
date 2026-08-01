@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 import yaml
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
+from dnadesign.devtools.docs.banners.render import check_banners
 from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
 from dnadesign.devtools.docs.metadata import LAST_VERIFIED_PATTERN, OWNER_PATTERN, SOR_MARKDOWN_FILES
 from dnadesign.ops.catalog import (
@@ -2118,6 +2119,21 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _find_banner_source_drift_issues(repo_root: Path) -> list[str]:
+    banner_source = repo_root / "src" / "dnadesign" / "devtools" / "docs" / "banners"
+    if not banner_source.is_dir():
+        return []
+    try:
+        stale_paths = check_banners(repo_root)
+    except ValueError as error:
+        return [str(error)]
+    return [
+        f"{relative_path}: checked-in banner differs from its deterministic source; "
+        "run 'uv run python -m dnadesign.devtools.docs.banners --repo-root .'."
+        for relative_path in stale_paths
+    ]
+
+
 def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
     src_root = repo_root / "src" / "dnadesign"
     if not src_root.exists():
@@ -2793,6 +2809,13 @@ def main(argv: list[str] | None = None) -> int:
     if study_execution_source_drift_issues:
         print("Study execution-source docs check failed:")
         for issue in study_execution_source_drift_issues:
+            print(f" - {issue}")
+        return 1
+
+    banner_source_drift_issues = _find_banner_source_drift_issues(repo_root)
+    if banner_source_drift_issues:
+        print("Banner source drift check failed:")
+        for issue in banner_source_drift_issues:
             print(f" - {issue}")
         return 1
 

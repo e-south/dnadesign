@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from dnadesign.devtools.docs import checks as docs_checks
 from dnadesign.devtools.docs.checks import (
     _find_active_shared_usr_dataset_id_issues,
     _find_agents_path_reference_issues,
@@ -1390,6 +1391,30 @@ def test_main_passes_when_docs_index_has_required_metadata(tmp_path: Path) -> No
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 0
+
+
+def test_main_fails_when_generated_banner_is_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    today = dt.date.today().isoformat()
+    _write(
+        tmp_path / "docs" / "README.md",
+        f"## Documentation Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+    _write(
+        tmp_path / "ARCHITECTURE.md",
+        f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+    (tmp_path / "src" / "dnadesign" / "devtools" / "docs" / "banners").mkdir(parents=True)
+    stale_path = Path("assets/dnadesign-banner.svg")
+    monkeypatch.setattr(docs_checks, "check_banners", lambda _repo_root: (stale_path,), raising=False)
+
+    rc = main(["--repo-root", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "Banner source drift check failed" in captured.out
+    assert str(stale_path) in captured.out
 
 
 def test_main_fails_when_start_here_doc_is_present(tmp_path: Path) -> None:
