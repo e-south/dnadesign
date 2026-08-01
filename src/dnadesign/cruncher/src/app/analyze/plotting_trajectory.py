@@ -34,7 +34,8 @@ def _resolve_trajectory_video_output_path(*, tmp_root: Path, output_name: str) -
     video_ext = Path(output_name).suffix.lstrip(".")
     if not video_ext:
         video_ext = "mp4"
-    return analysis_plot_path(tmp_root, video_stem, video_ext)
+    flat_path = analysis_plot_path(tmp_root, video_stem, video_ext)
+    return flat_path.parent / f"{video_stem}.render-v1" / flat_path.name
 
 
 def _record_trajectory_video_plot(

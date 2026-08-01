@@ -515,8 +515,8 @@ def build_views_manifest(*, solution_id: str, include_jobs: bool = True) -> dict
 
 def build_terminal_nick_job(*, output_format: str = "png") -> dict[str, Any]:
     return {
-        "version": 3,
-        "results_root": "..",
+        "version": 4,
+        "bundle": {"path": "../plots/scar_nick_terminal_nick.render-v1"},
         "input": {
             "kind": "jsonl",
             "path": f"../analysis/views/{_VISUAL_JSONL_FILENAME}",
@@ -546,11 +546,11 @@ def build_terminal_nick_job(*, output_format: str = "png") -> dict[str, Any]:
         "outputs": [
             {
                 "kind": "images",
-                "path": f"../plots/scar_nick_terminal_nick.{output_format}",
+                "path": f"scar_nick_terminal_nick.{output_format}",
                 "fmt": output_format,
             }
         ],
-        "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+        "run": {"strict": True, "fail_on_skips": True},
     }
 
 

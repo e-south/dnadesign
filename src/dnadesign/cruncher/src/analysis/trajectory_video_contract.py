@@ -47,8 +47,12 @@ def build_sequence_rows_video_job(
     pauses: Mapping[str, float],
     title_text: str,
 ) -> dict[str, object]:
+    bundle_root = out_path.parent
+    if bundle_root.name != f"{out_path.stem}.render-v1":
+        bundle_root = out_path.parent / f"{out_path.stem}.render-v1"
     return {
-        "version": 3,
+        "version": 4,
+        "bundle": {"path": str(bundle_root)},
         "input": {
             "kind": "parquet",
             "path": str(records_path),
@@ -72,7 +76,7 @@ def build_sequence_rows_video_job(
         "outputs": [
             {
                 "kind": "video",
-                "path": str(out_path),
+                "path": out_path.name,
                 "fmt": "mp4",
                 "fps": int(config.playback.fps),
                 "frames_per_record": 1,
@@ -83,5 +87,5 @@ def build_sequence_rows_video_job(
                 "title_align": "center",
             }
         ],
-        "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+        "run": {"strict": True, "fail_on_skips": True},
     }

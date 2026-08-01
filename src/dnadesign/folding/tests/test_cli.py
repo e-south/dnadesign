@@ -20,7 +20,13 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.folding.cli import _plot_output_dir_for, app
+from dnadesign.folding.cli import (
+    _bundle_plot_output_dir,
+    _FoldingBundle,
+    _plot_output_dir_for,
+    app,
+)
+from dnadesign.folding.src import FoldingConfigError
 
 _RUNNER = CliRunner()
 
@@ -52,6 +58,42 @@ def test_plot_output_dir_parent_relative_paths_stay_bundle_relative(tmp_path: Pa
     output_dir = _plot_output_dir_for(prediction, Path("../visual/viennarna_secondary_structure"))
 
     assert output_dir == (tmp_path / "bundle" / "visual" / "viennarna_secondary_structure").resolve()
+
+
+def test_plot_output_dir_preserves_symlink_components_for_publication_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prediction = tmp_path / "prediction.json"
+    prediction.write_text("{}\n", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    redirect = tmp_path / "redirect"
+    redirect.symlink_to(outside, target_is_directory=True)
+    relative_output = Path("redirect") / "viennarna_secondary_structure"
+
+    monkeypatch.chdir(tmp_path)
+    output_dir = _plot_output_dir_for(prediction, relative_output)
+
+    assert output_dir == redirect / "viennarna_secondary_structure"
+
+
+def test_bundle_plot_output_rejects_symlinked_escape(tmp_path: Path) -> None:
+    bundle_root = tmp_path / "bundle"
+    bundle_root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (bundle_root / "visual").symlink_to(outside, target_is_directory=True)
+    bundle = _FoldingBundle(
+        root=bundle_root.resolve(),
+        manifest_path=bundle_root / "manifest.json",
+        artifacts={},
+    )
+
+    with pytest.raises(FoldingConfigError, match="output.*symlink|escapes the bundle"):
+        _bundle_plot_output_dir(bundle)
+
+    assert list(outside.iterdir()) == []
 
 
 def _write_request(tmp_path: Path) -> Path:
@@ -257,6 +299,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         + "\n",
         encoding="utf-8",
     )
+    prediction_before = prediction.read_bytes()
     visual_contract = tmp_path / "sequence_evidence_map_v1.json"
     visual_contract.write_text(
         json.dumps(
@@ -312,8 +355,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     payload = json.loads(result.stdout)
     assert payload["layout_algorithm"] == "circular"
     assert payload["qa"]["cross_copy_pair_count"] == 2
-    enriched_prediction = json.loads(prediction.read_text(encoding="utf-8"))
-    assert enriched_prediction["qa"]["pairing_summary"]["intended_recovered_count"] == 1
+    assert prediction.read_bytes() == prediction_before
     annotated = (tmp_path / "visual" / "secondary_structure.annotated.svg").read_text(encoding="utf-8")
     assert ">T<" in annotated
     assert ">U<" not in annotated
@@ -410,6 +452,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         + "\n",
         encoding="utf-8",
     )
+    prediction_before = prediction.read_bytes()
     visual_contract = visual_dir / "sequence_evidence_map_v1.json"
     visual_contract.write_text(
         json.dumps(
@@ -461,6 +504,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert payload["layout_algorithm"] == "naview"
     assert payload["artifacts"]["annotated_svg"] == "secondary_structure.annotated.svg"
     assert (plot_dir / "secondary_structure.annotated.svg").is_file()
+    assert prediction.read_bytes() == prediction_before
 
 
 def test_folding_plot_bundle_fails_fast_without_manifest(tmp_path: Path) -> None:

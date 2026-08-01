@@ -114,9 +114,9 @@ def discover_workspaces(*, root: Path | None = None) -> tuple[Workspace, ...]:
 
 def _workspace_job_template() -> dict:
     return {
-        "version": 3,
+        "version": 4,
         "contract": {"kind": "sequence_rows_render_v3"},
-        "results_root": "outputs",
+        "bundle": {"path": "outputs/render-v1"},
         "input": {
             "kind": "parquet",
             "path": "inputs/input.parquet",
@@ -135,7 +135,7 @@ def _workspace_job_template() -> dict:
         },
         "render": {"renderer": "sequence_rows", "style": {"preset": "presentation_default", "overrides": {}}},
         "outputs": [{"kind": "images", "dir": "plots", "fmt": "png"}],
-        "run": {"strict": False, "fail_on_skips": False, "emit_report": False},
+        "run": {"strict": False, "fail_on_skips": False},
     }
 
 
@@ -148,7 +148,7 @@ def _workspace_readme_text() -> str:
             "",
             "- edit `job.yaml` or replace it with your own job contract",
             "- place input data at `inputs/input.parquet`, or update `input.path` in `job.yaml`",
-            "- rendered artifacts and optional `run_report.json` are written under `outputs/`",
+            "- rendered artifacts and their manifest are published together under `outputs/render-v1/`",
             "",
             "Checked-in package demos live under `src/dnadesign/baserender/workspaces/`.",
             (
@@ -184,8 +184,9 @@ def _outputs_readme_text() -> str:
             "",
             "BaseRender writes rendered artifacts here by default.",
             "",
-            "- image jobs default to `outputs/plots/` when no explicit output dir is set",
-            "- optional `run_report.json` is also written under this root when enabled",
+            "- the scaffold publishes one immutable bundle at `outputs/render-v1/`",
+            "- images and `manifest.json` are committed together inside that bundle",
+            "- choose a new bundle name for each publication; existing bundles are never replaced",
             "",
         ]
     )

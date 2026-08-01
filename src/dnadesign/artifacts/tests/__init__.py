@@ -1,14 +1,10 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/baserender/src/execution/__init__.py
+src/dnadesign/artifacts/tests/__init__.py
 
-Render-job execution orchestration.
+Test package for shared artifact contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
-
-from .runner import run_render_job
-
-__all__ = ["run_render_job"]

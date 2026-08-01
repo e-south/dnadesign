@@ -560,6 +560,13 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert plot.qa.nucleotide_node_count == 4
     assert plot.qa.cross_copy_pair_count == 1
     assert plot.qa.length_matches_svg_nodes is True
+    published_manifest = (
+        tmp_path / "visual" / "viennarna_secondary_structure" / "viennarna_secondary_structure_svg_v1.json"
+    ).read_text(encoding="utf-8")
+    assert str(tmp_path) not in published_manifest
+    assert plot.source_prediction == "in_memory"
+    assert plot.source_visual_contract is not None
+    assert plot.source_visual_contract.startswith("sha256:")
     annotated = (tmp_path / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg").read_text(
         encoding="utf-8"
     )
@@ -590,6 +597,20 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert annotation_manifest["basepairs"][0]["right_copy_index"] == 1
     assert annotation_manifest["section_annotations"][0]["label"] == "Payload primary"
     assert annotation_manifest["layout_normalization"]["requested_orientation"] == "cap_right"
+
+
+def test_portable_plot_source_reference_fails_when_evidence_is_unavailable(tmp_path: Path) -> None:
+    from dnadesign.folding.src.viennarna_plot import _portable_source_ref
+
+    with pytest.raises(FoldingConfigError, match="ViennaRNA plot source is unavailable or unsafe"):
+        _portable_source_ref(tmp_path / "missing-prediction.json")
+
+    source = tmp_path / "prediction.json"
+    source.write_text("{}\n", encoding="utf-8")
+    alias = tmp_path / "prediction-alias.json"
+    alias.symlink_to(source)
+    with pytest.raises(FoldingConfigError, match="ViennaRNA plot source is unavailable or unsafe"):
+        _portable_source_ref(alias)
 
 
 def test_publish_viennarna_structure_svg_requires_section_edge_colors(
@@ -661,13 +682,128 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         encoding="utf-8",
     )
 
+    output_dir = tmp_path / "visual" / "viennarna_secondary_structure"
     with pytest.raises(FoldingConfigError, match="span_backdrops.*edge_color"):
         publish_viennarna_structure_svg(
             prediction,
             assembled_sequence_path=tmp_path / "assembled_sequence.json",
             visual_contract_path=visual_contract,
-            output_dir=tmp_path / "visual" / "viennarna_secondary_structure",
+            output_dir=output_dir,
         )
+
+    assert not output_dir.exists()
+
+
+def test_publish_viennarna_structure_svg_failure_leaves_no_partial_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "broken_plot.py").write_text(
+        """
+def plot_layout_naview(structure):
+    return {"layout": "naview", "structure": structure}
+
+def plot_structure_svg(filename, sequence, structure, layout=None):
+    with open(filename, "w", encoding="utf-8") as handle:
+        handle.write('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+    return 1
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("broken_plot", None)
+    request = _python_api_request(tmp_path)
+    prediction = run_prediction_request(request, output_dir=tmp_path / "folding")
+    output_dir = tmp_path / "visual" / "viennarna_secondary_structure"
+
+    with pytest.raises(FoldingExecutionError, match="nucleotide node count"):
+        publish_viennarna_structure_svg(
+            prediction,
+            assembled_sequence_path=tmp_path / "assembled_sequence.json",
+            output_dir=output_dir,
+            python_module="broken_plot",
+        )
+
+    assert not output_dir.exists()
+    assert not list(output_dir.parent.glob(f".{output_dir.name}.staging-*"))
+
+
+def test_publish_viennarna_structure_svg_rejects_symlinked_output_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assembled_path, sequence_sha256 = _write_assembled_sequence(tmp_path, sequence=_CONTIGUOUS_STEM_SEQUENCE)
+    prediction = _contiguous_stem_prediction(sequence_sha256=sequence_sha256)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    redirect = tmp_path / "redirect"
+    redirect.symlink_to(outside, target_is_directory=True)
+    requested_output = redirect / "visual" / "viennarna_secondary_structure"
+    monkeypatch.setattr("dnadesign.folding.src.viennarna_plot.importlib.import_module", lambda _name: object())
+
+    with pytest.raises(FoldingConfigError, match="symlinked path component"):
+        publish_viennarna_structure_svg(
+            prediction,
+            assembled_sequence_path=assembled_path,
+            output_dir=requested_output,
+        )
+
+    assert not (outside / "visual").exists()
+
+
+@pytest.mark.parametrize("mutated_source", ["prediction", "visual_contract"])
+def test_publish_viennarna_structure_svg_rejects_source_mutation_during_svg_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutated_source: str,
+) -> None:
+    request = _python_api_request(tmp_path)
+    run_prediction_request(request, output_dir=tmp_path / "folding")
+    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v1.json"
+    visual_contract = tmp_path / "sequence_evidence_map_v1.json"
+    visual_contract.write_text(
+        json.dumps(
+            {
+                "contract_kind": "sequence_evidence_map_v1",
+                "state_id": "demo",
+                "topology_kind": "linear_ssdna",
+                "alphabet": "dna",
+                "primary_sequence": "GCAT",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    source_to_mutate = prediction_path if mutated_source == "prediction" else visual_contract
+
+    def _write_svg(module, *, sequence, structure, output_path, layout_algorithm):
+        del module, structure, layout_algorithm
+        source_to_mutate.write_bytes(source_to_mutate.read_bytes() + b" ")
+        output_path.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg"><g id="seq">'
+            + "".join(
+                f'<text class="nucleotide" x="{index}" y="0">{base}</text>' for index, base in enumerate(sequence)
+            )
+            + "</g></svg>",
+            encoding="utf-8",
+        )
+        return ["test.plot_structure_svg", "naview"]
+
+    monkeypatch.setattr("dnadesign.folding.src.viennarna_plot._write_native_viennarna_svg", _write_svg)
+    monkeypatch.setattr("dnadesign.folding.src.viennarna_plot.importlib.import_module", lambda _name: object())
+    output_dir = tmp_path / "visual" / "viennarna_secondary_structure"
+
+    with pytest.raises(FoldingConfigError, match="source changed during SVG publication"):
+        publish_viennarna_structure_svg(
+            prediction_path,
+            assembled_sequence_path=tmp_path / "assembled_sequence.json",
+            visual_contract_path=visual_contract,
+            output_dir=output_dir,
+        )
+
+    assert not output_dir.exists()
 
 
 def test_publish_viennarna_structure_svg_can_normalize_cap_orientation(

@@ -1525,7 +1525,8 @@ def test_analyze_trajectory_video_generates_video_when_enabled(tmp_path: Path, m
     assert analysis_runs
     analysis_dir = analysis_runs[0]
 
-    video_path = analysis_plot_path(analysis_dir, "chain_trajectory_video", "mp4")
+    flat_video_path = analysis_plot_path(analysis_dir, "chain_trajectory_video", "mp4")
+    video_path = flat_video_path.parent / "chain_trajectory_video.render-v1" / flat_video_path.name
     assert video_path.exists()
     plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
@@ -1589,7 +1590,8 @@ def test_analyze_trajectory_video_skips_when_ffmpeg_writer_is_unavailable(tmp_pa
     assert analysis_runs
     analysis_dir = analysis_runs[0]
 
-    video_path = analysis_plot_path(analysis_dir, "chain_trajectory_video", "mp4")
+    flat_video_path = analysis_plot_path(analysis_dir, "chain_trajectory_video", "mp4")
+    video_path = flat_video_path.parent / "chain_trajectory_video.render-v1" / flat_video_path.name
     assert not video_path.exists()
     plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}

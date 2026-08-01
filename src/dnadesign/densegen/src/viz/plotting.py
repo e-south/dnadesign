@@ -369,6 +369,11 @@ def _clean_selected_stage_b_outputs(out_dir: Path, *, plot_ids: Iterable[str]) -
     for path in sorted(target.rglob("*"), reverse=True):
         if not path.is_file():
             continue
+        if any((parent / "manifest.json").is_file() for parent in path.parents if parent != target.parent):
+            # BaseRender bundles are immutable publications. Their content is
+            # reused by identity or superseded by a new bundle; never cleaned
+            # piecemeal by the mutable plot-surface cleanup pass.
+            continue
         rel_path = str(path.relative_to(out_dir))
         if not _is_supported_plot_path(rel_path):
             continue

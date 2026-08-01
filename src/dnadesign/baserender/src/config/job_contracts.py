@@ -28,9 +28,9 @@ class RenderContractDescriptor:
 
 
 _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
-    "base_render_job_v3": RenderContractDescriptor(
-        kind="base_render_job_v3",
-        schema_version=3,
+    "render_job_v4": RenderContractDescriptor(
+        kind="render_job_v4",
+        schema_version=4,
         display_name="BaseRender orchestration contract",
         purpose="Generic adapter -> renderer -> output orchestration for BaseRender records.",
         accepted_renderers=(
@@ -40,8 +40,7 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
             "topology_cartoon",
             "snapback_map",
         ),
-        compatibility_aliases=("render_job_v3",),
-        docs_slug="base-render-job-v3",
+        docs_slug="render-job-v4",
     ),
     "sequence_rows_render_v3": RenderContractDescriptor(
         kind="sequence_rows_render_v3",
@@ -49,7 +48,6 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
         display_name="Sequence rows render contract",
         purpose="Linear sequence-row visualization for sequence features, motifs, and interval annotations.",
         accepted_renderers=("sequence_rows",),
-        compatibility_aliases=("sequence_rows_v3", "cruncher_showcase_v3"),
         docs_slug="sequence-rows-render-v3",
     ),
     "usr_genbank_annotation_render_v1": RenderContractDescriptor(
@@ -130,7 +128,7 @@ def validate_render_contract_renderer(kind: str, renderer: str, *, field: str) -
         )
 
 
-DEFAULT_RENDER_CONTRACT_KIND = "base_render_job_v3"
+DEFAULT_RENDER_CONTRACT_KIND = "render_job_v4"
 
 
 __all__ = [

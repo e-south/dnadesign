@@ -82,8 +82,9 @@ def test_visuals_validate_and_run_delegate_through_public_baserender_surface(tmp
     job_path.write_text(
         "\n".join(
             [
-                "version: 3",
-                "results_root: ..",
+                "version: 4",
+                "bundle:",
+                "  path: ../renders/candidate.render-v1",
                 "input:",
                 "  kind: json",
                 f"  path: ../views/{contract_path.name}",
@@ -97,12 +98,11 @@ def test_visuals_validate_and_run_delegate_through_public_baserender_surface(tmp
                 "    overrides: {}",
                 "outputs:",
                 "  - kind: images",
-                "    path: ../renders/candidate.pdf",
+                "    path: candidate.pdf",
                 "    fmt: pdf",
                 "run:",
                 "  strict: true",
                 "  fail_on_skips: true",
-                "  emit_report: false",
                 "",
             ]
         ),
@@ -113,8 +113,8 @@ def test_visuals_validate_and_run_delegate_through_public_baserender_surface(tmp
     run_result = runner.invoke(app, ["visuals", "run", "--job", str(job_path)], color=False)
 
     assert validate_result.exit_code == 0
-    assert "Render job kind -> render_job_v3" in validate_result.output
+    assert "Render job kind -> render_job_v4" in validate_result.output
     assert "Renderer -> topology_cartoon" in validate_result.output
     assert run_result.exit_code == 0
     assert "Rendered job ->" in run_result.output
-    assert (tmp_path / "published" / "renders" / "candidate.pdf").exists()
+    assert (tmp_path / "published" / "renders" / "candidate.render-v1" / "candidate.pdf").exists()

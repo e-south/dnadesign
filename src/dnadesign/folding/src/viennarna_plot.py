@@ -21,6 +21,7 @@ from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
 
+from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 from dnadesign.contracts.folding import SecondaryStructurePredictionV1
 from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructurePairingSummaryV1
 from dnadesign.contracts.visual import SequenceEvidenceMapV1, ViennaRNAStructureSvgV1
@@ -33,8 +34,9 @@ from .pairing_qa import (
     pair_key,
     unit_copy_spans,
 )
+from .source_evidence import CapturedSource
 from .viennarna_ontology import component_token, hue_for_owners
-from .viennarna_svg import SVG_NS, annotate_svg_surface, load_svg_surface
+from .viennarna_svg import SVG_NS, annotate_svg_surface, load_svg_surface, validate_svg_annotation_contract
 
 _VIENNARNA_PLOT_MANIFEST_FILENAME = "viennarna_secondary_structure_svg_v1.json"
 _VIENNARNA_NATIVE_SVG_FILENAME = "secondary_structure.native.svg"
@@ -59,17 +61,18 @@ def publish_viennarna_structure_svg(
     assembled_sequence_path: str | Path,
     visual_contract_path: str | Path | None = None,
     output_dir: str | Path,
+    source_prediction_ref: str | Path | None = None,
     python_module: str = "RNA",
     layout_algorithm: str = "naview",
     emphasize_stem_base_nucleotides: bool = True,
 ) -> ViennaRNAStructureSvgV1:
-    prediction_model, prediction_ref = _load_prediction(prediction)
+    prediction_model, prediction_ref, prediction_evidence = _load_prediction(prediction)
     if prediction_model.status != "ok" or prediction_model.result is None:
         raise FoldingExecutionError("ViennaRNA structure plotting requires an ok folding prediction.")
     if prediction_model.backend is None or prediction_model.dna_policy is None:
         raise FoldingExecutionError("ViennaRNA structure plotting requires backend and DNA policy metadata.")
 
-    assembled = _load_assembled_sequence(assembled_sequence_path)
+    assembled, assembled_evidence = _load_assembled_sequence(assembled_sequence_path)
     if assembled.sequence_id != prediction_model.input.sequence_id:
         raise FoldingConfigError("Prediction sequence_id does not match assembled sequence artifact.")
     if assembled.sequence_sha256 != prediction_model.input.sequence_sha256:
@@ -81,93 +84,171 @@ def publish_viennarna_structure_svg(
         assembled.sequence,
         dna_policy=prediction_model.dna_policy.mode,
     )
-    output_path = Path(output_dir).expanduser().resolve()
-    output_path.mkdir(parents=True, exist_ok=True)
-    native_svg_path = output_path / _VIENNARNA_NATIVE_SVG_FILENAME
-    annotated_svg_path = output_path / _VIENNARNA_ANNOTATED_SVG_FILENAME
-    annotation_manifest_path = output_path / _VIENNARNA_ANNOTATION_MANIFEST_FILENAME
-    manifest_path = output_path / _VIENNARNA_PLOT_MANIFEST_FILENAME
-
-    module = importlib.import_module(python_module)
-    # Folding may use a U-substituted RNA surrogate, but the published plot is a
-    # DNA artifact whose coordinates map to the original assembled sequence.
-    command = _write_native_viennarna_svg(
-        module,
-        sequence=assembled.sequence,
-        structure=prediction_model.result.dot_bracket,
-        output_path=native_svg_path,
-        layout_algorithm=layout_algorithm,
+    visual_contract, visual_contract_evidence = _optional_sequence_evidence_map(visual_contract_path)
+    source_prediction_evidence = _source_prediction_evidence(
+        source_prediction_ref,
+        prediction_evidence=prediction_evidence,
     )
-    surface = load_svg_surface(native_svg_path)
-    if len(surface.nucleotide_nodes) != assembled.length:
-        raise FoldingExecutionError(
-            "ViennaRNA SVG nucleotide node count "
-            f"{len(surface.nucleotide_nodes)} does not match input length {assembled.length}."
-        )
-
-    visual_contract = _optional_sequence_evidence_map(visual_contract_path)
     component_palette = _component_palette(visual_contract)
+    validate_svg_annotation_contract(visual_contract)
     nucleotide_annotations = _nucleotide_annotations(
         assembled=assembled,
         submitted_sequence=submitted_sequence,
         visual_contract=visual_contract,
         component_palette=component_palette,
     )
-    svg_annotations = annotate_svg_surface(
-        surface,
-        nucleotide_annotations=nucleotide_annotations,
-        unit_copy_spans=unit_copy_spans(visual_contract),
-        intended_pair_lookup=intended_pair_lookup(visual_contract),
-        intended_pairing_metrics=tuple(item.model_dump(mode="json") for item in prediction_model.qa.intended_pairings),
-        visual_contract=visual_contract,
-        emphasize_stem_base_nucleotides=emphasize_stem_base_nucleotides,
-    )
-    ET.register_namespace("", SVG_NS)
-    surface.tree.write(annotated_svg_path, encoding="utf-8", xml_declaration=True)
-    _write_json(
-        annotation_manifest_path,
-        {
-            "contract_kind": "viennarna_secondary_structure_annotation_manifest_v1",
-            "sequence_id": assembled.sequence_id,
-            "sequence_sha256": assembled.sequence_sha256,
-            "coordinate_system": "zero_based_half_open",
-            "viennarna_display_coordinates": "one_based",
-            "nucleotides": nucleotide_annotations,
-            "basepairs": svg_annotations.basepairs,
-            "section_annotations": svg_annotations.section_annotations,
-            "layout_normalization": svg_annotations.layout_normalization,
-            "palette": component_palette,
-        },
-    )
+    try:
+        module = importlib.import_module(python_module)
+    except ImportError as exc:
+        raise FoldingConfigError(f"ViennaRNA Python module '{python_module}' is not available: {exc}") from exc
 
-    manifest = ViennaRNAStructureSvgV1(
-        plot_id=f"{prediction_model.prediction_id}.viennarna_svg",
-        prediction_id=prediction_model.prediction_id,
-        sequence_id=assembled.sequence_id,
-        sequence_sha256=assembled.sequence_sha256,
-        length=assembled.length,
-        backend_name=prediction_model.backend.name,
-        backend_version=prediction_model.backend.version,
-        layout_algorithm=layout_algorithm,
-        command=command,
-        source_prediction=prediction_ref,
-        source_visual_contract=Path(visual_contract_path).as_posix() if visual_contract_path is not None else None,
-        artifacts={
-            "native_svg": _VIENNARNA_NATIVE_SVG_FILENAME,
-            "annotated_svg": _VIENNARNA_ANNOTATED_SVG_FILENAME,
-            "annotation_manifest": _VIENNARNA_ANNOTATION_MANIFEST_FILENAME,
-        },
-        qa={
-            "nucleotide_node_count": len(surface.nucleotide_nodes),
-            "basepair_node_count": len(surface.basepair_nodes),
-            "cross_copy_pair_count": sum(1 for pair in svg_annotations.basepairs if pair["is_cross_copy"]),
-            "length_matches_svg_nodes": True,
-            "warnings": [],
-            "errors": [],
-        },
+    output_path = Path(output_dir).expanduser()
+    try:
+        publication = CreateOnlyDirectoryPublication.prepare(output_path)
+    except PublicationError as exc:
+        raise FoldingConfigError(str(exc)) from exc
+    staging_path = publication.stage
+    native_svg_path = staging_path / _VIENNARNA_NATIVE_SVG_FILENAME
+    annotated_svg_path = staging_path / _VIENNARNA_ANNOTATED_SVG_FILENAME
+    annotation_manifest_path = staging_path / _VIENNARNA_ANNOTATION_MANIFEST_FILENAME
+    manifest_path = staging_path / _VIENNARNA_PLOT_MANIFEST_FILENAME
+
+    # Folding may use a U-substituted RNA surrogate, but the published plot is a
+    # DNA artifact whose coordinates map to the original assembled sequence.
+    try:
+        command = _write_native_viennarna_svg(
+            module,
+            sequence=assembled.sequence,
+            structure=prediction_model.result.dot_bracket,
+            output_path=native_svg_path,
+            layout_algorithm=layout_algorithm,
+        )
+        surface = load_svg_surface(native_svg_path)
+        if len(surface.nucleotide_nodes) != assembled.length:
+            raise FoldingExecutionError(
+                "ViennaRNA SVG nucleotide node count "
+                f"{len(surface.nucleotide_nodes)} does not match input length {assembled.length}."
+            )
+
+        svg_annotations = annotate_svg_surface(
+            surface,
+            nucleotide_annotations=nucleotide_annotations,
+            unit_copy_spans=unit_copy_spans(visual_contract),
+            intended_pair_lookup=intended_pair_lookup(visual_contract),
+            intended_pairing_metrics=tuple(
+                item.model_dump(mode="json") for item in prediction_model.qa.intended_pairings
+            ),
+            visual_contract=visual_contract,
+            emphasize_stem_base_nucleotides=emphasize_stem_base_nucleotides,
+        )
+        ET.register_namespace("", SVG_NS)
+        surface.tree.write(annotated_svg_path, encoding="utf-8", xml_declaration=True)
+        _write_json(
+            annotation_manifest_path,
+            {
+                "contract_kind": "viennarna_secondary_structure_annotation_manifest_v1",
+                "sequence_id": assembled.sequence_id,
+                "sequence_sha256": assembled.sequence_sha256,
+                "coordinate_system": "zero_based_half_open",
+                "viennarna_display_coordinates": "one_based",
+                "nucleotides": nucleotide_annotations,
+                "basepairs": svg_annotations.basepairs,
+                "section_annotations": svg_annotations.section_annotations,
+                "layout_normalization": svg_annotations.layout_normalization,
+                "palette": component_palette,
+            },
+        )
+
+        manifest = ViennaRNAStructureSvgV1(
+            plot_id=f"{prediction_model.prediction_id}.viennarna_svg",
+            prediction_id=prediction_model.prediction_id,
+            sequence_id=assembled.sequence_id,
+            sequence_sha256=assembled.sequence_sha256,
+            length=assembled.length,
+            backend_name=prediction_model.backend.name,
+            backend_version=prediction_model.backend.version,
+            layout_algorithm=layout_algorithm,
+            command=command,
+            source_prediction=(
+                source_prediction_evidence.portable_ref if source_prediction_evidence is not None else prediction_ref
+            ),
+            source_visual_contract=(
+                visual_contract_evidence.portable_ref if visual_contract_evidence is not None else None
+            ),
+            artifacts={
+                "native_svg": _VIENNARNA_NATIVE_SVG_FILENAME,
+                "annotated_svg": _VIENNARNA_ANNOTATED_SVG_FILENAME,
+                "annotation_manifest": _VIENNARNA_ANNOTATION_MANIFEST_FILENAME,
+            },
+            qa={
+                "nucleotide_node_count": len(surface.nucleotide_nodes),
+                "basepair_node_count": len(surface.basepair_nodes),
+                "cross_copy_pair_count": sum(1 for pair in svg_annotations.basepairs if pair["is_cross_copy"]),
+                "length_matches_svg_nodes": True,
+                "warnings": [],
+                "errors": [],
+            },
+        )
+        _write_json(manifest_path, manifest.model_dump(mode="json"))
+        _verify_plot_sources(
+            prediction_evidence=prediction_evidence,
+            source_prediction_evidence=source_prediction_evidence,
+            assembled_evidence=assembled_evidence,
+            visual_contract_evidence=visual_contract_evidence,
+        )
+        publication.publish(required_manifest=_VIENNARNA_PLOT_MANIFEST_FILENAME)
+        return manifest
+    except PublicationError as exc:
+        raise FoldingConfigError(str(exc)) from exc
+    finally:
+        publication.close()
+
+
+def _portable_source_ref(source: str | Path) -> str:
+    text = str(source)
+    if text == "in_memory":
+        return text
+    return CapturedSource.capture(source, label="ViennaRNA plot source").portable_ref
+
+
+def _source_prediction_evidence(
+    source_prediction_ref: str | Path | None,
+    *,
+    prediction_evidence: CapturedSource | None,
+) -> CapturedSource | None:
+    if source_prediction_ref is None:
+        return prediction_evidence
+    if str(source_prediction_ref) == "in_memory":
+        return None
+    candidate = Path(source_prediction_ref).expanduser()
+    candidate = candidate if candidate.is_absolute() else Path.cwd() / candidate
+    if prediction_evidence is not None and candidate == prediction_evidence.path:
+        return prediction_evidence
+    return CapturedSource.capture(source_prediction_ref, label="ViennaRNA source prediction")
+
+
+def _verify_plot_sources(
+    *,
+    prediction_evidence: CapturedSource | None,
+    source_prediction_evidence: CapturedSource | None,
+    assembled_evidence: CapturedSource,
+    visual_contract_evidence: CapturedSource | None,
+) -> None:
+    sources = (
+        (prediction_evidence, "Folding prediction source"),
+        (source_prediction_evidence, "ViennaRNA source prediction"),
+        (assembled_evidence, "Assembled sequence source"),
+        (visual_contract_evidence, "Sequence evidence map source"),
     )
-    _write_json(manifest_path, manifest.model_dump(mode="json"))
-    return manifest
+    verified: set[tuple[int, int]] = set()
+    for evidence, label in sources:
+        if evidence is None:
+            continue
+        identity = evidence.fingerprint[:2]
+        if identity in verified:
+            continue
+        evidence.verify_unchanged(label=label)
+        verified.add(identity)
 
 
 def enrich_prediction_pairing_qa(
@@ -176,10 +257,10 @@ def enrich_prediction_pairing_qa(
     visual_contract_path: str | Path,
     output_path: str | Path | None = None,
 ) -> SecondaryStructurePredictionV1:
-    prediction_model, _prediction_ref = _load_prediction(prediction)
+    prediction_model, _prediction_ref, prediction_evidence = _load_prediction(prediction)
     if prediction_model.status != "ok" or prediction_model.result is None:
         raise FoldingExecutionError("Pairing QA enrichment requires an ok folding prediction.")
-    visual_contract = _load_sequence_evidence_map(visual_contract_path)
+    visual_contract, visual_contract_evidence = _load_sequence_evidence_map_with_evidence(visual_contract_path)
     if visual_contract.primary_sequence and len(visual_contract.primary_sequence) != prediction_model.input.length:
         raise FoldingConfigError("Sequence evidence map length does not match folding prediction input.")
 
@@ -210,6 +291,9 @@ def enrich_prediction_pairing_qa(
     payload = prediction_model.model_dump(mode="json")
     payload["qa"] = qa_payload
     enriched = SecondaryStructurePredictionV1.model_validate(payload)
+    if prediction_evidence is not None:
+        prediction_evidence.verify_unchanged(label="Folding prediction source")
+    visual_contract_evidence.verify_unchanged(label="Sequence evidence map source")
     if output_path is not None:
         _write_json(Path(output_path).expanduser().resolve(), enriched.model_dump(mode="json"))
     return enriched
@@ -217,28 +301,26 @@ def enrich_prediction_pairing_qa(
 
 def _load_prediction(
     prediction: SecondaryStructurePredictionV1 | str | Path,
-) -> tuple[SecondaryStructurePredictionV1, str]:
+) -> tuple[SecondaryStructurePredictionV1, str, CapturedSource | None]:
     if isinstance(prediction, SecondaryStructurePredictionV1):
-        return prediction, "in_memory"
-    prediction_path = Path(prediction).expanduser().resolve()
+        return prediction, "in_memory", None
+    evidence = CapturedSource.capture(prediction, label="Folding prediction source")
     try:
-        payload = json.loads(prediction_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise FoldingConfigError(f"Invalid folding prediction JSON: {prediction_path}") from exc
+        payload = json.loads(evidence.content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise FoldingConfigError(f"Invalid folding prediction JSON: {evidence.path}") from exc
     try:
-        return SecondaryStructurePredictionV1.model_validate(payload), prediction_path.as_posix()
+        return SecondaryStructurePredictionV1.model_validate(payload), evidence.portable_ref, evidence
     except PydanticValidationError as exc:
-        raise FoldingConfigError(f"Invalid folding prediction {prediction_path}: {exc}") from exc
+        raise FoldingConfigError(f"Invalid folding prediction {evidence.path}: {exc}") from exc
 
 
-def _load_assembled_sequence(path: str | Path) -> _PlotSequence:
-    artifact_path = Path(path).expanduser().resolve()
-    if not artifact_path.exists():
-        raise FoldingConfigError(f"Assembled sequence artifact not found: {artifact_path}")
+def _load_assembled_sequence(path: str | Path) -> tuple[_PlotSequence, CapturedSource]:
+    evidence = CapturedSource.capture(path, label="Assembled sequence source")
     try:
-        payload = json.loads(artifact_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise FoldingConfigError(f"Invalid assembled sequence JSON: {artifact_path}") from exc
+        payload = json.loads(evidence.content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise FoldingConfigError(f"Invalid assembled sequence JSON: {evidence.path}") from exc
     sequence_payload = payload.get("sequence")
     if not isinstance(sequence_payload, dict):
         raise FoldingConfigError("Assembled sequence artifact missing sequence object.")
@@ -250,7 +332,7 @@ def _load_assembled_sequence(path: str | Path) -> _PlotSequence:
         raise FoldingConfigError("Assembled sequence artifact is missing sequence id, digest, or sequence.")
     if observed_sha256 != sequence_sha256:
         raise FoldingConfigError("Assembled sequence artifact sha256 does not match sequence.")
-    return _PlotSequence(sequence_id=sequence_id, sequence_sha256=sequence_sha256, sequence=sequence)
+    return _PlotSequence(sequence_id=sequence_id, sequence_sha256=sequence_sha256, sequence=sequence), evidence
 
 
 def _submitted_sequence(sequence: str, *, dna_policy: str) -> tuple[str, str]:
@@ -306,24 +388,28 @@ def _viennarna_layout(module: Any, *, structure: str, layout_algorithm: str) -> 
     return layout_factory(structure)
 
 
-def _load_sequence_evidence_map(path: str | Path | None) -> SequenceEvidenceMapV1:
+def _load_sequence_evidence_map_with_evidence(
+    path: str | Path | None,
+) -> tuple[SequenceEvidenceMapV1, CapturedSource]:
     if path is None:
         raise FoldingConfigError("Sequence evidence map is required for pairing QA.")
-    contract_path = Path(path).expanduser().resolve()
+    evidence = CapturedSource.capture(path, label="Sequence evidence map source")
     try:
-        payload = json.loads(contract_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise FoldingConfigError(f"Invalid sequence evidence map JSON: {contract_path}") from exc
+        payload = json.loads(evidence.content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise FoldingConfigError(f"Invalid sequence evidence map JSON: {evidence.path}") from exc
     try:
-        return SequenceEvidenceMapV1.model_validate(payload)
+        return SequenceEvidenceMapV1.model_validate(payload), evidence
     except PydanticValidationError as exc:
-        raise FoldingConfigError(f"Invalid sequence evidence map {contract_path}: {exc}") from exc
+        raise FoldingConfigError(f"Invalid sequence evidence map {evidence.path}: {exc}") from exc
 
 
-def _optional_sequence_evidence_map(path: str | Path | None) -> SequenceEvidenceMapV1 | None:
+def _optional_sequence_evidence_map(
+    path: str | Path | None,
+) -> tuple[SequenceEvidenceMapV1 | None, CapturedSource | None]:
     if path is None:
-        return None
-    return _load_sequence_evidence_map(path)
+        return None, None
+    return _load_sequence_evidence_map_with_evidence(path)
 
 
 def _component_palette(visual_contract: SequenceEvidenceMapV1 | None) -> dict[str, str]:

@@ -62,8 +62,8 @@ def build_payload_view_entries(
 
 def build_render_job_payload(*, entry: PayloadViewEntry) -> dict[str, object]:
     return {
-        "version": 3,
-        "results_root": "..",
+        "version": 4,
+        "bundle": {"path": f"../debug/rerenders/{entry.view_id}.render-v1"},
         "input": {
             "kind": entry.input_kind,
             "path": f"../{entry.view_contract_path}",
@@ -74,8 +74,8 @@ def build_render_job_payload(*, entry: PayloadViewEntry) -> dict[str, object]:
             "renderer": entry.renderer_kind,
             "style": {"preset": entry.style_preset, "overrides": entry.style_overrides},
         },
-        "outputs": [{"kind": "images", "path": f"../debug/rerenders/{entry.view_id}.pdf", "fmt": "pdf"}],
-        "run": {"strict": True, "fail_on_skips": True, "emit_report": False},
+        "outputs": [{"kind": "images", "path": f"{entry.view_id}.pdf", "fmt": "pdf"}],
+        "run": {"strict": True, "fail_on_skips": True},
     }
 
 

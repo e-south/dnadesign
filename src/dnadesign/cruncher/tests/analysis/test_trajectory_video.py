@@ -241,7 +241,7 @@ def test_render_chain_trajectory_video_uses_strict_baserender_run_contract(tmp_p
         captured["kind"] = kind
         captured["caller_root"] = caller_root
         captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
-        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(b"fake-mp4")
 
@@ -258,9 +258,11 @@ def test_render_chain_trajectory_video_uses_strict_baserender_run_contract(tmp_p
         tmp_root=tmp_path / "_tmp",
     )
 
-    assert out_path.exists()
+    published_path = Path(str(result["artifact_path"]))
+    assert published_path == tmp_path / "video.render-v1" / "video.mp4"
+    assert published_path.exists()
     assert result["snapshot_count"] >= 2
-    assert captured["kind"] == "sequence_rows_v3"
+    assert captured["kind"] == "sequence_rows_render_v3"
     run_cfg = dict(captured["job"]["run"])
     assert run_cfg["strict"] is True
     assert run_cfg["fail_on_skips"] is True
@@ -323,7 +325,7 @@ def test_render_chain_trajectory_video_embeds_side_panel_payload(tmp_path, monke
         del kind, caller_root
         captured["job"] = job_mapping
         captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
-        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(b"fake-mp4")
 
@@ -382,12 +384,12 @@ def test_render_chain_trajectory_video_replaces_final_still_with_polished_sequen
     def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
         del kind, caller_root
         captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
-        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(b"fake-mp4")
 
     monkeypatch.setattr("dnadesign.cruncher.analysis.trajectory_video.run_job", _fake_run_job)
-    render_chain_trajectory_video(
+    result = render_chain_trajectory_video(
         trajectory_df=trajectory_df,
         tf_names=["lexA"],
         pwms={"lexA": pwm},
@@ -400,7 +402,7 @@ def test_render_chain_trajectory_video_replaces_final_still_with_polished_sequen
         polished_final_sequence="CGTTTGT",
     )
 
-    assert out_path.exists()
+    assert Path(str(result["artifact_path"])).exists()
     records_df = captured["records_df"]
     assert str(records_df.iloc[-1]["sequence"]).strip().upper() == "CGTTTGT"
 
@@ -458,7 +460,7 @@ def test_render_chain_trajectory_video_aligns_final_panel_point_with_polished_se
     def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
         del kind, caller_root
         captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
-        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(b"fake-mp4")
 
@@ -468,7 +470,7 @@ def test_render_chain_trajectory_video_aligns_final_panel_point_with_polished_se
     )
     monkeypatch.setattr("dnadesign.cruncher.analysis.trajectory_video.run_job", _fake_run_job)
 
-    render_chain_trajectory_video(
+    result = render_chain_trajectory_video(
         trajectory_df=trajectory_df,
         tf_names=["lexA"],
         pwms={"lexA": pwm},
@@ -481,7 +483,7 @@ def test_render_chain_trajectory_video_aligns_final_panel_point_with_polished_se
         polished_final_sequence=polished_sequence,
     )
 
-    assert out_path.exists()
+    assert Path(str(result["artifact_path"])).exists()
     records_df = captured["records_df"]
     final_row = records_df.iloc[-1]
     final_display = json.loads(str(final_row["display"]))
@@ -527,7 +529,7 @@ def test_render_chain_trajectory_video_supports_pandas_str_dtype_mode(tmp_path, 
         out_path = tmp_path / "video_str_mode.mp4"
 
         def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
-            out = Path(str(job_mapping["outputs"][0]["path"]))
+            out = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(b"fake-mp4")
 
@@ -546,7 +548,7 @@ def test_render_chain_trajectory_video_supports_pandas_str_dtype_mode(tmp_path, 
     finally:
         pd.options.mode.string_storage = prior_storage
 
-    assert out_path.exists()
+    assert Path(str(result["artifact_path"])).exists()
     assert result["snapshot_count"] >= 2
 
 
@@ -591,7 +593,7 @@ def test_render_chain_trajectory_video_scores_repeated_best_so_far_sources_once(
 
     def _fake_run_job(job_mapping: dict[str, object], *, kind: str, caller_root: Path) -> None:
         del kind, caller_root
-        out = Path(str(job_mapping["outputs"][0]["path"]))
+        out = Path(str(job_mapping["bundle"]["path"])) / str(job_mapping["outputs"][0]["path"])
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(b"fake-mp4")
 
@@ -612,7 +614,7 @@ def test_render_chain_trajectory_video_scores_repeated_best_so_far_sources_once(
         tmp_root=tmp_path / "_tmp",
     )
 
-    assert out_path.exists()
+    assert Path(str(result["artifact_path"])).exists()
     assert result["snapshot_count"] == 5
     assert score_calls == 3
 

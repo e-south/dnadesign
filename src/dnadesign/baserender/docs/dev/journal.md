@@ -1,7 +1,7 @@
 # Baserender Dev Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-01
 
 
 ## 2026-02-12 - Critical audit for Cruncher substrate refactor
@@ -727,3 +727,18 @@ Conclusion: base track/kmer rendering is already compatible.
 - `src/config/cruncher_showcase_job.py` still owns too much parsing logic; the next config cleanup should split base-render v3 parser, path, output, run, and compatibility modules.
 - `Record.meta` is still an untyped side channel between adapters, renderers, and output writers.
 - `render/sequence_rows.py` remains a large mixed planning/drawing module and should be decomposed before adding more visual behavior.
+
+## 2026-07-30 - Immutable render bundles
+
+### Contract break
+
+- Replaced Render Job v3 with `RenderJobV4`; no v3 import, kind, or path shim remains.
+- Made `bundle.path` required and confined every image and video path beneath it.
+- Made `manifest.json` mandatory and reserved that path from output declarations.
+- Removed independent report paths, replacement policies, and default output-root inference.
+
+### Publication
+
+- A run renders privately, writes the manifest last, copies the complete tree to same-filesystem adjacent staging, and installs it with one atomic create-only directory rename.
+- Existing bundles are immutable. A rerun chooses a new versioned bundle path.
+- Concurrent writers, interrupted copies, path swaps, case aliases, and different process temp directories cannot expose a partial final bundle.

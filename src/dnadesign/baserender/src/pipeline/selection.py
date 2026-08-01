@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import csv
+import io
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
@@ -27,12 +28,26 @@ class SelectionRows:
     overlay_by_key: dict[str, str]
 
 
-def read_selection_rows(path, *, key_col: str, overlay_col: str | None) -> SelectionRows:
+def read_selection_rows(
+    path,
+    *,
+    key_col: str,
+    overlay_col: str | None,
+    content: bytes | None = None,
+) -> SelectionRows:
     keys: list[str] = []
     overlays: list[str | None] = []
     overlay_by_key: dict[str, str] = {}
 
-    with open(path, newline="") as handle:
+    try:
+        handle = (
+            open(path, encoding="utf-8", newline="")
+            if content is None
+            else io.StringIO(content.decode("utf-8"), newline="")
+        )
+    except UnicodeDecodeError as exc:
+        raise SchemaError(f"Selection CSV must be UTF-8: {path}") from exc
+    with handle:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None or key_col not in reader.fieldnames:
             raise SchemaError(f"Selection CSV must contain key column '{key_col}'")
@@ -132,8 +147,18 @@ def _default_overlay(selection: SelectionCfg, *, sel_row: int, key: str, record:
     return f"sel_row={sel_row} id={record.id}"
 
 
-def apply_selection(records: Sequence[Record], selection: SelectionCfg) -> tuple[list[Record], list[str]]:
-    rows = read_selection_rows(selection.path, key_col=selection.column, overlay_col=selection.overlay_column)
+def apply_selection(
+    records: Sequence[Record],
+    selection: SelectionCfg,
+    *,
+    source_content: bytes | None = None,
+) -> tuple[list[Record], list[str]]:
+    rows = read_selection_rows(
+        selection.path,
+        key_col=selection.column,
+        overlay_col=selection.overlay_column,
+        content=source_content,
+    )
     mapping = _record_key_map(records, match_on=selection.match_on)
 
     missing = [key for key in rows.keys if key not in mapping]

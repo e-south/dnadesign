@@ -40,28 +40,28 @@ def _load_baserender(job: Path):
 
 @app.command("validate", help="Validate a published render job through dnadesign.baserender.validate_job.")
 def validate_cmd(
-    job: Path = typer.Option(..., "--job", help="Path to a RenderJobV3 YAML file."),
+    job: Path = typer.Option(..., "--job", help="Path to a RenderJobV4 YAML file."),
 ) -> None:
     try:
         baserender = _load_baserender(job)
-        parsed = baserender.validate_job(job, kind="render_job_v3", caller_root=job.parent)
+        parsed = baserender.validate_job(job, kind="render_job_v4", caller_root=job.parent)
     except Exception as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
 
     console.print(f"Render job -> {parsed.path}")
-    console.print("Render job kind -> render_job_v3")
+    console.print("Render job kind -> render_job_v4")
     console.print(f"Renderer -> {parsed.render.renderer}")
-    console.print(f"Results root -> {parsed.results_root}")
+    console.print(f"Bundle -> {parsed.bundle.path}")
 
 
 @app.command("run", help="Run a published render job through dnadesign.baserender.run_job.")
 def run_cmd(
-    job: Path = typer.Option(..., "--job", help="Path to a RenderJobV3 YAML file."),
+    job: Path = typer.Option(..., "--job", help="Path to a RenderJobV4 YAML file."),
 ) -> None:
     try:
         baserender = _load_baserender(job)
-        report = baserender.run_job(job, kind="render_job_v3", caller_root=job.parent)
+        report = baserender.run_job(job, kind="render_job_v4", caller_root=job.parent)
     except Exception as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc

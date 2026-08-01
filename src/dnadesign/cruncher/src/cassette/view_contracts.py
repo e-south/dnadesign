@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from dnadesign.contracts.visual import CassetteViewsManifestV1, HairpinTopologyViewV1, LinearDuplexViewV1
@@ -297,8 +298,8 @@ def build_single_view_job(
     output_filename: str,
 ) -> dict[str, object]:
     return {
-        "version": 3,
-        "results_root": "..",
+        "version": 4,
+        "bundle": {"path": f"../renders/{Path(output_filename).stem}.render-v1"},
         "input": {
             "kind": "json",
             "path": f"../views/{input_filename}",
@@ -315,14 +316,13 @@ def build_single_view_job(
         "outputs": [
             {
                 "kind": "images",
-                "path": f"../renders/{output_filename}",
+                "path": output_filename,
                 "fmt": "pdf",
             }
         ],
         "run": {
             "strict": True,
             "fail_on_skips": True,
-            "emit_report": False,
         },
     }
 
@@ -336,8 +336,8 @@ def build_top_hits_job(
     output_filename: str,
 ) -> dict[str, object]:
     return {
-        "version": 3,
-        "results_root": "..",
+        "version": 4,
+        "bundle": {"path": f"../renders/{Path(output_filename).stem}.render-v1"},
         "input": {
             "kind": "jsonl",
             "path": f"../views/{input_filename}",
@@ -354,13 +354,12 @@ def build_top_hits_job(
         "outputs": [
             {
                 "kind": "images",
-                "path": f"../renders/{output_filename}",
+                "path": output_filename,
                 "fmt": "pdf",
             }
         ],
         "run": {
             "strict": True,
             "fail_on_skips": True,
-            "emit_report": False,
         },
     }

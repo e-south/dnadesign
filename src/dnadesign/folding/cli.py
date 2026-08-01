@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,11 +62,14 @@ def _output_dir_for(request_path: Path, output_dir: Path | None) -> Path:
 
 
 def _plot_output_dir_for(prediction_path: Path, output_dir: Path) -> Path:
-    if output_dir.is_absolute():
-        return output_dir
-    if output_dir.parts and output_dir.parts[0] == "..":
-        return (prediction_path.parent / output_dir).resolve()
-    return output_dir.expanduser().resolve()
+    expanded = output_dir.expanduser()
+    if expanded.is_absolute():
+        candidate = expanded
+    elif expanded.parts and expanded.parts[0] == "..":
+        candidate = prediction_path.parent / expanded
+    else:
+        candidate = Path.cwd() / expanded
+    return Path(os.path.abspath(candidate))
 
 
 def _load_bundle(bundle: Path) -> _FoldingBundle:
@@ -122,7 +126,18 @@ def _bundle_plot_output_dir(bundle: _FoldingBundle) -> Path:
     plot_manifest = _bundle_artifact_path(bundle, _BUNDLE_PLOT_ARTIFACT, required=False, must_exist=False)
     if plot_manifest is not None:
         return plot_manifest.parent
-    return (bundle.root / _BUNDLE_PLOT_DIR).resolve()
+    candidate = bundle.root / _BUNDLE_PLOT_DIR
+    current = bundle.root
+    for part in _BUNDLE_PLOT_DIR.parts:
+        current = current / part
+        if current.is_symlink():
+            raise FoldingConfigError(f"Folding bundle output must not use symlinked components: {current}")
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(bundle.root)
+    except ValueError as exc:
+        raise FoldingConfigError(f"Folding bundle output escapes the bundle: {candidate}") from exc
+    return resolved
 
 
 def _emit(payload: object, *, output_format: str) -> None:
@@ -295,17 +310,18 @@ def plot_command(
         if output_dir is None:
             raise FoldingConfigError("--output-dir is required unless --bundle is provided.")
         prediction_path = prediction.expanduser().resolve()
+        prediction_for_plot = prediction_path
         if visual_contract is not None:
-            enrich_prediction_pairing_qa(
+            prediction_for_plot = enrich_prediction_pairing_qa(
                 prediction_path,
                 visual_contract_path=visual_contract,
-                output_path=prediction_path,
             )
         plot = publish_viennarna_structure_svg(
-            prediction_path,
+            prediction_for_plot,
             assembled_sequence_path=assembled_sequence,
             visual_contract_path=visual_contract,
             output_dir=_plot_output_dir_for(prediction_path, output_dir),
+            source_prediction_ref=prediction_path,
             python_module=python_module,
             layout_algorithm=layout,
             emphasize_stem_base_nucleotides=emphasize_stem_bases,

@@ -16,7 +16,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pytest
 
-from dnadesign.baserender.src.config import load_cruncher_showcase_job, resolve_style
+from dnadesign.baserender.src.config import load_render_job, resolve_style
 from dnadesign.baserender.src.config.adapter_contracts import adapter_descriptor
 from dnadesign.baserender.src.core import SchemaError
 from dnadesign.baserender.src.public import adapt_record, get_render_contract_descriptor
@@ -599,9 +599,9 @@ def test_usr_genbank_adapter_policy_normalizer_rejects_bad_min_per_record() -> N
 def test_usr_genbank_render_job_validates_with_use_case_contract(tmp_path: Path) -> None:
     input_path = write_parquet(tmp_path / "input.parquet", [_genbank_row()])
     payload = {
-        "version": 3,
+        "version": 4,
         "contract": {"kind": "usr_genbank_annotation_render_v1"},
-        "results_root": str(tmp_path / "outputs"),
+        "bundle": {"path": str(tmp_path / "outputs" / "render-v1")},
         "input": {
             "kind": "parquet",
             "path": str(input_path),
@@ -617,7 +617,7 @@ def test_usr_genbank_render_job_validates_with_use_case_contract(tmp_path: Path)
     }
     job_path = write_job(tmp_path / "job.yaml", payload)
 
-    job = load_cruncher_showcase_job(job_path)
+    job = load_render_job(job_path)
 
     assert job.contract.kind == "usr_genbank_annotation_render_v1"
     assert job.input.adapter.kind == "usr_genbank_annotations_v1"

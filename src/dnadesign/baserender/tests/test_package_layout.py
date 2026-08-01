@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.baserender.src.config import resolve_job_path, resolve_preset_path, resolve_style
-from dnadesign.baserender.src.config.jobs import base_render_v3, sequence_rows_v3
+from dnadesign.baserender.src.config.jobs import base_render_v4
 from dnadesign.baserender.src.workspaces import default_workspaces_root
 
 
@@ -69,14 +69,8 @@ def test_resolve_job_path_missing_job_message_does_not_point_to_missing_jobs_dir
         resolve_job_path("definitely_missing_job_name")
 
 
-def test_sequence_rows_job_namespace_exports_contract() -> None:
-    assert sequence_rows_v3.SequenceRowsJobV3 is not None
-
-
-def test_base_render_job_namespace_is_canonical_generic_contract() -> None:
-    assert base_render_v3.BaseRenderJobV3 is not None
-    assert base_render_v3.RenderJobV3 is base_render_v3.BaseRenderJobV3
-    assert base_render_v3.SequenceRowsJobV3 is base_render_v3.BaseRenderJobV3
+def test_versioned_render_job_namespace_exports_one_contract() -> None:
+    assert base_render_v4.RenderJobV4 is not None
 
 
 def test_cli_implementation_lives_under_src_cli_package() -> None:

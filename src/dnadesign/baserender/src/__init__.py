@@ -16,15 +16,10 @@ from typing import Any
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
-    "BaseRenderJobV3": ("dnadesign.baserender.src.config", "BaseRenderJobV3"),
-    "RenderJobV3": ("dnadesign.baserender.src.config", "RenderJobV3"),
+    "RenderJobV4": ("dnadesign.baserender.src.config", "RenderJobV4"),
     "RenderContractDescriptor": ("dnadesign.baserender.src.config", "RenderContractDescriptor"),
-    "run_sequence_rows_job": ("dnadesign.baserender.src.public", "run_sequence_rows_job"),
     "run_render_job": ("dnadesign.baserender.src.public", "run_render_job"),
-    "run_cruncher_showcase_job": ("dnadesign.baserender.src.public", "run_cruncher_showcase_job"),
-    "validate_sequence_rows_job": ("dnadesign.baserender.src.public", "validate_sequence_rows_job"),
     "validate_render_job": ("dnadesign.baserender.src.public", "validate_render_job"),
-    "validate_cruncher_showcase_job": ("dnadesign.baserender.src.public", "validate_cruncher_showcase_job"),
     "run_job": ("dnadesign.baserender.src.public", "run_job"),
     "validate_job": ("dnadesign.baserender.src.public", "validate_job"),
     "list_adapters": ("dnadesign.baserender.src.public", "list_adapters"),

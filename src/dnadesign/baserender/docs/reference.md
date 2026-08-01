@@ -3,13 +3,13 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-19
+last_verified: 2026-08-01
 ---
 
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-19
+**Last verified:** 2026-08-01
 
 
 Single technical reference for operators and integrators.
@@ -39,7 +39,7 @@ Invariants:
 
 1. Validate job schema and paths.
 2. Run job (read rows, adapt, transform, select, render, write outputs).
-3. Inspect declared artifacts (`images_dir`, optional `video_path`, optional `report_path`).
+3. Inspect the immutable bundle named by `bundle.path`; `manifest.json` records every published artifact.
 4. Iterate by editing `job.yaml` style overrides or adapter/pipeline wiring.
 
 Primary commands:
@@ -49,31 +49,31 @@ Primary commands:
 
 ## Config Schema to Package Architecture
 
-`BaseRenderJobV3` / `RenderJobV3` keys and owner modules:
+`RenderJobV4` keys and owner modules:
 
 | Job key | Purpose | Primary module(s) |
 | --- | --- | --- |
-| `version` | Contract version gate (`3`) | `src/config/jobs/base_render_v3.py` |
+| `version` | Contract version gate (`4`) | `src/config/jobs/base_render_v4.py` |
 | `contract` | Optional use-case render-contract descriptor | `src/config/job_contracts.py` |
-| `results_root` | Output root resolution | `src/config/jobs/base_render_v3.py`, `src/workspaces/` |
+| `bundle` | Explicit immutable publication root | `src/config/jobs/base_render_v4.py`, `src/execution/` |
 | `input` | Source kind/path + adapter contract | `src/config/adapter_contracts.py`, `src/io/`, `src/adapters/` |
 | `selection` | Optional subset/ordering overlay | `src/pipeline/transforms.py` |
 | `pipeline` | Transform plugin chain | `src/pipeline/` |
 | `render` | Renderer + style preset/overrides | `src/render/`, `src/config/style_v1.py` |
-| `outputs` | Explicit artifact declaration | `src/config/jobs/base_render_v3.py`, `src/outputs/` |
-| `run` | Strictness and optional report emission | `src/execution/`, `src/reporting/` |
+| `outputs` | Bundle-relative artifact declaration | `src/config/jobs/base_render_v4.py`, `src/outputs/` |
+| `run` | Strictness policy | `src/execution/` |
 
-## Job Contract (`BaseRenderJobV3` / `RenderJobV3`)
+## Job Contract (`RenderJobV4`)
 
 Required top-level keys:
 - `version`
+- `bundle`
 - `input`
 - `render`
 - `outputs`
 
 Optional top-level keys:
 - `contract`
-- `results_root`
 - `selection`
 - `pipeline`
 - `run`
@@ -82,22 +82,19 @@ Contract behavior:
 - unknown keys fail at every level
 - `outputs` must be non-empty and explicit
 - `contract.kind`, when present, must be compatible with `render.renderer`
-- non-workspace default output root is `<job_dir>/results`
-- workspace `job.yaml` with sibling `inputs/` and `outputs/` defaults to `<workspace>/outputs`
-- `src/config/jobs/base_render_v3.py` is the canonical generic orchestration namespace
-- `src/config/jobs/sequence_rows_v3.py` remains a sequence-rows compatibility namespace
-- the legacy implementation path `src/config/cruncher_showcase_job.py` remains as a compatibility import shim
-- compatibility aliases `SequenceRowsJobV3` and `CruncherShowcaseJob` still load the same schema, but `BaseRenderJobV3` / `RenderJobV3` is the canonical public model name
+- `bundle.path` is required and names one directory owned by the run
+- every output path is relative to, and confined within, `bundle.path`
+- `src/config/jobs/base_render_v4.py` is the versioned orchestration namespace
+- `src/config/render_job_v4.py` owns parsing and validation; there is no v3 compatibility shim
 
 Render-contract descriptors:
-- `base_render_job_v3`: generic adapter -> renderer -> output orchestration; accepts all registered renderer families
+- `render_job_v4`: generic adapter -> renderer -> output orchestration; accepts all registered renderer families
 - `sequence_rows_render_v3`: linear sequence-row visualization; accepts `sequence_rows`
 - `usr_genbank_annotation_render_v1`: USR `seq_annot` GenBank feature-overlay visualization; accepts `sequence_rows`
 - `nucleotide_evidence_map_render_v3`: nucleotide-level ownership/evidence map visualization; accepts `nucleotide_evidence_map`
 - `hairpin_cartoon_render_v3`: hairpin topology cartoon visualization; accepts `hairpin_cartoon`
 - `topology_cartoon_render_v3`: explicit segment-topology cartoon visualization; accepts `topology_cartoon`
 - `snapback_map_render_v3`: snapback visual-map rendering; accepts `snapback_map`
-- legacy aliases `render_job_v3`, `sequence_rows_v3`, and `cruncher_showcase_v3` resolve to the corresponding descriptor and remain compatibility-only
 
 Adapters:
 - `densegen_tfbs`
@@ -198,9 +195,8 @@ For tool-specific style interpretation, see `docs/integrations/cruncher.md`.
 ## Output and Report Semantics
 
 Images:
-- if `outputs` includes `kind: images` with no `dir`, workspace jobs default to `outputs/plots`
-- non-workspace jobs default to `<results_root>/<job_name>/images`
-- if `dir` is set, it is resolved relative to output root unless absolute
+- if `outputs` includes `kind: images` with no `dir`, it defaults to `<bundle.path>/images`
+- explicit `dir` and `path` values must be relative to `bundle.path`
 
 Video:
 - `content_fit: native` preserves the rendered canvas scale and stable crop behavior
@@ -208,16 +204,11 @@ Video:
 - `content_fit: fill_width_per_frame` trims and scales each frame independently; use for variable-length records where per-record readability matters more than stable cross-frame crop geometry
 - BaseRender never non-uniformly stretches frames; fixed-size videos may still letterbox when records have different rendered aspect ratios.
 
-Run reports:
-- report emission is opt-in (`run.emit_report: true`)
-- workspace jobs default to `outputs/run_report.json`
-- non-workspace jobs default to `<results_root>/<job_name>/run_report.json`
-- there is no required `reports/` directory contract
-
-Default `results_root`:
-- workspace jobs: `<workspace>/outputs`
-- non-workspace jobs: `<job_dir>/results` (job-local by default)
-- API callers can override scope via `caller_root` (`<caller_root>/results`)
+Publication:
+- the run renders into private staging and writes `manifest.json` last
+- publication copies that complete tree to same-filesystem adjacent staging, then performs one atomic create-only directory rename
+- existing bundle paths fail; reruns must choose a new versioned `bundle.path`
+- failed rendering or publication never exposes a partial final bundle
 
 ## Public API Boundary
 
@@ -225,14 +216,13 @@ Stable API surface:
 - `adapt_record`, `adapt_records`
 - `validate_job`, `run_job`, `render`
 - `validate_render_job`, `run_render_job`
-- `validate_sequence_rows_job`, `run_sequence_rows_job`
 - `list_adapters`, `get_adapter_descriptor`
 - `list_renderers`, `get_renderer_descriptor`
 - `list_render_contracts`, `get_render_contract_descriptor`
 - `load_record_from_parquet`, `load_records_from_parquet`
 - `render_record_figure`, `render_record_grid_figure`, `render_parquet_record_figure`
 - `render_sequence_panel_image`, `sequence_panel_config_for_adapter`
-- `BaseRenderJobV3`, `RenderJobV3`, `RenderContractDescriptor`
+- `RenderJobV4`, `RenderContractDescriptor`
 - `SequencePanelConfig`, `SequencePanelDiagnostics`, `SequencePanelImage`
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
 - `Style`, `resolve_style`, `resolve_preset_path`, `list_style_presets`
@@ -256,12 +246,6 @@ Sequence-panel layout:
 - record list input defaults to a single-row layout (`ncols = len(records)`).
 - callers can override with `grid.ncols`.
 - invalid/unknown `grid` keys fail fast (`SchemaError`).
-
-Compatibility aliases:
-- `validate_cruncher_showcase_job`
-- `run_cruncher_showcase_job`
-- `SequenceRowsJobV3`
-- `CruncherShowcaseJob`
 
 Boundary rule:
 - supported imports: `dnadesign.baserender`

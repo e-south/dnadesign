@@ -32,12 +32,12 @@ def write_job(path: Path, payload: dict) -> Path:
 
 
 def densegen_job_payload(
-    *, parquet_path: Path, results_root: Path, outputs: list[dict], extra: dict | None = None
+    *, parquet_path: Path, bundle_path: Path, outputs: list[dict], extra: dict | None = None
 ) -> dict:
     base = {
-        "version": 3,
+        "version": 4,
         "contract": {"kind": "sequence_rows_render_v3"},
-        "results_root": str(results_root),
+        "bundle": {"path": str(bundle_path)},
         "input": {
             "kind": "parquet",
             "path": str(parquet_path),
@@ -64,8 +64,6 @@ def densegen_job_payload(
         "run": {
             "strict": False,
             "fail_on_skips": False,
-            "emit_report": False,
-            "report_path": None,
         },
     }
     if extra:

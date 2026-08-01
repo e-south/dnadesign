@@ -26,7 +26,7 @@ SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 
 STRUCTURE_SVG_PATH = Path("visual/viennarna_secondary_structure/secondary_structure.annotated.svg")
-COMPONENT_SPAN_SVG_PATH = Path("visual/renders/component_span_qa_svg/component_span_qa.svg")
+COMPONENT_SPAN_SVG_PATH = Path("visual/renders/component_span_qa_svg.render-v1/component_span_qa.svg")
 COMPOSITION_REVIEW_DIR = Path("visual/reviews")
 COMPOSITION_REVIEW_SVG_PATH = COMPOSITION_REVIEW_DIR / "composition_overview.svg"
 COMPOSITION_REVIEW_PNG_PATH = COMPOSITION_REVIEW_DIR / "composition_overview.png"

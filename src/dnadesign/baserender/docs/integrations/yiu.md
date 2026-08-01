@@ -1,7 +1,7 @@
 # YIU Integration Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-05
+**Last verified:** 2026-08-01
 
 
 This page defines the YIU visual-contract handoff used by `baserender`.
@@ -17,7 +17,7 @@ junction assembly, and admissibility. `baserender` is responsible only for:
 
 The default boundary is file-contract-first:
 
-- Cruncher/YIU writes JSON view contracts and sibling `RenderJobV3` YAML files
+- Cruncher/YIU writes JSON view contracts and sibling `RenderJobV4` YAML files
 - `baserender` validates and runs those jobs through public APIs or CLI
 - neither side imports the other's private modules
 

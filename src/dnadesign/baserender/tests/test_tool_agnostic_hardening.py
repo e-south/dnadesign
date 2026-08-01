@@ -27,7 +27,7 @@ def test_public_api_module_avoids_tool_specific_input_assumptions() -> None:
 
 def test_job_parser_avoids_adapter_kind_branching() -> None:
     root = Path(__file__).resolve().parents[1]
-    parser_text = _read(root / "src" / "config" / "cruncher_showcase_job.py")
+    parser_text = _read(root / "src" / "config" / "render_job_v4.py")
     assert 'if kind == "densegen_tfbs"' not in parser_text
     assert 'if kind == "cruncher_best_window"' not in parser_text
     assert "densegen_tfbs" not in parser_text

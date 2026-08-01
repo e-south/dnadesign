@@ -31,9 +31,9 @@ def write_baserender_jobs(artifact_bundle: Path, composed: ComposedLinearSsdna) 
     for fmt in _baserender_export_formats(composed):
         job_path = artifact_bundle / "baserender_jobs" / f"component_span_qa_{fmt}.yaml"
         payload = {
-            "version": 3,
+            "version": 4,
             "contract": {"kind": "nucleotide_evidence_map_render_v3"},
-            "results_root": "../visual/renders",
+            "bundle": {"path": f"../visual/renders/component_span_qa_{fmt}.render-v1"},
             "input": {
                 "kind": "json",
                 "path": f"../{SEQUENCE_EVIDENCE_MAP_PATH.as_posix()}",
@@ -86,8 +86,6 @@ def write_baserender_jobs(artifact_bundle: Path, composed: ComposedLinearSsdna) 
             "run": {
                 "strict": True,
                 "fail_on_skips": True,
-                "emit_report": True,
-                "report_path": "component_span_qa.run_report.json",
             },
         }
         job_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")

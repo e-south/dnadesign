@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dnadesign.baserender.src.adapters.sequence_windows_v1 import SequenceWindowsV1Adapter
-from dnadesign.baserender.src.config import load_cruncher_showcase_job
+from dnadesign.baserender.src.config import load_render_job
 
 from .conftest import write_job, write_parquet
 
@@ -87,8 +87,8 @@ def test_sequence_windows_adapter_kind_is_accepted_by_job_schema(tmp_path: Path)
         ],
     )
     payload = {
-        "version": 3,
-        "results_root": str(tmp_path / "outputs"),
+        "version": 4,
+        "bundle": {"path": str(tmp_path / "outputs" / "render-v1")},
         "input": {
             "kind": "parquet",
             "path": str(parquet),
@@ -108,5 +108,5 @@ def test_sequence_windows_adapter_kind_is_accepted_by_job_schema(tmp_path: Path)
         "outputs": [{"kind": "images", "fmt": "png"}],
     }
     job_path = write_job(tmp_path / "job.yaml", payload)
-    job = load_cruncher_showcase_job(job_path)
+    job = load_render_job(job_path)
     assert job.input.adapter.kind == "sequence_windows_v1"

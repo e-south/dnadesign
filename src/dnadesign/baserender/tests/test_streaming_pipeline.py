@@ -13,15 +13,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.baserender.src.public import run_cruncher_showcase_job
+from dnadesign.baserender.src.public import run_render_job
 
 from .conftest import write_job, write_parquet
 
 
-def _generic_job_payload(*, parquet_path: Path, results_root: Path, limit: int) -> dict:
+def _generic_job_payload(*, parquet_path: Path, bundle_path: Path, limit: int) -> dict:
     return {
-        "version": 3,
-        "results_root": str(results_root),
+        "version": 4,
+        "bundle": {"path": str(bundle_path)},
         "input": {
             "kind": "parquet",
             "path": str(parquet_path),
@@ -39,7 +39,7 @@ def _generic_job_payload(*, parquet_path: Path, results_root: Path, limit: int) 
         },
         "render": {"renderer": "sequence_rows", "style": {"preset": None, "overrides": {}}},
         "outputs": [{"kind": "images", "fmt": "png"}],
-        "run": {"strict": False, "fail_on_skips": False, "emit_report": False, "report_path": None},
+        "run": {"strict": False, "fail_on_skips": False},
     }
 
 
@@ -91,11 +91,11 @@ def test_limit_short_circuits_row_iteration_when_selection_is_disabled(tmp_path:
 
     payload = _generic_job_payload(
         parquet_path=parquet,
-        results_root=tmp_path / "results",
+        bundle_path=tmp_path / "results",
         limit=1,
     )
     job_path = write_job(tmp_path / "job.yaml", payload)
 
-    report = run_cruncher_showcase_job(str(job_path))
+    report = run_render_job(str(job_path))
     assert report.total_rows_seen == 1
     assert report.yielded_records == 1

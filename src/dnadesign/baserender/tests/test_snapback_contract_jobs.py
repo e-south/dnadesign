@@ -107,7 +107,7 @@ def test_snapback_design_emits_one_public_triptych_job_that_renders_a_png(tmp_pa
 
     assert report.status == "satisfied"
     job_path = run_dir / "baserender_jobs" / "snapback_triptych.job.yaml"
-    render_path = run_dir / "plots" / "snapback_triptych.png"
+    render_path = run_dir / "renders" / "snapback_triptych.render-v1" / "snapback_triptych.png"
     job_payload = yaml.safe_load(job_path.read_text(encoding="utf-8"))
     assert job_payload["input"]["kind"] == "jsonl"
     assert job_payload["input"]["adapter"]["kind"] == "snapback_visual_v1"
@@ -195,7 +195,7 @@ def test_snapback_solve_materialized_hit_emits_triptych_job_that_renders_a_png(t
     assert report.status == "satisfied"
     hit_dir = run_dir / "analysis" / "materialized_hits" / "hit_01"
     job_path = hit_dir / "baserender_jobs" / "snapback_triptych.job.yaml"
-    render_path = hit_dir / "plots" / "snapback_triptych.png"
+    render_path = hit_dir / "renders" / "snapback_triptych.render-v1" / "snapback_triptych.png"
     job_payload = yaml.safe_load(job_path.read_text(encoding="utf-8"))
     assert job_payload["input"]["kind"] == "jsonl"
     assert job_payload["input"]["adapter"]["kind"] == "snapback_visual_v1"

@@ -1,6 +1,8 @@
-version: 3
+version: 4
 contract:
   kind: sequence_rows_render_v3
+bundle:
+  path: outputs/render-v1
 input:
   kind: parquet
   path: inputs/input.parquet
@@ -92,4 +94,3 @@ outputs:
 run:
   strict: true
   fail_on_skips: true
-  emit_report: true
