@@ -13,11 +13,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import socket
 import stat
 import time
 from pathlib import Path
+
+import psutil
 
 from .errors import PublicationError
 from .owned_directory import (
@@ -27,22 +30,51 @@ from .owned_directory import (
 )
 
 _OWNER_FILE = ".dnadesign-publication-owner.json"
-_PUBLICATION_OWNER_SCHEMA = "dnadesign.artifact_publication_owner.v1"
-_ROLLBACK_OWNER_SCHEMA = "dnadesign.artifact_rollback_owner.v1"
+_PUBLICATION_OWNER_SCHEMA = "dnadesign.artifact_publication_owner.v2"
+_ROLLBACK_OWNER_SCHEMA = "dnadesign.artifact_rollback_owner.v2"
 _MAX_STALE_CANDIDATES = 64
+_MAX_SUPPORTED_PID = (1 << 31) - 1
 _PRIVATE_FILE_MODE = 0o600
 
 
-def _pid_is_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
+def _format_process_start_token(created_unix: float) -> str:
+    if created_unix <= 0 or not math.isfinite(created_unix):
+        raise ValueError("Process start time must be finite and positive")
+    return f"{created_unix:.9f}"
+
+
+def _canonical_process_start_token(value: object) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
     try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
+        canonical = _format_process_start_token(float(value))
+    except (OverflowError, ValueError):
+        return None
+    return canonical if value == canonical else None
+
+
+def _current_process_start_token() -> str:
+    try:
+        return _format_process_start_token(psutil.Process(os.getpid()).create_time())
+    except (OSError, OverflowError, ValueError, psutil.Error) as exc:
+        raise PublicationError("Artifact publication could not establish process identity") from exc
+
+
+def _owner_process_is_active(pid: int, expected_start_token: object) -> bool | None:
+    """Return whether the original owner is active, or None when identity is unknown."""
+
+    if pid <= 0 or pid > _MAX_SUPPORTED_PID:
+        return None
+    canonical_start_token = _canonical_process_start_token(expected_start_token)
+    if canonical_start_token is None:
+        return None
+    try:
+        observed_start_token = _format_process_start_token(psutil.Process(pid).create_time())
+    except psutil.NoSuchProcess:
         return False
-    except (OverflowError, PermissionError):
-        return True
-    return True
+    except (OSError, OverflowError, ValueError, psutil.Error):
+        return None
+    return observed_start_token == canonical_start_token
 
 
 def _owner_payload(final: Path) -> dict[str, object]:
@@ -51,6 +83,7 @@ def _owner_payload(final: Path) -> dict[str, object]:
         "target_sha256": hashlib.sha256(os.fsencode(final)).hexdigest(),
         "uid": os.getuid() if hasattr(os, "getuid") else None,
         "pid": os.getpid(),
+        "process_start_token": _current_process_start_token(),
         "host": socket.gethostname(),
         "created_unix": time.time(),
     }
@@ -120,18 +153,21 @@ def _owner_payload_is_recoverable(
     uid: int | None,
     owner_schema: str | tuple[str, ...],
 ) -> bool:
-    try:
-        owner_pid = int(payload.get("pid", -1))
-    except (TypeError, ValueError):
+    owner_pid = payload.get("pid")
+    if isinstance(owner_pid, bool) or not isinstance(owner_pid, int):
+        return False
+    if owner_pid <= 0 or owner_pid > _MAX_SUPPORTED_PID:
         return False
     schemas = (owner_schema,) if isinstance(owner_schema, str) else owner_schema
-    return (
+    owner_context_matches = (
         payload.get("schema") in schemas
         and payload.get("target_sha256") == hashlib.sha256(os.fsencode(final)).hexdigest()
         and payload.get("uid") == uid
         and payload.get("host") == socket.gethostname()
-        and not _pid_is_alive(owner_pid)
     )
+    if not owner_context_matches:
+        return False
+    return _owner_process_is_active(owner_pid, payload.get("process_start_token")) is False
 
 
 def _is_recoverable_directory(

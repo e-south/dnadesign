@@ -318,10 +318,10 @@ class CreateOnlyDirectoryPublication:
 
         validated_published_root_mode = _validate_published_root_mode(published_root_mode)
         final = _lexical_absolute_path(Path(bundle_root))
+        owner = _owner_payload(final)
         _preflight_existing_path_components(final.parent)
         parent_descriptor = _open_or_create_directory(final.parent)
         try:
-            owner = _owner_payload(final)
             uid = owner["uid"]
             recovery_uid = uid if isinstance(uid, int) else None
             _recover_final_directory(parent_descriptor, final, uid=recovery_uid)

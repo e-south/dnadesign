@@ -76,7 +76,7 @@ def test_adjacent_stale_recovery_never_removes_a_swapped_replacement(
             replacement.rename(path)
         return recoverable
 
-    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_owner_process_is_active", lambda _pid, _token: False)
     monkeypatch.setattr(recovery_module, "_is_recoverable_directory", _check_then_swap)
 
     publication = CreateOnlyDirectoryPublication.prepare(bundle)
@@ -116,7 +116,7 @@ def test_rollback_stale_recovery_never_removes_a_swapped_replacement(
             replacement.rename(path)
         return recoverable
 
-    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_owner_process_is_active", lambda _pid, _token: False)
     monkeypatch.setattr(recovery_module, "_is_recoverable_directory", _check_then_swap)
 
     publication = CreateOnlyDirectoryPublication.prepare(bundle)
@@ -159,7 +159,7 @@ def test_private_stale_recovery_never_removes_a_swapped_replacement(
             replacement.rename(path)
         return recoverable
 
-    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_owner_process_is_active", lambda _pid, _token: False)
     monkeypatch.setattr(recovery_module, "_is_recoverable_directory", _check_then_swap)
 
     publication = CreateOnlyDirectoryPublication.prepare(bundle)
@@ -268,7 +268,7 @@ def test_prepare_recovers_owned_rollback_after_process_exit(
         "remove_descriptor_anchored_directory",
         remove_directory,
     )
-    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_owner_process_is_active", lambda _pid, _token: False)
     recovered = CreateOnlyDirectoryPublication.prepare(bundle)
     try:
         assert not list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
@@ -300,7 +300,7 @@ def test_prepare_recovers_final_after_exit_between_owner_and_detach(
     assert (bundle / publication_module._OWNER_FILE).is_file()
 
     monkeypatch.setattr(publication_module, "_ensure_owner_on_descriptor", ensure_owner)
-    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_owner_process_is_active", lambda _pid, _token: False)
     recovered = CreateOnlyDirectoryPublication.prepare(bundle)
     try:
         assert not bundle.exists()
@@ -329,7 +329,7 @@ def test_final_recovery_detaches_before_partial_cleanup_failure(
             payload_removed = True
             raise OSError("injected failure after partial recovery cleanup")
 
-    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_owner_process_is_active", lambda _pid, _token: False)
     monkeypatch.setattr(owned_directory_module.os, "unlink", unlink_then_fail)
     with pytest.raises(OSError, match="after partial recovery cleanup"):
         CreateOnlyDirectoryPublication.prepare(bundle)
@@ -373,7 +373,7 @@ def test_prepare_preserves_unauthenticated_empty_rollback_after_exit_before_rmdi
     assert not list(detached[0].iterdir())
 
     monkeypatch.setattr(owned_directory_module.os, "rmdir", remove_directory)
-    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_owner_process_is_active", lambda _pid, _token: False)
     recovered = CreateOnlyDirectoryPublication.prepare(bundle)
     try:
         assert detached[0].is_dir()
@@ -389,6 +389,75 @@ def test_prepare_preserves_owner_bundle_with_unrepresentable_pid(tmp_path: Path)
     candidate.mkdir()
     owner = recovery_module._rollback_owner_payload(recovery_module._owner_payload(bundle))
     owner["pid"] = int("9" * 100)
+    recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
+
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    publication.close()
+
+    assert candidate.is_dir()
+
+
+def test_prepare_recovers_owner_bundle_after_pid_reuse(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.parent.mkdir()
+    candidate = bundle.parent / f".{bundle.name}.rollback-reused-pid"
+    candidate.mkdir()
+    owner = recovery_module._rollback_owner_payload(recovery_module._owner_payload(bundle))
+    owner["process_start_token"] = recovery_module._format_process_start_token(
+        float(str(owner["process_start_token"])) + 1.0
+    )
+    recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
+
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    publication.close()
+
+    assert not candidate.exists()
+
+
+def test_prepare_preserves_owner_bundle_while_original_process_is_active(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.parent.mkdir()
+    candidate = bundle.parent / f".{bundle.name}.rollback-active-owner"
+    candidate.mkdir()
+    owner = recovery_module._rollback_owner_payload(recovery_module._owner_payload(bundle))
+    recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
+
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    publication.close()
+
+    assert candidate.is_dir()
+
+
+@pytest.mark.parametrize("invalid_token", ["garbage", "nan", "0", "", None])
+def test_prepare_preserves_owner_bundle_with_malformed_process_identity(
+    tmp_path: Path,
+    invalid_token: object,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.parent.mkdir()
+    candidate = bundle.parent / f".{bundle.name}.rollback-malformed-owner"
+    candidate.mkdir()
+    owner = recovery_module._rollback_owner_payload(recovery_module._owner_payload(bundle))
+    owner["process_start_token"] = invalid_token
+    recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
+
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    publication.close()
+
+    assert candidate.is_dir()
+
+
+@pytest.mark.parametrize("invalid_pid", [True, "123", 0, -1, 2**31])
+def test_prepare_preserves_owner_bundle_with_malformed_pid(
+    tmp_path: Path,
+    invalid_pid: object,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.parent.mkdir()
+    candidate = bundle.parent / f".{bundle.name}.rollback-malformed-pid"
+    candidate.mkdir()
+    owner = recovery_module._rollback_owner_payload(recovery_module._owner_payload(bundle))
+    owner["pid"] = invalid_pid
     recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
 
     publication = CreateOnlyDirectoryPublication.prepare(bundle)
