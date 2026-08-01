@@ -41,7 +41,8 @@ from .contracts.decision import (
 )
 from .contracts.materialization import EvidenceReadiness, materialization_attempt_from_payload
 from .contracts.profile import ProfileEvidence
-from .evaluation import decision_evidence_payload, reevaluate_evidence_projection
+from .evaluation.evidence import decision_evidence_payload
+from .evaluation.selection import reevaluate_evidence_projection
 from .evidence_projection import parse_profile_evidence_projection
 from .sensitivity import sensitivity_evidence_payload, verify_sensitivity_evidence_payload
 from .sensitivity_coverage import SensitivityCoverageLedger

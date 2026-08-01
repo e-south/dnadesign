@@ -38,7 +38,8 @@ from ..contracts.decision import (
 from ..contracts.materialization import MaterializationAttemptReceipt, MaterializationBlocker
 from ..contracts.profile import ProfileEvidence
 from ..contracts.protocol import DEFAULT_PROTOCOL
-from ..evaluation import evaluate_metastudy, readiness_from_live_bridge
+from ..evaluation.readiness import readiness_from_live_bridge
+from ..evaluation.selection import evaluate_metastudy
 from ..materialize.service import materialize_record_evidence
 from ..sensitivity import evaluate_sensitivity, sensitivity_evaluations_to_payload
 from ..sensitivity_coverage import (
