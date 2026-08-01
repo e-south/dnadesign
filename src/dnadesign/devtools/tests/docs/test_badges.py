@@ -59,12 +59,26 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         "<script>\n"
         '<img alt="Coverage" src="badge.svg">\n'
         "</script>\n\n"
+        'text <script><![CDATA[<!--]]><script></script><img src="https://img.shields.io/badge/build-passing.svg">'
+        "</script>\n\n"
         '<video><source src="status-badge.mp4"></video>\n\n'
         '<picture><video><source srcset="https://img.shields.io/badge/build-passing.svg">'
         '<source src="clip.mp4"></video><img src="diagram.svg"></picture>\n\n'
         '<picture><img src="diagram.svg"><source srcset="https://img.shields.io/badge/build-passing.svg">'
         "</picture>\n\n"
         '<picture><source srcset="https://img.shields.io/badge/build-passing.svg"></picture>\n\n'
+        '<picture><source media="not all" srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img src="diagram.svg"></picture>\n\n'
+        '<picture><source media="not  all" srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img src="diagram.svg"></picture>\n\n'
+        '<picture><source media="not/**/all" srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img src="diagram.svg"></picture>\n\n'
+        '<picture><source type="text/plain" srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img src="diagram.svg"></picture>\n\n'
+        '<picture><source type="image/" srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img src="diagram.svg"></picture>\n\n'
+        '<picture><source type="image/*" srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img src="diagram.svg"></picture>\n\n'
         '<source srcset="https://img.shields.io/badge/build-passing.svg">\n\n'
         '<svg><image src="badge.svg"/></svg>\n\n'
         '<svg><title><img src="badge.svg"></title><desc><img src="badge.svg"></desc></svg>\n\n'
@@ -183,6 +197,27 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
         ),
         ('<svg><a xlink:href="report"><image alt="Coverage" href="status.svg"/></a></svg>\n', 1),
         ('<textarea><!-- </textarea> --><img src="https://img.shields.io/badge/build-passing.svg">\n', 1),
+        ('<script><foo a="</script><img src="https://img.shields.io/badge/build-passing.svg">\n', 1),
+        (
+            '<picture><source media="screen" srcset="https://img.shields.io/badge/build-passing.svg">'
+            '<img src="diagram.svg"></picture>\n',
+            1,
+        ),
+        (
+            '<picture><source type="image/svg+xml" srcset="https://img.shields.io/badge/build-passing.svg">'
+            '<img src="diagram.svg"></picture>\n',
+            1,
+        ),
+        (
+            '<picture><source type="" srcset="https://img.shields.io/badge/build-passing.svg">'
+            '<img src="diagram.svg"></picture>\n',
+            1,
+        ),
+        (
+            '<picture><source type="   " srcset="https://img.shields.io/badge/build-passing.svg">'
+            '<img src="diagram.svg"></picture>\n',
+            1,
+        ),
         ('<a href="report" />\n\n<img alt="Coverage" src="status.svg">\n', 3),
         ('intro\n<img\n alt="Coverage"\n src="badge.svg">\noutro\n', 2),
         ('intro `code\nspan`\n<img\n alt="Coverage"\n src="badge.svg">\n', 3),
@@ -191,6 +226,10 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
         (
             "text <textarea>\n\n<template>\n\n</textarea>\n\n[![Coverage](badge.svg)](report)\n",
             7,
+        ),
+        (
+            'text <textarea>\n\nignored\n\n</textarea><img alt="Coverage" src="badge.svg">\n',
+            5,
         ),
     ],
 )

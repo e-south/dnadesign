@@ -14,14 +14,16 @@ from __future__ import annotations
 import math
 import re
 import secrets
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from bisect import bisect_right
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from enum import Enum, auto
 from itertools import count
 from pathlib import Path
 from xml.etree.ElementTree import Element
 
 import html5lib
+from html5lib._tokenizer import HTMLTokenizer, tokenTypes
+from html5lib.html5parser import HTMLParser, _ReparseException
 from markdown_it import MarkdownIt
 from markdown_it.rules_inline import html_inline as markdown_html_inline_rule
 from markdown_it.rules_inline import image as markdown_image_rule
@@ -36,6 +38,8 @@ BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags
 FLOATING_POINT_PATTERN = re.compile(r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 NON_NEGATIVE_INTEGER_PATTERN = re.compile(r"[0-9]+")
 ASCII_WHITESPACE = frozenset("\t\n\f\r ")
+CSS_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", flags=re.DOTALL)
+MIME_SUBTYPE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*")
 RAW_IMAGE_TAGS = frozenset({"image", "img", "source"})
 XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
@@ -82,16 +86,70 @@ class _SrcsetCandidate:
     future_height: str | None = None
 
 
-class _StartTagState(Enum):
-    BEFORE_ATTRIBUTE_NAME = auto()
-    ATTRIBUTE_NAME = auto()
-    AFTER_ATTRIBUTE_NAME = auto()
-    BEFORE_ATTRIBUTE_VALUE = auto()
-    ATTRIBUTE_VALUE_DOUBLE_QUOTED = auto()
-    ATTRIBUTE_VALUE_SINGLE_QUOTED = auto()
-    ATTRIBUTE_VALUE_UNQUOTED = auto()
-    AFTER_ATTRIBUTE_VALUE_QUOTED = auto()
-    SELF_CLOSING_START_TAG = auto()
+@dataclass(frozen=True, slots=True)
+class _RawHTMLFragment:
+    content: str
+    source_start_line: int
+
+
+@dataclass(frozen=True, slots=True)
+class _RawHTMLSourceSpan:
+    rendered_start: int
+    rendered_end: int
+    rendered_start_line: int
+    source_start_line: int
+
+
+@dataclass(frozen=True, slots=True)
+class _RawHTMLSourceMap:
+    spans: tuple[_RawHTMLSourceSpan, ...]
+    rendered_starts: tuple[int, ...]
+
+    @classmethod
+    def from_fragments(
+        cls,
+        rendered_html: str,
+        fragments: Sequence[_RawHTMLFragment],
+    ) -> _RawHTMLSourceMap:
+        line_starts = _line_start_offsets(rendered_html)
+        spans: list[_RawHTMLSourceSpan] = []
+        search_start = 0
+        for fragment in fragments:
+            if not fragment.content or fragment.source_start_line < 1:
+                raise RuntimeError("raw HTML source fragment has an invalid source contract")
+            rendered_start = rendered_html.find(fragment.content, search_start)
+            if rendered_start < 0:
+                raise RuntimeError("rendered Markdown omitted a declared raw HTML source fragment")
+            rendered_end = rendered_start + len(fragment.content)
+            spans.append(
+                _RawHTMLSourceSpan(
+                    rendered_start=rendered_start,
+                    rendered_end=rendered_end,
+                    rendered_start_line=bisect_right(line_starts, rendered_start),
+                    source_start_line=fragment.source_start_line,
+                )
+            )
+            search_start = rendered_end
+        return cls(
+            spans=tuple(spans),
+            rendered_starts=tuple(span.rendered_start for span in spans),
+        )
+
+    def source_line_for(self, *, rendered_offset: int, rendered_line: int) -> int | None:
+        span_index = bisect_right(self.rendered_starts, rendered_offset) - 1
+        if span_index < 0:
+            return None
+        span = self.spans[span_index]
+        if rendered_offset >= span.rendered_end:
+            return None
+        line_offset = rendered_line - span.rendered_start_line
+        if line_offset < 0:
+            raise RuntimeError("HTML tokenizer resolved a tag before its raw source fragment")
+        return span.source_start_line + line_offset
+
+
+def _line_start_offsets(content: str) -> tuple[int, ...]:
+    return (0, *(index + 1 for index, character in enumerate(content) if character == "\n"))
 
 
 def _record_inline_source_span(
@@ -132,151 +190,14 @@ def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
     )
 
 
-def _start_tag_boundary(source: str, start: int) -> tuple[int, int] | None:
-    state = _StartTagState.BEFORE_ATTRIBUTE_NAME
-    self_closing_slash: int | None = None
-    index = start
-    while index < len(source):
-        character = source[index]
-        if state is _StartTagState.BEFORE_ATTRIBUTE_NAME:
-            if character in ASCII_WHITESPACE:
-                pass
-            elif character == "/":
-                self_closing_slash = index
-                state = _StartTagState.SELF_CLOSING_START_TAG
-            elif character == ">":
-                return index, index
-            else:
-                state = _StartTagState.ATTRIBUTE_NAME
-        elif state is _StartTagState.ATTRIBUTE_NAME:
-            if character in ASCII_WHITESPACE:
-                state = _StartTagState.AFTER_ATTRIBUTE_NAME
-            elif character == "/":
-                self_closing_slash = index
-                state = _StartTagState.SELF_CLOSING_START_TAG
-            elif character == "=":
-                state = _StartTagState.BEFORE_ATTRIBUTE_VALUE
-            elif character == ">":
-                return index, index
-        elif state is _StartTagState.AFTER_ATTRIBUTE_NAME:
-            if character in ASCII_WHITESPACE:
-                pass
-            elif character == "/":
-                self_closing_slash = index
-                state = _StartTagState.SELF_CLOSING_START_TAG
-            elif character == "=":
-                state = _StartTagState.BEFORE_ATTRIBUTE_VALUE
-            elif character == ">":
-                return index, index
-            else:
-                state = _StartTagState.ATTRIBUTE_NAME
-        elif state is _StartTagState.BEFORE_ATTRIBUTE_VALUE:
-            if character in ASCII_WHITESPACE:
-                pass
-            elif character == '"':
-                state = _StartTagState.ATTRIBUTE_VALUE_DOUBLE_QUOTED
-            elif character == "'":
-                state = _StartTagState.ATTRIBUTE_VALUE_SINGLE_QUOTED
-            elif character == ">":
-                return index, index
-            else:
-                state = _StartTagState.ATTRIBUTE_VALUE_UNQUOTED
-        elif state is _StartTagState.ATTRIBUTE_VALUE_DOUBLE_QUOTED:
-            if character == '"':
-                state = _StartTagState.AFTER_ATTRIBUTE_VALUE_QUOTED
-        elif state is _StartTagState.ATTRIBUTE_VALUE_SINGLE_QUOTED:
-            if character == "'":
-                state = _StartTagState.AFTER_ATTRIBUTE_VALUE_QUOTED
-        elif state is _StartTagState.ATTRIBUTE_VALUE_UNQUOTED:
-            if character in ASCII_WHITESPACE:
-                state = _StartTagState.BEFORE_ATTRIBUTE_NAME
-            elif character == ">":
-                return index, index
-        elif state is _StartTagState.AFTER_ATTRIBUTE_VALUE_QUOTED:
-            if character in ASCII_WHITESPACE:
-                state = _StartTagState.BEFORE_ATTRIBUTE_NAME
-            elif character == "/":
-                self_closing_slash = index
-                state = _StartTagState.SELF_CLOSING_START_TAG
-            elif character == ">":
-                return index, index
-            else:
-                state = _StartTagState.BEFORE_ATTRIBUTE_NAME
-                continue
-        elif state is _StartTagState.SELF_CLOSING_START_TAG:
-            if character == ">":
-                assert self_closing_slash is not None
-                return index, self_closing_slash
-            self_closing_slash = None
-            state = _StartTagState.BEFORE_ATTRIBUTE_NAME
-            continue
-        index += 1
-    return None
-
-
-def _marker_value(*, line_no: int, ordinal: int) -> str:
-    return f"{line_no}:{ordinal}"
-
-
-def _annotate_raw_html(
-    source: str,
-    *,
-    start_line_no: int,
-    marker_attribute: str,
-    ordinals: Iterator[int],
-) -> str:
-    replacements: list[tuple[int, str]] = []
-    cursor = 0
-    line_cursor = 0
-    line_offset = 0
-    while cursor < len(source):
-        tag_start = source.find("<", cursor)
-        if tag_start < 0:
-            break
-        line_offset += source[line_cursor:tag_start].count("\n")
-        line_cursor = tag_start
-        name_start = tag_start + 1
-        if name_start >= len(source) or not source[name_start].isascii() or not source[name_start].isalpha():
-            cursor = tag_start + 1
-            continue
-        name_end = name_start + 1
-        while (
-            name_end < len(source) and source[name_end] not in ASCII_WHITESPACE and source[name_end] not in {"/", ">"}
-        ):
-            name_end += 1
-        boundary = _start_tag_boundary(source, name_end)
-        if boundary is None:
-            break
-        tag_end, insertion = boundary
-        tag = source[name_start:name_end].casefold()
-        if tag in RAW_IMAGE_TAGS:
-            ordinal = next(ordinals)
-            line_no = start_line_no + line_offset
-            replacements.append(
-                (
-                    insertion,
-                    f' {marker_attribute}="{_marker_value(line_no=line_no, ordinal=ordinal)}"',
-                )
-            )
-        cursor = tag_end + 1
-
-    chunks: list[str] = []
-    cursor = 0
-    for insertion, marker in replacements:
-        chunks.extend((source[cursor:insertion], marker))
-        cursor = insertion
-    chunks.append(source[cursor:])
-    return "".join(chunks)
-
-
 def _annotate_inline_candidates(
     children: Sequence[Token],
     *,
     source: str,
     start_line_no: int,
     marker_attribute: str,
-    ordinals: Iterator[int],
-) -> None:
+) -> tuple[_RawHTMLFragment, ...]:
+    raw_fragments: list[_RawHTMLFragment] = []
     line_cursor = 0
     line_offset = 0
     for token in children:
@@ -292,44 +213,135 @@ def _annotate_inline_candidates(
         line_cursor = span_start
         token_line_no = start_line_no + line_offset
         if token.type == "image":
-            ordinal = next(ordinals)
-            token.attrSet(
-                marker_attribute,
-                _marker_value(line_no=token_line_no, ordinal=ordinal),
-            )
+            token.attrSet(marker_attribute, str(token_line_no))
         else:
             if token.content != source[span_start:span_end]:
                 raise RuntimeError("html_inline token content differs from its declared source span")
-            token.content = _annotate_raw_html(
-                token.content,
-                start_line_no=token_line_no,
-                marker_attribute=marker_attribute,
-                ordinals=ordinals,
+            raw_fragments.append(
+                _RawHTMLFragment(
+                    content=token.content,
+                    source_start_line=token_line_no,
+                )
             )
+    return tuple(raw_fragments)
 
 
-def _render_markdown_with_markers(content: str) -> tuple[str, str]:
+def _render_markdown_with_markers(content: str) -> tuple[str, str, _RawHTMLSourceMap]:
     environment: dict[str, object] = {}
     tokens = MARKDOWN.parse(content, environment)
     marker_attribute = f"data-dnadesign-image-{secrets.token_hex(12)}"
-    ordinals = count()
+    raw_fragments: list[_RawHTMLFragment] = []
     for token in tokens:
         if token.type == "inline" and token.map is not None:
-            _annotate_inline_candidates(
-                token.children or (),
-                source=token.content,
-                start_line_no=token.map[0] + 1,
-                marker_attribute=marker_attribute,
-                ordinals=ordinals,
+            raw_fragments.extend(
+                _annotate_inline_candidates(
+                    token.children or (),
+                    source=token.content,
+                    start_line_no=token.map[0] + 1,
+                    marker_attribute=marker_attribute,
+                )
             )
         elif token.type == "html_block" and token.map is not None:
-            token.content = _annotate_raw_html(
-                token.content,
-                start_line_no=token.map[0] + 1,
-                marker_attribute=marker_attribute,
-                ordinals=ordinals,
+            raw_fragments.append(
+                _RawHTMLFragment(
+                    content=token.content,
+                    source_start_line=token.map[0] + 1,
+                )
             )
-    return MARKDOWN.renderer.render(tokens, MARKDOWN.options, environment), marker_attribute
+    rendered_html = MARKDOWN.renderer.render(tokens, MARKDOWN.options, environment)
+    return (
+        rendered_html,
+        marker_attribute,
+        _RawHTMLSourceMap.from_fragments(rendered_html, raw_fragments),
+    )
+
+
+class _SourceMappedHTMLTokenizer(HTMLTokenizer):
+    def __init__(
+        self,
+        stream: str,
+        *,
+        parser: HTMLParser,
+        marker_attribute: str,
+        raw_source_map: _RawHTMLSourceMap,
+        **kwargs: object,
+    ) -> None:
+        if not isinstance(stream, str):
+            raise TypeError("source-mapped HTML parsing requires rendered text")
+        self._line_starts = _line_start_offsets(stream)
+        super().__init__(stream, parser=parser, **kwargs)
+        self._marker_attribute = marker_attribute
+        self._raw_source_map = raw_source_map
+        self._ordinals = count()
+
+    def tagOpenState(self) -> bool:
+        rendered_line, rendered_column = self.stream.position()
+        rendered_offset = self._line_starts[rendered_line - 1] + rendered_column - 1
+        previous_token = getattr(self, "currentToken", None)
+        result = super().tagOpenState()
+        token = getattr(self, "currentToken", None)
+        if token is not previous_token and token is not None and token.get("type") == tokenTypes["StartTag"]:
+            token["dnadesign_rendered_line"] = rendered_line
+            token["dnadesign_rendered_offset"] = rendered_offset
+        return result
+
+    def emitCurrentToken(self) -> None:
+        token = self.currentToken
+        rendered_line = token.pop("dnadesign_rendered_line", None)
+        rendered_offset = token.pop("dnadesign_rendered_offset", None)
+        super().emitCurrentToken()
+        if token.get("type") != tokenTypes["StartTag"] or token.get("name") not in RAW_IMAGE_TAGS:
+            return
+        attributes = token.get("data")
+        if not isinstance(attributes, dict):
+            raise RuntimeError("HTML tokenizer emitted a start tag without normalized attributes")
+        source_line = None
+        if isinstance(rendered_line, int) and isinstance(rendered_offset, int):
+            source_line = self._raw_source_map.source_line_for(
+                rendered_offset=rendered_offset,
+                rendered_line=rendered_line,
+            )
+        if source_line is None:
+            declared_line = attributes.get(self._marker_attribute)
+            if isinstance(declared_line, str) and declared_line.isdigit():
+                source_line = int(declared_line)
+        if source_line is None:
+            return
+        if source_line < 1:
+            raise RuntimeError("HTML tokenizer resolved an invalid source line")
+        attributes[self._marker_attribute] = f"{source_line}:{next(self._ordinals)}"
+
+
+class _SourceMappedHTMLParser(HTMLParser):
+    def __init__(self, *, marker_attribute: str, raw_source_map: _RawHTMLSourceMap) -> None:
+        self._marker_attribute = marker_attribute
+        self._raw_source_map = raw_source_map
+        super().__init__(tree=html5lib.getTreeBuilder("etree"), namespaceHTMLElements=True)
+
+    def _parse(
+        self,
+        stream: str,
+        innerHTML: bool = False,
+        container: str = "div",
+        scripting: bool = False,
+        **kwargs: object,
+    ) -> None:
+        self.innerHTMLMode = innerHTML
+        self.container = container
+        self.scripting = scripting
+        self.tokenizer = _SourceMappedHTMLTokenizer(
+            stream,
+            parser=self,
+            marker_attribute=self._marker_attribute,
+            raw_source_map=self._raw_source_map,
+            **kwargs,
+        )
+        self.reset()
+        try:
+            self.mainLoop()
+        except _ReparseException:
+            self.reset()
+            self.mainLoop()
 
 
 def _positive_integer_descriptor(value: str) -> str | None:
@@ -486,6 +498,22 @@ def _element_is_link(element: Element) -> bool:
     )
 
 
+def _picture_source_is_potentially_eligible(element: Element) -> bool:
+    media = element.attrib.get("media")
+    if media is not None:
+        normalized_media = " ".join(CSS_COMMENT_PATTERN.sub(" ", media).casefold().split())
+        if normalized_media == "not all":
+            return False
+    declared_type = element.attrib.get("type")
+    if declared_type is None:
+        return True
+    media_type = declared_type.partition(";")[0].strip().casefold()
+    if not media_type:
+        return True
+    prefix, separator, subtype = media_type.partition("/")
+    return separator == "/" and prefix == "image" and MIME_SUBTYPE_PATTERN.fullmatch(subtype) is not None
+
+
 def _occurrence_for_element(
     element: Element,
     *,
@@ -510,13 +538,17 @@ def _occurrence_for_element(
     )
 
 
-def _dom_image_occurrences(rendered_html: str, *, marker_attribute: str) -> tuple[_ImageOccurrence, ...]:
-    root = html5lib.parseFragment(
-        rendered_html,
-        treebuilder="etree",
-        namespaceHTMLElements=True,
-        scripting=True,
+def _dom_image_occurrences(
+    rendered_html: str,
+    *,
+    marker_attribute: str,
+    raw_source_map: _RawHTMLSourceMap,
+) -> tuple[_ImageOccurrence, ...]:
+    parser = _SourceMappedHTMLParser(
+        marker_attribute=marker_attribute,
+        raw_source_map=raw_source_map,
     )
+    root = parser.parseFragment(rendered_html, container="div", scripting=True)
     occurrences: list[_ImageOccurrence] = []
     seen_markers: set[str] = set()
 
@@ -548,7 +580,8 @@ def _dom_image_occurrences(rendered_html: str, *, marker_attribute: str) -> tupl
             for child in children:
                 child_name = _element_name(child)
                 if child_name == (XHTML_NAMESPACE, "source"):
-                    previous_sources.append(child)
+                    if _picture_source_is_potentially_eligible(child):
+                        previous_sources.append(child)
                     continue
                 if child_name == (XHTML_NAMESPACE, "img"):
                     for source_element in previous_sources:
@@ -578,8 +611,12 @@ def _dom_image_occurrences(rendered_html: str, *, marker_attribute: str) -> tupl
 
 
 def _rendered_image_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
-    rendered_html, marker_attribute = _render_markdown_with_markers(content)
-    return _dom_image_occurrences(rendered_html, marker_attribute=marker_attribute)
+    rendered_html, marker_attribute, raw_source_map = _render_markdown_with_markers(content)
+    return _dom_image_occurrences(
+        rendered_html,
+        marker_attribute=marker_attribute,
+        raw_source_map=raw_source_map,
+    )
 
 
 def _rendered_badge_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
