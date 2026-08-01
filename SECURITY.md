@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 ## At a glance
 This document records security expectations for code, data, secrets, and dependency handling in `dnadesign`.
@@ -33,8 +33,8 @@ It is a policy map with links to operator runbooks and implementation details.
 
 ### Bounded dependency exceptions
 
-Three upstream advisories across two constrained dependencies cannot yet be
-resolved without breaking an owning runtime constraint. They remain open,
+Two upstream advisories on one constrained dependency cannot yet be resolved
+without migrating and revalidating the owning GPU runtime. They remain open,
 visible, and time-bounded:
 
 - `torch` is constrained to the Evo2-compatible 2.10 series.
@@ -45,14 +45,11 @@ visible, and time-bounded:
   PYSEC-2026-139 affects PT2 loading through 2.10.0. PT2 artifacts and
   `torch.export.load` are not supported serialization surfaces.
   GHSA-rrmf-rvhw-rf47 affects `torch.jit.script` and is fixed in 2.13.
-  Repository-owned code does not call that function. Reassess when the
-  Evo2/CUDA stack supports PyTorch 2.13, and no later than 2026-10-29.
-- `pymdown-extensions` 10.21.3 is constrained by Marimo.
-  GHSA-9xwg-3r6f-jcx2 affects `pymdownx.b64`. Repository-owned code does not
-  enable that extension, and supported execution is native macOS or Linux.
-  Upstream Marimo can enable it under Pyodide/WASM, which is therefore outside
-  the supported deployment boundary while this exception is active. Reassess
-  when Marimo permits version 11, and no later than 2026-08-29.
+  Repository-owned code does not call that function. PyTorch 2.13 is
+  available, but adopting it requires a coupled migration from Torch 2.10,
+  torchvision 0.25, torchaudio 2.10, and the CUDA 12.8 wheel index, which does
+  not publish 2.13 wheels. Revalidate that GPU stack rather than changing
+  Torch alone, and reassess no later than 2026-10-29.
 
 The unresolved exception statements narrow supported reachability; they do not
 claim that affected installed versions are patched. Do not dismiss the
