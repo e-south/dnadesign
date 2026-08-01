@@ -10,7 +10,6 @@ Module Author(s): Eric J. South
 """
 
 import json
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -197,25 +196,6 @@ def test_write_overlay_part_and_compact(tmp_path: Path) -> None:
         compact_path = ds.compact_overlay("mock")
     assert compact_path.exists()
     assert not part_dir.exists()
-
-
-def test_create_overlay_part_is_atomic_and_create_once(tmp_path: Path) -> None:
-    ds = _make_dataset(tmp_path)
-    target_id = ds.head(1)["id"].iloc[0]
-    table = pa.table({"id": [target_id], "mock__score": [1.0]})
-
-    def create() -> int | type[Exception]:
-        try:
-            return ds.create_overlay("mock", table, key="id")
-        except Exception as exc:  # noqa: BLE001 - concurrency result is asserted below
-            return type(exc)
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        results = list(executor.map(lambda _: create(), range(2)))
-
-    assert results.count(1) == 1
-    assert results.count(FileExistsError) == 1
-    assert len(list((ds.dir / "_derived/mock").glob("part-*.parquet"))) == 1
 
 
 def test_write_overlay_part_after_compact_reopens_parts(tmp_path: Path) -> None:

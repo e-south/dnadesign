@@ -234,6 +234,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_attach_duckdb.py",
         "test_attach_sequence_keys.py",
         "test_attach_strict.py",
+        "test_create_only_publication.py",
         "test_dataset_overlay_maintenance_module.py",
         "test_dataset_overlay_package_module.py",
         "test_dataset_reserved_overlay_module.py",

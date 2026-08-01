@@ -13,11 +13,14 @@ from __future__ import annotations
 
 import os
 import uuid
+from pathlib import Path
 from typing import Any, Mapping, Optional
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 
 from ...contracts import NamespaceError, SchemaError
 from ...overlays import overlay_dir_path, overlay_path, with_overlay_metadata
@@ -34,6 +37,37 @@ from .policy import (
     validate_overlay_join_key,
     validate_overlay_target,
 )
+
+_WRITE_OVERLAY_PART_RESERVED_EVENT_KEYS = frozenset(
+    {
+        "namespace",
+        "key",
+        "columns",
+        "rows_incoming",
+        "rows_matched",
+        "rows_written",
+        "rows_missing",
+        "allow_missing",
+    }
+)
+
+
+def _entry_exists(path: Path) -> bool:
+    """Return whether one directory entry exists, including broken symlinks."""
+
+    try:
+        os.lstat(path)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _validate_write_overlay_part_event_args(event_args: Mapping[str, object] | None) -> None:
+    if event_args is None:
+        return
+    for event_key in event_args:
+        if event_key in _WRITE_OVERLAY_PART_RESERVED_EVENT_KEYS:
+            raise SchemaError(f"write_overlay_part event_args cannot override reserved key '{event_key}'.")
 
 
 def _merge_write_overlay_part_event_args(
@@ -59,9 +93,8 @@ def _merge_write_overlay_part_event_args(
     }
     if event_args is None:
         return args
+    _validate_write_overlay_part_event_args(event_args)
     for event_key, event_value in event_args.items():
-        if event_key in args:
-            raise SchemaError(f"write_overlay_part event_args cannot override reserved key '{event_key}'.")
         args[event_key] = event_value
     return args
 
@@ -173,8 +206,14 @@ def write_overlay_part_dataset(
 
     tbl = coerce_null_overlay_columns_to_registry_schema(dataset=dataset, namespace=namespace, tbl=tbl, key=key)
     dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
+    _validate_write_overlay_part_event_args(event_args)
 
-    def _write_part() -> int:
+    def _write_part(
+        *,
+        output_dir: Path = dir_path,
+        promote_existing_file: bool = True,
+        verify_written: bool = False,
+    ) -> tuple[int, int, int, Path] | None:
         def _sql_ident(name: str) -> str:
             escaped = str(name).replace('"', '""')
             return f'"{escaped}"'
@@ -249,7 +288,7 @@ def write_overlay_part_dataset(
         rows_written = int(tbl_out.num_rows)
         rows_missing = rows_incoming - rows_written
         if rows_written == 0:
-            return 0
+            return None
 
         registry = dataset._registry(required=True)
         reg_hash = dataset._registry_hash(required=True)
@@ -263,17 +302,18 @@ def write_overlay_part_dataset(
             namespace_contract_hash=namespace_hash,
         )
 
-        if file_path.exists():
-            dir_path.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(output_dir)
+        if promote_existing_file and file_path.exists():
+            output_dir.mkdir(parents=True, exist_ok=True)
             stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
-            promoted_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
+            promoted_path = output_dir / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
             os.replace(file_path, promoted_path)
             new_parts = [promoted_path]
         else:
-            dir_path.mkdir(parents=True, exist_ok=True)
+            output_dir.mkdir(parents=True, exist_ok=True)
             new_parts = []
         stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
-        part_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
+        part_path = output_dir / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
         tmp_path = part_path.with_suffix(".parquet.tmp")
         try:
             pq.write_table(tbl_out, tmp_path, compression=PARQUET_COMPRESSION)
@@ -282,9 +322,22 @@ def write_overlay_part_dataset(
         finally:
             if tmp_path.exists():
                 tmp_path.unlink(missing_ok=True)
-        ledger_path = overlay_digest_ledger_path(dir_path)
+        if verify_written:
+            written = pq.read_table(part_path)
+            if not written.schema.equals(tbl_out.schema, check_metadata=True) or not written.equals(tbl_out):
+                raise SchemaError(f"Staged overlay verification failed for namespace '{namespace}'.")
+        ledger_path = overlay_digest_ledger_path(output_dir)
         if ledger_path is not None and ledger_path.is_file():
-            update_overlay_digest_ledger(dir_path, new_parts=new_parts)
+            update_overlay_digest_ledger(output_dir, new_parts=new_parts)
+
+        return rows_written, rows_incoming, rows_missing, part_path
+
+    def _record_write(
+        result: tuple[int, int, int, Path],
+        *,
+        target_path: Path,
+    ) -> int:
+        rows_written, rows_incoming, rows_missing, _ = result
 
         dataset._record_event(
             "write_overlay_part",
@@ -304,13 +357,40 @@ def write_overlay_part_dataset(
                 "rows_missing": rows_missing,
             },
             artifacts={"overlay": {"namespace": namespace, "key": key}},
-            target_path=part_path,
+            target_path=target_path,
             actor=actor,
         )
         return rows_written
 
     with write_lock(dataset.dir):
-        if create_only and (file_path.exists() or dir_path.exists()):
+        if create_only and (_entry_exists(file_path) or _entry_exists(dir_path)):
             raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.")
         dataset._auto_freeze_registry()
-        return _write_part()
+        if not create_only:
+            result = _write_part()
+            if result is None:
+                return 0
+            return _record_write(result, target_path=result[3])
+
+        result: tuple[int, int, int, Path] | None = None
+        try:
+            with CreateOnlyDirectoryPublication.prepare(dir_path) as publication:
+                result = _write_part(
+                    output_dir=publication.stage,
+                    promote_existing_file=False,
+                    verify_written=True,
+                )
+                if result is None:
+                    return 0
+                if _entry_exists(file_path):
+                    raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.")
+                staged_part = result[3]
+                publication.publish(required_manifest=staged_part.name)
+        except PublicationError as exc:
+            if _entry_exists(file_path) or _entry_exists(dir_path):
+                raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.") from exc
+            raise
+        if result is None:  # pragma: no cover - guarded by the early return above
+            raise RuntimeError("Create-only overlay publication completed without a write result.")
+        final_part = dir_path / result[3].name
+        return _record_write(result, target_path=final_part)
