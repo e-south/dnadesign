@@ -80,19 +80,27 @@ def _staged_event_log(staged: Path) -> Path | None:
     return event_path
 
 
-def _promote_event_log(staged_event: Path | None, destination: Path) -> None:
+def _promote_event_log_locked(staged_event: Path | None, destination: Path) -> None:
+    """Install the staged event log while the destination event lock is held."""
+
     destination = Path(destination)
-    with event_log_lock(destination):
-        if staged_event is not None:
-            copy_file_atomic(staged_event, destination)
-            return
-        try:
-            destination.unlink()
-        except FileNotFoundError:
-            pass
+    if staged_event is not None:
+        copy_file_atomic(staged_event, destination)
+        return
+    try:
+        destination.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_snapshots: bool) -> None:
+    """Promote one validated pull without losing concurrent event appends.
+
+    Primary-only pulls replace only the base table and never touch the event
+    log. Full pulls validate the complete staged payload before holding the
+    event lock across every destination payload mutation.
+    """
+
     staged = Path(staged)
     dest = Path(dest)
     staged_primary = staged / "records.parquet"
@@ -106,42 +114,47 @@ def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_sn
     staged_event = _staged_event_log(staged)
     staged_entries = collect_staged_entries(staged, skip_snapshots=skip_snapshots)
 
-    dest.mkdir(parents=True, exist_ok=True)
-    copy_file_atomic(staged_primary, dest / "records.parquet")
     if primary_only:
+        dest.mkdir(parents=True, exist_ok=True)
+        copy_file_atomic(staged_primary, dest / "records.parquet")
         return
 
-    kept_paths: set[str] = {"records.parquet"}
-    for src_path, rel in staged_entries:
-        rel_text = rel.as_posix()
-        kept_paths.add(rel_text)
-        dst_path = dest / rel
-        if src_path.is_dir():
-            dst_path.mkdir(parents=True, exist_ok=True)
-            continue
-        copy_file_atomic(src_path, dst_path)
+    destination_event = dest / EVENT_LOG_FILENAME
+    with event_log_lock(destination_event):
+        dest.mkdir(parents=True, exist_ok=True)
+        copy_file_atomic(staged_primary, dest / "records.parquet")
 
-    keep_with_parents: set[str] = {EVENT_LOG_FILENAME, ".events.lock", ".usr.lock"}
-    for rel_text in kept_paths:
-        keep_with_parents.add(rel_text)
-        parent = Path(rel_text).parent
-        while str(parent) != ".":
-            keep_with_parents.add(parent.as_posix())
-            parent = parent.parent
+        kept_paths: set[str] = {"records.parquet"}
+        for src_path, rel in staged_entries:
+            rel_text = rel.as_posix()
+            kept_paths.add(rel_text)
+            dst_path = dest / rel
+            if src_path.is_dir():
+                dst_path.mkdir(parents=True, exist_ok=True)
+                continue
+            copy_file_atomic(src_path, dst_path)
 
-    for local_path in sorted(dest.rglob("*"), key=lambda p: (len(p.parts), p.as_posix()), reverse=True):
-        rel = local_path.relative_to(dest)
-        rel_text = rel.as_posix()
-        if rel_text in keep_with_parents:
-            continue
-        if skip_snapshots and rel.parts and rel.parts[0] == "_snapshots":
-            continue
-        if local_path.is_file() or local_path.is_symlink():
-            local_path.unlink()
-            continue
-        try:
-            local_path.rmdir()
-        except OSError:
-            pass
+        keep_with_parents: set[str] = {EVENT_LOG_FILENAME, ".events.lock", ".usr.lock"}
+        for rel_text in kept_paths:
+            keep_with_parents.add(rel_text)
+            parent = Path(rel_text).parent
+            while str(parent) != ".":
+                keep_with_parents.add(parent.as_posix())
+                parent = parent.parent
 
-    _promote_event_log(staged_event, dest / EVENT_LOG_FILENAME)
+        for local_path in sorted(dest.rglob("*"), key=lambda p: (len(p.parts), p.as_posix()), reverse=True):
+            rel = local_path.relative_to(dest)
+            rel_text = rel.as_posix()
+            if rel_text in keep_with_parents:
+                continue
+            if skip_snapshots and rel.parts and rel.parts[0] == "_snapshots":
+                continue
+            if local_path.is_file() or local_path.is_symlink():
+                local_path.unlink()
+                continue
+            try:
+                local_path.rmdir()
+            except OSError:
+                pass
+
+        _promote_event_log_locked(staged_event, destination_event)

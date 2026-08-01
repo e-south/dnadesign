@@ -60,6 +60,23 @@ def test_pull_promotion_preserves_local_runtime_locks(tmp_path: Path) -> None:
     assert not (destination / ".events.log").exists()
 
 
+def test_primary_only_pull_leaves_event_log_outside_promotion(tmp_path: Path) -> None:
+    staged = tmp_path / "staged"
+    staged.mkdir()
+    (staged / "records.parquet").write_bytes(b"remote-records")
+    (staged / ".events.log").write_text('{"event":"remote"}\n', encoding="utf-8")
+    destination = tmp_path / "dataset"
+    destination.mkdir()
+    (destination / "records.parquet").write_bytes(b"local-records")
+    (destination / ".events.log").write_text('{"event":"local"}\n', encoding="utf-8")
+
+    promote_staged_pull(staged, destination, primary_only=True, skip_snapshots=False)
+
+    assert (destination / "records.parquet").read_bytes() == b"remote-records"
+    assert (destination / ".events.log").read_text(encoding="utf-8") == '{"event":"local"}\n'
+    assert not (destination / ".events.lock").exists()
+
+
 def test_pull_promotion_serializes_event_replacement_with_concurrent_append(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -124,6 +141,79 @@ def test_pull_promotion_serializes_event_replacement_with_concurrent_append(
     ]
 
 
+@pytest.mark.parametrize("blocked_target", ["records.parquet", "meta.md"])
+@pytest.mark.parametrize("staged_event_present", [True, False])
+def test_full_pull_holds_event_lock_before_destination_promotion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    blocked_target: str,
+    staged_event_present: bool,
+) -> None:
+    staged = tmp_path / "staged"
+    staged.mkdir()
+    (staged / "records.parquet").write_bytes(b"remote-records")
+    (staged / "meta.md").write_text("remote metadata\n", encoding="utf-8")
+    if staged_event_present:
+        (staged / ".events.log").write_text('{"event":"remote"}\n', encoding="utf-8")
+    destination = tmp_path / "dataset"
+    destination.mkdir()
+    (destination / "records.parquet").write_bytes(b"local-records")
+    (destination / "meta.md").write_text("local metadata\n", encoding="utf-8")
+    (destination / ".events.log").write_text('{"event":"local"}\n', encoding="utf-8")
+
+    destination_copy_started = threading.Event()
+    release_destination_copy = threading.Event()
+    append_lock_attempted = threading.Event()
+    append_completed = threading.Event()
+    original_copy_file_atomic = transfer_module.copy_file_atomic
+    original_event_log_lock = event_append_module.event_log_lock
+
+    def blocking_copy_file_atomic(source: Path, target: Path) -> None:
+        target = Path(target)
+        if target.parent == destination and target.name == blocked_target:
+            destination_copy_started.set()
+            assert release_destination_copy.wait(timeout=5)
+        original_copy_file_atomic(source, target)
+
+    monkeypatch.setattr(transfer_module, "copy_file_atomic", blocking_copy_file_atomic)
+
+    @contextmanager
+    def tracked_append_lock(event_path: str | Path) -> Iterator[None]:
+        append_lock_attempted.set()
+        with original_event_log_lock(event_path):
+            yield
+
+    monkeypatch.setattr(event_append_module, "event_log_lock", tracked_append_lock)
+
+    def append_concurrently() -> None:
+        append_event_line(destination / ".events.log", '{"event":"local-concurrent"}')
+        append_completed.set()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        promotion = executor.submit(
+            promote_staged_pull,
+            staged,
+            destination,
+            primary_only=False,
+            skip_snapshots=False,
+        )
+        assert destination_copy_started.wait(timeout=5)
+        append = executor.submit(append_concurrently)
+        try:
+            assert append_lock_attempted.wait(timeout=5)
+            assert not append_completed.wait(timeout=0.1)
+        finally:
+            release_destination_copy.set()
+        promotion.result(timeout=5)
+        append.result(timeout=5)
+
+    assert append_completed.is_set()
+    expected_events = ['{"event":"local-concurrent"}']
+    if staged_event_present:
+        expected_events.insert(0, '{"event":"remote"}')
+    assert (destination / ".events.log").read_text(encoding="utf-8").splitlines() == expected_events
+
+
 @pytest.mark.parametrize("staged_event_kind", ["directory", "symlink"])
 def test_pull_promotion_rejects_malformed_staged_event_log_before_mutation(
     tmp_path: Path, staged_event_kind: str
@@ -147,3 +237,4 @@ def test_pull_promotion_rejects_malformed_staged_event_log_before_mutation(
 
     assert (destination / "records.parquet").read_bytes() == b"local-records"
     assert (destination / ".events.log").read_text(encoding="utf-8") == '{"event":"local"}\n'
+    assert not (destination / ".events.lock").exists()
