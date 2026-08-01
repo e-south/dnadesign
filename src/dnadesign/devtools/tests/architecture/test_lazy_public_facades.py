@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import pkgutil
 from pathlib import Path
 
 import pytest
@@ -51,3 +52,12 @@ def test_lazy_public_facade_declares_every_export_for_static_analysis(module_nam
 
     assert module_path.is_file()
     assert set(module.__all__) <= _type_checking_imports(module_path)
+
+
+@pytest.mark.parametrize("module_name", _LAZY_PUBLIC_FACADES)
+def test_lazy_public_facade_exports_do_not_collide_with_child_modules(module_name: str) -> None:
+    module = importlib.import_module(module_name)
+    child_module_names = {child.name for child in pkgutil.iter_modules(module.__path__)}
+    collisions = sorted(set(module.__all__).intersection(child_module_names))
+
+    assert not collisions, f"Lazy exports collide with importable child modules: {collisions}"
