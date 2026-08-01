@@ -51,8 +51,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/cluster/assets/cluster-banner.svg",
         "cluster",
-        "EXPLORE FEATURES",
-        "Explore feature tables through clusters and projections.",
+        "GROUP FEATURES",
+        "Group and visualize rows in numerical feature tables.",
         "cluster",
     ),
     BannerSpec(
@@ -65,8 +65,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/contracts/assets/contracts-banner.svg",
         "contracts",
-        "DEFINE HANDOFFS",
-        "Define neutral, versioned artifacts shared between tools.",
+        "DEFINE DATA SHAPES",
+        "Define versioned data shapes shared between tools.",
         "contracts",
     ),
     BannerSpec(
@@ -107,8 +107,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/latentdna/docs/assets/latentdna-banner.svg",
         "latentdna",
-        "COMPARE REPRESENTATIONS",
-        "Compare learned sequence representations in workspaces.",
+        "COMPARE SEQUENCE FEATURES",
+        "Compare numerical sequence features in declared workspaces.",
         "latent",
     ),
     BannerSpec(
@@ -121,8 +121,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/nmf/assets/nmf-banner.svg",
         "nmf",
-        "FIND MOTIF PROGRAMS",
-        "Factor motif tables into recurring programs.",
+        "FIND MOTIF PATTERNS",
+        "Find recurring combinations in motif tables.",
         "factor",
     ),
     BannerSpec(
@@ -136,7 +136,7 @@ BANNERS = (
         "src/dnadesign/opal/assets/opal-banner.svg",
         "opal",
         "SELECT NEXT DESIGNS",
-        "Run contract-driven active-learning campaigns.",
+        "Choose the next designs from measured sequence results.",
         "select",
     ),
     BannerSpec(
@@ -156,8 +156,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/studies/assets/studies-banner.svg",
         "studies",
-        "OWN STUDY LOGIC",
-        "Keep study-specific code with its checked-in records.",
+        "ORGANIZE STUDIES",
+        "Keep study methods, records, and decisions together.",
         "study",
     ),
     BannerSpec(

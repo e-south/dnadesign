@@ -2,7 +2,7 @@
   xmlns="http://www.w3.org/2000/svg" role="img"
   aria-labelledby="opal-banner-title opal-banner-description" shape-rendering="crispEdges">
   <title id="opal-banner-title">opal: select next designs</title>
-  <desc id="opal-banner-description">Run contract-driven active-learning campaigns.</desc>
+  <desc id="opal-banner-description">Choose the next designs from measured sequence results.</desc>
   <rect width="1200" height="180" fill="#1E1D1A"/>
   <g font-family="Menlo, Monaco, Consolas, monospace">
     <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">opal</text>
