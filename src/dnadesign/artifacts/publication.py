@@ -22,7 +22,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .errors import PublicationError
+from .errors import PublicationError, PublicationExistsError
 from .owned_directory import (
     descriptor_matches_entry,
     owner_matches_descriptor,
@@ -46,7 +46,17 @@ from .recovery import (
 
 _PRIVATE_DIRECTORY_MODE = 0o700
 _PRIVATE_FILE_MODE = 0o600
-_FINAL_ROOT_MODE = 0o755
+_DEFAULT_PUBLISHED_ROOT_MODE = 0o755
+
+
+def _validate_published_root_mode(mode: int) -> int:
+    if isinstance(mode, bool) or not isinstance(mode, int):
+        raise PublicationError("Artifact bundle published root mode must be an integer permission mode")
+    if mode < 0 or mode > 0o777:
+        raise PublicationError("Artifact bundle published root mode must contain only permission bits")
+    if mode & 0o700 != 0o700:
+        raise PublicationError("Artifact bundle published root mode must grant its owner read, write, and execute")
+    return mode
 
 
 def _lexical_absolute_path(path: Path) -> Path:
@@ -197,7 +207,7 @@ def _rename_create_only(parent_descriptor: int, source: str, destination: str) -
         return
     error = ctypes.get_errno()
     if error in {errno.EEXIST, errno.ENOTEMPTY}:
-        raise PublicationError(f"Artifact bundle already exists and is immutable: {destination}")
+        raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {destination}")
     raise OSError(error, os.strerror(error), destination)
 
 
@@ -292,12 +302,21 @@ class CreateOnlyDirectoryPublication:
     adjacent_stage_name: str
     parent_descriptor: int
     _owner: dict[str, object]
+    published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE
     _closed: bool = False
     _published_descriptor: int | None = field(default=None, init=False, repr=False)
     _rollback_name: str | None = field(default=None, init=False, repr=False)
 
     @classmethod
-    def prepare(cls, bundle_root: str | Path) -> CreateOnlyDirectoryPublication:
+    def prepare(
+        cls,
+        bundle_root: str | Path,
+        *,
+        published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE,
+    ) -> CreateOnlyDirectoryPublication:
+        """Prepare private staging after validating the publication policy."""
+
+        validated_published_root_mode = _validate_published_root_mode(published_root_mode)
         final = _lexical_absolute_path(Path(bundle_root))
         _preflight_existing_path_components(final.parent)
         parent_descriptor = _open_or_create_directory(final.parent)
@@ -307,7 +326,7 @@ class CreateOnlyDirectoryPublication:
             recovery_uid = uid if isinstance(uid, int) else None
             _recover_final_directory(parent_descriptor, final, uid=recovery_uid)
             if _entry_exists_at(parent_descriptor, final.name):
-                raise PublicationError(f"Artifact bundle already exists and is immutable: {final}")
+                raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {final}")
             target_digest = str(owner["target_sha256"])
             adjacent_prefix = f".{final.name}.staging-"
             rollback_prefix = f".{final.name}.rollback-"
@@ -363,6 +382,7 @@ class CreateOnlyDirectoryPublication:
                 adjacent_stage_name=f"{adjacent_prefix}u{uid}-p{os.getpid()}-{uuid.uuid4().hex}",
                 parent_descriptor=parent_descriptor,
                 _owner=owner,
+                published_root_mode=validated_published_root_mode,
             )
         except BaseException:
             os.close(parent_descriptor)
@@ -384,6 +404,7 @@ class CreateOnlyDirectoryPublication:
             raise PublicationError("Artifact publication is already closed")
         if self._published_descriptor is not None:
             raise PublicationError(f"Artifact bundle is already published: {self.final}")
+        validated_published_root_mode = _validate_published_root_mode(self.published_root_mode)
         manifest_relative = Path(required_manifest)
         if not required_manifest.strip() or manifest_relative.is_absolute() or ".." in manifest_relative.parts:
             raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
@@ -438,7 +459,7 @@ class CreateOnlyDirectoryPublication:
             if not descriptor_matches_entry(self.parent_descriptor, self.final.name, published_descriptor):
                 raise PublicationError("Published artifact bundle identity changed after atomic rename")
             _restore_published_modes(self.stage, published_descriptor)
-            os.fchmod(published_descriptor, _FINAL_ROOT_MODE)
+            os.fchmod(published_descriptor, validated_published_root_mode)
             os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
             self._published_descriptor = published_descriptor
             published_descriptor = None

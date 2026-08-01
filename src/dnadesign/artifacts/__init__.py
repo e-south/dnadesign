@@ -9,8 +9,13 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .errors import PublicationError
+from .errors import PublicationError, PublicationExistsError
 from .portable_paths import portable_path_identity
 from .publication import CreateOnlyDirectoryPublication
 
-__all__ = ["CreateOnlyDirectoryPublication", "PublicationError", "portable_path_identity"]
+__all__ = [
+    "CreateOnlyDirectoryPublication",
+    "PublicationError",
+    "PublicationExistsError",
+    "portable_path_identity",
+]
