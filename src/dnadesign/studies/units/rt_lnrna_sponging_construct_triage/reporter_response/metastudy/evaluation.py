@@ -24,19 +24,22 @@ from .. import profile_to_dict
 from ..profile import TimeWindowReduction
 from ..temporal import window_temporal_policy_projection
 from .audits import profile_audit_payload, profile_source_identity_payload
-from .contracts import (
+from .contracts._values import MetastudyContractError, canonical_digest
+from .contracts.decision import (
     DECISION_CONTRACT_ID,
-    DEFAULT_PROTOCOL,
     CandidateEvaluation,
+    MetastudyDecision,
+)
+from .contracts.materialization import (
     EvidenceReadiness,
     MaterializationAttemptReceipt,
-    MetastudyContractError,
-    MetastudyDecision,
-    MetastudyProtocol,
-    ProfileEvidence,
-    Window,
-    canonical_digest,
     materialization_attempt_payload,
+)
+from .contracts.profile import ProfileEvidence
+from .contracts.protocol import (
+    DEFAULT_PROTOCOL,
+    MetastudyProtocol,
+    Window,
     protocol_digest,
 )
 from .evidence_projection import (

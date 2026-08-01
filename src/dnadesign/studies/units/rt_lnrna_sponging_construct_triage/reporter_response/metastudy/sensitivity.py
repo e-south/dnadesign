@@ -18,14 +18,11 @@ from collections.abc import Iterable
 from .. import profile_to_dict
 from ..profile import EndpointReduction, TimeWindowReduction
 from .audits import profile_audit_payload
-from .contracts import (
-    DEFAULT_PROTOCOL,
-    MaterializationAttemptReceipt,
-    MetastudyContractError,
-    ProfileEvidence,
-    SensitivityEvaluation,
-    canonical_digest,
-)
+from .contracts._values import MetastudyContractError, canonical_digest
+from .contracts.decision import SensitivityEvaluation
+from .contracts.materialization import MaterializationAttemptReceipt
+from .contracts.profile import ProfileEvidence
+from .contracts.protocol import DEFAULT_PROTOCOL
 from .evidence_projection import ProfileEvidenceProjection, parse_profile_evidence_projection
 from .sensitivity_coverage import (
     SensitivityCoverageLedger,

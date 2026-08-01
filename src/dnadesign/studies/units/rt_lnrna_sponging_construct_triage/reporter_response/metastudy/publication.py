@@ -28,21 +28,19 @@ from .acquisition_projection import (
     build_acquisition_projection,
     validate_acquisition_projection_payload,
 )
-from .contracts import (
+from .contracts._values import MetastudyContractError, canonical_digest
+from .contracts.decision import (
     DEFAULT_OBJECTIVE_READINESS,
-    EvidenceReadiness,
-    MetastudyContractError,
     MetastudyDecision,
     ObjectiveReadiness,
-    ProfileEvidence,
     SensitivityEvaluation,
-    canonical_digest,
     decision_is_evidence_bearing,
     decision_to_dict,
-    materialization_attempt_from_payload,
     objective_readiness_from_payload,
     validate_decision_payload,
 )
+from .contracts.materialization import EvidenceReadiness, materialization_attempt_from_payload
+from .contracts.profile import ProfileEvidence
 from .evaluation import decision_evidence_payload, reevaluate_evidence_projection
 from .evidence_projection import parse_profile_evidence_projection
 from .sensitivity import sensitivity_evidence_payload, verify_sensitivity_evidence_payload

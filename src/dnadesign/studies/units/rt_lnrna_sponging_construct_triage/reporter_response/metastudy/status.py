@@ -15,10 +15,7 @@ import argparse
 import json
 from pathlib import Path
 
-from .contracts import (
-    MetastudyContractError,
-    canonical_digest,
-)
+from .contracts._values import MetastudyContractError, canonical_digest
 from .operator import validate_live_source_controlled_state
 
 

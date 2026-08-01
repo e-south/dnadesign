@@ -19,15 +19,14 @@ from typing import Literal
 
 from ...reader_evidence import ReaderEvidenceBindingSet
 from ..profile import EndpointReduction
-from .contracts import (
-    DEFAULT_PROTOCOL,
+from .contracts._values import MetastudyContractError, canonical_digest
+from .contracts.materialization import (
     MaterializationAttemptReceipt,
     MaterializationOmission,
-    MetastudyContractError,
-    ProfileEvidence,
     ReaderRecordIdentity,
-    canonical_digest,
 )
+from .contracts.profile import ProfileEvidence
+from .contracts.protocol import DEFAULT_PROTOCOL
 from .evidence_projection import ProfileEvidenceProjection
 
 SENSITIVITY_COVERAGE_CONTRACT_ID = "rt_lnrna_reporter_response_sensitivity_coverage.v1"

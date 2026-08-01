@@ -39,16 +39,14 @@ from ..profile import Reduction
 from ..temporal import TemporalSelectedRow, reduce_temporal_input_trace
 from .audits import _build_derivation_closed_profile_audit, profile_digest
 from .condition_ontology import ReporterResponseConditionOntology
-from .contracts import (
-    DEFAULT_PROTOCOL,
-    GrowthPhaseStratum,
+from .contracts.materialization import (
     MaterializationAttemptReceipt,
     MaterializationBlocker,
     MaterializationOmission,
-    MetastudyProtocol,
-    ProfileEvidence,
     ReaderRecordIdentity,
 )
+from .contracts.profile import GrowthPhaseStratum, ProfileEvidence
+from .contracts.protocol import DEFAULT_PROTOCOL, MetastudyProtocol
 from .sensitivity_coverage import (
     SensitivityCoverageLedger,
     SensitivitySubjectCoordinate,

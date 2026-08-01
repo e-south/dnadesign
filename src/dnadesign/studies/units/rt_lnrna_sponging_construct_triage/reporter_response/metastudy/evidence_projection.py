@@ -32,11 +32,8 @@ from ..profile import (
     UncertaintyPolicy,
 )
 from ..temporal import TemporalPolicyProjection
-from .contracts import (
-    GrowthPhaseStratum,
-    ProfileAuditArtifact,
-    canonical_digest,
-)
+from .contracts._values import canonical_digest
+from .contracts.profile import GrowthPhaseStratum, ProfileAuditArtifact
 
 
 @dataclass(frozen=True, slots=True)

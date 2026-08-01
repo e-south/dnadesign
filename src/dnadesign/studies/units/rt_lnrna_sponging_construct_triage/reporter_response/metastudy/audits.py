@@ -16,12 +16,9 @@ from typing import Literal
 
 from .. import profile_to_dict
 from ..profile import ReporterResponseProfile, TimeWindowReduction
-from .contracts import (
-    CANONICAL_CONDITION_ONTOLOGY_DIGEST,
-    GrowthPhaseStratum,
-    ProfileAuditArtifact,
-    canonical_digest,
-)
+from .contracts._values import canonical_digest
+from .contracts.profile import GrowthPhaseStratum, ProfileAuditArtifact
+from .contracts.protocol import CANONICAL_CONDITION_ONTOLOGY_DIGEST
 
 
 def profile_source_identity_payload(profile: ReporterResponseProfile) -> dict[str, object]:

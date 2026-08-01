@@ -20,7 +20,8 @@ from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from ..profile import TimeWindowReduction
-from .contracts import MetastudyContractError, ProfileEvidence, canonical_digest
+from .contracts._values import MetastudyContractError, canonical_digest
+from .contracts.profile import ProfileEvidence
 from .evidence_projection import ProfileEvidenceProjection
 
 ACQUISITION_PROJECTION_CONTRACT_ID = "rt_lnrna_reporter_response_acquisition_projection.v1"
