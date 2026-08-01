@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-reporter-response-evidence
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 measurement_readiness: ready
 descriptive_visualization_readiness: ready
 reduction_recommendation_status: ready
@@ -90,3 +90,31 @@ there is no constrained objective, biological-replicate uncertainty is not
 estimable, and OD linearity is not validated. Reader evidence may therefore
 support descriptive review, assay QC, canonical Reader plots, and aggregate
 study plots without becoming an optimization target.
+
+### Proposed objective, not an active contract
+
+The current objective hypothesis is **Reporter Response Feasibility (RRF)**,
+with the prospective identifier `reporter_response_feasibility_v1`. RRF would
+replace the retired endpoint-only SPOP formulation. For one predeclared dose
+and reduction, it would retain two visible margins:
+
+$$
+m_r = \frac{r-r_{\min}}{s_r}, \qquad
+m_{OD} = \frac{OD_{rel}-OD_{\min}}{s_{OD}}, \qquad
+RRF = \min(m_r, m_{OD}).
+$$
+
+Here, $r$ is the study-normalized reporter response and $OD_{rel}$ is the
+descriptive relative-OD measurement. The response floor, OD floor, and positive
+scales must be fixed before model fitting. Feasibility additionally requires
+both raw margins to be nonnegative. A strong reporter response therefore cannot
+compensate for a failed OD requirement, and the component margins remain
+available for review instead of being hidden inside one score.
+
+RRF is intentionally not registered in OPAL yet. Activation requires a
+source-closed response normalization policy, declared floors and scales,
+validated OD linearity for the relevant range, and supported biological-
+replicate uncertainty. Positive controls may calibrate a declared policy when
+present, but no construct alias or inducer name is part of the objective
+contract. Until those gates pass, `reporter_response_feasibility_v1` is a
+study-owned proposal rather than a label, rank, or optimization surface.

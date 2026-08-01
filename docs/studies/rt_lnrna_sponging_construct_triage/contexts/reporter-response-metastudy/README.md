@@ -137,6 +137,12 @@ single endpoints, and alternate centered-window widths are typed sensitivity
 results and cannot select the primary reduction. There is no weighted score,
 clipping, capping, label, or objective in this meta-study.
 
+The later objective candidate is Reporter Response Feasibility (RRF), documented
+in the parent [reporter-response evidence context](../reporter-response-evidence.md).
+It is not computed here: this meta-study selects a descriptive reduction, while
+the proposed objective separately needs predeclared response and OD margins,
+validated OD linearity, and biological-replicate support.
+
 ### Evidence and publication
 
 The operator accepts only source-closed Reader dataframe records, exact

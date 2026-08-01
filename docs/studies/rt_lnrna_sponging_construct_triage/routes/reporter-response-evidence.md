@@ -67,4 +67,6 @@ study-owned reduction recommendation.
 The four readiness questions are deliberately separate: measurements are
 ready, descriptive visualization is ready, the 6-10 h reduction recommendation
 is ready, and objective readiness is blocked. There is no active scalar
-objective.
+objective. The proposed successor is Reporter Response Feasibility (RRF), not
+SPOP; its formula and activation gates live in the
+[reporter-response evidence context](../contexts/reporter-response-evidence.md).
