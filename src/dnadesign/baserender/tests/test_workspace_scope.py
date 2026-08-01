@@ -65,7 +65,10 @@ def test_workspace_init_scaffolds_standard_layout(tmp_path: Path) -> None:
     assert (workspace.root / "outputs" / "README.md").exists()
     assert not (workspace.root / "reports").exists()
     assert "inputs/input.parquet" in (workspace.root / "README.md").read_text(encoding="utf-8")
-    assert "outputs/plots/" in (workspace.root / "outputs" / "README.md").read_text(encoding="utf-8")
+    outputs_readme = (workspace.root / "outputs" / "README.md").read_text(encoding="utf-8")
+    assert "outputs/render-v1/" in outputs_readme
+    assert "manifest.json" in outputs_readme
+    assert "outputs/plots/" not in outputs_readme
     assert "contract:\n  kind: sequence_rows_render_v3" in workspace.job_path.read_text(encoding="utf-8")
 
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import threading
@@ -100,6 +101,108 @@ def test_portable_manifest_fails_when_source_evidence_is_unavailable(tmp_path: P
         report.write_portable_manifest(staging / "manifest.json", bundle_root=bundle, staging_root=staging)
 
     assert not (staging / "manifest.json").exists()
+
+
+def test_publication_stage_is_private_and_final_bundle_has_deliberate_public_modes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dnadesign.artifacts import publication as publication_module
+
+    bundle = tmp_path / "results" / "render-v1"
+    publication = _prepare_bundle_publication(bundle)
+    observed_modes: dict[str, int] = {}
+    real_rename = publication_module._rename_create_only
+    try:
+        nested = publication.stage / "images"
+        nested.mkdir(mode=0o755)
+        artifact = nested / "rendered.png"
+        artifact.write_bytes(b"rendered")
+        artifact.chmod(0o644)
+        manifest = publication.stage / "manifest.json"
+        manifest.write_text("{}\n", encoding="utf-8")
+        manifest.chmod(0o640)
+
+        def _inspect_then_rename(parent_descriptor: int, source: str, destination: str) -> None:
+            adjacent = bundle.parent / source
+            observed_modes["root"] = stat.S_IMODE(adjacent.stat().st_mode)
+            observed_modes["directory"] = stat.S_IMODE((adjacent / "images").stat().st_mode)
+            observed_modes["artifact"] = stat.S_IMODE((adjacent / "images" / "rendered.png").stat().st_mode)
+            observed_modes["manifest"] = stat.S_IMODE((adjacent / "manifest.json").stat().st_mode)
+            real_rename(parent_descriptor, source, destination)
+
+        monkeypatch.setattr(publication_module, "_rename_create_only", _inspect_then_rename)
+        _publish_bundle(publication)
+    finally:
+        publication.close()
+
+    assert observed_modes == {"root": 0o700, "directory": 0o700, "artifact": 0o600, "manifest": 0o600}
+    assert stat.S_IMODE(bundle.stat().st_mode) == 0o755
+    assert stat.S_IMODE((bundle / "images").stat().st_mode) == 0o755
+    assert stat.S_IMODE((bundle / "images" / "rendered.png").stat().st_mode) == 0o644
+    assert stat.S_IMODE((bundle / "manifest.json").stat().st_mode) == 0o640
+
+
+@pytest.mark.parametrize("required_manifest", ["/tmp/manifest.json", "../manifest.json", "nested/../../manifest.json"])
+def test_publication_rejects_required_manifest_outside_stage_before_copy(
+    tmp_path: Path,
+    required_manifest: str,
+) -> None:
+    from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
+
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        with pytest.raises(PublicationError, match="required manifest must stay inside publication staging"):
+            publication.publish(required_manifest=required_manifest)
+    finally:
+        publication.close()
+
+    assert not bundle.exists()
+    assert not list(bundle.parent.glob(".render-v1.staging-*"))
+
+
+def test_publication_rejects_required_manifest_through_stage_symlink(tmp_path: Path) -> None:
+    from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "manifest.json").write_text("{}\n", encoding="utf-8")
+    publication = CreateOnlyDirectoryPublication.prepare(tmp_path / "results" / "render-v1")
+    try:
+        (publication.stage / "redirect").symlink_to(outside, target_is_directory=True)
+        with pytest.raises(PublicationError, match="required manifest must stay inside publication staging"):
+            publication.publish(required_manifest="redirect/manifest.json")
+    finally:
+        publication.close()
+
+
+def test_publication_rejects_symlinked_parent_without_creating_target_tree(tmp_path: Path) -> None:
+    from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    redirected = tmp_path / "redirected"
+    redirected.symlink_to(outside, target_is_directory=True)
+    requested = redirected / "new-parent" / "render-v1"
+
+    with pytest.raises(PublicationError, match="symlinked path component"):
+        CreateOnlyDirectoryPublication.prepare(requested)
+
+    assert not (outside / "new-parent").exists()
+
+
+def test_publication_rejects_parent_traversal_before_creating_target_tree(tmp_path: Path) -> None:
+    from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
+
+    requested = tmp_path / "uncreated" / ".." / "redirected" / "render-v1"
+
+    with pytest.raises(PublicationError, match="must not contain parent traversal"):
+        CreateOnlyDirectoryPublication.prepare(requested)
+
+    assert not (tmp_path / "uncreated").exists()
+    assert not (tmp_path / "redirected").exists()
 
 
 @pytest.mark.parametrize(
@@ -239,6 +342,62 @@ def test_strict_skip_failure_happens_before_bundle_creation(tmp_path: Path) -> N
     job_path = write_job(tmp_path / "strict_skip.yaml", payload)
 
     with pytest.raises(SchemaError, match="strict mode is enabled"):
+        run_render_job(str(job_path))
+
+    assert not bundle.exists()
+    assert not bundle.parent.exists()
+
+
+def test_non_strict_empty_input_fails_before_bundle_parent_creation(tmp_path: Path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "missing_sequence",
+                "sequence": None,
+                "densegen__used_tfbs_detail": [],
+                "details": "row",
+            }
+        ],
+    )
+    bundle = tmp_path / "results" / "render-v1"
+    job_path = write_job(
+        tmp_path / "empty.yaml",
+        densegen_job_payload(
+            parquet_path=parquet,
+            bundle_path=bundle,
+            outputs=[{"kind": "images", "fmt": "png"}],
+        ),
+    )
+
+    with pytest.raises(SchemaError, match="No records to render"):
+        run_render_job(str(job_path))
+
+    assert not bundle.parent.exists()
+
+
+def test_source_mutation_during_render_fails_closed_without_publishing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    bundle = tmp_path / "results" / "render-v1"
+    job_path = write_job(
+        tmp_path / "source-mutation.yaml",
+        densegen_job_payload(
+            parquet_path=parquet,
+            bundle_path=bundle,
+            outputs=[{"kind": "images", "fmt": "png"}],
+        ),
+    )
+
+    def _mutating_writer(records, *, output, renderer_name, style, palette):
+        _fake_image_writer(records, output=output, renderer_name=renderer_name, style=style, palette=palette)
+        parquet.write_bytes(b"changed after records were read")
+
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _mutating_writer)
+
+    with pytest.raises(ValueError, match="Render source changed during execution"):
         run_render_job(str(job_path))
 
     assert not bundle.exists()

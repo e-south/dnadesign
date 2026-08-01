@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -33,6 +34,8 @@ from .job_contracts import (
     render_contract_descriptor,
     validate_render_contract_renderer,
 )
+
+_RESERVED_BUNDLE_METADATA_NAMES = frozenset({"manifest.json", ".dnadesign-publication-owner.json"})
 
 
 @dataclass(frozen=True)
@@ -283,13 +286,31 @@ def _parse_bundle(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...]) 
     raw_path = str(data.get("path", "")).strip()
     ensure(raw_path != "", "bundle.path is required", SchemaError)
     path = Path(raw_path)
+    candidate = path if path.is_absolute() else job_path.parent / path
+    _reject_symlinked_path_components(candidate, field="bundle.path")
     resolved = _ensure_within_allowed_roots(
-        path if path.is_absolute() else job_path.parent / path,
+        candidate,
         field="bundle.path",
         allowed_roots=allowed_roots,
     )
     ensure(resolved != resolved.parent, "bundle.path must name an owned directory", SchemaError)
     return BundleCfg(path=resolved)
+
+
+def _reject_symlinked_path_components(path: Path, *, field: str) -> None:
+    absolute = path if path.is_absolute() else Path.cwd() / path
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        if part == "..":
+            current = current.parent
+            continue
+        current /= part
+        try:
+            entry_stat = current.lstat()
+        except FileNotFoundError:
+            return
+        if stat.S_ISLNK(entry_stat.st_mode):
+            raise SchemaError(f"{field} contains a symlinked path component: {current}")
 
 
 def resolve_job_path(spec: str | Path) -> Path:
@@ -637,7 +658,7 @@ def _resolve_output_dir(
         resolved.relative_to(bundle_root)
     except ValueError as exc:
         raise SchemaError(f"{field} must stay inside bundle.path: {relative}") from exc
-    ensure(resolved != bundle_root / "manifest.json", f"{field} is reserved for the bundle manifest", SchemaError)
+    _ensure_not_reserved_bundle_metadata(resolved, bundle_root=bundle_root, field=field)
     return resolved
 
 
@@ -657,8 +678,21 @@ def _resolve_output_file(
     except ValueError as exc:
         raise SchemaError(f"{field} must stay inside bundle.path: {relative}") from exc
     ensure(resolved != bundle_root, f"{field} must name a file inside bundle.path", SchemaError)
-    ensure(resolved != bundle_root / "manifest.json", f"{field} is reserved for the bundle manifest", SchemaError)
+    _ensure_not_reserved_bundle_metadata(resolved, bundle_root=bundle_root, field=field)
     return resolved
+
+
+def _ensure_not_reserved_bundle_metadata(path: Path, *, bundle_root: Path, field: str) -> None:
+    for name in _RESERVED_BUNDLE_METADATA_NAMES:
+        reserved = bundle_root / name
+        if path == reserved:
+            raise SchemaError(f"{field} is reserved for bundle publication metadata: {name}")
+        if reserved in path.parents:
+            if name == "manifest.json":
+                raise SchemaError(f"{field} must not place an artifact beneath the bundle manifest")
+            raise SchemaError(
+                f"{field} must not place an artifact beneath reserved bundle publication metadata: {name}"
+            )
 
 
 def _parse_outputs(
@@ -836,10 +870,8 @@ def _parse_outputs(
         "outputs must resolve to distinct bundle paths",
         SchemaError,
     )
-    manifest_path = bundle_root / "manifest.json"
     for index, destination in enumerate(destinations):
-        if manifest_path == destination or manifest_path in destination.parents:
-            raise SchemaError(f"outputs[{index}] must not place an artifact beneath the bundle manifest")
+        _ensure_not_reserved_bundle_metadata(destination, bundle_root=bundle_root, field=f"outputs[{index}]")
     for left_index, left in enumerate(destinations):
         for right_index, right in enumerate(destinations[left_index + 1 :], start=left_index + 1):
             if left in right.parents or right in left.parents:

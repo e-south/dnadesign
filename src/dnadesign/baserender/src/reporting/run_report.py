@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,46 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+@dataclass(frozen=True)
+class _SourceEvidence:
+    sha256: str
+    bytes: int
+    fingerprint: tuple[int, int, int, int, int]
+
+    def portable(self) -> dict[str, int | str]:
+        return {"sha256": self.sha256, "bytes": self.bytes}
+
+
+def _capture_source_evidence(path: Path) -> _SourceEvidence:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ValueError(f"Render source is unavailable or unsafe: {path}") from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError(f"Render source is unavailable or unsafe: {path}")
+        digest = hashlib.sha256()
+        with os.fdopen(os.dup(descriptor), "rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        after = os.fstat(descriptor)
+        before_fingerprint = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        after_fingerprint = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        if before_fingerprint != after_fingerprint:
+            raise ValueError(f"Render source changed while evidence was captured: {path}")
+        return _SourceEvidence(
+            sha256=digest.hexdigest(),
+            bytes=after.st_size,
+            fingerprint=after_fingerprint,
+        )
+    finally:
+        os.close(descriptor)
 
 
 @dataclass
@@ -38,6 +80,7 @@ class RunReport:
     missing_selection_keys: list[str] = field(default_factory=list)
     outputs: dict[str, str] = field(default_factory=dict)
     output_metrics: dict[str, dict[str, int | float | str]] = field(default_factory=dict)
+    _source_evidence: dict[str, _SourceEvidence] = field(default_factory=dict, init=False, repr=False)
 
     def note_skip_row(self, reason: str) -> None:
         self.skipped_rows_by_reason[reason] = self.skipped_rows_by_reason.get(reason, 0) + 1
@@ -49,7 +92,9 @@ class RunReport:
         return bool(self.skipped_rows_by_reason or self.skipped_records_by_reason or self.missing_selection_keys)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        payload.pop("_source_evidence", None)
+        return payload
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
@@ -58,20 +103,29 @@ class RunReport:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.to_json())
 
+    def capture_source_evidence(self) -> None:
+        sources = {"input": self.input_path}
+        if self.selection_path is not None:
+            sources["selection"] = self.selection_path
+        self._source_evidence = {label: _capture_source_evidence(Path(source)) for label, source in sources.items()}
+
+    def verify_source_evidence(self) -> None:
+        if not self._source_evidence:
+            raise ValueError("Render source evidence was not captured before execution")
+        sources = {"input": self.input_path}
+        if self.selection_path is not None:
+            sources["selection"] = self.selection_path
+        for label, source in sources.items():
+            expected = self._source_evidence.get(label)
+            if expected is None or _capture_source_evidence(Path(source)) != expected:
+                raise ValueError(f"Render source changed during execution: {source}")
+
     def write_portable_manifest(self, path: Path, *, bundle_root: Path, staging_root: Path) -> None:
         """Write the portable, complete catalog for one immutable render bundle."""
         final_root = bundle_root.resolve(strict=False)
 
-        def _source_artifact(source: str | None) -> dict[str, int | str] | None:
-            if source is None:
-                return None
-            source_path = Path(source)
-            if not source_path.is_file() or source_path.is_symlink():
-                raise ValueError(f"Render source is unavailable or unsafe: {source_path}")
-            return {
-                "sha256": _sha256_file(source_path),
-                "bytes": source_path.stat().st_size,
-            }
+        if not self._source_evidence:
+            self.capture_source_evidence()
 
         portable_outputs: dict[str, str] = {}
         for key, value in self.outputs.items():
@@ -97,10 +151,7 @@ class RunReport:
                 }
             )
 
-        sources = {"input": _source_artifact(self.input_path)}
-        selection = _source_artifact(self.selection_path)
-        if selection is not None:
-            sources["selection"] = selection
+        sources = {label: evidence.portable() for label, evidence in self._source_evidence.items()}
         payload = {
             "schema": "dnadesign.baserender.render_bundle_manifest.v1",
             "job_name": self.job_name,

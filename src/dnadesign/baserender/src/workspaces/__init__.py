@@ -184,8 +184,9 @@ def _outputs_readme_text() -> str:
             "",
             "BaseRender writes rendered artifacts here by default.",
             "",
-            "- image jobs default to `outputs/plots/` when no explicit output dir is set",
-            "- optional `run_report.json` is also written under this root when enabled",
+            "- the scaffold publishes one immutable bundle at `outputs/render-v1/`",
+            "- images and `manifest.json` are committed together inside that bundle",
+            "- choose a new bundle name for each publication; existing bundles are never replaced",
             "",
         ]
     )

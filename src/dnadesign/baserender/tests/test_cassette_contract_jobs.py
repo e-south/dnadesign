@@ -484,7 +484,16 @@ def test_cassette_job_normalize_cli_resolves_json_contract_paths(tmp_path: Path)
                 "renderer": "sequence_rows",
                 "style": {"preset": "cassette_duplex_qa", "overrides": {}},
             },
-            "outputs": [{"kind": "images", "path": "linear_duplex.pdf", "fmt": "pdf"}],
+            "outputs": [
+                {
+                    "kind": "video",
+                    "path": "linear_duplex.mp4",
+                    "fmt": "mp4",
+                    "title_text": "Linear duplex review",
+                    "title_font_size": 17,
+                    "title_align": "left",
+                }
+            ],
             "run": {"strict": True, "fail_on_skips": True},
         },
     )
@@ -499,3 +508,6 @@ def test_cassette_job_normalize_cli_resolves_json_contract_paths(tmp_path: Path)
     assert result.exit_code == 0
     normalized = normalized_path.read_text(encoding="utf-8")
     assert str((run_root / "views" / "linear_duplex.v1.json").resolve()) in normalized
+    assert "title_text: Linear duplex review" in normalized
+    assert "title_font_size: 17" in normalized
+    assert "title_align: left" in normalized

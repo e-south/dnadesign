@@ -120,14 +120,13 @@ def _materialize_before_strict_outputs(
     records: Iterable[Record] | list[Record],
     job: RenderJobV4,
     report: RunReport,
-) -> list[Record] | Iterable[Record]:
-    if not (job.run.strict or job.run.fail_on_skips):
-        return records
-
+) -> list[Record]:
     materialized = records if isinstance(records, list) else list(records)
     report.yielded_records = len(materialized)
-    if report.has_skips():
+    if (job.run.strict or job.run.fail_on_skips) and report.has_skips():
         raise SchemaError("Run completed with skipped rows/records; strict mode is enabled")
+    if not materialized:
+        raise SchemaError("No records to render after adapter, transforms, and selection")
     return materialized
 
 
@@ -151,6 +150,7 @@ def run_render_job(
         input_path=str(job.input.path),
         selection_path=str(job.selection.path) if job.selection else None,
     )
+    report.capture_source_evidence()
 
     style = resolve_style(preset=job.render.style_preset, overrides=job.render.style_overrides)
     from ..render import Palette
@@ -188,10 +188,8 @@ def run_render_job(
                 write_video,
             )
 
-            materialized = list(records)
+            materialized = records
             report.yielded_records = len(materialized)
-            if not materialized:
-                raise SchemaError("No records to render after adapter, transforms, and selection")
             planned_frame_count = planned_video_frame_count(materialized, output=vid_output)
             effective_frames_per_record = effective_video_frames_per_record(materialized, output=vid_output)
             if isinstance(img_output, ImagesOutputCfg):
@@ -225,30 +223,7 @@ def run_render_job(
         elif isinstance(img_output, ImagesOutputCfg):
             from ..outputs import write_images
 
-            if isinstance(records, list):
-                materialized = records
-            else:
-                iterator = iter(records)
-                try:
-                    first = next(iterator)
-                except StopIteration as exc:
-                    raise SchemaError("No records to render after adapter, transforms, and selection") from exc
-
-                emitted = 0
-
-                def _counted_records() -> Iterator[Record]:
-                    nonlocal emitted
-                    emitted += 1
-                    yield first
-                    for record in iterator:
-                        emitted += 1
-                        yield record
-
-                materialized = list(_counted_records())
-                report.yielded_records = emitted
-
-            if not materialized:
-                raise SchemaError("No records to render after adapter, transforms, and selection")
+            materialized = records
             write_images(
                 materialized,
                 output=img_output,
@@ -266,6 +241,7 @@ def run_render_job(
 
         report.outputs["bundle_root"] = str(original_job.bundle.path)
         report.outputs["manifest_path"] = str(original_job.bundle.path / "manifest.json")
+        report.verify_source_evidence()
         report.write_portable_manifest(
             publication.stage / "manifest.json",
             bundle_root=original_job.bundle.path,

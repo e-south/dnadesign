@@ -434,17 +434,41 @@ def test_bundle_path_is_required(tmp_path: Path) -> None:
         load_render_job(job_path)
 
 
+def test_bundle_path_rejects_symlinked_parent_without_creating_redirected_tree(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    redirected = tmp_path / "redirected"
+    redirected.symlink_to(outside, target_is_directory=True)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        bundle_path=redirected / "new-parent" / "render-v1",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="bundle.path contains a symlinked path component"):
+        load_render_job(job_path)
+
+    assert not (outside / "new-parent").exists()
+
+
 @pytest.mark.parametrize("output_key", ["path", "dir"])
-def test_bundle_manifest_path_is_reserved(tmp_path: Path, output_key: str) -> None:
+@pytest.mark.parametrize("reserved_name", ["manifest.json", ".dnadesign-publication-owner.json"])
+def test_bundle_publication_metadata_paths_are_reserved(
+    tmp_path: Path,
+    output_key: str,
+    reserved_name: str,
+) -> None:
     parquet = _make_input_parquet(tmp_path)
     payload = densegen_job_payload(
         parquet_path=parquet,
         bundle_path=tmp_path / "render-v1",
-        outputs=[{"kind": "images", output_key: "manifest.json", "fmt": "png"}],
+        outputs=[{"kind": "images", output_key: reserved_name, "fmt": "png"}],
     )
     job_path = write_job(tmp_path / "job.yaml", payload)
 
-    with pytest.raises(SchemaError, match="reserved for the bundle manifest"):
+    with pytest.raises(SchemaError, match="reserved for bundle publication metadata"):
         load_render_job(job_path)
 
 

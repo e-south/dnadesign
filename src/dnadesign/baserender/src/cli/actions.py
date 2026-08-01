@@ -134,6 +134,9 @@ def _job_to_mapping(parsed: RenderJobV4) -> dict[str, Any]:
                     "aspect": cfg.aspect_ratio,
                     "total_duration": cfg.total_duration,
                     "content_fit": cfg.content_fit,
+                    "title_text": cfg.title_text,
+                    "title_font_size": cfg.title_font_size,
+                    "title_align": cfg.title_align,
                 }
             )
             for cfg in parsed.outputs
