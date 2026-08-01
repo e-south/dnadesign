@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
 
@@ -37,8 +38,8 @@ def default_selection_path() -> Path:
     return Path(__file__).with_name("reader_records.json")
 
 
-def _sha256(path: Path) -> str:
-    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+def _sha256_bytes(payload: bytes) -> str:
+    return f"sha256:{hashlib.sha256(payload).hexdigest()}"
 
 
 def _json_digest(payload: object) -> str:
@@ -108,7 +109,8 @@ def load_verified_reader_selection(*, reader_root: Path, selection_path: Path) -
     """Load only digest-pinned, latest canonical Reader records."""
 
     envelope_path = selection_path.expanduser().resolve()
-    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    envelope_bytes = envelope_path.read_bytes()
+    envelope = json.loads(envelope_bytes)
     if envelope.get("schema_version") != SELECTION_SCHEMA:
         raise SchemaError(f"Reader selection must use {SELECTION_SCHEMA}.")
     selection_id = str(envelope.get("selection_id", "")).strip()
@@ -173,10 +175,11 @@ def load_verified_reader_selection(*, reader_root: Path, selection_path: Path) -
             if record.get(field) != value:
                 raise SchemaError(f"Reader record {record_id} has unverified {field}.")
         artifact = _confined_file(manifest_path.parent.parent, record.get("path"), label="Reader record artifact")
-        digest = _sha256(artifact)
+        artifact_bytes = artifact.read_bytes()
+        digest = _sha256_bytes(artifact_bytes)
         if digest != checks["content_digest"]:
             raise SchemaError(f"Reader record {record_id} content digest mismatch.")
-        frame = pq.read_table(artifact).to_pandas()
+        frame = pq.read_table(pa.BufferReader(artifact_bytes)).to_pandas()
         if "design_id" not in frame.columns:
             raise SchemaError(f"Reader record {record_id} is missing design_id.")
         design_ids = [str(value) for value in expected.get("design_ids", [])]
@@ -192,6 +195,6 @@ def load_verified_reader_selection(*, reader_root: Path, selection_path: Path) -
     combined = pd.concat(frames, ignore_index=True)
     if combined["design_id"].astype(str).duplicated().any():
         raise SchemaError("Reader selection contains duplicate design ids across records.")
-    envelope_digest = _sha256(envelope_path)
+    envelope_digest = _sha256_bytes(envelope_bytes)
     source_ref = f"reader-record-selection:{selection_id}@{envelope_digest}"
     return VerifiedReaderSelection(frame=combined, source_ref=source_ref, record_digests=tuple(digests))

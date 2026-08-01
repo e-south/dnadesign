@@ -16,7 +16,10 @@ import pytest
 import yaml
 
 from dnadesign.opal.api.sfxi import score_vec8
-from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.sfxi_reference_overlay import recipe
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.sfxi_reference_overlay import (
+    reader_records,
+    recipe,
+)
 
 
 def _checkout_root() -> Path:
@@ -222,6 +225,80 @@ def test_verified_preview_rejects_record_digest_drift_before_scoring(tmp_path: P
             reader_root=reader_root,
             selection_path=selection,
         )
+
+
+def test_selection_source_ref_digests_the_exact_parsed_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usr_root, reader_root, selection = _write_verified_fixture(tmp_path)
+    original = selection.read_bytes()
+    original_digest = hashlib.sha256(original).hexdigest()
+    real_json_loads = reader_records.json.loads
+    replaced = False
+
+    def parse_then_replace(payload, *args, **kwargs):
+        nonlocal replaced
+        parsed = real_json_loads(payload, *args, **kwargs)
+        is_selection = isinstance(parsed, dict) and parsed.get("schema_version") == reader_records.SELECTION_SCHEMA
+        if is_selection and not replaced:
+            replaced = True
+            mutated = dict(parsed)
+            mutated["selection_id"] = "concurrently-mutated-selection"
+            selection.write_text(json.dumps(mutated, sort_keys=True), encoding="utf-8")
+        return parsed
+
+    monkeypatch.setattr(reader_records.json, "loads", parse_then_replace)
+    preview = recipe.build_overlay_preview(
+        usr_root=usr_root,
+        dataset_name=recipe.DEFAULT_OUTPUT_DATASET,
+        reader_root=reader_root,
+        selection_path=selection,
+    )
+
+    assert replaced
+    assert preview.source_ref == f"reader-record-selection:fixture-selection@sha256:{original_digest}"
+
+
+def test_reader_scoring_uses_the_exact_artifact_bytes_that_were_hashed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usr_root, reader_root, selection = _write_verified_fixture(tmp_path)
+    artifact = (
+        reader_root / "experiments/2026/20260101_fixture/outputs/artifacts/"
+        "four_state_vector.transform_four_state_vector/vector.parquet"
+    )
+    original_table = pq.read_table(artifact)
+    mutated = original_table.set_column(
+        original_table.schema.get_field_index("y11_star"),
+        "y11_star",
+        pa.array([4.0, 3.0, 2.0, 1.0, 0.0]),
+    )
+    replacement = tmp_path / "replacement.parquet"
+    pq.write_table(mutated, replacement)
+    replacement_bytes = replacement.read_bytes()
+    real_read_bytes = Path.read_bytes
+    replaced = False
+
+    def read_then_replace(path: Path) -> bytes:
+        nonlocal replaced
+        payload = real_read_bytes(path)
+        if path == artifact and not replaced:
+            replaced = True
+            artifact.write_bytes(replacement_bytes)
+        return payload
+
+    monkeypatch.setattr(Path, "read_bytes", read_then_replace)
+    preview = recipe.build_overlay_preview(
+        usr_root=usr_root,
+        dataset_name=recipe.DEFAULT_OUTPUT_DATASET,
+        reader_root=reader_root,
+        selection_path=selection,
+    )
+
+    assert replaced
+    assert preview.table["sfxi_ref__effect_raw"].to_pylist() == [1.0, 2.0, 4.0, 8.0, 16.0]
 
 
 @pytest.mark.parametrize(
