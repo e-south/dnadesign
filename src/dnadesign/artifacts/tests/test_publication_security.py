@@ -138,6 +138,45 @@ def test_published_bundle_can_be_rolled_back_by_anchored_identity(tmp_path: Path
         publication.close()
 
 
+def test_publication_rollback_detaches_before_recursive_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+    publication.publish(required_manifest="manifest.json")
+    remove_directory = publication_module.remove_descriptor_anchored_directory
+
+    def fail_hidden_cleanup(parent_descriptor: int, name: str, owned_descriptor: int) -> bool:
+        del parent_descriptor, owned_descriptor
+        assert name.startswith(f".{bundle.name}.rollback-")
+        assert not bundle.exists()
+        detached = bundle.parent / name
+        assert (detached / "manifest.json").read_text(encoding="utf-8") == "{}\n"
+        raise OSError("injected recursive cleanup failure")
+
+    monkeypatch.setattr(
+        publication_module,
+        "remove_descriptor_anchored_directory",
+        fail_hidden_cleanup,
+    )
+    try:
+        with pytest.raises(OSError, match="injected recursive cleanup failure"):
+            publication.rollback()
+        assert not bundle.exists()
+        assert len(list(bundle.parent.glob(f".{bundle.name}.rollback-*"))) == 1
+    finally:
+        monkeypatch.setattr(
+            publication_module,
+            "remove_descriptor_anchored_directory",
+            remove_directory,
+        )
+        publication.close()
+
+    assert not list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
+
+
 def test_publication_rollback_preserves_a_swapped_replacement(tmp_path: Path) -> None:
     bundle = tmp_path / "results" / "render-v1"
     publication = CreateOnlyDirectoryPublication.prepare(bundle)
@@ -152,6 +191,45 @@ def test_publication_rollback_preserves_a_swapped_replacement(tmp_path: Path) ->
         assert not publication.rollback()
         assert (bundle / "keep.txt").read_text(encoding="utf-8") == "keep\n"
         assert (displaced / "manifest.json").read_text(encoding="utf-8") == "{}\n"
+    finally:
+        publication.close()
+
+
+def test_publication_rollback_restores_replacement_swapped_during_detach(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        publication.publish(required_manifest="manifest.json")
+        displaced = bundle.parent / "displaced"
+        rename_create_only = publication_module._rename_create_only
+        swapped = False
+
+        def swap_then_rename(parent_descriptor: int, source: str, destination: str) -> None:
+            nonlocal swapped
+            if source == bundle.name and not swapped:
+                swapped = True
+                os.rename(
+                    source,
+                    displaced.name,
+                    src_dir_fd=parent_descriptor,
+                    dst_dir_fd=parent_descriptor,
+                )
+                os.mkdir(source, dir_fd=parent_descriptor)
+                (bundle / "keep.txt").write_text("keep\n", encoding="utf-8")
+            rename_create_only(parent_descriptor, source, destination)
+
+        monkeypatch.setattr(publication_module, "_rename_create_only", swap_then_rename)
+
+        with pytest.raises(PublicationError, match="identity changed"):
+            publication.rollback()
+
+        assert (bundle / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+        assert (displaced / "manifest.json").read_text(encoding="utf-8") == "{}\n"
+        assert not list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
     finally:
         publication.close()
 

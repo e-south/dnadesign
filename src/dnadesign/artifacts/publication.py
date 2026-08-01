@@ -318,6 +318,7 @@ class CreateOnlyDirectoryPublication:
     _owner: dict[str, object]
     _closed: bool = False
     _published_descriptor: int | None = field(default=None, init=False, repr=False)
+    _rollback_name: str | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def prepare(cls, bundle_root: str | Path) -> CreateOnlyDirectoryPublication:
@@ -464,11 +465,9 @@ class CreateOnlyDirectoryPublication:
             published_descriptor = None
         except BaseException:
             if renamed and published_descriptor is not None:
-                remove_descriptor_anchored_directory(
-                    self.parent_descriptor,
-                    self.final.name,
-                    published_descriptor,
-                )
+                self._published_descriptor = published_descriptor
+                published_descriptor = None
+                self.rollback()
             elif published_descriptor is not None:
                 remove_owned_directory(
                     self.parent_descriptor,
@@ -490,21 +489,62 @@ class CreateOnlyDirectoryPublication:
                 os.close(published_descriptor)
 
     def rollback(self) -> bool:
-        """Remove this transaction's still-named publication by anchored identity."""
+        """Atomically hide this transaction's publication before recursive cleanup."""
 
         if self._closed:
             raise PublicationError("Artifact publication is already closed")
         published_descriptor = self._published_descriptor
         if published_descriptor is None:
             return False
+        rollback_name = self._rollback_name
+        if rollback_name is None:
+            rollback_name = f".{self.final.name}.rollback-u{self._owner['uid']}-p{os.getpid()}-{uuid.uuid4().hex}"
+            self._rollback_name = rollback_name
+        if not descriptor_matches_entry(
+            self.parent_descriptor,
+            rollback_name,
+            published_descriptor,
+        ):
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                self.final.name,
+                published_descriptor,
+            ):
+                return False
+            _rename_create_only(
+                self.parent_descriptor,
+                self.final.name,
+                rollback_name,
+            )
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                rollback_name,
+                published_descriptor,
+            ):
+                try:
+                    _rename_create_only(
+                        self.parent_descriptor,
+                        rollback_name,
+                        self.final.name,
+                    )
+                except BaseException as restore_error:
+                    raise PublicationError(
+                        "Artifact bundle identity changed during atomic rollback detachment, "
+                        "and the displaced entry could not be restored"
+                    ) from restore_error
+                raise PublicationError(
+                    "Artifact bundle identity changed during atomic rollback detachment; "
+                    "the displaced entry was restored without cleanup"
+                )
         removed = remove_descriptor_anchored_directory(
             self.parent_descriptor,
-            self.final.name,
+            rollback_name,
             published_descriptor,
         )
         if removed:
             os.close(published_descriptor)
             self._published_descriptor = None
+            self._rollback_name = None
         return removed
 
     def close(self) -> None:
@@ -518,10 +558,13 @@ class CreateOnlyDirectoryPublication:
                 self._owner,
                 owner_file=_OWNER_FILE,
             )
+            if self._published_descriptor is not None and self._rollback_name is not None:
+                self.rollback()
         finally:
             if self._published_descriptor is not None:
                 os.close(self._published_descriptor)
                 self._published_descriptor = None
+            self._rollback_name = None
             os.close(self.parent_descriptor)
             self._closed = True
 
