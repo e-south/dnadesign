@@ -16,8 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
+from dnadesign.artifacts import (
+    CreateOnlyDirectoryPublication,
+    PublicationError,
+)
+from dnadesign.artifacts import owned_directory as owned_directory_module
 from dnadesign.artifacts import publication as publication_module
+from dnadesign.artifacts import recovery as recovery_module
 
 
 @pytest.mark.parametrize(
@@ -62,7 +67,7 @@ def test_adjacent_stale_recovery_never_removes_a_swapped_replacement(
     replacement.mkdir()
     (replacement / "keep.txt").write_text("keep\n", encoding="utf-8")
     displaced_stale = parent / "checked-stale"
-    real_check = publication_module._is_recoverable_adjacent_stage
+    real_check = recovery_module._is_recoverable_directory
 
     def _check_then_swap(path: Path, **kwargs) -> bool:
         recoverable = real_check(path, **kwargs)
@@ -71,8 +76,48 @@ def test_adjacent_stale_recovery_never_removes_a_swapped_replacement(
             replacement.rename(path)
         return recoverable
 
-    monkeypatch.setattr(publication_module, "_pid_is_alive", lambda _pid: False)
-    monkeypatch.setattr(publication_module, "_is_recoverable_adjacent_stage", _check_then_swap)
+    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_is_recoverable_directory", _check_then_swap)
+
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    publication.close()
+
+    assert (parent / stale_name / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+    assert (displaced_stale / "stale.txt").read_text(encoding="utf-8") == "stale\n"
+
+
+def test_rollback_stale_recovery_never_removes_a_swapped_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    parent = tmp_path / "results"
+    parent.mkdir()
+    bundle = parent / "render-v1"
+    uid = os.getuid() if hasattr(os, "getuid") else None
+    stale_pid = 91_337_553
+    stale_name = f".{bundle.name}.rollback-u{uid}-p{stale_pid}-{'0' * 32}"
+    stale = parent / stale_name
+    stale.mkdir()
+    stale_owner = publication_module._rollback_owner_payload(publication_module._owner_payload(bundle))
+    stale_owner["pid"] = stale_pid
+    publication_module._write_owner(stale / publication_module._OWNER_FILE, stale_owner)
+    (stale / "stale.txt").write_text("stale\n", encoding="utf-8")
+
+    replacement = parent / "unrelated"
+    replacement.mkdir()
+    (replacement / "keep.txt").write_text("keep\n", encoding="utf-8")
+    displaced_stale = parent / "checked-rollback"
+    real_check = recovery_module._is_recoverable_directory
+
+    def _check_then_swap(path: Path, **kwargs) -> bool:
+        recoverable = real_check(path, **kwargs)
+        if recoverable and path.name == stale_name:
+            path.rename(displaced_stale)
+            replacement.rename(path)
+        return recoverable
+
+    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_is_recoverable_directory", _check_then_swap)
 
     publication = CreateOnlyDirectoryPublication.prepare(bundle)
     publication.close()
@@ -105,7 +150,7 @@ def test_private_stale_recovery_never_removes_a_swapped_replacement(
     replacement.mkdir()
     (replacement / "keep.txt").write_text("keep\n", encoding="utf-8")
     displaced_stale = private_parent / "checked-stale"
-    real_check = publication_module._is_recoverable_stale_stage
+    real_check = recovery_module._is_recoverable_directory
 
     def _check_then_swap(path: Path, **kwargs) -> bool:
         recoverable = real_check(path, **kwargs)
@@ -114,8 +159,8 @@ def test_private_stale_recovery_never_removes_a_swapped_replacement(
             replacement.rename(path)
         return recoverable
 
-    monkeypatch.setattr(publication_module, "_pid_is_alive", lambda _pid: False)
-    monkeypatch.setattr(publication_module, "_is_recoverable_stale_stage", _check_then_swap)
+    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(recovery_module, "_is_recoverable_directory", _check_then_swap)
 
     publication = CreateOnlyDirectoryPublication.prepare(bundle)
     publication.close()
@@ -148,9 +193,16 @@ def test_publication_rollback_detaches_before_recursive_cleanup(
     publication.publish(required_manifest="manifest.json")
     remove_directory = publication_module.remove_descriptor_anchored_directory
 
-    def fail_hidden_cleanup(parent_descriptor: int, name: str, owned_descriptor: int) -> bool:
+    def fail_hidden_cleanup(
+        parent_descriptor: int,
+        name: str,
+        owned_descriptor: int,
+        *,
+        last_entry: str | None = None,
+    ) -> bool:
         del parent_descriptor, owned_descriptor
         assert name.startswith(f".{bundle.name}.rollback-")
+        assert last_entry == publication_module._OWNER_FILE
         assert not bundle.exists()
         detached = bundle.parent / name
         assert (detached / "manifest.json").read_text(encoding="utf-8") == "{}\n"
@@ -175,6 +227,174 @@ def test_publication_rollback_detaches_before_recursive_cleanup(
         publication.close()
 
     assert not list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
+
+
+def test_prepare_recovers_owned_rollback_after_process_exit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+    publication.publish(required_manifest="manifest.json")
+    remove_directory = publication_module.remove_descriptor_anchored_directory
+
+    def fail_cleanup(
+        _parent_descriptor: int,
+        _name: str,
+        _owned_descriptor: int,
+        *,
+        last_entry: str | None = None,
+    ) -> bool:
+        assert last_entry == publication_module._OWNER_FILE
+        raise OSError("injected persistent cleanup failure")
+
+    monkeypatch.setattr(
+        publication_module,
+        "remove_descriptor_anchored_directory",
+        fail_cleanup,
+    )
+    with pytest.raises(OSError, match="persistent cleanup failure"):
+        publication.rollback()
+    with pytest.raises(OSError, match="persistent cleanup failure"):
+        publication.close()
+
+    detached = list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
+    assert len(detached) == 1
+    assert (detached[0] / publication_module._OWNER_FILE).is_file()
+
+    monkeypatch.setattr(
+        publication_module,
+        "remove_descriptor_anchored_directory",
+        remove_directory,
+    )
+    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    recovered = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        assert not list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
+    finally:
+        recovered.close()
+
+
+def test_prepare_recovers_final_after_exit_between_owner_and_detach(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+    publication.publish(required_manifest="manifest.json")
+    ensure_owner = publication_module._ensure_owner_on_descriptor
+
+    def ensure_then_exit(*args, **kwargs) -> None:
+        ensure_owner(*args, **kwargs)
+        raise SystemExit("injected exit after rollback owner publication")
+
+    monkeypatch.setattr(publication_module, "_ensure_owner_on_descriptor", ensure_then_exit)
+    with pytest.raises(SystemExit, match="after rollback owner publication"):
+        publication.rollback()
+    with pytest.raises(SystemExit, match="after rollback owner publication"):
+        publication.close()
+
+    assert bundle.is_dir()
+    assert (bundle / publication_module._OWNER_FILE).is_file()
+
+    monkeypatch.setattr(publication_module, "_ensure_owner_on_descriptor", ensure_owner)
+    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    recovered = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        assert not bundle.exists()
+    finally:
+        recovered.close()
+
+
+def test_final_recovery_detaches_before_partial_cleanup_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.mkdir(parents=True)
+    (bundle / "manifest.json").write_text("{}\n", encoding="utf-8")
+    (bundle / "data.txt").write_text("data\n", encoding="utf-8")
+    stale_owner = recovery_module._rollback_owner_payload(recovery_module._owner_payload(bundle))
+    stale_owner["pid"] = 91_337_554
+    recovery_module._write_owner(bundle / recovery_module._OWNER_FILE, stale_owner)
+    unlink = owned_directory_module.os.unlink
+    payload_removed = False
+
+    def unlink_then_fail(name, *args, **kwargs) -> None:
+        nonlocal payload_removed
+        unlink(name, *args, **kwargs)
+        if name != recovery_module._OWNER_FILE and not payload_removed:
+            payload_removed = True
+            raise OSError("injected failure after partial recovery cleanup")
+
+    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    monkeypatch.setattr(owned_directory_module.os, "unlink", unlink_then_fail)
+    with pytest.raises(OSError, match="after partial recovery cleanup"):
+        CreateOnlyDirectoryPublication.prepare(bundle)
+
+    assert not bundle.exists()
+    detached = list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
+    assert len(detached) == 1
+    assert (detached[0] / recovery_module._OWNER_FILE).is_file()
+
+    monkeypatch.setattr(owned_directory_module.os, "unlink", unlink)
+    recovered = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        assert not list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
+    finally:
+        recovered.close()
+
+
+def test_prepare_preserves_unauthenticated_empty_rollback_after_exit_before_rmdir(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+    publication.publish(required_manifest="manifest.json")
+    remove_directory = owned_directory_module.os.rmdir
+
+    def exit_before_rollback_rmdir(name, *args, **kwargs) -> None:
+        if isinstance(name, str) and name.startswith(f".{bundle.name}.rollback-"):
+            raise SystemExit("injected exit before rollback rmdir")
+        remove_directory(name, *args, **kwargs)
+
+    monkeypatch.setattr(owned_directory_module.os, "rmdir", exit_before_rollback_rmdir)
+    with pytest.raises(SystemExit, match="before rollback rmdir"):
+        publication.rollback()
+    with pytest.raises(SystemExit, match="before rollback rmdir"):
+        publication.close()
+
+    detached = list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
+    assert len(detached) == 1
+    assert not list(detached[0].iterdir())
+
+    monkeypatch.setattr(owned_directory_module.os, "rmdir", remove_directory)
+    monkeypatch.setattr(recovery_module, "_pid_is_alive", lambda _pid: False)
+    recovered = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        assert detached[0].is_dir()
+        assert not list(detached[0].iterdir())
+    finally:
+        recovered.close()
+
+
+def test_prepare_preserves_owner_bundle_with_unrepresentable_pid(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.parent.mkdir()
+    candidate = bundle.parent / f".{bundle.name}.rollback-untrusted"
+    candidate.mkdir()
+    owner = recovery_module._rollback_owner_payload(recovery_module._owner_payload(bundle))
+    owner["pid"] = int("9" * 100)
+    recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
+
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    publication.close()
+
+    assert candidate.is_dir()
 
 
 def test_publication_rollback_preserves_a_swapped_replacement(tmp_path: Path) -> None:
@@ -229,6 +449,7 @@ def test_publication_rollback_restores_replacement_swapped_during_detach(
 
         assert (bundle / "keep.txt").read_text(encoding="utf-8") == "keep\n"
         assert (displaced / "manifest.json").read_text(encoding="utf-8") == "{}\n"
+        assert not (displaced / publication_module._OWNER_FILE).exists()
         assert not list(bundle.parent.glob(f".{bundle.name}.rollback-*"))
     finally:
         publication.close()

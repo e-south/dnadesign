@@ -62,11 +62,15 @@ def owner_matches_descriptor(
     return read_owner_from_descriptor(descriptor, owner_file=owner_file) == expected
 
 
-def _remove_contents(descriptor: int) -> None:
+def _remove_contents(descriptor: int, *, last_entry: str | None = None) -> None:
     directory_flags = os.O_RDONLY | os.O_DIRECTORY
     if hasattr(os, "O_NOFOLLOW"):
         directory_flags |= os.O_NOFOLLOW
-    for name in os.listdir(descriptor):
+    names = os.listdir(descriptor)
+    if last_entry is not None and last_entry in names:
+        names.remove(last_entry)
+        names.append(last_entry)
+    for name in names:
         entry_stat = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
         if stat.S_ISDIR(entry_stat.st_mode):
             child_descriptor = os.open(name, directory_flags, dir_fd=descriptor)
@@ -93,19 +97,26 @@ def remove_owned_directory(
         return False
     if not owner_matches_descriptor(owned_descriptor, expected_owner, owner_file=owner_file):
         return False
-    return remove_descriptor_anchored_directory(parent_descriptor, name, owned_descriptor)
+    return remove_descriptor_anchored_directory(
+        parent_descriptor,
+        name,
+        owned_descriptor,
+        last_entry=owner_file,
+    )
 
 
 def remove_descriptor_anchored_directory(
     parent_descriptor: int,
     name: str,
     owned_descriptor: int,
+    *,
+    last_entry: str | None = None,
 ) -> bool:
     """Remove only the directory entry still matching an open descriptor."""
 
     if not descriptor_matches_entry(parent_descriptor, name, owned_descriptor):
         return False
-    _remove_contents(owned_descriptor)
+    _remove_contents(owned_descriptor, last_entry=last_entry)
     if not descriptor_matches_entry(parent_descriptor, name, owned_descriptor):
         return False
     os.rmdir(name, dir_fd=parent_descriptor)
