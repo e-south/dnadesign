@@ -18,6 +18,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from dnadesign.devtools.docs import checks as docs_checks
+from dnadesign.devtools.docs.banners.catalog import BannerSpec
 from dnadesign.devtools.docs.checks import (
     _find_active_shared_usr_dataset_id_issues,
     _find_agents_path_reference_issues,
@@ -851,6 +853,40 @@ def test_tool_readme_banner_check_accepts_existing_local_svg_banner(tmp_path: Pa
     assert issues == []
 
 
+def test_tool_readme_banner_check_rejects_uncatalogued_and_orphaned_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "![Alpha banner](assets/alternate-banner.svg)\n\nCompact subtitle.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alternate-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    (tmp_path / "src" / "dnadesign" / "devtools" / "docs" / "banners").mkdir(parents=True)
+    catalog_path = "src/dnadesign/alpha/assets/alpha-banner.svg"
+    monkeypatch.setattr(
+        docs_checks,
+        "BANNERS",
+        (
+            BannerSpec(
+                path=catalog_path,
+                name="alpha",
+                capability="TEST ALPHA",
+                description="Test alpha banners.",
+                glyph="align",
+            ),
+        ),
+        raising=False,
+    )
+
+    issues = _find_tool_readme_banner_issues(tmp_path)
+
+    assert any("alternate-banner.svg" in issue and "not declared in the banner catalog" in issue for issue in issues)
+    assert any(catalog_path in issue and "not referenced by a tool README" in issue for issue in issues)
+
+
 def test_tool_readme_banner_check_rejects_nonstandard_banner_dimensions(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
@@ -1390,6 +1426,30 @@ def test_main_passes_when_docs_index_has_required_metadata(tmp_path: Path) -> No
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 0
+
+
+def test_main_fails_when_generated_banner_is_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    today = dt.date.today().isoformat()
+    _write(
+        tmp_path / "docs" / "README.md",
+        f"## Documentation Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+    _write(
+        tmp_path / "ARCHITECTURE.md",
+        f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+    (tmp_path / "src" / "dnadesign" / "devtools" / "docs" / "banners").mkdir(parents=True)
+    stale_path = Path("assets/dnadesign-banner.svg")
+    monkeypatch.setattr(docs_checks, "check_banners", lambda _repo_root: (stale_path,), raising=False)
+
+    rc = main(["--repo-root", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "Banner source drift check failed" in captured.out
+    assert str(stale_path) in captured.out
 
 
 def test_main_fails_when_start_here_doc_is_present(tmp_path: Path) -> None:
@@ -2159,10 +2219,9 @@ def test_main_fails_when_readme_tool_catalog_missing_repo_tool(tmp_path: Path) -
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
                 "",
             ]
         ),
@@ -2187,10 +2246,9 @@ def test_readme_tool_catalog_does_not_require_studies_row(tmp_path: Path) -> Non
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
                 "",
             ]
         ),
@@ -2217,8 +2275,8 @@ def test_main_fails_when_readme_tool_catalog_row_has_too_few_columns(tmp_path: P
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
+                "| Tool | Description |",
+                "| --- | --- |",
                 "| [**aligner**](src/dnadesign/aligner/README.md) |",
                 "",
             ]
@@ -2229,7 +2287,7 @@ def test_main_fails_when_readme_tool_catalog_row_has_too_few_columns(tmp_path: P
     assert rc == 1
 
 
-def test_main_fails_when_readme_tool_catalog_missing_coverage_column(tmp_path: Path) -> None:
+def test_main_fails_when_readme_tool_catalog_has_an_extra_column(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(tmp_path / "docs" / "index.md", "## Index\n")
     _write(
@@ -2247,9 +2305,9 @@ def test_main_fails_when_readme_tool_catalog_missing_coverage_column(tmp_path: P
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description |",
-                "| --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
+                "| Tool | Description | Internal status |",
+                "| --- | --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | covered |",
                 "",
             ]
         ),
@@ -2257,6 +2315,30 @@ def test_main_fails_when_readme_tool_catalog_missing_coverage_column(tmp_path: P
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 1
+
+
+def test_readme_tool_catalog_rejects_component_coverage_badges(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "aligner" / "__init__.py", "")
+    _write(tmp_path / "src" / "dnadesign" / "aligner" / "README.md", "# aligner\n")
+    _write(
+        tmp_path / "README.md",
+        "\n".join(
+            [
+                "## Available tools",
+                "",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | "
+                "[![coverage](https://codecov.io/gh/example/repo/graph/badge.svg?component=aligner)]"
+                "(https://codecov.io/gh/example/repo?component=aligner) |",
+                "",
+            ]
+        ),
+    )
+
+    assert _find_readme_tool_catalog_issues(tmp_path) == [
+        f"{tmp_path / 'README.md'}: tool catalog must not repeat per-tool Codecov badges or component links."
+    ]
 
 
 def test_main_passes_when_readme_tool_catalog_matches_repo_tools(tmp_path: Path) -> None:
@@ -2300,12 +2382,10 @@ def test_main_passes_when_readme_tool_catalog_matches_repo_tools(tmp_path: Path)
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
-                "| [**notify**](src/dnadesign/notify/README.md) | notifications | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=notify) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
+                "| [**notify**](src/dnadesign/notify/README.md) | notifications |",
                 "",
             ]
         ),
@@ -2356,10 +2436,9 @@ def test_main_fails_when_readme_tool_link_does_not_match_expected_path(tmp_path:
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/docs) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/docs) | alignment |",
                 "",
             ]
         ),
@@ -2384,39 +2463,9 @@ def test_main_fails_when_readme_tool_link_target_directory_is_missing(tmp_path: 
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
-                "",
-            ]
-        ),
-    )
-
-    rc = main(["--repo-root", str(tmp_path)])
-    assert rc == 1
-
-
-def test_main_fails_when_readme_tool_coverage_link_component_mismatches_tool(tmp_path: Path) -> None:
-    today = dt.date.today().isoformat()
-    _write(tmp_path / "docs" / "index.md", "## Index\n")
-    _write(
-        tmp_path / "ARCHITECTURE.md",
-        f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
-    )
-    _write(tmp_path / "src" / "dnadesign" / "aligner" / "__init__.py", "")
-    _write(
-        tmp_path / "README.md",
-        "\n".join(
-            [
-                "# dnadesign",
-                "",
-                "## Available tools",
-                "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=notify) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
                 "",
             ]
         ),
@@ -2465,12 +2514,10 @@ def test_main_fails_when_codecov_components_do_not_cover_repo_tools(tmp_path: Pa
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
-                "| [**notify**](src/dnadesign/notify/README.md) | notifications | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=notify) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
+                "| [**notify**](src/dnadesign/notify/README.md) | notifications |",
                 "",
             ]
         ),
@@ -2517,10 +2564,9 @@ def test_main_fails_when_codecov_component_default_rules_are_missing(tmp_path: P
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
                 "",
             ]
         ),
@@ -2564,10 +2610,9 @@ def test_main_fails_when_public_interface_docs_use_absolute_paths(tmp_path: Path
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**densegen**](src/dnadesign/densegen/README.md) | densegen tool | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=densegen) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**densegen**](src/dnadesign/densegen/README.md) | densegen tool |",
                 "",
             ]
         ),
@@ -2618,10 +2663,9 @@ def test_main_fails_when_public_interface_docs_use_internal_source_inreach(tmp_p
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**densegen**](src/dnadesign/densegen/README.md) | densegen tool | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=densegen) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**densegen**](src/dnadesign/densegen/README.md) | densegen tool |",
                 "",
             ]
         ),
@@ -2700,10 +2744,9 @@ def test_broken_link_check_includes_top_level_tool_readmes(tmp_path: Path) -> No
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**opal**](src/dnadesign/opal/README.md) | opal tool | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=opal) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**opal**](src/dnadesign/opal/README.md) | opal tool |",
                 "",
             ]
         ),
@@ -2776,12 +2819,10 @@ def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) ->
                 "",
                 "## Available tools",
                 "",
-                "| Tool | Description | Coverage |",
-                "| --- | --- | --- |",
-                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=aligner) |",
-                "| [**notify**](src/dnadesign/notify/README.md) | notifications | "
-                "[Codecov](https://codecov.io/gh/example/repo?component=notify) |",
+                "| Tool | Description |",
+                "| --- | --- |",
+                "| [**aligner**](src/dnadesign/aligner/README.md) | alignment |",
+                "| [**notify**](src/dnadesign/notify/README.md) | notifications |",
                 "",
             ]
         ),

@@ -1,10 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180" role="img" aria-labelledby="title desc">
-  <title id="title">aligner</title>
-  <desc id="desc">pairwise sequence alignment.</desc>
-  <rect width="1200" height="180" fill="#111827" />
-  <path d="M72 48H1128" stroke="#94a3b8" stroke-opacity="0.28" stroke-width="2" />
-  <g font-family="Helvetica, Arial, sans-serif">
-    <text x="72" y="106" fill="#f8fafc" font-size="54" font-weight="700">aligner</text>
-    <text x="74" y="140" fill="#cbd5e1" font-size="22">pairwise sequence alignment</text>
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="aligner-banner-title aligner-banner-description" shape-rendering="crispEdges">
+  <title id="aligner-banner-title">aligner: align sequences</title>
+  <desc id="aligner-banner-description">Align nucleotide pairs and protein sequence sets.</desc>
+  <rect width="1200" height="180" fill="#1E1D1A"/>
+  <g font-family="Menlo, Monaco, Consolas, monospace">
+    <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">aligner</text>
+    <text x="50" y="114" fill="#969087" font-size="12" font-weight="700" letter-spacing="1.2">ALIGN SEQUENCES</text>
+    <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
+  </g>
+  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
+  <path d="M584 124H1144" stroke="#5A5650" stroke-width="2"/>
+  <g transform="translate(720 48)">
+    <path d="M0 18H72M0 42H72" stroke="#969087" stroke-width="3" fill="none"/><rect x="12" y="13" width="20" height="10" fill="#F3EFE7"/><rect x="38" y="37" width="20" height="10" fill="#D97757"/>
   </g>
 </svg>
