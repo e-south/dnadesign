@@ -178,6 +178,81 @@ def test_publication_rejects_required_manifest_through_stage_symlink(tmp_path: P
         publication.close()
 
 
+@pytest.mark.parametrize(
+    "alias",
+    ["MANIFEST.JSON", ".DNADESIGN-PUBLICATION-OWNER.JSON"],
+)
+def test_publication_rejects_portable_metadata_aliases(tmp_path: Path, alias: str) -> None:
+    from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
+
+    publication = CreateOnlyDirectoryPublication.prepare(tmp_path / "results" / "render-v1")
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        (publication.stage / alias).write_text("alias\n", encoding="utf-8")
+
+        required_manifest = alias if alias == "MANIFEST.JSON" else "manifest.json"
+        with pytest.raises(PublicationError, match="portable filesystem identity|owner sentinel"):
+            publication.publish(required_manifest=required_manifest)
+    finally:
+        publication.close()
+
+
+def test_post_rename_failure_never_removes_replacement_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dnadesign.artifacts import CreateOnlyDirectoryPublication
+    from dnadesign.artifacts import publication as publication_module
+
+    bundle = tmp_path / "results" / "render-v1"
+    displaced = tmp_path / "results" / "displaced-owned-publication"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+
+    def _replace_then_fail(source: Path, destination_descriptor: int) -> None:
+        del source, destination_descriptor
+        bundle.rename(displaced)
+        bundle.mkdir()
+        (bundle / "keep.txt").write_text("replacement\n", encoding="utf-8")
+        raise OSError("simulated post-rename failure")
+
+    monkeypatch.setattr(publication_module, "_restore_published_modes", _replace_then_fail)
+    try:
+        with pytest.raises(OSError, match="simulated post-rename failure"):
+            publication.publish(required_manifest="manifest.json")
+    finally:
+        publication.close()
+
+    assert (bundle / "keep.txt").read_text(encoding="utf-8") == "replacement\n"
+    assert displaced.is_dir()
+
+
+def test_post_rename_failure_removes_only_the_proven_owned_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dnadesign.artifacts import CreateOnlyDirectoryPublication
+    from dnadesign.artifacts import publication as publication_module
+
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+
+    def _fail_after_rename(source: Path, destination_descriptor: int) -> None:
+        del source, destination_descriptor
+        raise OSError("simulated owned post-rename failure")
+
+    monkeypatch.setattr(publication_module, "_restore_published_modes", _fail_after_rename)
+    try:
+        with pytest.raises(OSError, match="simulated owned post-rename failure"):
+            publication.publish(required_manifest="manifest.json")
+    finally:
+        publication.close()
+
+    assert not bundle.exists()
+    assert not list(bundle.parent.glob(".render-v1.staging-*"))
+
+
 def test_publication_rejects_symlinked_parent_without_creating_target_tree(tmp_path: Path) -> None:
     from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 

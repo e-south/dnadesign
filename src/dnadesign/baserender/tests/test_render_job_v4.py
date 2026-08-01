@@ -454,7 +454,15 @@ def test_bundle_path_rejects_symlinked_parent_without_creating_redirected_tree(t
 
 
 @pytest.mark.parametrize("output_key", ["path", "dir"])
-@pytest.mark.parametrize("reserved_name", ["manifest.json", ".dnadesign-publication-owner.json"])
+@pytest.mark.parametrize(
+    "reserved_name",
+    [
+        "manifest.json",
+        "MANIFEST.JSON",
+        ".dnadesign-publication-owner.json",
+        ".DNADESIGN-PUBLICATION-OWNER.JSON",
+    ],
+)
 def test_bundle_publication_metadata_paths_are_reserved(
     tmp_path: Path,
     output_key: str,
@@ -469,6 +477,33 @@ def test_bundle_publication_metadata_paths_are_reserved(
     job_path = write_job(tmp_path / "job.yaml", payload)
 
     with pytest.raises(SchemaError, match="reserved for bundle publication metadata"):
+        load_render_job(job_path)
+
+
+@pytest.mark.parametrize(
+    "left,right",
+    [
+        ("Data", "data/movie.mp4"),
+        ("caf\N{LATIN SMALL LETTER E WITH ACUTE}.png", "cafe\N{COMBINING ACUTE ACCENT}.png"),
+    ],
+)
+def test_output_topology_uses_portable_filesystem_identity(
+    tmp_path: Path,
+    left: str,
+    right: str,
+) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        bundle_path=tmp_path / "render-v1",
+        outputs=[
+            {"kind": "images", "dir": left, "fmt": "png"},
+            {"kind": "video", "path": right, "fmt": "mp4"},
+        ],
+    )
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="portable filesystem|prefix collision"):
         load_render_job(job_path)
 
 

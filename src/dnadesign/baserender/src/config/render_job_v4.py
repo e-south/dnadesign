@@ -18,6 +18,8 @@ from typing import Any, Mapping
 
 import yaml
 
+from dnadesign.artifacts import portable_path_identity
+
 from ..core import (
     Alphabet,
     ContractError,
@@ -683,11 +685,12 @@ def _resolve_output_file(
 
 
 def _ensure_not_reserved_bundle_metadata(path: Path, *, bundle_root: Path, field: str) -> None:
+    relative_identity = portable_path_identity(path.relative_to(bundle_root))
     for name in _RESERVED_BUNDLE_METADATA_NAMES:
-        reserved = bundle_root / name
-        if path == reserved:
+        reserved_identity = portable_path_identity(name)
+        if relative_identity == reserved_identity:
             raise SchemaError(f"{field} is reserved for bundle publication metadata: {name}")
-        if reserved in path.parents:
+        if relative_identity[: len(reserved_identity)] == reserved_identity:
             if name == "manifest.json":
                 raise SchemaError(f"{field} must not place an artifact beneath the bundle manifest")
             raise SchemaError(
@@ -865,16 +868,22 @@ def _parse_outputs(
         )
 
     destinations = [_output_destination_for_validation(output) for output in outputs]
+    destination_identities = [portable_path_identity(path.relative_to(bundle_root)) for path in destinations]
     ensure(
-        len(destinations) == len(set(destinations)),
-        "outputs must resolve to distinct bundle paths",
+        len(destination_identities) == len(set(destination_identities)),
+        "outputs must resolve to distinct bundle paths under the portable filesystem identity",
         SchemaError,
     )
     for index, destination in enumerate(destinations):
         _ensure_not_reserved_bundle_metadata(destination, bundle_root=bundle_root, field=f"outputs[{index}]")
     for left_index, left in enumerate(destinations):
         for right_index, right in enumerate(destinations[left_index + 1 :], start=left_index + 1):
-            if left in right.parents or right in left.parents:
+            left_identity = destination_identities[left_index]
+            right_identity = destination_identities[right_index]
+            if (
+                right_identity[: len(left_identity)] == left_identity
+                or left_identity[: len(right_identity)] == right_identity
+            ):
                 raise SchemaError(
                     f"outputs[{left_index}] and outputs[{right_index}] have an impossible "
                     "file/directory prefix collision"

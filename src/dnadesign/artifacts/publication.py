@@ -27,10 +27,14 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-
-class PublicationError(RuntimeError):
-    """Raised when an immutable artifact bundle cannot be published safely."""
-
+from .errors import PublicationError
+from .owned_directory import (
+    descriptor_matches_entry,
+    owner_matches_descriptor,
+    remove_owned_directory,
+    remove_owned_named_directory,
+)
+from .portable_paths import validate_publication_metadata_paths
 
 _OWNER_FILE = ".dnadesign-publication-owner.json"
 _MAX_STALE_CANDIDATES = 64
@@ -139,7 +143,8 @@ def _copy_directory(source: Path, parent_descriptor: int, name: str) -> None:
         flags |= os.O_NOFOLLOW
     destination_descriptor = os.open(name, flags, dir_fd=parent_descriptor)
     try:
-        for entry in os.scandir(source):
+        entries = sorted(os.scandir(source), key=lambda entry: (entry.name != _OWNER_FILE, entry.name))
+        for entry in entries:
             entry_path = Path(entry.path)
             if entry.is_symlink():
                 raise PublicationError(f"Bundle staging must not contain symlinks: {entry_path}")
@@ -370,39 +375,82 @@ class CreateOnlyDirectoryPublication:
                 break
         if not manifest_is_safe or not manifest.is_file():
             raise PublicationError(f"Artifact bundle staging is incomplete: {manifest}")
+        validate_publication_metadata_paths(
+            self.stage,
+            required_manifest=manifest_relative,
+            owner_file=_OWNER_FILE,
+        )
         if not self._parent_matches_anchor():
             raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
         if _entry_exists_at(self.parent_descriptor, self.adjacent_stage_name):
             raise PublicationError(f"Artifact bundle staging already exists: {self.adjacent_stage_name}")
         renamed = False
+        published_descriptor: int | None = None
         try:
             _copy_directory(self.stage, self.parent_descriptor, self.adjacent_stage_name)
             if not self._parent_matches_anchor():
                 raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
-            os.unlink(f"{self.adjacent_stage_name}/{_OWNER_FILE}", dir_fd=self.parent_descriptor)
-            _rename_create_only(self.parent_descriptor, self.adjacent_stage_name, self.final.name)
-            renamed = True
             final_flags = os.O_RDONLY | os.O_DIRECTORY
             if hasattr(os, "O_NOFOLLOW"):
                 final_flags |= os.O_NOFOLLOW
-            final_descriptor = os.open(self.final.name, final_flags, dir_fd=self.parent_descriptor)
-            try:
-                _restore_published_modes(self.stage, final_descriptor)
-                os.fchmod(final_descriptor, _FINAL_ROOT_MODE)
-            finally:
-                os.close(final_descriptor)
+            published_descriptor = os.open(
+                self.adjacent_stage_name,
+                final_flags,
+                dir_fd=self.parent_descriptor,
+            )
+            if not owner_matches_descriptor(
+                published_descriptor,
+                self._owner,
+                owner_file=_OWNER_FILE,
+            ):
+                raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
+            _rename_create_only(self.parent_descriptor, self.adjacent_stage_name, self.final.name)
+            renamed = True
+            if not descriptor_matches_entry(self.parent_descriptor, self.final.name, published_descriptor):
+                raise PublicationError("Published artifact bundle identity changed after atomic rename")
+            _restore_published_modes(self.stage, published_descriptor)
+            os.fchmod(published_descriptor, _FINAL_ROOT_MODE)
+            os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
         except Exception:
-            _remove_entry_at(self.parent_descriptor, self.adjacent_stage_name)
-            if renamed:
-                _remove_entry_at(self.parent_descriptor, self.final.name)
+            if renamed and published_descriptor is not None:
+                remove_owned_directory(
+                    self.parent_descriptor,
+                    self.final.name,
+                    published_descriptor,
+                    self._owner,
+                    owner_file=_OWNER_FILE,
+                )
+            elif published_descriptor is not None:
+                remove_owned_directory(
+                    self.parent_descriptor,
+                    self.adjacent_stage_name,
+                    published_descriptor,
+                    self._owner,
+                    owner_file=_OWNER_FILE,
+                )
+            else:
+                remove_owned_named_directory(
+                    self.parent_descriptor,
+                    self.adjacent_stage_name,
+                    self._owner,
+                    owner_file=_OWNER_FILE,
+                )
             raise
+        finally:
+            if published_descriptor is not None:
+                os.close(published_descriptor)
 
     def close(self) -> None:
         if self._closed:
             return
         try:
             shutil.rmtree(self.stage, ignore_errors=True)
-            _remove_entry_at(self.parent_descriptor, self.adjacent_stage_name)
+            remove_owned_named_directory(
+                self.parent_descriptor,
+                self.adjacent_stage_name,
+                self._owner,
+                owner_file=_OWNER_FILE,
+            )
         finally:
             os.close(self.parent_descriptor)
             self._closed = True
