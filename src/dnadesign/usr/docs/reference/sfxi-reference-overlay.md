@@ -1,15 +1,20 @@
 # SFXI Reference Overlay Contract
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Owner:** USR maintainers
+**Last verified:** 2026-07-30
 
 The `sfxi_ref` namespace stores provenance-aware SFXI reference metrics for downstream annotation overlays. It is an additive USR overlay keyed by canonical `id`; it must not mutate base `records.parquet` rows or existing Infer overlays.
 
 ## Boundary
 
-- Source observations come from Reader vec8 artifacts.
-- Scoring is reached through Reader's public `reader.domains.logic.sfxi.setpoint_scatter.score_sfxi_setpoints` API.
-- Reader delegates SFXI scoring to the source-owned `dnadesign.opal.api.sfxi` API.
+- Reader owns and publishes neutral `four_state_vector/vector` measurements
+  under `logic.four_state_vector.v1`.
+- OPAL's public `dnadesign.opal.api.sfxi` surface owns SFXI objective math and
+  conversion to overlay records.
+- A study owns the selection of Reader records, setpoint, and target USR
+  dataset. The stress-study recipe is documented under its `decision/opal/`
+  surface.
+- USR's public `Dataset` API owns generic overlay publication.
 - LatentDNA consumes materialized USR/view columns such as `sfxi_ref__metric_value`; it must not import Reader internals or OPAL internals.
 
 ## Required Semantics
@@ -24,11 +29,12 @@ Each overlay row represents one selected SFXI metric for one USR record.
 - `sfxi_ref__metric_provenance`, `sfxi_ref__source_ref`, and `sfxi_ref__score_ref`: source and scoring lineage.
 - OPAL-compatible fields preserve `objective_name`, `api_version`, `state_order`, `setpoint_vector`, `denom_used`, and `denom_percentile`.
 
-The builder joins Reader rows to USR base records by case-insensitive normalized DNA sequence, then writes USR `id` values into the overlay.
+The study recipe joins Reader rows to USR base records by case-insensitive
+normalized DNA sequence, then places USR `id` values into the proposed overlay.
 
 ## Validation
 
-Builders must fail before writing when any of these are true:
+Study recipes must fail before asking USR to write when any of these are true:
 
 - duplicate normalized sequence values exist in either base records or the selected Reader score rows;
 - duplicate `(reference_instance_id, metric_id)` pairs are produced;
@@ -42,14 +48,23 @@ Builders must fail before writing when any of these are true:
 Dry run:
 
 ```bash
-uv run python -m dnadesign.usr.scripts.build_reader_sfxi_reference_overlay --expected-count 23
+uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.sfxi_reference_overlay \
+  --reader-root ../reader \
+  --expected-count 23
 ```
 
-The dry run reads the sibling Reader artifact and reports the planned row count with `"written": false`.
-It also materializes the in-memory Arrow table against the packaged USR registry and reports
-`"registry_validated": true` before any write is allowed.
+The default route is read-only. It verifies each selected latest Reader record
+against the study's portable envelope, including
+`logic.four_state_vector.v1`, record-schema
+version, configuration digest, content digest, producer, and selected design
+identities. It then applies OPAL's fixed SFXI v1 scoring contract, resolves the
+target USR identities, and reports `"written": false`. Persisted source
+provenance is the portable selection identity and digest, never a machine path.
 
-Writing requires `--write`. The writer refuses to append if `sfxi_ref` already exists for the dataset, so replacement or aggregation remains an explicit maintenance workflow.
+Writing requires `--write`. The study recipe then passes the table to the
+atomic `Dataset.create_overlay` operation. Its create-once check and write run
+under the dataset lock, so concurrent publishers cannot append a second part.
+Replacement or aggregation remains an explicit maintenance workflow.
 
 ## LatentDNA Use
 

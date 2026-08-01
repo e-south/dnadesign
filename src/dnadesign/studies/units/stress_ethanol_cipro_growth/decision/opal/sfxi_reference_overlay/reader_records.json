@@ -1,0 +1,54 @@
+{
+  "schema_version": "stress_sfxi_reader_record_selection.v1",
+  "selection_id": "stress-sfxi-reference-promoters-v1",
+  "records": [
+    {
+      "manifest": "experiments/2025/20251103_sfxi_pES1-8_ref-pDual10/outputs/manifests/records.json",
+      "record_id": "four_state_vector/vector",
+      "revision": 1,
+      "revision_digest": "sha256:4b7c824d8e1fd2d1ee9418ac60f69de26302eea3d393d346b6ae378b1f38d25e",
+      "contract_id": "logic.four_state_vector.v1",
+      "record_schema_version": 6,
+      "content_digest": "sha256:6328a15663f1c7daa75bb23e1b3a4eaa59ef064df6696af7e5925c927695ca85",
+      "config_digest": "sha256:fe053c273f24d790faf1d0d7cdb9a8def1a9c8ac1ad4d0c12111b90b72c53e4f",
+      "code_digest": "sha256:0751f8f96ec9edff26c9238e54289cd8a67a515b53fa58698e0c0faa196dbe1d",
+      "design_ids": ["pDual-10-ES1p", "pDual-10-ES2p", "pDual-10-ES3p", "pDual-10-ES4p", "pDual-10-ES6p", "pDual-10-ES7p"]
+    },
+    {
+      "manifest": "experiments/2026/20260117_sfxi_ref-pDual10/outputs/manifests/records.json",
+      "record_id": "four_state_vector/vector",
+      "revision": 1,
+      "revision_digest": "sha256:210f59f2936d382d17e96dfc2dfe3c54bae72dc3302bc4c02275b5aa64c56091",
+      "contract_id": "logic.four_state_vector.v1",
+      "record_schema_version": 6,
+      "content_digest": "sha256:f031101dc8838cb8f6f8434c29cd26e89d1a6dc998d3c1c6da03dc14f59e4e54",
+      "config_digest": "sha256:c5e45e49c4416dd4e04c01ecd50559981240c92b0edc35d3096428b0ab1ea291",
+      "code_digest": "sha256:0751f8f96ec9edff26c9238e54289cd8a67a515b53fa58698e0c0faa196dbe1d",
+      "design_ids": ["pDual-10-ES10p", "pDual-10-ES12p", "pDual-10-ES13p"]
+    },
+    {
+      "manifest": "experiments/2026/20260119_sfxi_ref-pDual10/outputs/manifests/records.json",
+      "record_id": "four_state_vector/vector",
+      "revision": 1,
+      "revision_digest": "sha256:8a2193aeb57a379cb1ca9a374c2d604713286da411cad4b677e0d990378fc90a",
+      "contract_id": "logic.four_state_vector.v1",
+      "record_schema_version": 6,
+      "content_digest": "sha256:9846bc3dfd3399441b61bf03cc3c9029a7590a4d8e954a484020d51924ca0ac3",
+      "config_digest": "sha256:80367a357a2b23d2fcecbc3fa05a610703abcff89f7ade9d81390102b4851515",
+      "code_digest": "sha256:0751f8f96ec9edff26c9238e54289cd8a67a515b53fa58698e0c0faa196dbe1d",
+      "design_ids": ["pDual-10-ES15p", "pDual-10-ES16p", "pDual-10-ES17p", "pDual-10-ES18p", "pDual-10-ES19p", "pDual-10-ES20p", "pDual-10-ES23p"]
+    },
+    {
+      "manifest": "experiments/2026/20260121_sfxi_ref-pDual10/outputs/manifests/records.json",
+      "record_id": "four_state_vector/vector",
+      "revision": 1,
+      "revision_digest": "sha256:8f1844eb8f1399e06a94dd136171b6acdbc0d234b1205575c0e1aa2546199ee3",
+      "contract_id": "logic.four_state_vector.v1",
+      "record_schema_version": 6,
+      "content_digest": "sha256:9d031d17276057adf5c08a4f0dcfe264f6cd4abf07ecbf4c1da8009910269ebd",
+      "config_digest": "sha256:405794ae9ed9d69be888b7a04ebbd7af1de035974da3fad3b126cf3afed97eaf",
+      "code_digest": "sha256:0751f8f96ec9edff26c9238e54289cd8a67a515b53fa58698e0c0faa196dbe1d",
+      "design_ids": ["pDual-10-ES22p", "pDual-10-ES25p", "pDual-10-ES26p", "pDual-10-ES27p", "pDual-10-ES28p", "pDual-10-ES29p", "pDual-10-ES30p"]
+    }
+  ]
+}

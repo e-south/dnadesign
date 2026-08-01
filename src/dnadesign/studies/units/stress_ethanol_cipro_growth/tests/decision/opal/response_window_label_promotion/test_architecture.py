@@ -48,11 +48,11 @@ def test_label_promotion_modules_stay_bounded(module_path: Path) -> None:
 
 @pytest.mark.parametrize("module_path", sorted(PACKAGE_ROOT.glob("*.py")), ids=lambda path: path.name)
 def test_label_promotion_respects_package_boundaries(module_path: Path) -> None:
+    reader_roots = {"reader", "reader_workbench"}
     offenders = [
         f"{module_path.name}:{line}:{module}"
         for line, module in _imported_modules(module_path)
-        if module == "reader"
-        or module.startswith("reader.")
+        if module.split(".", maxsplit=1)[0] in reader_roots
         or "response_metastudy" in module.split(".")
         or module == "dnadesign.opal.src"
         or module.startswith("dnadesign.opal.src.")

@@ -108,7 +108,7 @@ _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]]
     ("studies", "construct"): ("dnadesign.construct",),
     ("studies", "densegen"): ("dnadesign.densegen",),
     ("studies", "infer"): ("dnadesign.infer", "dnadesign.infer.contracts"),
-    ("studies", "opal"): ("dnadesign.opal",),
+    ("studies", "opal"): ("dnadesign.opal", "dnadesign.opal.api.sfxi"),
     ("studies", "permuter"): ("dnadesign.permuter",),
     ("studies", "ops"): (
         "dnadesign.ops.catalog",

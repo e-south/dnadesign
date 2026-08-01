@@ -237,17 +237,18 @@ def test_generated_notebook_templates_do_not_import_dashboard_internals() -> Non
 
 
 def test_opal_source_does_not_import_reader_or_mutate_python_import_paths() -> None:
+    reader_roots = {"reader", "reader_workbench"}
     violations: list[str] = []
     for path in sorted(OPAL_SOURCE_ROOT.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name == "reader" or alias.name.startswith("reader."):
+                    if alias.name.split(".", maxsplit=1)[0] in reader_roots:
                         violations.append(f"{path}:{node.lineno}: import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
                 module = node.module or ""
-                if module == "reader" or module.startswith("reader."):
+                if module.split(".", maxsplit=1)[0] in reader_roots:
                     violations.append(f"{path}:{node.lineno}: from {module} import ...")
             elif (
                 isinstance(node, ast.Call)

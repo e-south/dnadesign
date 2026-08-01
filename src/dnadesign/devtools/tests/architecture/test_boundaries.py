@@ -835,6 +835,21 @@ def test_find_undeclared_cross_tool_imports_allows_studies_to_opal_public_api(tm
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_studies_to_sfxi_public_api(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "studies" / "units" / "demo" / "sfxi_recipe.py",
+        "from dnadesign.opal.api.sfxi import score_vec8\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "opal" / "api" / "sfxi.py",
+        "def score_vec8():\n    return None\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
 def test_find_undeclared_cross_tool_imports_rejects_studies_to_opal_private_api(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "studies" / "studies" / "demo" / "opal_handoff.py",
