@@ -62,8 +62,17 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         '<video><source src="status-badge.mp4"></video>\n\n'
         '<picture><video><source srcset="https://img.shields.io/badge/build-passing.svg">'
         '<source src="clip.mp4"></video><img src="diagram.svg"></picture>\n\n'
+        '<picture><img src="diagram.svg"><source srcset="https://img.shields.io/badge/build-passing.svg">'
+        "</picture>\n\n"
+        '<picture><source srcset="https://img.shields.io/badge/build-passing.svg"></picture>\n\n'
         '<source srcset="https://img.shields.io/badge/build-passing.svg">\n\n'
         '<svg><image src="badge.svg"/></svg>\n\n'
+        '<svg><title><img src="badge.svg"></title><desc><img src="badge.svg"></desc></svg>\n\n'
+        '<img src="diagram.svg" srcset="https://img.shields.io/badge/build-passing.svg 0w">\n\n'
+        '<img src="diagram.svg" srcset="https://img.shields.io/badge/build-passing.svg 0x">\n\n'
+        '<img src="https://img.shields.io/badge/build-passing.svg" srcset="diagram.svg 1x">\n\n'
+        '<img src="diagram.svg" srcset="diagram-2x.svg 1x, '
+        'https://img.shields.io/badge/build-passing.svg 1x">\n\n'
         '<a href="outer">\n\n'
         "[inner](report) ![Coverage](status.svg)\n\n"
         "</a>\n\n"
@@ -71,6 +80,8 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         "[before </a> ![Coverage](status.svg)](report)\n\n"
         '[before <a href="inner">inner](outer) ![Coverage](status.svg)\n\n'
         '<a id="coverage"><img alt="Coverage" src="status.svg"></a>\n\n'
+        '<picture><a href="x"><div></a><source '
+        'srcset="https://img.shields.io/badge/build-passing.svg"></div></picture>\n\n'
         '<template><img src="badge.svg"></template>\n\n'
         '<template></script><img src="badge.svg"></template>\n\n'
         "<template>\n\n"
@@ -139,6 +150,20 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
             1,
         ),
         (
+            '<img src="https://img.shields.io/badge/build-passing.svg" srcset="diagram.svg 1.x">\n',
+            1,
+        ),
+        (
+            '<img src="fallback.svg" srcset="invalid.svg foo((x), '
+            'https://img.shields.io/badge/build-passing.svg 2x">\n',
+            1,
+        ),
+        ('<img srcset="https://img.shields.io/badge/build-passing.svg 0x">\n', 1),
+        (
+            '<div>\n<img "><img src="https://img.shields.io/badge/build-passing.svg">\n</div>\n',
+            2,
+        ),
+        (
             '<img src="https://img.shields.io/badge/build-passing.svg" src="diagram.svg">\n',
             1,
         ),
@@ -150,9 +175,19 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
         ),
         ('<image src="https://img.shields.io/badge/build-passing.svg">\n', 1),
         ('<svg><image href="https://img.shields.io/badge/build-passing.svg"/></svg>\n', 1),
+        ('<svg><img src="https://img.shields.io/badge/build-passing.svg"></svg>\n', 1),
+        (
+            '<div><picture><table><source srcset="https://img.shields.io/badge/build-passing.svg">'
+            '</table><img src="diagram.svg"></picture></div>\n',
+            1,
+        ),
+        ('<svg><a xlink:href="report"><image alt="Coverage" href="status.svg"/></a></svg>\n', 1),
+        ('<textarea><!-- </textarea> --><img src="https://img.shields.io/badge/build-passing.svg">\n', 1),
         ('<a href="report" />\n\n<img alt="Coverage" src="status.svg">\n', 3),
         ('intro\n<img\n alt="Coverage"\n src="badge.svg">\noutro\n', 2),
         ('intro `code\nspan`\n<img\n alt="Coverage"\n src="badge.svg">\n', 3),
+        ('text <a\n href="x">![Coverage](status.svg)</a>\n', 2),
+        ("![diagram\n alt](diagram.svg)![Coverage](badge.svg)\n", 2),
         (
             "text <textarea>\n\n<template>\n\n</textarea>\n\n[![Coverage](badge.svg)](report)\n",
             7,
@@ -206,6 +241,64 @@ def test_badge_policy_keeps_plaintext_content_inert_through_eof(tmp_path: Path) 
     )
 
     assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == []
+
+
+def test_badge_policy_preserves_distinct_source_locations_for_equal_badges(tmp_path: Path) -> None:
+    root_readme = tmp_path / "README.md"
+    _write(
+        root_readme,
+        'text <a href="https://github.com/e-south/dnadesign/actions/workflows/ci.yaml">\n'
+        "<img\n"
+        ' alt="CI"\n'
+        ' src="https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg?branch=main">\n'
+        "</a>\n"
+        "[![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg?branch=main)]"
+        "(https://github.com/e-south/dnadesign/actions/workflows/ci.yaml)\n",
+    )
+
+    assert find_markdown_badge_policy_issues(tmp_path, [root_readme]) == [
+        f"{root_readme}:2: root README badge is not in the restrained CI, coverage, and license set."
+    ]
+
+
+def test_badge_policy_handles_unbounded_integer_descriptors_without_crashing(tmp_path: Path) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    digits = "9" * 4301
+    _write(
+        tool_readme,
+        f'<img src="https://example.test/badge.svg" srcset="diagram.svg {digits}w">\n'
+        f'<img src="https://example.test/badge.svg" srcset="diagram.svg {digits}h">\n',
+    )
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:1: badges belong only in the root README; use a plain text link instead.",
+        f"{tool_readme}:2: badges belong only in the root README; use a plain text link instead.",
+    ]
+
+
+def test_badge_policy_matches_browser_integer_descriptor_limit(tmp_path: Path) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(
+        tool_readme,
+        '<img src="https://example.test/badge.svg" srcset="diagram.svg 2147483647w">\n'
+        '<img src="https://example.test/badge.svg" srcset="diagram.svg 2147483648w">\n',
+    )
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:2: badges belong only in the root README; use a plain text link instead."
+    ]
+
+
+def test_badge_policy_handles_deep_html_without_recursion_failure(tmp_path: Path) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(
+        tool_readme,
+        "<div>" * 1100 + '<img src="https://example.test/badge.svg">' + "</div>" * 1100 + "\n",
+    )
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:1: badges belong only in the root README; use a plain text link instead."
+    ]
 
 
 def test_checked_in_root_readme_uses_the_restrained_badge_set() -> None:

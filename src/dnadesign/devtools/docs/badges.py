@@ -11,13 +11,21 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 import re
-from collections.abc import Iterable
-from dataclasses import dataclass, field
-from html.parser import HTMLParser
+import secrets
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from dataclasses import dataclass
+from enum import Enum, auto
+from itertools import count
 from pathlib import Path
+from xml.etree.ElementTree import Element
 
+import html5lib
 from markdown_it import MarkdownIt
+from markdown_it.rules_inline import html_inline as markdown_html_inline_rule
+from markdown_it.rules_inline import image as markdown_image_rule
+from markdown_it.rules_inline.state_inline import StateInline
 from markdown_it.token import Token
 
 BADGE_SOURCE_PATTERN = re.compile(
@@ -25,44 +33,22 @@ BADGE_SOURCE_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags=re.IGNORECASE)
-INERT_HTML_CONTAINERS = frozenset(
+FLOATING_POINT_PATTERN = re.compile(r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+NON_NEGATIVE_INTEGER_PATTERN = re.compile(r"[0-9]+")
+ASCII_WHITESPACE = frozenset("\t\n\f\r ")
+RAW_IMAGE_TAGS = frozenset({"image", "img", "source"})
+XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
+SVG_NAMESPACE = "http://www.w3.org/2000/svg"
+XLINK_HREF_ATTRIBUTE = "{http://www.w3.org/1999/xlink}href"
+NON_RENDERING_CONTAINERS = frozenset(
     {
-        "iframe",
-        "noembed",
-        "noframes",
-        "noscript",
-        "plaintext",
-        "script",
-        "style",
-        "template",
-        "textarea",
-        "title",
-        "xmp",
+        (XHTML_NAMESPACE, "template"),
+        (SVG_NAMESPACE, "desc"),
+        (SVG_NAMESPACE, "title"),
     }
 )
-HTML_NAMESPACE = "html"
-SVG_NAMESPACE = "svg"
-HTML_VOID_ELEMENTS = frozenset(
-    {
-        "area",
-        "base",
-        "br",
-        "col",
-        "embed",
-        "hr",
-        "img",
-        "input",
-        "link",
-        "meta",
-        "param",
-        "source",
-        "track",
-        "wbr",
-    }
-)
-RAW_TEXT_HTML_CONTAINERS = INERT_HTML_CONTAINERS - {"plaintext", "template"}
-SVG_HTML_INTEGRATION_POINTS = frozenset({"desc", "foreignobject", "title"})
-MARKDOWN = MarkdownIt("commonmark")
+INLINE_SOURCE_SPAN_META = "dnadesign_source_span"
+MAX_IMAGE_DESCRIPTOR_INTEGER = "2147483647"
 ROOT_README_ALLOWED_BADGES = frozenset(
     {
         "[![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg?branch=main)]"
@@ -84,153 +70,60 @@ class _ImageSpec:
 @dataclass(frozen=True, slots=True)
 class _ImageOccurrence:
     line_no: int
+    ordinal: int
     spec: _ImageSpec
 
 
 @dataclass(frozen=True, slots=True)
-class _RelativeImageOccurrence:
-    line_offset: int
-    spec: _ImageSpec
+class _SrcsetCandidate:
+    url: str
+    width: str | None = None
+    density: float | None = None
+    future_height: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class _OpenElement:
-    tag: str
-    namespace: str
+class _StartTagState(Enum):
+    BEFORE_ATTRIBUTE_NAME = auto()
+    ATTRIBUTE_NAME = auto()
+    AFTER_ATTRIBUTE_NAME = auto()
+    BEFORE_ATTRIBUTE_VALUE = auto()
+    ATTRIBUTE_VALUE_DOUBLE_QUOTED = auto()
+    ATTRIBUTE_VALUE_SINGLE_QUOTED = auto()
+    ATTRIBUTE_VALUE_UNQUOTED = auto()
+    AFTER_ATTRIBUTE_VALUE_QUOTED = auto()
+    SELF_CLOSING_START_TAG = auto()
 
 
-@dataclass(slots=True)
-class _HTMLContext:
-    inert_elements: list[str] = field(default_factory=list)
-    open_elements: list[_OpenElement] = field(default_factory=list)
-    plaintext: bool = False
-    raw_anchor_linked: bool = False
-
-    @property
-    def is_inert(self) -> bool:
-        return self.plaintext or bool(self.inert_elements)
-
-    @property
-    def child_namespace(self) -> str:
-        if not self.open_elements:
-            return HTML_NAMESPACE
-        parent = self.open_elements[-1]
-        if parent.namespace == SVG_NAMESPACE and parent.tag not in SVG_HTML_INTEGRATION_POINTS:
-            return SVG_NAMESPACE
-        return HTML_NAMESPACE
-
-    def direct_parent_is(self, tag: str, namespace: str) -> bool:
-        return bool(
-            self.open_elements and self.open_elements[-1].tag == tag and self.open_elements[-1].namespace == namespace
-        )
-
-    def close_open_element(self, tag: str) -> None:
-        for index in range(len(self.open_elements) - 1, -1, -1):
-            if self.open_elements[index].tag == tag:
-                del self.open_elements[index:]
-                return
-
-    def clone(self) -> _HTMLContext:
-        return _HTMLContext(
-            inert_elements=list(self.inert_elements),
-            open_elements=list(self.open_elements),
-            plaintext=self.plaintext,
-            raw_anchor_linked=self.raw_anchor_linked,
-        )
+def _record_inline_source_span(
+    state: StateInline,
+    silent: bool,
+    rule: Callable[[StateInline, bool], bool],
+    *,
+    expected_type: str,
+) -> bool:
+    start = state.pos
+    token_count = len(state.tokens)
+    matched = rule(state, silent)
+    if not matched or silent:
+        return matched
+    produced_tokens = state.tokens[token_count:]
+    if not produced_tokens or produced_tokens[-1].type != expected_type:
+        raise RuntimeError(f"source-mapped inline rule did not emit its expected {expected_type} token")
+    produced_tokens[-1].meta[INLINE_SOURCE_SPAN_META] = (start, state.pos)
+    return True
 
 
-class _HTMLImageParser(HTMLParser):
-    def __init__(self, *, context: _HTMLContext, markdown_link_depth: int) -> None:
-        super().__init__(convert_charrefs=True)
-        self.context = context
-        self.markdown_link_depth = markdown_link_depth
-        self.images: list[tuple[int, _ImageSpec]] = []
+def _source_mapped_image_rule(state: StateInline, silent: bool) -> bool:
+    return _record_inline_source_span(state, silent, markdown_image_rule, expected_type="image")
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        normalized_tag = tag.casefold()
-        if self.context.plaintext:
-            return
-        if self.context.inert_elements:
-            if self.context.inert_elements[-1] in RAW_TEXT_HTML_CONTAINERS:
-                return
-            if normalized_tag in INERT_HTML_CONTAINERS:
-                if normalized_tag == "plaintext":
-                    self.context.plaintext = True
-                else:
-                    self.context.inert_elements.append(normalized_tag)
-            return
 
-        namespace = self.context.child_namespace
-        if namespace == HTML_NAMESPACE and normalized_tag == "svg":
-            namespace = SVG_NAMESPACE
-        if namespace == HTML_NAMESPACE and normalized_tag == "image":
-            normalized_tag = "img"
-        if namespace == HTML_NAMESPACE and normalized_tag in INERT_HTML_CONTAINERS:
-            if normalized_tag == "plaintext":
-                self.context.plaintext = True
-            else:
-                self.context.inert_elements.append(normalized_tag)
-            return
+def _source_mapped_html_inline_rule(state: StateInline, silent: bool) -> bool:
+    return _record_inline_source_span(state, silent, markdown_html_inline_rule, expected_type="html_inline")
 
-        attributes: dict[str, str] = {}
-        for name, value in attrs:
-            attributes.setdefault(name.casefold(), value or "")
-        if normalized_tag == "a":
-            if namespace == HTML_NAMESPACE:
-                self.context.close_open_element("a")
-            self.context.raw_anchor_linked = "href" in attributes
-            self.markdown_link_depth = 0
 
-        is_html_image = namespace == HTML_NAMESPACE and normalized_tag == "img"
-        is_picture_source = (
-            namespace == HTML_NAMESPACE
-            and normalized_tag == "source"
-            and self.context.direct_parent_is("picture", HTML_NAMESPACE)
-        )
-        is_svg_image = namespace == SVG_NAMESPACE and normalized_tag == "image"
-        if is_html_image or is_picture_source or is_svg_image:
-            source_names = (
-                ("href", "xlink:href") if is_svg_image else (("src", "srcset") if is_html_image else ("srcset",))
-            )
-            sources = " ".join(value for name in source_names if (value := attributes.get(name, "")))
-            self.images.append(
-                (
-                    self.getpos()[0] - 1,
-                    _ImageSpec(
-                        label=attributes.get("alt", ""),
-                        source=sources,
-                        linked=self.markdown_link_depth > 0 or self.context.raw_anchor_linked,
-                    ),
-                )
-            )
-
-        if namespace == HTML_NAMESPACE and normalized_tag in HTML_VOID_ELEMENTS:
-            return
-        self.context.open_elements.append(_OpenElement(tag=normalized_tag, namespace=namespace))
-
-    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        open_element_count = len(self.context.open_elements)
-        self.handle_starttag(tag, attrs)
-        if (
-            len(self.context.open_elements) > open_element_count
-            and self.context.open_elements[-1].namespace != HTML_NAMESPACE
-        ):
-            self.handle_endtag(self.context.open_elements[-1].tag)
-
-    def handle_endtag(self, tag: str) -> None:
-        normalized_tag = tag.casefold()
-        if self.context.plaintext:
-            return
-        if self.context.inert_elements:
-            if normalized_tag == self.context.inert_elements[-1]:
-                self.context.inert_elements.pop()
-            return
-        if normalized_tag in INERT_HTML_CONTAINERS:
-            return
-        if normalized_tag == "a":
-            self.context.raw_anchor_linked = False
-            self.markdown_link_depth = 0
-        self.context.close_open_element(normalized_tag)
+MARKDOWN = MarkdownIt("commonmark")
+MARKDOWN.inline.ruler.at("image", _source_mapped_image_rule)
+MARKDOWN.inline.ruler.at("html_inline", _source_mapped_html_inline_rule)
 
 
 def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
@@ -239,158 +132,454 @@ def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
     )
 
 
-def _html_fragment_image_specs(
-    fragment: str,
-    *,
-    markdown_link_depth: int,
-    context: _HTMLContext,
-) -> tuple[tuple[tuple[int, _ImageSpec], ...], int]:
-    parser = _HTMLImageParser(context=context, markdown_link_depth=markdown_link_depth)
-    parser.feed(fragment)
-    parser.close()
-    return tuple(parser.images), parser.markdown_link_depth
+def _start_tag_boundary(source: str, start: int) -> tuple[int, int] | None:
+    state = _StartTagState.BEFORE_ATTRIBUTE_NAME
+    self_closing_slash: int | None = None
+    index = start
+    while index < len(source):
+        character = source[index]
+        if state is _StartTagState.BEFORE_ATTRIBUTE_NAME:
+            if character in ASCII_WHITESPACE:
+                pass
+            elif character == "/":
+                self_closing_slash = index
+                state = _StartTagState.SELF_CLOSING_START_TAG
+            elif character == ">":
+                return index, index
+            else:
+                state = _StartTagState.ATTRIBUTE_NAME
+        elif state is _StartTagState.ATTRIBUTE_NAME:
+            if character in ASCII_WHITESPACE:
+                state = _StartTagState.AFTER_ATTRIBUTE_NAME
+            elif character == "/":
+                self_closing_slash = index
+                state = _StartTagState.SELF_CLOSING_START_TAG
+            elif character == "=":
+                state = _StartTagState.BEFORE_ATTRIBUTE_VALUE
+            elif character == ">":
+                return index, index
+        elif state is _StartTagState.AFTER_ATTRIBUTE_NAME:
+            if character in ASCII_WHITESPACE:
+                pass
+            elif character == "/":
+                self_closing_slash = index
+                state = _StartTagState.SELF_CLOSING_START_TAG
+            elif character == "=":
+                state = _StartTagState.BEFORE_ATTRIBUTE_VALUE
+            elif character == ">":
+                return index, index
+            else:
+                state = _StartTagState.ATTRIBUTE_NAME
+        elif state is _StartTagState.BEFORE_ATTRIBUTE_VALUE:
+            if character in ASCII_WHITESPACE:
+                pass
+            elif character == '"':
+                state = _StartTagState.ATTRIBUTE_VALUE_DOUBLE_QUOTED
+            elif character == "'":
+                state = _StartTagState.ATTRIBUTE_VALUE_SINGLE_QUOTED
+            elif character == ">":
+                return index, index
+            else:
+                state = _StartTagState.ATTRIBUTE_VALUE_UNQUOTED
+        elif state is _StartTagState.ATTRIBUTE_VALUE_DOUBLE_QUOTED:
+            if character == '"':
+                state = _StartTagState.AFTER_ATTRIBUTE_VALUE_QUOTED
+        elif state is _StartTagState.ATTRIBUTE_VALUE_SINGLE_QUOTED:
+            if character == "'":
+                state = _StartTagState.AFTER_ATTRIBUTE_VALUE_QUOTED
+        elif state is _StartTagState.ATTRIBUTE_VALUE_UNQUOTED:
+            if character in ASCII_WHITESPACE:
+                state = _StartTagState.BEFORE_ATTRIBUTE_NAME
+            elif character == ">":
+                return index, index
+        elif state is _StartTagState.AFTER_ATTRIBUTE_VALUE_QUOTED:
+            if character in ASCII_WHITESPACE:
+                state = _StartTagState.BEFORE_ATTRIBUTE_NAME
+            elif character == "/":
+                self_closing_slash = index
+                state = _StartTagState.SELF_CLOSING_START_TAG
+            elif character == ">":
+                return index, index
+            else:
+                state = _StartTagState.BEFORE_ATTRIBUTE_NAME
+                continue
+        elif state is _StartTagState.SELF_CLOSING_START_TAG:
+            if character == ">":
+                assert self_closing_slash is not None
+                return index, self_closing_slash
+            self_closing_slash = None
+            state = _StartTagState.BEFORE_ATTRIBUTE_NAME
+            continue
+        index += 1
+    return None
 
 
-def _inline_image_specs(
-    children: Iterable[Token],
-    *,
-    context: _HTMLContext,
+def _marker_value(*, line_no: int, ordinal: int) -> str:
+    return f"{line_no}:{ordinal}"
+
+
+def _annotate_raw_html(
     source: str,
-) -> tuple[_RelativeImageOccurrence, ...]:
-    images: list[_RelativeImageOccurrence] = []
-    markdown_link_depth = 0
-    line_offset = 0
-    source_cursor = 0
-    for token in children:
-        if token.type == "link_open":
-            if not context.is_inert:
-                context.raw_anchor_linked = False
-                context.close_open_element("a")
-            markdown_link_depth += 1
-            continue
-        if token.type == "link_close":
-            if not context.is_inert:
-                context.raw_anchor_linked = False
-                context.close_open_element("a")
-            markdown_link_depth = max(0, markdown_link_depth - 1)
-            continue
-        if token.type == "image":
-            if not context.is_inert:
-                images.append(
-                    _RelativeImageOccurrence(
-                        line_offset=line_offset,
-                        spec=_ImageSpec(
-                            label=token.content,
-                            source=token.attrGet("src") or "",
-                            linked=markdown_link_depth > 0 or context.raw_anchor_linked,
-                        ),
-                    )
-                )
-        elif token.type == "html_inline":
-            fragment_start = source.find(token.content, source_cursor)
-            if fragment_start >= 0:
-                line_offset = source[:fragment_start].count("\n")
-                source_cursor = fragment_start + len(token.content)
-            html_images, markdown_link_depth = _html_fragment_image_specs(
-                token.content,
-                markdown_link_depth=markdown_link_depth,
-                context=context,
-            )
-            images.extend(
-                _RelativeImageOccurrence(line_offset=line_offset + relative_line, spec=spec)
-                for relative_line, spec in html_images
-            )
-        elif token.type == "code_inline" and token.markup:
-            opening = source.find(token.markup, source_cursor)
-            closing = source.find(token.markup, opening + len(token.markup)) if opening >= 0 else -1
-            if closing >= 0:
-                source_cursor = closing + len(token.markup)
-                line_offset = source[:source_cursor].count("\n")
-        elif token.type == "text" and token.content:
-            text_start = source.find(token.content, source_cursor)
-            if text_start >= 0:
-                source_cursor = text_start + len(token.content)
-        if token.type in {"softbreak", "hardbreak"}:
-            newline = source.find("\n", source_cursor)
-            if newline >= 0:
-                source_cursor = newline + 1
-            line_offset = source[:source_cursor].count("\n")
-    return tuple(images)
-
-
-def _match_image_lines(
-    relative_occurrences: tuple[_RelativeImageOccurrence, ...],
     *,
-    line_candidates: list[tuple[int, _ImageSpec]],
     start_line_no: int,
-) -> tuple[_ImageOccurrence, ...]:
+    marker_attribute: str,
+    ordinals: Iterator[int],
+) -> str:
+    replacements: list[tuple[int, str]] = []
+    cursor = 0
+    line_cursor = 0
+    line_offset = 0
+    while cursor < len(source):
+        tag_start = source.find("<", cursor)
+        if tag_start < 0:
+            break
+        line_offset += source[line_cursor:tag_start].count("\n")
+        line_cursor = tag_start
+        name_start = tag_start + 1
+        if name_start >= len(source) or not source[name_start].isascii() or not source[name_start].isalpha():
+            cursor = tag_start + 1
+            continue
+        name_end = name_start + 1
+        while (
+            name_end < len(source) and source[name_end] not in ASCII_WHITESPACE and source[name_end] not in {"/", ">"}
+        ):
+            name_end += 1
+        boundary = _start_tag_boundary(source, name_end)
+        if boundary is None:
+            break
+        tag_end, insertion = boundary
+        tag = source[name_start:name_end].casefold()
+        if tag in RAW_IMAGE_TAGS:
+            ordinal = next(ordinals)
+            line_no = start_line_no + line_offset
+            replacements.append(
+                (
+                    insertion,
+                    f' {marker_attribute}="{_marker_value(line_no=line_no, ordinal=ordinal)}"',
+                )
+            )
+        cursor = tag_end + 1
+
+    chunks: list[str] = []
+    cursor = 0
+    for insertion, marker in replacements:
+        chunks.extend((source[cursor:insertion], marker))
+        cursor = insertion
+    chunks.append(source[cursor:])
+    return "".join(chunks)
+
+
+def _annotate_inline_candidates(
+    children: Sequence[Token],
+    *,
+    source: str,
+    start_line_no: int,
+    marker_attribute: str,
+    ordinals: Iterator[int],
+) -> None:
+    line_cursor = 0
+    line_offset = 0
+    for token in children:
+        if token.type not in {"html_inline", "image"}:
+            continue
+        span = token.meta.get(INLINE_SOURCE_SPAN_META)
+        if not isinstance(span, tuple) or len(span) != 2 or not all(isinstance(position, int) for position in span):
+            raise RuntimeError(f"{token.type} token is missing its source-span contract")
+        span_start, span_end = span
+        if span_start < line_cursor or span_end < span_start or span_end > len(source):
+            raise RuntimeError(f"{token.type} token has an invalid source span")
+        line_offset += source[line_cursor:span_start].count("\n")
+        line_cursor = span_start
+        token_line_no = start_line_no + line_offset
+        if token.type == "image":
+            ordinal = next(ordinals)
+            token.attrSet(
+                marker_attribute,
+                _marker_value(line_no=token_line_no, ordinal=ordinal),
+            )
+        else:
+            if token.content != source[span_start:span_end]:
+                raise RuntimeError("html_inline token content differs from its declared source span")
+            token.content = _annotate_raw_html(
+                token.content,
+                start_line_no=token_line_no,
+                marker_attribute=marker_attribute,
+                ordinals=ordinals,
+            )
+
+
+def _render_markdown_with_markers(content: str) -> tuple[str, str]:
+    environment: dict[str, object] = {}
+    tokens = MARKDOWN.parse(content, environment)
+    marker_attribute = f"data-dnadesign-image-{secrets.token_hex(12)}"
+    ordinals = count()
+    for token in tokens:
+        if token.type == "inline" and token.map is not None:
+            _annotate_inline_candidates(
+                token.children or (),
+                source=token.content,
+                start_line_no=token.map[0] + 1,
+                marker_attribute=marker_attribute,
+                ordinals=ordinals,
+            )
+        elif token.type == "html_block" and token.map is not None:
+            token.content = _annotate_raw_html(
+                token.content,
+                start_line_no=token.map[0] + 1,
+                marker_attribute=marker_attribute,
+                ordinals=ordinals,
+            )
+    return MARKDOWN.renderer.render(tokens, MARKDOWN.options, environment), marker_attribute
+
+
+def _positive_integer_descriptor(value: str) -> str | None:
+    if NON_NEGATIVE_INTEGER_PATTERN.fullmatch(value) is None:
+        return None
+    normalized = value.lstrip("0")
+    if not normalized:
+        return None
+    if len(normalized) > len(MAX_IMAGE_DESCRIPTOR_INTEGER) or (
+        len(normalized) == len(MAX_IMAGE_DESCRIPTOR_INTEGER) and normalized > MAX_IMAGE_DESCRIPTOR_INTEGER
+    ):
+        return None
+    return normalized
+
+
+def _parse_descriptors(descriptors: Sequence[str]) -> tuple[str | None, float | None, str | None] | None:
+    width: str | None = None
+    density: float | None = None
+    future_height: str | None = None
+    for descriptor in descriptors:
+        if descriptor.endswith("w") and (value := _positive_integer_descriptor(descriptor[:-1])) is not None:
+            if width is not None or density is not None:
+                return None
+            width = value
+            continue
+        if descriptor.endswith("x") and FLOATING_POINT_PATTERN.fullmatch(descriptor[:-1]):
+            value = float(descriptor[:-1])
+            if (
+                not math.isfinite(value)
+                or value < 0
+                or width is not None
+                or density is not None
+                or future_height is not None
+            ):
+                return None
+            density = value
+            continue
+        if descriptor.endswith("h") and (value := _positive_integer_descriptor(descriptor[:-1])) is not None:
+            if future_height is not None or density is not None:
+                return None
+            future_height = value
+            continue
+        return None
+    if future_height is not None and width is None:
+        return None
+    return width, density, future_height
+
+
+def _parse_srcset(value: str) -> tuple[_SrcsetCandidate, ...]:
+    candidates: list[_SrcsetCandidate] = []
+    position = 0
+    while position < len(value):
+        while position < len(value) and (value[position] in ASCII_WHITESPACE or value[position] == ","):
+            position += 1
+        if position >= len(value):
+            break
+
+        url_start = position
+        while position < len(value) and value[position] not in ASCII_WHITESPACE:
+            position += 1
+        url = value[url_start:position]
+        descriptors: list[str] = []
+        if url.endswith(","):
+            url = url.rstrip(",")
+        else:
+            while position < len(value) and value[position] in ASCII_WHITESPACE:
+                position += 1
+            descriptor: list[str] = []
+            in_parentheses = False
+            while position < len(value):
+                character = value[position]
+                if character == "," and not in_parentheses:
+                    if descriptor:
+                        descriptors.append("".join(descriptor))
+                        descriptor = []
+                    position += 1
+                    break
+                if character in ASCII_WHITESPACE and not in_parentheses:
+                    if descriptor:
+                        descriptors.append("".join(descriptor))
+                        descriptor = []
+                else:
+                    if character == "(" and not in_parentheses:
+                        in_parentheses = True
+                    elif character == ")" and in_parentheses:
+                        in_parentheses = False
+                    descriptor.append(character)
+                position += 1
+            if descriptor:
+                descriptors.append("".join(descriptor))
+
+        parsed = _parse_descriptors(descriptors)
+        if url and parsed is not None:
+            width, density, future_height = parsed
+            candidates.append(
+                _SrcsetCandidate(
+                    url=url,
+                    width=width,
+                    density=density,
+                    future_height=future_height,
+                )
+            )
+    return tuple(candidates)
+
+
+def _selectable_srcset_candidates(value: str) -> tuple[_SrcsetCandidate, ...]:
+    selected: list[_SrcsetCandidate] = []
+    density_values: set[float] = set()
+    width_values: set[str] = set()
+    for candidate in _parse_srcset(value):
+        if candidate.width is not None:
+            if candidate.width in width_values:
+                continue
+            width_values.add(candidate.width)
+        else:
+            density = candidate.density if candidate.density is not None else 1.0
+            if density in density_values:
+                continue
+            density_values.add(density)
+        selected.append(candidate)
+    if any(candidate.width is not None or candidate.density is None or candidate.density > 0 for candidate in selected):
+        selected = [candidate for candidate in selected if candidate.density != 0]
+    return tuple(selected)
+
+
+def _html_image_sources(element: Element) -> tuple[str, ...]:
+    candidates = _selectable_srcset_candidates(element.attrib.get("srcset", ""))
+    has_width = any(candidate.width is not None for candidate in candidates)
+    has_density_one = any(
+        candidate.width is None and (candidate.density is None or candidate.density == 1) for candidate in candidates
+    )
+    default_source = element.attrib.get("src", "")
+    if default_source and not has_width and not has_density_one:
+        candidates = tuple(candidate for candidate in candidates if candidate.density != 0)
+    sources = [candidate.url for candidate in candidates]
+    if default_source and not has_width and not has_density_one:
+        sources.append(default_source)
+    return tuple(sources)
+
+
+def _element_name(element: Element) -> tuple[str, str] | None:
+    if not isinstance(element.tag, str) or not element.tag.startswith("{"):
+        return None
+    namespace, separator, local_name = element.tag[1:].partition("}")
+    if not separator:
+        return None
+    return namespace, local_name.casefold()
+
+
+def _element_is_link(element: Element) -> bool:
+    name = _element_name(element)
+    return name in {(XHTML_NAMESPACE, "a"), (SVG_NAMESPACE, "a")} and (
+        "href" in element.attrib or XLINK_HREF_ATTRIBUTE in element.attrib
+    )
+
+
+def _occurrence_for_element(
+    element: Element,
+    *,
+    marker_attribute: str,
+    source: str,
+    linked: bool,
+) -> _ImageOccurrence | None:
+    marker = element.attrib.get(marker_attribute)
+    if marker is None:
+        return None
+    line_text, separator, ordinal_text = marker.partition(":")
+    if not separator or not line_text.isdigit() or not ordinal_text.isdigit():
+        return None
+    return _ImageOccurrence(
+        line_no=int(line_text),
+        ordinal=int(ordinal_text),
+        spec=_ImageSpec(
+            label=element.attrib.get("alt", ""),
+            source=source,
+            linked=linked,
+        ),
+    )
+
+
+def _dom_image_occurrences(rendered_html: str, *, marker_attribute: str) -> tuple[_ImageOccurrence, ...]:
+    root = html5lib.parseFragment(
+        rendered_html,
+        treebuilder="etree",
+        namespaceHTMLElements=True,
+        scripting=True,
+    )
     occurrences: list[_ImageOccurrence] = []
-    candidate_cursor = 0
-    for relative_occurrence in relative_occurrences:
-        spec = relative_occurrence.spec
-        line_no = start_line_no + relative_occurrence.line_offset
-        for candidate_index in range(candidate_cursor, len(line_candidates)):
-            candidate_line_no, candidate_spec = line_candidates[candidate_index]
-            if candidate_spec == spec:
-                line_no = candidate_line_no
-                candidate_cursor = candidate_index + 1
-                break
-        occurrences.append(_ImageOccurrence(line_no=line_no, spec=spec))
-    return tuple(occurrences)
+    seen_markers: set[str] = set()
+
+    def record(element: Element, *, linked: bool, sources: Sequence[str]) -> None:
+        marker = element.attrib.get(marker_attribute)
+        if marker is None or marker in seen_markers:
+            return
+        occurrence = _occurrence_for_element(
+            element,
+            marker_attribute=marker_attribute,
+            source=" ".join(source for source in sources if source),
+            linked=linked,
+        )
+        if occurrence is not None:
+            seen_markers.add(marker)
+            occurrences.append(occurrence)
+
+    stack: list[tuple[Element, bool]] = [(root, False)]
+    while stack:
+        element, ancestor_linked = stack.pop()
+        name = _element_name(element)
+        if name in NON_RENDERING_CONTAINERS:
+            continue
+        linked = ancestor_linked or _element_is_link(element)
+        children = list(element)
+
+        if name == (XHTML_NAMESPACE, "picture"):
+            previous_sources: list[Element] = []
+            for child in children:
+                child_name = _element_name(child)
+                if child_name == (XHTML_NAMESPACE, "source"):
+                    previous_sources.append(child)
+                    continue
+                if child_name == (XHTML_NAMESPACE, "img"):
+                    for source_element in previous_sources:
+                        record(
+                            source_element,
+                            linked=linked,
+                            sources=tuple(
+                                candidate.url
+                                for candidate in _selectable_srcset_candidates(source_element.attrib.get("srcset", ""))
+                            ),
+                        )
+        elif name == (XHTML_NAMESPACE, "img"):
+            record(
+                element,
+                linked=ancestor_linked,
+                sources=_html_image_sources(element),
+            )
+        elif name == (SVG_NAMESPACE, "image"):
+            record(
+                element,
+                linked=ancestor_linked,
+                sources=(element.attrib.get("href", ""), element.attrib.get(XLINK_HREF_ATTRIBUTE, "")),
+            )
+
+        stack.extend((child, linked) for child in reversed(children))
+    return tuple(sorted(occurrences, key=lambda occurrence: occurrence.ordinal))
 
 
 def _rendered_image_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
-    lines = content.splitlines()
-    environment: dict[str, object] = {}
-    tokens = MARKDOWN.parse(content, environment)
-    occurrences: list[_ImageOccurrence] = []
-    context = _HTMLContext()
-    for token in tokens:
-        if token.type == "inline" and token.map is not None:
-            initial_context = context.clone()
-            relative_occurrences = _inline_image_specs(
-                token.children or (),
-                context=context,
-                source=token.content,
-            )
-            if not relative_occurrences:
-                continue
-            start_line, end_line = token.map
-            line_candidates: list[tuple[int, _ImageSpec]] = []
-            candidate_context = initial_context
-            for line_index in range(start_line, min(end_line, len(lines))):
-                line_tokens = MARKDOWN.parseInline(lines[line_index], environment)
-                for line_token in line_tokens:
-                    line_occurrences = _inline_image_specs(
-                        line_token.children or (),
-                        context=candidate_context,
-                        source=line_token.content,
-                    )
-                    line_candidates.extend(
-                        (line_index + 1 + occurrence.line_offset, occurrence.spec) for occurrence in line_occurrences
-                    )
-            occurrences.extend(
-                _match_image_lines(
-                    relative_occurrences,
-                    line_candidates=line_candidates,
-                    start_line_no=start_line + 1,
-                )
-            )
-            continue
-        if token.type == "html_block" and token.map is not None:
-            html_images, _markdown_link_depth = _html_fragment_image_specs(
-                token.content,
-                markdown_link_depth=0,
-                context=context,
-            )
-            for relative_line, spec in html_images:
-                occurrences.append(
-                    _ImageOccurrence(
-                        line_no=token.map[0] + relative_line + 1,
-                        spec=spec,
-                    )
-                )
-    return tuple(occurrences)
+    rendered_html, marker_attribute = _render_markdown_with_markers(content)
+    return _dom_image_occurrences(rendered_html, marker_attribute=marker_attribute)
 
 
 def _rendered_badge_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
@@ -415,7 +604,6 @@ def find_markdown_badge_policy_issues(repo_root: Path, markdown_files: Iterable[
     """Return badge-policy violations without changing documentation."""
     root_readme = (repo_root / "README.md").resolve()
     issues: list[str] = []
-    reported_locations: set[tuple[Path, int]] = set()
     root_badge_counts: dict[str, int] = {}
     for path in markdown_files:
         content = path.read_text(encoding="utf-8")
@@ -423,10 +611,6 @@ def find_markdown_badge_policy_issues(repo_root: Path, markdown_files: Iterable[
         is_root_readme = path.resolve() == root_readme
         for occurrence in _rendered_badge_occurrences(content):
             line_no = occurrence.line_no
-            location = (path, line_no)
-            if location in reported_locations:
-                continue
-            reported_locations.add(location)
             line = lines[line_no - 1].strip()
             if not is_root_readme:
                 issues.append(
