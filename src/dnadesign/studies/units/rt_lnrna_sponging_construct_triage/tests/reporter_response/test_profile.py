@@ -48,6 +48,14 @@ def _digest(character: str) -> str:
     return "sha256:" + character * 64
 
 
+def test_profile_contract_uses_the_bounded_package_layout() -> None:
+    study_root = Path(__file__).resolve().parents[2]
+    reporter_response_root = study_root / "reporter_response"
+
+    assert (reporter_response_root / "profile").is_dir()
+    assert not (reporter_response_root / "profile.py").exists()
+
+
 def _bindings(
     *,
     subject_id: str = "subject-a",
