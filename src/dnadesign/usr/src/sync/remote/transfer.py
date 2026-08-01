@@ -11,16 +11,83 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import stat
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from ...contracts import VerificationError
 from ...events.append import event_log_lock
 
 EVENT_LOG_FILENAME = ".events.log"
+
+
+@dataclass(frozen=True, slots=True)
+class EventLogRevision:
+    """One descriptor-validated local event-log revision."""
+
+    exists: bool
+    device: int | None = None
+    inode: int | None = None
+    size_bytes: int | None = None
+    sha256: str | None = None
+
+
+def _event_log_revision_locked(event_path: Path) -> EventLogRevision:
+    """Read one event-log revision while its stable sidecar lock is held."""
+
+    event_path = Path(event_path)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(event_path, flags)
+    except FileNotFoundError:
+        return EventLogRevision(exists=False)
+    except OSError as exc:
+        raise VerificationError(f"Local event log is unavailable for pull revision capture: {event_path}") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise VerificationError(f"Local event log must be one regular file: {event_path}")
+        digest = hashlib.sha256()
+        while chunk := os.read(descriptor, 1 << 16):
+            digest.update(chunk)
+        completed = os.fstat(descriptor)
+        try:
+            current = event_path.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise VerificationError(f"Local event log changed during pull revision capture: {event_path}") from exc
+        opened_identity = (opened.st_dev, opened.st_ino)
+        if (
+            not stat.S_ISREG(completed.st_mode)
+            or opened_identity != (completed.st_dev, completed.st_ino)
+            or opened.st_size != completed.st_size
+            or opened_identity != (current.st_dev, current.st_ino)
+        ):
+            raise VerificationError(f"Local event log changed during pull revision capture: {event_path}")
+        return EventLogRevision(
+            exists=True,
+            device=completed.st_dev,
+            inode=completed.st_ino,
+            size_bytes=completed.st_size,
+            sha256=digest.hexdigest(),
+        )
+    finally:
+        os.close(descriptor)
+
+
+def capture_event_log_revision(event_path: Path) -> EventLogRevision:
+    """Capture the local event-log precondition for one staged full pull."""
+
+    event_path = Path(event_path)
+    with event_log_lock(event_path):
+        return _event_log_revision_locked(event_path)
 
 
 def make_pull_staging_dir(root: Path, dataset: str) -> Path:
@@ -93,13 +160,26 @@ def _promote_event_log_locked(staged_event: Path | None, destination: Path) -> N
         pass
 
 
-def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_snapshots: bool) -> None:
-    """Promote one validated pull without losing concurrent event appends.
+def promote_staged_pull(
+    staged: Path,
+    dest: Path,
+    *,
+    primary_only: bool,
+    skip_snapshots: bool,
+    expected_event_revision: EventLogRevision | None,
+) -> None:
+    """Promote one validated pull under an explicit event-log precondition.
 
-    Primary-only pulls replace only the base table and never touch the event
-    log. Full pulls validate the complete staged payload before holding the
-    event lock across every destination payload mutation.
+    Primary-only pulls require no event revision because they never touch the
+    event log. Full pulls require the revision captured before transfer and
+    abort before destination mutation if that local state changed. Promotion
+    does not merge event histories or retry against a newer local revision.
     """
+
+    if primary_only and expected_event_revision is not None:
+        raise ValueError("Primary-only pull promotion must not declare an event-log revision.")
+    if not primary_only and expected_event_revision is None:
+        raise ValueError("Full pull promotion requires its pre-transfer event-log revision.")
 
     staged = Path(staged)
     dest = Path(dest)
@@ -121,6 +201,13 @@ def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_sn
 
     destination_event = dest / EVENT_LOG_FILENAME
     with event_log_lock(destination_event):
+        if (
+            expected_event_revision is not None
+            and _event_log_revision_locked(destination_event) != expected_event_revision
+        ):
+            raise VerificationError(
+                "Local event log changed while the full pull was staged; refusing destination promotion."
+            )
         dest.mkdir(parents=True, exist_ok=True)
         copy_file_atomic(staged_primary, dest / "records.parquet")
 

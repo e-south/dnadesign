@@ -26,7 +26,11 @@ from .diff import (
 )
 from .remote import SSHRemote
 from .sidecars import local_sidecar_state, remote_sidecar_state, verify_sidecar_state_match
-from .transfer import make_pull_staging_dir, promote_staged_pull
+from .transfer import (
+    capture_event_log_revision,
+    make_pull_staging_dir,
+    promote_staged_pull,
+)
 
 
 @dataclass(frozen=True)
@@ -115,6 +119,7 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
             if not summary.has_change and summary.primary_remote.exists:
                 return summary
 
+            expected_event_revision = None if opts.primary_only else capture_event_log_revision(dest / ".events.log")
             staged_dir = make_pull_staging_dir(root, dataset)
             try:
                 remote.pull_to_local(
@@ -136,6 +141,7 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
                     dest,
                     primary_only=opts.primary_only,
                     skip_snapshots=opts.skip_snapshots,
+                    expected_event_revision=expected_event_revision,
                 )
             finally:
                 shutil.rmtree(staged_dir, ignore_errors=True)

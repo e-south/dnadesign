@@ -764,6 +764,8 @@ def test_dataset_state_module_exports_expected_symbols() -> None:
 
 def test_sync_remote_transfer_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.sync.remote.transfer")
+    assert hasattr(module, "EventLogRevision")
+    assert hasattr(module, "capture_event_log_revision")
     assert hasattr(module, "make_pull_staging_dir")
     assert hasattr(module, "copy_file_atomic")
     assert hasattr(module, "collect_staged_entries")
