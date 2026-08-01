@@ -19,8 +19,9 @@ import pytest
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings import (
     load_resolved_registered_subject_bindings,
 )
-from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings import (
-    loader as subject_binding_loader,
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings import sources as binding_sources
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings.contracts import (
+    SubjectBindingContractError,
 )
 
 
@@ -39,7 +40,7 @@ def test_local_hairpin_handoff_digest_drift_blocks_binding_resolution(
         _repo_root() / "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
         "reader_spop_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml"
     ).resolve()
-    original_load_yaml = subject_binding_loader._load_yaml
+    original_load_yaml = binding_sources.load_yaml
 
     def _load_yaml(path: Path) -> object:
         payload = original_load_yaml(path)
@@ -50,10 +51,10 @@ def test_local_hairpin_handoff_digest_drift_blocks_binding_resolution(
         drifted["source_sequence_sha256"] = "0" * 64
         return drifted
 
-    monkeypatch.setattr(subject_binding_loader, "_load_yaml", _load_yaml)
+    monkeypatch.setattr(binding_sources, "load_yaml", _load_yaml)
 
     with pytest.raises(
-        subject_binding_loader.SubjectBindingContractError,
+        SubjectBindingContractError,
         match="hairpin source sequence digest disagrees with catalog lnRNA digest",
     ):
         load_resolved_registered_subject_bindings(repo_root=_repo_root())
@@ -70,7 +71,7 @@ def test_catalog_handoff_marker_cannot_disable_hairpin_source_closure(
         _repo_root() / "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
         "reader_spop_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml"
     ).resolve()
-    original_load_yaml = subject_binding_loader._load_yaml
+    original_load_yaml = binding_sources.load_yaml
 
     def _load_yaml(path: Path) -> object:
         payload = original_load_yaml(path)
@@ -87,10 +88,10 @@ def test_catalog_handoff_marker_cannot_disable_hairpin_source_closure(
             return drifted
         return payload
 
-    monkeypatch.setattr(subject_binding_loader, "_load_yaml", _load_yaml)
+    monkeypatch.setattr(binding_sources, "load_yaml", _load_yaml)
 
     with pytest.raises(
-        subject_binding_loader.SubjectBindingContractError,
+        SubjectBindingContractError,
         match="projected identity digest drifted",
     ):
         load_resolved_registered_subject_bindings(repo_root=_repo_root())
@@ -103,7 +104,7 @@ def test_catalog_projection_identity_drift_blocks_binding_resolution(
         _repo_root() / "docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/subject_bindings/"
         "retron_subject_bindings_v1.yaml"
     ).resolve()
-    original_load_yaml = subject_binding_loader._load_yaml
+    original_load_yaml = binding_sources.load_yaml
 
     def _load_yaml(path: Path) -> object:
         payload = original_load_yaml(path)
@@ -114,10 +115,10 @@ def test_catalog_projection_identity_drift_blocks_binding_resolution(
         drifted["source_sets"][0]["projection_sha256"] = "sha256:" + "0" * 64
         return drifted
 
-    monkeypatch.setattr(subject_binding_loader, "_load_yaml", _load_yaml)
+    monkeypatch.setattr(binding_sources, "load_yaml", _load_yaml)
 
     with pytest.raises(
-        subject_binding_loader.SubjectBindingContractError,
+        SubjectBindingContractError,
         match="projected identity digest drifted",
     ):
         load_resolved_registered_subject_bindings(repo_root=_repo_root())

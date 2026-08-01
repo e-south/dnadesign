@@ -27,9 +27,7 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings
     load_resolved_subject_bindings,
     load_subject_bindings,
 )
-from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings import (
-    loader as subject_binding_loader,
-)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings import sources as binding_sources
 
 _ECO1_PUBLICATION_PATH = Path("docs/studies/eco1_rt_repack/record/rt-parts/eco1-g3-distal-pair-v1.yaml")
 
@@ -70,14 +68,14 @@ def _sha256(value: str) -> str:
 
 def _override_eco1_publication(monkeypatch: pytest.MonkeyPatch, publication: dict[str, object]) -> None:
     publication_path = (_repo_root() / _ECO1_PUBLICATION_PATH).resolve()
-    original_load_yaml = subject_binding_loader._load_yaml
+    original_load_yaml = binding_sources.load_yaml
 
     def _load_yaml(path: Path) -> object:
         if Path(path).resolve() == publication_path:
             return publication
         return original_load_yaml(path)
 
-    monkeypatch.setattr(subject_binding_loader, "_load_yaml", _load_yaml)
+    monkeypatch.setattr(binding_sources, "load_yaml", _load_yaml)
 
 
 def _subject_by_id(payload: dict[str, object], subject_id: str) -> dict[str, object]:
@@ -257,9 +255,9 @@ def test_contained_file_rejects_parent_traversal_and_symlink_escape(tmp_path: Pa
     (bundle / "escape.yaml").symlink_to(outside)
 
     with pytest.raises(SubjectBindingContractError, match="parent traversal"):
-        subject_binding_loader._contained_file(bundle, "../outside.yaml", label="fixture")
+        binding_sources.contained_file(bundle, "../outside.yaml", label="fixture")
     with pytest.raises(SubjectBindingContractError, match="remain inside"):
-        subject_binding_loader._contained_file(bundle, "escape.yaml", label="fixture")
+        binding_sources.contained_file(bundle, "escape.yaml", label="fixture")
 
 
 def test_binding_loader_rejects_rt_digest_drift_and_blocks_projection(tmp_path: Path) -> None:
@@ -313,14 +311,14 @@ def test_binding_loader_accepts_non_eco1_provider_with_different_protein_length(
         ],
     }
     publication_path = (_repo_root() / synthetic_path).resolve()
-    original_load_yaml = subject_binding_loader._load_yaml
+    original_load_yaml = binding_sources.load_yaml
 
     def _load_yaml(path: Path) -> object:
         if Path(path).resolve() == publication_path:
             return publication
         return original_load_yaml(path)
 
-    monkeypatch.setattr(subject_binding_loader, "_load_yaml", _load_yaml)
+    monkeypatch.setattr(binding_sources, "load_yaml", _load_yaml)
 
     observed_registry = load_subject_bindings(
         repo_root=_repo_root(),
@@ -422,14 +420,14 @@ def test_binding_loader_rejects_genbank_source_file_digest_drift(
     source_ref = "docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/genbank/pes-retron-18.gb"
     changed_source = tmp_path / "pes-retron-18.gb"
     changed_source.write_bytes((_repo_root() / source_ref).read_bytes() + b"\n")
-    original_contained_file = subject_binding_loader._contained_file
+    original_contained_file = binding_sources.contained_file
 
     def _contained_file(base: Path, value: str, *, label: str) -> Path:
         if value == source_ref:
             return changed_source
         return original_contained_file(base, value, label=label)
 
-    monkeypatch.setattr(subject_binding_loader, "_contained_file", _contained_file)
+    monkeypatch.setattr(binding_sources, "contained_file", _contained_file)
 
     with pytest.raises(
         SubjectBindingContractError,
