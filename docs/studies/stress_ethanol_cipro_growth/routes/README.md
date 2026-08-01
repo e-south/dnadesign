@@ -31,13 +31,19 @@ Each step verifies its input before publishing the next artifact.
 
 | Step | Owner | Input and output | Open next |
 | --- | --- | --- | --- |
-| Measured records and assay review | Reader plus the stress-study display adapter | Raw assay sources become verified measurement, event-window, and plot records. The study adapter verifies and presents the pinned Reader plot without assigning candidates, labels, or objectives. | [Reader evidence display](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/reader_promoter_evidence/README.md) |
+| Measured records | Reader | Raw assay sources become verified measurement, event-window, and plot records. Reader does not assign study candidates, labels, or objectives. | [Candidate bindings](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/promoter_candidate_bindings/README.md) |
 | Candidate identity | Stress study | Reader aliases resolve to exact promoter candidates and sequence digests. | [Candidate bindings](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/promoter_candidate_bindings/README.md) |
 | Candidate observations | Stress study | Verified Reader reductions plus explicit repeat decisions become objective-neutral candidate observations. | [Response-window observations](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/README.md) |
 | Candidate features | Stress study and LatentDNA | The candidate table binds each candidate to the selected fixed-length model input. | [Candidate-table contract](../contexts/opal/candidate-table.md) |
 | Observed labels | Stress study | An approved observation bundle becomes an immutable OPAL label publication; this step does not score an objective. | [Label promotion](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_window_label_promotion/README.md) |
 | Objective interpretation | OPAL mathematics plus stress-study policy | SFXI, RMF, and MSRB interpret declared vectors under separate contracts. The active campaign uses MSRB; SFXI and RMF remain comparison evidence. | [OPAL context](../contexts/opal/README.md) |
 | Campaign state | OPAL plus checked-in study record | Validated features and labels feed model fitting, scoring, selection, ledgers, and the recorded physical handoff. | [OPAL route and commands](decision/opal/README.md) |
+
+The pinned Reader plot has one read-only study display after candidate bindings
+exist: [Reader evidence display](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/reader_promoter_evidence/README.md).
+It verifies the exact plot record and promoter binding for review in the OPAL
+notebook; it is not another data-plane step and does not produce observations,
+labels, or objectives.
 
 Stop when the next contract is absent or fails validation. Do not infer a study
 candidate from a Reader `design_id`, synthesize response-window labels from an

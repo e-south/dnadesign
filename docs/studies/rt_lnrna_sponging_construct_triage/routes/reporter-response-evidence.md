@@ -42,8 +42,12 @@ study-owned reduction recommendation.
    relative OD, and supported biological-replicate uncertainty.
 4. Declare a typed observation policy whose fixed formulas and reduction
    semantics derive its digest. Never supply a policy digest as provenance.
-5. Compare profiles only when their comparability keys match. Otherwise stop
-   with the mismatched policy, reduction, or dose-grid identity.
+5. Require exact comparability-key equality for direct aggregation within one
+   profile variant. The meta-study may compare the shared raw estimand across
+   raw and reference-normalized variants only when observation-policy digest,
+   reduction, and dose grid match; normalized response remains a separate
+   compatible subset and is never imputed for a raw-only profile. Stop on any
+   mismatch in that base identity.
 6. View each admitted time series through Reader's one public lifecycle:
    `reader/v8 -> plate_reader/single_reporter_screen ->
    sample_measurements/df -> plot/single_reporter_diagnostic -> registered

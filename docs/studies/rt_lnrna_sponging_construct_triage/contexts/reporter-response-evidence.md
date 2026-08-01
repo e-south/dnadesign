@@ -44,9 +44,11 @@ rate objective is currently named or published.
 
 ### Comparability and uncertainty
 
-Profiles may be compared or aggregated only when their comparability keys
-match and their contract variants support the requested operation. Every
-profile embeds a typed
+Direct aggregation within one profile variant requires an exact comparability
+key. The meta-study may compare the shared raw estimand across raw and
+reference-normalized variants when observation-policy digest, reduction, and
+dose grid match; normalized response stays a separate compatible subset and is
+never imputed. Every profile embeds a typed
 `rt_lnrna_reporter_response_observation_policy.v3`; its digest is derived from
 fixed formulas, clipping policy, pairing kind, and reduction semantics rather
 than supplied as provenance. The comparability key binds that policy digest,
