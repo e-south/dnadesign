@@ -60,12 +60,16 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         '<img alt="Coverage" src="badge.svg">\n'
         "</script>\n\n"
         '<video><source src="status-badge.mp4"></video>\n\n'
+        '<picture><video><source srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<source src="clip.mp4"></video><img src="diagram.svg"></picture>\n\n'
         '<source srcset="https://img.shields.io/badge/build-passing.svg">\n\n'
+        '<svg><image src="badge.svg"/></svg>\n\n'
         '<a href="outer">\n\n'
         "[inner](report) ![Coverage](status.svg)\n\n"
         "</a>\n\n"
         '[outer <a href="inner">inner</a> ![Coverage](status.svg)](report)\n\n'
         "[before </a> ![Coverage](status.svg)](report)\n\n"
+        '[before <a href="inner">inner](outer) ![Coverage](status.svg)\n\n'
         '<a id="coverage"><img alt="Coverage" src="status.svg"></a>\n\n'
         '<template><img src="badge.svg"></template>\n\n'
         '<template></script><img src="badge.svg"></template>\n\n'
@@ -135,14 +139,24 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
             1,
         ),
         (
+            '<img src="https://img.shields.io/badge/build-passing.svg" src="diagram.svg">\n',
+            1,
+        ),
+        ('<a href="report"><img alt="Coverage" alt="diagram" src="status.svg"></a>\n', 1),
+        (
             '<picture><source srcset="https://img.shields.io/badge/build-passing.svg">'
             '<img alt="build" src="diagram.svg"></picture>\n',
             1,
         ),
         ('<image src="https://img.shields.io/badge/build-passing.svg">\n', 1),
+        ('<svg><image href="https://img.shields.io/badge/build-passing.svg"/></svg>\n', 1),
         ('<a href="report" />\n\n<img alt="Coverage" src="status.svg">\n', 3),
         ('intro\n<img\n alt="Coverage"\n src="badge.svg">\noutro\n', 2),
         ('intro `code\nspan`\n<img\n alt="Coverage"\n src="badge.svg">\n', 3),
+        (
+            "text <textarea>\n\n<template>\n\n</textarea>\n\n[![Coverage](badge.svg)](report)\n",
+            7,
+        ),
     ],
 )
 def test_badge_policy_rejects_alternate_badge_syntax_outside_root(

@@ -40,6 +40,28 @@ INERT_HTML_CONTAINERS = frozenset(
         "xmp",
     }
 )
+HTML_NAMESPACE = "html"
+SVG_NAMESPACE = "svg"
+HTML_VOID_ELEMENTS = frozenset(
+    {
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    }
+)
+RAW_TEXT_HTML_CONTAINERS = INERT_HTML_CONTAINERS - {"plaintext", "template"}
+SVG_HTML_INTEGRATION_POINTS = frozenset({"desc", "foreignobject", "title"})
 MARKDOWN = MarkdownIt("commonmark")
 ROOT_README_ALLOWED_BADGES = frozenset(
     {
@@ -71,10 +93,16 @@ class _RelativeImageOccurrence:
     spec: _ImageSpec
 
 
+@dataclass(frozen=True, slots=True)
+class _OpenElement:
+    tag: str
+    namespace: str
+
+
 @dataclass(slots=True)
 class _HTMLContext:
     inert_elements: list[str] = field(default_factory=list)
-    picture_depth: int = 0
+    open_elements: list[_OpenElement] = field(default_factory=list)
     plaintext: bool = False
     raw_anchor_linked: bool = False
 
@@ -82,10 +110,30 @@ class _HTMLContext:
     def is_inert(self) -> bool:
         return self.plaintext or bool(self.inert_elements)
 
+    @property
+    def child_namespace(self) -> str:
+        if not self.open_elements:
+            return HTML_NAMESPACE
+        parent = self.open_elements[-1]
+        if parent.namespace == SVG_NAMESPACE and parent.tag not in SVG_HTML_INTEGRATION_POINTS:
+            return SVG_NAMESPACE
+        return HTML_NAMESPACE
+
+    def direct_parent_is(self, tag: str, namespace: str) -> bool:
+        return bool(
+            self.open_elements and self.open_elements[-1].tag == tag and self.open_elements[-1].namespace == namespace
+        )
+
+    def close_open_element(self, tag: str) -> None:
+        for index in range(len(self.open_elements) - 1, -1, -1):
+            if self.open_elements[index].tag == tag:
+                del self.open_elements[index:]
+                return
+
     def clone(self) -> _HTMLContext:
         return _HTMLContext(
             inert_elements=list(self.inert_elements),
-            picture_depth=self.picture_depth,
+            open_elements=list(self.open_elements),
             plaintext=self.plaintext,
             raw_anchor_linked=self.raw_anchor_linked,
         )
@@ -102,43 +150,72 @@ class _HTMLImageParser(HTMLParser):
         normalized_tag = tag.casefold()
         if self.context.plaintext:
             return
-        if normalized_tag == "image":
+        if self.context.inert_elements:
+            if self.context.inert_elements[-1] in RAW_TEXT_HTML_CONTAINERS:
+                return
+            if normalized_tag in INERT_HTML_CONTAINERS:
+                if normalized_tag == "plaintext":
+                    self.context.plaintext = True
+                else:
+                    self.context.inert_elements.append(normalized_tag)
+            return
+
+        namespace = self.context.child_namespace
+        if namespace == HTML_NAMESPACE and normalized_tag == "svg":
+            namespace = SVG_NAMESPACE
+        if namespace == HTML_NAMESPACE and normalized_tag == "image":
             normalized_tag = "img"
-        if normalized_tag in INERT_HTML_CONTAINERS:
+        if namespace == HTML_NAMESPACE and normalized_tag in INERT_HTML_CONTAINERS:
             if normalized_tag == "plaintext":
                 self.context.plaintext = True
             else:
                 self.context.inert_elements.append(normalized_tag)
             return
-        if self.context.is_inert:
-            return
+
+        attributes: dict[str, str] = {}
+        for name, value in attrs:
+            attributes.setdefault(name.casefold(), value or "")
         if normalized_tag == "a":
-            self.context.raw_anchor_linked = any(name.casefold() == "href" for name, _value in attrs)
+            if namespace == HTML_NAMESPACE:
+                self.context.close_open_element("a")
+            self.context.raw_anchor_linked = "href" in attributes
             self.markdown_link_depth = 0
-            return
-        if normalized_tag == "picture":
-            self.context.picture_depth += 1
-            return
-        if normalized_tag not in {"img", "source"}:
-            return
-        attributes = {name.casefold(): value or "" for name, value in attrs}
-        source_names = ("src", "srcset") if normalized_tag == "img" else ("srcset",)
-        sources = " ".join(value for name in source_names if (value := attributes.get(name, "")))
-        if normalized_tag == "source" and self.context.picture_depth == 0:
-            return
-        self.images.append(
-            (
-                self.getpos()[0] - 1,
-                _ImageSpec(
-                    label=attributes.get("alt", ""),
-                    source=sources,
-                    linked=self.markdown_link_depth > 0 or self.context.raw_anchor_linked,
-                ),
-            )
+
+        is_html_image = namespace == HTML_NAMESPACE and normalized_tag == "img"
+        is_picture_source = (
+            namespace == HTML_NAMESPACE
+            and normalized_tag == "source"
+            and self.context.direct_parent_is("picture", HTML_NAMESPACE)
         )
+        is_svg_image = namespace == SVG_NAMESPACE and normalized_tag == "image"
+        if is_html_image or is_picture_source or is_svg_image:
+            source_names = (
+                ("href", "xlink:href") if is_svg_image else (("src", "srcset") if is_html_image else ("srcset",))
+            )
+            sources = " ".join(value for name in source_names if (value := attributes.get(name, "")))
+            self.images.append(
+                (
+                    self.getpos()[0] - 1,
+                    _ImageSpec(
+                        label=attributes.get("alt", ""),
+                        source=sources,
+                        linked=self.markdown_link_depth > 0 or self.context.raw_anchor_linked,
+                    ),
+                )
+            )
+
+        if namespace == HTML_NAMESPACE and normalized_tag in HTML_VOID_ELEMENTS:
+            return
+        self.context.open_elements.append(_OpenElement(tag=normalized_tag, namespace=namespace))
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        open_element_count = len(self.context.open_elements)
         self.handle_starttag(tag, attrs)
+        if (
+            len(self.context.open_elements) > open_element_count
+            and self.context.open_elements[-1].namespace != HTML_NAMESPACE
+        ):
+            self.handle_endtag(self.context.open_elements[-1].tag)
 
     def handle_endtag(self, tag: str) -> None:
         normalized_tag = tag.casefold()
@@ -153,8 +230,7 @@ class _HTMLImageParser(HTMLParser):
         if normalized_tag == "a":
             self.context.raw_anchor_linked = False
             self.markdown_link_depth = 0
-        elif normalized_tag == "picture":
-            self.context.picture_depth = max(0, self.context.picture_depth - 1)
+        self.context.close_open_element(normalized_tag)
 
 
 def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
@@ -189,9 +265,13 @@ def _inline_image_specs(
         if token.type == "link_open":
             if not context.is_inert:
                 context.raw_anchor_linked = False
+                context.close_open_element("a")
             markdown_link_depth += 1
             continue
         if token.type == "link_close":
+            if not context.is_inert:
+                context.raw_anchor_linked = False
+                context.close_open_element("a")
             markdown_link_depth = max(0, markdown_link_depth - 1)
             continue
         if token.type == "image":
