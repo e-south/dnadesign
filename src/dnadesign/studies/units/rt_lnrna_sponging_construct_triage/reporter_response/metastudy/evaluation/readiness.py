@@ -206,6 +206,18 @@ def readiness_from_live_bridge(*, phd_root: Path) -> EvidenceReadiness:
         METASTUDY_ROUTE_ID,
     ]
     completed = subprocess.run(command, cwd=root, check=False, capture_output=True, text=True)
+    if completed.returncode != 0:
+        diagnostics = "; ".join(
+            value
+            for value in (
+                f"stdout={completed.stdout.strip()}" if completed.stdout.strip() else "",
+                f"stderr={completed.stderr.strip()}" if completed.stderr.strip() else "",
+            )
+            if value
+        )
+        raise MetastudyContractError(
+            f"live bridge checker exited with status {completed.returncode}: {diagnostics or '<no output>'}"
+        )
     raw = completed.stdout.strip() or completed.stderr.strip()
     try:
         payload = json.loads(raw)

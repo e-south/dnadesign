@@ -96,13 +96,7 @@ def test_live_bridge_runner_is_the_selection_authority(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    skill = tmp_path / ".agents/skills/retron-assay-study-bridge"
-    registry = skill / "references/reader-experiment-routes.json"
-    checker = skill / "scripts/check_reader_experiment_readiness.py"
-    registry.parent.mkdir(parents=True)
-    checker.parent.mkdir(parents=True)
-    registry.write_text("{}\n", encoding="utf-8")
-    checker.write_text("# fixture\n", encoding="utf-8")
+    _install_live_bridge_fixture(tmp_path)
     receipt = _readiness_receipt(ready_ids=KINETIC_IDS)
 
     monkeypatch.setattr(
@@ -118,6 +112,70 @@ def test_live_bridge_runner_is_the_selection_authority(
 
     assert readiness.is_selection_authorized
     assert evaluate_metastudy(_evidence(), readiness=readiness).status == "selected"
+
+
+def test_live_bridge_runner_rejects_ready_receipt_from_failed_process(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_live_bridge_fixture(tmp_path)
+    receipt = _readiness_receipt(ready_ids=KINETIC_IDS)
+
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *_args, **_kwargs: type(
+            "Completed",
+            (),
+            {
+                "stdout": json.dumps(receipt),
+                "stderr": "bridge transport failed after writing receipt",
+                "returncode": 1,
+            },
+        )(),
+    )
+
+    with pytest.raises(MetastudyContractError) as exc_info:
+        readiness_from_live_bridge(phd_root=tmp_path)
+
+    message = str(exc_info.value)
+    assert "exited with status 1" in message
+    assert 'stdout={"available_protocols"' in message
+    assert "stderr=bridge transport failed after writing receipt" in message
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        pytest.param(OSError("bridge executable unavailable"), id="transport-error"),
+        pytest.param(KeyboardInterrupt(), id="base-exception"),
+    ],
+)
+def test_live_bridge_runner_preserves_execution_exception_taxonomy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error: BaseException,
+) -> None:
+    _install_live_bridge_fixture(tmp_path)
+
+    def fail_execution(*_args: object, **_kwargs: object) -> None:
+        raise error
+
+    monkeypatch.setattr("subprocess.run", fail_execution)
+
+    with pytest.raises(type(error)) as exc_info:
+        readiness_from_live_bridge(phd_root=tmp_path)
+
+    assert exc_info.value is error
+
+
+def _install_live_bridge_fixture(root: Path) -> None:
+    skill = root / ".agents/skills/retron-assay-study-bridge"
+    registry = skill / "references/reader-experiment-routes.json"
+    checker = skill / "scripts/check_reader_experiment_readiness.py"
+    registry.parent.mkdir(parents=True)
+    checker.parent.mkdir(parents=True)
+    registry.write_text("{}\n", encoding="utf-8")
+    checker.write_text("# fixture\n", encoding="utf-8")
 
 
 def _readiness_receipt(*, ready_ids: tuple[str, ...] = ()) -> dict[str, object]:
