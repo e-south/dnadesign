@@ -26,14 +26,10 @@ if TYPE_CHECKING:
         render_record_figure,
         render_record_grid_figure,
         render_sequence_panel_image,
-        run_cruncher_showcase_job,
         run_job,
         run_render_job,
-        run_sequence_rows_job,
-        validate_cruncher_showcase_job,
         validate_job,
         validate_render_job,
-        validate_sequence_rows_job,
     )
     from .catalog import (  # noqa: F401
         get_adapter_descriptor,

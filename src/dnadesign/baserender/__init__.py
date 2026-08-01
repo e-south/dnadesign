@@ -17,9 +17,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dnadesign.baserender.src.cli import app  # noqa: F401
     from dnadesign.baserender.src.config import (  # noqa: F401
-        BaseRenderJobV3,
         RenderContractDescriptor,
-        RenderJobV3,
+        RenderJobV4,
         Style,
         list_style_presets,
         resolve_preset_path,
@@ -59,15 +58,11 @@ if TYPE_CHECKING:
         render_record_figure,
         render_record_grid_figure,
         render_sequence_panel_image,
-        run_cruncher_showcase_job,
         run_job,
         run_render_job,
-        run_sequence_rows_job,
         sequence_panel_config_for_adapter,
-        validate_cruncher_showcase_job,
         validate_job,
         validate_render_job,
-        validate_sequence_rows_job,
     )
     from dnadesign.baserender.src.render.palette import Palette  # noqa: F401
     from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401

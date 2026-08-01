@@ -15,7 +15,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from dnadesign.baserender.src.config import BaseRenderJobV3, RenderContractDescriptor, RenderJobV3  # noqa: F401
+    from dnadesign.baserender.src.config import RenderContractDescriptor, RenderJobV4  # noqa: F401
     from dnadesign.baserender.src.contracts import DENSEGEN_TFBS_REQUIRED_KEYS  # noqa: F401
     from dnadesign.baserender.src.core import (  # noqa: F401
         ContractError,
@@ -42,14 +42,10 @@ if TYPE_CHECKING:
         render_parquet_record_figure,
         render_record_figure,
         render_record_grid_figure,
-        run_cruncher_showcase_job,
         run_job,
         run_render_job,
-        run_sequence_rows_job,
-        validate_cruncher_showcase_job,
         validate_job,
         validate_render_job,
-        validate_sequence_rows_job,
     )
     from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
