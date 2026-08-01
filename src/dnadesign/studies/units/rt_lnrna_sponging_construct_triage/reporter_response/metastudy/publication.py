@@ -17,6 +17,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import sys
 import tempfile
 from collections.abc import Iterable
@@ -29,21 +30,19 @@ from .acquisition_projection import (
     validate_acquisition_projection_payload,
 )
 from .contracts._values import MetastudyContractError, canonical_digest
-from .contracts.decision import (
-    DEFAULT_OBJECTIVE_READINESS,
-    MetastudyDecision,
-    ObjectiveReadiness,
-    SensitivityEvaluation,
-    decision_is_evidence_bearing,
-    decision_to_dict,
-    objective_readiness_from_payload,
-    validate_decision_payload,
-)
+from .contracts.decision import MetastudyDecision, decision_is_evidence_bearing
+from .contracts.decision_codec import decision_to_dict, validate_decision_payload
 from .contracts.materialization import EvidenceReadiness, materialization_attempt_from_payload
+from .contracts.objective import (
+    DEFAULT_OBJECTIVE_READINESS,
+    ObjectiveReadiness,
+    objective_readiness_from_payload,
+)
 from .contracts.profile import ProfileEvidence
+from .contracts.sensitivity import SensitivityEvaluation
 from .evaluation.evidence import decision_evidence_payload
 from .evaluation.selection import reevaluate_evidence_projection
-from .evidence_projection import parse_profile_evidence_projection
+from .evidence_projection.parsing import parse_profile_evidence_projection
 from .sensitivity import sensitivity_evidence_payload, verify_sensitivity_evidence_payload
 from .sensitivity_coverage import SensitivityCoverageLedger
 
@@ -62,6 +61,57 @@ _PUBLICATION_SCHEMA_ID = "rt_lnrna_reporter_response_metastudy_publication.v6"
 _AT_FDCWD = -100
 _RENAME_NOREPLACE = 1
 _RENAME_EXCL = 4
+
+
+def _read_publication_bundle(root: Path) -> dict[str, bytes]:
+    """Snapshot an exact bundle without following member symlinks."""
+
+    try:
+        root_metadata = root.lstat()
+    except OSError as exc:
+        raise MetastudyContractError("publication directory is unreadable") from exc
+    if not stat.S_ISDIR(root_metadata.st_mode):
+        raise MetastudyContractError("publication must be a directory")
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if nofollow is None or directory is None:
+        raise MetastudyContractError("no-follow publication verification is unavailable")
+    directory_flags = os.O_RDONLY | nofollow | directory | getattr(os, "O_CLOEXEC", 0)
+    try:
+        root_fd = os.open(root, directory_flags)
+    except OSError as exc:
+        raise MetastudyContractError("publication directory is unreadable") from exc
+    try:
+        try:
+            observed_files = set(os.listdir(root_fd))
+        except OSError as exc:
+            raise MetastudyContractError("publication directory is unreadable") from exc
+        if observed_files not in (_EVIDENCE_FREE_FILES, _EVIDENCE_BEARING_FILES, _SELECTED_FILES):
+            raise MetastudyContractError("publication files do not match a readiness, evaluated, or selected contract")
+        payloads: dict[str, bytes] = {}
+        file_flags = os.O_RDONLY | nofollow | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0)
+        for name in sorted(observed_files):
+            try:
+                metadata = os.lstat(name, dir_fd=root_fd)
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise MetastudyContractError("publication bundle members must be regular files")
+                member_fd = os.open(name, file_flags, dir_fd=root_fd)
+            except MetastudyContractError:
+                raise
+            except OSError as exc:
+                raise MetastudyContractError("publication bundle members must be regular files") from exc
+            try:
+                if not stat.S_ISREG(os.fstat(member_fd).st_mode):
+                    raise MetastudyContractError("publication bundle members must be regular files")
+                with os.fdopen(member_fd, "rb", closefd=False) as stream:
+                    payloads[name] = stream.read()
+            except OSError as exc:
+                raise MetastudyContractError(f"publication bundle member is unreadable: {name}") from exc
+            finally:
+                os.close(member_fd)
+        return payloads
+    finally:
+        os.close(root_fd)
 
 
 def _rename_directory_create_only(stage: Path, target: Path) -> None:
@@ -196,15 +246,12 @@ def publish_metastudy(
 def verify_publication(path: Path) -> MetastudyDecision | None:
     """Verify exact files, decision contract, and report digest without mutation."""
 
-    root = Path(path).expanduser().resolve()
-    if not root.is_dir():
-        raise MetastudyContractError("publication must be a directory")
-    observed_files = {entry.name for entry in root.iterdir()}
-    if observed_files not in (_EVIDENCE_FREE_FILES, _EVIDENCE_BEARING_FILES, _SELECTED_FILES):
-        raise MetastudyContractError("publication files do not match a readiness, evaluated, or selected contract")
+    root = Path(path).expanduser().absolute()
+    bundle = _read_publication_bundle(root)
+    observed_files = set(bundle)
     try:
-        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        manifest = json.loads(bundle["manifest.json"])
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise MetastudyContractError("publication manifest is unreadable") from exc
     expected_manifest_fields = {
         "schema_id",
@@ -233,14 +280,14 @@ def verify_publication(path: Path) -> MetastudyDecision | None:
         raise MetastudyContractError("decision evidence shape and publication bundle kind differ")
     if (decision["selected_reduction"] is not None) != (observed_files == _SELECTED_FILES):
         raise MetastudyContractError("selected decision and acquisition publication shape differ")
-    report = (root / "report.md").read_bytes()
+    report = bundle["report.md"]
     observed = "sha256:" + hashlib.sha256(report).hexdigest()
     if manifest["report_digest"] != observed:
         raise MetastudyContractError("publication report digest mismatch")
     expected_report = _render_report(decision).encode("utf-8")
     if report != expected_report:
         raise MetastudyContractError("publication report bytes do not equal the canonical rendered decision")
-    sensitivity_bytes = (root / "sensitivity.json").read_bytes()
+    sensitivity_bytes = bundle["sensitivity.json"]
     observed_sensitivity_digest = "sha256:" + hashlib.sha256(sensitivity_bytes).hexdigest()
     if manifest["sensitivity_file_digest"] != observed_sensitivity_digest:
         raise MetastudyContractError("publication sensitivity file digest mismatch")
@@ -257,7 +304,7 @@ def verify_publication(path: Path) -> MetastudyDecision | None:
     verify_sensitivity_evidence_payload(sensitivity_payload, attempts=parsed_attempts)
     evidence_payload: object | None = None
     if decision_is_evidence_bearing(decision):
-        evidence_bytes = (root / "evidence.json").read_bytes()
+        evidence_bytes = bundle["evidence.json"]
         observed_evidence_file_digest = "sha256:" + hashlib.sha256(evidence_bytes).hexdigest()
         if manifest["evidence_file_digest"] != observed_evidence_file_digest:
             raise MetastudyContractError("publication evidence file digest mismatch")
@@ -267,7 +314,7 @@ def verify_publication(path: Path) -> MetastudyDecision | None:
             raise MetastudyContractError("publication evidence is unreadable") from exc
         verify_decision_evidence_payload(evidence_payload, decision)
     if decision["selected_reduction"] is not None:
-        acquisition_bytes = (root / "acquisition.json").read_bytes()
+        acquisition_bytes = bundle["acquisition.json"]
         if manifest["acquisition_file_digest"] != "sha256:" + hashlib.sha256(acquisition_bytes).hexdigest():
             raise MetastudyContractError("publication acquisition file digest mismatch")
         try:

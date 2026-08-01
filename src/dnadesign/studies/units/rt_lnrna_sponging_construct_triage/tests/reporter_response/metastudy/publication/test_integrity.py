@@ -76,6 +76,30 @@ def test_selected_publication_is_create_only_and_evidence_bearing(tmp_path: Path
         _publish_selected(selected, destination)
 
 
+def test_verify_publication_rejects_symlink_bundle_member(tmp_path: Path) -> None:
+    selected = evaluate_metastudy(_evidence(), readiness=_ready())
+    destination = _publish_selected(selected, tmp_path / "symlink-member")
+    report = destination / "report.md"
+    external = tmp_path / "external-report.md"
+    external.write_bytes(report.read_bytes())
+    report.unlink()
+    report.symlink_to(external)
+
+    with pytest.raises(MetastudyContractError, match="regular files"):
+        verify_publication(destination)
+
+
+def test_verify_publication_rejects_nonregular_bundle_member(tmp_path: Path) -> None:
+    selected = evaluate_metastudy(_evidence(), readiness=_ready())
+    destination = _publish_selected(selected, tmp_path / "directory-member")
+    report = destination / "report.md"
+    report.unlink()
+    report.mkdir()
+
+    with pytest.raises(MetastudyContractError, match="regular files"):
+        verify_publication(destination)
+
+
 def test_selected_raw_profile_publication_keeps_normalized_metrics_unavailable(tmp_path: Path) -> None:
     evidence = _evidence(reference_normalized=False)
     selected = evaluate_metastudy(evidence, readiness=_ready())
@@ -113,7 +137,8 @@ def test_publication_rejects_rehashed_acquisition_projection_not_derived_from_pr
     projection_path = destination / "acquisition.json"
     manifest_path = destination / "manifest.json"
     payload = json.loads(projection_path.read_text(encoding="utf-8"))
-    payload["coordinates"][0]["contributions"][0]["normalized_reporter_response"] += 1.0
+    coordinate = next(row for row in payload["coordinates"] if row["metric_space"] == "reference_normalized")
+    coordinate["contributions"][0]["normalized_reporter_response"] += 1.0
     payload_without_digest = {key: value for key, value in payload.items() if key != "projection_digest"}
     payload["projection_digest"] = canonical_digest(payload_without_digest)
     projection_bytes = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
