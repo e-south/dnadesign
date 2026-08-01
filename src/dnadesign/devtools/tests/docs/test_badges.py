@@ -35,10 +35,17 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         "[Coverage details](https://codecov.io/gh/e-south/dnadesign?component=aligner)\n",
     )
     _write(tool_readme, "![construct banner](docs/assets/construct-banner.svg)\n")
-    _write(figure_doc, "[![Workflow diagram](diagram.png)](diagram-full.png)\n")
+    _write(
+        figure_doc,
+        "[![Workflow diagram](diagram.png)](diagram-full.png)\n"
+        "[![Security architecture](security-architecture.svg)](security-architecture-full.svg)\n"
+        "[![Release sequence](release-sequence.svg)](release-sequence-full.svg)\n",
+    )
     _write(
         example_doc,
         "Literal shortcut syntax: ![Coverage]\n\n"
+        "Inline example: `[![Coverage](coverage.svg)](report)`\n\n"
+        "<!-- [![Coverage](coverage.svg)](report) -->\n\n"
         "```markdown\n"
         "[![Coverage](https://example.test/coverage.svg)](https://example.test/report)\n"
         "```\n",

@@ -27,10 +27,13 @@ HTML_ATTRIBUTE_PATTERN = re.compile(
     r"(?P<name>[A-Za-z_:][-A-Za-z0-9_:.]*)\s*=\s*"
     r'(?:"(?P<double>[^"]*)"|\'(?P<single>[^\']*)\'|(?P<bare>[^\s"\'=<>`]+))'
 )
-BADGE_HINT_PATTERN = re.compile(
-    r"(?:\bbadge\b|shields\.io|codecov\.io|\b(?:build|ci|coverage|codeql|license|release|security|status|version)\b)",
+HTML_COMMENT_PATTERN = re.compile(r"<!--[\s\S]*?-->")
+HTML_ANCHOR_OPEN_PATTERN = re.compile(r"<a(?:\s|>)", flags=re.IGNORECASE)
+BADGE_SOURCE_PATTERN = re.compile(
+    r"(?:shields\.io|codecov\.io|(?:^|[/_.-])badge(?:[./?_-]|$))",
     flags=re.IGNORECASE,
 )
+BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags=re.IGNORECASE)
 ROOT_README_ALLOWED_BADGES = frozenset(
     {
         "[![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg?branch=main)]"
@@ -72,6 +75,55 @@ def _mask_fenced_code(content: str) -> str:
     return "".join(masked)
 
 
+def _mask_range(content: str, start: int, end: int) -> str:
+    masked_range = "".join(character if character in "\r\n" else " " for character in content[start:end])
+    return content[:start] + masked_range + content[end:]
+
+
+def _mask_html_comments(content: str) -> str:
+    masked = content
+    for match in reversed(tuple(HTML_COMMENT_PATTERN.finditer(content))):
+        masked = _mask_range(masked, match.start(), match.end())
+    return masked
+
+
+def _mask_inline_code(content: str) -> str:
+    masked = content
+    cursor = 0
+    while cursor < len(content):
+        if content[cursor] != "`":
+            cursor += 1
+            continue
+        opening_end = cursor
+        while opening_end < len(content) and content[opening_end] == "`":
+            opening_end += 1
+        delimiter = content[cursor:opening_end]
+        search_from = opening_end
+        closing_start = -1
+        while True:
+            candidate = content.find(delimiter, search_from)
+            if candidate < 0:
+                break
+            candidate_end = candidate + len(delimiter)
+            if (candidate == 0 or content[candidate - 1] != "`") and (
+                candidate_end == len(content) or content[candidate_end] != "`"
+            ):
+                closing_start = candidate
+                break
+            search_from = candidate_end
+        if closing_start < 0:
+            cursor = opening_end
+            continue
+        closing_end = closing_start + len(delimiter)
+        masked = _mask_range(masked, cursor, closing_end)
+        cursor = closing_end
+    return masked
+
+
+def _mask_non_rendered_spans(content: str) -> str:
+    return _mask_inline_code(_mask_html_comments(_mask_fenced_code(content)))
+
+
 def _html_attributes(raw_attributes: str) -> dict[str, str]:
     attributes: dict[str, str] = {}
     for match in HTML_ATTRIBUTE_PATTERN.finditer(raw_attributes):
@@ -80,8 +132,27 @@ def _html_attributes(raw_attributes: str) -> dict[str, str]:
     return attributes
 
 
+def _is_markdown_image_linked(content: str, position: int) -> bool:
+    return position > 0 and content[position - 1] == "["
+
+
+def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
+    return BADGE_SOURCE_PATTERN.search(source) is not None or (
+        linked and BADGE_LABEL_PATTERN.fullmatch(label) is not None
+    )
+
+
+def _is_html_image_linked(content: str, start: int, end: int) -> bool:
+    lowered = content.casefold()
+    openings = tuple(HTML_ANCHOR_OPEN_PATTERN.finditer(content, 0, start))
+    opening = openings[-1].start() if openings else -1
+    prior_closing = lowered.rfind("</a>", 0, start)
+    next_closing = lowered.find("</a>", end)
+    return opening > prior_closing and next_closing >= 0
+
+
 def _badge_image_positions(content: str) -> tuple[int, ...]:
-    visible_content = _mask_fenced_code(content)
+    visible_content = _mask_non_rendered_spans(content)
     reference_targets = {
         match.group("label").casefold(): match.group("target")
         for match in MARKDOWN_REFERENCE_DEFINITION_PATTERN.finditer(visible_content)
@@ -89,23 +160,39 @@ def _badge_image_positions(content: str) -> tuple[int, ...]:
     positions: set[int] = set()
 
     for match in MARKDOWN_INLINE_IMAGE_PATTERN.finditer(visible_content):
-        if BADGE_HINT_PATTERN.search(f"{match.group('alt')} {match.group('image')}"):
+        if _looks_like_badge(
+            label=match.group("alt"),
+            source=match.group("image"),
+            linked=_is_markdown_image_linked(visible_content, match.start()),
+        ):
             positions.add(match.start())
 
     for match in MARKDOWN_REFERENCE_IMAGE_PATTERN.finditer(visible_content):
         label = match.group("label") or match.group("alt")
         target = reference_targets.get(label.casefold(), "")
-        if BADGE_HINT_PATTERN.search(f"{match.group('alt')} {label} {target}"):
+        if _looks_like_badge(
+            label=match.group("alt"),
+            source=target,
+            linked=_is_markdown_image_linked(visible_content, match.start()),
+        ):
             positions.add(match.start())
 
     for match in MARKDOWN_SHORTCUT_REFERENCE_IMAGE_PATTERN.finditer(visible_content):
         target = reference_targets.get(match.group("alt").casefold(), "")
-        if target and BADGE_HINT_PATTERN.search(f"{match.group('alt')} {target}"):
+        if target and _looks_like_badge(
+            label=match.group("alt"),
+            source=target,
+            linked=_is_markdown_image_linked(visible_content, match.start()),
+        ):
             positions.add(match.start())
 
     for match in HTML_IMAGE_PATTERN.finditer(visible_content):
         attributes = _html_attributes(match.group("attributes"))
-        if BADGE_HINT_PATTERN.search(f"{attributes.get('alt', '')} {attributes.get('src', '')}"):
+        if _looks_like_badge(
+            label=attributes.get("alt", ""),
+            source=attributes.get("src", ""),
+            linked=_is_html_image_linked(visible_content, match.start(), match.end()),
+        ):
             positions.add(match.start())
 
     return tuple(sorted(positions))
