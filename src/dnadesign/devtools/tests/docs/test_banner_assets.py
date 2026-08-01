@@ -162,7 +162,36 @@ def test_render_rejects_symlinked_output_parent_without_mutation(tmp_path: Path)
     outside.mkdir()
     (repo_root / "assets").symlink_to(outside, target_is_directory=True)
 
-    with pytest.raises(ValueError, match="escapes repository root"):
+    with pytest.raises(ValueError, match="symlink component"):
         render_banners(repo_root)
 
     assert list(outside.iterdir()) == []
+
+
+def test_render_rejects_in_repo_symlinked_output_parent_without_mutation(tmp_path: Path) -> None:
+    repo_root = tmp_path / "dnadesign"
+    _write_repo_markers(repo_root)
+    alternate_assets = repo_root / "alternate-assets"
+    alternate_assets.mkdir()
+    (repo_root / "assets").symlink_to(alternate_assets, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink component"):
+        render_banners(repo_root)
+
+    assert list(alternate_assets.iterdir()) == []
+
+
+def test_render_rejects_symlinked_output_file_without_mutation(tmp_path: Path) -> None:
+    repo_root = tmp_path / "dnadesign"
+    _write_repo_markers(repo_root)
+    unrelated = repo_root / "unrelated.svg"
+    unrelated.write_text("preserve me", encoding="utf-8")
+    output = repo_root / REPOSITORY_BANNER_PATH
+    output.parent.mkdir(parents=True)
+    output.symlink_to(unrelated)
+
+    with pytest.raises(ValueError, match="symlink component"):
+        render_banners(repo_root)
+
+    assert output.is_symlink()
+    assert unrelated.read_text(encoding="utf-8") == "preserve me"

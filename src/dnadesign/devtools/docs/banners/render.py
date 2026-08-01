@@ -40,6 +40,11 @@ def _resolve_output_path(root: Path, relative_path: str) -> Path:
     declared_path = Path(relative_path)
     if declared_path.is_absolute():
         raise ValueError(f"Banner output path escapes repository root: {relative_path}")
+    candidate = root
+    for component in declared_path.parts:
+        candidate /= component
+        if candidate.is_symlink():
+            raise ValueError(f"Banner output path contains a symlink component: {relative_path}")
     output_path = (root / declared_path).resolve()
     try:
         output_path.relative_to(root)
