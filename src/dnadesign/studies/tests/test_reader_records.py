@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
@@ -274,6 +275,90 @@ def test_public_reader_record_follows_bounded_pages(tmp_path: Path, monkeypatch)
     assert commands[2][-4:] == ("verify", str(config), "--format", "json")
     assert "--continuation" not in commands[3]
     assert commands[4][-2:] == ("--continuation", "opaque")
+
+
+def test_public_reader_record_rejects_repeated_continuation_token(tmp_path: Path, monkeypatch) -> None:
+    reader_root, config, artifact, digest = _fixture(tmp_path)
+    first_page = _page(
+        config=config,
+        artifact=artifact,
+        digest=digest,
+        records=[_record(digest=digest, record_id="a/df")],
+        total=2,
+        truncated=True,
+        continuation="opaque",
+    )
+    repeated_page = _page(
+        config=config,
+        artifact=artifact,
+        digest=digest,
+        records=[_record(digest=digest)],
+        total=2,
+        truncated=True,
+        continuation="opaque",
+    )
+    pages = iter((first_page, repeated_page))
+    monkeypatch.setattr(records_module, "_run_reader_json", lambda *_args, **_kwargs: next(pages))
+
+    with pytest.raises(ReaderDataframeRecordError, match="repeated continuation token"):
+        _resolve(reader_root, config)
+
+
+def test_public_reader_record_rejects_truncated_empty_page(tmp_path: Path, monkeypatch) -> None:
+    reader_root, config, artifact, digest = _fixture(tmp_path)
+    payload = _page(
+        config=config,
+        artifact=artifact,
+        digest=digest,
+        records=[],
+        total=1,
+        truncated=True,
+        continuation="opaque",
+    )
+    monkeypatch.setattr(records_module, "_run_reader_json", lambda *_args, **_kwargs: payload)
+
+    with pytest.raises(ReaderDataframeRecordError, match="truncated page must contain at least one record"):
+        _resolve(reader_root, config)
+
+
+def test_public_reader_record_rejects_pagination_beyond_page_bound(tmp_path: Path, monkeypatch) -> None:
+    reader_root, config, artifact, digest = _fixture(tmp_path)
+    payload = _page(
+        config=config,
+        artifact=artifact,
+        digest=digest,
+        records=[_record(digest=digest, record_id="a/df")],
+        total=2,
+        truncated=True,
+        continuation="opaque",
+    )
+    calls = 0
+
+    def run(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        return payload
+
+    monkeypatch.setattr(records_module, "_MAX_RECORD_PAGES", 1, raising=False)
+    monkeypatch.setattr(records_module, "_run_reader_json", run)
+
+    with pytest.raises(ReaderDataframeRecordError, match="exceeded the 1-page safety bound"):
+        _resolve(reader_root, config)
+    assert calls == 1
+
+
+def test_reader_cli_timeout_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    observed: dict[str, object] = {}
+
+    def run(command, **kwargs):
+        observed.update(kwargs)
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(records_module.subprocess, "run", run)
+
+    with pytest.raises(ReaderDataframeRecordError, match="timed out after 60 seconds"):
+        records_module._run_reader_json(("reader-fixture", "records"), cwd=tmp_path)
+    assert observed["timeout"] == 60
 
 
 @pytest.mark.parametrize(

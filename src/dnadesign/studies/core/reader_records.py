@@ -24,6 +24,8 @@ READER_CLI_SCHEMA = "reader.cli/v1"
 READER_CATALOG_SCHEMA_VERSION = 4
 READER_RECORD_SCHEMA_VERSION = 6
 _PAGE_LIMIT = 100
+_MAX_RECORD_PAGES = 100
+_READER_CLI_TIMEOUT_SECONDS = 60
 _SOURCE_CLOSURE_TOKEN = object()
 
 
@@ -685,7 +687,10 @@ def _collect_record_pages(
     first_data: Mapping[str, object] | None = None
     records: list[Mapping[str, object]] = []
     seen_ids: set[str] = set()
+    seen_continuations: set[str] = set()
+    page_count = 0
     while True:
+        page_count += 1
         argv = [*command, "records", str(config_path), "--limit", str(_PAGE_LIMIT), "--format", "json"]
         if continuation is not None:
             argv.extend(("--continuation", continuation))
@@ -722,7 +727,19 @@ def _collect_record_pages(
             if next_token is not None:
                 raise ReaderDataframeRecordError("records.meta.continuation must be null on the final page")
             break
-        continuation = _text(next_token, label="records.meta.continuation")
+        if not page_records:
+            raise ReaderDataframeRecordError("Reader records truncated page must contain at least one record")
+        next_continuation = _text(next_token, label="records.meta.continuation")
+        if next_continuation in seen_continuations:
+            raise ReaderDataframeRecordError(
+                f"Reader records pagination repeated continuation token {next_continuation!r}"
+            )
+        if page_count >= _MAX_RECORD_PAGES:
+            raise ReaderDataframeRecordError(
+                f"Reader records pagination exceeded the {_MAX_RECORD_PAGES}-page safety bound"
+            )
+        seen_continuations.add(next_continuation)
+        continuation = next_continuation
     assert first_data is not None
     summary = _mapping(first_data.get("summary"), label="records.data.summary")
     if summary.get("records") != len(records):
@@ -818,14 +835,20 @@ def _reader_command(reader_root: Path) -> tuple[str, ...]:
 def _run_reader_json(command: Sequence[str], *, cwd: Path) -> Mapping[str, object]:
     environment = os.environ.copy()
     environment.pop("__PYVENV_LAUNCHER__", None)
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=environment,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=_READER_CLI_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ReaderDataframeRecordError(
+            f"Reader CLI command timed out after {_READER_CLI_TIMEOUT_SECONDS} seconds"
+        ) from exc
     raw = completed.stdout.strip()
     try:
         payload = json.loads(raw)
