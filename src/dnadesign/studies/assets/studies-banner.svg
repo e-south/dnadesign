@@ -1,10 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180" role="img" aria-labelledby="title desc">
-  <title id="title">studies</title>
-  <desc id="desc">checked-in study records and helpers.</desc>
-  <rect width="1200" height="180" fill="#111827" />
-  <path d="M72 48H1128" stroke="#94a3b8" stroke-opacity="0.28" stroke-width="2" />
-  <g font-family="Helvetica, Arial, sans-serif">
-    <text x="72" y="106" fill="#f8fafc" font-size="54" font-weight="700">studies</text>
-    <text x="74" y="140" fill="#cbd5e1" font-size="22">checked-in study records and helpers</text>
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="studies-banner-title studies-banner-description" shape-rendering="crispEdges">
+  <title id="studies-banner-title">studies: own study logic</title>
+  <desc id="studies-banner-description">Keep study-specific code with its checked-in records.</desc>
+  <rect width="1200" height="180" fill="#1E1D1A"/>
+  <g font-family="Menlo, Monaco, Consolas, monospace">
+    <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">studies</text>
+    <text x="50" y="114" fill="#969087" font-size="12" font-weight="700" letter-spacing="1.2">OWN STUDY LOGIC</text>
+    <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
+  </g>
+  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
+  <path d="M584 124H1144" stroke="#5A5650" stroke-width="2"/>
+  <g transform="translate(720 48)">
+    <path d="M0 10H42V48H0ZM58 10H100V48H58Z" stroke="#969087" stroke-width="3" fill="none"/><rect x="8" y="19" width="26" height="5" fill="#F3EFE7"/><rect x="66" y="19" width="26" height="5" fill="#D97757"/><rect x="8" y="31" width="18" height="5" fill="#5A5650"/><rect x="66" y="31" width="22" height="5" fill="#F3EFE7"/>
   </g>
 </svg>
