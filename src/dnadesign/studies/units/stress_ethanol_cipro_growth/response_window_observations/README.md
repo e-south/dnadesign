@@ -155,7 +155,7 @@ uv run python -m \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
 ```
 
-The adapter accepts only `plate_reader/response_window`, catalog schema v4,
+The adapter accepts only `plate_reader/four_state_event_window`, catalog schema v4,
 record schema v6, the five exact dataframe contracts in the projection, and
 digest-verified bytes. The canonical aggregate is published and verified under
 that contract. A live v3 dry-run reproduced all seven accepted v2 scientific

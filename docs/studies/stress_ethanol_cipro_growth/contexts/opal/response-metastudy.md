@@ -102,7 +102,7 @@ v12 only as frozen historical evidence.
 
 ### Evidence Flow
 
-1. Resolve the canonical `plate_reader/response_window` experiment through
+1. Resolve the canonical `plate_reader/four_state_event_window` experiment through
    `reader records --format json`; verify catalog schema v4, provenance epoch,
    schema-v6 record revisions, exact contracts, artifact digests, and row counts.
 2. Verify the response-owned 35-row screen selection against those Reader records,
@@ -159,9 +159,9 @@ Multistate Response Behavior objective and study evidence:
 
 Reader response-window contract:
 
-- `reader/docs/lib/plate_reader/response_window.md`
+- `reader/docs/lib/plate_reader/four_state_event_window.md`
 - Reader catalog schema v4 and record schema v6 under the canonical
-  `plate_reader/response_window` lifecycle
+  `plate_reader/four_state_event_window` lifecycle
 
 ### Package Layout
 

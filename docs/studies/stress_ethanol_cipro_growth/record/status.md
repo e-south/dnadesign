@@ -128,7 +128,7 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   Reader aggregate contains 8 experiments, 7 reductions, 413 design/reduction
   rows, 206500 descriptive-resampling draw rows, and 12 repeated design IDs.
   The active study adapter accepts only the canonical
-  `plate_reader/response_window` catalog-v4/record-v6 lifecycle. The aggregate
+  `plate_reader/four_state_event_window` catalog-v4/record-v6 lifecycle. The aggregate
   is regenerated and verified under that contract; future publication fails
   closed if its record identities, digests, or contracts change.
   The primary reduction is the 4-8 hour post-event log mean; the other

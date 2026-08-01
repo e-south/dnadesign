@@ -18,7 +18,7 @@ from typing import Mapping
 
 from .contracts import (
     PROMOTER_RESPONSE_SEMANTIC_KIND,
-    READER_DIAGNOSTIC_RECORD_ID,
+    READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID,
     READER_PROMOTER_EVIDENCE_MEDIA_DIR,
     ReaderPromoterEvidenceError,
     canonical_json_sha256,
@@ -63,7 +63,7 @@ def verify_display_artifact(
     if (
         value["semantic_kind"] != PROMOTER_RESPONSE_SEMANTIC_KIND
         or value["kind"] != "reader_record_projection"
-        or value["record_id"] != READER_DIAGNOSTIC_RECORD_ID
+        or value["record_id"] != READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID
         or value["scope"] != "design_reduction"
         or value["exists"] is not True
         or value["source_record_revision_digest"] != revision_digest

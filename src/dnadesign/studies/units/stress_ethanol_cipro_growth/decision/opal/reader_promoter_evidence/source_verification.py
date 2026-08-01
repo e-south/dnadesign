@@ -15,7 +15,7 @@ from pathlib import PurePosixPath
 from typing import Mapping
 from uuid import UUID
 
-from .contracts import READER_DIAGNOSTIC_RECORD_ID, ReaderPromoterEvidenceError
+from .contracts import READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID, ReaderPromoterEvidenceError
 from .display_artifact_verification import is_sha256
 
 _DATAFRAME_FIELDS = {
@@ -129,7 +129,7 @@ def _verify_response_source(value: object, *, row: Mapping[str, object]) -> dict
         raise ReaderPromoterEvidenceError("Reader response-window source fields are malformed.")
     if (
         value["schema_version"] != "stress_ethanol_cipro_growth.reader_response_record_source.v1"
-        or value["protocol_id"] != "plate_reader/response_window"
+        or value["protocol_id"] != "plate_reader/four_state_event_window"
         or value["source_experiment_id"] != row["reader_experiment_id"]
         or value["design_id"] != row["design_id"]
         or value["reduction_id"] != row["reduction_id"]
@@ -147,13 +147,13 @@ def _verify_response_source(value: object, *, row: Mapping[str, object]) -> dict
         raise ReaderPromoterEvidenceError("Reader response-window source must bind designs, traces, and diagnostic.")
     _verify_dataframe_record(
         records["designs"],
-        record_id="response_window/designs",
-        contract_id="plate_reader.response_window.designs.v4",
+        record_id="four_state_event_window/designs",
+        contract_id="plate_reader.four_state_event_window.designs.v4",
     )
     _verify_dataframe_record(
         records["traces"],
-        record_id="response_window/traces",
-        contract_id="plate_reader.response_window.traces.v3",
+        record_id="four_state_event_window/traces",
+        contract_id="plate_reader.four_state_event_window.traces.v3",
     )
     _verify_diagnostic_record(records["diagnostic"])
     return dict(value)
@@ -180,7 +180,7 @@ def _verify_diagnostic_record(value: object) -> None:
     if not isinstance(value, dict) or set(value) != _DIAGNOSTIC_FIELDS:
         raise ReaderPromoterEvidenceError("Reader diagnostic source fields are malformed.")
     if (
-        value["record_id"] != READER_DIAGNOSTIC_RECORD_ID
+        value["record_id"] != READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID
         or value["kind"] != "file_bundle"
         or value["schema_version"] != 6
         or not _positive_int(value["revision"])

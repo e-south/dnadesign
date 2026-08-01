@@ -34,13 +34,13 @@ from dnadesign.studies.core.reader_records import (
 )
 
 from .display_contract import response_example_labels, validate_study_display
-from .reader_record_receipt import READER_RESPONSE_RECORD_CONTRACTS
+from .reader_record_receipt import READER_EVENT_WINDOW_RECORD_CONTRACTS
 from .reader_record_validation import validate_reader_response_frames
 
-READER_RESPONSE_PROTOCOL_ID = "plate_reader/response_window"
-READER_RESPONSE_WINDOW_DIAGNOSTIC_RECORD_ID = "plot:response_window_diagnostic"
-STUDY_PROJECTION_SCHEMA = "stress_ethanol_cipro_growth.reader_response_projection.v2"
-EXPECTED_RECORDS = READER_RESPONSE_RECORD_CONTRACTS
+READER_EVENT_WINDOW_PROTOCOL_ID = "plate_reader/four_state_event_window"
+READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID = "plot:four_state_event_window_diagnostic"
+STUDY_PROJECTION_SCHEMA = "stress_ethanol_cipro_growth.reader_response_projection.v3"
+EXPECTED_RECORDS = READER_EVENT_WINDOW_RECORD_CONTRACTS
 STATE_ORDER = ("00", "10", "01", "11")
 VALUE_COLUMNS = tuple(f"r{state}" for state in STATE_ORDER) + tuple(f"b{state}" for state in STATE_ORDER)
 
@@ -161,7 +161,7 @@ def load_reader_response_records(
         experiment / "config.yaml",
         reader_root=reader_root,
         experiment_id=str(projection["reader_experiment_id"]),
-        protocol_id=READER_RESPONSE_PROTOCOL_ID,
+        protocol_id=READER_EVENT_WINDOW_PROTOCOL_ID,
         expected_records=_record_expectations(),
         reader_command=reader_command,
     )
@@ -199,7 +199,7 @@ def load_reader_response_display_record(
     expectations = {
         **_record_expectations(),
         "diagnostic": ReaderRecordExpectation(
-            record_id=READER_RESPONSE_WINDOW_DIAGNOSTIC_RECORD_ID,
+            record_id=READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID,
             kind="file_bundle",
         ),
     }
@@ -275,8 +275,8 @@ def _validate_diagnostic(
         )
     expected_producer = {
         "kind": "plot",
-        "id": "response_window_diagnostic",
-        "plugin": "plot/response_window_diagnostic",
+        "id": "four_state_event_window_diagnostic",
+        "plugin": "plot/four_state_event_window_diagnostic",
     }
     if any(record.producer.get(field) != expected for field, expected in expected_producer.items()):
         raise ReaderResponseRecordError("Reader diagnostic producer identity is invalid")
@@ -360,9 +360,9 @@ def _validate_display_artifact_spec(value: object) -> dict[str, str]:
     if not isinstance(value, Mapping) or set(value) != fields:
         raise ReaderResponseRecordError(f"projection.display_artifact fields must be exactly {sorted(fields)}")
     result = {field: _text(value[field], label=f"projection.display_artifact.{field}") for field in fields}
-    if result["record_id"] != READER_RESPONSE_WINDOW_DIAGNOSTIC_RECORD_ID:
+    if result["record_id"] != READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID:
         raise ReaderResponseRecordError(
-            f"projection.display_artifact.record_id must be {READER_RESPONSE_WINDOW_DIAGNOSTIC_RECORD_ID!r}"
+            f"projection.display_artifact.record_id must be {READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID!r}"
         )
     _sha256_digest(result["producer_config_digest"], label="projection.display_artifact.producer_config_digest")
     path = Path(result["path"])
@@ -423,8 +423,8 @@ __all__ = [
     "EXPECTED_RECORDS",
     "READER_CATALOG_SCHEMA_VERSION",
     "READER_RECORD_SCHEMA_VERSION",
-    "READER_RESPONSE_PROTOCOL_ID",
-    "READER_RESPONSE_WINDOW_DIAGNOSTIC_RECORD_ID",
+    "READER_EVENT_WINDOW_PROTOCOL_ID",
+    "READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID",
     "STUDY_PROJECTION_SCHEMA",
     "ReaderRecordRef",
     "ReaderResponseDisplay",

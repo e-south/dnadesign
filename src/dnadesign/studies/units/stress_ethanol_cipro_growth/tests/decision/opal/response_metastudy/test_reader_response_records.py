@@ -44,7 +44,7 @@ def test_study_projection_parses_verified_reader_bytes(monkeypatch, tmp_path: Pa
     assert result.reference_design_id == "pDual-10"
     assert result.designs["design_id"].tolist() == ["pDual-10", "pDual-10-spyp"]
     receipt = result.source_receipt()
-    assert receipt["schema_version"] == "stress_ethanol_cipro_growth.reader_response_projection.v2"
+    assert receipt["schema_version"] == "stress_ethanol_cipro_growth.reader_response_projection.v3"
     assert set(receipt["records"]) == set(reader_records.EXPECTED_RECORDS)
 
 
@@ -147,8 +147,8 @@ def test_pinned_diagnostic_resolves_exact_record_inputs_config_and_path(monkeypa
 
     assert display.source_experiment_id == "source-a"
     assert display.design_id == "pDual-10-spyp"
-    assert display.record.record_id == "plot:response_window_diagnostic"
-    assert display.selected_file.reader_path == "plots/response_window_diagnostic.png"
+    assert display.record.record_id == "plot:four_state_event_window_diagnostic"
+    assert display.selected_file.reader_path == "plots/four_state_event_window_diagnostic.png"
 
 
 @pytest.mark.parametrize(
@@ -214,7 +214,7 @@ def _source(tmp_path: Path) -> ReaderRecordSet:
         catalog_schema_version=4,
         provenance_epoch_id="epoch-test",
         experiment_id="20260717_stress_response_window_aggregate",
-        protocol_id="plate_reader/response_window",
+        protocol_id="plate_reader/four_state_event_window",
         experiment_evidence={},
         records=records,
     )
@@ -223,11 +223,11 @@ def _source(tmp_path: Path) -> ReaderRecordSet:
 def _pinned_projection(tmp_path: Path, *, missing_path: bool = False) -> Path:
     payload = yaml.safe_load(PROJECTION.read_text(encoding="utf-8"))
     payload["display_artifact"] = {
-        "record_id": "plot:response_window_diagnostic",
+        "record_id": "plot:four_state_event_window_diagnostic",
         "source_experiment_id": "source-a",
         "design_id": "pDual-10-spyp",
         "producer_config_digest": "sha256:" + "c" * 64,
-        "path": "plots/missing.png" if missing_path else "plots/response_window_diagnostic.png",
+        "path": "plots/missing.png" if missing_path else "plots/four_state_event_window_diagnostic.png",
     }
     path = tmp_path / "pinned_reader_response_projection.yaml"
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -236,14 +236,14 @@ def _pinned_projection(tmp_path: Path, *, missing_path: bool = False) -> Path:
 
 def _source_with_diagnostic(source: ReaderRecordSet, *, drift: str | None = None) -> ReaderRecordSet:
     content = b"not a png" if drift == "media_signature" else b"\x89PNG\r\n\x1a\nreader diagnostic"
-    path = source.outputs_root / "plots/response_window_diagnostic.png"
+    path = source.outputs_root / "plots/four_state_event_window_diagnostic.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
     designs_revision = source.records["designs"].revision_digest
     if drift == "designs_revision":
         designs_revision = "sha256:" + "f" * 64
     diagnostic = ReaderResolvedRecord._verified(
-        record_id="plot:response_window_diagnostic",
+        record_id="plot:four_state_event_window_diagnostic",
         kind="file_bundle",
         schema_version=6,
         revision=1,
@@ -251,8 +251,8 @@ def _source_with_diagnostic(source: ReaderRecordSet, *, drift: str | None = None
         contract_id=None,
         producer={
             "kind": "plot",
-            "id": "response_window_diagnostic",
-            "plugin": "plot/response_window_diagnostic",
+            "id": "four_state_event_window_diagnostic",
+            "plugin": "plot/four_state_event_window_diagnostic",
         },
         producer_config_digest=("sha256:" + ("e" if drift == "producer_config" else "c") * 64),
         inputs=(
@@ -278,7 +278,7 @@ def _source_with_diagnostic(source: ReaderRecordSet, *, drift: str | None = None
         content=None,
         files=(
             ReaderArtifactFile(
-                reader_path="plots/response_window_diagnostic.png",
+                reader_path="plots/four_state_event_window_diagnostic.png",
                 path=path,
                 size_bytes=len(content),
                 content_digest="sha256:" + hashlib.sha256(content).hexdigest(),

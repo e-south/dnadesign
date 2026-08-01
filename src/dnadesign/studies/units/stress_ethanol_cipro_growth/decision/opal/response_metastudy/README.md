@@ -21,7 +21,7 @@ next-build policy.
 - OPAL owns objective primitives, campaign training, candidate scoring,
   selection, and ledgers after observed-Y promotion.
 
-The active runtime consumes the canonical `plate_reader/response_window`
+The active runtime consumes the canonical `plate_reader/four_state_event_window`
 experiment through Reader's public `records --format json` contract. It
 requires catalog schema v4, record schema v6, and the exact record contracts
 declared by the study projection. The runtime does not import Reader, inspect
@@ -118,7 +118,7 @@ uv run reader verify "$READER_EXPERIMENT" --format json
 uv run reader notebook "$READER_EXPERIMENT" --mode none
 ```
 
-The aggregate is a verified `plate_reader/response_window` RecordStore
+The aggregate is a verified `plate_reader/four_state_event_window` RecordStore
 experiment under catalog v4 and record v6. The study commands below consume
 those exact records and fail closed if their identities, digests, or contracts
 change. They do not fall back to bundle v5.

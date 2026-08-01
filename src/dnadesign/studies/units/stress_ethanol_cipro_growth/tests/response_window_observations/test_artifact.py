@@ -32,7 +32,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
     load_response_window_observation_policy,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_record_receipt import (
-    READER_RESPONSE_RECORD_CONTRACTS,
+    READER_EVENT_WINDOW_RECORD_CONTRACTS,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.repeat_diagnostics import (
     REPEAT_DIAGNOSTIC_COLUMNS,
@@ -238,7 +238,7 @@ def test_verifier_requires_exact_reader_projection_receipt(
     elif mutation == "fake_record_id":
         records["designs"]["record_id"] = "response_window/not-designs"
     elif mutation == "fake_contract_id":
-        records["designs"]["contract_id"] = "plate_reader.response_window.not-designs.v1"
+        records["designs"]["contract_id"] = "plate_reader.four_state_event_window.not-designs.v1"
     elif mutation == "empty_experiment":
         manifest["source_manifests"]["reader_records"]["experiment_id"] = ""
     elif mutation == "empty_epoch":
@@ -482,12 +482,12 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
     }
     receipt_records = {
         name: {
-            "record_id": READER_RESPONSE_RECORD_CONTRACTS[name][0],
+            "record_id": READER_EVENT_WINDOW_RECORD_CONTRACTS[name][0],
             "kind": "dataframe_artifact",
             "schema_version": 6,
             "revision": 1,
             "revision_digest": "sha256:" + ("a" * 64),
-            "contract_id": READER_RESPONSE_RECORD_CONTRACTS[name][1],
+            "contract_id": READER_EVENT_WINDOW_RECORD_CONTRACTS[name][1],
             "path": f"tables/{name}.parquet",
             "size_bytes": record_refs[name].size_bytes,
             "content_digest": record_refs[name].content_digest,
@@ -497,9 +497,9 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
     reader_records = SimpleNamespace(
         record_refs=record_refs,
         source_receipt=lambda: {
-            "schema_version": "stress_ethanol_cipro_growth.reader_response_projection.v2",
+            "schema_version": "stress_ethanol_cipro_growth.reader_response_projection.v3",
             "experiment_id": "aggregate",
-            "protocol_id": "plate_reader/response_window",
+            "protocol_id": "plate_reader/four_state_event_window",
             "catalog": {
                 "schema_version": 4,
                 "provenance_epoch_id": "epoch-test",

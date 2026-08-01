@@ -15,15 +15,15 @@ from pathlib import PurePosixPath
 
 from .artifact_contract import ResponseWindowObservationArtifactError
 
-READER_RESPONSE_RECORD_CONTRACTS = {
-    "wells": ("response_window/wells", "plate_reader.response_window.wells.v3"),
-    "designs": ("response_window/designs", "plate_reader.response_window.designs.v4"),
+READER_EVENT_WINDOW_RECORD_CONTRACTS = {
+    "wells": ("four_state_event_window/wells", "plate_reader.four_state_event_window.wells.v3"),
+    "designs": ("four_state_event_window/designs", "plate_reader.four_state_event_window.designs.v4"),
     "descriptive_resampling_draws": (
-        "response_window/descriptive_resampling_draws",
-        "plate_reader.response_window.descriptive_resampling_draws.v3",
+        "four_state_event_window/descriptive_resampling_draws",
+        "plate_reader.four_state_event_window.descriptive_resampling_draws.v3",
     ),
-    "traces": ("response_window/traces", "plate_reader.response_window.traces.v3"),
-    "events": ("response_window/events", "plate_reader.response_window.events.v2"),
+    "traces": ("four_state_event_window/traces", "plate_reader.four_state_event_window.traces.v3"),
+    "events": ("four_state_event_window/events", "plate_reader.four_state_event_window.events.v2"),
 }
 _RECORD_FIELDS = {
     "record_id",
@@ -57,9 +57,9 @@ def validate_reader_record_receipt(value: object) -> None:
     catalog = value.get("catalog")
     records = value.get("records")
     if (
-        value.get("schema_version") != "stress_ethanol_cipro_growth.reader_response_projection.v2"
+        value.get("schema_version") != "stress_ethanol_cipro_growth.reader_response_projection.v3"
         or not _nonempty_text(value.get("experiment_id"))
-        or value.get("protocol_id") != "plate_reader/response_window"
+        or value.get("protocol_id") != "plate_reader/four_state_event_window"
         or not _is_sha256(value.get("projection_sha256"))
         or not isinstance(catalog, dict)
         or set(catalog) != _CATALOG_FIELDS
@@ -69,11 +69,11 @@ def validate_reader_record_receipt(value: object) -> None:
         or not isinstance(records, dict)
     ):
         raise ResponseWindowObservationArtifactError("Reader record receipt identity is malformed.")
-    if set(records) != set(READER_RESPONSE_RECORD_CONTRACTS):
+    if set(records) != set(READER_EVENT_WINDOW_RECORD_CONTRACTS):
         raise ResponseWindowObservationArtifactError(
             "Reader record receipt must contain exactly the five projected response-window records."
         )
-    for name, (record_id, contract_id) in READER_RESPONSE_RECORD_CONTRACTS.items():
+    for name, (record_id, contract_id) in READER_EVENT_WINDOW_RECORD_CONTRACTS.items():
         record = records[name]
         if not isinstance(record, dict) or set(record) != _RECORD_FIELDS:
             raise ResponseWindowObservationArtifactError("Reader record receipt contains malformed revisions.")
@@ -126,4 +126,4 @@ def _prefixed_sha256(value: object) -> bool:
     )
 
 
-__all__ = ["READER_RESPONSE_RECORD_CONTRACTS", "validate_reader_record_receipt"]
+__all__ = ["READER_EVENT_WINDOW_RECORD_CONTRACTS", "validate_reader_record_receipt"]

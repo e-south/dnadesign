@@ -43,10 +43,10 @@ def test_discovery_preserves_exact_record_provenance_and_notebook_routing(tmp_pa
     row = surface["media_rows"][0]
 
     assert row["label"] == label
-    assert row["artifact_record_id"] == "plot:response_window_diagnostic"
+    assert row["artifact_record_id"] == "plot:four_state_event_window_diagnostic"
     assert row["kind"] == "reader_record_projection"
     assert row["source_record_revision_digest"] == "sha256:" + "a" * 64
-    assert row["source_file_path"] == "plots/response_window_diagnostic.png"
+    assert row["source_file_path"] == "plots/four_state_event_window_diagnostic.png"
     assert row["source_receipt_sha256"] == canonical_json_sha256(row["sources"]["response_window"])
     assert row["sources"]["response_window"]["catalog"]["schema_version"] == 4
     assert set(row["sources"]) == {"response_window", "candidate_bindings"}
@@ -122,7 +122,7 @@ def test_render_rejects_relabeling_and_unconfined_paths(tmp_path: Path) -> None:
     assert "verified publication manifest" in _render(surface, label=label)["text"]
 
     surface, label = _valid_promoter_surface(tmp_path / "second")
-    surface["media_rows"][0]["path"] = "~/response_window_diagnostic.png"
+    surface["media_rows"][0]["path"] = "~/four_state_event_window_diagnostic.png"
     assert "verified publication manifest" in _render(surface, label=label)["text"]
 
 
@@ -176,7 +176,7 @@ def _valid_promoter_surface(tmp_path: Path) -> tuple[dict[str, object], str]:
     manifest_path = workdir / "inputs" / "r0" / "reader_evidence_promoter_response.json"
     manifest_path.parent.mkdir(parents=True)
     revision_digest = "sha256:" + "a" * 64
-    source_file_path = "plots/response_window_diagnostic.png"
+    source_file_path = "plots/four_state_event_window_diagnostic.png"
     relative_media = Path("reader_evidence_media") / ("a" * 64) / Path(source_file_path).name
     media_path = manifest_path.parent / relative_media
     media_path.parent.mkdir(parents=True)
@@ -227,7 +227,7 @@ def _response_source(*, media_path: Path, revision_digest: str, source_file_path
         "source_experiment_id": "20260619_sfxi_sensor-panel-m9-glu-1-10",
         "design_id": "pDual-10-ES1p",
         "reduction_id": "event_logmean_4_8h_post",
-        "protocol_id": "plate_reader/response_window",
+        "protocol_id": "plate_reader/four_state_event_window",
         "projection_sha256": "sha256:" + "4" * 64,
         "catalog": {
             "schema_version": 4,
@@ -236,17 +236,17 @@ def _response_source(*, media_path: Path, revision_digest: str, source_file_path
         },
         "records": {
             "designs": dataframe_record(
-                "response_window/designs",
-                "plate_reader.response_window.designs.v4",
+                "four_state_event_window/designs",
+                "plate_reader.four_state_event_window.designs.v4",
                 "1",
             ),
             "traces": dataframe_record(
-                "response_window/traces",
-                "plate_reader.response_window.traces.v3",
+                "four_state_event_window/traces",
+                "plate_reader.four_state_event_window.traces.v3",
                 "2",
             ),
             "diagnostic": {
-                "record_id": "plot:response_window_diagnostic",
+                "record_id": "plot:four_state_event_window_diagnostic",
                 "kind": "file_bundle",
                 "schema_version": 6,
                 "revision": 3,
@@ -316,12 +316,12 @@ def _publication_row(
             {
                 "semantic_kind": "promoter_response_evidence",
                 "kind": "reader_record_projection",
-                "record_id": "plot:response_window_diagnostic",
+                "record_id": "plot:four_state_event_window_diagnostic",
                 "scope": "design_reduction",
                 "path": relative_media.as_posix(),
                 "path_label": (
                     "20260619_sfxi_sensor-panel-m9-glu-1-10/pDual-10-ES1p/"
-                    "event_logmean_4_8h_post/response_window_diagnostic.png"
+                    "event_logmean_4_8h_post/four_state_event_window_diagnostic.png"
                 ),
                 "exists": True,
                 "media_type": "image/png",

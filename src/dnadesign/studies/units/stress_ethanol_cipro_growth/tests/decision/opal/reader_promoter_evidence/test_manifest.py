@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence import (
-    READER_DIAGNOSTIC_RECORD_ID,
+    READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID,
     READER_EVIDENCE_SCHEMA_VERSION,
     ReaderPromoterEvidenceError,
     materialize_reader_promoter_evidence_manifest,
@@ -75,10 +75,10 @@ def test_preview_projects_one_exact_reader_diagnostic_without_study_math(
     assert response["catalog"]["schema_version"] == 4
     assert response["records"]["designs"]["schema_version"] == 6
     assert response["records"]["traces"]["schema_version"] == 6
-    assert response["records"]["diagnostic"]["record_id"] == READER_DIAGNOSTIC_RECORD_ID
+    assert response["records"]["diagnostic"]["record_id"] == READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID
     artifact = row["artifacts"][0]
     assert artifact["kind"] == "reader_record_projection"
-    assert artifact["record_id"] == READER_DIAGNOSTIC_RECORD_ID
+    assert artifact["record_id"] == READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID
     assert artifact["source_record_revision_digest"] == source.display.record.revision_digest
     assert artifact["source_file_path"] == source.display.selected_file.reader_path
     assert artifact["path"].startswith(

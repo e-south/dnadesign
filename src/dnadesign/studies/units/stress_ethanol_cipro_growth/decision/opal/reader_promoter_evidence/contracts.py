@@ -20,7 +20,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
     ReaderResponseRecords,
 )
 
-READER_DIAGNOSTIC_RECORD_ID = "plot:response_window_diagnostic"
+READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID = "plot:four_state_event_window_diagnostic"
 READER_EVIDENCE_SCHEMA_VERSION = "stress_ethanol_cipro_growth.reader_promoter_evidence.v3"
 # Wire identity declared by OPAL's producer-neutral consumer contract.
 READER_EVIDENCE_MANIFEST_ADAPTER = "opal.reader_evidence_manifest.v1"
@@ -95,7 +95,7 @@ def canonical_json_sha256(payload: Any) -> str:
 __all__ = [
     "PROMOTER_EVIDENCE_NON_CLAIM",
     "PROMOTER_RESPONSE_SEMANTIC_KIND",
-    "READER_DIAGNOSTIC_RECORD_ID",
+    "READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID",
     "READER_EVIDENCE_MANIFEST_ADAPTER",
     "READER_EVIDENCE_SCHEMA_VERSION",
     "READER_PROMOTER_EVIDENCE_FILENAME",

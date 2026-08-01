@@ -43,7 +43,7 @@ def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
     config_path = experiment_root / "config.yaml"
     catalog_path = outputs_root / "manifests" / "records.json"
     projection_path = tmp_path / "projection.yaml"
-    diagnostic_path = outputs_root / "plots" / "response_window_diagnostic.png"
+    diagnostic_path = outputs_root / "plots" / "four_state_event_window_diagnostic.png"
     for path, content in (
         (config_path, b"reader/v8\n"),
         (catalog_path, b"{}\n"),
@@ -53,20 +53,20 @@ def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
     designs = _dataframe_record(
-        record_id="response_window/designs",
-        contract_id="plate_reader.response_window.designs.v4",
-        reader_path="artifacts/response_window/designs.parquet",
+        record_id="four_state_event_window/designs",
+        contract_id="plate_reader.four_state_event_window.designs.v4",
+        reader_path="artifacts/four_state_event_window/designs.parquet",
         digest_character="1",
     )
     traces = _dataframe_record(
-        record_id="response_window/traces",
-        contract_id="plate_reader.response_window.traces.v3",
-        reader_path="artifacts/response_window/traces.parquet",
+        record_id="four_state_event_window/traces",
+        contract_id="plate_reader.four_state_event_window.traces.v3",
+        reader_path="artifacts/four_state_event_window/traces.parquet",
         digest_character="2",
     )
     file_digest = sha256(diagnostic_path)
     diagnostic = ReaderResolvedRecord._verified(
-        record_id="plot:response_window_diagnostic",
+        record_id="plot:four_state_event_window_diagnostic",
         kind="file_bundle",
         schema_version=6,
         revision=3,
@@ -74,8 +74,8 @@ def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
         contract_id=None,
         producer={
             "kind": "plot",
-            "id": "response_window_diagnostic",
-            "plugin": "plot/response_window_diagnostic",
+            "id": "four_state_event_window_diagnostic",
+            "plugin": "plot/four_state_event_window_diagnostic",
         },
         producer_config_digest="sha256:" + "c" * 64,
         inputs=(
@@ -101,7 +101,7 @@ def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
         content=None,
         files=(
             ReaderArtifactFile(
-                reader_path="plots/response_window_diagnostic.png",
+                reader_path="plots/four_state_event_window_diagnostic.png",
                 path=diagnostic_path,
                 size_bytes=diagnostic_path.stat().st_size,
                 content_digest=file_digest,
@@ -119,7 +119,7 @@ def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
         catalog_schema_version=4,
         provenance_epoch_id="123e4567-e89b-42d3-a456-426614174000",
         experiment_id="20260717_stress_response_window_aggregate",
-        protocol_id="plate_reader/response_window",
+        protocol_id="plate_reader/four_state_event_window",
         experiment_evidence={},
         records={"designs": designs, "traces": traces},
     )

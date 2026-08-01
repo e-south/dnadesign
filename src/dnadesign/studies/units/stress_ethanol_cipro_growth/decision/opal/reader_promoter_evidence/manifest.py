@@ -23,7 +23,7 @@ from typing import Any
 from .contracts import (
     PROMOTER_EVIDENCE_NON_CLAIM,
     PROMOTER_RESPONSE_SEMANTIC_KIND,
-    READER_DIAGNOSTIC_RECORD_ID,
+    READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID,
     READER_EVIDENCE_MANIFEST_ADAPTER,
     READER_EVIDENCE_SCHEMA_VERSION,
     READER_PROMOTER_EVIDENCE_FILENAME,
@@ -179,7 +179,7 @@ def _display_row(source: VerifiedReaderPromoterEvidenceSource) -> dict[str, Any]
             {
                 "semantic_kind": PROMOTER_RESPONSE_SEMANTIC_KIND,
                 "kind": "reader_record_projection",
-                "record_id": READER_DIAGNOSTIC_RECORD_ID,
+                "record_id": READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID,
                 "scope": "design_reduction",
                 "path": _media_relative_path(source).as_posix(),
                 "path_label": (

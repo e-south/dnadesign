@@ -4,7 +4,7 @@ title: Reader promoter-response display
 owner: stress_ethanol_cipro_growth
 surface: study-display-adapter
 status: active
-last_verified: 2026-07-29
+last_verified: 2026-08-01
 entry_artifact: reader_catalog_v4_record_v6
 exit_artifact: stress_ethanol_cipro_growth.reader_promoter_evidence.v3
 ---
@@ -19,8 +19,8 @@ The live path is:
 
 `Reader records → study display pin → promoter binding → portable media → OPAL viewport`
 
-Reader owns the `plate_reader/response_window` experiment, its catalog-v4
-provenance, schema-v6 records, and `plot:response_window_diagnostic`. The study
+Reader owns the `plate_reader/four_state_event_window` experiment, its catalog-v4
+provenance, schema-v6 records, and `plot:four_state_event_window_diagnostic`. The study
 owns the selected source experiment and design, the exact promoter binding,
 and the statement that this media belongs in the stress-study review surface.
 OPAL verifies and renders the portable projection.
@@ -34,7 +34,7 @@ OPAL code contains no promoter, response-window, or stress-study semantics.
 The display pin records the source experiment, design, plot-config digest, and
 exact output path. The adapter then verifies:
 
-- `response_window/designs` and `response_window/traces`, including revisions,
+- `four_state_event_window/designs` and `four_state_event_window/traces`, including revisions,
   revision digests, content digests, and sizes;
 - the diagnostic file-bundle revision and its exact input revisions;
 - every diagnostic file digest and the selected PNG or PDF signature; and

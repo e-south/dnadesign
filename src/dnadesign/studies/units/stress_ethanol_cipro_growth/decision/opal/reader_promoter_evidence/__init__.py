@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from .contracts import (
     PROMOTER_RESPONSE_SEMANTIC_KIND,
-    READER_DIAGNOSTIC_RECORD_ID,
+    READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID,
     READER_EVIDENCE_SCHEMA_VERSION,
     READER_PROMOTER_EVIDENCE_FILENAME,
     ReaderPromoterEvidenceError,
@@ -28,7 +28,7 @@ from .verification import verify_reader_promoter_evidence_source
 
 __all__ = [
     "PROMOTER_RESPONSE_SEMANTIC_KIND",
-    "READER_DIAGNOSTIC_RECORD_ID",
+    "READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID",
     "READER_EVIDENCE_SCHEMA_VERSION",
     "READER_PROMOTER_EVIDENCE_FILENAME",
     "ReaderPromoterEvidenceError",

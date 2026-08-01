@@ -123,7 +123,7 @@ metastudy](response-metastudy.md) records the equal-footing window comparison.
 Alternative windows, event bounds, area-under-the-curve summaries, and delta
 summaries remain sensitivity evidence. They do not replace the primary
 reduction. Reader owns the full contract in
-`reader/docs/lib/plate_reader/response_window.md` in the sibling Reader
+`reader/docs/lib/plate_reader/four_state_event_window.md` in the sibling Reader
 repository.
 
 ### 2. Reader summarizes wells within an experiment
@@ -665,7 +665,7 @@ resolve candidate authority.
 Source map:
 
 - Reader response-window contract:
-  `reader/docs/lib/plate_reader/response_window.md`
+  `reader/docs/lib/plate_reader/four_state_event_window.md`
 - Study observation and repeat policy:
   `src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/README.md`
 - Study label promotion:
