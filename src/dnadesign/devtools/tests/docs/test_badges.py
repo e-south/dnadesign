@@ -204,6 +204,11 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
             1,
         ),
         (
+            '<picture><source media="invalid ???" srcset="https://img.shields.io/badge/build-passing.svg">'
+            '<img src="diagram.svg"></picture>\n',
+            1,
+        ),
+        (
             '<picture><source type="image/svg+xml" srcset="https://img.shields.io/badge/build-passing.svg">'
             '<img src="diagram.svg"></picture>\n',
             1,

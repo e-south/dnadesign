@@ -504,6 +504,8 @@ def _picture_source_is_potentially_eligible(element: Element) -> bool:
         normalized_media = " ".join(CSS_COMMENT_PATTERN.sub(" ", media).casefold().split())
         if normalized_media == "not all":
             return False
+        # Unknown or invalid queries remain inspectable: without a viewport and
+        # full CSS evaluator, treating them as ineligible could hide a badge.
     declared_type = element.attrib.get("type")
     if declared_type is None:
         return True
