@@ -51,6 +51,8 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         "Escaped image example: \\![Coverage](badge.svg)\n\n"
         "Inline example: `[![Coverage](coverage.svg)](report)`\n\n"
         "![build](https://img%252Eshields%252Eio/status.svg)\n\n"
+        '<img alt="build" src="/ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg">\n\n'
+        '<img alt="build" src="\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg">\n\n'
         "<!-- [![Coverage](coverage.svg)](report) -->\n\n"
         "    [![Coverage](badge.svg)](report)\n\n"
         ">     [![Coverage](badge.svg)](report)\n\n"
@@ -299,6 +301,30 @@ def test_badge_policy_normalizes_browser_equivalent_provider_hosts(
     ],
 )
 def test_badge_policy_normalizes_browser_special_scheme_separators(
+    tmp_path: Path,
+    provider_url: str,
+) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(tool_readme, f'<img alt="build" src="{provider_url}">\n')
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:1: badges belong only in the root README; use a plain text link instead."
+    ]
+
+
+@pytest.mark.parametrize(
+    "provider_url",
+    [
+        r"\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        r"/\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        r"///ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
+        r"////ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
+        r"\\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        r"\//ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
+        r"/\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+    ],
+)
+def test_badge_policy_normalizes_special_base_network_paths(
     tmp_path: Path,
     provider_url: str,
 ) -> None:

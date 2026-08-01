@@ -195,6 +195,11 @@ def _source_has_badge_hint(source: str) -> bool:
     if separator and scheme.casefold() in SPECIAL_URL_SCHEMES:
         remainder = remainder.replace("\\", "/").lstrip("/")
         preprocessed_source = f"{scheme}://{remainder}"
+    else:
+        network_path = preprocessed_source.lstrip("/\\")
+        leading_separators = len(preprocessed_source) - len(network_path)
+        if leading_separators >= 2:
+            preprocessed_source = f"//{network_path.replace('\\', '/')}"
     hint_source = unquote(preprocessed_source) if "%" in preprocessed_source else preprocessed_source
     if BADGE_SOURCE_PATTERN.search(hint_source) is not None:
         return True
