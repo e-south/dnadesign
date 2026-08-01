@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Literal
 
-from ._values import MetastudyContractError, canonical_digest
+from ._values import MetastudyContractError, _digest, canonical_digest
 
 PROTOCOL_ID = "rt_lnrna_reporter_response_metastudy.v3"
 
@@ -157,8 +157,7 @@ class MetastudyProtocol:
             "earlier_end_tie_break",
         ):
             raise MetastudyContractError("selection must use the predeclared lexicographic order")
-        if self.condition_ontology_digest != CANONICAL_CONDITION_ONTOLOGY_DIGEST:
-            raise MetastudyContractError("condition ontology digest changed")
+        _digest(self.condition_ontology_digest, label="condition_ontology_digest")
         if self.observation_policy_digest != CANONICAL_OBSERVATION_POLICY_DIGEST:
             raise MetastudyContractError("observation policy digest changed")
 

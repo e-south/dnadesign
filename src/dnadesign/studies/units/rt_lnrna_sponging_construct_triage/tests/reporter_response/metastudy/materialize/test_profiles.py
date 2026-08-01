@@ -17,7 +17,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response import TimeWindowReduction
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response import (
+    TimeWindowReduction,
+)
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
     DEFAULT_PROTOCOL,
     MaterializationOmission,

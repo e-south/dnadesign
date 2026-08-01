@@ -14,11 +14,33 @@ required:
   - digest
 properties:
   ontology_id:
-    const: rt_lnrna_reporter_response_conditions.v1
+    type: string
+    minLength: 1
   conditions:
     type: array
-    minItems: 3
+    minItems: 2
     uniqueItems: true
+    allOf:
+      - contains:
+          type: object
+          required: [role]
+          properties:
+            role: {const: baseline}
+        minContains: 1
+        maxContains: 1
+      - contains:
+          type: object
+          required: [role]
+          properties:
+            role: {const: positive_control}
+        minContains: 0
+        maxContains: 1
+      - contains:
+          type: object
+          required: [role]
+          properties:
+            role: {const: dose}
+        minContains: 1
     items:
       type: object
       additionalProperties: false

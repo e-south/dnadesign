@@ -41,9 +41,10 @@ _LINE_BUDGETS = {
     "profile.py": 170,
     "protocol.py": 270,
 }
-_EXPECTED_EVALUATION_MODULES = {"__init__.py", "evidence.py", "readiness.py", "selection.py"}
+_EXPECTED_EVALUATION_MODULES = {"__init__.py", "comparability.py", "evidence.py", "readiness.py", "selection.py"}
 _EVALUATION_LINE_BUDGETS = {
     "__init__.py": 35,
+    "comparability.py": 40,
     "evidence.py": 240,
     "readiness.py": 250,
     "selection.py": 480,
@@ -70,6 +71,7 @@ _EXPECTED_MATERIALIZE_TEST_MODULES = {
     "_support.py",
     "test_identity.py",
     "test_profiles.py",
+    "test_reference_profiles.py",
     "test_service.py",
     "test_temporal.py",
 }
@@ -78,6 +80,7 @@ _MATERIALIZE_TEST_LINE_BUDGETS = {
     "_support.py": 340,
     "test_identity.py": 380,
     "test_profiles.py": 370,
+    "test_reference_profiles.py": 130,
     "test_service.py": 150,
     "test_temporal.py": 150,
 }

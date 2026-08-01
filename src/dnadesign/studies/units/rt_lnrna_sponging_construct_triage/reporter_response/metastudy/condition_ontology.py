@@ -85,8 +85,10 @@ class ReporterResponseConditionOntology:
         if len(ids) != len(set(ids)) or len(labels) != len(set(labels)):
             raise MetastudyContractError("condition ids and treatment labels must be unique")
         roles = [row.role for row in self.conditions]
-        if roles.count("baseline") != 1 or roles.count("positive_control") != 1 or "dose" not in roles:
-            raise MetastudyContractError("condition ontology requires one baseline, one positive control, and doses")
+        if roles.count("baseline") != 1 or roles.count("positive_control") > 1 or "dose" not in roles:
+            raise MetastudyContractError(
+                "condition ontology requires one baseline, zero or one positive control, and doses"
+            )
         doses = [float(row.dose_uM) for row in self.conditions if row.role == "dose"]
         if len(doses) != len(set(doses)):
             raise MetastudyContractError("condition ontology dose values must be unique")
@@ -107,6 +109,12 @@ class ReporterResponseConditionOntology:
         if len(matches) != 1:
             raise MetastudyContractError(f"condition ontology does not declare dose {dose_uM:g} uM exactly once")
         return matches[0]
+
+    @property
+    def positive_control(self) -> ConditionDefinition | None:
+        """Return the explicitly declared positive control, if one exists."""
+
+        return next((row for row in self.conditions if row.role == "positive_control"), None)
 
 
 DEFAULT_CONDITION_ONTOLOGY = ReporterResponseConditionOntology(

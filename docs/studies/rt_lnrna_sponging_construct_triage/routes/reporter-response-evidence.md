@@ -16,6 +16,7 @@ entry_artifacts:
   - source-closed-reader-record
   - source-closed-reader-evidence-bindings
 exit_artifacts:
+  - rt_lnrna_reporter_measurement_profile.v1
   - rt_lnrna_reporter_response_profile.v3
   - reporter-response-metastudy-route
 ---
@@ -31,12 +32,14 @@ study-owned reduction recommendation.
    binding. Profile construction and parsing require the source-closed binding
    set and derive provenance from exactly one bound subject row. Do not copy
    measurements into the identity registry.
-3. Represent a descriptive assay result with
-   `rt_lnrna_reporter_response_profile.v3`. Preserve the recorded interval,
-   ordered dose grid, explicit condition roles, raw reporter signal, OD600,
-   reporter/OD600, dose-wise response, relative OD, and biological-replicate
-   uncertainty when replicate identities are declared. Treatment names and particular positive-control aliases are
-   study data, not hard-coded profile semantics.
+3. Always preserve the recorded interval, ordered dose grid, explicit condition
+   roles, raw reporter signal, OD600, and reporter/OD600 in
+   `rt_lnrna_reporter_measurement_profile.v1`. A positive control is optional
+   and must be declared by role; its name is never inferred. When exactly one
+   declared positive control has positive separation from baseline, the stricter
+   `rt_lnrna_reporter_response_profile.v3` also carries normalized response,
+   relative OD, and biological-replicate uncertainty. Otherwise the measurement
+   profile records a typed reason that reference normalization is unavailable.
 4. Declare a typed observation policy whose fixed formulas and reduction
    semantics derive its digest. Never supply a policy digest as provenance.
 5. Compare profiles only when their comparability keys match. Otherwise stop

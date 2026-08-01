@@ -23,9 +23,11 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
     DoseUncertainty,
     NotEstimableMetricUncertainty,
     PairingPolicy,
+    ReferenceNormalizationUnavailable,
     ReporterResponseObservationPolicy,
     TimeWindowReduction,
     UncertaintyPolicy,
+    build_reporter_measurement_profile,
     build_reporter_response_profile,
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
@@ -122,6 +124,7 @@ def _profile(
     observation_policy_id: str = "rt_lnrna_reporter_response_observation_policy.v3",
     revision_digest: str = _digest("b"),
     doses: tuple[float, ...] = (500.0,),
+    reference_normalized: bool = True,
 ):
     measurements: list[ConditionMeasurement] = []
     assignments: list[ControlAssignment] = []
@@ -183,7 +186,7 @@ def _profile(
         revision_digest=revision_digest,
     )
     evidence_binding = next(row for row in evidence_bindings.rows if row.subject_id == subject_id)
-    return build_reporter_response_profile(
+    common_profile = dict(
         profile_id=f"profile-{experiment_index}-{subject_id}-{window[0]:g}-{window[1]:g}",
         subject_id=subject_id,
         raw_design_id=evidence_binding.raw_design_id,
@@ -205,10 +208,23 @@ def _profile(
             ratio_reduction_order="ratio_then_reduce",
         ),
         dose_grid_uM=doses,
-        measurements=measurements,
+        measurements=(
+            measurements if reference_normalized else [row for row in measurements if row.role != "positive_control"]
+        ),
+        ineligibility_reasons=("preference_objective_not_defined",),
+    )
+    if not reference_normalized:
+        return build_reporter_measurement_profile(
+            **common_profile,
+            reference_normalization=ReferenceNormalizationUnavailable(
+                reason="positive_control_not_declared",
+                positive_control_condition_id=None,
+            ),
+        )
+    return build_reporter_response_profile(
+        **common_profile,
         pairing_policy=PairingPolicy(kind="pooled_controls_by_design", assignments=tuple(assignments)),
         dose_uncertainties=uncertainties,
-        ineligibility_reasons=("preference_objective_not_defined",),
     )
 
 
@@ -255,6 +271,7 @@ def _evidence(
     *,
     doses: tuple[float, ...] = (500.0,),
     reversed_experiments: tuple[int, ...] = (),
+    reference_normalized: bool = True,
 ) -> tuple[ProfileEvidence, ...]:
     rows: list[ProfileEvidence] = []
     phase_by_window = {
@@ -281,6 +298,7 @@ def _evidence(
                     separation=40.0 - candidate_index,
                     response=response + experiment_index / 1000.0,
                     doses=doses,
+                    reference_normalized=reference_normalized,
                 )
                 rows.append(
                     ProfileEvidence(

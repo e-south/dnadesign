@@ -2,8 +2,9 @@
 
 This package owns retrospective, provisional selection of one standard
 RT-lnRNA reporter-response time window for descriptive comparison. It consumes
-only validated `ReporterResponseProfile` instances (or payloads first parsed by
-the authoritative `profile_from_dict` API). It never reads assay workbooks,
+validated raw measurement profiles and, when a declared positive control has
+positive baseline separation, their stricter reference-normalized profile
+variant. It never infers a control from its name. It never reads assay workbooks,
 notebook state, images, legacy condition tables, or unverified dataframes. The
 protocol is fixed before regeneration, but the current cohort was not collected
 as a prospective validation study.
@@ -55,7 +56,9 @@ raw-observation rederivation.
 
 Within-acquisition observation range and observation quality share one derivation-
 closed, self-digesting audit artifact bound to the complete canonical profile
-and the pinned condition ontology. The descriptive v3 profile does not treat
+and the pinned condition ontology. The raw measurement profile remains valid
+when reference normalization is explicitly unavailable; selection uses control
+separation only for profiles that carry the stricter projection. Neither profile treats
 within-acquisition dispersion as biological-replicate uncertainty. Reader
 experiment, plate, sheet, well, and position remain acquisition provenance.
 Only a declared replicate field supplies biological-replicate identity; absent

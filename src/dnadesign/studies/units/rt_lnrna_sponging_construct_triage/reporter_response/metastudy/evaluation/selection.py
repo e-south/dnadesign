@@ -16,7 +16,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import replace
 
-from ...profile import TimeWindowReduction
+from ...measurement_profile import ReporterMeasurementProfile
+from ...profile import ReporterResponseProfile, TimeWindowReduction
 from ...temporal import window_temporal_policy_projection
 from ..contracts._values import MetastudyContractError
 from ..contracts.decision import (
@@ -35,7 +36,8 @@ from ..contracts.protocol import (
     Window,
     protocol_digest,
 )
-from ..evidence_projection import ProfileEvidenceProjection
+from ..evidence_projection import ProfileContentProjection, ProfileEvidenceProjection
+from .comparability import profiles_are_selection_comparable
 from .evidence import (
     canonical_evidence_digest,
     require_attempt_ledger,
@@ -164,8 +166,7 @@ def _evaluate_canonical_evidence(
         for window, candidate_rows in grouped.items()
     }
     for candidate_rows in grouped.values():
-        comparability_keys = {row.profile.comparability_key for row in candidate_rows}
-        if len(candidate_rows) < 2 or len(comparability_keys) != 1:
+        if not profiles_are_selection_comparable(candidate_rows):
             raise MetastudyContractError("candidate profiles fail exact comparability")
 
     evaluations = tuple(
@@ -346,6 +347,13 @@ def _evaluate_candidate(
         experiment_id = profile.provenance.reader_experiment_id
         if experiment_id not in eligible_experiments:
             continue
+        if isinstance(profile, ReporterMeasurementProfile) or getattr(profile, "reference_normalization", None):
+            limitations.append("reference_normalization_unavailable")
+            continue
+        if not isinstance(profile, (ReporterResponseProfile, ProfileContentProjection)):
+            raise MetastudyContractError("candidate profile variant is undeclared")
+        if profile.pairing_policy is None:
+            raise MetastudyContractError("normalized profile projection requires a pairing policy")
         observations = {measurement.observation_id: measurement for measurement in profile.measurements}
         response_by_observation = {response.dose_observation_id: response for response in profile.dose_responses}
         for assignment in profile.pairing_policy.assignments:
@@ -366,7 +374,7 @@ def _evaluate_candidate(
                 )
     if any(not values or min(values) <= 0.0 for values in separation_by_experiment.values()):
         blockers.append("positive_control_separation_failed")
-    worst_separation = min((min(values) for values in separation_by_experiment.values()), default=0.0)
+    worst_separation = min((min(values) for values in separation_by_experiment.values()), default=None)
 
     co_measured = 0
     ordered = 0
@@ -410,9 +418,11 @@ def _evaluate_candidate(
     )
 
 
-def _selection_key(row: CandidateEvaluation) -> tuple[float, float, float, float]:
+def _selection_key(row: CandidateEvaluation) -> tuple[float, float, float, float, float]:
+    has_reference = row.worst_experiment_control_separation is not None
     return (
-        -row.worst_experiment_control_separation,
+        0.0 if has_reference else 1.0,
+        -row.worst_experiment_control_separation if has_reference else 0.0,
         (float("inf") if "repeated_reference_drift_not_estimable" in row.limitations else row.repeated_anchor_drift),
         row.within_acquisition_observation_range,
         row.reduction[1],

@@ -17,6 +17,10 @@ from pathlib import Path
 
 from .._contract_values import json_value
 from ..canonical import comparability_key, derive_profile_rows
+from ..measurement_profile import (
+    MEASUREMENT_PROFILE_CONTRACT_ID,
+    ReferenceNormalizationUnavailable,
+)
 from ..policy import ReporterResponseObservationPolicy
 from ..profile import (
     ConditionMeasurement,
@@ -94,9 +98,10 @@ class ProfileContentProjection:
     reduction: EndpointReduction | TimeWindowReduction
     dose_grid_uM: tuple[float, ...]
     measurements: tuple[ConditionMeasurement, ...]
-    pairing_policy: PairingPolicy
+    pairing_policy: PairingPolicy | None
     dose_uncertainties: tuple[DoseUncertainty, ...]
     dose_responses: tuple[DoseResponse, ...]
+    reference_normalization: ReferenceNormalizationUnavailable | None
     comparability_key: str
     serialized_payload: Mapping[str, object]
 
@@ -113,8 +118,11 @@ def parse_profile_evidence_projection(value: object, *, index: int) -> ProfileEv
     """Parse bundled evidence without minting live-source closure tokens."""
 
     row = _strict_object(value, label=f"publication evidence profiles[{index}]", fields={"profile", "audit"})
+    raw_profile = _mapping(row["profile"], label=f"publication evidence profiles[{index}].profile")
+    if raw_profile.get("contract_id") == MEASUREMENT_PROFILE_CONTRACT_ID:
+        return _parse_measurement_profile_projection(row, raw_profile, index=index)
     profile_payload = _strict_object(
-        row["profile"],
+        raw_profile,
         label=f"publication evidence profiles[{index}].profile",
         fields={
             "contract_id",
@@ -197,11 +205,91 @@ def parse_profile_evidence_projection(value: object, *, index: int) -> ProfileEv
         pairing_policy=pairing,
         dose_uncertainties=canonical_uncertainties,
         dose_responses=responses,
+        reference_normalization=None,
         comparability_key=expected_key,
         serialized_payload=dict(profile_payload),
     )
     # Constructing eligibility is itself the exact schema and fixed-value check.
     del eligibility
+    audit_payload = _strict_object(
+        row["audit"],
+        label="audit",
+        fields={item.name for item in fields(ProfileAuditArtifact) if item.name != "_derivation_closure"},
+    )
+    audit_values = {item.name: audit_payload[item.name] for item in fields(ProfileAuditArtifact) if item.init}
+    audit_values["growth_phase_strata"] = tuple(
+        GrowthPhaseStratum(**_strict_dataclass(item, GrowthPhaseStratum))
+        for item in _object_list(audit_values["growth_phase_strata"], label="audit.growth_phase_strata")
+    )
+    audit = ProfileAuditArtifact(**audit_values)
+    audit_without_digest = dict(audit_payload)
+    artifact_digest = audit_without_digest.pop("artifact_digest")
+    if artifact_digest != canonical_digest(audit_without_digest):
+        raise ValueError("publication evidence audit digest mismatch")
+    if audit.profile_digest != canonical_digest(profile_payload):
+        raise ValueError("publication evidence profile digest mismatch")
+    if audit.profile_source_digest != canonical_digest(profile_source_identity_projection(projection)):
+        raise ValueError("publication evidence profile source digest mismatch")
+    return ProfileEvidenceProjection(profile=projection, audit=audit)
+
+
+def _parse_measurement_profile_projection(
+    row: Mapping[str, object],
+    profile_payload: Mapping[str, object],
+    *,
+    index: int,
+) -> ProfileEvidenceProjection:
+    profile_payload = _strict_object(
+        profile_payload,
+        label=f"publication evidence profiles[{index}].profile",
+        fields={
+            "contract_id",
+            "study_id",
+            "profile_id",
+            "subject_id",
+            "provenance",
+            "observation_policy",
+            "reduction",
+            "dose_grid_uM",
+            "measurements",
+            "reference_normalization",
+            "comparability_key",
+            "eligibility",
+        },
+    )
+    provenance = ProfileProvenanceProjection(
+        **_strict_dataclass(profile_payload["provenance"], ProfileProvenanceProjection)
+    )
+    policy = _parse_observation_policy(profile_payload["observation_policy"])
+    reduction = _parse_reduction(profile_payload["reduction"])
+    measurements = tuple(
+        ConditionMeasurement(**_strict_dataclass(item, ConditionMeasurement))
+        for item in _object_list(profile_payload["measurements"], label="measurements")
+    )
+    reference = ReferenceNormalizationUnavailable(
+        **_strict_dataclass(
+            profile_payload["reference_normalization"],
+            ReferenceNormalizationUnavailable,
+        )
+    )
+    eligibility_values = _strict_dataclass(profile_payload["eligibility"], ProfileEligibility)
+    eligibility_values["reasons"] = tuple(eligibility_values["reasons"])
+    ProfileEligibility(**eligibility_values)
+    projection = ProfileContentProjection(
+        profile_id=_required_text(profile_payload["profile_id"], label="profile_id"),
+        subject_id=_required_text(profile_payload["subject_id"], label="subject_id"),
+        provenance=provenance,
+        observation_policy=policy,
+        reduction=reduction,
+        dose_grid_uM=_number_tuple(profile_payload["dose_grid_uM"], label="dose_grid_uM"),
+        measurements=measurements,
+        pairing_policy=None,
+        dose_uncertainties=(),
+        dose_responses=(),
+        reference_normalization=reference,
+        comparability_key=_required_text(profile_payload["comparability_key"], label="comparability_key"),
+        serialized_payload=dict(profile_payload),
+    )
     audit_payload = _strict_object(
         row["audit"],
         label="audit",

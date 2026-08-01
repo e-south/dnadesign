@@ -7,8 +7,9 @@ These YAML fragments are loaded by `../ops.study.yaml`.
 - `status/`: record-only snapshot scope.
 - `readiness/`: providerless readiness scope, group bindings, next-scope rules,
   GenBank source-authority checks, and phase-named checks.
-- `schemas/`: study-owned contract fixtures, including the Construct
-  projection manifest schema, the representation-table handoff schema, and the
+- `schemas/`: study-owned contract fixtures, including raw reporter measurement
+  and stricter reference-normalized profile schemas, the Construct projection
+  manifest schema, the representation-table handoff schema, and the
   compositional RT-lnRNA subject-binding schema.
 - `fixtures/`: minimal planned candidate, overlay, Permuter, Construct
   projection, and Infer feature-bundle examples. Candidate fixtures use

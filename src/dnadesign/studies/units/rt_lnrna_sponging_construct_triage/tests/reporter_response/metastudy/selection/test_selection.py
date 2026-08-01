@@ -59,6 +59,19 @@ def test_lexicographic_selection_uses_primary_cohort_and_is_loo_stable() -> None
     assert selected.loo_same_or_adjacent_fraction == pytest.approx(1.0)
 
 
+def test_selection_uses_control_separation_only_when_reference_normalization_exists() -> None:
+    decision = evaluate_metastudy(
+        _evidence(reference_normalized=False),
+        readiness=_ready(),
+    )
+
+    assert decision.status == "selected"
+    assert decision.selected_reduction == (6.0, 10.0)
+    assert all(row.worst_experiment_control_separation is None for row in decision.evaluations)
+    assert all("reference_normalization_unavailable" in row.limitations for row in decision.evaluations)
+    assert all("positive_control_separation_failed" not in row.blockers for row in decision.evaluations)
+
+
 def test_growth_phase_gate_reduces_within_acquisition_before_across_experiments() -> None:
     evidence: list[ProfileEvidence] = []
     for row in _evidence():

@@ -15,6 +15,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Literal
 
+from ...measurement_profile import DescriptiveReporterProfile, ReporterMeasurementProfile
 from ...profile import ReporterResponseProfile
 from ._values import MetastudyContractError, _digest, _nonnegative, _required_text, canonical_digest
 
@@ -105,14 +106,14 @@ class ProfileAuditArtifact:
 class ProfileEvidence:
     """One canonical profile plus digest-bound within-acquisition range evidence."""
 
-    profile: ReporterResponseProfile
+    profile: DescriptiveReporterProfile
     audit: ProfileAuditArtifact
 
     def __post_init__(self) -> None:
         from ..audits import profile_audit_payload, profile_digest, profile_source_identity_payload
 
-        if not isinstance(self.profile, ReporterResponseProfile):
-            raise MetastudyContractError("profile evidence must contain ReporterResponseProfile")
+        if not isinstance(self.profile, (ReporterResponseProfile, ReporterMeasurementProfile)):
+            raise MetastudyContractError("profile evidence must contain a typed reporter profile")
         if not isinstance(self.audit, ProfileAuditArtifact):
             raise MetastudyContractError("profile evidence requires ProfileAuditArtifact")
         expected_source = canonical_digest(profile_source_identity_payload(self.profile))

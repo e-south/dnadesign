@@ -15,13 +15,14 @@ from dataclasses import asdict
 from typing import Literal
 
 from .. import profile_to_dict
-from ..profile import ReporterResponseProfile, TimeWindowReduction
+from ..measurement_profile import DescriptiveReporterProfile
+from ..profile import TimeWindowReduction
 from .contracts._values import canonical_digest
 from .contracts.profile import GrowthPhaseStratum, ProfileAuditArtifact
 from .contracts.protocol import CANONICAL_CONDITION_ONTOLOGY_DIGEST
 
 
-def profile_source_identity_payload(profile: ReporterResponseProfile) -> dict[str, object]:
+def profile_source_identity_payload(profile: DescriptiveReporterProfile) -> dict[str, object]:
     """Return the exact source identity to which one profile audit must bind."""
 
     provenance = profile.provenance
@@ -44,20 +45,20 @@ def profile_source_identity_payload(profile: ReporterResponseProfile) -> dict[st
     }
 
 
-def _profile_policy_identity(profile: ReporterResponseProfile) -> object:
+def _profile_policy_identity(profile: DescriptiveReporterProfile) -> object:
     """Single compatibility seam for the canonical reporter-response observation policy."""
 
     return profile.observation_policy.digest
 
 
-def profile_digest(profile: ReporterResponseProfile) -> str:
+def profile_digest(profile: DescriptiveReporterProfile) -> str:
     """Digest the complete canonical profile, including measurements and reduction."""
 
     return canonical_digest(profile_to_dict(profile))
 
 
 def build_profile_audit_artifact(
-    profile: ReporterResponseProfile,
+    profile: DescriptiveReporterProfile,
     *,
     method_id: Literal["synthetic_profile_audit_v1", "canonical_profile_observation_audit_v1"],
     within_acquisition_observation_range: float,
@@ -91,7 +92,7 @@ def build_profile_audit_artifact(
 
 
 def _build_derivation_closed_profile_audit(
-    profile: ReporterResponseProfile,
+    profile: DescriptiveReporterProfile,
     *,
     method_id: object | None = None,
     within_acquisition_observation_range: float,
@@ -126,7 +127,7 @@ def _build_derivation_closed_profile_audit(
 
 
 def _build_profile_audit(
-    profile: ReporterResponseProfile,
+    profile: DescriptiveReporterProfile,
     *,
     method_id: Literal["synthetic_profile_audit_v1", "canonical_profile_observation_audit_v1"],
     condition_ontology_digest: str,

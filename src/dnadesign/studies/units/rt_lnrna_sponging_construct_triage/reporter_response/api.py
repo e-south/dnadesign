@@ -17,6 +17,11 @@ from dataclasses import asdict
 from ..reader_evidence import ReaderEvidenceBindingSet
 from ._contract_values import json_value as _json_value
 from ._contract_values import required_text as _required_text
+from .measurement_profile import (
+    MEASUREMENT_PROFILE_CONTRACT_ID,
+    ReferenceNormalizationUnavailable,
+    ReporterMeasurementProfile,
+)
 from .policy import ReporterResponseObservationPolicy
 from .profile import (
     CONTRACT_ID,
@@ -86,11 +91,11 @@ def build_reporter_response_profile(
     )
 
 
-def profile_to_dict(profile: ReporterResponseProfile) -> dict[str, object]:
+def profile_to_dict(profile: ReporterResponseProfile | ReporterMeasurementProfile) -> dict[str, object]:
     """Serialize one already-validated profile without objective fields."""
 
-    if not isinstance(profile, ReporterResponseProfile):
-        raise ReporterResponseContractError("profile must be ReporterResponseProfile")
+    if not isinstance(profile, (ReporterResponseProfile, ReporterMeasurementProfile)):
+        raise ReporterResponseContractError("profile must be a typed reporter profile")
     payload = _json_value(asdict(profile))
     assert isinstance(payload, dict)
     provenance = payload["provenance"]
@@ -105,7 +110,7 @@ def profile_from_dict(
     payload: Mapping[str, object],
     *,
     evidence_bindings: ReaderEvidenceBindingSet,
-) -> ReporterResponseProfile:
+) -> ReporterResponseProfile | ReporterMeasurementProfile:
     """Parse and canonically revalidate one serialized profile payload."""
 
     try:
@@ -120,7 +125,9 @@ def _parse_profile(
     payload: Mapping[str, object],
     *,
     evidence_bindings: ReaderEvidenceBindingSet,
-) -> ReporterResponseProfile:
+) -> ReporterResponseProfile | ReporterMeasurementProfile:
+    if payload.get("contract_id") == MEASUREMENT_PROFILE_CONTRACT_ID:
+        return _parse_measurement_profile(payload, evidence_bindings=evidence_bindings)
     root = _strict_object(
         payload,
         name="profile",
@@ -219,6 +226,79 @@ def _parse_profile(
         raise ReporterResponseContractError(
             "serialized dose_responses must equal canonical responses recomputed from measurements and pairing"
         )
+    if root["comparability_key"] != profile.comparability_key:
+        raise ReporterResponseContractError("serialized comparability_key must equal the canonical comparison identity")
+    return profile
+
+
+def _parse_measurement_profile(
+    payload: Mapping[str, object],
+    *,
+    evidence_bindings: ReaderEvidenceBindingSet,
+) -> ReporterMeasurementProfile:
+    root = _strict_object(
+        payload,
+        name="measurement profile",
+        fields={
+            "contract_id",
+            "study_id",
+            "profile_id",
+            "subject_id",
+            "provenance",
+            "observation_policy",
+            "reduction",
+            "dose_grid_uM",
+            "measurements",
+            "reference_normalization",
+            "comparability_key",
+            "eligibility",
+        },
+    )
+    provenance_payload = _mapping(root["provenance"], name="provenance")
+    provenance = ReaderEvidenceProvenance._from_source_closed_bindings(
+        evidence_bindings=evidence_bindings,
+        subject_id=root["subject_id"],
+        raw_design_id=provenance_payload.get("raw_design_id"),
+        raw_assay_subject_id=provenance_payload.get("raw_assay_subject_id"),
+    )
+    if root["provenance"] != _public_provenance_payload(provenance):
+        raise ReporterResponseContractError(
+            "serialized provenance must equal provenance rederived from the verified evidence-binding artifact"
+        )
+    reduction_payload = _mapping(root["reduction"], name="reduction")
+    reduction: Reduction
+    if reduction_payload.get("kind") == "endpoint":
+        values = _strict_dataclass(reduction_payload, EndpointReduction)
+        values["temporal_policy"] = _temporal_policy(values["temporal_policy"])
+        reduction = EndpointReduction(**values)
+    elif reduction_payload.get("kind") == "time_window":
+        values = _strict_dataclass(reduction_payload, TimeWindowReduction)
+        values["temporal_policy"] = _temporal_policy(values["temporal_policy"])
+        reduction = TimeWindowReduction(**values)
+    else:
+        raise ReporterResponseContractError("reduction.kind must be endpoint or time_window")
+    reference_values = _strict_dataclass(
+        root["reference_normalization"],
+        ReferenceNormalizationUnavailable,
+    )
+    eligibility_values = _strict_dataclass(root["eligibility"], ProfileEligibility)
+    eligibility_values["reasons"] = tuple(eligibility_values["reasons"])
+    profile = ReporterMeasurementProfile(
+        contract_id=root["contract_id"],
+        study_id=root["study_id"],
+        profile_id=root["profile_id"],
+        subject_id=root["subject_id"],
+        provenance=provenance,
+        observation_policy=_observation_policy(root["observation_policy"]),
+        reduction=reduction,
+        dose_grid_uM=_number_tuple(root["dose_grid_uM"], name="dose_grid_uM"),
+        measurements=tuple(
+            ConditionMeasurement(**_strict_dataclass(row, ConditionMeasurement))
+            for row in _object_list(root["measurements"], name="measurements")
+        ),
+        reference_normalization=ReferenceNormalizationUnavailable(**reference_values),
+        eligibility=ProfileEligibility(**eligibility_values),
+    )
     if root["comparability_key"] != profile.comparability_key:
         raise ReporterResponseContractError("serialized comparability_key must equal the canonical comparison identity")
     return profile

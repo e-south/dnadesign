@@ -18,11 +18,12 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 
 _METASTUDY_ROOT = Path(__file__).parents[3] / "reporter_response" / "metastudy"
 _MATERIALIZE_ROOT = _METASTUDY_ROOT / "materialize"
-_EXPECTED_MODULES = {"__init__.py", "models.py", "profiles.py", "service.py", "temporal.py"}
+_EXPECTED_MODULES = {"__init__.py", "models.py", "profiles.py", "reference.py", "service.py", "temporal.py"}
 _LINE_BUDGETS = {
     "__init__.py": 25,
     "models.py": 80,
     "profiles.py": 410,
+    "reference.py": 70,
     "service.py": 380,
     "temporal.py": 280,
 }

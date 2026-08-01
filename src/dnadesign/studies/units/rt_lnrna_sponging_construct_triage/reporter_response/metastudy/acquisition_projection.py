@@ -19,6 +19,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
+from ..measurement_profile import ReporterMeasurementProfile
 from ..profile import TimeWindowReduction
 from .contracts._values import MetastudyContractError, canonical_digest
 from .contracts.profile import ProfileEvidence
@@ -158,6 +159,8 @@ def build_acquisition_projection(
         if not isinstance(reduction, TimeWindowReduction):
             raise MetastudyContractError("acquisition projection accepts time-window profiles only")
         if (reduction.recorded_start_time_h, reduction.recorded_end_time_h) != selected_window:
+            continue
+        if isinstance(profile, ReporterMeasurementProfile) or getattr(profile, "reference_normalization", None):
             continue
         reduction_id = f"window-{reduction.recorded_start_time_h:g}-{reduction.recorded_end_time_h:g}h"
         reduction_digest = canonical_digest(asdict(reduction))

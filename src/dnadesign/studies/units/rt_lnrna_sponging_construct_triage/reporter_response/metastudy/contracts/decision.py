@@ -56,7 +56,7 @@ class CandidateEvaluation:
 
     reduction: Window
     eligible_experiment_count: int
-    worst_experiment_control_separation: float
+    worst_experiment_control_separation: float | None
     repeated_anchor_drift: float
     within_acquisition_observation_range: float
     growth_phase_start: float
@@ -80,7 +80,6 @@ class CandidateEvaluation:
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise MetastudyContractError(f"{name} must be a non-negative integer")
         for name in (
-            "worst_experiment_control_separation",
             "repeated_anchor_drift",
             "within_acquisition_observation_range",
             "growth_phase_start",
@@ -90,6 +89,10 @@ class CandidateEvaluation:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
                 raise MetastudyContractError(f"{name} must be finite")
+        if self.worst_experiment_control_separation is not None:
+            value = self.worst_experiment_control_separation
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise MetastudyContractError("worst_experiment_control_separation must be finite or null")
         if not 0.0 <= self.loo_same_or_adjacent_fraction <= 1.0:
             raise MetastudyContractError("loo_same_or_adjacent_fraction must be between zero and one")
         _unique_text(self.blockers, label="candidate blockers", allow_empty=self.eligible)
@@ -433,7 +436,10 @@ def _validate_selected_projection(
     if (
         not selected.eligible
         or selected.eligible_experiment_count < DEFAULT_PROTOCOL.minimum_kinetic_experiments
-        or selected.worst_experiment_control_separation <= 0.0
+        or (
+            selected.worst_experiment_control_separation is not None
+            and selected.worst_experiment_control_separation <= 0.0
+        )
         or selected.growth_phase_start < DEFAULT_PROTOCOL.growth_phase_start_minimum
         or not DEFAULT_PROTOCOL.growth_phase_end_minimum
         <= selected.growth_phase_end
@@ -444,7 +450,8 @@ def _validate_selected_projection(
     expected = min(
         eligible,
         key=lambda row: (
-            -row.worst_experiment_control_separation,
+            0.0 if row.worst_experiment_control_separation is not None else 1.0,
+            (-row.worst_experiment_control_separation if row.worst_experiment_control_separation is not None else 0.0),
             (
                 float("inf")
                 if "repeated_reference_drift_not_estimable" in row.limitations

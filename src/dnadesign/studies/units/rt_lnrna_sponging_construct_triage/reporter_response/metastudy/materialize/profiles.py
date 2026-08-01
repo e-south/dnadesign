@@ -25,6 +25,7 @@ from ... import (
     NotEstimableMetricUncertainty,
     PairingPolicy,
     ReporterResponseObservationPolicy,
+    build_reporter_measurement_profile,
     build_reporter_response_profile,
 )
 from ...profile import Reduction
@@ -33,6 +34,7 @@ from ..condition_ontology import ReporterResponseConditionOntology
 from ..contracts.materialization import MaterializationOmission
 from ..contracts.profile import ProfileEvidence
 from ..contracts.protocol import MetastudyProtocol
+from .reference import resolve_reference_basis
 from .temporal import _condition_summary, _contains_censored_values, _growth_phase_strata, _reduce, _select_reduction
 
 
@@ -145,7 +147,7 @@ def _build_profile(
     reference_rows = _select_reduction(frame, reference)
     primary = ontology.condition_for_dose(protocol.primary_dose_uM)
     baseline = next(row for row in ontology.conditions if row.role == "baseline")
-    positive = next(row for row in ontology.conditions if row.role == "positive_control")
+    positive = ontology.positive_control
     observed_labels = set(selected["treatment"].astype(str))
     dose_definitions = [primary]
     if include_sensitivity_doses:
@@ -159,7 +161,9 @@ def _build_profile(
             and definition.treatment_label in observed_labels
         )
     dose_definitions.sort(key=lambda row: float(row.dose_uM))
-    included = {baseline.treatment_label, positive.treatment_label}
+    included = {baseline.treatment_label}
+    if positive is not None:
+        included.add(positive.treatment_label)
     included.update(definition.treatment_label for definition in dose_definitions)
     selected = selected.loc[selected["treatment"].isin(included)]
     reference_rows = reference_rows.loc[reference_rows["treatment"].isin(included)]
@@ -188,7 +192,8 @@ def _build_profile(
             return "declared_biological_replicate_identity_incomplete"
 
     measurements_by_condition: dict[str, list[ConditionMeasurement]] = {}
-    for definition in (baseline, positive, *dose_definitions):
+    condition_definitions = (baseline, *((positive,) if positive is not None else ()), *dose_definitions)
+    for definition in condition_definitions:
         label = definition.treatment_label
         selected_condition = selected.loc[selected["treatment"].eq(label)]
         reference_condition_rows = reference_rows.loc[reference_rows["treatment"].eq(label)]
@@ -246,15 +251,39 @@ def _build_profile(
             condition_measurements.append(measurement)
 
     baselines = measurements_by_condition[baseline.condition_id]
-    positives = measurements_by_condition[positive.condition_id]
+    positives = measurements_by_condition[positive.condition_id] if positive is not None else []
     if replicate_field is not None and policy.pairing_kind == "paired_by_design":
         return "explicit_paired_control_assignment_missing"
-    baseline_ratio = statistics.median(row.rfp_over_od600 for row in baselines)
-    positive_ratio = statistics.median(row.rfp_over_od600 for row in positives)
-    baseline_od = statistics.median(row.od600 for row in baselines)
-    separation = positive_ratio - baseline_ratio
-    if separation <= 0.0 or baseline_od <= 0.0:
-        return "positive_control_separation_failed"
+    reference_basis = resolve_reference_basis(baselines=baselines, positive=positive, positives=positives)
+    if reference_basis.unavailable is not None:
+        profile = build_reporter_measurement_profile(
+            profile_id=f"{record.experiment_id}:{subject_id}:{_reduction_id(reduction)}",
+            subject_id=subject_id,
+            raw_design_id=design_id,
+            raw_assay_subject_id=assay_subject_id,
+            evidence_bindings=bindings,
+            observation_policy=policy,
+            reduction=reduction,
+            dose_grid_uM=tuple(float(row.dose_uM) for row in dose_definitions),
+            measurements=measurements,
+            reference_normalization=reference_basis.unavailable,
+            ineligibility_reasons=(
+                "preference_objective_not_defined",
+                f"reference_normalization_{reference_basis.unavailable.reason}",
+            ),
+        )
+        return _profile_evidence(
+            profile,
+            selected=selected,
+            ontology=ontology,
+            within_acquisition_ranges=within_acquisition_ranges,
+            reference_spans=reference_spans,
+            growth_phase_strata=growth_phase_strata,
+        )
+    assert reference_basis.separation is not None
+    separation = reference_basis.separation
+    baseline_ratio = reference_basis.baseline_ratio
+    baseline_od = reference_basis.baseline_od600
     for definition in dose_definitions:
         dose = float(definition.dose_uM)
         for dose_measurement in measurements_by_condition[definition.condition_id]:
@@ -297,6 +326,25 @@ def _build_profile(
         dose_uncertainties=uncertainties,
         ineligibility_reasons=("preference_objective_not_defined",),
     )
+    return _profile_evidence(
+        profile,
+        selected=selected,
+        ontology=ontology,
+        within_acquisition_ranges=within_acquisition_ranges,
+        reference_spans=reference_spans,
+        growth_phase_strata=growth_phase_strata,
+    )
+
+
+def _profile_evidence(
+    profile,
+    *,
+    selected,
+    ontology,
+    within_acquisition_ranges,
+    reference_spans,
+    growth_phase_strata,
+):
     required = len(selected)
     clipped = int(
         (selected["value_policy_clipped"].astype(bool) | selected["value_bound_kind"].astype(str).ne("exact")).sum()
