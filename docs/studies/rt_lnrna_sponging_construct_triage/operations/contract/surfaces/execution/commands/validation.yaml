@@ -57,3 +57,60 @@ representation_contract:
     - run
     - pytest
     - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/infer/test_representation_contract.py
+reader_experiment_routes_static:
+  surface_type: command
+  status: active
+  argv:
+    - python3
+    - ../.agents/skills/retron-assay-study-bridge/scripts/validate_reader_experiment_routes.py
+reader_rt_competence_routes_live:
+  surface_type: command
+  status: active
+  argv:
+    - python3
+    - ../.agents/skills/retron-assay-study-bridge/scripts/check_reader_experiment_readiness.py
+    - --route-id
+    - rt_competence_subject_binding
+subject_binding_contract:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - pytest
+    - -q
+    - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/subject_bindings/test_registry.py
+subject_binding_query:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - python
+    - -m
+    - dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings.query
+    - --rt-part-id
+    - Eco1RT-G3-D01
+reader_evidence_binding_contract:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - pytest
+    - -q
+    - src/dnadesign/studies/tests/test_reader_records.py
+    - src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_evidence_bindings.py
+reporter_response_metastudy_status:
+  surface_type: command
+  status: active
+  argv:
+    - uv
+    - run
+    - python
+    - -m
+    - dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.status
+    - --phd-root
+    - ..
+    - --state
+    - docs/studies/rt_lnrna_sponging_construct_triage/contexts/reporter-response-metastudy/metastudy-state.yaml

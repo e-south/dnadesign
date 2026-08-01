@@ -10,9 +10,26 @@ command_groups:
       - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_genbank_authority.py src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_variant_genbank_catalog.py
   - id: construct_projection
     status: paused
-    purpose: Materialize dual-cassette construct contexts from GenBank, source-promotion, and Permuter construct subjects.
+    purpose: Materialize bound RT-lnRNA subjects, explicit source promotions, and Permuter variants into dual-cassette construct contexts.
     blockers:
       - khan_source_rows_exceeding_current_2000bp_construct_window
+    operational_sequence:
+      - id: hairpin_compiler_primitive_preflight
+        owner: retron_hairpin_design
+        public_callable: dnadesign.studies.units.retron_hairpin_design.catalog.compiler_spec.resolve_msd_compiler_spec_payload
+        requirement: Resolve and validate the configured hairpin compiler primitives before any study promotion.
+      - id: unified_construct_materialization
+        owner: rt_lnrna_sponging_construct_triage
+        public_callable: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.construct_materialization.materialize_unified_construct_subject_contexts
+        kwargs:
+          allow_partial_byte_resolution: true
+          include_source_promotions: true
+          include_msd_compiler_promotions: true
+          include_rt_cds_dms: true
+        partial_resolution_policy: >-
+          Explicitly materialize byte-resolved subjects while retaining requested,
+          resolved, and blocked counts plus blocked identities and reasons in the
+          returned typed report. Exact blocked selectors still fail before writes.
   - id: permuter_rt_cds_dms
     status: paused
     purpose: Generate RT-CDS DMS variants through the public Permuter API and promote them into study-owned construct subject envelopes before Construct realization.
@@ -42,22 +59,12 @@ command_groups:
     commands:
       - uv run latentdna validate workspace --workspace rt_lnrna_sponging_construct_triage --deep --json
       - uv run latentdna recipe validate rt_lnrna_representation_review_recipe --workspace rt_lnrna_sponging_construct_triage --json
-  - id: reader_spop_label_materialization
-    status: materialized_for_latentdna_overlay
-    purpose: Materialize Reader-derived SPOP scalar labels for RT-lnRNA assay subjects without promoting unresolved sequence identities.
-    commands:
-      - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan --reader-root ../reader --write-label-tables src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs --json
-      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_plan.py
-  - id: reader_spop_condition_structure_matrix
-    status: materialized
-    purpose: Materialize the study-owned condition-long SPOP matrix and MSD structure thumbnail heatmap.
-    commands:
-      - uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.materialize --reader-root ../reader --json
-      - uv run pytest -q src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/test_reader_spop_composite.py
   - id: opal_readiness
     status: blocked
-    purpose: Validate candidate records with one fixed-size vector X and real labels.
+    purpose: Validate candidate records with one fixed-size vector X and a study-approved constrained reporter-response objective.
     blockers:
       - candidate_x_not_selected
-      - reader_spop_labels_not_joined_to_opal_training_table
+      - reporter_response_meta_study_not_complete
+      - comparable_uncertainty_bearing_profiles_absent
+      - constrained_reporter_response_objective_not_defined
       - rt_lnrna_sponging_construct_triage_opal_training_examples_v1_absent

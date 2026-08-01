@@ -1,6 +1,6 @@
 ## RT-lnRNA Sponging Construct Vocabulary
 
-- Last verified: 2026-05-26
+- Last verified: 2026-07-29
 - Owner: dnadesign-maintainers
 
 ### Core Terms
@@ -9,7 +9,7 @@
 | --- | --- |
 | `SyntheticRtLnrnaSpongingConstruct` | One paired lnRNA/msr-msd-payload cassette plus one RT CDS cassette in the fixed dual-expression context. |
 | `RtCds` | DNA coding sequence for the reverse transcriptase in the construct subject row. |
-| `LnrnaSequence` | DNA representation of the lnRNA cassette used in the construct context. |
+| `LnrnaSequence` | DNA representation of the RNA-bearing Construct slot. Its source may publish a complete lnRNA cassette or a construct-ready MSD handoff; the source record determines the grain. |
 | `MsdDesignSpec` | Study/compiler design metadata for the MSD, hairpin, payload, and feasibility details. |
 | `YIU` | Study acronym for the YIU-compatible cloning method; in this study it composes Snapback cap and scar-nick stem-base primitives before MSD compilation. |
 | `ConstructSlot` | Named placement slot owned by Construct, for example `lnrna` or `rt_cds`, with template span, source field, emitted span, and orientation-aware bounds. |
@@ -18,7 +18,7 @@
 | `ConstructContextView` | Declared construct-context sequence view with orientation, coordinates, spans, and pooling intent. |
 | `InferFeatureAlias` | Pointer to model-derived feature vectors and aliases. |
 | `AbundancePriorOverlay` | Literature/source abundance prior, not a sponging assay label. |
-| `SpongingAssayObservation` | Future Reader-owned lab TF-sponging label rows with source-scoped SPOP numerics. |
+| `ReporterResponseProfile` | Study-owned descriptive dose-wise reporter response, relative OD, uncertainty, and provenance. It is not an optimization label. |
 
 ### Naming Rules
 
@@ -32,7 +32,7 @@
   or candidate-control labels. They are not Construct part roles.
 - Use the GenBank catalog as one first-class sequence-authority layer for
   representable study variants and fixtures.
-- Keep Khan abundance, Crawford abundance, and Reader SPOP numerics
+- Keep Khan abundance, Crawford abundance, and reporter-response numerics
   source-scoped. Ordinal bins and categorical hues are metadata views, not
   shared-scale numeric labels.
 - Keep `anchor_mean`, `anchor_start_0`, `anchor_end_0`, and

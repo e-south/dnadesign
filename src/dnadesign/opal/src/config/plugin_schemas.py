@@ -454,11 +454,6 @@ class _ScalarIdentityParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-@register_param_schema("objective", "spop_v1")
-class _SpopParams(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
 @register_param_schema("objective", "vector_channel_v1")
 class _VectorChannelParams(BaseModel):
     model_config = ConfigDict(extra="forbid")

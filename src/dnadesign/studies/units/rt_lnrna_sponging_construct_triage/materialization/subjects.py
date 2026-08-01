@@ -24,8 +24,6 @@ from .common import _list, _mapping, _span_0
 from .contracts import (
     _BASE_TEMPLATE_LNRNA_SPAN_0,
     _CONSTRUCT_SUBJECT_BIOLOGICAL_SEQUENCE_FIELDS,
-    _GENBANK_CATALOG_SOURCE_BASIS,
-    _GENBANK_CATALOG_SOURCE_COLLECTION_ID,
     _MATERIALIZATION_SOURCE,
     _SEQUENCE_ID_SOURCE_MAP,
     MaterializationContractError,
@@ -139,47 +137,6 @@ def _catalog_materialization_candidates(
     return tuple(candidates)
 
 
-def _catalog_candidate_rows(
-    *,
-    manifest: dict[str, object],
-    template_sequence: str,
-    target_start: int,
-    target_end: int,
-    candidates: tuple[_CatalogMaterializationCandidate, ...],
-) -> tuple[list[dict[str, object]], dict[str, str]]:
-    slots = tuple(_mapping(slot, label="slots[]") for slot in _list(manifest["slots"], label="slots"))
-    window_length = target_end - target_start
-    rows: list[dict[str, object]] = []
-    expected_sequences: dict[str, str] = {}
-    for index, candidate in enumerate(candidates):
-        row: dict[str, object] = {
-            "id": candidate.construct_subject_id,
-            "sequence": "A" * (index + 1),
-            "source": _MATERIALIZATION_SOURCE,
-            **_construct_subject_envelope_overlay(),
-            "construct_subject__lnrna_sequence": candidate.lnrna_sequence,
-            "construct_subject__rt_cds_sequence": candidate.rt_cds_sequence,
-            "construct_subject__source_basis": _GENBANK_CATALOG_SOURCE_BASIS,
-            "construct_subject__source_collection_id": _GENBANK_CATALOG_SOURCE_COLLECTION_ID,
-            "construct_subject__source_variant_id": candidate.source_variant_id,
-            "construct_subject__variant_class": candidate.source_variant_class,
-            "construct_subject__reader_design_id": candidate.reader_design_id,
-            "construct_subject__lnrna_authority_kind": candidate.lnrna_authority_kind,
-            "construct_subject__rt_cds_authority_kind": candidate.rt_cds_authority_kind,
-            "construct_subject__construct_projection_status": "representable",
-            "construct_subject__role": "construct_subject",
-        }
-        rows.append(row)
-        expected_sequences[candidate.construct_subject_id] = _expected_context_sequence_at_window(
-            template_sequence=template_sequence,
-            slots=slots,
-            row=row,
-            window_start=candidate.window_start,
-            window_end=candidate.window_start + window_length,
-        )
-    return rows, expected_sequences
-
-
 def _source_promotion_rows(
     *,
     manifest: dict[str, object],
@@ -191,10 +148,9 @@ def _source_promotion_rows(
     slots = tuple(_mapping(slot, label="slots[]") for slot in _list(manifest["slots"], label="slots"))
     rows: list[dict[str, object]] = []
     expected_sequences: dict[str, str] = {}
-    for index, promotion in enumerate(promotions, start=1):
+    for promotion in promotions:
         row: dict[str, object] = {
             "id": promotion.construct_subject_id,
-            "sequence": "A" * index,
             "source": _MATERIALIZATION_SOURCE,
             **_construct_subject_envelope_overlay(),
             "construct_subject__lnrna_sequence": promotion.lnrna_sequence,
@@ -309,7 +265,7 @@ def _rt_cds_dms_construct_subject_rows(
     source_basis = _required_result_metadata(result, "source_basis")
     rows: list[dict[str, object]] = []
     seen_ids: set[str] = set()
-    for index, record in enumerate(result.records, start=1):
+    for record in result.records:
         permuter_meta = CodingDnaDmsVariantMetadata.from_record(record)
         aa_pos = permuter_meta.aa_pos
         aa_wt = permuter_meta.aa_wt
@@ -321,7 +277,6 @@ def _rt_cds_dms_construct_subject_rows(
         rows.append(
             {
                 "id": construct_subject_id,
-                "sequence": "A" * index,
                 "source": _MATERIALIZATION_SOURCE,
                 **_construct_subject_envelope_overlay(),
                 "construct_subject__lnrna_sequence": lnrna_sequence,
@@ -367,7 +322,7 @@ def _construct_subject_envelope_overlay() -> dict[str, object]:
     return {
         "construct_subject__record_kind": "construct_subject_envelope",
         "construct_subject__sequence_authority": "overlay_only",
-        "construct_subject__envelope_carrier_policy": "synthetic_unique_dna4_v1",
+        "construct_subject__envelope_carrier_policy": "subject_id_sha256_digest_carrier_v1",
         "construct_subject__biological_sequence_fields": list(_CONSTRUCT_SUBJECT_BIOLOGICAL_SEQUENCE_FIELDS),
     }
 

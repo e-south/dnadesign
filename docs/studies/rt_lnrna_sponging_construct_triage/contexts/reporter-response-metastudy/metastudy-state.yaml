@@ -1,0 +1,2053 @@
+schema_id: rt_lnrna_reporter_response_metastudy_state.v6
+generation_digest: sha256:1a050778ae126b719b58320d525fa01ed429c4768523cfcacf0f9e464e097501
+readiness:
+  schema_id: rt_lnrna_reporter_response_readiness_snapshot.v1
+  source_identity:
+    route_id: rt_lnrna_reporter_response_metastudy
+    route_registry_path: .agents/skills/retron-assay-study-bridge/references/reader-experiment-routes.json
+    route_registry_digest: sha256:6f60bfa71405bf24ee599e9c7a9904902fc12249678e723bd33efd61d7529106
+    normalized_full_receipt_digest: sha256:3b5148dffe109d524294e137f17d14d78f32d8a99edac13c22f80bf60df648b3
+    normalization: omit environment-specific reader_command before canonical JSON
+      hashing
+  last_verified: '2026-08-01'
+  selected_experiment_count: 8
+  related_experiment_count: 1
+  related_experiment_ids:
+  - 20251105_retron_Eco1_RT_variants
+  ready_experiment_count: 8
+  ready_experiment_ids:
+  - 20250622_retron_Eco1_26_43_benchmark
+  - 20250707_retron_Eco1_26_43_45_46_benchmark
+  - 20250718_retron_Eco1_26_45_47_48_benchmark
+  - 20260418_retron_Eco1_26_43_170_171_benchmark
+  - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+  - 20260529_retron_Eco1_26_43_177_186_benchmark
+  - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+  - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+  blocked_experiment_ids: []
+decision:
+  contract_id: rt_lnrna_reporter_response_metastudy_decision.v4
+  protocol_id: rt_lnrna_reporter_response_metastudy.v3
+  status: selected
+  selection_use: descriptive_comparison
+  evidence_grade: provisional_descriptive
+  selected_reduction:
+  - 6.0
+  - 10.0
+  blockers: []
+  limitations:
+  - retrospective_calibration_cohort
+  - growth_phase_rule_requires_external_replication
+  - acquisition_projection_is_descriptive_only
+  - study_side_blank_correction_not_claimed
+  - within_acquisition_observation_range_exceeds_endpoint_reference
+  - reference_panel_incomplete
+  - loo_fold_without_eligible_candidate
+  - loo_choice_same_or_adjacent_below_75_percent
+  - subject_window_omissions_present
+  policy_digest: sha256:b01a69f30b608ea28fe580edf2ca01347284d41b52ba048095daa2cf2f6ed711
+  evidence_digest: sha256:e2ce76aa92697c44aa62a7ac91426b98f77e3a513f41292e34e52e97d8d07725
+  readiness:
+    selected_experiment_count: 8
+    ready_experiment_count: 8
+    ready_experiment_ids:
+    - 20250622_retron_Eco1_26_43_benchmark
+    - 20250707_retron_Eco1_26_43_45_46_benchmark
+    - 20250718_retron_Eco1_26_45_47_48_benchmark
+    - 20260418_retron_Eco1_26_43_170_171_benchmark
+    - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    blocked_experiment_ids: []
+    receipt_digest: sha256:3b5148dffe109d524294e137f17d14d78f32d8a99edac13c22f80bf60df648b3
+  evaluations:
+  - reduction:
+    - 4.0
+    - 8.0
+    eligible_experiment_count: 8
+    worst_experiment_control_separation: 5927.004020393953
+    repeated_anchor_drift: 0.15112602687831633
+    within_acquisition_observation_range: 237.24643371809162
+    growth_phase_start: 0.7056391214140172
+    growth_phase_end: 1.041963527832338
+    anchor_ordered_acquisition_count: 4
+    co_measured_anchor_acquisition_count: 4
+    loo_same_or_adjacent_fraction: 0.0
+    eligible: false
+    blockers:
+    - growth_phase_end_before_deceleration
+    limitations:
+    - within_acquisition_observation_range_exceeds_endpoint_reference
+    - reference_panel_incomplete
+  - reduction:
+    - 6.0
+    - 10.0
+    eligible_experiment_count: 8
+    worst_experiment_control_separation: 5500.888357083288
+    repeated_anchor_drift: 0.32967268462026245
+    within_acquisition_observation_range: 141.99111700238245
+    growth_phase_start: 1.0173018135450569
+    growth_phase_end: 0.5258685445108273
+    anchor_ordered_acquisition_count: 4
+    co_measured_anchor_acquisition_count: 4
+    loo_same_or_adjacent_fraction: 0.5
+    eligible: true
+    blockers: []
+    limitations:
+    - within_acquisition_observation_range_exceeds_endpoint_reference
+    - reference_panel_incomplete
+    - loo_fold_without_eligible_candidate
+    - loo_choice_same_or_adjacent_below_75_percent
+  - reduction:
+    - 8.0
+    - 12.0
+    eligible_experiment_count: 8
+    worst_experiment_control_separation: 4230.09693916495
+    repeated_anchor_drift: 0.6857787509795632
+    within_acquisition_observation_range: 65.04848653871352
+    growth_phase_start: 0.8721316497712416
+    growth_phase_end: 0.053211348262137914
+    anchor_ordered_acquisition_count: 4
+    co_measured_anchor_acquisition_count: 4
+    loo_same_or_adjacent_fraction: 0.0
+    eligible: false
+    blockers:
+    - growth_phase_end_near_plateau
+    limitations:
+    - within_acquisition_observation_range_exceeds_endpoint_reference
+    - reference_panel_incomplete
+  - reduction:
+    - 10.0
+    - 14.0
+    eligible_experiment_count: 8
+    worst_experiment_control_separation: 4208.168512002969
+    repeated_anchor_drift: 0.8953545653340735
+    within_acquisition_observation_range: 57.9152944242459
+    growth_phase_start: 0.2520999060019085
+    growth_phase_end: 0.019768218047106163
+    anchor_ordered_acquisition_count: 4
+    co_measured_anchor_acquisition_count: 4
+    loo_same_or_adjacent_fraction: 0.0
+    eligible: false
+    blockers:
+    - growth_phase_start_below_active_threshold
+    - growth_phase_end_near_plateau
+    limitations:
+    - within_acquisition_observation_range_exceeds_endpoint_reference
+    - reference_panel_incomplete
+  - reduction:
+    - 12.0
+    - 16.0
+    eligible_experiment_count: 8
+    worst_experiment_control_separation: 4616.307066395439
+    repeated_anchor_drift: 1.2873255707782874
+    within_acquisition_observation_range: 75.58052089019225
+    growth_phase_start: 0.02402685247055418
+    growth_phase_end: 0.022079783256519138
+    anchor_ordered_acquisition_count: 4
+    co_measured_anchor_acquisition_count: 4
+    loo_same_or_adjacent_fraction: 0.0
+    eligible: false
+    blockers:
+    - growth_phase_start_below_active_threshold
+    - growth_phase_end_near_plateau
+    limitations:
+    - within_acquisition_observation_range_exceeds_endpoint_reference
+    - reference_panel_incomplete
+  materialization_attempts:
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20250622_retron_Eco1_26_43_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20250622_retron_Eco1_26_43_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:05a3a05ee2b927c33fb87e6f836db1b2bc437cc30552b9b5230d8d35b2a130b1
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:08823964a85c927c8acad421bd72a07e5e22b3e22bf0e9fb1d8f31f6b510dcff
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250622_retron_Eco1_26_43_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:e96aa8b3b8fd0fc15d8342ea7b529770dd7b2919c1acf6245e8132b1e4db834e
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    status: complete
+    candidate_profile_count: 10
+    candidate_profile_digests:
+    - sha256:05b5eaeb0feb27a0f7be160bef1a8a9384a20cff9ef29aa92e3aec5df37830e1
+    - sha256:194b5f63326ff96b9a233df70fa7c60829e4216464147cfd4246d0cb1995a629
+    - sha256:2ff3d7ebe83a22bca5b0813f54ded5f599ed7a7686b4a97c3441b234afa8437b
+    - sha256:39327bc4d4f404b597c02ac8f326ada4378c0a1d1ce93216292f1ab1448bf7b0
+    - sha256:652204035729abe79c90e8a46596c084a9019f664cf583fa54611d97cf09388a
+    - sha256:6f559f8be42aa4f23c67a1504978d3e8e2fa297c6b2f5a42f37da284db5fc7e4
+    - sha256:9eaee14dc05b0b41dff0a76b43fb5c951710535c82c372c395ce266c44301325
+    - sha256:aef55e23bcd13f6974db9b899b7c704e7c1510b7b3bb971e1b299e8ebdf5c917
+    - sha256:b86b20cafedd39ee320a32a88e4f2a48802327660e9af859c679326b2fa7ad1e
+    - sha256:ba8aaa49b69aefc691ece54b7eb907ad33d38120b019150bf8a416388e1b143f
+    candidate_omissions: []
+    blockers: []
+    attempt_digest: sha256:374397cd5efbe2d36e7db3675ff51ff52fa54ddefee1d855864ecc421d4cbf52
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:d41999ea7ec681c06c923e1947f0b66698da543f62546ba460a6bc67a4eab134
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:0b380ce9ec75c02404dc71821c3f3e2d5c3c40b8451164af23d3d0ccc98bd3a2
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250707_retron_Eco1_26_43_45_46_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:77335672e43c396af13e2b7db2a43702ead2d09bdb57a5db1021b4f30fcacefe
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO
+    status: complete
+    candidate_profile_count: 20
+    candidate_profile_digests:
+    - sha256:07f0342751fd88d8d6349ed5f3b79e8ef71f02b485c6cfaba9f0228c998fc666
+    - sha256:203b5d34d8513a6e9394100f5c52d5e6ed2b751f1d93e2d91e244de8546265da
+    - sha256:20ba65692020fc3c23c3de08a519e16482ac9881cc02b4c0c19325112aebd123
+    - sha256:2495fcbcdc4bfb704c4e836b8fd68eafde32014a11102cd4ce8b8e1a27f1fc28
+    - sha256:27adfbb2c089f6363da7445d2f057137be6a9e44cc3cf4fbfc9ae63615a23416
+    - sha256:4f535be7e35aba7bd61ae24f05cf058bd2508adf3df79bcaecae92269d4ddea2
+    - sha256:5f63f3eaaec52f5d102916f7653298d7779803030d01d7a2844d3a2d44b3082b
+    - sha256:89b1134db22ced0c08bd6ff01dd98b71b1b2d7966af0f23e1192173dbbfc310e
+    - sha256:8b3f82748f1b9cf347f3ff54a0dbebd9f5faa1b6677dd2048f8c3841f78578f0
+    - sha256:9b7048e18d70c0b39f32707db4c29bf6ad08bf6a70dd7e319a8dac8595ab7221
+    - sha256:9f63c8ec439facd96f57e9cba59ce78ac646fb5ba733363f65c6ef42abf539de
+    - sha256:b070f0fb61e4f880560098fbff230ebc4a885861dacabb414c159bd6c9390282
+    - sha256:b9b4e417758aaf076f8305f32e576770b207b4192cbcb2c46fb7912b14ba3ea8
+    - sha256:befba0ce04a8c31577f00caafe663a5825fd2bbc54b7ee1a1aec19700cd63190
+    - sha256:c5051aa4f8b16cede64cf31fcaf22b7ea8a49e13c3b1e90038d203f0c6ee74e2
+    - sha256:ccdbefa56fdf759e01434a5c096b67eb3eec2acf7cf3e74577b4dbb427d99c9d
+    - sha256:da21a0c2d085dd9ccafe9a0814685d40b94ee6ccf37406c2e2d1ae52c8c663b0
+    - sha256:ecf8c7f82387e4b7548017099cd78a3f9e4d32fbd99d97f85cbcb7f8c3897426
+    - sha256:eec760ce325d56e95aa224e13b9444df9888c77691ff4a7a11330c0a5a9be902
+    - sha256:ff676582708f15c286ac8add754c6ee717c26705c324b17d1fa7bef09bdf2a58
+    candidate_omissions: []
+    blockers: []
+    attempt_digest: sha256:c5690aca60c9563b5002e8f7977b92a7b0f59da32ac1e52c17d314512752d652
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:1ca4826ec7c0d48f6ce86db1e480c21a9ab4d536dc79184b7ebe7dc2f3e4d1ef
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:1ef85d112b7246555995e23e07c2c83b08e6b8088bff3176d6af317f8aedc892
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250718_retron_Eco1_26_45_47_48_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:63b40cd40ce4f8f70e5b0702be335483083ef8f7f61a9f60d89e9aa7cf539ec1
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
+    - rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO
+    - rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO
+    status: complete
+    candidate_profile_count: 20
+    candidate_profile_digests:
+    - sha256:0f7aea448fe3e056adef1c575f45f52e94c401214bf299e6d5273485c78f74ff
+    - sha256:20d27f980fada335cebc0eeace6c122b76c9424eb4926e856708e88913abf119
+    - sha256:45bbb3e4a11c11bbebd04d4cd50eb40ee8f8347710655451d6cd8ababe9cd9ed
+    - sha256:4e9583cf7c607d541594b55bf37d25c3cb100c5782b779e377bacba9aac697a2
+    - sha256:58125f456ccade43144251f9379d9318cd1be62bd7b7be2774e49557d63526e3
+    - sha256:6d06d38cad9dabfe0314da4065d6dea66914c3aee26c312878c66b21a9ca8f94
+    - sha256:78c15c5eaca310e32dbbee989ab59fa090933e48cabad640795ecc4b0fae6f03
+    - sha256:8bc6e4107b3d931115d0d9c7807d2a2bfe439a8344caf5d2a9625427fa26ac69
+    - sha256:923a4a017390e481e9dcec223af41d4821dfe9a1b5c14dd55a376439b483d28f
+    - sha256:a02e5358330b496c0417493b13e0445eec4d21698395220121704f80d14ea541
+    - sha256:ab9e2f109e5b8d80340967d8aed8baeb3bf45e153497eec5af1711e9dc1bc8a9
+    - sha256:c3c52afa6893d1dc8d77d9c5ee00f4e33bf528711e055159b18050362c7e8c92
+    - sha256:d1023131ad205cfb42c503f7a0b42f46687551a47958b8041288388e86ce6bc9
+    - sha256:de4887d55bcab9009484227cb0e3bc96f998fb600a3e5054e7327dfd81c5d179
+    - sha256:e0905014e4f9e7d3d9f87c5d48b1c6ecc815c446be9cfbfda26ceee0d7764b6b
+    - sha256:eb17f24d975bf8732ef3c351e7cbbf3dc66a6a7c9f2a153e3c6e847338962335
+    - sha256:edfac63757ba0cb1253ecea0b35397d95519ab4dac2ef1241246cae9a6b6aefe
+    - sha256:f2b899ff4dd0210c36a758ee2a4483b0d47172b5b85f7c1960c9adf9c62599ee
+    - sha256:fc0d8aa90ca4c8ffa62121cd4d0882dd7d04e496ba67f3538f50dfd4d2bcec2f
+    - sha256:fddc23c78e5f4627e56c670cea419b77829974594b5bf3c47fe844434dbcc0a7
+    candidate_omissions: []
+    blockers: []
+    attempt_digest: sha256:bdd206cfac03f44771360e6d2d642c5f14d994d8bbec5b611d96a7b69da77194
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:d786aff2b83b01b414029de4ef4c2d4dbe71012211e52e7e0478a6c0355f5cd1
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:094f16c2631b3aa94086b1c8fe83e01825c4ae261ffbe2fac80e05ac640a48a8
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260418_retron_Eco1_26_43_170_171_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:d8577bba466967a9b8cbedc9d95e17b0be7386ce9be6e198bbe7283d0757d720
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    status: complete
+    candidate_profile_count: 20
+    candidate_profile_digests:
+    - sha256:04178198b48b76905c9bced96cea1685092f04c80c7ae762b6f2ec3a1ac79177
+    - sha256:0b9aa08abfb7ea83633e751b2cf59a95f63fd01474366606ec2f82c526a2d796
+    - sha256:0d0be8956c84b7f16cdad8cb534b33bd7517ac7ab83e2c537e829380a22d5647
+    - sha256:1a421cb3b3fc17cbbe5d8012e7897c60d484ffa76c947a9691bdb7e8e37aadc6
+    - sha256:2011e939cebd531fb6a6b79df42f33da0e193b6443f15ce60621be3d425475a9
+    - sha256:2e3dd864c36ea5d87930f00bfd7ad0e6801e73c148c7893f7c1b61ebaa51c286
+    - sha256:2edffeda71b9936b12ae908308079bfe56647630426ee1cd14d80747d603aae7
+    - sha256:368a3461936816553d192818e244b66b3f935ca76277e1be9829f0305bee984c
+    - sha256:46d4bb25ca8a3f93e5ab22bf6acb9678967ce1f1cdfbb654323ac948b406cde2
+    - sha256:53a797d1f78418839bb8db84888907792b644bda2cee7affab82ba03b46a485f
+    - sha256:60f2973ed40be83a6441c7947cd80524bd7079e808532272c4a90f4d0bdf7636
+    - sha256:93f0b8c5d6717eed7b9d4f8e276d58a0e675b536ebbed6670e5e4d243ca38dbe
+    - sha256:a0e47d3ec6798004a48b84ec067ef133e93141f4fc944cec8061b12fd4a8a035
+    - sha256:a3f60012e8928569803d0da6225bd62a41a484e8895687adb68ceeebfe32111f
+    - sha256:b122fc8665d3eae04740524c53b8292027f28f8d2f0aca42d507af30406df87f
+    - sha256:beeecd64ab1a00b569a8f3b9a246c3926b22a58a04636cad239d614fe1a99d3f
+    - sha256:e3748e5958ed04d56184778b2953698f218dae18e1bae948bf73add7170ac88b
+    - sha256:ee37584e11b2ca38062ed9c7a82b28001090499b1fc99f48fe888fe4c48da7b6
+    - sha256:f2e49c386877c1048776934f53a362f28095adf23b180005d359de378f7fcd74
+    - sha256:f4006d5ca7b3dac84e2d9fe66d6ee181e48804e3c20a8a7ff4bdef6379af50f6
+    candidate_omissions: []
+    blockers: []
+    attempt_digest: sha256:d6b0834d8aebffabd60e6b1269327d2566f4d5caa1357132a5de135de116c8a7
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:176924c7744da54ebddf883c74e51be9fcf174f54850fd5db93dde56a49b7822
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:2932657f151e02692a2abe7c1c5d4d858a0cc7c19c477c646ff6ec88ab497878
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:e4d5ace6ec54ffd4efad5b5c39e97e0dd3cbb0cc065d369d0a1edfce39b6d9f8
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    status: partial
+    candidate_profile_count: 30
+    candidate_profile_digests:
+    - sha256:071891ee80a0ccb92a700f57f3822e0ee5c80b3cebf0691298cb26cf75301f15
+    - sha256:186d52a9245762bb68c9c6f1f21a5c11d54b751334b81a1dd87b1103094eef75
+    - sha256:1c8d69d5cbe80195add445eb6ff876e971b709c718a1153769b88c417c733088
+    - sha256:1d132d1375986ee48a229fbb81a04636543b25f4758069849f5cc72aa507150c
+    - sha256:1dfa1111cc543426d860d502824f7b49cd0e7de1c74402d01eeef99120c26e9d
+    - sha256:31aa3f8bd666626d69ee858f0df05681edb1c42a5eca860cc2d7daa4ae41def7
+    - sha256:48c9942507be13678d3bd63b184b0ad7387c3aeb624d685787c7c4fa9d24d9cf
+    - sha256:5194bc2968c268ba6d958c39d5610e7ed302b65db04e616e50e2c92e675ac5d0
+    - sha256:525ad33086010d312b3b1adf118d7b29e479f9fe24af04585d266d6071942529
+    - sha256:5f7519ab6d1f52641de2a8216dca1d7bae447a869fa4253522f0c326f6eaeaea
+    - sha256:6367a3fce8c74f2ee105e595b313b77d7c6d36beb7f6efa367c92a25d78fc925
+    - sha256:644020f5a2a30b5c7a79e31893282050d8ab297eb57764004063ef41cc2db4e1
+    - sha256:6ee1e51ca2bd4442e6c40dc1935efb375d9fd2ef75f01c9658217df7d04d2177
+    - sha256:70f001d6d185e9b19718da6075add5cb3d58c2881fc773fbd2693ae85350d5c7
+    - sha256:76879ef9bc60200b05cb9f9ebd7e18b584bf0096ca4796aa0cc6c343372a3814
+    - sha256:9aa32262873cb58a64c55eff6a225493af31a0770f303642e7893db74b0a047b
+    - sha256:9e0ce352943904971a172c0ebbc534c181e148c3d1cf5bffa79e332919bc18c4
+    - sha256:a0123edaf2593ec629dfa97b3b0c8002cf4333169424a08b3c365479e85d6b39
+    - sha256:b92ab3b5863a053d172f9300bbc6fae908898043a44b15787231100e42823d68
+    - sha256:bc149a7c68910ce8a9c6f926f2cb01f759e4d54de3aaba938cb739051e7f4dd8
+    - sha256:d130b24f67f1012f03bd135868aa781bf33e326b9ea8a25ecb5649e7121e348a
+    - sha256:d6cdd38aa28e4a7d58733f983d00e9925c8d8d04d3618ee313f34385838f53e8
+    - sha256:d74b7603bb84c51465c9996e01ee7100c540645e570af6c4bfb99576e5c1ac45
+    - sha256:d8139cdcbd9d4ccc87a80c3e53e7c7b5c46bc0653a61d4a589a641f7f6ae707c
+    - sha256:dadd832b6d31f48eb670d85f5dbf8a3517a44a5c1909a62e9bac7a85f2a34ed5
+    - sha256:dd375487bc5df5aece77f2ea470206fbb9716c40f2487d428c5445e3a0efb728
+    - sha256:e0c27559656443cecb10091ad153af0c742ba94a5d8c9cd2397c6569ea0c702e
+    - sha256:e3b17bd8090fa7a8e82e7fb808f3662f5074333c38e8d8cb8dbf98fe049ded45
+    - sha256:e4c0fc066edcacf8f26451d9ea59f872fa341875b7c1b66662db625e8ae82a40
+    - sha256:e6171fe7f91c2a1f4c1eec84500de38298d98d87342e6c166710644d44c07349
+    candidate_omissions:
+    - code: positive_control_separation_failed
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+      reduction_id: window-10-14h
+    - code: positive_control_separation_failed
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+      reduction_id: window-12-16h
+    - code: positive_control_separation_failed
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+      reduction_id: window-4-8h
+    - code: positive_control_separation_failed
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+      reduction_id: window-6-10h
+    - code: positive_control_separation_failed
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+      reduction_id: window-8-12h
+    blockers: []
+    attempt_digest: sha256:afe0c0226549de3dd7792eddeeb3f778d348230e7e97221ee4f1c7e96abe3738
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:7bcff1c5d9eb82a6ccbfeb57f561937e803e2980e2db0ce2835e5805fd3a79e4
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:28e7b7a79004aca291df96b0b18e6425bcd1c724182114327380f03d4a744485
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260529_retron_Eco1_26_43_177_186_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:730973e8ffed6eebf4fdf25d8af728475009810ff5703d60aad7a054c8a87687
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    status: partial
+    candidate_profile_count: 50
+    candidate_profile_digests:
+    - sha256:02df521efb935c48ec41897aa49ead0ceb4a722bb1d9c9156dd42275135655f9
+    - sha256:03901b18868c4ce6ad763b0fbb47ab577c7976961ebc3e759fcf7675f47679a4
+    - sha256:09d6ee763fcab2d17540a91846f17fb74b04b249cfed86955513baa7394f9ef6
+    - sha256:115bad998dd282d82816a34ab606738647d44441efe91e6044d60255ba5f7259
+    - sha256:15ed660db1bb3e3c8ba30fd3676aab89d60e5350f43f074c9906bdf8fb62a5bd
+    - sha256:18d3d9c329af2fa32c6c922248f5628f77f78867af110d9f036e6c0681c72c2f
+    - sha256:1cae4ed82102291f8daf7c638dd6de9747087d41ad37242136585078a1a18e0f
+    - sha256:1feec0b0d7024e42b57be3b74da0639620f2c32cfa37eb1844e009c016afbeb3
+    - sha256:2451adee4392ab1ded21495dd1f66d5bdaa944f367935c30363a3892cc9362c3
+    - sha256:294167e735db1288b5fdd1b46ec88250c946a9eba0c057fed0aa5cee83c982fe
+    - sha256:2afa774c964fcdb368475ff92c449bfa8faca57f8484f874b79640442772bc17
+    - sha256:2b86b2bf17ee2d75bd207fe971bf3ab115e1b09bbdc51494d1372a1f0a16acf8
+    - sha256:2d7e7d3f38a56c66eaacc35b8f2f32885909e5480ce12d39c9646842d7ae465b
+    - sha256:4508ecb5a27a6d4b34a81d1b99e9282e6ea57dc884ac6df9498812fa480de302
+    - sha256:5179b242624fc32888feda3e1b733eeafe971eeac03024e69bae758463131cf4
+    - sha256:5ad0169ab8dadade96fb400e868c141770db22c9ab30b0390ea3d509ecb8fab5
+    - sha256:6484a1b27539b37e26a55c01f92b5bc7419b13d72dd3f2aa16ec020fa51f0718
+    - sha256:64dada0fc6d5e2a3750d826b4b01bd9a2f72279701a4282b3440895415bd2ab4
+    - sha256:6f0cd02c10c5675162083e1700efa880893b41ca9ede08ccfa6cf6d955eff8a8
+    - sha256:6f3f1fbca01570af610fae914d3496e681bbeb41134c3a00c10cfd0ac205c06d
+    - sha256:77db7e555af6148ea6a2a63eb74e417fba832149b237543817bc3672479314c0
+    - sha256:7ab587623810c269e8ab055fe398bc75b903cd775eb4ff43e5b6dc2a3484e861
+    - sha256:7dad576983c440519966f1d0f4a0dc29c6f6a3d8c0d060eee37e455365ee4934
+    - sha256:842dd0fa6e4edb1a798ea417ee5307a0290db1de3aea5e6a0ff4f746a80a997a
+    - sha256:8709a79414abebfb989a9c30afc57b57e3dd6ec68a365a730200a25ac0c6358f
+    - sha256:89068c5ae241da23bda5cf50ee5fb9220366977b469c9396615a2b556374147e
+    - sha256:892e6f2f56d8606e15ad6dcc5b33214f724dec3929cabda1387627abb551597d
+    - sha256:8dd36b1fafcdfd0bc4c3ade97c0476513cb58864ff3d12f2f42833da83d046d4
+    - sha256:98b6f19cfcac3e802e0ecc99cf0b42d742d58e82620e680d1a62110ecc7ad2d2
+    - sha256:9cf0d4714eba81219fbc08720519d890696f3ab18521943308717998d4732734
+    - sha256:a5331bbbcfe00b25d46f0437d178999fa83f908bdcd7207583260b24e1776a49
+    - sha256:a64d3d04d1da018ae382eb3cc19495b70fd2004461e6b04f8d294f586af3320a
+    - sha256:b1b12365e33def0c8a10d61aba0e523e89fc0958593727a4e6354384c00243ce
+    - sha256:c0fe3c7df28aea28901c977f1235990a0647b71a4d420e8e50ccf8379596c18e
+    - sha256:c3595b0642f30e7afa5697fdafc968aa6e7b81a1850016d496b718678507b6b0
+    - sha256:c55a2146e404987e33e59e7b102225c61c644c29fecb4a791fb7ee1ec6f6ea70
+    - sha256:c75f9746135abac825025feb0cbb2292feee4b9e0da2c25bcfa20b28b2074ae4
+    - sha256:cda60c0e2c88965bc4c131c128130fd410c6722d6f690e44d618e3cf60d9a341
+    - sha256:ce6b6eb081681d710f03a64fa6f44dfba2f66f3fc2056f1427140ffaf3197703
+    - sha256:d4534074b92f27d47c5654481d9528e5bf5c16ab978a0fa88122e9b75e776be3
+    - sha256:df88ae27ac8d353e07d9be8cadb137db1752b9e1135b24b07d440b6bb4dc67b2
+    - sha256:e0e539e8af87de944226ec14841add819c644754f603de127cad93bdaeae2f51
+    - sha256:e26d9dd8db61df319f6e708e0159d863fa9960ba4566825f562f4445070e98b6
+    - sha256:e2993d230271f0c42c1f273afe8b907db9317822c585045abff0b6c35872a2f5
+    - sha256:e716bf27f271712cc18638a577bcc162f8b317a1ca007fed1ff15ea492ef090d
+    - sha256:ea5e1cfd566b6a94fea4f6ccc56450eefd5b0a01970a31f0b128722147c11a76
+    - sha256:eb5ba7c63f7bfa0f29f8f19584d2ae2a670cbd6a797618e6956d236e784f1f1b
+    - sha256:ed3cbf3611bc9582d35d06658d41a7069b57bb654927fc45adf3582f3b035133
+    - sha256:fc2fc1237ba847c6be833b73a08d7a4f4f4c725162981035ebac59af59a1f7d9
+    - sha256:fcfff3eee9d89b4fe30ed8c1b434195dc263fb2c2b508aa0c87a79a4cb4eee5b
+    candidate_omissions:
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+      reduction_id: window-10-14h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+      reduction_id: window-12-16h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+      reduction_id: window-4-8h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+      reduction_id: window-6-10h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+      reduction_id: window-8-12h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+      reduction_id: window-10-14h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+      reduction_id: window-12-16h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+      reduction_id: window-4-8h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+      reduction_id: window-6-10h
+    - code: condition_or_channel_observations_incomplete
+      subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+      reduction_id: window-8-12h
+    blockers: []
+    attempt_digest: sha256:1c5a737fc9f28b3a27380c38a1e11994972bdfbcb759c05a3e771eae6e1c334a
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:6b778b43e100fb1a5914989a384952e9d05f6896b7125fa9a81344cd3c5d75ba
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:4b53221a45e2df8f84ce295bb186d6118d37786f9c5b16169714ee6f4a3e06cd
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:6d20c01b70063b5721b1990c2c57393a9756180d4ab083ea3ef201ec37b54bd4
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron196_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron197_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron198_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron199_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    status: complete
+    candidate_profile_count: 40
+    candidate_profile_digests:
+    - sha256:05ee66b5f5bafb3b75f609afd38eb255ae5eb893cff7635be5b8f1d463c836dd
+    - sha256:10a57a82071e83c92f5eea6b45f31410cecece111642abb1b38be275130ba959
+    - sha256:114b38a39ec7308c1c9bdf9cb87d44e9dd28c4bfe219a246510b271be39ea296
+    - sha256:1270e2ad8f5fc55fdccc371bdb2c5304d26ffa67025926366def065b2009a438
+    - sha256:1ebd99958f8e73ab640723832e0709ae882f1f67247f98929b990a620c930b85
+    - sha256:20bf3275cf24a741684af68a4ab979875f25b2af048ddde7713a912339604ca5
+    - sha256:21f6803b2e9ccad6f164c2f96267d52390c73f9310086841b621187e266d4e48
+    - sha256:23c519c8791800e5de83e4c8911454922c4db2f9b30916a38428befe40c5af32
+    - sha256:25415eebdf34496f340a2fb7740f8840307a7653d894cfbef7a5708cc6d29997
+    - sha256:34a94044ff570d360d9f996f2b5c91b3d442fe21835c89dff5c348e828db7a1b
+    - sha256:3ba770ef86dae352014e835688d472bef17e84571e8cfd827d9624a9bc943a5d
+    - sha256:3cf899248b955201c69d220eca4566208d184b07eaf60b353f32bb93ad63b240
+    - sha256:40f649b84bc74ebe39fa350662af72a1d3152c59d14a085b0e644e474f536968
+    - sha256:4529fa6fa910c7f328b0c25b97bf3c0fd887c72bf0583c5e632bc6b20f636460
+    - sha256:4ae413f403bf94d75357c8ebef8c1ef76ec0089c4eeb48d9c9d2644561364efa
+    - sha256:585f29d0681f21835e5cdc2923a43b42dff018607c95c796b41e5952737e5b78
+    - sha256:6c8f0a2863bb64f121e9f0757ab095756ae35b593d8be9ae973608cbf460faef
+    - sha256:70f26e937d8fe7c1598d0f99167aa63cc7912f8b756ebb985e893296efa5573b
+    - sha256:780c71e5c2c335ed58f38f03370fd111aae7418bce92d330f31e8f71b6d85efe
+    - sha256:78a5d407139a9a7678cd5b3ca4dc277c45c3f64c547067ca363f008ad850607a
+    - sha256:7ba8214c4fb540b67586f4171e23b21d1cf950a78d5b09cf471f434f9b4cb63c
+    - sha256:80be8c1f3dd40148a021ca67cee3c42f00556a8454c42a438c8b0b235e37cc71
+    - sha256:8ddcaeb5b2417981dac02a0ed4ec32ad57b209f9911fe217b5a21a8ca5dd52ce
+    - sha256:8f9294681812f3b758c761e25223921d14d05cbf5290881ef44c6f71070b8db1
+    - sha256:925d582b1ce95e8693726f18cee3dc288c1011124ec95dac93bf9adf1e8f5f22
+    - sha256:a27782292e138f364aef4ad880dd99ce0b28d822e91eff7a86c737ded0233ce0
+    - sha256:ab9a9d08551ac33dfbb47d9ae7ade17aa40314f405e817fa3bb797675cc96a86
+    - sha256:abdce7aa4560ed4547c62e5030e96cad75187060f14150651db1e8723e921bcd
+    - sha256:b05e6591355ebf74210f319fe2bab495b33d212fd64a070056f6ab8dc6e1bb54
+    - sha256:b0c73748914ac67c66bbb132fc627ea2cdf5e5e2efc30d0d64dfaea8dd524143
+    - sha256:c1f0866719024a915bb5294a8bcd1772d71feb0532d1532306cf325bbaa8ca43
+    - sha256:c33eede30694ee69a2b325d0c24efa5b5c071284db64aa73e4c9372d08b742bb
+    - sha256:c60f244e42de98aa89511a4c60abcc96ab0463262bef34d91960fb5262a631b2
+    - sha256:c98e2a2df33f76a02dde97c775eda422253d5cbebf3cd274be42d47d308dd280
+    - sha256:ca78fcb8ab8febd669a355b8fa3d8b4c64901fce63fd8d1b1f00f438b79d6eb9
+    - sha256:cfb760251d0faaa028a8e153265172a29dd76c0f200b7707661c7afaad5c373e
+    - sha256:e99c26fcd1b756a0b8dbb26b7872e1aaf876f4db8d85e8e78adaa7092f5fbb26
+    - sha256:ef296fbea3d8dbe67d8ee5f3ef01f6ee8a303948d6fb46a6c1f25a05d360e1b5
+    - sha256:f9c575b75df88ce26115fa54156309e43a704c70a124ea9877c488f9fa03ee5a
+    - sha256:fb418fa93f03a4df876f7fd32297794b49db0c464a9add99b923f3b61bb935fb
+    candidate_omissions: []
+    blockers: []
+    attempt_digest: sha256:f268916637520211e4668ad7048d6b740643e5efe05815b80ebe5c484d4f16b1
+  - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
+    experiment_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    reader_record_identity:
+      reader_experiment_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+      reader_protocol_id: plate_reader/single_reporter_screen
+      reader_record_id: sample_measurements/df
+      reader_record_kind: dataframe_artifact
+      reader_record_schema_version: 6
+      reader_record_revision: 1
+      reader_record_revision_digest: sha256:aaa83125e82be7fb769e5b8afa913374a7c0726509302e4ecdc4b2f80aea96fb
+      reader_record_contract_id: plate_reader.annotated.v1
+      reader_record_content_digest: sha256:3fdecd950087cd8c84d20a1ded5f04fc441f73f2f44f3361060ccf4f148f7355
+      reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+    evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260720_retron_Eco1_26_180_201_202_203_204_benchmark:sample_measurements/df:r1
+    evidence_binding_artifact_digest: sha256:0125c7f01cdfb8920c55d1718c13b176da51fb357f62b6339e1109ae49e4c9dc
+    expected_subject_ids:
+    - rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron202_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron203_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron204_msd_lnrna__tetO
+    - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    status: complete
+    candidate_profile_count: 30
+    candidate_profile_digests:
+    - sha256:11d9ebec560e5a9595fa75c66b7839350393ef3eb11c7ca03247f8f59a48648d
+    - sha256:13c7a5ee97947caa68a98dfdc10d021154e05e54b0a0954c2dac24a075620c77
+    - sha256:1f4404ebbebaf10a2a0a564ea0a215c5e2b25021e82fe0760ef871c1c27abe44
+    - sha256:2b89dc5ffa7c00ea6e67c1ab911f0c262c0ff6d1b9553021d52c9b4e3a5e8449
+    - sha256:3cc00199700738c3f026ff3e13e820935b69bbfbfc7cd475280ed9440133b4f6
+    - sha256:3d07dc45611a29a40f7cac8ec1dd3a39ddffc54aae182d9f3ced637fb5e475e2
+    - sha256:4053012929c2a62d6c114956d7cbfe970c84eb1ef693ae43caafaeff7250f5be
+    - sha256:45088a764bcbf4baeee3a724c06e31c44823069014c307503c4899f626c5d6af
+    - sha256:49de5bea680fffb09604c8b23b96357652d34fdeea9d669ccf644b733d205290
+    - sha256:56b80c4485a56dea035bf3765ff9247f345bbb76ac81528d95b07b71462fd6fe
+    - sha256:5876a6f4cf164802f677435ff60b54a2e6a5b9e92e5e820fe1f04a62700bbf96
+    - sha256:5b117ff61fd45dc1f3c4dfbe9bc9761f3cb4fa9e884cd1fb29a1b597562b397e
+    - sha256:5da9688c42b03837f6d0934ce0fa5913535bb33df3f09bfca7b7fef3d8063617
+    - sha256:5db89b9b68813c89ae4eab89c9865f67fdd75f5f577bf0119e3480256036c832
+    - sha256:5e8c06bc83cc59d1972b8cf5579c287e3c931dfced05aa0f56dda62769a830ef
+    - sha256:6406b05ace2079b2dca6770ada93ff58a09ec83223cde9a80294516079041b2a
+    - sha256:68be72a4ca113793b578834481a885a44e5ee217d6b7ae67389f098611126c9f
+    - sha256:6cc1c55d74b806c79ad2909f7333230184307a8a715857e745d2d1f4842c9a9a
+    - sha256:6db9f5466599649f6113fd52c98f3c99c0a7d4786eaab33194e2d56632706a2d
+    - sha256:73b3912e8ea9e8714565a9f1d14f7fff8c8bbfe4d057111ba3bdb4642acef2ac
+    - sha256:79935a236e62dd3a7a806358e87ee0d442c216aecb2605341c0f13f9bd8a84f0
+    - sha256:a7024318bfcb6fb657631e337a9112ab24bc09e9a607a5ef4bf045852e3e992f
+    - sha256:b342a62e9b8bf6903fb1a7c9dc9ea1056eb7f154efe0c9d690a96873aa54b941
+    - sha256:b5f77eecca2c48df90f829d3643aa2453ff8ff659eab00e5a444905ba0a7df32
+    - sha256:b980a99bbb50c7f8617e5cbdb6665bac37758c9bc810b6c1492bb7f7a05031e0
+    - sha256:cc4c7ef5772e134cb99c4398482c005b2a303abf102f81a0400611edc606592d
+    - sha256:dc0a79573fdd9e9eb1c9b8f175a065305f6a74628b15d77174290ff9b2d02afa
+    - sha256:e83676b6e84063fc18f70ba0f8151613c9b2624cf0b6eeadd03b3c64d86d94b6
+    - sha256:e95d04b37cf48d68f5edcff8afc818029b03ed124d0f59c1e870dcdc3055d9f0
+    - sha256:f1d78f6dfcacc55630504e5942704eaf152df9eca98f0c64276bc4169059bc8b
+    candidate_omissions: []
+    blockers: []
+    attempt_digest: sha256:fb179e775668f86b5c8eea60f98cc76631024bc609246952ded2d3d8fa6bef91
+objective_readiness:
+  contract_id: rt_lnrna_reporter_response_objective_readiness.v3
+  status: blocked
+  objective_id: null
+  blockers:
+  - constrained_objective_not_defined
+  - biological_replicate_uncertainty_not_estimable
+  - od_linearity_not_validated
+sensitivity_evaluations:
+- kind: centered_window
+  value: 2.0
+  profile_count: 220
+  evidence_digest: sha256:072289d5a38e43682681def6f912a0b8d587496c601a1dbed33786615507001c
+  selectable: false
+- kind: centered_window
+  value: 6.0
+  profile_count: 217
+  evidence_digest: sha256:542f5ab86acb5db2c45d6fea24cfcefd8dbfe73b6f5e2128abe0dfd7d2656112
+  selectable: false
+- kind: dose
+  value: 5.0
+  profile_count: 358
+  evidence_digest: sha256:2834ffe11b9e6da0c57d6c80fe121a863a557fd49510eb4de805d42add1b48f3
+  selectable: false
+- kind: dose
+  value: 50.0
+  profile_count: 148
+  evidence_digest: sha256:b07fae2507cf3666c4ab32620090e492901cf8d7685b05af6158e655ce007229
+  selectable: false
+- kind: endpoint
+  value: 8.0
+  profile_count: 44
+  evidence_digest: sha256:6d39db1e96f51fca333188624018982b1e7d0df183df3ad58d66b16830762fb2
+  selectable: false
+- kind: endpoint
+  value: 10.0
+  profile_count: 44
+  evidence_digest: sha256:c2b65c344c197114a50be7537bd30a8f9e282670a853c27714ee884b7f527d9e
+  selectable: false
+- kind: endpoint
+  value: 12.0
+  profile_count: 44
+  evidence_digest: sha256:95efa05d46382f399b81bf655a0841d564ea8d795f2165c42f4844d2cc3ecfeb
+  selectable: false
+- kind: endpoint
+  value: 14.0
+  profile_count: 45
+  evidence_digest: sha256:e6ce1371454e3062aa2124e3237a0dc10454fd419258ac80befaf9c7db3893db
+  selectable: false
+- kind: endpoint
+  value: 16.0
+  profile_count: 44
+  evidence_digest: sha256:91f3dd382f9fa8829c072052c97558122a20754802c33a6b064e726fe1621bd4
+  selectable: false
+sensitivity_coverage_receipts:
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20250622_retron_Eco1_26_43_benchmark
+  materialization_attempt_digest: sha256:374397cd5efbe2d36e7db3675ff51ff52fa54ddefee1d855864ecc421d4cbf52
+  reader_record_identity:
+    reader_experiment_id: 20250622_retron_Eco1_26_43_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:05a3a05ee2b927c33fb87e6f836db1b2bc437cc30552b9b5230d8d35b2a130b1
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:08823964a85c927c8acad421bd72a07e5e22b3e22bf0e9fb1d8f31f6b510dcff
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250622_retron_Eco1_26_43_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:e96aa8b3b8fd0fc15d8342ea7b529770dd7b2919c1acf6245e8132b1e4db834e
+  expected_subjects:
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  - raw_design_id: pES-retron-43; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 30
+  omission_count: 0
+  coverage_digest: sha256:33ba80cc9f1bd96d0b414f5413ec31d30e059070409637cfc12dd90c4dd8f8d3
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+  materialization_attempt_digest: sha256:c5690aca60c9563b5002e8f7977b92a7b0f59da32ac1e52c17d314512752d652
+  reader_record_identity:
+    reader_experiment_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:d41999ea7ec681c06c923e1947f0b66698da543f62546ba460a6bc67a4eab134
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:0b380ce9ec75c02404dc71821c3f3e2d5c3c40b8451164af23d3d0ccc98bd3a2
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250707_retron_Eco1_26_43_45_46_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:77335672e43c396af13e2b7db2a43702ead2d09bdb57a5db1021b4f30fcacefe
+  expected_subjects:
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  - raw_design_id: pES-retron-43; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+  - raw_design_id: pES-retron-45; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
+  - raw_design_id: pES-retron-46; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 59
+  omission_count: 1
+  coverage_digest: sha256:39f8c29b2a544a64671ca48a983856dd5e86a18dd134fdf690b0252f5b158ba6
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+  materialization_attempt_digest: sha256:bdd206cfac03f44771360e6d2d642c5f14d994d8bbec5b611d96a7b69da77194
+  reader_record_identity:
+    reader_experiment_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:1ca4826ec7c0d48f6ce86db1e480c21a9ab4d536dc79184b7ebe7dc2f3e4d1ef
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:1ef85d112b7246555995e23e07c2c83b08e6b8088bff3176d6af317f8aedc892
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250718_retron_Eco1_26_45_47_48_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:63b40cd40ce4f8f70e5b0702be335483083ef8f7f61a9f60d89e9aa7cf539ec1
+  expected_subjects:
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  - raw_design_id: pES-retron-45; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
+  - raw_design_id: pES-retron-47; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO
+  - raw_design_id: pES-retron-48; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 59
+  omission_count: 1
+  coverage_digest: sha256:291b12119ac7ef7e2a0269b4d3665554dbb55bb9511d9fedf6928967f6952d74
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+  materialization_attempt_digest: sha256:d6b0834d8aebffabd60e6b1269327d2566f4d5caa1357132a5de135de116c8a7
+  reader_record_identity:
+    reader_experiment_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:d786aff2b83b01b414029de4ef4c2d4dbe71012211e52e7e0478a6c0355f5cd1
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:094f16c2631b3aa94086b1c8fe83e01825c4ae261ffbe2fac80e05ac640a48a8
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260418_retron_Eco1_26_43_170_171_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:d8577bba466967a9b8cbedc9d95e17b0be7386ce9be6e198bbe7283d0757d720
+  expected_subjects:
+  - raw_design_id: pES-retron-170; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO
+  - raw_design_id: pES-retron-171; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  - raw_design_id: pES-retron-43; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 60
+  omission_count: 0
+  coverage_digest: sha256:5e0d3b78d3e92e906a2ca841310e2121ead509543add32b3d48d9dd26577cb4b
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+  materialization_attempt_digest: sha256:afe0c0226549de3dd7792eddeeb3f778d348230e7e97221ee4f1c7e96abe3738
+  reader_record_identity:
+    reader_experiment_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:176924c7744da54ebddf883c74e51be9fcf174f54850fd5db93dde56a49b7822
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:2932657f151e02692a2abe7c1c5d4d858a0cc7c19c477c646ff6ec88ab497878
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:e4d5ace6ec54ffd4efad5b5c39e97e0dd3cbb0cc065d369d0a1edfce39b6d9f8
+  expected_subjects:
+  - raw_design_id: pES-retron-172; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO
+  - raw_design_id: pES-retron-173; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO
+  - raw_design_id: pES-retron-174; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO
+  - raw_design_id: pES-retron-175; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO
+  - raw_design_id: pES-retron-176; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  - raw_design_id: pES-retron-43; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 91
+  omission_count: 14
+  coverage_digest: sha256:d2ac399df982301fb657f80704c39f18d6a8277f56daa702c5c99bf607cd3324
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+  materialization_attempt_digest: sha256:1c5a737fc9f28b3a27380c38a1e11994972bdfbcb759c05a3e771eae6e1c334a
+  reader_record_identity:
+    reader_experiment_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:7bcff1c5d9eb82a6ccbfeb57f561937e803e2980e2db0ce2835e5805fd3a79e4
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:28e7b7a79004aca291df96b0b18e6425bcd1c724182114327380f03d4a744485
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260529_retron_Eco1_26_43_177_186_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:730973e8ffed6eebf4fdf25d8af728475009810ff5703d60aad7a054c8a87687
+  expected_subjects:
+  - raw_design_id: pES-retron-177; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO
+  - raw_design_id: pES-retron-178; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO
+  - raw_design_id: pES-retron-179; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO
+  - raw_design_id: pES-retron-180; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+  - raw_design_id: pES-retron-181; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO
+  - raw_design_id: pES-retron-182; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO
+  - raw_design_id: pES-retron-183; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO
+  - raw_design_id: pES-retron-184; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO
+  - raw_design_id: pES-retron-185; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO
+  - raw_design_id: pES-retron-186; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  - raw_design_id: pES-retron-43; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 149
+  omission_count: 31
+  coverage_digest: sha256:ef4d4513de036df92249243dd08cbc91efa01444d21cd9142d2e7c16601f64e9
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+  materialization_attempt_digest: sha256:f268916637520211e4668ad7048d6b740643e5efe05815b80ebe5c484d4f16b1
+  reader_record_identity:
+    reader_experiment_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:6b778b43e100fb1a5914989a384952e9d05f6896b7125fa9a81344cd3c5d75ba
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:4b53221a45e2df8f84ce295bb186d6118d37786f9c5b16169714ee6f4a3e06cd
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:6d20c01b70063b5721b1990c2c57393a9756180d4ab083ea3ef201ec37b54bd4
+  expected_subjects:
+  - raw_design_id: pES-retron-180; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+  - raw_design_id: pES-retron-195; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO
+  - raw_design_id: pES-retron-196; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron196_msd_lnrna__tetO
+  - raw_design_id: pES-retron-197; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron197_msd_lnrna__tetO
+  - raw_design_id: pES-retron-198; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron198_msd_lnrna__tetO
+  - raw_design_id: pES-retron-199; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron199_msd_lnrna__tetO
+  - raw_design_id: pES-retron-200; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 120
+  omission_count: 0
+  coverage_digest: sha256:a8a6c6023bfc9270a7411b2e8637985bea00b8e38e1399e44a82d8dd7619ec48
+- contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
+  experiment_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+  materialization_attempt_digest: sha256:fb179e775668f86b5c8eea60f98cc76631024bc609246952ded2d3d8fa6bef91
+  reader_record_identity:
+    reader_experiment_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    reader_protocol_id: plate_reader/single_reporter_screen
+    reader_record_id: sample_measurements/df
+    reader_record_kind: dataframe_artifact
+    reader_record_schema_version: 6
+    reader_record_revision: 1
+    reader_record_revision_digest: sha256:aaa83125e82be7fb769e5b8afa913374a7c0726509302e4ecdc4b2f80aea96fb
+    reader_record_contract_id: plate_reader.annotated.v1
+    reader_record_content_digest: sha256:3fdecd950087cd8c84d20a1ded5f04fc441f73f2f44f3361060ccf4f148f7355
+    reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
+  evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260720_retron_Eco1_26_180_201_202_203_204_benchmark:sample_measurements/df:r1
+  evidence_binding_artifact_digest: sha256:0125c7f01cdfb8920c55d1718c13b176da51fb357f62b6339e1109ae49e4c9dc
+  expected_subjects:
+  - raw_design_id: pES-retron-180; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+  - raw_design_id: pES-retron-201-msd[TetR]-r26-w02-17; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO
+  - raw_design_id: pES-retron-202-msd[TetR]-r26-w03-16; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron202_msd_lnrna__tetO
+  - raw_design_id: pES-retron-203-msd[TetR]-r180-w02-17; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron203_msd_lnrna__tetO
+  - raw_design_id: pES-retron-204-msd[TetR]-r180-w03-16; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron204_msd_lnrna__tetO
+  - raw_design_id: pES-retron-26; pBbS2c-rfp
+    raw_assay_subject_id: null
+    subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+  expected_reduction_ids:
+  - endpoint-8h
+  - endpoint-10h
+  - endpoint-12h
+  - endpoint-14h
+  - endpoint-16h
+  - window-5-7h
+  - window-3-9h
+  - window-7-9h
+  - window-5-11h
+  - window-9-11h
+  - window-7-13h
+  - window-11-13h
+  - window-9-15h
+  - window-13-15h
+  - window-11-17h
+  profile_count: 90
+  omission_count: 0
+  coverage_digest: sha256:669be949fc2ded0c68e2e11e6d1125f605ea3611c7297fbcd5863ec04e5175be
+acquisition_projection:
+  contract_id: rt_lnrna_reporter_response_acquisition_projection.v1
+  selected_reduction:
+  - 6.0
+  - 10.0
+  coordinates:
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260418_retron_Eco1_26_43_170_171_benchmark
+    contributions:
+    - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+      profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO:window-6-10h
+      profile_digest: sha256:04178198b48b76905c9bced96cea1685092f04c80c7ae762b6f2ec3a1ac79177
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.024995911121421265
+      relative_od: 0.8996138996138996
+    normalized_reporter_response:
+      estimate: 0.024995911121421265
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.8996138996138996
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260418_retron_Eco1_26_43_170_171_benchmark
+    contributions:
+    - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+      profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO:window-6-10h
+      profile_digest: sha256:2e3dd864c36ea5d87930f00bfd7ad0e6801e73c148c7893f7c1b61ebaa51c286
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.104959315744197
+      relative_od: 0.7544910179640718
+    normalized_reporter_response:
+      estimate: 0.104959315744197
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.7544910179640718
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    contributions:
+    - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO:window-6-10h
+      profile_digest: sha256:5f7519ab6d1f52641de2a8216dca1d7bae447a869fa4253522f0c326f6eaeaea
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.04030797301740879
+      relative_od: 0.8937644341801386
+    normalized_reporter_response:
+      estimate: 0.04030797301740879
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.8937644341801386
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    contributions:
+    - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO:window-6-10h
+      profile_digest: sha256:e0c27559656443cecb10091ad153af0c742ba94a5d8c9cd2397c6569ea0c702e
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.032477436943800723
+      relative_od: 0.9125295508274233
+    normalized_reporter_response:
+      estimate: 0.032477436943800723
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9125295508274233
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    contributions:
+    - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO:window-6-10h
+      profile_digest: sha256:31aa3f8bd666626d69ee858f0df05681edb1c42a5eca860cc2d7daa4ae41def7
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.01398743695272561
+      relative_od: 0.9117647058823529
+    normalized_reporter_response:
+      estimate: 0.01398743695272561
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9117647058823529
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    contributions:
+    - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO:window-6-10h
+      profile_digest: sha256:e4c0fc066edcacf8f26451d9ea59f872fa341875b7c1b66662db625e8ae82a40
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.01075500371640727
+      relative_od: 0.9686800894854586
+    normalized_reporter_response:
+      estimate: 0.01075500371640727
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9686800894854586
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO:window-6-10h
+      profile_digest: sha256:c55a2146e404987e33e59e7b102225c61c644c29fecb4a791fb7ee1ec6f6ea70
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.026602622463084518
+      relative_od: 0.6446469248291571
+    normalized_reporter_response:
+      estimate: 0.026602622463084518
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.6446469248291571
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO:window-6-10h
+      profile_digest: sha256:115bad998dd282d82816a34ab606738647d44441efe91e6044d60255ba5f7259
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.0031632027237602878
+      relative_od: 0.9560853199498117
+    normalized_reporter_response:
+      estimate: 0.0031632027237602878
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9560853199498117
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO:window-6-10h
+      profile_digest: sha256:ed3cbf3611bc9582d35d06658d41a7069b57bb654927fc45adf3582f3b035133
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.0033293084505794874
+      relative_od: 0.9084249084249085
+    normalized_reporter_response:
+      estimate: 0.0033293084505794874
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9084249084249085
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO:window-6-10h
+      profile_digest: sha256:e2993d230271f0c42c1f273afe8b907db9317822c585045abff0b6c35872a2f5
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.004325103921105019
+      relative_od: 0.9411764705882353
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO:window-6-10h
+      profile_digest: sha256:c33eede30694ee69a2b325d0c24efa5b5c071284db64aa73e4c9372d08b742bb
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.01821387705029175
+      relative_od: 0.7773019271948608
+    - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+      profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO:window-6-10h
+      profile_digest: sha256:1f4404ebbebaf10a2a0a564ea0a215c5e2b25021e82fe0760ef871c1c27abe44
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.01490788669996444
+      relative_od: 0.837037037037037
+    normalized_reporter_response:
+      estimate: 0.01490788669996444
+      method: median_across_acquisitions
+      acquisition_count: 3
+      leave_one_acquisition_out_estimates:
+      - 0.016560881875128095
+      - 0.009616495310534729
+      - 0.011269490485698384
+    relative_od:
+      estimate: 0.837037037037037
+      method: median_across_acquisitions
+      acquisition_count: 3
+      leave_one_acquisition_out_estimates:
+      - 0.807169482115949
+      - 0.8891067538126362
+      - 0.859239198891548
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO:window-6-10h
+      profile_digest: sha256:5179b242624fc32888feda3e1b733eeafe971eeac03024e69bae758463131cf4
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.002516374694622425
+      relative_od: 0.9086479902557857
+    normalized_reporter_response:
+      estimate: 0.002516374694622425
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9086479902557857
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO:window-6-10h
+      profile_digest: sha256:e26d9dd8db61df319f6e708e0159d863fa9960ba4566825f562f4445070e98b6
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.0036828695051393965
+      relative_od: 0.9313253012048194
+    normalized_reporter_response:
+      estimate: 0.0036828695051393965
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9313253012048194
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO:window-6-10h
+      profile_digest: sha256:c0fe3c7df28aea28901c977f1235990a0647b71a4d420e8e50ccf8379596c18e
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.002854018851532382
+      relative_od: 0.8636871508379889
+    normalized_reporter_response:
+      estimate: 0.002854018851532382
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.8636871508379889
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO:window-6-10h
+      profile_digest: sha256:eb5ba7c63f7bfa0f29f8f19584d2ae2a670cbd6a797618e6956d236e784f1f1b
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.002668999936683565
+      relative_od: 0.9474969474969476
+    normalized_reporter_response:
+      estimate: 0.002668999936683565
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9474969474969476
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO:window-6-10h
+      profile_digest: sha256:4508ecb5a27a6d4b34a81d1b99e9282e6ea57dc884ac6df9498812fa480de302
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.0009085271642202043
+      relative_od: 0.9041850220264316
+    normalized_reporter_response:
+      estimate: 0.0009085271642202043
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9041850220264316
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260529_retron_Eco1_26_43_177_186_benchmark
+    contributions:
+    - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
+      profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO:window-6-10h
+      profile_digest: sha256:fc2fc1237ba847c6be833b73a08d7a4f4f4c725162981035ebac59af59a1f7d9
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.00016043858992497294
+      relative_od: 0.9887218045112782
+    normalized_reporter_response:
+      estimate: 0.00016043858992497294
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.9887218045112782
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    contributions:
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:7ba8214c4fb540b67586f4171e23b21d1cf950a78d5b09cf471f434f9b4cb63c
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.049964918809411694
+      relative_od: 0.5641025641025642
+    normalized_reporter_response:
+      estimate: 0.049964918809411694
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.5641025641025642
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron196_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    contributions:
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron196_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:ef296fbea3d8dbe67d8ee5f3ef01f6ee8a303948d6fb46a6c1f25a05d360e1b5
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.05077525794505674
+      relative_od: 0.4270833333333333
+    normalized_reporter_response:
+      estimate: 0.05077525794505674
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.4270833333333333
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron197_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    contributions:
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron197_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:21f6803b2e9ccad6f164c2f96267d52390c73f9310086841b621187e266d4e48
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.0160829659207498
+      relative_od: 0.7102102102102101
+    normalized_reporter_response:
+      estimate: 0.0160829659207498
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.7102102102102101
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron198_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    contributions:
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron198_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:ca78fcb8ab8febd669a355b8fa3d8b4c64901fce63fd8d1b1f00f438b79d6eb9
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.01677106130354941
+      relative_od: 0.7147335423197493
+    normalized_reporter_response:
+      estimate: 0.01677106130354941
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.7147335423197493
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron199_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    contributions:
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron199_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:10a57a82071e83c92f5eea6b45f31410cecece111642abb1b38be275130ba959
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.010492360918235988
+      relative_od: 0.8228155339805826
+    normalized_reporter_response:
+      estimate: 0.010492360918235988
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.8228155339805826
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    contributions:
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:b0c73748914ac67c66bbb132fc627ea2cdf5e5e2efc30d0d64dfaea8dd524143
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.039026533766524436
+      relative_od: 0.6342229199372057
+    normalized_reporter_response:
+      estimate: 0.039026533766524436
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.6342229199372057
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    contributions:
+    - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+      profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:3d07dc45611a29a40f7cac8ec1dd3a39ddffc54aae182d9f3ced637fb5e475e2
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.04660335155550266
+      relative_od: 0.6279491833030852
+    normalized_reporter_response:
+      estimate: 0.04660335155550266
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.6279491833030852
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron202_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    contributions:
+    - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+      profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron202_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:6db9f5466599649f6113fd52c98f3c99c0a7d4786eaab33194e2d56632706a2d
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.041056311134851364
+      relative_od: 0.5492424242424242
+    normalized_reporter_response:
+      estimate: 0.041056311134851364
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.5492424242424242
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron203_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    contributions:
+    - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+      profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron203_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:2b89dc5ffa7c00ea6e67c1ab911f0c262c0ff6d1b9553021d52c9b4e3a5e8449
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.04139623237629678
+      relative_od: 0.651017214397496
+    normalized_reporter_response:
+      estimate: 0.04139623237629678
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.651017214397496
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron204_msd_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    contributions:
+    - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+      profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron204_msd_lnrna__tetO:window-6-10h
+      profile_digest: sha256:5db89b9b68813c89ae4eab89c9865f67fdd75f5f577bf0119e3480256036c832
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.02528223710082584
+      relative_od: 0.7012987012987013
+    normalized_reporter_response:
+      estimate: 0.02528223710082584
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.7012987012987013
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20250622_retron_Eco1_26_43_benchmark
+    - 20250707_retron_Eco1_26_43_45_46_benchmark
+    - 20250718_retron_Eco1_26_45_47_48_benchmark
+    - 20260418_retron_Eco1_26_43_170_171_benchmark
+    - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+    - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+    contributions:
+    - acquisition_id: 20250622_retron_Eco1_26_43_benchmark
+      profile_id: 20250622_retron_Eco1_26_43_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
+      profile_digest: sha256:194b5f63326ff96b9a233df70fa7c60829e4216464147cfd4246d0cb1995a629
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 1.0488523444338946
+      relative_od: 0.5154121863799282
+    - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+      profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
+      profile_digest: sha256:203b5d34d8513a6e9394100f5c52d5e6ed2b751f1d93e2d91e244de8546265da
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 1.2358578105567795
+      relative_od: 0.49686520376175547
+    - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+      profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
+      profile_digest: sha256:edfac63757ba0cb1253ecea0b35397d95519ab4dac2ef1241246cae9a6b6aefe
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.9261963863383745
+      relative_od: 0.5459098497495827
+    - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+      profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
+      profile_digest: sha256:beeecd64ab1a00b569a8f3b9a246c3926b22a58a04636cad239d614fe1a99d3f
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.9136462294277685
+      relative_od: 0.6162528216704289
+    - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
+      profile_digest: sha256:d6cdd38aa28e4a7d58733f983d00e9925c8d8d04d3618ee313f34385838f53e8
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.906185125936517
+      relative_od: 0.611111111111111
+    - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
+      profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
+      profile_digest: sha256:925d582b1ce95e8693726f18cee3dc288c1011124ec95dac93bf9adf1e8f5f22
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.5125297771420385
+      relative_od: 0.7067307692307693
+    - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+      profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
+      profile_digest: sha256:dc0a79573fdd9e9eb1c9b8f175a065305f6a74628b15d77174290ff9b2d02afa
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.5571348680246527
+      relative_od: 0.6210268948655258
+    normalized_reporter_response:
+      estimate: 0.9136462294277685
+      method: median_across_acquisitions
+      acquisition_count: 7
+      leave_one_acquisition_out_estimates:
+      - 0.9099156776821428
+      - 0.9099156776821428
+      - 0.9099156776821428
+      - 0.9161907561374458
+      - 0.9199213078830715
+      - 0.9199213078830715
+      - 0.9199213078830715
+    relative_od:
+      estimate: 0.611111111111111
+      method: median_across_acquisitions
+      acquisition_count: 7
+      leave_one_acquisition_out_estimates:
+      - 0.61368196639077
+      - 0.61368196639077
+      - 0.61368196639077
+      - 0.5785104804303469
+      - 0.5810813357100058
+      - 0.5785104804303469
+      - 0.5785104804303469
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20250622_retron_Eco1_26_43_benchmark
+    - 20250707_retron_Eco1_26_43_45_46_benchmark
+    - 20260418_retron_Eco1_26_43_170_171_benchmark
+    - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+    contributions:
+    - acquisition_id: 20250622_retron_Eco1_26_43_benchmark
+      profile_id: 20250622_retron_Eco1_26_43_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
+      profile_digest: sha256:05b5eaeb0feb27a0f7be160bef1a8a9384a20cff9ef29aa92e3aec5df37830e1
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.03567023779402888
+      relative_od: 0.925137903861308
+    - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+      profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
+      profile_digest: sha256:20ba65692020fc3c23c3de08a519e16482ac9881cc02b4c0c19325112aebd123
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.02447129124303192
+      relative_od: 0.879746835443038
+    - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
+      profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
+      profile_digest: sha256:53a797d1f78418839bb8db84888907792b644bda2cee7affab82ba03b46a485f
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.056436938224164575
+      relative_od: 0.8836206896551723
+    - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
+      profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
+      profile_digest: sha256:1c8d69d5cbe80195add445eb6ff876e971b709c718a1153769b88c417c733088
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.03923125207694863
+      relative_od: 0.8413461538461539
+    normalized_reporter_response:
+      estimate: 0.03745074493548875
+      method: median_across_acquisitions
+      acquisition_count: 4
+      leave_one_acquisition_out_estimates:
+      - 0.03923125207694863
+      - 0.03923125207694863
+      - 0.03567023779402888
+      - 0.03567023779402888
+    relative_od:
+      estimate: 0.8816837625491052
+      method: median_across_acquisitions
+      acquisition_count: 4
+      leave_one_acquisition_out_estimates:
+      - 0.879746835443038
+      - 0.8836206896551723
+      - 0.879746835443038
+      - 0.8836206896551723
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20250707_retron_Eco1_26_43_45_46_benchmark
+    - 20250718_retron_Eco1_26_45_47_48_benchmark
+    contributions:
+    - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+      profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO:window-6-10h
+      profile_digest: sha256:b9b4e417758aaf076f8305f32e576770b207b4192cbcb2c46fb7912b14ba3ea8
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.20920524222515566
+      relative_od: 0.5790273556231003
+    - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+      profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO:window-6-10h
+      profile_digest: sha256:4e9583cf7c607d541594b55bf37d25c3cb100c5782b779e377bacba9aac697a2
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.15764896231800787
+      relative_od: 0.5996932515337423
+    normalized_reporter_response:
+      estimate: 0.18342710227158177
+      method: median_across_acquisitions
+      acquisition_count: 2
+      leave_one_acquisition_out_estimates:
+      - 0.15764896231800787
+      - 0.20920524222515566
+    relative_od:
+      estimate: 0.5893603035784213
+      method: median_across_acquisitions
+      acquisition_count: 2
+      leave_one_acquisition_out_estimates:
+      - 0.5996932515337423
+      - 0.5790273556231003
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20250707_retron_Eco1_26_43_45_46_benchmark
+    contributions:
+    - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
+      profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO:window-6-10h
+      profile_digest: sha256:2495fcbcdc4bfb704c4e836b8fd68eafde32014a11102cd4ce8b8e1a27f1fc28
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 0.14181659469313845
+      relative_od: 0.640625
+    normalized_reporter_response:
+      estimate: 0.14181659469313845
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.640625
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20250718_retron_Eco1_26_45_47_48_benchmark
+    contributions:
+    - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+      profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO:window-6-10h
+      profile_digest: sha256:e0905014e4f9e7d3d9f87c5d48b1c6ecc815c446be9cfbfda26ceee0d7764b6b
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 2.425192386507761
+      relative_od: 0.2817589576547231
+    normalized_reporter_response:
+      estimate: 2.425192386507761
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.2817589576547231
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  - subject_id: rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO
+    condition_role: dose
+    dose_uM: 500.0
+    reduction_id: window-6-10h
+    reduction_digest: sha256:0137db54f9180a6e30309a9d8575621a481c76bca147472f8eb7552d06f44de5
+    observation_policy_digest: sha256:5d1ebf8a2e4c0cac751fcd80e378ca32d0986799db7ed53b5c6913298d293dec
+    acquisition_ids:
+    - 20250718_retron_Eco1_26_45_47_48_benchmark
+    contributions:
+    - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
+      profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO:window-6-10h
+      profile_digest: sha256:fddc23c78e5f4627e56c670cea419b77829974594b5bf3c47fe844434dbcc0a7
+      declared_biological_replicate_ids: []
+      normalized_reporter_response: 2.229612178544822
+      relative_od: 0.39375
+    normalized_reporter_response:
+      estimate: 2.229612178544822
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+    relative_od:
+      estimate: 0.39375
+      method: median_across_acquisitions
+      acquisition_count: 1
+      leave_one_acquisition_out_estimates: []
+  projection_digest: sha256:898def9ffb2e7390c8996ed946c8212ffef5731682f0e2732409ed024a3c5757

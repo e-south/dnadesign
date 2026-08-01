@@ -60,7 +60,7 @@ def test_rt_lnrna_unified_construct_subjects_promote_crawford_and_block_khan_wit
     report = materialize_unified_construct_subject_contexts(
         repo_root=_repo_root(),
         work_root=tmp_path / "work",
-        include_genbank_catalog=False,
+        allow_partial_byte_resolution=True,
         include_rt_cds_dms=False,
         include_source_promotions=True,
         include_msd_compiler_promotions=False,
@@ -68,7 +68,8 @@ def test_rt_lnrna_unified_construct_subjects_promote_crawford_and_block_khan_wit
         source_record_resolver=_fixture_source_record_resolver,
     )
 
-    assert report.genbank_construct_subject_count == 0
+    assert report.subject_binding_resolved_subject_count == 46
+    assert len(report.blocked_subject_bindings) == 3
     assert report.crawford_construct_subject_count == 2
     assert report.khan_construct_subject_count == 0
     assert report.msd_compiler_construct_subject_count == 0
@@ -78,34 +79,36 @@ def test_rt_lnrna_unified_construct_subjects_promote_crawford_and_block_khan_wit
         "missing_affiliated_abundance_observation": 1,
         "missing_source_rt_cds_sequence": 1,
     }
-    assert len(report.input_ids_by_subject_id) == 2
+    assert len(report.input_ids_by_subject_id) == 48
     _assert_construct_subject_envelope_inputs(report)
     _assert_construct_output_subject_bridge(report)
     _assert_usr_contracts_strictly_validate(report)
 
-    inputs = Dataset(report.usr_root, report.input_dataset).head(n=5)
-    assert set(inputs["construct_subject__source_basis"]) == {"crawford_eco1_lnrna_fixed_wt_rt"}
-    assert set(inputs["construct_subject__source_collection_id"]) == {
+    inputs = Dataset(report.usr_root, report.input_dataset).head(n=60)
+    crawford_inputs = inputs[inputs["construct_subject__source_basis"] == "crawford_eco1_lnrna_fixed_wt_rt"]
+    assert crawford_inputs.shape[0] == 2
+    assert set(crawford_inputs["construct_subject__source_collection_id"]) == {
         "crawford_eco1_lnrna_abundance_affiliated_sequence_v1"
     }
-    assert set(inputs["construct_subject__source_reference_record_count"]) == {0, 1}
-    assert set(inputs["construct_subject__source_abundance_record_count"]) == {1}
-    assert set(inputs["construct_subject__rt_cds_authority_kind"]) == {"fixed_eco1_wt_rt"}
-    assert set(inputs["construct_subject__source_orientation"]) == {"forward"}
-    assert set(inputs["construct_subject__crawford_sequence_qc_policy"]) == {"eco1_forward_kmer_similarity_v1"}
-    assert set(inputs["construct_subject__crawford_msd_anchor_status"]) == {
+    assert set(crawford_inputs["construct_subject__source_reference_record_count"]) == {0, 1}
+    assert set(crawford_inputs["construct_subject__source_abundance_record_count"]) == {1}
+    assert set(crawford_inputs["construct_subject__rt_cds_authority_kind"]) == {"fixed_eco1_wt_rt"}
+    assert set(crawford_inputs["construct_subject__source_orientation"]) == {"forward"}
+    assert set(crawford_inputs["construct_subject__crawford_sequence_qc_policy"]) == {"eco1_forward_kmer_similarity_v1"}
+    assert set(crawford_inputs["construct_subject__crawford_msd_anchor_status"]) == {
         "exact_declared_msd_substring",
         "not_declared_for_abundance_only_sequence",
     }
-    assert set(inputs["construct_subject__crawford_source_context_note"]) == {
+    assert set(crawford_inputs["construct_subject__crawford_source_context_note"]) == {
         "source_lnrna_sequence_projected_into_dnadesign_dual_cassette_not_native_expression_context"
     }
 
-    output = Dataset(report.usr_root, report.output_dataset).head(n=10)
-    assert output.shape[0] == 4
-    assert set(output["construct_subject__source_basis"]) == {"crawford_eco1_lnrna_fixed_wt_rt"}
+    output = Dataset(report.usr_root, report.output_dataset).head(n=110)
+    assert output.shape[0] == 96
+    crawford_output = output[output["construct_subject__source_basis"] == "crawford_eco1_lnrna_fixed_wt_rt"]
+    assert crawford_output.shape[0] == 4
     views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
-    assert len(views) == 12
+    assert len(views) == 288
 
 
 def test_rt_lnrna_source_promotions_resolve_tables_through_public_source_ids(tmp_path: Path) -> None:

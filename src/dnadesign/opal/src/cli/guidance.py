@@ -104,9 +104,6 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     if "sfxi_v1" in objective_names:
         docs.append("docs/plugins/objectives/sfxi.md")
         source.append(f"{src_root}/objectives/sfxi_v1.py")
-    if "spop_v1" in objective_names:
-        docs.append("docs/plugins/objectives/spop.md")
-        source.append(f"{src_root}/objectives/spop_v1.py")
     if "expected_improvement" in selection_names:
         docs.append("docs/plugins/selection/expected-improvement.md")
         source.append(f"{src_root}/selection/expected_improvement.py")
@@ -252,12 +249,6 @@ def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int 
             0,
             "SFXI min_n failures occur when current-round observed labels are missing for the run cutoff.",
         )
-    if "spop_v1" in objective_names:
-        common_errors.insert(
-            0,
-            "SPOP campaigns require scalar Y with y_expected_length=1 and score_ref 'spop_v1/spop'.",
-        )
-
     report = GuidanceReport(
         workflow_key=workflow_key,
         campaign={

@@ -24,5 +24,5 @@ parts:
     - contract/readiness/checks/construct_subject_contract.yaml
     - contract/readiness/checks/representation_readiness.yaml
     - contract/readiness/checks/overlay_linkage.yaml
-    - contract/readiness/checks/reader_spop_label_materialization.yaml
+    - contract/readiness/checks/reporter_response_metastudy.yaml
     - contract/readiness/checks/opal_precondition.yaml

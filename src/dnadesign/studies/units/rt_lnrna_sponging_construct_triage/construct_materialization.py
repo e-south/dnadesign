@@ -32,19 +32,16 @@ from .materialization.execution import (
     _load_materialization_context,
     _materialize_construct_view_plans,
 )
+from .materialization.subject_binding_adapter import _adapt_registered_subject_bindings
 from .materialization.subjects import (
     _candidate_rows,
-    _catalog_candidate_rows,
-    _catalog_materialization_candidates,
     _construct_subject_row_by_id,
     _expected_context_sequence,
-    _group_by_window_offset,
     _required_candidate_sequence,
     _rt_cds_dms_construct_subject_rows,
 )
 from .materialization.unified import _select_unified_construct_subjects
 from .source_promotions import SourceRecordResolver
-from .variant_genbank_catalog import build_variant_genbank_catalog
 
 
 def materialize_control_construct_contexts(
@@ -97,36 +94,40 @@ def materialize_variant_construct_contexts(
     repo_root: Path | None = None,
     work_root: Path,
 ) -> ControlConstructMaterializationReport:
-    """Materialize all catalog-representable variants into consolidated 2,000 bp views."""
+    """Audit catalog-provenance subjects after exact subject-binding resolution."""
     context = _load_materialization_context(repo_root)
-    catalog = build_variant_genbank_catalog(repo_root=context.root)
-    if not catalog.ok:
-        joined = "; ".join(catalog.errors)
-        raise MaterializationContractError(f"Variant GenBank catalog is invalid: {joined}")
-    candidates = _catalog_materialization_candidates(
-        repo_root=context.root,
-        catalog_genbank_dir=Path(catalog.genbank_dir),
-        records=catalog.records,
-        target_start=context.target_start,
-        target_end=context.target_end,
-    )
-    rows, expected_sequences = _catalog_candidate_rows(
-        manifest=context.manifest,
-        template_sequence=context.template_sequence,
-        target_start=context.target_start,
-        target_end=context.target_end,
-        candidates=candidates,
-    )
+    projection = _adapt_registered_subject_bindings(context=context)
+    rows = [
+        row
+        for row in projection.rows
+        if row.get("construct_subject__lnrna_authority_kind") == "rt_lnrna_variant_genbank_catalog"
+        and row.get("construct_subject__rt_cds_authority_kind") == "rt_lnrna_variant_genbank_catalog"
+    ]
+    resolved_ids = {str(row["id"]) for row in rows}
+    expected_catalog_ids = set(projection.catalog_subject_ids)
+    if resolved_ids != expected_catalog_ids:
+        missing = sorted(expected_catalog_ids - resolved_ids)
+        unexpected = sorted(resolved_ids - expected_catalog_ids)
+        raise MaterializationContractError(
+            "Catalog provenance audit requires exact subject-binding coverage; "
+            f"missing={missing}, unexpected={unexpected}"
+        )
+    expected_sequences = {subject_id: projection.expected_sequences[subject_id] for subject_id in resolved_ids}
 
     plans: list[_ConstructViewRunPlan] = []
-    for group_index, (window_offset_bp, group) in enumerate(_group_by_window_offset(candidates).items(), start=1):
+    for group_index, (window_offset_bp, subject_ids) in enumerate(
+        projection.subject_ids_by_window_offset.items(), start=1
+    ):
+        selected_subject_ids = tuple(subject_id for subject_id in subject_ids if subject_id in resolved_ids)
+        if not selected_subject_ids:
+            continue
         plans.append(
             _ConstructViewRunPlan(
                 context_job_id=f"rt_lnrna_variant_context_views_offset_{group_index}",
                 slot_anchor_job_id=f"rt_lnrna_variant_slot_anchor_views_offset_{group_index}",
                 context_config_name=f"construct-context-views-{group_index:02d}.yaml",
                 slot_anchor_config_name=f"construct-slot-anchor-views-{group_index:02d}.yaml",
-                subject_ids=tuple(candidate.construct_subject_id for candidate in group),
+                subject_ids=selected_subject_ids,
                 window_offset_bp=window_offset_bp,
             )
         )
@@ -238,22 +239,22 @@ def materialize_unified_construct_subject_contexts(
     *,
     repo_root: Path | None = None,
     work_root: Path,
-    include_genbank_catalog: bool = True,
-    include_source_promotions: bool = True,
-    include_msd_compiler_promotions: bool = True,
-    include_rt_cds_dms: bool = True,
+    include_source_promotions: bool = False,
+    include_msd_compiler_promotions: bool = False,
+    include_rt_cds_dms: bool = False,
     dnadesign_data_root: Path | None = None,
     source_record_resolver: SourceRecordResolver | None = None,
     msd_variant_pool_spec_paths: tuple[Path, ...] | None = None,
     dms_base_construct_subject_id: str = _DEFAULT_DMS_BASE_CONSTRUCT_SUBJECT_ID,
     rt_cds_positions: tuple[int, ...] = (),
     max_dms_variants: int | None = None,
+    subject_binding_subject_ids: tuple[str, ...] | None = None,
+    allow_partial_byte_resolution: bool = False,
 ) -> UnifiedConstructSubjectMaterializationReport:
-    """Materialize all first-class RT-lnRNA construct subjects into one Construct output dataset."""
+    """Materialize registered subjects; partial byte resolution requires explicit opt-in."""
     context = _load_materialization_context(repo_root)
     selection = _select_unified_construct_subjects(
         context=context,
-        include_genbank_catalog=include_genbank_catalog,
         include_source_promotions=include_source_promotions,
         include_msd_compiler_promotions=include_msd_compiler_promotions,
         include_rt_cds_dms=include_rt_cds_dms,
@@ -263,6 +264,8 @@ def materialize_unified_construct_subject_contexts(
         dms_base_construct_subject_id=dms_base_construct_subject_id,
         rt_cds_positions=rt_cds_positions,
         max_dms_variants=max_dms_variants,
+        subject_binding_subject_ids=subject_binding_subject_ids,
+        allow_partial_byte_resolution=allow_partial_byte_resolution,
     )
     run = _materialize_construct_view_plans(
         work_root=work_root,
@@ -280,7 +283,11 @@ def materialize_unified_construct_subject_contexts(
         template_sequence=context.template_sequence,
         template_context_sequence=context.template_context_sequence,
         expected_sequences=selection.expected_sequences,
-        genbank_construct_subject_count=selection.genbank_construct_subject_count,
+        subject_binding_requested_subject_count=selection.subject_binding_requested_subject_count,
+        subject_binding_resolved_subject_count=selection.subject_binding_resolved_subject_count,
+        subject_binding_blocked_subject_count=selection.subject_binding_blocked_subject_count,
+        subject_binding_resolution_complete=selection.subject_binding_resolution_complete,
+        blocked_subject_bindings=selection.blocked_subject_bindings,
         crawford_construct_subject_count=selection.crawford_construct_subject_count,
         khan_construct_subject_count=selection.khan_construct_subject_count,
         msd_compiler_construct_subject_count=selection.msd_compiler_construct_subject_count,

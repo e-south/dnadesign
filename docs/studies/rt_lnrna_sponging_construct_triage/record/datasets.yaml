@@ -15,7 +15,8 @@ datasets:
       Numeric RT-DNA abundance prior only. Preserve raw_value and
       normalized_value as source-fidelity fields; ordinal_bin is secondary
       metadata and not a TF-sponging label. The numeric scale is scoped to the
-      Khan source and must not be mixed with Crawford abundance or Reader SPOP.
+      Khan source and must not be mixed with Crawford abundance or RT-lnRNA
+      reporter-response evidence.
   - role: khan_rt_lnrna_reference_bridge
     owner_tool: dnadesign-data
     lifecycle: source_reference
@@ -52,7 +53,8 @@ datasets:
       Eco1-local ncRNA abundance observations with preserved raw_value and
       normalized_value. These rows are abundance priors, not TF-sponging
       assay observations. The numeric scale is scoped to Crawford Eco1 msDNA
-      abundance and is not comparable to Khan RT-DNA abundance or Reader SPOP.
+      abundance and is not comparable to Khan RT-DNA abundance or RT-lnRNA
+      reporter-response evidence.
   - role: crawford_eco1_lnrna_msd_design_references
     owner_tool: dnadesign-data
     lifecycle: source_reference
@@ -188,6 +190,17 @@ datasets:
       fields named in `construct_subject__biological_sequence_fields` before treating a
       row as biological sequence authority.
     derived_lanes:
+      - lane_id: registered_rt_lnrna_subjects
+        owner_tool: study
+        generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.subject_bindings.load_resolved_registered_subject_bindings
+        dependency_surface: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/subject_bindings/retron_subject_bindings_v1.yaml
+        source_basis: rt_lnrna_subject_binding
+        notes: >-
+          Resolves independently available logical paired subjects and reports
+          opaque provider-published RT parts as explicit byte blocks. Exact
+          requests containing a blocked subject fail before writes. GenBank is
+          component and placement provenance, not a second subject selector or
+          fallback for private provider bytes.
       - lane_id: crawford_lnrna_msd_designs_fixed_wt_rt
         owner_tool: study
         generator: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.source_promotions.resolve_source_construct_subject_promotions
@@ -293,85 +306,79 @@ datasets:
       expected Evo2 7B vector/scalar sidecars, OPAL X selection posture, and
       Khan/Crawford source-overlay integration boundaries. Its
       `row_key_source` requires the Construct output construct_subject overlay bridge.
-  - role: reader_spop_label_plan
-    owner_tool: study_reader_bridge
-    lifecycle: reader_label_tables_materialized_for_latentdna_overlay
-    status: materialized_for_latentdna_overlay
-    source_owner_tool: reader
-    source_record: ratio_reporter_normalizer/df
-    metric_id: reader_spop_endpoint_dose_mean_v1
-    source_of_truth_doc: reader/docs/lib/spop_endpoint_in_reader.md
-    source_of_truth_api: reader.domains.plate_reader.analysis.spop.score_spop_endpoint
-    schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/sponging-assay-observation.schema.yaml
-    materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan
-    materialized_outputs:
-      observations: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_observations.parquet
-      candidate_summary: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
-    reader_experiment_ids:
-      - 20250622_retron_Eco1_26_43_benchmark
-      - 20250707_retron_Eco1_26_43_45_46_benchmark
-      - 20250718_retron_Eco1_26_45_47_48_benchmark
-      - 20251105_retron_Eco1_RT_variants
-      - 20260418_retron_Eco1_26_43_170_171_benchmark
-      - 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
-      - 20260529_retron_Eco1_26_43_177_186_benchmark
-      - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
-      - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
+  - role: rt_lnrna_subject_binding_registry
+    owner_tool: study
+    lifecycle: compositional_identity_authority
+    status: present
+    path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/subject_bindings/retron_subject_bindings_v1.yaml
+    schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/rt-lnrna-subject-binding-registry.schema.yaml
+    row_identity: subject_id
     notes: >-
-      Reader-derived TF-sponging scalar labels from pES-retron plus
-      pBbS2c-RFP experiments, materialized for LatentDNA GenBank overlays.
-      Rows keep Reader assay subject identity separate from Construct subject
-      identity; retron rows resolve through the
-      variant GenBank catalog when explicit RT plus lnRNA sequence authority
-      exists. The SPOP numeric scope is Reader experiment-normalized
-      TF-sponging and is not comparable to Khan or Crawford abundance scales.
-      Numeric scoring delegates to Reader's public score_spop_endpoint API.
-      The 20251105 RT-variant Reader artifact is a single-point mid-log
-      read recorded at artifact time 0 h but interpreted as approximately 10 h
-      after seeding; the 20260507 retron176 wells are omitted because no actual
-      strain was present. The 20260705 benchmark contributes retron195-200 plus
-      retron26/retron180 observations and uses 200 nm aTc as its positive
-      control condition. The 20260720 benchmark contributes retron201-204 plus
-      repeat retron26/retron180 observations under the same positive-control
-      convention.
-  - role: reader_spop_condition_structure_matrix
+      Composes exact RT, full-lnRNA, and hairpin-owned MSD authorities. Reader
+      aliases are exact join keys only; measurements and interpretations are
+      forbidden from this registry.
+  - role: reader_evidence_bindings
     owner_tool: study_reader_bridge
-    lifecycle: composite_plot_evidence
-    status: materialized_by_study_route
-    source_owner_tool: reader
-    materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.materialize
-    route: docs/studies/rt_lnrna_sponging_construct_triage/routes/reader-spop-condition-structure-matrix.md
-    schemas:
-      condition_matrix: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/reader-spop-condition-matrix.schema.yaml
-      structure_thumbnail_manifest: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/retron-structure-thumbnail-manifest.schema.yaml
-    materialized_outputs:
-      output_root: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1
-      condition_matrix: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/tables/reader_spop_condition_matrix.parquet
-      condition_columns: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/tables/reader_spop_condition_columns.parquet
-      structure_thumbnail_manifest: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/tables/retron_structure_thumbnail_manifest.parquet
-      plot_manifest: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_spop_condition_structure_matrix_v1/plots/manifest.json
-    row_count: 202
-    variant_count: 40
-    condition_count: 5
-    missing_cell_count: 57
-    structure_thumbnail_rows: 40
+    lifecycle: route_gated_identity_join
+    status: ready_on_demand
+    source_record: sample_measurements/df
+    source_catalog_schema_version: 4
+    source_record_schema_version: 6
+    source_record_contract: plate_reader.annotated.v1
+    source_record_identity: exact_positive_revision_plus_revision_digest
+    schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/reader-evidence-bindings.schema.yaml
+    materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_evidence.materialize
+    reader_experiment_route_registry: ../.agents/skills/retron-assay-study-bridge/references/reader-experiment-routes.json
+    reader_experiment_route_id: rt_competence_subject_binding
+    reader_readiness_gate: ../.agents/skills/retron-assay-study-bridge/scripts/check_reader_experiment_readiness.py
+    output_target: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_evidence_bindings_v4/20260727_retron_Eco1_26_D01_D02_P01_P03_DP01_DP03_benchmark/bindings.json
     notes: >-
-      Study-owned composite evidence surface joining Reader SPOP condition-long
-      rows to retron-hairpin MSD structure thumbnails. Missing condition tiles
-      remain missing in plots and tables; they are not imputed as zero.
+      The competence route is live-ready. On-demand materialization requires
+      its exact selected membership and rechecks Reader before reading the
+      record or writing output. The join preserves the exact revision, revision
+      digest, and content digest; publication derives a canonical artifact id
+      and digest, is create-only, and strict loading restores source closure
+      only after complete contract validation. Generated outputs are
+      recipe-owned and ignored by Git. No measurements or scientific
+      interpretations enter this artifact.
+  - role: rt_lnrna_reporter_response_profile_contract
+    owner_tool: study
+    lifecycle: descriptive_assay_evidence_contract
+    status: present_not_materialized
+    contract_id: rt_lnrna_reporter_response_profile.v3
+    schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/rt-lnrna-reporter-response-profile.schema.yaml
+    context: docs/studies/rt_lnrna_sponging_construct_triage/contexts/reporter-response-evidence.md
+    route: docs/studies/rt_lnrna_sponging_construct_triage/routes/reporter-response-evidence.md
+    source_record: sample_measurements/df
+    evidence_use: descriptive
+    optimization_status: ineligible
+    materializer: none
+    notes: >-
+      Preserves declared RFP, OD600, and RFP/OD600 summaries; exact Reader
+      provenance; a typed pooled-or-explicitly-paired control reduction; an
+      ordered dose grid; dose-wise normalized reporter response; uncapped
+      relative OD; and declared biological-replicate uncertainty. Replicate
+      identity is condition-scoped, and equal labels across conditions do not
+      imply pairing. Endpoint relative OD is an OD ratio, not viability or
+      growth; biomass interpretation requires meta-study validation.
+      Provenance is derived from exactly one bound row in a source-closed
+      evidence-binding artifact, and the typed observation policy derives its
+      own digest. Cross-profile aggregation requires identical comparability
+      keys.
   - role: opal_training_examples_usr_dataset
     owner_tool: study
     lifecycle: opal_training_examples
-    status: blocked_until_candidate_x_and_label_join
+    status: blocked_until_candidate_x_objective_and_profile_join
     dataset_id: rt_lnrna_sponging_construct_triage_opal_training_examples_v1
     path: src/dnadesign/usr/datasets/rt_lnrna_sponging_construct_triage_opal_training_examples_v1
     row_identity: study_construct_subject_id
     notes: >-
       Future OPAL-ready table for this study only. Rows require one selected
-      fixed-size X vector and a join to the materialized Reader
-      SpongingAssayObservation labels before OPAL run/explain. Do not use
-      generic names such as opal_handoff_v1 in mixed USR roots.
+      fixed-size X vector, a meta-study-defined constrained reporter-response
+      objective, and comparable uncertainty-bearing profiles before OPAL
+      run/explain. Do not use generic names such as opal_handoff_v1 in mixed
+      USR roots.
 notes:
   - Study-prefixed USR dataset ids are registered above.
-  - Construct, Infer, LatentDNA, and Reader-label evidence surfaces are materialized; the OPAL training table remains absent until candidate-X selection and label joining are complete.
+  - Construct, Infer, and LatentDNA evidence surfaces are materialized; current reporter-response profiles and the OPAL training table are absent.
   - GenBank source authority is recorded in workbench/provenance/genbank-source-authority.yaml.

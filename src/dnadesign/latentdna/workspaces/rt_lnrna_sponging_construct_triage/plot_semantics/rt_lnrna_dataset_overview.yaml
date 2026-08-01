@@ -5,7 +5,7 @@ encoding: Multi-panel categorical count chart over source family, promotion stat
 scope: The materialized 2,000 bp RT-lnRNA construct denominator shared by the Evo2 7B Infer sidecar sources.
 guardrails:
   - Inventory counts set the denominator only; they do not rank candidate representations.
-  - Label readiness is a status overlay and does not imply Reader-to-Construct SPOP labels exist.
+  - Evidence readiness is a status overlay and does not imply comparable reporter-response profiles exist.
 caption: RT-lnRNA source/readiness inventory for the materialized construct denominator.
 alt_text: Multi-panel categorical chart showing source family, promotion, abundance affiliation, projection, label readiness, and source-window shares for RT-lnRNA constructs.
 preprocessing_md: Uses the dataset-overview scalar table built from source metadata derivations; no vector geometry is used.

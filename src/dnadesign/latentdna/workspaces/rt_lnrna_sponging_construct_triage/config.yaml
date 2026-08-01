@@ -366,12 +366,6 @@ sources:
       model_name: evo2_7b
       scalar_kind: log_likelihood__mean_per_token
       view_name: rt_cds_fixed_1600bp_window_in_construct_reverse_complement_anchor_mean
-  rt_lnrna_reader_spop_candidate_summary:
-    kind: parquet
-    path: study_inputs/reader_spop_candidate_summary.parquet
-    record_key: construct_subject__id
-    subject_key: construct_subject__id
-    role: source_overlay
 metadata:
   include:
     - source_family
@@ -403,13 +397,6 @@ metadata:
     - crawford_abundance_raw_value
     - crawford_abundance_ordinal_bin
     - crawford_design_reference_status
-    - reader_spop_overlay_status
-    - reader_spop_metric_id
-    - reader_spop_experiment_ids
-    - reader_spop_normalized_value
-    - reader_spop_score_median
-    - reader_spop_observation_count
-    - reader_spop_qc_flags
   derivations:
     source_family:
       kind: copy
@@ -465,13 +452,9 @@ metadata:
       source: construct_subject__construct_projection_status
       value_type: string
     label_readiness_status:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_overlay_status
-      missing_policy: "null"
-      default: reader_spop_labels_not_materialized
+      kind: constant
+      value: reporter_response_profiles_absent_pending_meta_study
+      value_type: string
     template_name:
       kind: constant
       value: dual_cassette_rt_lnrna_expression_template_v1
@@ -558,55 +541,6 @@ metadata:
       present_value: design_reference_affiliated
       absent_value: not_design_reference_affiliated
       value_type: string
-    reader_spop_overlay_status:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_overlay_status
-      missing_policy: "null"
-    reader_spop_metric_id:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_metric_id
-      missing_policy: "null"
-    reader_spop_experiment_ids:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_experiment_ids
-      missing_policy: "null"
-    reader_spop_normalized_value:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_normalized_value
-      missing_policy: "null"
-    reader_spop_score_median:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_score_median
-      missing_policy: "null"
-    reader_spop_observation_count:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_observation_count
-      missing_policy: "null"
-    reader_spop_qc_flags:
-      kind: lookup
-      source: rt_lnrna_reader_spop_candidate_summary
-      left_key: construct_subject__id
-      right_key: construct_subject__id
-      value_column: reader_spop_qc_flags
-      missing_policy: "null"
   axes:
     khan_abundance_ordinal_bin:
       column: khan_abundance_ordinal_bin
@@ -701,12 +635,7 @@ metadata:
       label: Label readiness
       kind: categorical
       display_labels:
-        reader_spop_assay_observed: Reader SPOP observed
-        reader_spop_labels_not_materialized: SPOP labels not materialized
-    reader_spop_score_median:
-      column: reader_spop_score_median
-      label: Reader SPOP median
-      kind: continuous
+        reporter_response_profiles_absent_pending_meta_study: Reporter-response profiles absent pending meta-study
     source_window_case:
       column: source_window_case
       label: Source window
@@ -1158,16 +1087,6 @@ reference_sets:
         equals: genbank_variant_catalog
       - column: source_variant_id
         not_regex: '^no_source_variant$'
-  reference_reader_spop_assayed_genbank_rows:
-    label: Reader SPOP assayed GenBank rows
-    match_column: construct_subject__id
-    label_column: source_variant_id
-    label_limit: 12
-    where_all:
-      - column: candidate_source
-        equals: genbank_variant_catalog
-      - column: reader_spop_overlay_status
-        equals: reader_spop_assay_observed
   reference_source_family_anchors:
     label: Source-family anchors
     match_column: construct_subject__id
@@ -1623,8 +1542,6 @@ plots:
       - {column: rt_variant_class, label: RT variant class, type: categorical}
       - {column: rt_dms_mutation_class, label: RT-DMS mutation class, type: categorical}
       - {column: template_name, label: Template, type: categorical}
-      - {column: reader_spop_score_median, label: Reader SPOP median, type: continuous, scale: panel}
-      - {column: reader_spop_overlay_status, label: Reader SPOP status, type: categorical}
       - {column: khan_abundance_normalized_value, label: Khan PAGE RT-DNA abundance, type: continuous, scale: panel}
       - {column: khan_abundance_ordinal_bin, label: Khan abundance group, type: ordinal}
       - {column: crawford_abundance_raw_value, label: Crawford Fig2 Eco1 msDNA score, type: continuous, scale: panel}
@@ -1687,8 +1604,6 @@ notebooks:
       - rt_variant_class
       - rt_dms_mutation_class
       - template_name
-      - reader_spop_score_median
-      - reader_spop_overlay_status
       - khan_abundance_normalized_value
       - khan_abundance_ordinal_bin
       - crawford_abundance_raw_value
@@ -1704,8 +1619,6 @@ notebooks:
       rt_variant_class: categorical
       rt_dms_mutation_class: categorical
       template_name: categorical
-      reader_spop_score_median: continuous
-      reader_spop_overlay_status: categorical
       khan_abundance_normalized_value: continuous
       khan_abundance_ordinal_bin: ordinal
       crawford_abundance_raw_value: continuous
@@ -1721,7 +1634,6 @@ notebooks:
           - reference_msd_compiler_landmarks
           - reference_khan_abundance_rows
           - reference_crawford_design_affiliated_rows
-          - reference_reader_spop_assayed_genbank_rows
       - label: Literature source
         column: source_literature_id
         type: categorical
@@ -1729,19 +1641,6 @@ notebooks:
           - reference_genbank_catalog_rows
           - reference_khan_abundance_rows
           - reference_crawford_design_affiliated_rows
-          - reference_reader_spop_assayed_genbank_rows
-      - label: Reader SPOP median
-        column: reader_spop_score_median
-        type: continuous
-        reference_set_ids:
-          - reference_genbank_catalog_rows
-          - reference_reader_spop_assayed_genbank_rows
-      - label: Reader SPOP status
-        column: reader_spop_overlay_status
-        type: categorical
-        reference_set_ids:
-          - reference_genbank_catalog_rows
-          - reference_reader_spop_assayed_genbank_rows
       - label: Abundance affiliation
         column: abundance_affiliation
         type: categorical
@@ -2172,9 +2071,6 @@ recipes:
             - compiler_msd_design_id
             - crawford_abundance_ordinal_bin
             - khan_abundance_ordinal_bin
-            - reader_spop_overlay_status
-            - reader_spop_score_median
-            - reader_spop_experiment_ids
           candidate_views:
             - intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat
             - intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat

@@ -12,5 +12,5 @@ preprocessing_md: Reads only the trait_axis_projection_summary scalar table emit
 math_md: |
   Spearman correlation is computed between finite source assay values and row-level axis_projection values for fit and eval source rows.
 rationale_md: Promotes the trait-axis summary into the notebook decision funnel instead of relying on older source-family or ordinal proxies.
-limitations_md: Source-value correlation does not establish causal abundance performance and does not replace future Reader-owned labels.
+limitations_md: Source-value correlation does not establish causal abundance performance and does not replace study-owned reporter-response evidence derived from Reader measurement records.
 failure_modes_md: Low finite-pair counts or stale source scalar inputs can make a view look weak or strong for the wrong reason.

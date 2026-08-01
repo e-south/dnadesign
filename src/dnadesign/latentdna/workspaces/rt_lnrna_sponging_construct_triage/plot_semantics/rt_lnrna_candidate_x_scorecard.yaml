@@ -12,5 +12,5 @@ preprocessing_md: Reuses scalar summaries from the current LatentDNA workspace r
 math_md: |
   Metrics are carried from their source scalar tables; dimensional cost is the candidate input dimension reported by the representation-health reducer.
 rationale_md: Makes candidate-X tradeoffs explicit before OPAL consumes a fixed-size vector.
-limitations_md: It does not include future SPOP labels or OPAL assay outcomes.
+limitations_md: It does not include reporter-response profiles or OPAL assay outcomes.
 failure_modes_md: If context or ordinal scalar rows are stale, the scorecard can appear complete while mixing old evidence.

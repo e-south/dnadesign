@@ -18,6 +18,7 @@ from dnadesign.construct import RunResult
 
 from ..genbank_authority import GenBankAuthorityAudit
 from ..source_promotions import SourcePromotionReport
+from ..subject_bindings import SubjectBindingByteBlock
 
 _STUDY_DIR = Path("docs/studies/rt_lnrna_sponging_construct_triage")
 _PROJECTION_MANIFEST_PATH = _STUDY_DIR / "operations/contract/fixtures/construct/construct-projection-manifest.yaml"
@@ -28,8 +29,6 @@ _OUTPUT_DATASET = "rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_
 _MATERIALIZATION_SOURCE = "rt_lnrna_sponging_construct_triage construct materialization"
 _PAYLOAD_PROGRAM_ID = "tetO_sponging_v1"
 _RT_CDS_DMS_SOURCE_BASIS = "in_silico_rt_cds_dms"
-_GENBANK_CATALOG_SOURCE_BASIS = "genbank_variant_catalog"
-_GENBANK_CATALOG_SOURCE_COLLECTION_ID = "rt_lnrna_sponging_construct_triage_retron_variant_genbank_catalog_v1"
 _DEFAULT_DNADESIGN_DATA_ROOT = Path("../dnadesign-data")
 _DEFAULT_DMS_BASE_CONSTRUCT_SUBJECT_ID = "rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO"
 _CONSTRUCT_SUBJECT_OVERLAY = "construct_subject"
@@ -104,7 +103,11 @@ class RtCdsDmsConstructMaterializationReport(ControlConstructMaterializationRepo
 
 @dataclass(frozen=True)
 class UnifiedConstructSubjectMaterializationReport(ControlConstructMaterializationReport):
-    genbank_construct_subject_count: int
+    subject_binding_requested_subject_count: int
+    subject_binding_resolved_subject_count: int
+    subject_binding_blocked_subject_count: int
+    subject_binding_resolution_complete: bool
+    blocked_subject_bindings: tuple[SubjectBindingByteBlock, ...]
     crawford_construct_subject_count: int
     khan_construct_subject_count: int
     msd_compiler_construct_subject_count: int

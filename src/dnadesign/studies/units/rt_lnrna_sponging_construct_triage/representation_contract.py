@@ -51,7 +51,6 @@ _EXPECTED_OVERLAY_REFERENCE_IDS = (
     "khan_cross_retron_rt_dna_abundance_v1",
     "crawford_eco1_lnrna_msd_abundance_v1",
     "crawford_eco1_lnrna_msd_design_reference_v1",
-    "reader_spop_endpoint_dose_mean_v1",
 )
 _EXPECTED_FIXED_SIZE_VECTORS = {
     "intermediate_embedding_7b_dual_cassette_2000bp_fwd_rc_concat": ("float32", 8192),
@@ -146,8 +145,7 @@ def validate_representation_table_contract_payload(payload: object) -> Represent
     )
     if overlay_reference_ids != _EXPECTED_OVERLAY_REFERENCE_IDS:
         errors.append(
-            "source_overlay_inputs must declare Khan abundance, Crawford abundance, Crawford design references, "
-            "and Reader SPOP"
+            "source_overlay_inputs must declare Khan abundance, Crawford abundance, and Crawford design references"
         )
     construct_subject_promotion = _parse_construct_subject_promotion(
         payload.get("construct_subject_promotion"),

@@ -241,7 +241,6 @@ opal_x_selection:
     - latentdna__evo2_7b__lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat
     - latentdna__evo2_7b__rt_cds_fixed_1600bp_window_in_construct_anchor_mean_bidir_concat
     - latentdna__evo2_7b__lnrna_384bp_rt_cds_1600bp_anchor_window_pair_concat
-  label_status: blocked_until_sponging_assay_observations
 source_overlay_inputs:
   - reference_overlay_id: khan_cross_retron_rt_dna_abundance_v1
     source_role: khan_abundance_prior_overlay
@@ -271,16 +270,6 @@ source_overlay_inputs:
       - msr_sequence
       - msd_sequence
     notes: Rows require explicit RT plus lnRNA authority and affiliated abundance observation before Crawford construct promotion.
-  - reference_overlay_id: reader_spop_endpoint_dose_mean_v1
-    source_role: reader_spop_label_plan
-    integration_mode: sponging_assay_observation
-    allowed_as_opal_y: true
-    allowed_as_latentdna_overlay: true
-    join_basis: construct_subject_id
-    required_numeric_fields:
-      - raw_value
-      - normalized_value
-    notes: Reader SPOP is source-scoped to reader_experiment_normalized_tf_sponging and is not numerically comparable to Khan or Crawford abundance priors.
 construct_subject_promotion:
   source_dataset: rt_lnrna_sponging_construct_triage_construct_slot_inputs_v1
   consolidated_construct_dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1

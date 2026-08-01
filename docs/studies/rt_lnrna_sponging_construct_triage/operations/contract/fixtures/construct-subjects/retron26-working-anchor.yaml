@@ -21,12 +21,10 @@ candidate:
   construct_id:
   construct_context_view_ids: []
   abundance_prior_overlay_ids: []
-  sponging_assay_observation_ids: []
   construct_subject_role: working_control
   source_authority_status: resolved_by_genbank_source_authority
-  blockers:
-    - real_sponging_assay_observations_absent
-  construct_subject_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; six 2,000 bp source view lanes and Infer sidecars are materialized, while real labels remain absent.
+  blockers: []
+  construct_subject_note: Eco1 WT RT plus retron26-derived lnRNA working control backed by GenBank source authority and the multi-slot Construct projection manifest; six 2,000 bp source view lanes and Infer sidecars are materialized.
 msd_design_spec:
   msd_design_spec_id: msd_design_spec__retron26__tetO_sponging_v1
   schema_version: msd_design_spec_v1

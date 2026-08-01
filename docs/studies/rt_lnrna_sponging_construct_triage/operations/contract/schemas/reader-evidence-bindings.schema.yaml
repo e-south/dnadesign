@@ -1,0 +1,92 @@
+schema_id: rt_lnrna_reader_evidence_bindings_v4
+study_id: rt_lnrna_sponging_construct_triage
+owner: rt_lnrna_sponging_construct_triage
+purpose: >-
+  Bind exact identities from one digest-verified Reader dataframe record to
+  compositional RT-lnRNA subjects without copying measurements or scientific
+  interpretations.
+artifact_fields:
+  schema_id:
+    type: string
+    const: rt_lnrna_reader_evidence_bindings_v4
+  artifact_id:
+    type: non_empty_string
+    derivation: schema_id_plus_exact_reader_experiment_record_and_revision
+  artifact_digest:
+    type: sha256_digest
+    derivation: canonical_json_without_artifact_digest
+  subject_binding_set_id:
+    type: non_empty_string
+  binding_count:
+    type: non_negative_integer
+  unbound_count:
+    type: non_negative_integer
+  bindings:
+    type: list
+binding_fields:
+  reader_experiment_id: non_empty_string
+  reader_protocol_id: non_empty_string
+  reader_replicate_kind:
+    enum:
+      - unknown
+      - biological
+  reader_replicate_identity_field: string_or_null
+  reader_record_id:
+    const: sample_measurements/df
+  reader_record_kind:
+    type: string
+    const: dataframe_artifact
+  reader_record_schema_version:
+    type: integer
+    const: 6
+  reader_record_revision: positive_integer
+  reader_record_revision_digest: sha256_digest
+  reader_record_contract_id:
+    type: string
+    const: plate_reader.annotated.v1
+  reader_record_content_digest: sha256_digest
+  reader_record_path: outputs_relative_path
+  raw_design_id: string_or_null
+  raw_assay_subject_id: string_or_null
+  subject_id: string_or_null
+  observation_identity_field: non_empty_string
+  observation_identity_values: unique_non_empty_string_list
+  biological_replicate_identity_scopes:
+    type: list
+    item_fields:
+      condition_value: non_empty_string
+      biological_replicate_id: non_empty_string
+  binding_state:
+    enum:
+      - bound
+      - unbound
+  binding_reason:
+    enum:
+      - exact_subject_alias_match
+      - no_exact_subject_alias_match
+      - partial_exact_subject_alias_match
+validation_rules:
+  - Input must come from the exact sample_measurements/df record in a catalog-schema-v4 Reader public payload using record schema v6 and contract plate_reader.annotated.v1.
+  - Persisted position is always the observation identity. Acquisition coordinates remain provenance and are never promoted to biological-replicate identity.
+  - replicate_kind=unknown requires replicate_identity_field=null. Unknown identity remains unknown even when an unrelated dataframe column resembles an identity field.
+  - A null replicate_identity_field means biological-replicate identity is unknown. The binding records an empty biological_replicate_identity_scopes list and never infers identity from experiment, plate, sheet, well, or position.
+  - A populated replicate_identity_field declares biological-replicate identity within each source treatment condition. The same label may recur under different conditions without implying a shared identity or pairing.
+  - A reporter-response profile must use exactly the condition-scoped biological-replicate identities preserved by its bound row. It cannot invent a value, move a value between conditions, omit a declared value, or replace an unknown declaration with an acquisition coordinate.
+  - Reader record references and binding sets are source-closed; directly constructed lookalikes cannot be published as verified evidence.
+  - Every binding preserves the positive exact record revision, its canonical revision digest, and the content digest.
+  - The selected catalog epoch and exact record identity must remain unchanged across public resolution; the parsed dataframe bytes must be the same bytes checked against the content digest.
+  - At least one of raw_design_id or raw_assay_subject_id must be populated.
+  - Reader identities resolve only through exact namespace-qualified aliases in the selected subject binding set.
+  - Exact aliases that resolve one Reader row to different subjects are an error.
+  - Every populated Reader identity must resolve to the same subject; a partial match remains explicitly unbound.
+  - Unknown aliases remain explicit unbound rows and are never normalized or guessed.
+  - binding_count equals the number of bindings and unbound_count equals the number with binding_state unbound.
+  - artifact_id is derived from the one exact Reader record shared by every row; artifact_digest covers the canonical artifact payload except itself.
+  - Publication is create-only and atomic. Existing destinations are never replaced, and strict loading rejects duplicate fields, count drift, identity drift, or digest drift.
+  - Binding state describes exact identity resolution only; assay eligibility belongs to the study observation policy.
+  - Measurement values, objective values, fold changes, treatment values, and scientific interpretations are forbidden.
+ownership_boundaries:
+  reader: verified sample-only measurement records, replicate declarations, and persisted observation coordinates
+  subject_binding_registry: compositional RT-lnRNA identity and exact Reader aliases
+  evidence_binding_artifact: provenance join and binding state only
+  reporter_response_and_plots: downstream study-owned interpretation artifacts

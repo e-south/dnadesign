@@ -46,6 +46,8 @@ from .helpers import (
 from .source_fixtures import _fixture_source_record_resolver, _write_source_promotion_fixture
 
 GENBANK_CONSTRUCT_SUBJECT_COUNT = 46
+SUBJECT_BINDING_CONSTRUCT_SUBJECT_COUNT = 46
+BLOCKED_SUBJECT_BINDING_COUNT = 3
 RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT = 19
 CRAWFORD_FIXTURE_CONSTRUCT_SUBJECT_COUNT = 2
 KHAN_FIXTURE_CONSTRUCT_SUBJECT_COUNT = 0
@@ -61,17 +63,19 @@ def test_rt_lnrna_materialization_source_is_split_by_contract_domain() -> None:
         "materialization/usr_io.py": 350,
         "materialization/views.py": 350,
         "materialization/unified.py": 420,
+        "materialization/subject_binding_adapter.py": 220,
         "materialization/execution.py": 220,
         "materialization/contracts.py": 150,
         "materialization/manifest.py": 180,
         "materialization/common.py": 80,
         "tests/construct/helpers.py": 340,
         "tests/construct/source_fixtures.py": 220,
-        "tests/construct/test_materialization.py": 420,
+        "tests/construct/test_materialization.py": 430,
         "tests/construct/test_msd_compiler.py": 260,
         "tests/construct/test_msd_compiler_primitives.py": 120,
         "tests/construct/test_projection.py": 220,
         "tests/construct/test_source_promotions.py": 340,
+        "tests/construct/test_subject_binding_projection.py": 250,
     }
 
     for module_name, max_lines in max_lines_by_module.items():
@@ -289,18 +293,21 @@ def test_rt_lnrna_rt_cds_dms_public_api_is_exhaustive_without_stop_intrusions(tm
     assert {len(alternates) for alternates in variants_by_position.values()} == {19}
 
 
-def test_rt_lnrna_unified_construct_subjects_materialize_genbank_and_rt_dms(tmp_path: Path) -> None:
+def test_rt_lnrna_unified_construct_subjects_materialize_bound_subjects_and_rt_dms(tmp_path: Path) -> None:
     report = materialize_unified_construct_subject_contexts(
         repo_root=_repo_root(),
         work_root=tmp_path,
+        allow_partial_byte_resolution=True,
         include_source_promotions=False,
         include_msd_compiler_promotions=False,
+        include_rt_cds_dms=True,
         rt_cds_positions=(1,),
     )
 
-    assert report.genbank_construct_subject_count == GENBANK_CONSTRUCT_SUBJECT_COUNT
+    assert report.subject_binding_resolved_subject_count == SUBJECT_BINDING_CONSTRUCT_SUBJECT_COUNT
+    assert len(report.blocked_subject_bindings) == BLOCKED_SUBJECT_BINDING_COUNT
     assert report.rt_cds_dms_construct_subject_count == RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
-    expected_subjects = GENBANK_CONSTRUCT_SUBJECT_COUNT + RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
+    expected_subjects = SUBJECT_BINDING_CONSTRUCT_SUBJECT_COUNT + RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
     assert len(report.input_ids_by_subject_id) == expected_subjects
     assert report.permuter_request_id
     _assert_construct_subject_envelope_inputs(report)
@@ -308,19 +315,19 @@ def test_rt_lnrna_unified_construct_subjects_materialize_genbank_and_rt_dms(tmp_
     _assert_usr_contracts_strictly_validate(report)
 
     inputs = Dataset(report.usr_root, report.input_dataset).head(n=70)
-    assert set(inputs["construct_subject__source_basis"]) == {"genbank_variant_catalog", "in_silico_rt_cds_dms"}
+    assert set(inputs["construct_subject__source_basis"]) == {"rt_lnrna_subject_binding", "in_silico_rt_cds_dms"}
     assert set(
-        inputs.loc[inputs["construct_subject__source_basis"] == "genbank_variant_catalog"][
+        inputs.loc[inputs["construct_subject__source_basis"] == "rt_lnrna_subject_binding"][
             "construct_subject__source_collection_id"
         ]
-    ) == {"rt_lnrna_sponging_construct_triage_retron_variant_genbank_catalog_v1"}
+    ) == {"retron_subject_bindings_v1"}
     assert set(
         inputs.loc[inputs["construct_subject__source_basis"] == "in_silico_rt_cds_dms"]["construct_subject__role"]
     ) == {"in_silico_rt_cds_dms_variant"}
 
     output = Dataset(report.usr_root, report.output_dataset).head(n=200)
     assert output.shape[0] == expected_subjects * CONTEXT_ROWS_PER_SUBJECT
-    assert set(output["construct_subject__source_basis"]) == {"genbank_variant_catalog", "in_silico_rt_cds_dms"}
+    assert set(output["construct_subject__source_basis"]) == {"rt_lnrna_subject_binding", "in_silico_rt_cds_dms"}
     views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
     assert len(views) == expected_subjects * SEQUENCE_VIEWS_PER_SUBJECT
     assert {view.view_name for view in views if view.view_name is not None} == {
@@ -341,7 +348,7 @@ def test_rt_lnrna_unified_construct_subjects_are_infer_ready_across_source_famil
     report = materialize_unified_construct_subject_contexts(
         repo_root=_repo_root(),
         work_root=tmp_path / "work",
-        include_genbank_catalog=True,
+        allow_partial_byte_resolution=True,
         include_source_promotions=True,
         include_msd_compiler_promotions=True,
         include_rt_cds_dms=True,
@@ -359,13 +366,14 @@ def test_rt_lnrna_unified_construct_subjects_are_infer_ready_across_source_famil
     )
 
     assert audit.ok, "\n".join(audit.errors)
-    assert report.genbank_construct_subject_count == GENBANK_CONSTRUCT_SUBJECT_COUNT
+    assert report.subject_binding_resolved_subject_count == SUBJECT_BINDING_CONSTRUCT_SUBJECT_COUNT
+    assert len(report.blocked_subject_bindings) == BLOCKED_SUBJECT_BINDING_COUNT
     assert report.crawford_construct_subject_count == CRAWFORD_FIXTURE_CONSTRUCT_SUBJECT_COUNT
     assert report.khan_construct_subject_count == KHAN_FIXTURE_CONSTRUCT_SUBJECT_COUNT
     assert report.msd_compiler_construct_subject_count == MSD_COMPILER_CONSTRUCT_SUBJECT_COUNT
     assert report.rt_cds_dms_construct_subject_count == RT_CDS_DMS_CONSTRUCT_SUBJECT_COUNT
     expected_subjects = (
-        GENBANK_CONSTRUCT_SUBJECT_COUNT
+        SUBJECT_BINDING_CONSTRUCT_SUBJECT_COUNT
         + CRAWFORD_FIXTURE_CONSTRUCT_SUBJECT_COUNT
         + KHAN_FIXTURE_CONSTRUCT_SUBJECT_COUNT
         + MSD_COMPILER_CONSTRUCT_SUBJECT_COUNT

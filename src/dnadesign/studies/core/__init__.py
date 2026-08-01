@@ -22,6 +22,20 @@ from .preflight_plan import (
     build_study_preflight_plan,
     normalize_study_preflight_scope,
 )
+from .reader_records import (
+    READER_CATALOG_SCHEMA_VERSION,
+    READER_CLI_SCHEMA,
+    READER_RECORD_SCHEMA_VERSION,
+    ReaderArtifactFile,
+    ReaderDataframeRecordError,
+    ReaderDataframeRecordRef,
+    ReaderRecordError,
+    ReaderRecordExpectation,
+    ReaderRecordSet,
+    ReaderResolvedRecord,
+    resolve_digest_verified_dataframe_record,
+    resolve_digest_verified_records,
+)
 from .record_loader import load_study_ops_contract
 from .record_locator import (
     ActiveStudySelection,
@@ -32,6 +46,16 @@ from .registry import StudyIndex, StudyIndexEntry, load_study_index
 
 __all__ = [
     "ActiveStudySelection",
+    "READER_CATALOG_SCHEMA_VERSION",
+    "READER_CLI_SCHEMA",
+    "READER_RECORD_SCHEMA_VERSION",
+    "ReaderArtifactFile",
+    "ReaderDataframeRecordError",
+    "ReaderDataframeRecordRef",
+    "ReaderRecordError",
+    "ReaderRecordExpectation",
+    "ReaderRecordSet",
+    "ReaderResolvedRecord",
     "StudyIndex",
     "StudyIndexEntry",
     "StudyOpsContract",
@@ -47,4 +71,6 @@ __all__ = [
     "load_study_index",
     "load_study_ops_contract",
     "normalize_study_preflight_scope",
+    "resolve_digest_verified_dataframe_record",
+    "resolve_digest_verified_records",
 ]

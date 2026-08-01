@@ -503,9 +503,8 @@ run remains comparator evidence rather than a second executable selector.
 (SFXI)](../../../../../src/dnadesign/opal/docs/plugins/objectives/sfxi.md) uses a
 distinct Reader vec8 and does not directly score target-OFF signal. Vector
 target similarity requires absolute setpoints and penalizes overshoot. A
-single vector channel omits two behavior families. Scalar identity and
-[SPOP](../../../../../src/dnadesign/opal/docs/plugins/objectives/spop.md) belong
-to different Y contracts.
+single vector channel omits two behavior families. Scalar identity and the
+retired RT-lnRNA endpoint score belong to different Y contracts.
 
 SpyP ranks near the top of observed ethanol-associated examples but retains an
 OFF-suppression failure. SulAp ranks near the top of observed

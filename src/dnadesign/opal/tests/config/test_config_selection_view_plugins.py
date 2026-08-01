@@ -75,18 +75,6 @@ def test_load_config_preserves_view_identity_and_campaign_metadata(tmp_path: Pat
     assert cfg.campaign.metadata == {"scenario_kind": "positive", "split_id": "random"}
 
 
-def test_load_config_accepts_spop_view(tmp_path: Path) -> None:
-    cfg = load_config(
-        _write(
-            tmp_path / "campaign.yaml",
-            _base_config(objective_name="spop_v1", score_ref="spop"),
-        )
-    )
-
-    assert cfg.selection_views[0].objective.name == "spop_v1"
-    assert cfg.selection_views[0].selection.params["score_ref"] == "spop"
-
-
 def test_load_config_resolves_candidate_scope_from_campaign_root(tmp_path: Path) -> None:
     root = tmp_path / "campaign"
     payload = _base_config()
