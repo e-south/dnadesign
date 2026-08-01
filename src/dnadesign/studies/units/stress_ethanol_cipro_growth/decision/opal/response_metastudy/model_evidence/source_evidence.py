@@ -106,7 +106,12 @@ def upstream_artifacts(source: dict[str, object]) -> dict[str, object]:
 
 
 def corpus_snapshot(source: dict[str, object], *, screen: dict[str, object]) -> dict[str, int]:
-    reader_counts = required_mapping(required_mapping(source, "reader_bundle"), "counts")
+    reader_source = source.get("reader_records")
+    if reader_source is None:
+        reader_source = required_mapping(source, "reader_bundle")
+    if not isinstance(reader_source, dict):
+        raise ModelEvidenceError("source Reader evidence must be a mapping.")
+    reader_counts = required_mapping(reader_source, "counts")
     binding = required_mapping(source, "candidate_identity_binding")
     selection = required_mapping(source, "response_measurement_selection")
     return {
@@ -125,7 +130,7 @@ def upstream_manifests(
     label_truth: dict[str, object],
     metastudy_manifest_sha256: str,
 ) -> dict[str, object]:
-    reader_manifest = required_mapping(required_mapping(source, "reader_bundle"), "manifest")
+    reader_records = source.get("reader_records")
     binding = required_mapping(source, "candidate_identity_binding")
     binding_files = binding.get("files")
     if not isinstance(binding_files, list):
@@ -135,15 +140,30 @@ def upstream_manifests(
         raise ModelEvidenceError("source.candidate_identity_binding.files must contain exactly one manifest.json.")
     records: dict[str, object] = {
         "metastudy": {"sha256": sha256_digest(metastudy_manifest_sha256, "metastudy manifest")},
-        "reader_response_window_bundle": {
-            "path": required_string(reader_manifest, "path"),
-            "sha256": sha256_digest(reader_manifest.get("sha256"), "Reader bundle manifest"),
-        },
         "promoter_candidate_bindings": {
             "path": required_string(manifests[0], "path"),
             "sha256": sha256_digest(manifests[0].get("sha256"), "candidate-binding manifest"),
         },
     }
+    if reader_records is None:
+        reader_manifest = required_mapping(required_mapping(source, "reader_bundle"), "manifest")
+        records["historical_reader_response_window_bundle"] = {
+            "path": required_string(reader_manifest, "path"),
+            "sha256": sha256_digest(reader_manifest.get("sha256"), "historical Reader bundle manifest"),
+        }
+    else:
+        if not isinstance(reader_records, dict):
+            raise ModelEvidenceError("source.reader_records must be a mapping.")
+        catalog = required_mapping(reader_records, "catalog_file")
+        projection = required_mapping(reader_records, "projection")
+        records["reader_record_catalog"] = {
+            "path": required_string(catalog, "path"),
+            "sha256": sha256_digest(catalog.get("sha256"), "Reader record catalog"),
+        }
+        records["reader_study_projection"] = {
+            "path": required_string(projection, "path"),
+            "sha256": sha256_digest(projection.get("sha256"), "Reader study projection"),
+        }
     promotion = label_truth.get("observed_label_promotion_manifest")
     if promotion is not None:
         if not isinstance(promotion, dict):

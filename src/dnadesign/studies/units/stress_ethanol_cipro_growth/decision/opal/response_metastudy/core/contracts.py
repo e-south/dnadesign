@@ -114,7 +114,8 @@ class PolicySpec:
 @dataclass(frozen=True)
 class MetastudyPaths:
     repo_root: Path
-    reader_bundle_root: Path
+    reader_root: Path
+    reader_experiment_root: Path
     out_dir: Path
     campaign_root: Path
 

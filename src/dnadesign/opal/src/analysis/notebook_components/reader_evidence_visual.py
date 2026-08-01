@@ -14,14 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping
 
+from dnadesign.opal.api.reader_evidence import optional_reader_evidence_artifact_adapter
+
 from .reader_evidence_media import select_reader_media_artifact
 from .reader_evidence_preview import reader_pdf_preview_path
-from .reader_promoter_evidence import (
-    ReaderPromoterEvidenceIntegrityError,
-    is_reader_promoter_evidence_artifact,
-    verify_reader_promoter_evidence_artifact,
-)
-from .reader_promoter_evidence_details import render_notebook_reader_promoter_evidence_details
 from .zoomable_visual import render_notebook_zoomable_image
 
 
@@ -51,12 +47,13 @@ def render_notebook_reader_evidence_artifact_visual(
 def _render_static_reader_artifact(selected: Mapping[str, Any], *, mo: Any) -> Any:
     path = Path(str(selected.get("path") or ""))
     media_type = str(selected.get("media_type") or "")
-    is_promoter_evidence = is_reader_promoter_evidence_artifact(selected)
-    if is_promoter_evidence:
+    semantic_kind = str(selected.get("semantic_kind") or "").strip()
+    adapter = optional_reader_evidence_artifact_adapter(semantic_kind)
+    if adapter is not None:
         try:
-            path = verify_reader_promoter_evidence_artifact(selected)
-        except ReaderPromoterEvidenceIntegrityError as exc:
-            return mo.md(f"Promoter-response evidence verification failed: `{exc}`")
+            path = adapter.verify_artifact(selected)
+        except Exception as exc:
+            return mo.md(f"{adapter.verification_label} verification failed: `{exc}`")
     if not path.exists():
         return mo.md(f"Plot artifact missing: `{path}`")
     if media_type == "application/pdf" or path.suffix.lower() == ".pdf":
@@ -81,9 +78,9 @@ def _render_static_reader_artifact(selected: Mapping[str, Any], *, mo: Any) -> A
         )
     else:
         return mo.md(f"Plot artifact: `{path}`")
-    if not is_promoter_evidence:
+    if adapter is None or adapter.render_details is None:
         return visual
-    details = render_notebook_reader_promoter_evidence_details(selected, mo=mo)
+    details = adapter.render_details(selected, mo=mo)
     return mo.vstack([visual, details], gap=0.25)
 
 

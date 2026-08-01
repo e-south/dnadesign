@@ -76,8 +76,8 @@ def test_calibration_preview_binds_reader_identity_masks_and_campaign_parity() -
     payload = calibration_preview.build_calibration_preview_payload(
         calibration=pd.DataFrame(rows),
         campaign=campaign,
-        reader_manifest_sha256="a" * 64,
-        reader_request_sha256="sha256:" + "b" * 64,
+        reader_catalog_sha256="a" * 64,
+        reader_projection_sha256="sha256:" + "b" * 64,
         candidate_bindings_manifest_sha256="c" * 64,
         observation_policy_sha256="d" * 64,
         primary_reduction_id="event_logmean_4_8h_post",
@@ -156,8 +156,8 @@ def test_calibration_preview_reports_drift_without_mutating_or_failing() -> None
     payload = calibration_preview.build_calibration_preview_payload(
         calibration=calibration,
         campaign=campaign,
-        reader_manifest_sha256="a" * 64,
-        reader_request_sha256="sha256:" + "b" * 64,
+        reader_catalog_sha256="a" * 64,
+        reader_projection_sha256="sha256:" + "b" * 64,
         candidate_bindings_manifest_sha256="c" * 64,
         observation_policy_sha256="d" * 64,
         primary_reduction_id="primary",

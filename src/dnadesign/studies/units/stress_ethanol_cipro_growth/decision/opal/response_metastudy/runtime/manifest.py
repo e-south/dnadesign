@@ -22,8 +22,8 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
     SCHEMA_ID,
     SCHEMA_VERSION,
 )
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
-    ReaderResponseBundle,
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_records import (
+    ReaderResponseRecords,
 )
 
 from ...source_evidence import sfxi_round0_source_evidence_dir
@@ -73,7 +73,7 @@ def write_metastudy_manifest(
     paths: MetastudyPaths,
     sfxi_evidence: tuple[SfxiEvidenceFrame, ...],
     stress_campaign: StressCampaignContract,
-    reader_bundle: ReaderResponseBundle,
+    reader_records: ReaderResponseRecords,
     measurement_selection: ResponseMeasurementSelection,
     label_truth_state: LabelTruthState,
     candidate_identity_bindings: ResponseCandidateIdentityBindings,
@@ -177,7 +177,7 @@ def write_metastudy_manifest(
             "sfxi_training_matrix_sha256": sfxi_training_matrix_sha256,
             "response_x_matrix_sha256": response_x_matrix_sha256,
             "files": source_inventory(paths.repo_root, _provenance_files(paths, stress_campaign=stress_campaign)),
-            "reader_bundle": _reader_bundle_inventory(reader_bundle),
+            "reader_records": _reader_record_inventory(reader_records),
         },
         "policy_count": int(len(policy_specs)),
         "top_k": int(top_k),
@@ -224,7 +224,7 @@ def _provenance_files(
     files.append(
         paths.repo_root
         / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "response_window_observations/config/reader_response_window.yaml"
+        / "response_window_observations/config/reader_response_projection.yaml"
     )
     files.extend(package_root.rglob("*.py"))
     files.append(stress_campaign.config_path)
@@ -240,15 +240,20 @@ def _provenance_files(
     return tuple(files)
 
 
-def _reader_bundle_inventory(bundle: ReaderResponseBundle) -> dict[str, object]:
+def _reader_record_inventory(records: ReaderResponseRecords) -> dict[str, object]:
     return {
-        "root": str(bundle.root),
-        "manifest": source_inventory(bundle.root, [bundle.manifest_path])[0],
-        "schema_version": bundle.manifest["schema_version"],
-        "request_id": bundle.manifest["request_id"],
-        "request": bundle.manifest["request"],
-        "primary_reduction_id": bundle.primary_reduction_id,
-        "contracts": bundle.manifest["contracts"],
-        "counts": bundle.manifest["counts"],
-        "source_records": bundle.manifest["source_records"],
+        **records.source_receipt(),
+        "config": source_inventory(records.reader_root, [records.config_path])[0],
+        "catalog_file": source_inventory(records.reader_root, [records.catalog_path])[0],
+        "projection": source_inventory(records.projection_path.parent, [records.projection_path])[0],
+        "primary_reduction_id": records.primary_reduction_id,
+        "counts": {
+            "experiments": int(records.designs["experiment_id"].astype(str).nunique()),
+            "unique_design_ids": int(records.designs["design_id"].astype(str).nunique()),
+            "design_rows": int(len(records.designs)),
+            "descriptive_resampling_draw_rows": int(len(records.descriptive_resampling_draws)),
+            "well_rows": int(len(records.wells)),
+            "trace_rows": int(len(records.traces)),
+            "event_rows": int(len(records.events)),
+        },
     }

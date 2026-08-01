@@ -17,9 +17,9 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
-    ReaderResponseBundle,
-    load_reader_response_bundle,
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_records import (
+    ReaderResponseRecords,
+    load_reader_response_records,
 )
 
 from ...source_evidence import sfxi_round0_source_evidence_dir
@@ -155,20 +155,24 @@ def assert_campaign_response_reduction(
         )
 
 
-def load_campaign_reader_bundle(
+def load_campaign_reader_records(
     paths: MetastudyPaths,
     campaign: StressCampaignContract,
-) -> ReaderResponseBundle:
-    """Load the configured Reader bundle and verify its campaign reduction."""
+) -> ReaderResponseRecords:
+    """Load canonical Reader records and verify their campaign reduction."""
 
-    request_path = (
+    projection_path = (
         paths.repo_root
         / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "response_window_observations/config/reader_response_window.yaml"
+        / "response_window_observations/config/reader_response_projection.yaml"
     )
-    bundle = load_reader_response_bundle(paths.reader_bundle_root, expected_request_path=request_path)
-    assert_campaign_response_reduction(campaign, primary_reduction_id=bundle.primary_reduction_id)
-    return bundle
+    records = load_reader_response_records(
+        reader_root=paths.reader_root,
+        experiment_root=paths.reader_experiment_root,
+        projection_path=projection_path,
+    )
+    assert_campaign_response_reduction(campaign, primary_reduction_id=records.primary_reduction_id)
+    return records
 
 
 def _validate_campaign_model_io(payload: dict[str, object]) -> None:

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/source_integrity.py
 
-Revalidate every file bound by the verified Reader and candidate bundles.
+ Revalidate the study-owned candidate-binding source.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,45 +11,23 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
+
+from dnadesign.studies.core.reader_records import ReaderResolvedRecord
 
 from .artifact_contract import ResponseWindowObservationArtifactError
 from .artifact_io import file_sha256, read_json_object
 
 
-def verify_source_bundle_records(
+def verify_candidate_binding_records(
     *,
-    reader_manifest_path: Path,
     candidate_bindings_manifest_path: Path,
     candidate_bindings_path: Path,
 ) -> None:
-    """Reject any source-record change since the study preview was assembled."""
-
-    reader = _manifest(reader_manifest_path, label="Reader manifest")
-    artifacts = reader.get("artifacts")
-    if not isinstance(artifacts, dict) or not artifacts:
-        raise ResponseWindowObservationArtifactError("Reader manifest lacks its artifact inventory.")
-    reader_root = reader_manifest_path.parent.resolve()
-    for artifact_id, raw in artifacts.items():
-        if not isinstance(artifact_id, str) or not isinstance(raw, dict) or set(raw) != {"path", "bytes", "sha256"}:
-            raise ResponseWindowObservationArtifactError(f"Reader artifact {artifact_id!r} metadata is malformed.")
-        relative = raw["path"]
-        size = raw["bytes"]
-        expected = raw["sha256"]
-        if relative != artifact_id:
-            raise ResponseWindowObservationArtifactError(
-                f"Reader artifact {artifact_id!r} path disagrees with its manifest identity."
-            )
-        if isinstance(size, bool) or not isinstance(size, int) or size < 0:
-            raise ResponseWindowObservationArtifactError(f"Reader artifact {artifact_id!r} byte count is invalid.")
-        if not isinstance(expected, str) or not expected.startswith("sha256:") or len(expected) != 71:
-            raise ResponseWindowObservationArtifactError(f"Reader artifact {artifact_id!r} digest is invalid.")
-        path = _confined(reader_root / artifact_id, root=reader_root, label=f"Reader artifact {artifact_id!r}")
-        if not path.is_file() or path.stat().st_size != size or f"sha256:{file_sha256(path)}" != expected:
-            raise ResponseWindowObservationArtifactError(
-                f"Reader artifact {artifact_id!r} drift detected after preview."
-            )
+    """Reject candidate-binding changes since the study preview was assembled."""
 
     binding = _manifest(candidate_bindings_manifest_path, label="candidate-binding manifest")
     record = binding.get("record")
@@ -65,6 +43,21 @@ def verify_source_bundle_records(
         raise ResponseWindowObservationArtifactError("candidate-binding record path disagrees with verified preview.")
     if not path.is_file() or file_sha256(path) != expected:
         raise ResponseWindowObservationArtifactError("candidate-binding record drift detected after preview.")
+
+
+def verify_reader_record_bytes(record_refs: Mapping[str, ReaderResolvedRecord]) -> None:
+    """Reject dataframe-record changes since the canonical Reader resolution."""
+
+    for name, record in record_refs.items():
+        if record.path is None or record.content_digest is None or record.size_bytes is None:
+            raise ResponseWindowObservationArtifactError(f"Reader {name!r} source is not a dataframe record.")
+        try:
+            content = record.path.read_bytes()
+        except OSError as exc:
+            raise ResponseWindowObservationArtifactError(f"Reader {name!r} source cannot be read: {exc}") from exc
+        digest = "sha256:" + hashlib.sha256(content).hexdigest()
+        if len(content) != record.size_bytes or digest != record.content_digest:
+            raise ResponseWindowObservationArtifactError(f"Reader {name!r} source record drift detected.")
 
 
 def _manifest(path: Path, *, label: str) -> dict[str, object]:
@@ -83,4 +76,4 @@ def _confined(path: Path, *, root: Path, label: str) -> Path:
     return resolved
 
 
-__all__ = ["verify_source_bundle_records"]
+__all__ = ["verify_candidate_binding_records", "verify_reader_record_bytes"]

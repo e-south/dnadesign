@@ -368,9 +368,39 @@ def test_response_window_observation_operator_docs_do_not_route_to_moving_reader
     text = path.read_text(encoding="utf-8")
 
     assert "response_window_observations/4_8h_v1" in text
-    assert "source_manifests.reader_bundle_sha256" in text
+    assert "config/reader_response_projection.yaml" in text
+    assert "--reader-root ../reader" in text
+    assert "--reader-experiment ../reader/experiments/2026/20260717_stress_response_window_aggregate" in text
+    assert "--reader-bundle" not in text
     assert "--allowed-root" in text
     assert "stress_response_window/latest" not in text
+
+
+def test_response_study_keeps_within_experiment_wells_replicate_neutral() -> None:
+    surfaces = (
+        Path("docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md"),
+        Path("docs/studies/stress_ethanol_cipro_growth/contexts/opal/response-metastudy.md"),
+        STUDY_ROOT / "decision/opal/response_metastudy/README.md",
+        STUDY_ROOT / "decision/opal/response_metastudy/reporting/plot_definitions.py",
+        STUDY_ROOT / "decision/opal/response_metastudy/reporting/response_assay_plots.py",
+        STUDY_ROOT / "decision/opal/response_metastudy/reporting/response_metric_report.py",
+    )
+    forbidden = (
+        "replicate bootstrap",
+        "replicate-bootstrap",
+        "replicate wells",
+        "replicate medians",
+        "replicate spread",
+        "replicate resampling",
+        "replicate-aware",
+        "within-experiment replicate",
+    )
+
+    for path in surfaces:
+        text = path.read_text(encoding="utf-8").casefold()
+        assert all(term not in text for term in forbidden), path
+
+    assert "well-resampling bootstrap sd" in surfaces[4].read_text(encoding="utf-8").casefold()
 
 
 def test_sfxi_source_evidence_root_is_study_owned() -> None:

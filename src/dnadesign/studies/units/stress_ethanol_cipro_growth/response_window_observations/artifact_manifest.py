@@ -19,6 +19,8 @@ from typing import Any
 import pandas as pd
 
 from .artifact_contract import (
+    HISTORICAL_SCHEMA_ID,
+    HISTORICAL_SCHEMA_VERSION,
     RECORD_FILES,
     SCHEMA_ID,
     SCHEMA_VERSION,
@@ -27,6 +29,7 @@ from .artifact_contract import (
 )
 from .artifact_io import file_sha256
 from .contracts import VALUE_COLUMNS
+from .reader_record_receipt import validate_reader_record_receipt
 from .sources import ResponseWindowObservationEvidence
 
 _MANIFEST_FIELDS = {
@@ -59,7 +62,7 @@ def build_manifest(
             "approved_at": evidence.policy.approved_at,
         },
         "source_manifests": {
-            "reader_bundle": {"sha256": evidence.reader_manifest_sha256},
+            "reader_records": evidence.reader_records.source_receipt(),
             "candidate_bindings": {"sha256": evidence.candidate_bindings_manifest_sha256},
         },
         "observation_contract": {
@@ -94,10 +97,14 @@ def build_manifest(
 
 def validate_manifest_identity(payload: object) -> None:
     if not isinstance(payload, dict) or set(payload) != _MANIFEST_FIELDS:
-        raise ResponseWindowObservationArtifactError("observation manifest fields disagree with the v2 contract.")
+        raise ResponseWindowObservationArtifactError("observation manifest fields disagree with the contract.")
+    identity = (payload["schema_id"], str(payload["schema_version"]))
     if (
-        payload["schema_id"] != SCHEMA_ID
-        or str(payload["schema_version"]) != SCHEMA_VERSION
+        identity
+        not in {
+            (SCHEMA_ID, SCHEMA_VERSION),
+            (HISTORICAL_SCHEMA_ID, HISTORICAL_SCHEMA_VERSION),
+        }
         or payload["study_id"] != STUDY_ID
     ):
         raise ResponseWindowObservationArtifactError("observation manifest identity disagrees.")
@@ -110,7 +117,10 @@ def validate_manifest_identity(payload: object) -> None:
             raise ResponseWindowObservationArtifactError(f"observation policy {field} is empty.")
     if not is_sha256(policy["config_sha256"]):
         raise ResponseWindowObservationArtifactError("observation policy config digest is invalid.")
-    _validate_sources(payload["source_manifests"])
+    if identity == (HISTORICAL_SCHEMA_ID, HISTORICAL_SCHEMA_VERSION):
+        _validate_historical_sources(payload["source_manifests"])
+    else:
+        _validate_sources(payload["source_manifests"])
     _validate_observation_contract(payload["observation_contract"])
     if not isinstance(payload["records"], dict) or set(payload["records"]) != set(RECORD_FILES):
         raise ResponseWindowObservationArtifactError("observation record inventory is incomplete.")
@@ -121,13 +131,22 @@ def is_sha256(value: object) -> bool:
 
 
 def _validate_sources(value: object) -> None:
-    if not isinstance(value, dict) or set(value) != {"reader_bundle", "candidate_bindings"}:
+    if not isinstance(value, dict) or set(value) != {"reader_records", "candidate_bindings"}:
         raise ResponseWindowObservationArtifactError("observation source manifests are malformed.")
+    candidate = value["candidate_bindings"]
+    if not isinstance(candidate, dict) or set(candidate) != {"sha256"} or not is_sha256(candidate["sha256"]):
+        raise ResponseWindowObservationArtifactError("candidate-binding source digest is invalid.")
+    validate_reader_record_receipt(value["reader_records"])
+
+
+def _validate_historical_sources(value: object) -> None:
+    if not isinstance(value, dict) or set(value) != {"reader_bundle", "candidate_bindings"}:
+        raise ResponseWindowObservationArtifactError("historical observation source manifests are malformed.")
     if any(
         not isinstance(item, dict) or set(item) != {"sha256"} or not is_sha256(item["sha256"])
         for item in value.values()
     ):
-        raise ResponseWindowObservationArtifactError("observation source-manifest digest is invalid.")
+        raise ResponseWindowObservationArtifactError("historical source-manifest digest is invalid.")
 
 
 def _validate_observation_contract(value: object) -> None:

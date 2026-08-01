@@ -882,7 +882,7 @@ def test_shadow_publication_is_atomic_complete_and_digest_verified(tmp_path: Pat
         completion=completion,
         reference_identity=behavior_reference.ReferenceSignalIdentityReceipt(
             reference_unit_count=3,
-            bootstrap_row_count=360,
+            descriptive_resampling_row_count=360,
             reader_experiment_count=3,
         ),
         source={

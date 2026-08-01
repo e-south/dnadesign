@@ -168,7 +168,7 @@ def verify_behavior_decision_artifacts(
         raise ValueError("decision prior observation Reader source disagrees with the protocol.")
     for field in ("central_label_equivalence_sha256", "label_artifact_sha256", "promotion_manifest_sha256"):
         prefixed_digest(source.get(field), field=f"source_equivalence.{field}")
-    for field in ("reference_unit_count", "reference_bootstrap_row_count"):
+    for field in ("reference_unit_count", "reference_descriptive_resampling_row_count"):
         value = source.get(field)
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ValueError(f"decision source equivalence {field!r} must be positive integer evidence.")

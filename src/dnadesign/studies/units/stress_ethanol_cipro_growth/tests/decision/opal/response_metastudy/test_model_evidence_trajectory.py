@@ -373,7 +373,7 @@ def test_current_low_n_checkpoint_remains_retrospective_and_non_promoted(tmp_pat
         snapshot["per_view_evidence"]["and"]["retrospective_best_fixed_challenger_greedy_support"]["model_id"],
     } == {"campaign_random_forest", "pls4"}
     assert tuple(snapshot["review_calibration_by_selection_view"]) == ("and", "ciprofloxacin", "ethanol")
-    assert snapshot["upstream_manifests"]["reader_response_window_bundle"]["sha256"] == "1" * 64
+    assert snapshot["upstream_manifests"]["historical_reader_response_window_bundle"]["sha256"] == "1" * 64
     assert "opal" not in snapshot
 
 

@@ -1,0 +1,55 @@
+schema_version: stress_ethanol_cipro_growth.reader_response_projection.v2
+study_id: stress_ethanol_cipro_growth
+projection_id: stress_ethanol_cipro_growth.response_window.primary_v1
+reader_experiment_id: 20260717_stress_response_window_aggregate
+primary_reduction_id: event_logmean_4_8h_post
+state_order: ["00", "10", "01", "11"]
+
+records:
+  wells:
+    record_id: response_window/wells
+    contract_id: plate_reader.response_window.wells.v3
+  designs:
+    record_id: response_window/designs
+    contract_id: plate_reader.response_window.designs.v4
+  descriptive_resampling_draws:
+    record_id: response_window/descriptive_resampling_draws
+    contract_id: plate_reader.response_window.descriptive_resampling_draws.v3
+  traces:
+    record_id: response_window/traces
+    contract_id: plate_reader.response_window.traces.v3
+  events:
+    record_id: response_window/events
+    contract_id: plate_reader.response_window.events.v2
+
+display:
+  schema_version: stress_ethanol_cipro_growth.reader_response_display.v1
+  study_label: Ethanol and ciprofloxacin promoter response
+  event_label: Stress addition
+  state_labels:
+    "00": No stress
+    "10": Ethanol
+    "01": Ciprofloxacin
+    "11": Ethanol + ciprofloxacin
+  channels:
+    response_ratio: YFP/CFP
+    magnitude_ratio: YFP/OD600
+    growth: OD600
+    reference_design_id: pDual-10
+  examples:
+    - design_id: pDual-10
+      label: pDual-10 fluorescence anchor
+      role: reference_anchor
+    - design_id: pDual-10-spyp
+      label: SpyP measured ethanol-response example
+      role: response_example
+    - design_id: pDual-10-sulAp
+      label: sulAp measured ciprofloxacin-response example
+      role: response_example
+
+display_artifact:
+  record_id: plot:response_window_diagnostic
+  source_experiment_id: 20260622_sfxi_sensor-panel-m9-glu-29-30-sulAp-spyp
+  design_id: pDual-10-spyp
+  producer_config_digest: sha256:2bac7d2d9d5cf7dcdf189d80f3565aea278d01b86abb31d607ad59f992b290c2
+  path: artifacts/file_bundles/plots/response_window_diagnostic__r2/plots/response_window_diagnostic.png

@@ -38,10 +38,15 @@ from .observed_objective_history import (
 )
 from .reader_evidence import (
     READER_EVIDENCE_API_VERSION,
+    READER_EVIDENCE_ARTIFACT_ENTRY_POINT,
     READER_EVIDENCE_MANIFEST_ADAPTER,
+    ReaderEvidenceArtifactAdapter,
     ReaderEvidenceManifestAdapterError,
     ReaderEvidenceManifestProjection,
+    optional_reader_evidence_artifact_adapter,
     parse_reader_evidence_manifest_adapter,
+    reader_evidence_artifact_adapter,
+    register_reader_evidence_artifact_adapter,
 )
 from .response_magnitude_feasibility import (
     RESPONSE_MAGNITUDE_FEASIBILITY_API_VERSION,
@@ -79,7 +84,9 @@ __all__ = [
     "OBSERVED_LABELS_API_VERSION",
     "OBSERVED_OBJECTIVE_HISTORY_API_VERSION",
     "READER_EVIDENCE_API_VERSION",
+    "READER_EVIDENCE_ARTIFACT_ENTRY_POINT",
     "READER_EVIDENCE_MANIFEST_ADAPTER",
+    "ReaderEvidenceArtifactAdapter",
     "ReaderEvidenceManifestAdapterError",
     "ReaderEvidenceManifestProjection",
     "CandidateExclusionSetBinding",
@@ -108,7 +115,10 @@ __all__ = [
     "candidate_exclusion_sets_from_config",
     "candidate_snapshot_record",
     "calibrate_response_magnitude_feasibility",
+    "optional_reader_evidence_artifact_adapter",
     "parse_reader_evidence_manifest_adapter",
+    "reader_evidence_artifact_adapter",
+    "register_reader_evidence_artifact_adapter",
     "observed_objective_run_contract_sha256",
     "preview_round_robin_next_best_unallocated",
     "multistate_response_behavior_clearances",

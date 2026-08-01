@@ -12,7 +12,15 @@ Module Author(s): Eric J. South
 import json
 from pathlib import Path
 
-from dnadesign.opal.api.reader_evidence import READER_EVIDENCE_MANIFEST_ADAPTER
+import pytest
+
+from dnadesign.opal.api.reader_evidence import (
+    READER_EVIDENCE_MANIFEST_ADAPTER,
+    ReaderEvidenceArtifactAdapter,
+    ReaderEvidenceManifestAdapterError,
+    reader_evidence_artifact_adapter,
+    register_reader_evidence_artifact_adapter,
+)
 from dnadesign.opal.src.analysis.notebook_components import reader_evidence_visual as reader_evidence_visual_module
 from dnadesign.opal.src.analysis.notebook_components.reader_evidence import (
     build_notebook_reader_evidence_artifact_options,
@@ -132,13 +140,13 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     surface = build_notebook_reader_evidence_surface(view_model)
 
     assert build_notebook_reader_evidence_plot_type_options(surface) == [
-        "Plate-reader time series",
-        "Time series + snapshot",
-        "SFXI vec8 heatmap",
+        "Raw Kinetics",
+        "Intensity Overview",
+        "Sfxi Vec8 Heatmap",
     ]
     assert build_notebook_reader_evidence_artifact_options(
         surface,
-        selected_plot_type_label="SFXI vec8 heatmap",
+        selected_plot_type_label="Sfxi Vec8 Heatmap",
     ) == ["Round 0 · 2026-07-06 · SFXI · pDual-10-SECG-B0-ETH-01 · 12.04 h"]
 
 
@@ -308,6 +316,30 @@ def test_reader_evidence_discovery_rejects_manifest_without_public_adapter(tmp_p
 
     assert discover_reader_evidence_manifests(workdir)[0]["status"] == "schema_attention"
     assert discover_reader_evidence_artifacts(workdir) == []
+
+
+def test_reader_evidence_artifact_adapter_rejects_unregistered_semantic_kind() -> None:
+    with pytest.raises(ReaderEvidenceManifestAdapterError, match="no registered OPAL artifact adapter"):
+        reader_evidence_artifact_adapter("study_private_interpretation")
+
+
+def test_reader_evidence_artifact_registry_accepts_non_stress_producer_adapter(tmp_path: Path) -> None:
+    expected = tmp_path / "generic-study.png"
+
+    def verify_artifact(_row):
+        return expected
+
+    adapter = ReaderEvidenceArtifactAdapter(
+        semantic_kind="another_study.generic_verified_plot",
+        verify_artifact=verify_artifact,
+        verification_label="Another study evidence",
+    )
+    register_reader_evidence_artifact_adapter(adapter)
+
+    resolved = reader_evidence_artifact_adapter("another_study.generic_verified_plot")
+
+    assert resolved is adapter
+    assert resolved.verify_artifact({}) == expected
 
 
 def test_reader_evidence_visual_choices_join_deliverable_universe() -> None:

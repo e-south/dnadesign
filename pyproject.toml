@@ -76,6 +76,10 @@ baserender = "dnadesign.baserender:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
 junction = "dnadesign.junction.cli:main"
 ops        = "dnadesign.ops.cli:main"
+rt-lnrna-reporter-metastudy = "dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator:main"
+
+[project.entry-points."dnadesign.opal.reader_evidence_artifacts"]
+stress-promoter-response = "dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence.notebook_adapter:register_notebook_adapter"
 
 [project.optional-dependencies]
 # GPU stack (Linux x86_64 only)

@@ -22,12 +22,12 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 )
 
 
-def test_reader_request_declares_comprehensive_geometric_windows() -> None:
+def test_historical_reader_request_records_comprehensive_geometric_windows() -> None:
     repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file())
     request_path = (
         repo_root
         / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "response_window_observations/config/reader_response_window.yaml"
+        / "response_window_observations/config/evidence/historical_reader_response_window_request_v3.yaml"
     )
     payload = yaml.safe_load(request_path.read_text(encoding="utf-8"))
     reductions = {str(row["id"]): row for row in payload["reductions"]}

@@ -24,8 +24,10 @@ def test_preview_reports_label_truth_and_repeat_blockers(monkeypatch, capsys, tm
     result = cli.main(
         [
             "preview",
-            "--reader-bundle",
+            "--reader-root",
             str(tmp_path / "reader"),
+            "--reader-experiment",
+            str(tmp_path / "reader/experiment"),
             "--candidate-bindings",
             str(tmp_path / "bindings"),
         ]
@@ -41,19 +43,21 @@ def test_preview_reports_label_truth_and_repeat_blockers(monkeypatch, capsys, tm
     assert payload["ready_to_materialize"] is False
 
 
-def test_parser_uses_study_owned_policy_and_reader_request_defaults(tmp_path: Path) -> None:
+def test_parser_uses_study_owned_policy_and_reader_projection_defaults(tmp_path: Path) -> None:
     args = cli.build_parser().parse_args(
         [
             "preview",
-            "--reader-bundle",
+            "--reader-root",
             str(tmp_path / "reader"),
+            "--reader-experiment",
+            str(tmp_path / "reader/experiment"),
             "--candidate-bindings",
             str(tmp_path / "bindings"),
         ]
     )
 
     assert args.policy.name == "observation_policy.yaml"
-    assert args.reader_request.name == "reader_response_window.yaml"
+    assert args.reader_projection.name == "reader_response_projection.yaml"
 
 
 def _evidence(tmp_path: Path):
@@ -114,8 +118,11 @@ def _evidence(tmp_path: Path):
             excluded_reader_designs=pd.DataFrame({"design_id": ["excluded"]}),
         ),
         preview=preview,
-        reader_manifest_path=tmp_path / "reader.json",
-        reader_manifest_sha256="a" * 64,
+        reader_records=object(),  # type: ignore[arg-type]
+        reader_catalog_path=tmp_path / "records.json",
+        reader_catalog_sha256="a" * 64,
+        reader_projection_path=tmp_path / "reader_response_projection.yaml",
+        reader_projection_sha256="c" * 64,
         candidate_bindings_manifest_path=tmp_path / "bindings.json",
         candidate_bindings_manifest_sha256="b" * 64,
         candidate_bindings_path=tmp_path / "bindings.parquet",

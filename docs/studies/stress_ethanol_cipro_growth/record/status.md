@@ -124,10 +124,14 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   constraint on the SFXI source label pool.
 - Response metric metastudy: `verified`. Canonical beta=1 gamma=1 SFXI recomputes
   exactly, but 18 top-six slots collapse to 11 sequences, 2 candidates occur in
-  all three campaigns, and scoring is effect dominated. Reader now publishes a
-  verified `reader.response_window.bundle.v5` for 8 experiments, 7 reductions,
-  413 design/reduction rows, 206500 joint bootstrap rows, and 12 repeated design
-  IDs. The primary reduction is the 4-8 hour post-event log mean; the other
+  all three campaigns, and scoring is effect dominated. The frozen historical
+  Reader aggregate contains 8 experiments, 7 reductions, 413 design/reduction
+  rows, 206500 descriptive-resampling draw rows, and 12 repeated design IDs.
+  The active study adapter accepts only the canonical
+  `plate_reader/response_window` catalog-v4/record-v6 lifecycle. The aggregate
+  is regenerated and verified under that contract; future publication fails
+  closed if its record identities, digests, or contracts change.
+  The primary reduction is the 4-8 hour post-event log mean; the other
   declared windows, normalized linear AUC, and delta remain response sensitivity
   analyses. The strongest descriptive fixed challenger is PLS4 over the primary
   eight-component summary, with weakest selection-view response-separation and

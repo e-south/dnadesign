@@ -43,7 +43,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         display_title="RMF sensitivity to state-panel size",
         premise="Hard extrema become more noise-sensitive as the state panel grows.",
         decision_value=(
-            "Shows when RMF's worst-state components need replicate-aware uncertainty or a prespecified robust "
+            "Shows when RMF's worst-state components need well-resampling uncertainty or a prespecified robust "
             "extremum before the objective is extended beyond the four-state assay."
         ),
         alt_text=(
@@ -396,10 +396,13 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         visual_type="uncertainty source bars",
         display_title="Assay uncertainty by RMF component",
         premise="Metric scales should reflect the dominant measured uncertainty source.",
-        decision_value="Compares replicate-bootstrap variation with event-time interval sensitivity by component.",
+        decision_value=(
+            "Compares well-resampling bootstrap variation with event-time interval sensitivity by component."
+        ),
         alt_text=(
-            "Grouped bars show median replicate-bootstrap standard deviation and maximum event-bound deviation for "
-            "response separation, ON fluorescence, and OFF fluorescence under the three campaign masks and the "
+            "Grouped bars show median well-resampling bootstrap standard deviation and maximum event-bound "
+            "deviation for response separation, ON fluorescence, and OFF fluorescence under the three campaign "
+            "masks and the "
             "OR pressure-test mask."
         ),
     ),

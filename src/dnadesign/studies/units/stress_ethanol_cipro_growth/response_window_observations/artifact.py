@@ -30,7 +30,7 @@ from .artifact_manifest import build_manifest, is_sha256, validate_manifest_iden
 from .artifact_validation import validate_frames
 from .censoring import bounded_label_blockers
 from .contracts import ResponseWindowObservationPreview
-from .source_integrity import verify_source_bundle_records
+from .source_integrity import verify_candidate_binding_records, verify_reader_record_bytes
 from .sources import ResponseWindowObservationEvidence
 
 
@@ -161,30 +161,31 @@ def _record_frames(preview: ResponseWindowObservationPreview) -> dict[str, pd.Da
 
 
 def _verify_live_sources(evidence: ResponseWindowObservationEvidence) -> None:
-    if file_sha256(evidence.reader_manifest_path) != evidence.reader_manifest_sha256:
-        raise ResponseWindowObservationArtifactError("Reader manifest drift detected after observation preview.")
+    if file_sha256(evidence.reader_catalog_path) != evidence.reader_catalog_sha256:
+        raise ResponseWindowObservationArtifactError("Reader catalog drift detected after observation preview.")
+    if file_sha256(evidence.reader_projection_path) != evidence.reader_projection_sha256:
+        raise ResponseWindowObservationArtifactError("Reader projection drift detected after observation preview.")
     if file_sha256(evidence.candidate_bindings_manifest_path) != evidence.candidate_bindings_manifest_sha256:
         raise ResponseWindowObservationArtifactError(
             "candidate-binding manifest drift detected after observation preview."
         )
     if file_sha256(evidence.policy.config_path) != evidence.policy.config_sha256:
         raise ResponseWindowObservationArtifactError("observation policy drift detected after preview.")
-    if evidence.reader_manifest_sha256 != evidence.policy.reader_bundle_sha256:
-        raise ResponseWindowObservationArtifactError("Reader manifest is not pinned by the observation policy.")
     if evidence.candidate_bindings_manifest_sha256 != evidence.policy.candidate_bindings_sha256:
         raise ResponseWindowObservationArtifactError(
             "candidate-binding manifest is not pinned by the observation policy."
         )
-    verify_source_bundle_records(
-        reader_manifest_path=evidence.reader_manifest_path,
+    verify_candidate_binding_records(
         candidate_bindings_manifest_path=evidence.candidate_bindings_manifest_path,
         candidate_bindings_path=evidence.candidate_bindings_path,
     )
+    verify_reader_record_bytes(evidence.reader_records.record_refs)
     if (
-        file_sha256(evidence.reader_manifest_path) != evidence.reader_manifest_sha256
+        file_sha256(evidence.reader_catalog_path) != evidence.reader_catalog_sha256
+        or file_sha256(evidence.reader_projection_path) != evidence.reader_projection_sha256
         or file_sha256(evidence.candidate_bindings_manifest_path) != evidence.candidate_bindings_manifest_sha256
     ):
-        raise ResponseWindowObservationArtifactError("source manifest drift detected during record revalidation.")
+        raise ResponseWindowObservationArtifactError("source identity drift detected during record revalidation.")
 
 
 def _output_path(out_dir: Path, *, allowed_output_root: Path) -> Path:

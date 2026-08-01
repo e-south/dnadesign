@@ -14,8 +14,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observations.v2"
-SCHEMA_VERSION = "2"
+SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observations.v3"
+SCHEMA_VERSION = "3"
+HISTORICAL_SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observations.v2"
+HISTORICAL_SCHEMA_VERSION = "2"
 STUDY_ID = "stress_ethanol_cipro_growth"
 RECORD_FILES = {
     "observations": "observations.parquet",
@@ -51,6 +53,8 @@ class ResponseWindowObservationVerification:
 
 __all__ = [
     "RECORD_FILES",
+    "HISTORICAL_SCHEMA_ID",
+    "HISTORICAL_SCHEMA_VERSION",
     "SCHEMA_ID",
     "SCHEMA_VERSION",
     "STUDY_ID",

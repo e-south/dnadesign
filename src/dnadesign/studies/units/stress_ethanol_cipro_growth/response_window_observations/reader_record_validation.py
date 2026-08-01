@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/reader_bundle_validation.py
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/reader_record_validation.py
 
-Validate public Reader response-window record frames.
+Validate canonical Reader response-window record frames for this study.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -29,14 +29,15 @@ _EVENT_CENSOR_COLUMNS = {
 }
 
 
-def validate_reader_bundle_frames(
+def validate_reader_response_frames(
     *,
     designs: pd.DataFrame,
     draws: pd.DataFrame,
     wells: pd.DataFrame,
     traces: pd.DataFrame,
     events: pd.DataFrame,
-    payload: dict[str, object],
+    primary_reduction_id: str,
+    reference_design_id: str,
 ) -> None:
     requirements = (
         (
@@ -54,7 +55,7 @@ def validate_reader_bundle_frames(
             },
         ),
         (
-            "bootstrap_draws",
+            "descriptive_resampling_draws",
             draws,
             {"experiment_id", "design_id", "reduction_id", "draw_index", "is_reference", *_VALUE_COLUMNS},
         ),
@@ -114,22 +115,27 @@ def validate_reader_bundle_frames(
     if designs.duplicated(subset=["experiment_id", "design_id", "reduction_id"]).any():
         raise ValueError("Reader design identities are not unique.")
     if draws.duplicated(subset=["experiment_id", "design_id", "reduction_id", "draw_index"]).any():
-        raise ValueError("Reader bootstrap-draw identities are not unique.")
+        raise ValueError("Reader descriptive-resampling draw identities are not unique.")
     if events["experiment_id"].duplicated().any():
         raise ValueError("Reader event identities are not unique.")
-    counts = payload.get("counts")
-    if not isinstance(counts, dict):
-        raise ValueError("Reader bundle lacks row counts.")
-    expected_counts = {
-        "design_rows": len(designs),
-        "bootstrap_draw_rows": len(draws),
-        "well_rows": len(wells),
-        "trace_rows": len(traces),
-        "experiments": len(events),
-    }
-    for key, observed in expected_counts.items():
-        if int(counts.get(key, -1)) != observed:
-            raise ValueError(f"Reader bundle count mismatch for {key}: {counts.get(key)!r} != {observed}.")
+    primary = designs.loc[designs["reduction_role"].astype(str).eq("primary"), "reduction_id"].astype(str).unique()
+    if tuple(primary) != (primary_reduction_id,):
+        raise ValueError(
+            "Reader primary reduction disagrees with the study projection: "
+            f"expected {primary_reduction_id!r}, observed {primary.tolist()!r}."
+        )
+    references = set(designs.loc[designs["is_reference"].astype(bool), "design_id"].astype(str))
+    if references != {reference_design_id}:
+        raise ValueError(
+            "Reader reference design disagrees with the study projection: "
+            f"expected {reference_design_id!r}, observed {sorted(references)!r}."
+        )
+    for label, frame in (("wells", wells), ("traces", traces)):
+        states = set(frame["state"].astype(str))
+        if states != set(_STATE_ORDER):
+            raise ValueError(
+                f"Reader {label} states must be exactly {list(_STATE_ORDER)!r}; observed {sorted(states)!r}."
+            )
 
 
-__all__ = ["validate_reader_bundle_frames"]
+__all__ = ["validate_reader_response_frames"]

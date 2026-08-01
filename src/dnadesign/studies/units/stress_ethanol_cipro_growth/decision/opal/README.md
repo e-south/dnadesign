@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-decision
 title: OPAL decision surfaces
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-07-29
 ---
 
 ## OPAL Decision Surfaces
@@ -23,15 +23,16 @@ prospective enrichment remain unproven.
 - `batch0/`: pre-assay candidate-table materialization and provenance review.
 - `densegen_axis_probe/`: DenseGen construction-label OPAL probes, including
   the strict TFBS learnability workflow.
-- `reader_promoter_evidence/`: verifies Reader publication bundles and writes
-  display-only manifests for the `secg_msrb_greedy` campaign.
+- `reader_promoter_evidence/`: projects one digest-verified diagnostic from a
+  canonical Reader catalog-v4/record-v6 experiment into a portable,
+  display-only OPAL manifest.
 - `multistate_response_behavior/`: fixes the study-owned response-window
   contract, normalization, target masks, evidence posture, and MSRB campaign
   decision without redefining OPAL's generic objective mathematics.
 - `response_metastudy/`: read-only metric, label, and predictor review over the
-  digest-pinned SFXI and RMF comparator evidence plus Reader's response-window
-  bundle. It records evidence and risk without changing campaign state or
-  promoting a model.
+  digest-pinned SFXI and RMF comparator evidence plus canonical Reader
+  response-window records. It records evidence and risk without changing
+  campaign state or promoting a model.
 - `sfxi_reference_overlay/`: applies OPAL's study-owned SFXI objective to
   neutral Reader four-state vectors, then publishes the historical USR overlay.
   Reader, OPAL, the study, and USR retain separate contracts.

@@ -66,7 +66,7 @@ The exact binding is recorded in
 ```text
 OD600, YFP, and CFP well trajectories
   -> event-relative 4-8 h reduction for each well
-  -> within-experiment replicate medians
+  -> within-experiment observation medians
   -> same-state pDual-10 signal subtraction
   -> one Reader experiment-level response-window phenotype
   -> identity-verified Reader alias-to-candidate binding
@@ -111,7 +111,7 @@ constructs.
 
 Each well is reduced before wells are combined. Pooling raw time points across
 wells would give densely sampled wells more influence and would erase the
-replicate structure.
+well-level structure.
 
 In the assay-development plates, the 4–8-hour window retained much of the SpyP
 and sulAp separation seen at 6–12 hours while reducing late-plate OD
@@ -128,7 +128,7 @@ repository.
 
 ### 2. Reader summarizes wells within an experiment
 
-For state $i$, Reader combines replicate wells from the same experiment with
+For state $i$, Reader combines wells from the same experiment with
 medians:
 
 $$
@@ -552,7 +552,7 @@ variation and is handled by study review rather than hidden in MSRB.
 
 The campaign needs five evidence surfaces:
 
-1. Reader evidence for the selected time window, trajectories, replicate
+1. Reader evidence for the selected time window, trajectories, well-level
    support, censoring, and growth context.
 2. The three family scores, hard bottleneck, limiting coordinate, and
    direction-met status for every selected candidate.

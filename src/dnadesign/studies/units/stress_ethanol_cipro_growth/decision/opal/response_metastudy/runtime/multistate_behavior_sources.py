@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/multistate_behavior_sources.py
 
-Corrected Reader and immutable label-policy sources for behavior evaluation.
+Historical Reader and immutable label-policy sources for frozen behavior replay.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,13 +18,13 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
     load_promoter_candidate_bindings,
     verify_promoter_candidate_bindings,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.historical import (
+    HistoricalReaderResponseBundleV5,
+    load_historical_reader_response_bundle_v5,
+)
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.policy import (
     ResponseWindowObservationPolicy,
     load_response_window_observation_policy,
-)
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
-    ReaderResponseBundle,
-    load_reader_response_bundle,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.sources import (
     ResolvedReaderCandidateEvidence,
@@ -34,14 +34,14 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
 from ..evaluation.multistate_behavior_protocol import MultistateBehaviorShadowProtocol
 from .multistate_behavior_reference import (
     ReferenceSignalIdentityReceipt,
-    verify_reference_relative_bootstrap_identity,
+    verify_reference_relative_descriptive_resampling_identity,
 )
 from .publication import sha256_file
 
 
 @dataclass(frozen=True)
 class VerifiedBehaviorSources:
-    reader: ReaderResponseBundle
+    reader: HistoricalReaderResponseBundleV5
     resolved: ResolvedReaderCandidateEvidence
     prior_observation_policy: ResponseWindowObservationPolicy
     reference_identity: ReferenceSignalIdentityReceipt
@@ -62,7 +62,7 @@ def load_verified_behavior_sources(
     policy = load_response_window_observation_policy(prior_observation_policy_path)
     if policy.reader_bundle_sha256 != protocol.source_equivalence.prior_observation_reader_bundle_sha256:
         raise ValueError("prior observation policy does not match the declared source-equivalence version.")
-    reader = load_reader_response_bundle(
+    reader = load_historical_reader_response_bundle_v5(
         reader_bundle_root,
         expected_request_path=reader_request_path,
     )
@@ -84,9 +84,9 @@ def load_verified_behavior_sources(
         raise ValueError("resolved Reader candidate evidence lacks the reference-exclusion field.")
     if resolved.measurements["is_reference"].astype(bool).any():
         raise ValueError("pDual-10 reference rows must not enter the candidate normalization cohort.")
-    reference = verify_reference_relative_bootstrap_identity(
+    reference = verify_reference_relative_descriptive_resampling_identity(
         reader.designs,
-        reader.bootstrap_draws,
+        reader.descriptive_resampling_draws,
         primary_reduction_id=protocol.primary_reduction_id,
         state_ids=protocol.state_ids,
     )

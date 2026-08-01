@@ -112,7 +112,7 @@ def build_multistate_behavior_decision(
             "label_artifact_sha256": labels.label_artifact_sha256,
             "promotion_manifest_sha256": labels.source["promotion_manifest_sha256"],
             "reference_unit_count": preview.reference_identity.reference_unit_count,
-            "reference_bootstrap_row_count": preview.reference_identity.bootstrap_row_count,
+            "reference_descriptive_resampling_row_count": (preview.reference_identity.descriptive_resampling_row_count),
             "normalization_reference_unit_count": 0,
         },
         "independent_adversarial_implementation_audit": {

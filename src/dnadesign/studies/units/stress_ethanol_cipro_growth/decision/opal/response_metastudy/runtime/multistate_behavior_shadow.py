@@ -63,11 +63,13 @@ def load_verified_multistate_behavior_shadow(
     """Load exhaustive verified Reader evidence and one digest-bound prediction run."""
 
     root = Path(repo_root).resolve()
+    historical_bundle_root = Path(reader_bundle_root).resolve()
     if not prediction_run_id.strip() or prediction_run_id != prediction_run_id.strip():
         raise ValueError("prediction_run_id must be one explicit nonempty run identity.")
     paths = MetastudyPaths(
         repo_root=root,
-        reader_bundle_root=Path(reader_bundle_root).resolve(),
+        reader_root=historical_bundle_root,
+        reader_experiment_root=historical_bundle_root,
         out_dir=root / ".unused-behavior-shadow",
         campaign_root=response_window_round0_source_evidence_root(root).resolve(),
     )
@@ -82,11 +84,11 @@ def load_verified_multistate_behavior_shadow(
     request_path = (
         root
         / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "response_window_observations/config/reader_response_window.yaml"
+        / "response_window_observations/config/evidence/historical_reader_response_window_request_v3.yaml"
     )
     policy_path = request_path.with_name("observation_policy.yaml")
     sources = load_verified_behavior_sources(
-        reader_bundle_root=paths.reader_bundle_root,
+        reader_bundle_root=historical_bundle_root,
         reader_request_path=request_path,
         candidate_bindings_root=Path(candidate_bindings_root).resolve(),
         prior_observation_policy_path=policy_path,

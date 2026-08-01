@@ -132,7 +132,8 @@ def test_label_source_frame_aligns_reader_experiments_to_ledger_order(tmp_path) 
     )
     paths = MetastudyPaths(
         repo_root=tmp_path,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=tmp_path / "campaigns",
     )
@@ -161,7 +162,8 @@ def test_label_source_frame_rejects_identity_drift(tmp_path) -> None:
     labels = pd.DataFrame({"id": ["expected"], "sequence": ["AAAA"], "y_obs": [np.zeros(8)]})
     paths = MetastudyPaths(
         repo_root=tmp_path,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=tmp_path / "campaigns",
     )
@@ -179,7 +181,8 @@ def test_stress_campaign_contract_rejects_missing_candidate_records(tmp_path) ->
     target_config.write_text(source_config.read_text(encoding="utf-8"), encoding="utf-8")
     paths = MetastudyPaths(
         repo_root=tmp_path,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=campaign_root,
     )
@@ -195,7 +198,8 @@ def test_stress_campaign_contract_preserves_configured_model_and_response_vector
     records.touch()
     paths = MetastudyPaths(
         repo_root=tmp_path,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=campaign_root,
     )
@@ -224,7 +228,8 @@ def test_stress_campaign_contract_rejects_reader_primary_reduction_drift(tmp_pat
     records.touch()
     paths = MetastudyPaths(
         repo_root=tmp_path,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=campaign_root,
     )
@@ -244,7 +249,8 @@ def test_stress_campaign_contract_rejects_response_vector_transform_drift(tmp_pa
     records.touch()
     paths = MetastudyPaths(
         repo_root=tmp_path,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=campaign_root,
     )
@@ -258,7 +264,8 @@ def test_sfxi_evidence_frame_rejects_missing_persisted_ledgers(tmp_path) -> None
     target_view = _target_view()
     paths = MetastudyPaths(
         repo_root=tmp_path,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=tmp_path / "campaigns",
     )
@@ -299,7 +306,8 @@ def test_real_repository_sfxi_sources_load_from_persisted_artifacts(tmp_path) ->
     _require_repository_sfxi_artifacts(repo_root)
     paths = MetastudyPaths(
         repo_root=repo_root,
-        reader_bundle_root=tmp_path / "reader-bundle",
+        reader_root=tmp_path / "reader",
+        reader_experiment_root=tmp_path / "reader/experiment",
         out_dir=tmp_path / "out",
         campaign_root=response_window_round0_source_evidence_root(repo_root),
     )

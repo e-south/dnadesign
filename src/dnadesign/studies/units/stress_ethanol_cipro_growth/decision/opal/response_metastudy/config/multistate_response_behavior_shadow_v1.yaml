@@ -9,7 +9,7 @@ source_equivalence:
   prior_observation_reader_bundle_sha256: e0065183fe010fe40e88e75da998cff5ed1399e56ff1d2bc1268f9331b573a67  # pragma: allowlist secret
   prior_observation_bundle_repo_path: src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations/4_8h_v1
   central_label_requirement: exact_candidate_source_experiment_vector_equality
-  reference_signal_requirement: central_b_bootstrap_sd_and_all_joint_draws_exactly_zero
+  reference_signal_requirement: central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero
 
 objective:
   name: multistate_response_behavior_v1

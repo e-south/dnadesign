@@ -1,7 +1,7 @@
 ## OPAL Plots
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-22
+**Last verified:** 2026-08-01
 
 
 Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
@@ -482,6 +482,7 @@ plots:
 
 ```python
 from ..registries.plots import PlotMeta, register_plot
+
 
 @register_plot(
     "my_cool_plot",

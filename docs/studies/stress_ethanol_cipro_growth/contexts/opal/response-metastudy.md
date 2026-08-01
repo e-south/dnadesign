@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-response-metastudy
 title: Response assay and objective comparison
 owner: dnadesign-maintainers
 status: source_evidence
-last_verified: 2026-07-28
+last_verified: 2026-07-29
 audience:
   - scientist
   - maintainer
@@ -43,7 +43,8 @@ ledgers, and synthesis handoffs.
 ### Ownership
 
 - Reader owns event resolution, trajectory reduction, within-experiment
-  replicate aggregation, joint bootstrap draws, reference subtraction, and
+  within-experiment observation aggregation, joint well-resampling draws,
+  reference subtraction, and
   assay review visuals.
 - The stress study owns target masks, Reader-to-candidate joins, label
   representation comparisons, repeated-candidate label-source decisions,
@@ -52,8 +53,10 @@ ledgers, and synthesis handoffs.
   mathematics, plus model fitting, candidate scoring, selection, and ledgers
   after promotion.
 
-The metastudy consumes Reader's public bundle. It does not import Reader or
-maintain duplicate trajectory math.
+The active metastudy consumes Reader's public catalog and exact record
+revisions. It does not import Reader or maintain duplicate trajectory math.
+The earlier bundle-v5 source remains historical evidence for the frozen
+campaign and shadow replay only.
 
 ### Campaign, target-view, and source boundaries
 
@@ -93,18 +96,21 @@ label sources, and approval live in the study-level
 study-bound, non-reference primary Reader candidate-experiment unit rather than
 this screen selection.
 
-The response-metastudy publication schema is
-`stress_ethanol_cipro_growth.response_metastudy.v12`.
+New response-metastudy publications use
+`stress_ethanol_cipro_growth.response_metastudy.v13`. The verifier recognizes
+v12 only as frozen historical evidence.
 
 ### Evidence Flow
 
-1. Verify `reader.response_window.bundle.v5`, all record contracts, source
-   provenance, artifact digests, and row counts.
-2. Verify the response-owned 35-row screen selection against the Reader bundle,
+1. Resolve the canonical `plate_reader/response_window` experiment through
+   `reader records --format json`; verify catalog schema v4, provenance epoch,
+   schema-v6 record revisions, exact contracts, artifact digests, and row counts.
+2. Verify the response-owned 35-row screen selection against those Reader records,
    resolve each design alias through the study binding artifact, and join by
    exact Reader experiment and design identity.
 3. Evaluate response and fluorescence requirement stability across seven
-   Reader-owned event-relative reductions. Compare pDual-10 replicate spread,
+   Reader-owned event-relative reductions. Compare pDual-10 within-experiment
+   observation spread,
    cross-experiment anchor drift, SpyP and sulAp response separation, OD context,
    event sensitivity, repeat agreement, censoring support, and the same fixed
    model screen for every reduction. Model performance is diagnostic and does
@@ -154,19 +160,23 @@ Multistate Response Behavior objective and study evidence:
 Reader response-window contract:
 
 - `reader/docs/lib/plate_reader/response_window.md`
-- Reader bundle schema `reader.response_window.bundle.v5`
+- Reader catalog schema v4 and record schema v6 under the canonical
+  `plate_reader/response_window` lifecycle
 
 ### Package Layout
 
 - `core/`: stress target views, SFXI source provenance, policy, path, and evidence contracts.
 - `evaluation/`: metric behavior, target margins, uncertainty, fixed model
   comparisons, repeated measurements, and greedy-support evidence.
-- `runtime/`: OPAL loading, Reader-bundle verification, orchestration,
+- `runtime/`: OPAL loading, canonical Reader-record verification, orchestration,
   publication, and manifests.
 - `reporting/`: declarative plot contracts, plot writers, report sections, and
   Marimo generation.
-- `response_window_observations/config/reader_response_window.yaml`: study-owned
-  Reader service request shared by evidence and decision workflows.
+- `response_window_observations/config/reader_response_projection.yaml`:
+  study-owned semantic projection over exact Reader record contracts.
+- `response_window_observations/config/evidence/historical_reader_response_window_request_v3.yaml`:
+  immutable provenance for the pre-RecordStore evidence path; it is not an
+  executable route for new data.
 
 Reader trajectory loaders, event inference, and time reducers do not exist in
 the study package.
@@ -217,9 +227,11 @@ scaled-effect ranks than with logic-fidelity ranks. It does not establish that
 SFXI is universally invalid or that another policy would have succeeded
 prospectively.
 
-The Reader bundle contains 8 experiments, 7 reductions, 413 design/reduction
-rows, 206,500 joint bootstrap rows, and 12 repeated design IDs. The primary
-reduction is `event_logmean_4_8h_post`.
+The frozen Reader evidence snapshot contains 8 experiments, 7 reductions, 413
+design/reduction rows, 206,500 joint bootstrap rows, and 12 repeated design
+IDs. The primary reduction is `event_logmean_4_8h_post`. Future snapshots must
+arrive through the canonical catalog/record projection; these historical counts
+are evidence, not a live input contract.
 
 The strongest descriptive fixed challenger in this snapshot is PLS4 over the primary eight-component
 summary. Its weakest response-separation and feasibility Spearman values are
@@ -274,14 +286,19 @@ From `dnadesign/`:
 ```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
-  --reader-bundle ../reader/experiments/2026/20260717_stress_response_window_aggregate/outputs \
+  --reader-root ../reader \
+  --reader-experiment ../reader/experiments/2026/20260717_stress_response_window_aggregate \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --overwrite \
   --json
 ```
 
-The command stages output atomically, verifies generated artifacts, and replaces
-the destination only after the complete run succeeds.
+Before this command, run Reader's canonical `inspect --section plan`,
+`validate`, dry-run, `run`, `records`, and `verify` sequence on the aggregate
+experiment. The command stages output atomically and replaces the destination
+only after the complete run succeeds. The aggregate is regenerated and verified
+under catalog v4 / record v6. The active path consumes those current records and
+fails closed if their identities, digests, or contracts change.
 
 ### Promotion Boundary
 

@@ -30,7 +30,7 @@ class BehaviorSourceEquivalenceProtocol:
     prior_observation_reader_bundle_sha256: str
     prior_observation_bundle_repo_path: str
     central_label_requirement: Literal["exact_candidate_source_experiment_vector_equality"]
-    reference_signal_requirement: Literal["central_b_bootstrap_sd_and_all_joint_draws_exactly_zero"]
+    reference_signal_requirement: Literal["central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero"]
 
 
 def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenceProtocol:
@@ -57,7 +57,7 @@ def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenc
     require_literal(
         payload,
         "reference_signal_requirement",
-        "central_b_bootstrap_sd_and_all_joint_draws_exactly_zero",
+        "central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero",
         context="source_equivalence",
     )
     current = _digest(payload["current_reader_bundle_sha256"], field="current_reader_bundle_sha256")
@@ -83,7 +83,7 @@ def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenc
         prior_observation_reader_bundle_sha256=prior,
         prior_observation_bundle_repo_path=parsed_path.as_posix(),
         central_label_requirement="exact_candidate_source_experiment_vector_equality",
-        reference_signal_requirement="central_b_bootstrap_sd_and_all_joint_draws_exactly_zero",
+        reference_signal_requirement="central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero",
     )
 
 

@@ -11,32 +11,32 @@ Module Author(s): Eric J. South
 
 from .contracts import (
     PROMOTER_RESPONSE_SEMANTIC_KIND,
-    READER_BUNDLE_SCHEMA_VERSION,
+    READER_DIAGNOSTIC_RECORD_ID,
     READER_EVIDENCE_SCHEMA_VERSION,
     READER_PROMOTER_EVIDENCE_FILENAME,
     ReaderPromoterEvidenceError,
     ReaderPromoterEvidenceVerification,
     ReaderPromoterEvidenceWriteResult,
-    VerifiedReaderPromoterEvidenceBundle,
+    VerifiedReaderPromoterEvidenceSource,
 )
 from .manifest import (
     materialize_reader_promoter_evidence_manifest,
     preview_reader_promoter_evidence_manifest,
     verify_reader_promoter_evidence_manifest,
 )
-from .verification import verify_reader_promoter_evidence_bundle
+from .verification import verify_reader_promoter_evidence_source
 
 __all__ = [
     "PROMOTER_RESPONSE_SEMANTIC_KIND",
-    "READER_BUNDLE_SCHEMA_VERSION",
+    "READER_DIAGNOSTIC_RECORD_ID",
     "READER_EVIDENCE_SCHEMA_VERSION",
     "READER_PROMOTER_EVIDENCE_FILENAME",
     "ReaderPromoterEvidenceError",
     "ReaderPromoterEvidenceVerification",
     "ReaderPromoterEvidenceWriteResult",
-    "VerifiedReaderPromoterEvidenceBundle",
+    "VerifiedReaderPromoterEvidenceSource",
     "materialize_reader_promoter_evidence_manifest",
     "preview_reader_promoter_evidence_manifest",
-    "verify_reader_promoter_evidence_bundle",
+    "verify_reader_promoter_evidence_source",
     "verify_reader_promoter_evidence_manifest",
 ]

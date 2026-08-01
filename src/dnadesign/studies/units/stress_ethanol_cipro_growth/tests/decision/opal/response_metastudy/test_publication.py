@@ -135,7 +135,8 @@ def test_metastudy_run_removes_staging_directory_on_interrupt(
     with pytest.raises(KeyboardInterrupt):
         audit.run_metastudy(
             repo_root=tmp_path,
-            reader_bundle_root=tmp_path,
+            reader_root=tmp_path,
+            reader_experiment_root=tmp_path,
             candidate_binding_bundle_root=tmp_path,
             out_dir=tmp_path / "latest",
             overwrite=True,

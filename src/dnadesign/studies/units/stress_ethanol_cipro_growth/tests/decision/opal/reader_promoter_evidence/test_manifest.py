@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/reader_promoter_evidence/test_manifest.py
 
-Tests the study-owned Reader promoter-evidence display manifest.
+Tests for the study-owned projection of canonical Reader plot records.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,8 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.opal.api.reader_evidence import READER_EVIDENCE_MANIFEST_ADAPTER
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence import (
+    READER_DIAGNOSTIC_RECORD_ID,
+    READER_EVIDENCE_SCHEMA_VERSION,
     ReaderPromoterEvidenceError,
     materialize_reader_promoter_evidence_manifest,
     preview_reader_promoter_evidence_manifest,
@@ -26,626 +27,258 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_pr
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence import (
     manifest as manifest_module,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence import (
+    verification as source_verification,
+)
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence.cli import (
     main,
 )
-from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bindings import (
-    materialize_promoter_candidate_bindings,
-)
-from dnadesign.studies.units.stress_ethanol_cipro_growth.tests.promoter_candidate_bindings.test_artifact import (
-    preview as candidate_binding_preview,
-)
 
-from ._fixtures import sha256 as _sha256
-from ._fixtures import write_candidate_bindings as _write_candidate_bindings
-from ._fixtures import write_reader_bundle as _write_reader_bundle
+from ._fixtures import sha256, verified_source, write_candidate_bindings
 
 
-def test_preview_builds_display_only_rows_from_verified_reader_bundles(tmp_path: Path) -> None:
-    bindings = _write_candidate_bindings(
-        tmp_path / "bindings",
-        [
-            ("candidate-densegen", "pDual-10-ES1p", "densegen_tfbs"),
-            ("candidate-genbank", "pDual-10-spyp", "usr_genbank_annotations_v1"),
-        ],
-    )
-    densegen, _ = _write_reader_bundle(
-        tmp_path / "densegen",
-        candidate_id="candidate-densegen",
-        design_id="pDual-10-ES1p",
-        experiment_id="20260619_sfxi",
-        bindings_bundle=bindings,
-    )
-    genbank, _ = _write_reader_bundle(
-        tmp_path / "genbank",
-        candidate_id="candidate-genbank",
-        design_id="pDual-10-spyp",
-        experiment_id="20260622_sfxi",
-        adapter_kind="usr_genbank_annotations_v1",
-        bindings_bundle=bindings,
-    )
+def test_preview_projects_one_exact_reader_diagnostic_without_study_math(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = verified_source(tmp_path)
+    _use_verified_source(monkeypatch, source)
 
-    payload = preview_reader_promoter_evidence_manifest(
-        [densegen, genbank],
-        bindings_bundle=bindings,
-    )
+    payload = _preview(tmp_path)
 
-    assert payload["schema_version"] == "stress_ethanol_cipro_growth.reader_promoter_evidence.v2"
-    assert payload["opal_adapter"] == READER_EVIDENCE_MANIFEST_ADAPTER
-    assert payload["campaign_slug"] == "secg_msrb_greedy"
-    assert payload["round"] == "r0"
-    assert "observed_round" not in payload
-    assert "label_input" not in payload
+    assert payload["schema_version"] == READER_EVIDENCE_SCHEMA_VERSION
     assert payload["summary"] == {
-        "rows": 2,
-        "distinct_ids": 2,
-        "reader_experiments": 2,
-        "artifact_count": 4,
+        "rows": 1,
+        "distinct_ids": 1,
+        "reader_experiments": 1,
+        "artifact_count": 1,
         "missing_artifact_rows": 0,
     }
-    densegen_row = payload["rows"][0]
-    assert densegen_row == {
-        "id": "candidate-densegen",
-        "candidate_id": "candidate-densegen",
-        "design_id": "pDual-10-ES1p",
-        "reader_experiment_id": "20260619_sfxi",
-        "reduction_id": "event_logmean_6_12h_post",
-        "evidence_role": "display_only",
-        "claim_status": "objective_neutral",
-        "non_claim_boundary": densegen_row["non_claim_boundary"],
-        "selected_binding": densegen_row["selected_binding"],
-        "sources": densegen_row["sources"],
-        "objective_overlay": None,
-        "artifacts": densegen_row["artifacts"],
-    }
-    assert "time_selected_h" not in densegen_row
-    assert "label_input" not in densegen_row
-    assert "observed_round" not in densegen_row
-    assert densegen_row["selected_binding"]["binding_status"] == "resolved"
-    assert densegen_row["selected_binding"]["binding_method"] == "exact_alias"
-    assert densegen_row["selected_binding"]["densegen_run_id"] == "reader_sfxi_pdual10_archive_port"
-    assert densegen_row["sources"]["response_window"]["schema_version"] == "reader.response_window.bundle.v5"
-    assert densegen_row["sources"]["baserender"]["adapter_kind"] == "densegen_tfbs"
-    assert densegen_row["sources"]["candidate_bindings"]["candidate_table_id"]
-    source_manifest = densegen / "manifest.json"
-    for artifact in densegen_row["artifacts"]:
-        source_artifact = densegen / Path(artifact["path"]).name
-        assert artifact["semantic_kind"] == "promoter_response_evidence"
-        assert artifact["kind"] == "reader_publication"
-        assert artifact["record_id"] == "reader.response_window.promoter_evidence_bundle.v5"
-        assert artifact["scope"] == "design_reduction"
-        assert artifact["exists"] is True
-        assert artifact["bytes"] == source_artifact.stat().st_size
-        assert artifact["sha256"] == _sha256(source_artifact)
-        assert not Path(artifact["path"]).is_absolute()
-        assert "source_manifest_path" not in artifact
-        assert artifact["source_manifest_sha256"] == _sha256(source_manifest)
-
-
-def test_preview_rejects_retired_reader_promoter_evidence_v4(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle-v4",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-    manifest_path = bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["schema_version"] = "reader.response_window.promoter_evidence_bundle.v4"
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="promoter_evidence_bundle.v5"):
-        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
-
-
-def test_preview_rejects_reader_claim_that_disagrees_with_explicit_study_bindings(tmp_path: Path) -> None:
-    allowed_root = tmp_path / "study"
-    bindings = allowed_root / "bindings"
-    materialize_promoter_candidate_bindings(
-        candidate_binding_preview(one_row=True),
-        out_dir=bindings,
-        allowed_output_root=allowed_root,
-    )
-    reader_bundle, _ = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-other",
-        design_id="pDual-10-A",
-        experiment_id="20260713_sfxi",
-    )
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="candidate identity"):
-        preview_reader_promoter_evidence_manifest(
-            [reader_bundle],
-            bindings_bundle=bindings,
-        )
-
-
-def test_preview_accepts_reader_screen_only_overlay_without_promoting_a_score(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "screen-only",
-        candidate_id="candidate-screen",
-        design_id="pDual-10-screen",
-        experiment_id="20260713_sfxi",
-        claim_status="screen_only",
-    )
-    manifest_path = bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["objective_overlay"] = {
-        "schema_version": "reader.response_window.objective_display_overlay.v2",
-        "objective_id": "response_magnitude_feasibility_v1",
-        "objective_display_label": "RMF",
-        "claim_status": "screen_only",
-        "experiment_id": "20260713_sfxi",
-        "reader_design_id": "pDual-10-screen",
-        "reduction_id": "event_logmean_6_12h_post",
-        "manifest_sha256": "sha256:" + "5" * 64,
-        "components": [
-            {
-                "component_id": "on_fluorescence_floor",
-                "label": "ON fluorescence floor",
-                "value": 1.25,
-                "unit": "log2 ratio",
-            }
-        ],
-    }
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-    payload = preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
-
     row = payload["rows"][0]
-    assert row["claim_status"] == "screen_only"
-    assert row["objective_overlay"] == manifest["objective_overlay"]
-    assert "score" not in row
-
-
-@pytest.mark.parametrize("label", [" RMF", "RMF\nscore", "W" * 41])
-def test_preview_rejects_invalid_objective_display_labels(tmp_path: Path, label: str) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "invalid-display-label",
-        candidate_id="candidate-screen",
-        design_id="pDual-10-screen",
-        experiment_id="20260713_sfxi",
-        claim_status="screen_only",
-    )
-    manifest_path = bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["objective_overlay"] = {
-        "schema_version": "reader.response_window.objective_display_overlay.v2",
-        "objective_id": "response_magnitude_feasibility_v1",
-        "objective_display_label": label,
-        "claim_status": "screen_only",
-        "experiment_id": "20260713_sfxi",
-        "reader_design_id": "pDual-10-screen",
-        "reduction_id": "event_logmean_6_12h_post",
-        "manifest_sha256": "sha256:" + "5" * 64,
-        "components": [
-            {
-                "component_id": "on_fluorescence_floor",
-                "label": "ON fluorescence floor",
-                "value": 1.25,
-                "unit": "log2 ratio",
-            }
-        ],
+    assert set(row) == {
+        "id",
+        "candidate_id",
+        "design_id",
+        "reader_experiment_id",
+        "reduction_id",
+        "evidence_role",
+        "claim_status",
+        "non_claim_boundary",
+        "selected_binding",
+        "sources",
+        "artifacts",
     }
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="display label"):
-        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
-
-
-def test_materialize_atomically_writes_and_verifies_the_default_manifest(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
+    assert row["claim_status"] == "objective_neutral"
+    assert "objective_overlay" not in row
+    assert "baserender" not in row["sources"]
+    response = row["sources"]["response_window"]
+    assert response["catalog"]["schema_version"] == 4
+    assert response["records"]["designs"]["schema_version"] == 6
+    assert response["records"]["traces"]["schema_version"] == 6
+    assert response["records"]["diagnostic"]["record_id"] == READER_DIAGNOSTIC_RECORD_ID
+    artifact = row["artifacts"][0]
+    assert artifact["kind"] == "reader_record_projection"
+    assert artifact["record_id"] == READER_DIAGNOSTIC_RECORD_ID
+    assert artifact["source_record_revision_digest"] == source.display.record.revision_digest
+    assert artifact["source_file_path"] == source.display.selected_file.reader_path
+    assert artifact["path"].startswith(
+        "reader_evidence_media/" + source.display.record.revision_digest.removeprefix("sha256:")
     )
-    output_dir = tmp_path / "campaign" / "inputs" / "r0"
-
-    result = materialize_reader_promoter_evidence_manifest(
-        [bundle],
-        bindings_bundle=bindings,
-        out_dir=output_dir,
-    )
-
-    assert result.manifest_json == output_dir / "reader_evidence_promoter_response.json"
-    assert result.manifest_json.is_file()
-    verification = verify_reader_promoter_evidence_manifest(result.manifest_json)
-    assert verification.row_count == 1
-    assert verification.artifact_count == 2
-    published = json.loads(result.manifest_json.read_text(encoding="utf-8"))
-    for artifact in published["rows"][0]["artifacts"]:
-        staged_media = result.manifest_json.parent / artifact["path"]
-        assert staged_media.is_file()
-        assert _sha256(staged_media) == artifact["sha256"]
-    original = result.manifest_json.read_bytes()
-    with pytest.raises(ReaderPromoterEvidenceError, match="already exists"):
-        materialize_reader_promoter_evidence_manifest(
-            [bundle],
-            bindings_bundle=bindings,
-            out_dir=output_dir,
-        )
-    assert result.manifest_json.read_bytes() == original
+    serialized = json.dumps(payload)
+    assert "reader.response_window.bundle" not in serialized
+    assert "promoter_evidence_bundle" not in serialized
 
 
-def test_preview_uses_portable_content_addressed_media_references(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-
-    payload = preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
-
-    artifacts = payload["rows"][0]["artifacts"]
-    for artifact in artifacts:
-        assert not Path(artifact["path"]).is_absolute()
-        assert artifact["path"].startswith("reader_evidence_media/")
-        assert "source_manifest_path" not in artifact
-
-
-def test_published_evidence_verifies_after_source_bundles_are_removed(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-    result = materialize_reader_promoter_evidence_manifest(
-        [bundle],
-        bindings_bundle=bindings,
-        out_dir=tmp_path / "campaign" / "inputs" / "r0",
-    )
-    for source_bundle in (bundle, bindings):
-        for path in source_bundle.iterdir():
-            path.unlink()
-        source_bundle.rmdir()
-
-    verified = verify_reader_promoter_evidence_manifest(result.manifest_json)
-
-    assert verified.row_count == 1
-    assert verified.artifact_count == 2
-
-
-def test_preview_rejects_screen_overlay_with_more_than_six_components(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "too-many-components",
-        candidate_id="candidate-screen",
-        design_id="pDual-10-screen",
-        experiment_id="20260713_sfxi",
-        claim_status="screen_only",
-    )
-    manifest_path = bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["objective_overlay"] = {
-        "schema_version": "reader.response_window.objective_display_overlay.v2",
-        "objective_id": "response_magnitude_feasibility_v1",
-        "objective_display_label": "RMF",
-        "claim_status": "screen_only",
-        "experiment_id": "20260713_sfxi",
-        "reader_design_id": "pDual-10-screen",
-        "reduction_id": "event_logmean_6_12h_post",
-        "manifest_sha256": "sha256:" + "5" * 64,
-        "components": [
-            {"component_id": f"c{index}", "label": f"C {index}", "value": 1.0, "unit": "log2 ratio"}
-            for index in range(7)
-        ],
-    }
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="between one and six"):
-        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
-
-
-def test_cli_previews_materializes_and_verifies_without_label_mutation(tmp_path: Path, capsys) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
+def test_materialize_stages_portable_verified_media(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = verified_source(tmp_path)
+    _use_verified_source(monkeypatch, source)
     out_dir = tmp_path / "campaign" / "inputs" / "r0"
 
-    assert main(["preview", "--bindings-bundle", str(bindings), str(bundle)]) == 0
-    preview = json.loads(capsys.readouterr().out)
-    assert preview["summary"]["rows"] == 1
-    assert (
-        main(
-            [
-                "materialize",
-                "--bindings-bundle",
-                str(bindings),
-                "--out-dir",
-                str(out_dir),
-                str(bundle),
-            ]
-        )
-        == 0
+    result = _materialize(tmp_path, out_dir=out_dir)
+    payload = json.loads(result.manifest_json.read_text(encoding="utf-8"))
+    artifact = payload["rows"][0]["artifacts"][0]
+    staged = result.manifest_json.parent / artifact["path"]
+
+    assert staged.is_file()
+    assert sha256(staged) == artifact["sha256"]
+    assert verify_reader_promoter_evidence_manifest(result.manifest_json).artifact_count == 1
+    source.display.selected_file.path.write_bytes(b"changed after publication")
+    assert verify_reader_promoter_evidence_manifest(result.manifest_json).row_count == 1
+
+
+def test_materialize_refuses_existing_manifest_and_preserves_it_on_publish_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = verified_source(tmp_path)
+    _use_verified_source(monkeypatch, source)
+    out_dir = tmp_path / "campaign" / "inputs" / "r0"
+    result = _materialize(tmp_path, out_dir=out_dir)
+    before = result.manifest_json.read_bytes()
+
+    with pytest.raises(ReaderPromoterEvidenceError, match="already exists"):
+        _materialize(tmp_path, out_dir=out_dir)
+    assert result.manifest_json.read_bytes() == before
+
+    real_publish_media = manifest_module._publish_media
+    monkeypatch.setattr(
+        manifest_module,
+        "_publish_media",
+        lambda **_: (_ for _ in ()).throw(ReaderPromoterEvidenceError("publish failed")),
     )
-    written = json.loads(capsys.readouterr().out)
-    assert written["row_count"] == 1
-    manifest_path = Path(written["manifest_json"])
-    assert main(["verify", str(manifest_path)]) == 0
-    verified = json.loads(capsys.readouterr().out)
-    assert verified == {
-        "artifact_count": 2,
-        "manifest_json": str(manifest_path),
-        "row_count": 1,
-        "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v2",
-    }
+    with pytest.raises(ReaderPromoterEvidenceError, match="publish failed"):
+        _materialize(tmp_path, out_dir=out_dir, overwrite=True)
+    assert result.manifest_json.read_bytes() == before
+
+    monkeypatch.setattr(manifest_module, "_publish_media", real_publish_media)
+    real_replace = manifest_module.os.replace
+
+    def fail_manifest_commit(source_path: object, destination_path: object) -> None:
+        if Path(destination_path) == result.manifest_json:
+            raise OSError("commit failed")
+        real_replace(source_path, destination_path)
+
+    monkeypatch.setattr(manifest_module.os, "replace", fail_manifest_commit)
+    with pytest.raises(ReaderPromoterEvidenceError, match="Could not publish.*commit failed"):
+        _materialize(tmp_path, out_dir=out_dir, overwrite=True)
+    assert result.manifest_json.read_bytes() == before
+
+
+def test_materialize_rejects_symlinked_media_namespace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = verified_source(tmp_path)
+    _use_verified_source(monkeypatch, source)
+    out_dir = tmp_path / "campaign" / "inputs" / "r0"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    out_dir.mkdir(parents=True)
+    (out_dir / "reader_evidence_media").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ReaderPromoterEvidenceError, match="must not be a symlink"):
+        _materialize(tmp_path, out_dir=out_dir)
+
+    assert list(outside.iterdir()) == []
+    assert not (out_dir / "reader_evidence_promoter_response.json").exists()
 
 
 @pytest.mark.parametrize(
-    ("adapter_kind", "field", "value", "message"),
+    ("mutate", "message"),
     [
-        ("densegen_tfbs", "reader_design_id", "pDual-10-other", "selection design_id"),
-        ("densegen_tfbs", "candidate_id", "candidate-other", "selection candidate_id"),
-        ("densegen_tfbs", "binding_method", "prefix_alias", "exact-binding provenance"),
-        ("densegen_tfbs", "densegen_plan", None, "requires selected_binding plan"),
-        ("usr_genbank_annotations_v1", "densegen_run_id", "unexpected-run", "requires null DenseGen"),
-        ("usr_genbank_annotations_v1", "source_class", "", "provenance is malformed"),
+        (
+            lambda payload: payload["rows"][0]["sources"]["response_window"]["records"]["diagnostic"].__setitem__(
+                "revision_digest", "sha256:" + "f" * 64
+            ),
+            "source binding",
+        ),
+        (
+            lambda payload: payload["rows"][0]["artifacts"][0].__setitem__("source_file_path", "plots/different.png"),
+            "file-evidence",
+        ),
+        (
+            lambda payload: payload["rows"][0]["selected_binding"].__setitem__("candidate_id", "different-candidate"),
+            "selected binding",
+        ),
     ],
 )
-def test_preview_rejects_malformed_selected_binding_provenance(
+def test_display_verifier_rejects_provenance_tampering(
     tmp_path: Path,
-    adapter_kind: str,
-    field: str,
-    value: object,
+    monkeypatch: pytest.MonkeyPatch,
+    mutate,
     message: str,
 ) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-        adapter_kind=adapter_kind,
-    )
-    manifest_path = bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["selected_binding"][field] = value
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    source = verified_source(tmp_path)
+    _use_verified_source(monkeypatch, source)
+    result = _materialize(tmp_path, out_dir=tmp_path / "campaign" / "inputs" / "r0")
+    payload = json.loads(result.manifest_json.read_text(encoding="utf-8"))
+    mutate(payload)
+    result.manifest_json.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
     with pytest.raises(ReaderPromoterEvidenceError, match=message):
-        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
+        verify_reader_promoter_evidence_manifest(result.manifest_json)
 
 
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("experiment_id", "different-experiment"),
-        ("reduction_id", "different-reduction"),
-    ],
-)
-def test_preview_rejects_response_source_identity_that_disagrees_with_selection(
+def test_source_verification_joins_canonical_display_to_exact_study_binding(
     tmp_path: Path,
-    field: str,
-    value: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
+    source = verified_source(tmp_path)
+    bindings = write_candidate_bindings(tmp_path / "bindings")
+    monkeypatch.setattr(source_verification, "load_reader_response_records", lambda **_: source.records)
+    monkeypatch.setattr(
+        source_verification,
+        "load_reader_response_display_record",
+        lambda records, **_: source.display,
     )
-    manifest_path = bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["sources"]["response_window"][field] = value
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
-    with pytest.raises(ReaderPromoterEvidenceError, match=rf"{field}.*selection {field}"):
-        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
+    resolved = source_verification.verify_reader_promoter_evidence_source(
+        reader_root=tmp_path / "reader",
+        experiment_root=source.records.experiment_root,
+        projection_path=source.records.projection_path,
+        bindings_bundle=bindings,
+    )
+
+    assert resolved.design_id == "pDual-10-ES1p"
+    assert resolved.candidate_id == "candidate-1"
+    assert resolved.selected_binding["binding_method"] == "exact_alias"
+    assert resolved.binding_source["schema_id"] == "dnadesign.study.promoter_candidate_bindings.v1"
 
 
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("experiment_id", "different-experiment"),
-        ("reader_design_id", "pDual-10-other"),
-        ("reduction_id", "different-reduction"),
-    ],
-)
-def test_preview_rejects_objective_overlay_identity_that_disagrees_with_selection(
+def test_cli_uses_canonical_reader_source_arguments(
     tmp_path: Path,
-    field: str,
-    value: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "screen-only",
-        candidate_id="candidate-screen",
-        design_id="pDual-10-screen",
-        experiment_id="20260713_sfxi",
-        claim_status="screen_only",
-    )
-    manifest_path = bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["objective_overlay"] = {
-        "schema_version": "reader.response_window.objective_display_overlay.v2",
-        "objective_id": "response_magnitude_feasibility_v1",
-        "objective_display_label": "RMF",
-        "claim_status": "screen_only",
-        "experiment_id": "20260713_sfxi",
-        "reader_design_id": "pDual-10-screen",
-        "reduction_id": "event_logmean_6_12h_post",
-        "manifest_sha256": "sha256:" + "5" * 64,
-        "components": [
-            {
-                "component_id": "on_fluorescence_floor",
-                "label": "ON fluorescence floor",
-                "value": 1.25,
-                "unit": "log2 ratio",
-            }
-        ],
-    }
-    manifest["objective_overlay"][field] = value
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match=rf"{field}.*selection"):
-        preview_reader_promoter_evidence_manifest([bundle], bindings_bundle=bindings)
-
-
-def test_preview_rejects_artifact_digest_and_signature_tampering(tmp_path: Path) -> None:
-    digest_bundle, digest_bindings = _write_reader_bundle(
-        tmp_path / "digest",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-    (digest_bundle / "promoter_evidence.png").write_bytes(b"\x89PNG\r\n\x1a\ntampered")
-    with pytest.raises(ReaderPromoterEvidenceError, match="digest or size mismatch"):
-        preview_reader_promoter_evidence_manifest(
-            [digest_bundle],
-            bindings_bundle=digest_bindings,
-        )
-
-    signature_bundle, signature_bindings = _write_reader_bundle(
-        tmp_path / "signature",
-        candidate_id="candidate-2",
-        design_id="pDual-10-2",
-        experiment_id="20260713_sfxi",
-    )
-    png_path = signature_bundle / "promoter_evidence.png"
-    png_path.write_bytes(b"not-a-png-signature")
-    manifest_path = signature_bundle / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["artifacts"][png_path.name] = {
-        "path": png_path.name,
-        "bytes": png_path.stat().st_size,
-        "sha256": _sha256(png_path),
-    }
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    with pytest.raises(ReaderPromoterEvidenceError, match="PNG signature is invalid"):
-        preview_reader_promoter_evidence_manifest(
-            [signature_bundle],
-            bindings_bundle=signature_bindings,
-        )
-
-
-def test_preview_rejects_duplicate_selection_identity(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="duplicate selection identity"):
-        preview_reader_promoter_evidence_manifest(
-            [bundle, bundle],
-            bindings_bundle=bindings,
-        )
-
-
-def test_materialize_preserves_prior_manifest_when_atomic_replace_fails(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
+    source = verified_source(tmp_path)
+    _use_verified_source(monkeypatch, source)
+    common = [
+        "--reader-root",
+        str(tmp_path / "reader"),
+        "--experiment-root",
+        str(source.records.experiment_root),
+        "--projection",
+        str(source.records.projection_path),
+        "--bindings-bundle",
+        str(tmp_path / "bindings"),
+    ]
+    assert main(["preview", *common]) == 0
+    assert json.loads(capsys.readouterr().out)["summary"]["rows"] == 1
     out_dir = tmp_path / "campaign" / "inputs" / "r0"
-    first = materialize_reader_promoter_evidence_manifest(
-        [bundle],
-        bindings_bundle=bindings,
+    assert main(["materialize", *common, "--out-dir", str(out_dir)]) == 0
+    materialized = json.loads(capsys.readouterr().out)
+    assert materialized["schema_version"] == READER_EVIDENCE_SCHEMA_VERSION
+    assert main(["verify", materialized["manifest_json"]]) == 0
+    assert json.loads(capsys.readouterr().out)["artifact_count"] == 1
+
+
+def _use_verified_source(monkeypatch: pytest.MonkeyPatch, source: object) -> None:
+    monkeypatch.setattr(manifest_module, "verify_reader_promoter_evidence_source", lambda **_: source)
+
+
+def _preview(tmp_path: Path) -> dict[str, object]:
+    return preview_reader_promoter_evidence_manifest(
+        reader_root=tmp_path / "reader",
+        experiment_root=tmp_path / "experiment",
+        projection_path=tmp_path / "projection.yaml",
+        bindings_bundle=tmp_path / "bindings",
+    )
+
+
+def _materialize(
+    tmp_path: Path,
+    *,
+    out_dir: Path,
+    overwrite: bool = False,
+):
+    return materialize_reader_promoter_evidence_manifest(
+        reader_root=tmp_path / "reader",
+        experiment_root=tmp_path / "experiment",
+        projection_path=tmp_path / "projection.yaml",
+        bindings_bundle=tmp_path / "bindings",
         out_dir=out_dir,
+        overwrite=overwrite,
     )
-    original = first.manifest_json.read_bytes()
-
-    def fail_replace(source, destination):
-        raise OSError("simulated replace failure")
-
-    monkeypatch.setattr(manifest_module.os, "replace", fail_replace)
-    with pytest.raises(OSError, match="simulated replace failure"):
-        materialize_reader_promoter_evidence_manifest(
-            [bundle],
-            bindings_bundle=bindings,
-            out_dir=out_dir,
-            overwrite=True,
-        )
-
-    assert first.manifest_json.read_bytes() == original
-    assert not list(out_dir.glob(".*.staging-*"))
-    assert all(path.is_dir() and any(path.iterdir()) for path in out_dir.glob("reader_evidence_media"))
-
-
-def test_display_verifier_rejects_artifact_metadata_tampering(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-    result = materialize_reader_promoter_evidence_manifest(
-        [bundle],
-        bindings_bundle=bindings,
-        out_dir=tmp_path / "campaign" / "inputs" / "r0",
-    )
-    display = json.loads(result.manifest_json.read_text(encoding="utf-8"))
-    display["rows"][0]["artifacts"][0]["sha256"] = "sha256:" + "0" * 64
-    result.manifest_json.write_text(json.dumps(display, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="digest or size mismatch"):
-        verify_reader_promoter_evidence_manifest(result.manifest_json)
-
-
-def test_display_verifier_rejects_selected_binding_identity_tampering(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-    result = materialize_reader_promoter_evidence_manifest(
-        [bundle],
-        bindings_bundle=bindings,
-        out_dir=tmp_path / "campaign" / "inputs" / "r0",
-    )
-    display = json.loads(result.manifest_json.read_text(encoding="utf-8"))
-    display["rows"][0]["selected_binding"]["candidate_id"] = "candidate-other"
-    result.manifest_json.write_text(json.dumps(display, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="candidate_id disagrees with selection candidate_id"):
-        verify_reader_promoter_evidence_manifest(result.manifest_json)
-
-
-def test_display_verifier_rejects_structured_source_tampering(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-    result = materialize_reader_promoter_evidence_manifest(
-        [bundle],
-        bindings_bundle=bindings,
-        out_dir=tmp_path / "campaign" / "inputs" / "r0",
-    )
-    display = json.loads(result.manifest_json.read_text(encoding="utf-8"))
-    display["rows"][0]["sources"]["baserender"]["feature_count"] = -1
-    result.manifest_json.write_text(json.dumps(display, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="BaseRender diagnostics"):
-        verify_reader_promoter_evidence_manifest(result.manifest_json)
-
-
-def test_display_verifier_rejects_a_different_campaign_destination(tmp_path: Path) -> None:
-    bundle, bindings = _write_reader_bundle(
-        tmp_path / "reader-bundle",
-        candidate_id="candidate-1",
-        design_id="pDual-10-1",
-        experiment_id="20260713_sfxi",
-    )
-    result = materialize_reader_promoter_evidence_manifest(
-        [bundle],
-        bindings_bundle=bindings,
-        out_dir=tmp_path / "campaign" / "inputs" / "r0",
-    )
-    display = json.loads(result.manifest_json.read_text(encoding="utf-8"))
-    display["campaign_slug"] = "secg_cipro_rf_sfxi_topn"
-    result.manifest_json.write_text(json.dumps(display, indent=2) + "\n", encoding="utf-8")
-
-    with pytest.raises(ReaderPromoterEvidenceError, match="secg_msrb_greedy"):
-        verify_reader_promoter_evidence_manifest(result.manifest_json)
