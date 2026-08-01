@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import re
 import subprocess
 from collections.abc import Mapping
@@ -22,6 +23,7 @@ from urllib.parse import urlparse
 import yaml
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
+from dnadesign.devtools.docs.banners.catalog import BANNERS
 from dnadesign.devtools.docs.banners.render import check_banners
 from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
 from dnadesign.devtools.docs.metadata import LAST_VERIFIED_PATTERN, OWNER_PATTERN, SOR_MARKDOWN_FILES
@@ -2072,6 +2074,61 @@ def _find_public_interface_doc_contract_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _resolve_readme_banner_reference(*, repo_root: Path, readme_path: Path, target_rel: str) -> tuple[Path, Path]:
+    resolved_repo_root = repo_root.resolve()
+    readme_relative = readme_path.relative_to(repo_root)
+    declared_relative = Path(os.path.normpath(str(readme_relative.parent / target_rel)))
+    if declared_relative.is_absolute() or declared_relative.parts[:1] == ("..",):
+        raise ValueError(target_rel)
+
+    target_path = (resolved_repo_root / declared_relative).resolve()
+    try:
+        target_path.relative_to(resolved_repo_root)
+    except ValueError as error:
+        raise ValueError(target_rel) from error
+    return declared_relative, target_path
+
+
+def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
+    banner_source = repo_root / "src" / "dnadesign" / "devtools" / "docs" / "banners"
+    if not banner_source.is_dir():
+        return []
+
+    referenced_paths: set[str] = set()
+    for readme_path in sorted((repo_root / "src" / "dnadesign").rglob("README.md")):
+        top_block = "\n".join(readme_path.read_text(encoding="utf-8").splitlines()[:25])
+        banner_match = TOOL_README_BANNER_PATTERN.search(top_block)
+        if banner_match is None:
+            continue
+        link = banner_match.group("link").strip().split()[0]
+        parsed = urlparse(link)
+        if parsed.scheme or link.startswith("mailto:") or not link.lower().endswith(".svg"):
+            continue
+        target_rel = link.split("#", 1)[0].strip()
+        if not target_rel:
+            continue
+        try:
+            declared_relative, _target_path = _resolve_readme_banner_reference(
+                repo_root=repo_root,
+                readme_path=readme_path,
+                target_rel=target_rel,
+            )
+        except ValueError:
+            continue
+        referenced_paths.add(declared_relative.as_posix())
+
+    catalog_paths = {Path(spec.path).as_posix() for spec in BANNERS}
+    issues = [
+        f"{path}: tool README banner path is not declared in the banner catalog."
+        for path in sorted(referenced_paths - catalog_paths)
+    ]
+    issues.extend(
+        f"{path}: banner catalog path is not referenced by a tool README."
+        for path in sorted(catalog_paths - referenced_paths)
+    )
+    return issues
+
+
 def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
     src_root = repo_root / "src" / "dnadesign"
     if not src_root.exists():
@@ -2101,7 +2158,15 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
             issues.append(f"{readme_path}: banner link must include a relative asset path.")
             continue
 
-        target_path = (readme_path.parent / target_rel).resolve()
+        try:
+            _declared_relative, target_path = _resolve_readme_banner_reference(
+                repo_root=repo_root,
+                readme_path=readme_path,
+                target_rel=target_rel,
+            )
+        except ValueError:
+            issues.append(f"{readme_path}: banner asset target escapes the repository: {target_rel}.")
+            continue
         if not target_path.exists():
             issues.append(f"{readme_path}: banner asset target does not exist: {target_rel}.")
             continue
@@ -2116,6 +2181,7 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
         if "placeholder" in top_block.lower():
             issues.append(f"{readme_path}: banner copy must not use placeholder wording.")
 
+    issues.extend(_find_banner_catalog_inventory_issues(repo_root))
     return issues
 
 

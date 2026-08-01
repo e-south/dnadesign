@@ -19,6 +19,7 @@ import pytest
 import yaml
 
 from dnadesign.devtools.docs import checks as docs_checks
+from dnadesign.devtools.docs.banners.catalog import BannerSpec
 from dnadesign.devtools.docs.checks import (
     _find_active_shared_usr_dataset_id_issues,
     _find_agents_path_reference_issues,
@@ -850,6 +851,40 @@ def test_tool_readme_banner_check_accepts_existing_local_svg_banner(tmp_path: Pa
     issues = _find_tool_readme_banner_issues(tmp_path)
 
     assert issues == []
+
+
+def test_tool_readme_banner_check_rejects_uncatalogued_and_orphaned_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "![Alpha banner](assets/alternate-banner.svg)\n\nCompact subtitle.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alternate-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    (tmp_path / "src" / "dnadesign" / "devtools" / "docs" / "banners").mkdir(parents=True)
+    catalog_path = "src/dnadesign/alpha/assets/alpha-banner.svg"
+    monkeypatch.setattr(
+        docs_checks,
+        "BANNERS",
+        (
+            BannerSpec(
+                path=catalog_path,
+                name="alpha",
+                capability="TEST ALPHA",
+                description="Test alpha banners.",
+                glyph="align",
+            ),
+        ),
+        raising=False,
+    )
+
+    issues = _find_tool_readme_banner_issues(tmp_path)
+
+    assert any("alternate-banner.svg" in issue and "not declared in the banner catalog" in issue for issue in issues)
+    assert any(catalog_path in issue and "not referenced by a tool README" in issue for issue in issues)
 
 
 def test_tool_readme_banner_check_rejects_nonstandard_banner_dimensions(tmp_path: Path) -> None:
