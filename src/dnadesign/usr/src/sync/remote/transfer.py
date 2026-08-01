@@ -13,10 +13,14 @@ from __future__ import annotations
 
 import os
 import shutil
+import stat
 import tempfile
 from pathlib import Path
 
 from ...contracts import VerificationError
+from ...events.append import event_log_lock
+
+EVENT_LOG_FILENAME = ".events.log"
 
 
 def make_pull_staging_dir(root: Path, dataset: str) -> Path:
@@ -50,7 +54,7 @@ def collect_staged_entries(staged: Path, *, skip_snapshots: bool) -> list[tuple[
         if not rel.parts:
             continue
         rel_text = rel.as_posix()
-        if rel_text in {"records.parquet", ".events.lock", ".usr.lock"}:
+        if rel_text in {"records.parquet", EVENT_LOG_FILENAME, ".events.lock", ".usr.lock"}:
             continue
         if skip_snapshots and rel.parts[0] == "_snapshots":
             continue
@@ -61,6 +65,31 @@ def collect_staged_entries(staged: Path, *, skip_snapshots: bool) -> list[tuple[
             continue
         raise VerificationError(f"Staged pull payload contains unsupported entry type: {rel_text}")
     return entries
+
+
+def _staged_event_log(staged: Path) -> Path | None:
+    event_path = Path(staged) / EVENT_LOG_FILENAME
+    try:
+        event_stat = event_path.lstat()
+    except FileNotFoundError:
+        return None
+    if event_path.is_symlink():
+        raise VerificationError(f"Staged pull payload contains symlink entry: {EVENT_LOG_FILENAME}")
+    if not stat.S_ISREG(event_stat.st_mode):
+        raise VerificationError(f"Staged pull payload contains unsupported event-log entry: {EVENT_LOG_FILENAME}")
+    return event_path
+
+
+def _promote_event_log(staged_event: Path | None, destination: Path) -> None:
+    destination = Path(destination)
+    with event_log_lock(destination):
+        if staged_event is not None:
+            copy_file_atomic(staged_event, destination)
+            return
+        try:
+            destination.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_snapshots: bool) -> None:
@@ -74,6 +103,7 @@ def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_sn
     if not staged_primary.is_file():
         raise VerificationError(f"Staged pull payload contains unsupported records entry: {staged_primary.name}")
 
+    staged_event = _staged_event_log(staged)
     staged_entries = collect_staged_entries(staged, skip_snapshots=skip_snapshots)
 
     dest.mkdir(parents=True, exist_ok=True)
@@ -91,7 +121,7 @@ def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_sn
             continue
         copy_file_atomic(src_path, dst_path)
 
-    keep_with_parents: set[str] = {".events.lock", ".usr.lock"}
+    keep_with_parents: set[str] = {EVENT_LOG_FILENAME, ".events.lock", ".usr.lock"}
     for rel_text in kept_paths:
         keep_with_parents.add(rel_text)
         parent = Path(rel_text).parent
@@ -113,3 +143,5 @@ def promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_sn
             local_path.rmdir()
         except OSError:
             pass
+
+    _promote_event_log(staged_event, dest / EVENT_LOG_FILENAME)
