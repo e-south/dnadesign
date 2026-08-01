@@ -20,6 +20,7 @@ from pathlib import Path
 from ..contracts.decision import decision_is_evidence_bearing, decision_to_dict
 from ..publication import publish_metastudy, verify_publication
 from ..sensitivity import sensitivity_evaluations_to_payload
+from .checkout import require_active_dnadesign_checkout
 from .persistence import write_source_controlled_state
 from .regeneration import regenerate_metastudy, validate_live_source_controlled_state
 from .state import STATE_FILE
@@ -35,10 +36,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Reconstruct and optionally publish one canonical meta-study generation",
     )
     regenerate.add_argument("--phd-root", type=Path, required=True)
+    regenerate.add_argument(
+        "--dnadesign-root",
+        type=Path,
+        help="Active Dnadesign source checkout. Defaults to the checkout running this command.",
+    )
     regenerate.add_argument("--publication", type=Path)
     regenerate.add_argument("--state-dir", type=Path)
     status = subparsers.add_parser("status", help="Validate and summarize one source-controlled state generation")
     status.add_argument("--phd-root", type=Path, required=True)
+    status.add_argument(
+        "--dnadesign-root",
+        type=Path,
+        help="Active Dnadesign source checkout. Defaults to the checkout running this command.",
+    )
     status.add_argument("--state-dir", type=Path, required=True)
     verify = subparsers.add_parser("verify", help="Verify one create-only meta-study publication")
     verify.add_argument("--publication", type=Path, required=True)
@@ -53,10 +64,12 @@ def main(argv: list[str] | None = None) -> int:
         verify_publication(args.publication)
         print(json.dumps({"ok": True, "publication": str(args.publication.resolve())}, sort_keys=True))
         return 0
+    dnadesign_root = require_active_dnadesign_checkout(args.dnadesign_root)
     if args.command == "status":
         validation = validate_live_source_controlled_state(
             args.state_dir / STATE_FILE,
             phd_root=args.phd_root,
+            dnadesign_root=dnadesign_root,
         )
         state = validation.state
         decision = state["decision"]
@@ -77,7 +90,10 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 0
-    result = regenerate_metastudy(phd_root=args.phd_root)
+    result = regenerate_metastudy(
+        phd_root=args.phd_root,
+        dnadesign_root=dnadesign_root,
+    )
     state_paths = None
     if args.state_dir is not None:
         state_paths = write_source_controlled_state(

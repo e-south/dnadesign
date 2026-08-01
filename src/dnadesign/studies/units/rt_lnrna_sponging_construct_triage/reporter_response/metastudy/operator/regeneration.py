@@ -47,6 +47,7 @@ from ..sensitivity_coverage import (
     sensitivity_coverage_receipt_payload,
     validate_sensitivity_coverage_set,
 )
+from .checkout import require_active_dnadesign_checkout
 from .state import (
     ROUTE_ID,
     ROUTE_REGISTRY_PATH,
@@ -117,11 +118,15 @@ class LiveStateValidation:
     regeneration: RegenerationResult
 
 
-def regenerate_metastudy(*, phd_root: Path) -> RegenerationResult:
+def regenerate_metastudy(
+    *,
+    phd_root: Path,
+    dnadesign_root: Path | None = None,
+) -> RegenerationResult:
     """Reconstruct selected routes through public Reader records and canonical evaluation."""
 
     root = Path(phd_root).expanduser().resolve()
-    repo_root = root / "dnadesign"
+    repo_root = require_active_dnadesign_checkout(dnadesign_root)
     reader_root = root / "reader"
     route_registry = root / ROUTE_REGISTRY_PATH
     route_registry_digest = digest_file(route_registry)
@@ -221,11 +226,13 @@ def validate_live_source_controlled_state(
     path: Path,
     *,
     phd_root: Path,
+    dnadesign_root: Path | None = None,
 ) -> LiveStateValidation:
     """Require exact parity between checked state and one canonical live regeneration."""
 
+    repo_root = require_active_dnadesign_checkout(dnadesign_root)
     state = validate_source_controlled_state(path, phd_root=phd_root)
-    regeneration = regenerate_metastudy(phd_root=phd_root)
+    regeneration = regenerate_metastudy(phd_root=phd_root, dnadesign_root=repo_root)
     expected_decision = json.loads(json.dumps(decision_to_dict(regeneration.decision), allow_nan=False))
     if state["decision"] != expected_decision:
         raise MetastudyContractError("source-controlled meta-study state differs from canonical live regeneration")

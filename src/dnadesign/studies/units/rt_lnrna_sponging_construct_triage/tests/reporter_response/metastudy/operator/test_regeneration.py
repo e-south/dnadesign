@@ -27,6 +27,9 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
     validate_acquisition_projection_payload,
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+    checkout as operator_checkout,
+)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
     regeneration as operator_regeneration,
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
@@ -62,7 +65,13 @@ def test_operator_preserves_complete_partial_and_blocked_materialization_states(
         "selected_experiments_for_route",
         lambda *_args, **_kwargs: members,
     )
-    monkeypatch.setattr(operator_regeneration, "load_registered_subject_bindings", lambda **_kwargs: object())
+    loaded_repo_roots: list[Path] = []
+
+    def load_subjects(*, repo_root: Path) -> object:
+        loaded_repo_roots.append(repo_root)
+        return object()
+
+    monkeypatch.setattr(operator_regeneration, "load_registered_subject_bindings", load_subjects)
     resolved_ids: list[str] = []
 
     def resolve_record(_config, **kwargs):
@@ -104,6 +113,8 @@ def test_operator_preserves_complete_partial_and_blocked_materialization_states(
     blocked_id = DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[-1]
     assert result.route_registry_path == operator_state.ROUTE_REGISTRY_PATH
     assert result.route_registry_digest == _digest("a")
+    assert loaded_repo_roots == [operator_checkout.active_dnadesign_checkout()]
+    assert loaded_repo_roots != [(Path("unused").resolve() / "dnadesign")]
     assert resolved_ids == list(ready_ids)
     assert result.attempts == captured["attempts"]
     assert tuple(row.status for row in result.attempts) == (

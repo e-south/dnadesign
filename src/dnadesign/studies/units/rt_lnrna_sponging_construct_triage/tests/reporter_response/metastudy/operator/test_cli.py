@@ -12,12 +12,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
     DEFAULT_OBJECTIVE_READINESS,
+    MetastudyContractError,
     operator,
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
@@ -35,13 +37,67 @@ from ._support import (
 def test_operator_parser_exposes_regenerate_status_and_verify() -> None:
     parser = operator_cli.build_parser()
 
-    regenerate = parser.parse_args(["regenerate", "--phd-root", "/tmp/phd"])
-    status = parser.parse_args(["status", "--phd-root", "/tmp/phd", "--state-dir", "/tmp/state"])
+    regenerate = parser.parse_args(["regenerate", "--phd-root", "/tmp/phd", "--dnadesign-root", "/tmp/checkout"])
+    status = parser.parse_args(
+        [
+            "status",
+            "--phd-root",
+            "/tmp/phd",
+            "--dnadesign-root",
+            "/tmp/checkout",
+            "--state-dir",
+            "/tmp/state",
+        ]
+    )
     verify = parser.parse_args(["verify", "--publication", "/tmp/publication"])
 
     assert regenerate.command == "regenerate"
+    assert regenerate.dnadesign_root == Path("/tmp/checkout")
     assert status.command == "status"
+    assert status.dnadesign_root == Path("/tmp/checkout")
     assert verify.command == "verify"
+
+
+@pytest.mark.parametrize(
+    ("checkout_name", "create_checkout", "message"),
+    (
+        ("foreign", True, "must be the active source checkout"),
+        ("missing", False, "does not exist"),
+    ),
+)
+def test_cli_rejects_an_invalid_checkout_before_regeneration_or_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    checkout_name: str,
+    create_checkout: bool,
+    message: str,
+) -> None:
+    checkout = tmp_path / checkout_name
+    if create_checkout:
+        checkout.mkdir()
+    monkeypatch.setattr(
+        operator_cli,
+        "regenerate_metastudy",
+        lambda **_kwargs: pytest.fail("regeneration must not start"),
+    )
+    monkeypatch.setattr(
+        operator_cli,
+        "write_source_controlled_state",
+        lambda *_args, **_kwargs: pytest.fail("state publication must not start"),
+    )
+
+    with pytest.raises(MetastudyContractError, match=message):
+        operator_cli.main(
+            [
+                "regenerate",
+                "--phd-root",
+                str(tmp_path),
+                "--dnadesign-root",
+                str(checkout),
+                "--state-dir",
+                str(tmp_path),
+            ]
+        )
 
 
 def test_regenerate_cli_emits_sibling_readiness_and_sensitivity_evaluations(

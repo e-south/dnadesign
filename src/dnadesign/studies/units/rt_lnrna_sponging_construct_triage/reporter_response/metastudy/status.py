@@ -19,12 +19,21 @@ from .contracts._values import MetastudyContractError, canonical_digest
 from .operator import validate_live_source_controlled_state
 
 
-def status_payload(*, phd_root: Path, state_path: Path) -> dict[str, object]:
+def status_payload(
+    *,
+    phd_root: Path,
+    state_path: Path,
+    dnadesign_root: Path | None = None,
+) -> dict[str, object]:
     """Return a typed semantic status; path presence alone never means ready."""
 
     source = Path(state_path).expanduser().resolve()
     try:
-        validation = validate_live_source_controlled_state(source, phd_root=phd_root)
+        validation = validate_live_source_controlled_state(
+            source,
+            phd_root=phd_root,
+            dnadesign_root=dnadesign_root,
+        )
     except (OSError, UnicodeError) as exc:
         raise MetastudyContractError(f"cannot read source state {source}: {exc}") from exc
     state = validation.state
@@ -70,9 +79,18 @@ def status_payload(*, phd_root: Path, state_path: Path) -> dict[str, object]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--phd-root", type=Path, required=True)
+    parser.add_argument(
+        "--dnadesign-root",
+        type=Path,
+        help="Active Dnadesign source checkout. Defaults to the checkout running this command.",
+    )
     parser.add_argument("--state", type=Path, required=True)
     args = parser.parse_args(argv)
-    payload = status_payload(phd_root=args.phd_root, state_path=args.state)
+    payload = status_payload(
+        phd_root=args.phd_root,
+        state_path=args.state,
+        dnadesign_root=args.dnadesign_root,
+    )
     payload["status_digest"] = canonical_digest(payload)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if payload["status"] == "ready" else 1

@@ -123,10 +123,15 @@ def test_status_uses_readiness_from_the_single_live_validation(
 ) -> None:
     ready_ids = (DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[0],)
     readiness = _live_readiness(ready_ids=ready_ids)
-    calls: list[tuple[Path, Path]] = []
+    calls: list[tuple[Path, Path, Path | None]] = []
 
-    def validate(path: Path, *, phd_root: Path) -> SimpleNamespace:
-        calls.append((path, phd_root))
+    def validate(
+        path: Path,
+        *,
+        phd_root: Path,
+        dnadesign_root: Path | None,
+    ) -> SimpleNamespace:
+        calls.append((path, phd_root, dnadesign_root))
         return _live_validation(readiness=readiness)
 
     monkeypatch.setattr(
@@ -137,7 +142,7 @@ def test_status_uses_readiness_from_the_single_live_validation(
 
     payload = status_module.status_payload(phd_root=Path("unused"), state_path=_state_path())
 
-    assert calls == [(_state_path().resolve(), Path("unused"))]
+    assert calls == [(_state_path().resolve(), Path("unused"), None)]
     assert payload["measurement_readiness"] == "partial"
     assert payload["descriptive_visualization_readiness"] == "ready"
     assert payload["ready_experiment_ids"] == ready_ids

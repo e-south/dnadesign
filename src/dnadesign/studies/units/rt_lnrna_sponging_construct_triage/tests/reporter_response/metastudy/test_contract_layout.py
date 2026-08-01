@@ -52,6 +52,7 @@ _EVALUATION_LINE_BUDGETS = {
 _EXPECTED_OPERATOR_MODULES = {
     "__init__.py",
     "__main__.py",
+    "checkout.py",
     "cli.py",
     "persistence.py",
     "regeneration.py",
@@ -60,6 +61,7 @@ _EXPECTED_OPERATOR_MODULES = {
 _OPERATOR_LINE_BUDGETS = {
     "__init__.py": 60,
     "__main__.py": 30,
+    "checkout.py": 80,
     "cli.py": 150,
     "persistence.py": 160,
     "regeneration.py": 320,
@@ -88,6 +90,7 @@ _OPERATOR_TEST_ROOT = _TEST_ROOT / "operator"
 _EXPECTED_OPERATOR_TEST_MODULES = {
     "__init__.py",
     "_support.py",
+    "test_checkout.py",
     "test_cli.py",
     "test_persistence.py",
     "test_regeneration.py",
@@ -96,7 +99,8 @@ _EXPECTED_OPERATOR_TEST_MODULES = {
 _OPERATOR_TEST_LINE_BUDGETS = {
     "__init__.py": 20,
     "_support.py": 200,
-    "test_cli.py": 100,
+    "test_checkout.py": 100,
+    "test_cli.py": 150,
     "test_persistence.py": 120,
     "test_regeneration.py": 380,
     "test_state.py": 200,

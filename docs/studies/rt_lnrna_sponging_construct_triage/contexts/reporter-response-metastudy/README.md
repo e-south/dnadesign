@@ -162,6 +162,11 @@ study bindings.
 
 Run from the repository root:
 
+The operator reads study-owned inputs from the Dnadesign checkout executing the
+command. `--phd-root` remains the sibling-workspace root for Reader and bridge
+routing. Use `--dnadesign-root` only to assert that the active checkout is the
+one you intended; a different or missing checkout is rejected.
+
 ```bash
 uv run rt-lnrna-reporter-metastudy regenerate \
   --phd-root /path/to/phd \
