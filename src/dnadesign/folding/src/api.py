@@ -40,7 +40,6 @@ from .errors import (
     FoldingMalformedOutputError,
 )
 from .rnafold import parse_rnafold_stdout
-from .viennarna_plot import enrich_prediction_pairing_qa, publish_viennarna_structure_svg
 
 _PREDICTION_FILENAME = "secondary_structure_prediction_v1.json"
 _PREFLIGHT_FILENAME = "folding_preflight.json"
@@ -669,10 +668,8 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 __all__ = [
     "FoldingPreflightResult",
-    "enrich_prediction_pairing_qa",
     "load_prediction_request",
     "parse_rnafold_stdout",
     "preflight_request",
-    "publish_viennarna_structure_svg",
     "run_prediction_request",
 ]

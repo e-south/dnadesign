@@ -99,7 +99,7 @@ _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]]
     ("ops", "construct"): ("dnadesign.construct",),
     ("ops", "densegen"): ("dnadesign.densegen.contracts",),
     ("ops", "infer"): ("dnadesign.infer", "dnadesign.infer.contracts"),
-    ("ops", "notify"): ("dnadesign.notify.core.contracts",),
+    ("ops", "notify"): ("dnadesign.notify",),
     ("ops", "usr"): ("dnadesign.usr",),
     ("permuter", "infer"): ("dnadesign.infer",),
     ("construct", "folding"): ("dnadesign.folding",),

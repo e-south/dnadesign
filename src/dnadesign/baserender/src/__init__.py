@@ -12,7 +12,42 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dnadesign.baserender.src.config import RenderContractDescriptor, RenderJobV4  # noqa: F401
+    from dnadesign.baserender.src.contracts import DENSEGEN_TFBS_REQUIRED_KEYS  # noqa: F401
+    from dnadesign.baserender.src.core import (  # noqa: F401
+        ContractError,
+        Display,
+        Effect,
+        Feature,
+        LayoutError,
+        Record,
+        SchemaError,
+        Span,
+    )
+    from dnadesign.baserender.src.public import (  # noqa: F401
+        adapt_record,
+        adapt_records,
+        cruncher_showcase_style_overrides,
+        get_adapter_descriptor,
+        get_render_contract_descriptor,
+        get_renderer_descriptor,
+        list_adapters,
+        list_render_contracts,
+        list_renderers,
+        load_record_from_parquet,
+        load_records_from_parquet,
+        render_parquet_record_figure,
+        render_record_figure,
+        render_record_grid_figure,
+        run_job,
+        run_render_job,
+        validate_job,
+        validate_render_job,
+    )
+    from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
@@ -22,13 +57,12 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "validate_render_job": ("dnadesign.baserender.src.public", "validate_render_job"),
     "run_job": ("dnadesign.baserender.src.public", "run_job"),
     "validate_job": ("dnadesign.baserender.src.public", "validate_job"),
-    "list_adapters": ("dnadesign.baserender.src.public", "list_adapters"),
-    "list_render_contracts": ("dnadesign.baserender.src.public", "list_render_contracts"),
-    "list_renderers": ("dnadesign.baserender.src.public", "list_renderers"),
-    "get_adapter_descriptor": ("dnadesign.baserender.src.public", "get_adapter_descriptor"),
-    "get_render_contract_descriptor": ("dnadesign.baserender.src.public", "get_render_contract_descriptor"),
-    "get_renderer_descriptor": ("dnadesign.baserender.src.public", "get_renderer_descriptor"),
-    "render": ("dnadesign.baserender.src.public", "render"),
+    "list_adapters": ("dnadesign.baserender.src.public.catalog", "list_adapters"),
+    "list_render_contracts": ("dnadesign.baserender.src.public.catalog", "list_render_contracts"),
+    "list_renderers": ("dnadesign.baserender.src.public.catalog", "list_renderers"),
+    "get_adapter_descriptor": ("dnadesign.baserender.src.public.catalog", "get_adapter_descriptor"),
+    "get_render_contract_descriptor": ("dnadesign.baserender.src.public.catalog", "get_render_contract_descriptor"),
+    "get_renderer_descriptor": ("dnadesign.baserender.src.public.catalog", "get_renderer_descriptor"),
     "cruncher_showcase_style_overrides": ("dnadesign.baserender.src.public", "cruncher_showcase_style_overrides"),
     "Record": ("dnadesign.baserender.src.core", "Record"),
     "Feature": ("dnadesign.baserender.src.core", "Feature"),

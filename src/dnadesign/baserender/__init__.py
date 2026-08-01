@@ -12,7 +12,60 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dnadesign.baserender.src.cli import app  # noqa: F401
+    from dnadesign.baserender.src.config import (  # noqa: F401
+        RenderContractDescriptor,
+        RenderJobV4,
+        Style,
+        list_style_presets,
+        resolve_preset_path,
+        resolve_style,
+    )
+    from dnadesign.baserender.src.contracts import DENSEGEN_TFBS_REQUIRED_KEYS  # noqa: F401
+    from dnadesign.baserender.src.core import (  # noqa: F401
+        ContractError,
+        Display,
+        Effect,
+        Feature,
+        LayoutError,
+        Record,
+        SchemaError,
+        Span,
+    )
+    from dnadesign.baserender.src.public import (  # noqa: F401
+        BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
+        BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION,
+        DEFAULT_SEQUENCE_PANEL_PROFILE,
+        SequencePanelConfig,
+        SequencePanelDiagnostics,
+        SequencePanelImage,
+        adapt_record,
+        adapt_records,
+        cruncher_showcase_style_overrides,
+        get_adapter_descriptor,
+        get_render_contract_descriptor,
+        get_renderer_descriptor,
+        list_adapters,
+        list_render_contracts,
+        list_renderers,
+        load_record_from_parquet,
+        load_records_from_parquet,
+        render,
+        render_parquet_record_figure,
+        render_record_figure,
+        render_record_grid_figure,
+        render_sequence_panel_image,
+        run_job,
+        run_render_job,
+        sequence_panel_config_for_adapter,
+        validate_job,
+        validate_render_job,
+    )
+    from dnadesign.baserender.src.render.palette import Palette  # noqa: F401
+    from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
@@ -29,12 +82,12 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "validate_render_job": ("dnadesign.baserender.src.public", "validate_render_job"),
     "run_job": ("dnadesign.baserender.src.public", "run_job"),
     "validate_job": ("dnadesign.baserender.src.public", "validate_job"),
-    "list_adapters": ("dnadesign.baserender.src.public", "list_adapters"),
-    "list_renderers": ("dnadesign.baserender.src.public", "list_renderers"),
-    "list_render_contracts": ("dnadesign.baserender.src.public", "list_render_contracts"),
-    "get_adapter_descriptor": ("dnadesign.baserender.src.public", "get_adapter_descriptor"),
-    "get_renderer_descriptor": ("dnadesign.baserender.src.public", "get_renderer_descriptor"),
-    "get_render_contract_descriptor": ("dnadesign.baserender.src.public", "get_render_contract_descriptor"),
+    "list_adapters": ("dnadesign.baserender.src.public.catalog", "list_adapters"),
+    "list_renderers": ("dnadesign.baserender.src.public.catalog", "list_renderers"),
+    "list_render_contracts": ("dnadesign.baserender.src.public.catalog", "list_render_contracts"),
+    "get_adapter_descriptor": ("dnadesign.baserender.src.public.catalog", "get_adapter_descriptor"),
+    "get_renderer_descriptor": ("dnadesign.baserender.src.public.catalog", "get_renderer_descriptor"),
+    "get_render_contract_descriptor": ("dnadesign.baserender.src.public.catalog", "get_render_contract_descriptor"),
     "render": ("dnadesign.baserender.src.public", "render"),
     "cruncher_showcase_style_overrides": ("dnadesign.baserender.src.public", "cruncher_showcase_style_overrides"),
     "Record": ("dnadesign.baserender.src.core", "Record"),

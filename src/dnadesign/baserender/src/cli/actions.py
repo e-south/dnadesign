@@ -22,8 +22,6 @@ from ..config import (
     resolve_preset_path,
 )
 from ..core import BaseRenderError
-from ..public import run_job as run_job_public
-from ..public import validate_job as validate_job_public
 from ..workspaces import Workspace, discover_workspaces, init_workspace, resolve_workspace_job_path
 
 
@@ -43,6 +41,8 @@ def validate_job_action(
     *,
     caller_root: Path | None = None,
 ) -> RenderJobV4:
+    from ..public import validate_job as validate_job_public
+
     return validate_job_public(
         resolve_job_spec(job, workspace, workspace_root),
         kind="render_job_v4",
@@ -57,6 +57,8 @@ def run_job_action(
     *,
     caller_root: Path | None = None,
 ):
+    from ..public import run_job as run_job_public
+
     return run_job_public(
         resolve_job_spec(job, workspace, workspace_root),
         kind="render_job_v4",
@@ -156,6 +158,8 @@ def normalize_job_action(
     out: Path,
     caller_root: Path | None = None,
 ) -> Path:
+    from ..public import validate_job as validate_job_public
+
     parsed = validate_job_public(
         resolve_job_spec(job, workspace, workspace_root),
         kind="render_job_v4",
