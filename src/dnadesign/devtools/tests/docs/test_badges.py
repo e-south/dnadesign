@@ -59,6 +59,11 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         "<script>\n"
         '<img alt="Coverage" src="badge.svg">\n'
         "</script>\n\n"
+        '<video><source src="status-badge.mp4"></video>\n\n'
+        '<source srcset="https://img.shields.io/badge/build-passing.svg">\n\n'
+        '<a href="outer">\n\n'
+        "[inner](report) ![Coverage](status.svg)\n\n"
+        "</a>\n\n"
         "```markdown\n"
         "[![Coverage](https://example.test/coverage.svg)](https://example.test/report)\n"
         "```\n",
@@ -128,6 +133,7 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
         ),
         ('<a href="report" />\n\n<img alt="Coverage" src="status.svg">\n', 3),
         ('intro\n<img\n alt="Coverage"\n src="badge.svg">\noutro\n', 2),
+        ('intro `code\nspan`\n<img\n alt="Coverage"\n src="badge.svg">\n', 3),
     ],
 )
 def test_badge_policy_rejects_alternate_badge_syntax_outside_root(
