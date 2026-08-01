@@ -24,6 +24,7 @@ from dnadesign.devtools.docs.badges import _source_has_badge_hint
         "https://127.1/badge.svg",
         "https://%31%32%37%2E%30%2E%30%2E%31/badge.svg",
         "https://ci_internal.test/badge.svg",
+        "https://gitlab.example/group/project/-/badges/main/pipeline.svg",
         "file://[2001:db8::1]/badge.svg",
         "https:badge.svg",
         "https:/assets/badge.svg",

@@ -32,7 +32,7 @@ from markdown_it.rules_inline.state_inline import StateInline
 from markdown_it.token import Token
 from upa_url import URL
 
-BADGE_PATH_PATTERN = re.compile(r"(?:^|[/_.-])badge(?:[./?_-]|$)", flags=re.IGNORECASE)
+BADGE_PATH_PATTERN = re.compile(r"(?:^|[/_.-])badges?(?:[./?_-]|$)", flags=re.IGNORECASE)
 BADGE_PROVIDER_HOSTS = frozenset({"shields.io", "codecov.io"})
 BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags=re.IGNORECASE)
 FLOATING_POINT_PATTERN = re.compile(r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
@@ -520,11 +520,14 @@ def _element_is_link(element: Element) -> bool:
     )
 
 
+def _normalized_media_query(media: str) -> str:
+    return " ".join(CSS_COMMENT_PATTERN.sub(" ", media).casefold().split())
+
+
 def _picture_source_is_potentially_eligible(element: Element) -> bool:
     media = element.attrib.get("media")
     if media is not None:
-        normalized_media = " ".join(CSS_COMMENT_PATTERN.sub(" ", media).casefold().split())
-        if normalized_media == "not all":
+        if _normalized_media_query(media) == "not all":
             return False
         # Unknown or invalid queries remain inspectable: without a viewport and
         # full CSS evaluator, treating them as ineligible could hide a badge.
@@ -536,6 +539,34 @@ def _picture_source_is_potentially_eligible(element: Element) -> bool:
         return True
     prefix, separator, subtype = media_type.partition("/")
     return separator == "/" and prefix == "image" and MIME_SUBTYPE_PATTERN.fullmatch(subtype) is not None
+
+
+def _picture_source_is_terminal(element: Element, *, sources: Sequence[str]) -> bool:
+    """Return whether this source ends selection in every rendering environment."""
+    media = element.attrib.get("media")
+    media_is_unconditional = media is None or _normalized_media_query(media) in {"", "all"}
+    return bool(sources) and media_is_unconditional and "type" not in element.attrib
+
+
+def _picture_sources_before_image(
+    children: Sequence[Element],
+    *,
+    image_index: int,
+) -> tuple[tuple[tuple[Element, tuple[str, ...]], ...], bool]:
+    """Return reachable sources and whether the image fallback URL is unreachable."""
+    candidates: list[tuple[Element, tuple[str, ...]]] = []
+    for element in children[:image_index]:
+        if _element_name(element) != (XHTML_NAMESPACE, "source"):
+            continue
+        if not _picture_source_is_potentially_eligible(element):
+            continue
+        sources = tuple(candidate.url for candidate in _selectable_srcset_candidates(element.attrib.get("srcset", "")))
+        if not sources:
+            continue
+        candidates.append((element, sources))
+        if _picture_source_is_terminal(element, sources=sources):
+            return tuple(candidates), True
+    return tuple(candidates), False
 
 
 def _occurrence_for_element(
@@ -575,6 +606,7 @@ def _dom_image_occurrences(
     root = parser.parseFragment(rendered_html, container="div", scripting=True)
     occurrences: list[_ImageOccurrence] = []
     seen_markers: set[str] = set()
+    terminal_picture_images: set[int] = set()
 
     def record(element: Element, *, linked: bool, sources: Sequence[str]) -> None:
         marker = element.attrib.get(marker_attribute)
@@ -600,28 +632,25 @@ def _dom_image_occurrences(
         children = list(element)
 
         if name == (XHTML_NAMESPACE, "picture"):
-            previous_sources: list[Element] = []
-            for child in children:
-                child_name = _element_name(child)
-                if child_name == (XHTML_NAMESPACE, "source"):
-                    if _picture_source_is_potentially_eligible(child):
-                        previous_sources.append(child)
-                    continue
-                if child_name == (XHTML_NAMESPACE, "img"):
-                    for source_element in previous_sources:
+            for image_index, child in enumerate(children):
+                if _element_name(child) == (XHTML_NAMESPACE, "img"):
+                    previous_sources, is_terminal = _picture_sources_before_image(
+                        children,
+                        image_index=image_index,
+                    )
+                    for source_element, sources in previous_sources:
                         record(
                             source_element,
                             linked=linked,
-                            sources=tuple(
-                                candidate.url
-                                for candidate in _selectable_srcset_candidates(source_element.attrib.get("srcset", ""))
-                            ),
+                            sources=sources,
                         )
+                    if is_terminal:
+                        terminal_picture_images.add(id(child))
         elif name == (XHTML_NAMESPACE, "img"):
             record(
                 element,
                 linked=ancestor_linked,
-                sources=_html_image_sources(element),
+                sources=() if id(element) in terminal_picture_images else _html_image_sources(element),
             )
         elif name == (SVG_NAMESPACE, "image"):
             record(

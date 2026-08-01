@@ -136,6 +136,10 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
     [
         ("[![Coverage](https://example.test/coverage.svg)](https://example.test/report)\n", 1),
         ("[ ![Coverage](status.svg) ](report)\n", 1),
+        (
+            "[![pipeline](https://gitlab.example/group/project/-/badges/main/pipeline.svg)](report)\n",
+            1,
+        ),
         ("- item\n\n    [![Coverage](badge.svg)](report)\n", 3),
         (
             "[![Coverage][coverage-image]][coverage-report]\n\n"
