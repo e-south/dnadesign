@@ -50,6 +50,7 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         "Literal shortcut syntax: ![Coverage]\n\n"
         "Escaped image example: \\![Coverage](badge.svg)\n\n"
         "Inline example: `[![Coverage](coverage.svg)](report)`\n\n"
+        "![build](https://img%252Eshields%252Eio/status.svg)\n\n"
         "<!-- [![Coverage](coverage.svg)](report) -->\n\n"
         "    [![Coverage](badge.svg)](report)\n\n"
         ">     [![Coverage](badge.svg)](report)\n\n"
@@ -157,6 +158,7 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
             1,
         ),
         ('<img alt="quality > details" src="badge.svg">\n', 1),
+        ('<img alt="build" src="https://ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg">\n', 1),
         ('<a href="report">\n\n![Coverage](status.svg)\n\n</a>\n', 3),
         ('text <a href="report">\n<img alt="Coverage" src="status.svg">\n</a>\n', 2),
         (
@@ -184,6 +186,11 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
         ('<a href="report"><img alt="Coverage" alt="diagram" src="status.svg"></a>\n', 1),
         (
             '<picture><source srcset="https://img.shields.io/badge/build-passing.svg">'
+            '<img alt="build" src="diagram.svg"></picture>\n',
+            1,
+        ),
+        (
+            '<picture><source srcset="https://img%2Eshields%2Eio/github/actions/workflow/status/org/repo/ci.yml.svg">'
             '<img alt="build" src="diagram.svg"></picture>\n',
             1,
         ),
@@ -248,6 +255,74 @@ def test_badge_policy_rejects_alternate_badge_syntax_outside_root(
 
     assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
         f"{tool_readme}:{expected_line}: badges belong only in the root README; use a plain text link instead."
+    ]
+
+
+@pytest.mark.parametrize(
+    "provider_host",
+    [
+        "img%2Eshields%2Eio",
+        "img%E3%80%82shields%E3%80%82io",
+        "img%EF%BC%8Eshields%EF%BC%8Eio",
+        "img%EF%BD%A1shields%EF%BD%A1io",
+        "%EF%BD%89%EF%BD%8D%EF%BD%87%EF%BC%8E%EF%BD%93%EF%BD%88%EF%BD%89%EF%BD%85%EF%BD%8C%EF%BD%84%EF%BD%93%EF%BC%8E%EF%BD%89%EF%BD%8F",
+    ],
+)
+def test_badge_policy_normalizes_browser_equivalent_provider_hosts(
+    tmp_path: Path,
+    provider_host: str,
+) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(
+        tool_readme,
+        f"![build](https://{provider_host}/github/actions/workflow/status/org/repo/ci.yml.svg)\n",
+    )
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:1: badges belong only in the root README; use a plain text link instead."
+    ]
+
+
+@pytest.mark.parametrize(
+    "provider_url",
+    [
+        r"https:\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        r"https:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        r"https:/\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
+        r"https:ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
+        r"https:\img%E3%80%82shields%E3%80%82io\status.svg",
+        " https:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
+        "\thttps:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
+        "ht\ttps:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
+        "https\n:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
+        "\x1fhttps:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg ",
+    ],
+)
+def test_badge_policy_normalizes_browser_special_scheme_separators(
+    tmp_path: Path,
+    provider_url: str,
+) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(tool_readme, f'<img alt="build" src="{provider_url}">\n')
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:1: badges belong only in the root README; use a plain text link instead."
+    ]
+
+
+@pytest.mark.parametrize("encoded_delimiter", ["%23", "%3F", "%2F"])
+def test_badge_policy_preserves_encoded_userinfo_delimiters(
+    tmp_path: Path,
+    encoded_delimiter: str,
+) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(
+        tool_readme,
+        f'<img alt="build" src="https://user{encoded_delimiter}x@ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg">\n',
+    )
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:1: badges belong only in the root README; use a plain text link instead."
     ]
 
 

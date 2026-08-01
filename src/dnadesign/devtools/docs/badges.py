@@ -19,9 +19,11 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import count
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 from xml.etree.ElementTree import Element
 
 import html5lib
+import idna
 from html5lib._tokenizer import HTMLTokenizer, tokenTypes
 from html5lib.html5parser import HTMLParser, _ReparseException
 from markdown_it import MarkdownIt
@@ -38,9 +40,12 @@ BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags
 FLOATING_POINT_PATTERN = re.compile(r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 NON_NEGATIVE_INTEGER_PATTERN = re.compile(r"[0-9]+")
 ASCII_WHITESPACE = frozenset("\t\n\f\r ")
+C0_CONTROL_OR_SPACE = "".join(chr(codepoint) for codepoint in range(0x21))
 CSS_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", flags=re.DOTALL)
 MIME_SUBTYPE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*")
 RAW_IMAGE_TAGS = frozenset({"image", "img", "source"})
+SPECIAL_URL_SCHEMES = frozenset({"file", "ftp", "http", "https", "ws", "wss"})
+URL_PREPROCESS_TRANSLATION = str.maketrans("", "", "\t\n\r")
 XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 XLINK_HREF_ATTRIBUTE = "{http://www.w3.org/1999/xlink}href"
@@ -67,7 +72,7 @@ ROOT_README_ALLOWED_BADGES = frozenset(
 @dataclass(frozen=True, slots=True)
 class _ImageSpec:
     label: str
-    source: str
+    sources: tuple[str, ...]
     linked: bool
 
 
@@ -184,8 +189,31 @@ MARKDOWN.inline.ruler.at("image", _source_mapped_image_rule)
 MARKDOWN.inline.ruler.at("html_inline", _source_mapped_html_inline_rule)
 
 
-def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
-    return BADGE_SOURCE_PATTERN.search(source) is not None or (
+def _source_has_badge_hint(source: str) -> bool:
+    preprocessed_source = source.translate(URL_PREPROCESS_TRANSLATION).strip(C0_CONTROL_OR_SPACE)
+    scheme, separator, remainder = preprocessed_source.partition(":")
+    if separator and scheme.casefold() in SPECIAL_URL_SCHEMES:
+        remainder = remainder.replace("\\", "/").lstrip("/")
+        preprocessed_source = f"{scheme}://{remainder}"
+    hint_source = unquote(preprocessed_source) if "%" in preprocessed_source else preprocessed_source
+    if BADGE_SOURCE_PATTERN.search(hint_source) is not None:
+        return True
+    try:
+        hostname = urlsplit(preprocessed_source).hostname
+    except ValueError:
+        return False
+    if hostname is None:
+        return False
+    hostname = unquote(hostname) if "%" in hostname else hostname
+    try:
+        canonical_hostname = idna.encode(hostname, uts46=True, std3_rules=True).decode("ascii")
+    except idna.IDNAError:
+        return False
+    return BADGE_SOURCE_PATTERN.search(canonical_hostname) is not None
+
+
+def _looks_like_badge(*, label: str, sources: Sequence[str], linked: bool) -> bool:
+    return any(_source_has_badge_hint(source) for source in sources) or (
         linked and BADGE_LABEL_PATTERN.fullmatch(label) is not None
     )
 
@@ -520,7 +548,7 @@ def _occurrence_for_element(
     element: Element,
     *,
     marker_attribute: str,
-    source: str,
+    sources: Sequence[str],
     linked: bool,
 ) -> _ImageOccurrence | None:
     marker = element.attrib.get(marker_attribute)
@@ -534,7 +562,7 @@ def _occurrence_for_element(
         ordinal=int(ordinal_text),
         spec=_ImageSpec(
             label=element.attrib.get("alt", ""),
-            source=source,
+            sources=tuple(source for source in sources if source),
             linked=linked,
         ),
     )
@@ -561,7 +589,7 @@ def _dom_image_occurrences(
         occurrence = _occurrence_for_element(
             element,
             marker_attribute=marker_attribute,
-            source=" ".join(source for source in sources if source),
+            sources=sources,
             linked=linked,
         )
         if occurrence is not None:
@@ -627,7 +655,7 @@ def _rendered_badge_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
         for occurrence in _rendered_image_occurrences(content)
         if _looks_like_badge(
             label=occurrence.spec.label,
-            source=occurrence.spec.source,
+            sources=occurrence.spec.sources,
             linked=occurrence.spec.linked,
         )
     )
