@@ -38,7 +38,7 @@ def test_local_hairpin_handoff_digest_drift_blocks_binding_resolution(
 ) -> None:
     record_path = (
         _repo_root() / "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml"
+        "retron_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml"
     ).resolve()
     original_load_yaml = binding_sources.load_yaml
 
@@ -69,7 +69,7 @@ def test_catalog_handoff_marker_cannot_disable_hairpin_source_closure(
     ).resolve()
     record_path = (
         _repo_root() / "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml"
+        "retron_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml"
     ).resolve()
     original_load_yaml = binding_sources.load_yaml
 

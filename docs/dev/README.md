@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -22,7 +22,6 @@ Do not bump verification dates without reviewing the affected content.
 2. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
 3. Use [CI and quality checks](#ci-and-quality-checks) before merging maintainer changes.
 4. Use the repo-local gate here rather than `./scripts/agent-verify`. That script belongs to the external agent-hub repo and is not present in `dnadesign`.
-5. Review the [temporary privacy allowlist](privacy-legacy-path-allowlist.md) before regenerating the two named legacy provenance files.
 
 ### Quick checks by change type
 

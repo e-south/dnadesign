@@ -48,13 +48,12 @@ base-junction scar-nick work.
 - `docs/studies/retron_hairpin_design/workbench/provenance/`: compiler-run and
   materialization records that cite workbench design sets without storing bulky
   generated artifacts
-- `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/`:
-  MSD-region source records under an immutable historical evidence identity, with one-variant GenBank inputs
+- `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/`:
+  hairpin-owned MSD-region source records, with one-variant GenBank inputs
   under `source_inputs/variants/`, a `variant_sources.yaml` source manifest,
   decomposed variant YAML records, and pairing-segment facts. Retired bulk
-  source metadata is provenance only. Never use this historical id as a new
-  ingest default; new bundles use neutral, revisioned `retron_msd_structure_panel_v*`
-  identities.
+  source metadata is provenance only. New bundles use neutral, revisioned
+  `retron_msd_structure_panel_v*` identities.
 - `docs/studies/retron_hairpin_design/contexts/cruncher/scar-nick-base-junction.md`: the
   base-junction context for B26/B43 profile logic, strict terminal nick policy,
   retained scar families, and scar-nick schema implications

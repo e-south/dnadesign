@@ -87,4 +87,5 @@ validation:
   - An exact projection request containing a byte-blocked subject fails before any materialization writes.
   - Every published subject carries proven component authority; representable is binding eligibility, not a completed Construct projection.
   - When an MSD source exists, its sequence must match one unique forward or reverse-complement lnRNA span and its display identity must match.
+  - The MSD materialization id must equal its hairpin-owned source-bundle directory; retired Reader- or objective-coupled identities are rejected.
   - Absence of an MSD source does not invalidate RT-lnRNA identity.

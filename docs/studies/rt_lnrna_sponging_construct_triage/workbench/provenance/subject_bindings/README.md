@@ -3,7 +3,7 @@ doc_id: rt-lnrna-subject-bindings
 surface: study-workbench-provenance
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-07-29
+last_verified: 2026-08-01
 ---
 
 ## RT-lnRNA subject bindings
@@ -17,7 +17,9 @@ the RT-lnRNA study. It is not a global retron or RT registry.
   subjects: either a complete lnRNA cassette or a construct-ready MSD handoff,
   as declared by that catalog record.
 - The retron hairpin study owns MSD primitives and the source record used to
-  materialize secondary structures.
+  materialize secondary structures. Its active structure provenance uses the
+  study-owned `retron_msd_structure_panel_v1` identity; Reader and downstream
+  objective names do not enter this binding.
 - Reader aliases are exact join keys. Measurements and Reader experiment
   selection are outside this registry.
 - `construct_projection_status: representable` means the component references

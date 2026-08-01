@@ -27,6 +27,7 @@ from .validation import digest, mapping, object_list, require_exact_fields, sha2
 STUDY_ID = "rt_lnrna_sponging_construct_triage"
 CATALOG_AUTHORITY_KIND = "rt_lnrna_variant_genbank_catalog"
 RT_PART_PUBLICATION_KIND = "rt_part_publication_v1"
+_RETIRED_MSD_MATERIALIZATION_IDS = frozenset({"reader_" + "spop_msd_structure_panel_v1"})
 
 _PART_FIELDS = {
     "owner_study_id",
@@ -182,6 +183,8 @@ def resolve_msd_structure(
     )
     if ref.owner_study_id != "retron_hairpin_design":
         raise SubjectBindingContractError(f"{label}.owner_study_id must be retron_hairpin_design")
+    if ref.structure_materialization_id in _RETIRED_MSD_MATERIALIZATION_IDS:
+        raise SubjectBindingContractError(f"{label}: retired structure_materialization_id is not accepted")
     if ref.orientation_in_lnrna not in {"forward", "reverse_complement"}:
         raise SubjectBindingContractError(f"{label}.orientation_in_lnrna is unsupported")
     manifest_path = source_path(root, ref.source_manifest_path, label=label)

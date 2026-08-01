@@ -3,7 +3,7 @@ doc_id: study-retron-hairpin-design-workbench-provenance
 surface: study-workbench-provenance
 study_id: retron_hairpin_design
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 plane: evidence-plane
 surface_role: run-provenance-and-source-records
 ---
@@ -11,7 +11,7 @@ surface_role: run-provenance-and-source-records
 ## Retron Workbench Provenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 Stores what was run against a workbench design set. It stores compact
 manifests, command contracts, hashes, and output posture, not bulky generated
@@ -23,7 +23,7 @@ artifacts.
 | --- | --- |
 | Catalog compile invocation and digest | [compiler_runs/](compiler_runs/README.md) |
 | GenBank, plot, or sequence-bundle materialization posture | [materializations/](materializations/README.md) |
-| Historically named MSD-region source records, per-variant GenBank inputs, and pairing facts | [`msd_region_records/reader_spop_msd_structure_panel_v1/manifest.yaml`](msd_region_records/reader_spop_msd_structure_panel_v1/manifest.yaml) |
+| Hairpin-owned MSD-region source records, per-variant GenBank inputs, and pairing facts | [`msd_region_records/retron_msd_structure_panel_v1/manifest.yaml`](msd_region_records/retron_msd_structure_panel_v1/manifest.yaml) |
 | Design, compiler, primitive, and handoff lineage for selected variants 195–204 | [`pes_retron_195_204.yaml`](materialized_variant_lineage/pes_retron_195_204.yaml) |
 
 ### Boundary
@@ -34,16 +34,15 @@ generated output bundles.
 
 ### MSD Region Source Contract
 
-`msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/`
-is the authoritative GenBank source snapshot for the immutable, historically
-named MSD structure-evidence bundle. Each file
+`msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/`
+is the authoritative GenBank source snapshot for the immutable, hairpin-owned
+MSD structure-evidence bundle. Each file
 contains one retron variant, and `source_inputs/variant_sources.yaml` records the
 orientation rule, hashes, replacement inputs, and retired bulk source metadata.
 
-Do not rewrite that directory or reuse its SPOP-derived id for new work. The
-ingest CLI now defaults to the neutral `retron_msd_structure_panel_v1` bundle
-and compiler-spec identity. After that identity is published, later runs must
-mint another neutral revision rather than overwrite either provenance bundle.
+Do not rewrite that directory. The ingest CLI uses the same neutral bundle and
+compiler-spec identity. Later publications must mint another neutral revision
+rather than overwrite this provenance bundle.
 
 The retired `msd-regions - all DNA RNA.gb` file is migration provenance only.
 New ingest, plotting, and materialization code must read the per-variant

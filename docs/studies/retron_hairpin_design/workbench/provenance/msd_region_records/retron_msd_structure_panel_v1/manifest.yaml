@@ -216,7 +216,7 @@ source_record_count: 40
 included_record_count: 40
 skipped_record_count: 0
 skipped_records: []
-compiler_spec: compiler/reader_spop_msd_structure_panel_v1.spec.yaml
+compiler_spec: compiler/retron_msd_structure_panel_v1.spec.yaml
 discrepancy_report: reports/discrepancies.yaml
 records:
 - variant_id: retron26

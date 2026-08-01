@@ -1,7 +1,7 @@
 contract: retron_hairpin_materialized_variant_lineage_v1
 schema_version: 1
 owner_study_id: retron_hairpin_design
-source_bundle_manifest_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/manifest.yaml
+source_bundle_manifest_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/manifest.yaml
 selected_variant_ids:
   - retron195
   - retron196
@@ -34,10 +34,10 @@ entries:
       left_stem_base_5to3: CGGG
       right_stem_base_5to3: ACAG
       scar_nick_profile_s3s2s1s0: MXMX
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-195.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-195.gb
     source_genbank_sha256: 915cc882452e7b97e4bc081ebcb3548a3e0ec06fd1045e37f1188822228d3b85  # pragma: allowlist secret
     source_sequence_sha256: 2a563438824dc25042023c4d7d86d87057d1f59d0ff5c9c25549191dd3db42d1  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-195-msd-region.yaml
     msd_sequence_sha256: fd494658da0c4c75a7877a9f7216a3738e891e9aba0018bcfc3af2d235ae8a5b  # pragma: allowlist secret
   - variant_id: retron196
     display_id: pES-retron-196
@@ -58,10 +58,10 @@ entries:
       left_stem_base_5to3: CGGG
       right_stem_base_5to3: ACAG
       scar_nick_profile_s3s2s1s0: MXMX
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-196.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-196.gb
     source_genbank_sha256: 38754922c1b2e06e38f991a36d8fd2b67dbf69ce7ea7a68798140f51dc4e7664  # pragma: allowlist secret
     source_sequence_sha256: c56eba1b437f775320a0c6b6b25cc5775b12e37bb2d5eb8e0013483e1a5f0776  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-196-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-196-msd-region.yaml
     msd_sequence_sha256: 7c1cb0f4fad74c41f94fc83d49ba6a8d8245c6d1af2cb9d35905a33be1264e03  # pragma: allowlist secret
   - variant_id: retron197
     display_id: pES-retron-197
@@ -82,10 +82,10 @@ entries:
       left_stem_base_5to3: CAAG
       right_stem_base_5to3: CTCG
       scar_nick_profile_s3s2s1s0: MXMM
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-197.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-197.gb
     source_genbank_sha256: 6aebb1ac8ae8e6751ab1f523f096467794f197b21bef84e69e154eca782d9218  # pragma: allowlist secret
     source_sequence_sha256: 1cf3f3774dcfe8f1ffc241ae080486f3c2ad2d682e778392ca7d5f83fec2646d  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-197-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-197-msd-region.yaml
     msd_sequence_sha256: 52a4a742d4368d2e4f4df2753db385701d1debd586dc7c7ae56fe9018ee3d60d  # pragma: allowlist secret
   - variant_id: retron198
     display_id: pES-retron-198
@@ -106,10 +106,10 @@ entries:
       left_stem_base_5to3: CAAG
       right_stem_base_5to3: CTCG
       scar_nick_profile_s3s2s1s0: MXMM
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-198.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-198.gb
     source_genbank_sha256: 478b714055701560a6fd3d8444a5c2c280eca15ae28d3be59290bb1584fe11c5  # pragma: allowlist secret
     source_sequence_sha256: dda7dae7f6051eb573e8a813a5cd8fe975f01347b4929e36fe3a7b6db310067f  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-198-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-198-msd-region.yaml
     msd_sequence_sha256: bc7f600260e5009049e261a02028452c8179c28ad2c5d947ffa40f2cae5e2309  # pragma: allowlist secret
   - variant_id: retron199
     display_id: pES-retron-199
@@ -131,10 +131,10 @@ entries:
       right_stem_base_5to3: CATG
       scar_nick_profile_s3s2s1s0: XWMM
       literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-199.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-199.gb
     source_genbank_sha256: a0cf1bd1404ae2ac44bfa519fe1a294fcd892cd4d37138bc9b00659647b40d86  # pragma: allowlist secret
     source_sequence_sha256: 77421d4112188a91410a3d74b65983ee8242591e5a62bbe122e60214b5ddb96d  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-199-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-199-msd-region.yaml
     msd_sequence_sha256: 904c499c2e4eca7363e085c3e5045c9676e7776ab9f603876859acf840e30848  # pragma: allowlist secret
   - variant_id: retron200
     display_id: pES-retron-200
@@ -156,10 +156,10 @@ entries:
       right_stem_base_5to3: CATG
       scar_nick_profile_s3s2s1s0: XWMM
       literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-200.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-200.gb
     source_genbank_sha256: 6b0946697247437ac23272f834e3379a837d28c4b359791011d6d8f4bf8112df  # pragma: allowlist secret
     source_sequence_sha256: 74835be07ba27a00a95371aa7aa599ac398cc1cfcd1468f7f36608e4874aa7ec  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-200-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-200-msd-region.yaml
     msd_sequence_sha256: d336af2e8b2f541c7d79cfb5ae39dccbaf4d785765c721cfa10ba2684f5b6aec  # pragma: allowlist secret
   - variant_id: retron201
     display_id: pES-retron-201
@@ -180,10 +180,10 @@ entries:
       left_stem_base_5to3: CGGG
       right_stem_base_5to3: ACAG
       scar_nick_profile_s3s2s1s0: MXMX
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-201.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-201.gb
     source_genbank_sha256: ad766f117866923a71f01e00081d1469473388ffb450b499a10b7957ea38f778  # pragma: allowlist secret
     source_sequence_sha256: 903900ec29d4eb4e0120fc671c5cf535909cc24595af15e2a41094828848cf88  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-201-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-201-msd-region.yaml
     msd_sequence_sha256: 9df5398c93af1b581315817e4526a5ad661f4465af663fc6e728455fc7ed3bc4  # pragma: allowlist secret
   - variant_id: retron202
     display_id: pES-retron-202
@@ -204,10 +204,10 @@ entries:
       left_stem_base_5to3: CGGG
       right_stem_base_5to3: ACAG
       scar_nick_profile_s3s2s1s0: MXMX
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-202.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-202.gb
     source_genbank_sha256: d99ed25d9c515a3ac6b94fe24c2fc668ec4da186941b543f7668efdcf18dffce  # pragma: allowlist secret
     source_sequence_sha256: c234593ccf02127c65d7ca97de95fed2e1201ca699ce140d33040e9ce414fd5c  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-202-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-202-msd-region.yaml
     msd_sequence_sha256: 32f9cd2dc5ff6e4d3d3d7a5373afb9fa9b371f5e209315398a52663d29d23703  # pragma: allowlist secret
   - variant_id: retron203
     display_id: pES-retron-203
@@ -229,10 +229,10 @@ entries:
       right_stem_base_5to3: CATG
       scar_nick_profile_s3s2s1s0: XWMM
       literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-203.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-203.gb
     source_genbank_sha256: 8ca96dfb613a9e4a1014b034de15f926c49a1298384053d9a2709d9940817102  # pragma: allowlist secret
     source_sequence_sha256: 8e63dba95076184d8d97d0eec32671d11c70268e0ccdbddfc10ef1489b521bb1  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-203-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-203-msd-region.yaml
     msd_sequence_sha256: 36f2f8b6620549bb949594d6d3140c2d18c3d6a51f974951ce26818293b7b2ca  # pragma: allowlist secret
   - variant_id: retron204
     display_id: pES-retron-204
@@ -254,8 +254,8 @@ entries:
       right_stem_base_5to3: CATG
       scar_nick_profile_s3s2s1s0: XWMM
       literal_stem_base_source_id: retron180_literal_AGTG_CATG_XWMM_bottom_NbBtsI
-    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants/pes-retron-204.gb
+    source_genbank_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/source_inputs/variants/pes-retron-204.gb
     source_genbank_sha256: e025748cdcd30159de2cb3f76145c22214e17460f4932d6089f56ba2d312e3d1  # pragma: allowlist secret
     source_sequence_sha256: 09f928d08508df8769c2bd87bc9c7e3da0ac2c541b43c6d48b521cc8f37301e0  # pragma: allowlist secret
-    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/variants/pes-retron-204-msd-region.yaml
+    msd_region_record_ref: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/variants/pes-retron-204-msd-region.yaml
     msd_sequence_sha256: 26d27aece2bf97d59a6430938620457e09e31262ff5af86bfbab6ee1ba2fba8d  # pragma: allowlist secret

@@ -14,7 +14,8 @@ In scope:
 - Retron MSD shorthand IDs and explicit part sets.
 - Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, literal payloads or trim metadata, and selected public cap/stem-base primitive sources.
 - Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation and workbench provenance.
-- MSD-region source ingest from one-variant GenBank files, plus decomposed primitive and pairing records under workbench provenance. The retained `reader_spop_msd_structure_panel_v1` name is an immutable historical evidence identity, not an active metric route or a future output default. New runs start from the neutral `retron_msd_structure_panel_v1` identity and mint a new neutral revision rather than rewriting the historical bundle.
+- MSD-region source ingest from one-variant GenBanks, plus decomposed records
+  under hairpin-owned `retron_msd_structure_panel_v1` provenance; later publications mint a neutral revision.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
 - Routing mismatch-display questions to YIU as contrast only.
@@ -67,7 +68,11 @@ Out of scope:
   payload/cap sequences; `C###` cap IDs never imply a de033 sequence by pattern.
 - Need an intentional non-ligatable S0 control: materialize with `--allow-non-ligatable-s0` or a typed spec that sets `allow_non_ligatable_s0: true`; do not use this for profile-drift errors.
 - Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
-- Need MSD source primitives, stem lengths, or pairing status: open the historically named `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/manifest.yaml`. For exact design/compiler/deliverable lineage of the selected `pES-retron-195` through `pES-retron-204` cohort, open `docs/studies/retron_hairpin_design/workbench/provenance/materialized_variant_lineage/pes_retron_195_204.yaml`. The selection points to the source bundle; the historical bundle does not point back. Active GenBank sources are one file per variant under `source_inputs/variants/`; retired bulk source metadata is provenance only.
+- Need MSD primitives, stem lengths, or pairing status: open
+  `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/manifest.yaml`;
+  for selected `pES-retron-195` through `pES-retron-204` lineage, open
+  `docs/studies/retron_hairpin_design/workbench/provenance/materialized_variant_lineage/pes_retron_195_204.yaml`.
+  Selection points to sources, not the reverse; active GenBanks are one file per variant, and retired bulk-source metadata is provenance only.
 - Missing cap, shortening, or stem/cap geometry: route to Snapback in `docs/studies/retron_hairpin_design/routes/README.md`.
 - Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile: route to scar-nick.
 - Mismatch-only display or boundary contrast: route to YIU; it is not the
