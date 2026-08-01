@@ -78,6 +78,24 @@ def test_selected_decision_serialization_binds_attempts_but_is_not_a_publication
         validate_decision_payload(fabricated)
 
 
+def test_decision_policy_identity_binds_the_actual_condition_ontology() -> None:
+    readiness = EvidenceReadiness._from_validated_receipt(
+        selected_experiment_count=8,
+        ready_experiment_count=0,
+        ready_experiment_ids=(),
+        blocked_experiment_ids=KINETIC_IDS,
+        receipt_digest=_digest("8"),
+    )
+    protocol = replace(DEFAULT_PROTOCOL, condition_ontology_digest=_digest("6"))
+    payload = decision_to_dict(decision_from_readiness(readiness, protocol=protocol))
+
+    assert payload["condition_ontology_digest"] == protocol.condition_ontology_digest
+    validate_decision_payload(payload)
+    payload["condition_ontology_digest"] = DEFAULT_PROTOCOL.condition_ontology_digest
+    with pytest.raises(MetastudyContractError, match="policy_digest"):
+        validate_decision_payload(payload)
+
+
 def test_materialization_attempt_rejects_noncanonical_or_duplicate_profile_digests() -> None:
     attempt = _attempts(_evidence())[0]
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Literal
 
 from ._values import MetastudyContractError, _digest, _nonnegative, _unique_text
@@ -109,6 +109,7 @@ class MetastudyDecision:
 
     contract_id: str
     protocol_id: str
+    condition_ontology_digest: str
     status: DecisionStatus
     selection_use: Literal["descriptive_comparison"]
     evidence_grade: Literal["provisional_descriptive", "none"]
@@ -125,13 +126,18 @@ class MetastudyDecision:
     def __post_init__(self) -> None:
         if self.contract_id != DECISION_CONTRACT_ID or self.protocol_id != PROTOCOL_ID:
             raise MetastudyContractError("decision contract or protocol identity changed")
+        _digest(self.condition_ontology_digest, label="condition_ontology_digest")
         if self.status not in {"selected", "blocked"}:
             raise MetastudyContractError("decision status must be selected or blocked")
         if self.selection_use != "descriptive_comparison":
             raise MetastudyContractError("meta-study selection use must remain descriptive_comparison")
         _digest(self.policy_digest, label="policy_digest")
         _digest(self.evidence_digest, label="evidence_digest")
-        if self.policy_digest != protocol_digest():
+        expected_protocol = replace(
+            DEFAULT_PROTOCOL,
+            condition_ontology_digest=self.condition_ontology_digest,
+        )
+        if self.policy_digest != protocol_digest(expected_protocol):
             raise MetastudyContractError("decision policy_digest does not match the predeclared protocol")
         _unique_text(self.blockers, label="blockers", allow_empty=self.status == "selected")
         _unique_text(self.limitations, label="limitations", allow_empty=True)
@@ -248,6 +254,7 @@ def validate_decision_payload(payload: Mapping[str, object]) -> None:
     expected = {
         "contract_id",
         "protocol_id",
+        "condition_ontology_digest",
         "status",
         "selection_use",
         "evidence_grade",
@@ -285,7 +292,13 @@ def validate_decision_payload(payload: Mapping[str, object]) -> None:
         raise MetastudyContractError("decision status must be selected or blocked")
     _digest(payload["policy_digest"], label="policy_digest")
     _digest(payload["evidence_digest"], label="evidence_digest")
-    if payload["policy_digest"] != protocol_digest():
+    condition_ontology_digest = payload["condition_ontology_digest"]
+    _digest(condition_ontology_digest, label="condition_ontology_digest")
+    expected_protocol = replace(
+        DEFAULT_PROTOCOL,
+        condition_ontology_digest=condition_ontology_digest,
+    )
+    if payload["policy_digest"] != protocol_digest(expected_protocol):
         raise MetastudyContractError("decision policy_digest does not match the predeclared protocol")
     readiness = payload["readiness"]
     evaluations = payload["evaluations"]
@@ -390,6 +403,7 @@ def validate_decision_payload(payload: Mapping[str, object]) -> None:
         MetastudyDecision(
             contract_id=payload["contract_id"],
             protocol_id=payload["protocol_id"],
+            condition_ontology_digest=payload["condition_ontology_digest"],
             status=status,
             selection_use=payload["selection_use"],
             evidence_grade=payload["evidence_grade"],

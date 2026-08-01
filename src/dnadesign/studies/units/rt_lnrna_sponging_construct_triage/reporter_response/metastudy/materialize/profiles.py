@@ -197,6 +197,8 @@ def _build_profile(
         label = definition.treatment_label
         selected_condition = selected.loc[selected["treatment"].eq(label)]
         reference_condition_rows = reference_rows.loc[reference_rows["treatment"].eq(label)]
+        if definition.role == "positive_control" and (selected_condition.empty or reference_condition_rows.empty):
+            continue
         if replicate_field is None:
             biological_replicate_ids: tuple[str | None, ...] = (None,)
         else:
@@ -251,7 +253,7 @@ def _build_profile(
             condition_measurements.append(measurement)
 
     baselines = measurements_by_condition[baseline.condition_id]
-    positives = measurements_by_condition[positive.condition_id] if positive is not None else []
+    positives = measurements_by_condition.get(positive.condition_id, []) if positive is not None else []
     if replicate_field is not None and policy.pairing_kind == "paired_by_design":
         return "explicit_paired_control_assignment_missing"
     reference_basis = resolve_reference_basis(baselines=baselines, positive=positive, positives=positives)

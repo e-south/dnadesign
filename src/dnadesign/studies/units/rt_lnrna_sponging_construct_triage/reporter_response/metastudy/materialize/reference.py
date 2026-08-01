@@ -33,7 +33,13 @@ def resolve_reference_basis(
     separation = positive_ratio - baseline_ratio if positive_ratio is not None else None
     if separation is not None and separation > 0.0:
         return ReferenceBasis(baseline_ratio, baseline_od600, separation, None)
-    reason = "positive_control_not_declared" if positive is None else "positive_control_separation_not_positive"
+    reason = (
+        "positive_control_not_declared"
+        if positive is None
+        else "positive_control_observations_missing"
+        if not positives
+        else "positive_control_separation_not_positive"
+    )
     return ReferenceBasis(
         baseline_ratio,
         baseline_od600,

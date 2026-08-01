@@ -49,6 +49,7 @@ properties:
       reason:
         enum:
           - positive_control_not_declared
+          - positive_control_observations_missing
           - positive_control_separation_not_positive
       positive_control_condition_id:
         anyOf:

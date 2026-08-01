@@ -261,6 +261,7 @@ def _evaluate_canonical_evidence(
     return MetastudyDecision._from_canonical_evaluation(
         contract_id=DECISION_CONTRACT_ID,
         protocol_id=protocol.protocol_id,
+        condition_ontology_digest=protocol.condition_ontology_digest,
         status="selected",
         selection_use="descriptive_comparison",
         evidence_grade="provisional_descriptive",
@@ -341,6 +342,7 @@ def _evaluate_candidate(
             blockers.append("growth_phase_end_before_deceleration")
 
     separation_by_experiment: dict[str, list[float]] = defaultdict(list)
+    normalization_complete = True
     anchor_values_by_acquisition: dict[tuple[str, str], dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     for row in rows:
         profile = row.profile
@@ -348,6 +350,7 @@ def _evaluate_candidate(
         if experiment_id not in eligible_experiments:
             continue
         if isinstance(profile, ReporterMeasurementProfile) or getattr(profile, "reference_normalization", None):
+            normalization_complete = False
             limitations.append("reference_normalization_unavailable")
             continue
         if not isinstance(profile, (ReporterResponseProfile, ProfileContentProjection)):
@@ -374,7 +377,11 @@ def _evaluate_candidate(
                 )
     if any(not values or min(values) <= 0.0 for values in separation_by_experiment.values()):
         blockers.append("positive_control_separation_failed")
-    worst_separation = min((min(values) for values in separation_by_experiment.values()), default=None)
+    worst_separation = (
+        min((min(values) for values in separation_by_experiment.values()), default=None)
+        if normalization_complete
+        else None
+    )
 
     co_measured = 0
     ordered = 0
@@ -447,6 +454,7 @@ def _blocked(
     return MetastudyDecision(
         contract_id=DECISION_CONTRACT_ID,
         protocol_id=protocol.protocol_id,
+        condition_ontology_digest=protocol.condition_ontology_digest,
         status="blocked",
         selection_use="descriptive_comparison",
         evidence_grade="none",

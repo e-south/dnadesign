@@ -23,6 +23,7 @@ from .profile import (
 MEASUREMENT_PROFILE_CONTRACT_ID = "rt_lnrna_reporter_measurement_profile.v1"
 ReferenceNormalizationAbsenceReason = Literal[
     "positive_control_not_declared",
+    "positive_control_observations_missing",
     "positive_control_separation_not_positive",
 ]
 
@@ -38,6 +39,7 @@ class ReferenceNormalizationUnavailable:
     def __post_init__(self) -> None:
         if self.reason not in {
             "positive_control_not_declared",
+            "positive_control_observations_missing",
             "positive_control_separation_not_positive",
         }:
             raise ReporterResponseContractError("reference-normalization absence reason is undeclared")
@@ -110,15 +112,25 @@ class ReporterMeasurementProfile:
             raise ReporterResponseContractError("dose observations must cover the declared dose grid exactly")
         if self.reference_normalization.reason == "positive_control_not_declared" and positive_rows:
             raise ReporterResponseContractError("positive-control measurements contradict not-declared status")
-        if self.reference_normalization.reason == "positive_control_separation_not_positive":
+        if self.reference_normalization.reason in {
+            "positive_control_observations_missing",
+            "positive_control_separation_not_positive",
+        }:
             expected_id = self.reference_normalization.positive_control_condition_id
-            if not positive_rows or {row.condition_id for row in positive_rows} != {expected_id}:
+            if self.reference_normalization.reason == "positive_control_observations_missing" and positive_rows:
+                raise ReporterResponseContractError("missing positive-control observations cannot be present")
+            if self.reference_normalization.reason == "positive_control_separation_not_positive" and (
+                not positive_rows or {row.condition_id for row in positive_rows} != {expected_id}
+            ):
                 raise ReporterResponseContractError(
                     "non-positive separation status must name the observed positive-control condition"
                 )
-            baseline_ratio = statistics.median(row.rfp_over_od600 for row in baseline_rows)
-            positive_ratio = statistics.median(row.rfp_over_od600 for row in positive_rows)
-            if positive_ratio - baseline_ratio > 0.0:
+            if (
+                positive_rows
+                and statistics.median(row.rfp_over_od600 for row in positive_rows)
+                - statistics.median(row.rfp_over_od600 for row in baseline_rows)
+                > 0.0
+            ):
                 raise ReporterResponseContractError(
                     "positive baseline separation requires the reference-normalized profile variant"
                 )

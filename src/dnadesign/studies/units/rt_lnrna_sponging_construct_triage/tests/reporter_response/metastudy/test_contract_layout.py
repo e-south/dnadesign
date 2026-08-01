@@ -80,7 +80,7 @@ _MATERIALIZE_TEST_LINE_BUDGETS = {
     "_support.py": 340,
     "test_identity.py": 380,
     "test_profiles.py": 370,
-    "test_reference_profiles.py": 130,
+    "test_reference_profiles.py": 160,
     "test_service.py": 150,
     "test_temporal.py": 150,
 }

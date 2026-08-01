@@ -120,3 +120,25 @@ def test_nonpositive_reference_separation_does_not_drop_raw_profile(tmp_path: Pa
     assert {row.profile.reference_normalization.reason for row in result.candidate_evidence} == {
         "positive_control_separation_not_positive"
     }
+
+
+def test_declared_but_unobserved_positive_control_preserves_raw_profile(tmp_path: Path) -> None:
+    record, bindings = _source_closed_inputs(tmp_path)
+    frame = pd.read_parquet(record.path)
+    frame = frame.loc[~frame["treatment"].eq("200 nm aTc; 0 uM IPTG")]
+    frame.to_parquet(record.path, index=False)
+    _rehash(record, bindings)
+
+    result = materialize_record_evidence(
+        record=record,
+        bindings=bindings,
+        ontology=_ontology(),
+        observation_policy=_policy(),
+        protocol=DEFAULT_PROTOCOL,
+    )
+
+    assert result.status == "complete"
+    assert result.omissions == ()
+    assert {row.profile.reference_normalization.reason for row in result.candidate_evidence} == {
+        "positive_control_observations_missing"
+    }

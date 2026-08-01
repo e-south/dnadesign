@@ -232,6 +232,7 @@ def test_selected_decision_cannot_be_reconstructed_from_copied_fields() -> None:
         MetastudyDecision(
             contract_id=selected.contract_id,
             protocol_id=selected.protocol_id,
+            condition_ontology_digest=selected.condition_ontology_digest,
             status=selected.status,
             selection_use=selected.selection_use,
             evidence_grade=selected.evidence_grade,

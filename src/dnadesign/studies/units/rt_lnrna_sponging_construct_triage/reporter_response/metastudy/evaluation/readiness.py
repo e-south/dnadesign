@@ -41,6 +41,7 @@ def decision_from_readiness(
     return MetastudyDecision(
         contract_id=DECISION_CONTRACT_ID,
         protocol_id=protocol.protocol_id,
+        condition_ontology_digest=protocol.condition_ontology_digest,
         status="blocked",
         selection_use="descriptive_comparison",
         evidence_grade="none",

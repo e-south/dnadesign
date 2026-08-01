@@ -72,6 +72,28 @@ def test_selection_uses_control_separation_only_when_reference_normalization_exi
     assert all("positive_control_separation_failed" not in row.blockers for row in decision.evaluations)
 
 
+def test_partial_normalization_coverage_disables_separation_for_the_whole_window() -> None:
+    normalized = _evidence()
+    raw = {
+        (row.profile.provenance.reader_experiment_id, row.profile.subject_id, row.profile.reduction): row
+        for row in _evidence(reference_normalized=False)
+    }
+    first = normalized[0]
+    key = (
+        first.profile.provenance.reader_experiment_id,
+        first.profile.subject_id,
+        first.profile.reduction,
+    )
+    evidence = (raw[key], *normalized[1:])
+
+    decision = evaluate_metastudy(evidence, readiness=_ready())
+
+    mixed = next(row for row in decision.evaluations if row.reduction == (4.0, 8.0))
+    assert mixed.worst_experiment_control_separation is None
+    assert "reference_normalization_unavailable" in mixed.limitations
+    assert decision.selected_reduction == (6.0, 10.0)
+
+
 def test_growth_phase_gate_reduces_within_acquisition_before_across_experiments() -> None:
     evidence: list[ProfileEvidence] = []
     for row in _evidence():
