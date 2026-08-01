@@ -17,7 +17,7 @@ import math
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
-from ..profile import ConditionRole
+from ..profile.measurement import ConditionRole
 from .contracts._values import MetastudyContractError
 
 CONDITION_ONTOLOGY_CONTRACT_ID = "rt_lnrna_reporter_response_condition_ontology.v1"

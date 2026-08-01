@@ -19,11 +19,9 @@ from typing import Literal
 from ._contract_values import ReporterResponseContractError
 from ._contract_values import json_value as _json_value
 from ._contract_values import required_text as _required_text
-from .profile import (
-    PairingKind,
-    UncertaintyPolicy,
-    WithinAcquisitionReductionStatistic,
-)
+from .profile.measurement import WithinAcquisitionReductionStatistic
+from .profile.response import PairingKind
+from .profile.uncertainty import UncertaintyPolicy
 
 OBSERVATION_POLICY_CONTRACT_ID = "rt_lnrna_reporter_response_observation_policy.v3"
 NORMALIZED_REPORTER_FORMULA = "(Z_d-Z_0)/(Z_positive-Z_0)"

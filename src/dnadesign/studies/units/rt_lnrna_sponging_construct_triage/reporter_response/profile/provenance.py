@@ -145,16 +145,23 @@ class ReaderEvidenceProvenance:
         self,
         values: tuple[tuple[str, str | None], ...],
     ) -> None:
-        """Require condition-scoped profile identities to equal the source declaration."""
+        """Require exact source-declared identities for every profile condition."""
 
         observed = tuple(sorted({(condition, value) for condition, value in values if value is not None}))
         contains_unknown = any(value is None for _, value in values)
         expected = self._declared_biological_replicate_scopes
         if expected:
-            if contains_unknown or observed != expected:
+            selected_conditions = {condition for condition, _ in values}
+            source_conditions = {condition for condition, _ in expected}
+            expected_for_selected_conditions = tuple(scope for scope in expected if scope[0] in selected_conditions)
+            if (
+                contains_unknown
+                or not selected_conditions <= source_conditions
+                or observed != expected_for_selected_conditions
+            ):
                 raise ReporterResponseContractError(
-                    "profile condition-scoped biological-replicate identities must equal the source-closed "
-                    "Reader binding"
+                    "profile condition-scoped biological-replicate identities must exactly cover each selected "
+                    "condition in the source-closed Reader binding"
                 )
         elif observed:
             raise ReporterResponseContractError(

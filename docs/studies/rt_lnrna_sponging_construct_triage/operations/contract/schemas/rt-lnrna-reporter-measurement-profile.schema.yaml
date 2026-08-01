@@ -59,3 +59,51 @@ properties:
     $ref: 'rt_lnrna_reporter_response_profile.v3#/$defs/eligibility'
   comparability_key:
     $ref: 'rt_lnrna_reporter_response_profile.v3#/$defs/sha256_digest'
+allOf:
+  - if:
+      properties:
+        reference_normalization:
+          properties:
+            reason: {const: positive_control_not_declared}
+    then:
+      properties:
+        reference_normalization:
+          properties:
+            positive_control_condition_id: {type: "null"}
+        measurements:
+          not:
+            contains:
+              properties:
+                role: {const: positive_control}
+              required: [role]
+  - if:
+      properties:
+        reference_normalization:
+          properties:
+            reason: {const: positive_control_observations_missing}
+    then:
+      properties:
+        reference_normalization:
+          properties:
+            positive_control_condition_id: {type: string, minLength: 1}
+        measurements:
+          not:
+            contains:
+              properties:
+                role: {const: positive_control}
+              required: [role]
+  - if:
+      properties:
+        reference_normalization:
+          properties:
+            reason: {const: positive_control_separation_not_positive}
+    then:
+      properties:
+        reference_normalization:
+          properties:
+            positive_control_condition_id: {type: string, minLength: 1}
+        measurements:
+          contains:
+            properties:
+              role: {const: positive_control}
+            required: [role]

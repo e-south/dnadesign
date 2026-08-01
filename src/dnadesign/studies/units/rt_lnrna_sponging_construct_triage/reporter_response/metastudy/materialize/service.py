@@ -19,7 +19,8 @@ from typing import Literal
 import pandas as pd
 
 from ....reader_evidence import ReaderDataframeRecordRef, ReaderEvidenceBindingSet
-from ... import EndpointReduction, ReporterResponseObservationPolicy, TimeWindowReduction
+from ...policy import ReporterResponseObservationPolicy
+from ...profile.measurement import EndpointReduction, TimeWindowReduction
 from ..audits import profile_digest
 from ..condition_ontology import ReporterResponseConditionOntology
 from ..contracts.materialization import (
@@ -30,13 +31,9 @@ from ..contracts.materialization import (
 )
 from ..contracts.protocol import DEFAULT_PROTOCOL, MetastudyProtocol
 from ..sensitivity_coverage import SensitivitySubjectCoordinate, build_sensitivity_coverage
+from .identities import _has_ambiguous_partial_identity, _observed_reader_identities, _reader_identity_mask
 from .models import MaterializationReadiness
-from .profiles import (
-    _has_ambiguous_partial_identity,
-    _materialize_reductions,
-    _observed_reader_identities,
-    _reader_identity_mask,
-)
+from .reductions import _materialize_reductions
 
 _BASE_COLUMNS = {"type", "position", "time", "channel", "value", "treatment", "design_id"}
 _QUALITY_COLUMNS = {"value_policy_clipped", "value_instrument_overflow", "value_bound_kind"}

@@ -18,14 +18,37 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 
 _METASTUDY_ROOT = Path(__file__).parents[3] / "reporter_response" / "metastudy"
 _MATERIALIZE_ROOT = _METASTUDY_ROOT / "materialize"
-_EXPECTED_MODULES = {"__init__.py", "models.py", "profiles.py", "reference.py", "service.py", "temporal.py"}
+_EXPECTED_MODULES = {
+    "__init__.py",
+    "identities.py",
+    "models.py",
+    "profile_building.py",
+    "reductions.py",
+    "reference.py",
+    "service.py",
+    "temporal.py",
+    "uncertainty.py",
+}
 _LINE_BUDGETS = {
     "__init__.py": 25,
+    "identities.py": 80,
     "models.py": 80,
-    "profiles.py": 410,
+    "profile_building.py": 300,
+    "reductions.py": 100,
     "reference.py": 70,
     "service.py": 380,
     "temporal.py": 280,
+    "uncertainty.py": 80,
+}
+_ALLOWED_SIBLING_IMPORTS = {
+    "identities.py": set(),
+    "models.py": set(),
+    "profile_building.py": {"reference", "temporal", "uncertainty"},
+    "reductions.py": {"identities", "profile_building"},
+    "reference.py": set(),
+    "service.py": {"identities", "models", "reductions"},
+    "temporal.py": set(),
+    "uncertainty.py": {"temporal"},
 }
 
 
@@ -52,3 +75,17 @@ def test_materialization_production_modules_do_not_import_the_facade() -> None:
             if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module is None
         ]
         assert not facade_imports, f"{path.name} must import the owning materialization leaf"
+
+
+def test_materialization_dependencies_follow_the_semantic_owner_graph() -> None:
+    for filename, allowed in _ALLOWED_SIBLING_IMPORTS.items():
+        path = _MATERIALIZE_ROOT / filename
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        sibling_imports = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module is not None
+        }
+        assert sibling_imports <= allowed, (
+            f"{filename} has reverse or undeclared dependencies: {sibling_imports - allowed}"
+        )

@@ -21,12 +21,9 @@ import yaml
 
 from ..acquisition_projection import validate_acquisition_projection_payload
 from ..contracts._values import MetastudyContractError
-from ..contracts.decision import (
-    DEFAULT_OBJECTIVE_READINESS,
-    objective_readiness_from_payload,
-    validate_decision_payload,
-)
+from ..contracts.decision_codec import validate_decision_payload
 from ..contracts.materialization import materialization_attempt_from_payload
+from ..contracts.objective import DEFAULT_OBJECTIVE_READINESS, objective_readiness_from_payload
 from ..contracts.protocol import DEFAULT_PROTOCOL
 from ..sensitivity import parse_sensitivity_evaluations
 from ..sensitivity_coverage import validate_sensitivity_coverage_receipt_payloads

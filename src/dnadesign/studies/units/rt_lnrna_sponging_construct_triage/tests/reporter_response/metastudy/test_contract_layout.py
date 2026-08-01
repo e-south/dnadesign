@@ -17,6 +17,7 @@ from pathlib import Path
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
     contracts,
     evaluation,
+    evidence_projection,
     operator,
 )
 
@@ -26,29 +27,49 @@ _CONTRACTS_ROOT = _METASTUDY_ROOT / "contracts"
 _EVALUATION_ROOT = _METASTUDY_ROOT / "evaluation"
 _OPERATOR_ROOT = _METASTUDY_ROOT / "operator"
 _ACQUISITION_PROJECTION_ROOT = _METASTUDY_ROOT / "acquisition_projection"
+_EVIDENCE_PROJECTION_ROOT = _METASTUDY_ROOT / "evidence_projection"
+_SENSITIVITY_COVERAGE_ROOT = _METASTUDY_ROOT / "sensitivity_coverage"
 _EXPECTED_CONTRACT_MODULES = {
     "__init__.py",
     "_values.py",
+    "candidate.py",
     "decision.py",
+    "decision_codec.py",
     "materialization.py",
+    "objective.py",
     "profile.py",
+    "profile_identity.py",
     "protocol.py",
+    "sensitivity.py",
 }
 _LINE_BUDGETS = {
     "__init__.py": 90,
     "_values.py": 90,
-    "decision.py": 550,
+    "candidate.py": 150,
+    "decision.py": 180,
+    "decision_codec.py": 240,
     "materialization.py": 400,
+    "objective.py": 90,
     "profile.py": 170,
+    "profile_identity.py": 70,
     "protocol.py": 270,
+    "sensitivity.py": 50,
 }
-_EXPECTED_EVALUATION_MODULES = {"__init__.py", "comparability.py", "evidence.py", "readiness.py", "selection.py"}
+_EXPECTED_EVALUATION_MODULES = {
+    "__init__.py",
+    "candidate.py",
+    "comparability.py",
+    "evidence.py",
+    "readiness.py",
+    "selection.py",
+}
 _EVALUATION_LINE_BUDGETS = {
     "__init__.py": 35,
+    "candidate.py": 190,
     "comparability.py": 40,
     "evidence.py": 240,
     "readiness.py": 250,
-    "selection.py": 480,
+    "selection.py": 320,
 }
 _EXPECTED_OPERATOR_MODULES = {
     "__init__.py",
@@ -83,7 +104,7 @@ _MATERIALIZE_TEST_LINE_BUDGETS = {
     "_support.py": 340,
     "test_identity.py": 380,
     "test_profiles.py": 370,
-    "test_reference_profiles.py": 160,
+    "test_reference_profiles.py": 210,
     "test_service.py": 150,
     "test_temporal.py": 150,
 }
@@ -112,6 +133,27 @@ _ACQUISITION_PROJECTION_LINE_BUDGETS = {
     "building.py": 220,
     "contracts.py": 230,
     "serialization.py": 130,
+}
+_EVIDENCE_PROJECTION_LINE_BUDGETS = {
+    "__init__.py": 25,
+    "_values.py": 60,
+    "audit_parsing.py": 60,
+    "contracts.py": 130,
+    "parsing.py": 330,
+}
+_EVIDENCE_PROJECTION_ALLOWED_SIBLING_IMPORTS = {
+    "_values.py": set(),
+    "audit_parsing.py": {"_values", "contracts"},
+    "contracts.py": {"_values"},
+    "parsing.py": {"_values", "audit_parsing", "contracts"},
+}
+_SENSITIVITY_COVERAGE_LINE_BUDGETS = {
+    "__init__.py": 60,
+    "_values.py": 40,
+    "building.py": 120,
+    "contracts.py": 180,
+    "serialization.py": 230,
+    "validation.py": 180,
 }
 
 
@@ -150,6 +192,20 @@ def test_contract_facade_exposes_only_supported_contract_names() -> None:
         "protocol_digest",
         "validate_decision_payload",
     }
+
+
+def test_contract_modules_do_not_depend_on_evaluation_implementations() -> None:
+    for path in _CONTRACTS_ROOT.glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        imports = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            and node.level >= 2
+            and node.module is not None
+            and node.module.startswith("evaluation")
+        ]
+        assert not imports, f"{path.name} must not depend on evaluation implementations"
 
 
 def test_evaluation_package_has_one_semantic_module_per_owner() -> None:
@@ -199,6 +255,62 @@ def test_acquisition_projection_has_one_semantic_module_per_owner() -> None:
     )
     for filename, line_budget in _ACQUISITION_PROJECTION_LINE_BUDGETS.items():
         line_count = len((_ACQUISITION_PROJECTION_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
+
+
+def test_evidence_projection_has_one_semantic_module_per_owner() -> None:
+    assert not (_METASTUDY_ROOT / "evidence_projection.py").exists()
+    assert {path.name for path in _EVIDENCE_PROJECTION_ROOT.glob("*.py")} == set(_EVIDENCE_PROJECTION_LINE_BUDGETS)
+    for filename, line_budget in _EVIDENCE_PROJECTION_LINE_BUDGETS.items():
+        line_count = len((_EVIDENCE_PROJECTION_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
+
+
+def test_evidence_projection_facade_exposes_only_supported_names() -> None:
+    assert set(evidence_projection.__all__) == {
+        "ProfileContentProjection",
+        "ProfileEvidenceProjection",
+        "ProfileProvenanceProjection",
+        "parse_profile_evidence_projection",
+        "profile_source_identity_projection",
+    }
+
+
+def test_evidence_projection_dependencies_follow_the_semantic_owner_graph() -> None:
+    for filename, allowed in _EVIDENCE_PROJECTION_ALLOWED_SIBLING_IMPORTS.items():
+        path = _EVIDENCE_PROJECTION_ROOT / filename
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        sibling_imports = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module is not None
+        }
+        assert sibling_imports <= allowed, (
+            f"{filename} has reverse or undeclared dependencies: {sibling_imports - allowed}"
+        )
+
+
+def test_metastudy_production_modules_import_evidence_projection_owners() -> None:
+    facade = _EVIDENCE_PROJECTION_ROOT / "__init__.py"
+    for path in _METASTUDY_ROOT.rglob("*.py"):
+        if path == facade:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        facade_imports = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            and node.module is not None
+            and node.module.endswith("evidence_projection")
+        ]
+        assert not facade_imports, f"{path.relative_to(_METASTUDY_ROOT)} must import the evidence owner leaf"
+
+
+def test_sensitivity_coverage_has_one_semantic_module_per_owner() -> None:
+    assert not (_METASTUDY_ROOT / "sensitivity_coverage.py").exists()
+    assert {path.name for path in _SENSITIVITY_COVERAGE_ROOT.glob("*.py")} == set(_SENSITIVITY_COVERAGE_LINE_BUDGETS)
+    for filename, line_budget in _SENSITIVITY_COVERAGE_LINE_BUDGETS.items():
+        line_count = len((_SENSITIVITY_COVERAGE_ROOT / filename).read_text(encoding="utf-8").splitlines())
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 

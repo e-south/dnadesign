@@ -48,19 +48,12 @@ def _digest(character: str) -> str:
     return "sha256:" + character * 64
 
 
-def test_profile_contract_uses_the_bounded_package_layout() -> None:
-    study_root = Path(__file__).resolve().parents[2]
-    reporter_response_root = study_root / "reporter_response"
-
-    assert (reporter_response_root / "profile").is_dir()
-    assert not (reporter_response_root / "profile.py").exists()
-
-
 def _bindings(
     *,
     subject_id: str = "subject-a",
     experiment_id: str = "experiment-a",
     biological_replicate_ids: tuple[str, ...] = ("replicate-1",),
+    source_conditions: tuple[str, ...] = ("baseline", "positive", "dose"),
 ):
     row = ReaderEvidenceBinding(
         reader_experiment_id=experiment_id,
@@ -85,7 +78,7 @@ def _bindings(
                 condition_value=f"condition-{condition}",
                 biological_replicate_id=replicate_id,
             )
-            for condition in ("baseline", "positive", "dose")
+            for condition in source_conditions
             for replicate_id in biological_replicate_ids
         ),
         binding_state="bound",
@@ -301,6 +294,35 @@ def test_same_replicate_label_is_valid_across_conditions() -> None:
     profile = _profile()
 
     assert {row.biological_replicate_id for row in profile.measurements} == {"replicate-1"}
+
+
+def test_profile_accepts_an_exact_subset_of_source_conditions() -> None:
+    bindings = _bindings(
+        source_conditions=("baseline", "positive", "dose", "sensitivity-dose"),
+    )
+
+    profile = _profile(bindings=bindings)
+
+    assert {row.source_condition_value for row in profile.measurements} == {
+        "condition-baseline",
+        "condition-positive",
+        "condition-dose",
+    }
+
+
+def test_profile_rejects_an_invented_source_condition() -> None:
+    rows = list(_profile().measurements)
+    rows[0] = replace(rows[0], source_condition_value="condition-invented")
+
+    with pytest.raises(ReporterResponseContractError, match="condition-scoped biological-replicate identities"):
+        _profile(measurements=rows)
+
+
+def test_profile_requires_complete_replicate_identity_coverage_for_each_selected_condition() -> None:
+    bindings = _bindings(biological_replicate_ids=("replicate-1", "replicate-2"))
+
+    with pytest.raises(ReporterResponseContractError, match="condition-scoped biological-replicate identities"):
+        _profile(bindings=bindings)
 
 
 def test_unknown_replicate_identity_is_admissible_but_uncertainty_is_not_estimable() -> None:

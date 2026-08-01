@@ -12,12 +12,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from ...measurement_profile import DescriptiveReporterProfile, ReporterMeasurementProfile
-from ...profile import ReporterResponseProfile
+from ...profile.measurement import EndpointReduction, TimeWindowReduction
+from ...profile.normalized import ReporterResponseProfile
 from ._values import MetastudyContractError, _digest, _nonnegative, _required_text, canonical_digest
+from .profile_identity import profile_digest, profile_source_identity_payload
 
 _AUDIT_DERIVATION_TOKEN = object()
 
@@ -102,6 +104,16 @@ class ProfileAuditArtifact:
         return self._derivation_closure is _AUDIT_DERIVATION_TOKEN
 
 
+def profile_audit_payload(audit: ProfileAuditArtifact, *, include_digest: bool = True) -> dict[str, object]:
+    """Serialize one profile audit canonically."""
+
+    payload = asdict(audit)
+    payload.pop("_derivation_closure", None)
+    if not include_digest:
+        payload.pop("artifact_digest")
+    return payload
+
+
 @dataclass(frozen=True, slots=True)
 class ProfileEvidence:
     """One canonical profile plus digest-bound within-acquisition range evidence."""
@@ -110,8 +122,6 @@ class ProfileEvidence:
     audit: ProfileAuditArtifact
 
     def __post_init__(self) -> None:
-        from ..audits import profile_audit_payload, profile_digest, profile_source_identity_payload
-
         if not isinstance(self.profile, (ReporterResponseProfile, ReporterMeasurementProfile)):
             raise MetastudyContractError("profile evidence must contain a typed reporter profile")
         if not isinstance(self.audit, ProfileAuditArtifact):
@@ -123,8 +133,6 @@ class ProfileEvidence:
             raise MetastudyContractError("profile audit full profile digest mismatch")
         if self.audit.artifact_digest != canonical_digest(profile_audit_payload(self.audit, include_digest=False)):
             raise MetastudyContractError("profile audit artifact digest mismatch")
-        from ...profile import EndpointReduction, TimeWindowReduction
-
         if isinstance(self.profile.reduction, TimeWindowReduction) and not self.audit.growth_phase_strata:
             raise MetastudyContractError("time-window profile evidence requires growth-phase strata")
         if isinstance(self.profile.reduction, EndpointReduction) and self.audit.growth_phase_strata:
@@ -135,4 +143,5 @@ __all__ = [
     "GrowthPhaseStratum",
     "ProfileAuditArtifact",
     "ProfileEvidence",
+    "profile_audit_payload",
 ]

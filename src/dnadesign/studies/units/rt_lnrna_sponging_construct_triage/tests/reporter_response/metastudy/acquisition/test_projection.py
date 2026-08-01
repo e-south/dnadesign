@@ -38,7 +38,10 @@ def test_acquisition_projection_is_descriptive_and_exposes_leave_one_acquisition
     high = next(
         row
         for row in projection.coordinates
-        if row.subject_id == HIGH_ANCHOR and row.reduction_id == "window-6-10h" and row.dose_uM == 500.0
+        if row.subject_id == HIGH_ANCHOR
+        and row.reduction_id == "window-6-10h"
+        and row.dose_uM == 500.0
+        and row.metric_space == "reference_normalized"
     )
     assert high.acquisition_ids == KINETIC_IDS
     assert all(row.declared_biological_replicate_ids == () for row in high.contributions)
@@ -59,8 +62,8 @@ def test_acquisition_projection_keeps_single_acquisition_descriptive() -> None:
     )
     projection = build_acquisition_projection((source,), selected_reduction=(6.0, 10.0))
 
-    assert len(projection.coordinates) == 1
-    coordinate = projection.coordinates[0]
+    assert len(projection.coordinates) == 2
+    coordinate = next(row for row in projection.coordinates if row.metric_space == "reference_normalized")
     assert coordinate.acquisition_ids == (KINETIC_IDS[0],)
     assert coordinate.normalized_reporter_response.acquisition_count == 1
     assert coordinate.normalized_reporter_response.leave_one_acquisition_out_estimates == ()
@@ -99,8 +102,12 @@ def test_acquisition_projection_keeps_raw_and_normalized_metric_spaces_distinct(
         for row in projection.coordinates
         if row.subject_id == HIGH_ANCHOR and row.reduction_id == "window-6-10h" and row.dose_uM == 500.0
     )
-    assert len(high) == 2
-    assert {row.rfp is not None for row in high} == {False, True}
+    assert {row.metric_space for row in high} == {"raw_measurement", "reference_normalized"}
+    by_space = {row.metric_space: row for row in high}
+    assert by_space["raw_measurement"].acquisition_ids == KINETIC_IDS
+    assert by_space["reference_normalized"].acquisition_ids == KINETIC_IDS[1:]
+    assert by_space["raw_measurement"].normalized_reporter_response is None
+    assert by_space["reference_normalized"].rfp is None
 
 
 def test_acquisition_projection_rejects_duplicate_acquisition_coordinate() -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
@@ -152,3 +153,23 @@ class ConditionMeasurement:
         if od600 <= 0.0:
             raise ReporterResponseContractError("od600 must be positive when rfp_over_od600 is declared")
         _finite_number(self.rfp_over_od600, field_name="rfp_over_od600")
+
+
+def validate_ratio_reduction_semantics(
+    reduction: Reduction,
+    measurements: tuple[ConditionMeasurement, ...],
+) -> None:
+    """Require channel-derived ratios when the declared reduction orders them that way."""
+
+    ratio_must_follow_channel_reduction = isinstance(reduction, EndpointReduction) or (
+        isinstance(reduction, TimeWindowReduction) and reduction.ratio_reduction_order == "reduce_channels_then_ratio"
+    )
+    if not ratio_must_follow_channel_reduction:
+        return
+    for row in measurements:
+        expected_ratio = row.rfp / row.od600
+        if not math.isclose(row.rfp_over_od600, expected_ratio, rel_tol=1e-12, abs_tol=1e-12):
+            raise ReporterResponseContractError(
+                f"{row.observation_id}: rfp_over_od600 must equal rfp / od600 for "
+                "endpoint or reduce_channels_then_ratio summaries"
+            )

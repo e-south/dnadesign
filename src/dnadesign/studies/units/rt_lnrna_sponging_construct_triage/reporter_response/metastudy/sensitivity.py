@@ -15,15 +15,16 @@ import json
 from collections import defaultdict
 from collections.abc import Iterable
 
-from .. import profile_to_dict
-from ..profile import EndpointReduction, TimeWindowReduction
+from ..profile.measurement import EndpointReduction, TimeWindowReduction
+from ..serialization import profile_to_dict
 from .audits import profile_audit_payload
 from .contracts._values import MetastudyContractError, canonical_digest
-from .contracts.decision import SensitivityEvaluation
 from .contracts.materialization import MaterializationAttemptReceipt
 from .contracts.profile import ProfileEvidence
 from .contracts.protocol import DEFAULT_PROTOCOL
-from .evidence_projection import ProfileEvidenceProjection, parse_profile_evidence_projection
+from .contracts.sensitivity import SensitivityEvaluation
+from .evidence_projection.contracts import ProfileEvidenceProjection
+from .evidence_projection.parsing import parse_profile_evidence_projection
 from .sensitivity_coverage import (
     SensitivityCoverageLedger,
     parse_sensitivity_coverage,

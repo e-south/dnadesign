@@ -311,6 +311,31 @@ def test_optional_doses_are_sensitivity_only_and_do_not_change_primary_profiles(
     assert all(row.profile.eligibility.optimization_status == "ineligible" for row in result.endpoint_evidence)
 
 
+def test_declared_replicates_allow_primary_profiles_to_exclude_sensitivity_doses(tmp_path: Path) -> None:
+    record, bindings = _source_closed_inputs(
+        tmp_path,
+        optional_doses=True,
+        replicate_identity_field="biological_replicate_id",
+    )
+
+    result = materialize_record_evidence(
+        record=record,
+        bindings=bindings,
+        ontology=_ontology(optional_doses=True),
+        observation_policy=_policy(),
+        protocol=DEFAULT_PROTOCOL,
+    )
+
+    assert result.status == "complete", result.blockers
+    assert all(row.profile.dose_grid_uM == (500.0,) for row in result.candidate_evidence)
+    assert all(
+        {measurement.biological_replicate_id for measurement in row.profile.measurements}
+        == {"replicate-1", "replicate-2"}
+        for row in result.candidate_evidence
+    )
+    assert all(row.profile.dose_grid_uM == (5.0, 50.0, 500.0) for row in result.endpoint_evidence)
+
+
 def test_censored_optional_dose_rows_do_not_block_primary_estimand(tmp_path: Path) -> None:
     record, bindings = _source_closed_inputs(tmp_path, optional_doses=True)
     frame = pd.read_parquet(record.path)

@@ -15,6 +15,7 @@ from pathlib import Path
 
 SEMANTIC_TEST_MODULES = (
     "acquisition/test_projection.py",
+    "contracts/test_candidate.py",
     "contracts/test_decision.py",
     "contracts/test_protocol.py",
     "evidence/test_audits.py",

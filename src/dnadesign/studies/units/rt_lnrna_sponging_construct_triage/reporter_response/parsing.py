@@ -1,109 +1,31 @@
-"""
---------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/api.py
-
-Public construction, parsing, serialization, and comparison surfaces.
-
-Module Author(s): Eric J. South
---------------------------------------------------------------------------------
-"""
+"""Strict parsing and source-closed revalidation of serialized reporter profiles."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
-from dataclasses import asdict
+from collections.abc import Mapping
+from dataclasses import asdict, fields
 
 from ..reader_evidence import ReaderEvidenceBindingSet
+from ._contract_values import ReporterResponseContractError
 from ._contract_values import json_value as _json_value
-from ._contract_values import required_text as _required_text
 from .measurement_profile import (
     MEASUREMENT_PROFILE_CONTRACT_ID,
     ReferenceNormalizationUnavailable,
     ReporterMeasurementProfile,
 )
 from .policy import ReporterResponseObservationPolicy
-from .profile import (
-    CONTRACT_ID,
-    STUDY_ID,
-    ConditionMeasurement,
-    ControlAssignment,
-    DoseResponse,
+from .profile.measurement import ConditionMeasurement, EndpointReduction, Reduction, TimeWindowReduction
+from .profile.normalized import ReporterResponseProfile
+from .profile.provenance import ReaderEvidenceProvenance
+from .profile.response import ControlAssignment, DoseResponse, PairingPolicy
+from .profile.uncertainty import (
     DoseUncertainty,
-    EndpointReduction,
     EstimatedMetricUncertainty,
     NotEstimableMetricUncertainty,
-    PairingPolicy,
     ProfileEligibility,
-    ReaderEvidenceProvenance,
-    Reduction,
-    ReporterResponseContractError,
-    ReporterResponseProfile,
-    TimeWindowReduction,
     UncertaintyPolicy,
 )
 from .temporal import TemporalPolicyProjection
-
-
-def build_reporter_response_profile(
-    *,
-    profile_id: str,
-    subject_id: str,
-    raw_design_id: str | None,
-    raw_assay_subject_id: str | None,
-    evidence_bindings: ReaderEvidenceBindingSet,
-    observation_policy: ReporterResponseObservationPolicy,
-    reduction: Reduction,
-    dose_grid_uM: Iterable[float],
-    measurements: Iterable[ConditionMeasurement],
-    pairing_policy: PairingPolicy,
-    dose_uncertainties: Iterable[DoseUncertainty],
-    ineligibility_reasons: Iterable[str],
-) -> ReporterResponseProfile:
-    """Build a profile from bindings returned by source derivation or revalidating load."""
-
-    _required_text(profile_id, field_name="profile_id")
-    _required_text(subject_id, field_name="subject_id")
-    provenance = ReaderEvidenceProvenance._from_source_closed_bindings(
-        evidence_bindings=evidence_bindings,
-        subject_id=subject_id,
-        raw_design_id=raw_design_id,
-        raw_assay_subject_id=raw_assay_subject_id,
-    )
-    eligibility = ProfileEligibility(
-        evidence_use="descriptive",
-        optimization_status="ineligible",
-        reasons=tuple(ineligibility_reasons),
-    )
-    return ReporterResponseProfile(
-        contract_id=CONTRACT_ID,
-        study_id=STUDY_ID,
-        profile_id=profile_id,
-        subject_id=subject_id,
-        provenance=provenance,
-        observation_policy=observation_policy,
-        reduction=reduction,
-        dose_grid_uM=tuple(dose_grid_uM),
-        measurements=tuple(measurements),
-        pairing_policy=pairing_policy,
-        dose_uncertainties=tuple(dose_uncertainties),
-        eligibility=eligibility,
-    )
-
-
-def profile_to_dict(profile: ReporterResponseProfile | ReporterMeasurementProfile) -> dict[str, object]:
-    """Serialize one already-validated profile without objective fields."""
-
-    if not isinstance(profile, (ReporterResponseProfile, ReporterMeasurementProfile)):
-        raise ReporterResponseContractError("profile must be a typed reporter profile")
-    payload = _json_value(asdict(profile))
-    assert isinstance(payload, dict)
-    provenance = payload["provenance"]
-    assert isinstance(provenance, dict)
-    provenance.pop("_bound_subject_id", None)
-    provenance.pop("_source_closed", None)
-    provenance.pop("_declared_biological_replicate_scopes", None)
-    return payload
 
 
 def profile_from_dict(
@@ -207,7 +129,6 @@ def _parse_profile(
         )
     eligibility_payload = _strict_dataclass(root["eligibility"], ProfileEligibility)
     eligibility_payload["reasons"] = tuple(eligibility_payload["reasons"])
-    eligibility = ProfileEligibility(**eligibility_payload)
     profile = ReporterResponseProfile(
         contract_id=root["contract_id"],
         study_id=root["study_id"],
@@ -220,7 +141,7 @@ def _parse_profile(
         measurements=measurements,
         pairing_policy=pairing,
         dose_uncertainties=tuple(uncertainties),
-        eligibility=eligibility,
+        eligibility=ProfileEligibility(**eligibility_payload),
     )
     if responses != profile.dose_responses:
         raise ReporterResponseContractError(
@@ -371,24 +292,6 @@ def _temporal_policy(value: object) -> TemporalPolicyProjection:
     return projection
 
 
-def require_comparable_profiles(profiles: Iterable[ReporterResponseProfile]) -> str:
-    """Return the shared comparability key or reject aggregation."""
-
-    rows = tuple(profiles)
-    if len(rows) < 2:
-        raise ReporterResponseContractError("cross-profile aggregation requires at least two profiles")
-    if not all(isinstance(row, ReporterResponseProfile) for row in rows):
-        raise ReporterResponseContractError("aggregation inputs must be ReporterResponseProfile values")
-    expected = rows[0].comparability_key
-    mismatches = [row.profile_id for row in rows[1:] if row.comparability_key != expected]
-    if mismatches:
-        raise ReporterResponseContractError(
-            "cross-profile aggregation requires exactly matching comparability keys; "
-            f"mismatched profiles: {', '.join(mismatches)}"
-        )
-    return expected
-
-
 def _metric_uncertainty(value: object) -> EstimatedMetricUncertainty | NotEstimableMetricUncertainty:
     payload = _mapping(value, name="metric_uncertainty")
     if payload.get("status") == "estimated":
@@ -413,8 +316,6 @@ def _dose_response(value: object) -> DoseResponse:
 
 
 def _strict_dataclass(value: object, cls: type[object]) -> dict[str, object]:
-    from dataclasses import fields
-
     declared_fields = fields(cls)
     payload = _strict_object(value, name=cls.__name__, fields={item.name for item in declared_fields})
     return {item.name: payload[item.name] for item in declared_fields if item.init}
@@ -448,9 +349,4 @@ def _number_tuple(value: object, *, name: str) -> tuple[float, ...]:
     return tuple(value)
 
 
-__all__ = [
-    "build_reporter_response_profile",
-    "profile_from_dict",
-    "profile_to_dict",
-    "require_comparable_profiles",
-]
+__all__ = ["profile_from_dict"]

@@ -18,8 +18,8 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-from ... import EndpointReduction, ReporterResponseContractError
-from ...profile import Reduction
+from ..._contract_values import ReporterResponseContractError
+from ...profile.measurement import EndpointReduction, Reduction
 from ...temporal import TemporalSelectedRow, reduce_temporal_input_trace
 from ..condition_ontology import ReporterResponseConditionOntology
 from ..contracts.profile import GrowthPhaseStratum

@@ -1,140 +1,43 @@
-"""
---------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/materialize/profiles.py
-
-Reader identity joins and descriptive reporter-response profile construction.
-
-Module Author(s): Eric J. South
---------------------------------------------------------------------------------
-"""
+"""Construction and audit binding for one descriptive reporter profile."""
 
 from __future__ import annotations
 
 import statistics
-from collections.abc import Iterable
 
 import pandas as pd
 
-from ....reader_evidence import ReaderDataframeRecordRef, ReaderEvidenceBinding, ReaderEvidenceBindingSet
-from ... import (
-    ConditionMeasurement,
-    ControlAssignment,
-    DoseUncertainty,
-    EndpointReduction,
-    NotEstimableMetricUncertainty,
-    PairingPolicy,
-    ReporterResponseObservationPolicy,
-    build_reporter_measurement_profile,
-    build_reporter_response_profile,
-)
-from ...profile import Reduction
+from ....reader_evidence import ReaderDataframeRecordRef, ReaderEvidenceBindingSet
+from ...building import build_reporter_response_profile
+from ...measurement_profile import DescriptiveReporterProfile, build_reporter_measurement_profile
+from ...policy import ReporterResponseObservationPolicy
+from ...profile.measurement import ConditionMeasurement, EndpointReduction, Reduction
+from ...profile.response import ControlAssignment, PairingPolicy
 from ..audits import _build_derivation_closed_profile_audit
 from ..condition_ontology import ReporterResponseConditionOntology
-from ..contracts.materialization import MaterializationOmission
-from ..contracts.profile import ProfileEvidence
+from ..contracts.profile import GrowthPhaseStratum, ProfileEvidence
 from ..contracts.protocol import MetastudyProtocol
 from .reference import resolve_reference_basis
-from .temporal import _condition_summary, _contains_censored_values, _growth_phase_strata, _reduce, _select_reduction
+from .temporal import _condition_summary, _contains_censored_values, _growth_phase_strata, _select_reduction
+from .uncertainty import _descriptive_uncertainty
 
 
-def _materialize_reductions(
+def _build_profile(
     frame: pd.DataFrame,
     *,
-    reductions: Iterable[Reduction],
+    reduction: Reduction,
     reference: EndpointReduction,
     record: ReaderDataframeRecordRef,
     bindings: ReaderEvidenceBindingSet,
-    binding_by_identity: dict[tuple[str, str | None], ReaderEvidenceBinding],
+    design_id: str,
+    assay_subject_id: str | None,
+    subject_id: str,
     ontology: ReporterResponseConditionOntology,
     policy: ReporterResponseObservationPolicy,
     protocol: MetastudyProtocol,
     include_sensitivity_doses: bool,
-) -> tuple[tuple[ProfileEvidence, ...], tuple[MaterializationOmission, ...]]:
-    evidence: list[ProfileEvidence] = []
-    omissions: list[MaterializationOmission] = []
-    for reduction in reductions:
-        for identity in sorted(_observed_reader_identities(frame), key=lambda value: (value[0], value[1] or "")):
-            design_id, assay_subject_id = identity
-            binding = binding_by_identity[identity]
-            subject_id = binding.subject_id
-            design_frame = frame.loc[_reader_identity_mask(frame, identity)]
-            built = _build_profile(
-                design_frame,
-                reduction=reduction,
-                reference=reference,
-                record=record,
-                bindings=bindings,
-                design_id=design_id,
-                assay_subject_id=assay_subject_id,
-                subject_id=subject_id,
-                ontology=ontology,
-                policy=policy,
-                protocol=protocol,
-                include_sensitivity_doses=include_sensitivity_doses,
-            )
-            if isinstance(built, str):
-                omissions.append(
-                    MaterializationOmission(
-                        code=built,
-                        subject_id=subject_id,
-                        reduction_id=_reduction_id(reduction),
-                    )
-                )
-            else:
-                evidence.append(built)
-    return tuple(evidence), tuple(omissions)
+) -> ProfileEvidence | str:
+    """Build one source-closed profile or return a typed omission code."""
 
-
-def _observed_reader_identities(frame: pd.DataFrame) -> set[tuple[str, str | None]]:
-    assay_subjects = (
-        frame["assay_subject_id"]
-        if "assay_subject_id" in frame.columns
-        else pd.Series((None,) * len(frame), index=frame.index, dtype=object)
-    )
-    return {
-        (str(design_id), None if pd.isna(assay_subject_id) else str(assay_subject_id))
-        for design_id, assay_subject_id in zip(frame["design_id"], assay_subjects, strict=True)
-    }
-
-
-def _has_ambiguous_partial_identity(
-    observed_identities: set[tuple[str, str | None]],
-    *,
-    bindings: ReaderEvidenceBindingSet,
-) -> bool:
-    binding_design_ids = tuple(row.raw_design_id for row in bindings.rows)
-    return any(
-        assay_subject_id is None and binding_design_ids.count(design_id) > 1
-        for design_id, assay_subject_id in observed_identities
-    )
-
-
-def _reader_identity_mask(frame: pd.DataFrame, identity: tuple[str, str | None]) -> pd.Series:
-    design_id, assay_subject_id = identity
-    mask = frame["design_id"].astype(str).eq(design_id)
-    if "assay_subject_id" not in frame.columns:
-        return mask if assay_subject_id is None else mask & False
-    if assay_subject_id is None:
-        return mask & frame["assay_subject_id"].isna()
-    return mask & frame["assay_subject_id"].astype(str).eq(assay_subject_id)
-
-
-def _build_profile(
-    frame,
-    *,
-    reduction,
-    reference,
-    record,
-    bindings,
-    design_id,
-    assay_subject_id,
-    subject_id,
-    ontology,
-    policy,
-    protocol,
-    include_sensitivity_doses,
-):
     growth_phase_strata = _growth_phase_strata(
         frame,
         reduction=reduction,
@@ -339,14 +242,16 @@ def _build_profile(
 
 
 def _profile_evidence(
-    profile,
+    profile: DescriptiveReporterProfile,
     *,
-    selected,
-    ontology,
-    within_acquisition_ranges,
-    reference_spans,
-    growth_phase_strata,
-):
+    selected: pd.DataFrame,
+    ontology: ReporterResponseConditionOntology,
+    within_acquisition_ranges: list[float],
+    reference_spans: list[float],
+    growth_phase_strata: tuple[GrowthPhaseStratum, ...],
+) -> ProfileEvidence:
+    """Bind one profile to its derivation-closed quality audit."""
+
     required = len(selected)
     clipped = int(
         (selected["value_policy_clipped"].astype(bool) | selected["value_bound_kind"].astype(str).ne("exact")).sum()
@@ -365,43 +270,9 @@ def _profile_evidence(
     return ProfileEvidence(profile=profile, audit=audit)
 
 
-def _descriptive_uncertainty(
-    *,
-    dose: float,
-    values: list[tuple[float, float]],
-    statistic: str,
-    minimum_replicates: int,
-    identity_complete: bool,
-) -> DoseUncertainty:
-    count = len(values)
-    if count == 0:
-        raise ValueError("dose uncertainty requires acquisition observations")
-    if not identity_complete:
-        reason = "biological_replicate_identity_unknown"
-        biological_replicate_count = 0
-    elif count < minimum_replicates:
-        reason = "below_minimum_biological_replicates"
-        biological_replicate_count = count
-    else:
-        # Materialization remains descriptive until a biological-replicate
-        # resampling method is explicitly selected and validated.
-        reason = "insufficient_valid_resamples"
-        biological_replicate_count = count
-    return DoseUncertainty(
-        dose_uM=dose,
-        biological_replicate_count=biological_replicate_count,
-        normalized_reporter_response=NotEstimableMetricUncertainty(
-            estimate=_reduce((row[0] for row in values), statistic),
-            reason=reason,
-        ),
-        relative_od=NotEstimableMetricUncertainty(
-            estimate=_reduce((row[1] for row in values), statistic),
-            reason=reason,
-        ),
-    )
-
-
 def _reduction_id(reduction: Reduction) -> str:
+    """Return the stable profile identifier segment for one reduction."""
+
     if isinstance(reduction, EndpointReduction):
         return f"endpoint-{reduction.recorded_time_h:g}h"
     return f"window-{reduction.recorded_start_time_h:g}-{reduction.recorded_end_time_h:g}h"

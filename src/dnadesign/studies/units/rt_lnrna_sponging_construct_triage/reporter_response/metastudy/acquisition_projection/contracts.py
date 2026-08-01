@@ -8,7 +8,8 @@ from typing import Literal
 from ..contracts._values import MetastudyContractError, canonical_digest
 from ._values import digest, finite, text, window
 
-ACQUISITION_PROJECTION_CONTRACT_ID = "rt_lnrna_reporter_response_acquisition_projection.v1"
+ACQUISITION_PROJECTION_CONTRACT_ID = "rt_lnrna_reporter_response_acquisition_projection.v2"
+MetricSpace = Literal["raw_measurement", "reference_normalized"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +81,7 @@ class AcquisitionCoordinate:
 
     subject_id: str
     condition_role: Literal["dose"]
+    metric_space: MetricSpace
     dose_uM: float
     reduction_id: str
     reduction_digest: str
@@ -96,6 +98,8 @@ class AcquisitionCoordinate:
         text(self.subject_id, "subject_id")
         if self.condition_role != "dose" or finite(self.dose_uM, "dose_uM") <= 0.0:
             raise MetastudyContractError("acquisition coordinates require one positive dose condition")
+        if self.metric_space not in {"raw_measurement", "reference_normalized"}:
+            raise MetastudyContractError("acquisition coordinate metric_space is undeclared")
         text(self.reduction_id, "reduction_id")
         digest(self.reduction_digest, "reduction_digest")
         digest(self.observation_policy_digest, "observation_policy_digest")
@@ -112,6 +116,9 @@ class AcquisitionCoordinate:
             raise MetastudyContractError("normalized coordinate metrics must be available together")
         if (self.rfp is None) == (self.normalized_reporter_response is None):
             raise MetastudyContractError("acquisition coordinate requires exactly one declared metric space")
+        expected_space = "raw_measurement" if self.rfp is not None else "reference_normalized"
+        if self.metric_space != expected_space:
+            raise MetastudyContractError("acquisition coordinate metrics differ from metric_space")
         metrics = tuple(metric for metric in raw_metrics + normalized_metrics if metric is not None)
         if any(metric.acquisition_count != len(acquisition_ids) for metric in metrics):
             raise MetastudyContractError("metric support must match acquisition contributions")
@@ -154,14 +161,14 @@ class AcquisitionProjection:
         )
 
 
-def coordinate_key(row: AcquisitionCoordinate) -> tuple[str, float, str, str, str, bool]:
+def coordinate_key(row: AcquisitionCoordinate) -> tuple[str, float, str, str, str, str]:
     return (
         row.subject_id,
         row.dose_uM,
         row.reduction_id,
         row.reduction_digest,
         row.observation_policy_digest,
-        row.rfp is not None,
+        row.metric_space,
     )
 
 
@@ -169,6 +176,7 @@ def coordinate_payload(row: AcquisitionCoordinate) -> dict[str, object]:
     payload = {
         "subject_id": row.subject_id,
         "condition_role": row.condition_role,
+        "metric_space": row.metric_space,
         "dose_uM": row.dose_uM,
         "reduction_id": row.reduction_id,
         "reduction_digest": row.reduction_digest,

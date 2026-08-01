@@ -13,28 +13,28 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import statistics
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict
 from typing import Literal
 
+from ._contract_values import ReporterResponseContractError
 from ._contract_values import json_value as _json_value
 from ._contract_values import ordered_dose_grid as _ordered_dose_grid
 from .policy import ReporterResponseObservationPolicy
-from .profile import (
-    BiologicalReplicateReductionStatistic,
+from .profile.measurement import (
     ConditionMeasurement,
-    DoseResponse,
-    DoseUncertainty,
     EndpointReduction,
+    Reduction,
+    TimeWindowReduction,
+    validate_ratio_reduction_semantics,
+)
+from .profile.response import DoseResponse, PairingKind, PairingPolicy
+from .profile.uncertainty import (
+    BiologicalReplicateReductionStatistic,
+    DoseUncertainty,
     EstimatedMetricUncertainty,
     NotEstimableMetricUncertainty,
-    PairingKind,
-    PairingPolicy,
-    Reduction,
-    ReporterResponseContractError,
-    TimeWindowReduction,
     UncertaintyPolicy,
 )
 
@@ -71,7 +71,7 @@ def derive_profile_rows(
         raise ReporterResponseContractError("measurements must not be empty")
     if not all(isinstance(row, ConditionMeasurement) for row in measurement_rows):
         raise ReporterResponseContractError("measurements must contain ConditionMeasurement values")
-    _validate_ratio_reduction_semantics(reduction, measurement_rows)
+    validate_ratio_reduction_semantics(reduction, measurement_rows)
     observations = {row.observation_id: row for row in measurement_rows}
     if len(observations) != len(measurement_rows):
         raise ReporterResponseContractError("measurement observation_id values must be unique")
@@ -234,24 +234,6 @@ def _validate_paired_control_strata(
             raise ReporterResponseContractError(
                 f"{dose.observation_id}: paired control {control.observation_id!r} must share "
                 "acquisition_id with the dose observation"
-            )
-
-
-def _validate_ratio_reduction_semantics(
-    reduction: Reduction,
-    measurements: tuple[ConditionMeasurement, ...],
-) -> None:
-    ratio_must_follow_channel_reduction = isinstance(reduction, EndpointReduction) or (
-        isinstance(reduction, TimeWindowReduction) and reduction.ratio_reduction_order == "reduce_channels_then_ratio"
-    )
-    if not ratio_must_follow_channel_reduction:
-        return
-    for row in measurements:
-        expected_ratio = row.rfp / row.od600
-        if not math.isclose(row.rfp_over_od600, expected_ratio, rel_tol=1e-12, abs_tol=1e-12):
-            raise ReporterResponseContractError(
-                f"{row.observation_id}: rfp_over_od600 must equal rfp / od600 for "
-                "endpoint or reduce_channels_then_ratio summaries"
             )
 
 

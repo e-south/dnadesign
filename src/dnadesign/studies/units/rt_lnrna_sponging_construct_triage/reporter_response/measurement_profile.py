@@ -9,16 +9,18 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from typing import Literal, TypeAlias
 
-from ._contract_values import json_value, ordered_dose_grid, required_text
+from ._contract_values import ReporterResponseContractError, json_value, ordered_dose_grid, required_text
 from .policy import ReporterResponseObservationPolicy
-from .profile import (
+from .profile.measurement import (
     ConditionMeasurement,
-    ProfileEligibility,
-    ReaderEvidenceProvenance,
+    EndpointReduction,
     Reduction,
-    ReporterResponseContractError,
-    ReporterResponseProfile,
+    TimeWindowReduction,
+    validate_ratio_reduction_semantics,
 )
+from .profile.normalized import STUDY_ID, ReporterResponseProfile
+from .profile.provenance import ReaderEvidenceProvenance
+from .profile.uncertainty import ProfileEligibility
 
 MEASUREMENT_PROFILE_CONTRACT_ID = "rt_lnrna_reporter_measurement_profile.v1"
 ReferenceNormalizationAbsenceReason = Literal[
@@ -111,8 +113,6 @@ def validate_measurement_profile_contract(
 ) -> str:
     """Validate canonical raw-profile content and return its comparison identity."""
 
-    from .profile import STUDY_ID
-
     if contract_id != MEASUREMENT_PROFILE_CONTRACT_ID:
         raise ReporterResponseContractError("measurement profile contract_id changed")
     if study_id != STUDY_ID:
@@ -121,6 +121,8 @@ def validate_measurement_profile_contract(
     required_text(subject_id, field_name="subject_id")
     if not isinstance(observation_policy, ReporterResponseObservationPolicy):
         raise ReporterResponseContractError("observation_policy must be ReporterResponseObservationPolicy")
+    if not isinstance(reduction, (EndpointReduction, TimeWindowReduction)):
+        raise ReporterResponseContractError("reduction must be endpoint or time_window")
     if not isinstance(reference_normalization, ReferenceNormalizationUnavailable):
         raise ReporterResponseContractError("measurement profile must type why reference normalization is absent")
     if not isinstance(eligibility, ProfileEligibility):
@@ -129,8 +131,9 @@ def validate_measurement_profile_contract(
     if dose_grid != dose_grid_uM:
         raise ReporterResponseContractError("dose_grid_uM must be stored as its canonical tuple")
     rows = measurements
-    if not rows or not all(isinstance(row, ConditionMeasurement) for row in rows):
+    if not isinstance(rows, tuple) or not rows or not all(isinstance(row, ConditionMeasurement) for row in rows):
         raise ReporterResponseContractError("measurement profile requires typed condition measurements")
+    validate_ratio_reduction_semantics(reduction, rows)
     if len({row.observation_id for row in rows}) != len(rows):
         raise ReporterResponseContractError("measurement observation_id values must be unique")
     baseline_rows = tuple(row for row in rows if row.role == "baseline")
@@ -201,8 +204,6 @@ def build_reporter_measurement_profile(
     ineligibility_reasons: Iterable[str],
 ) -> ReporterMeasurementProfile:
     """Build a source-closed descriptive profile without inventing a reference."""
-
-    from .profile import STUDY_ID
 
     provenance = ReaderEvidenceProvenance._from_source_closed_bindings(
         evidence_bindings=evidence_bindings,

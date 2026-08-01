@@ -78,6 +78,25 @@ def test_selected_decision_serialization_binds_attempts_but_is_not_a_publication
         validate_decision_payload(fabricated)
 
 
+@pytest.mark.parametrize(
+    ("limitations", "message"),
+    [
+        (["duplicate", "duplicate"], "must not contain duplicates"),
+        ([""], "non-empty trimmed strings"),
+        ([1], "non-empty trimmed strings"),
+    ],
+)
+def test_selected_decision_payload_rejects_noncanonical_limitations(
+    limitations: list[object],
+    message: str,
+) -> None:
+    payload = decision_to_dict(evaluate_metastudy(_evidence(), readiness=_ready()))
+    payload["limitations"] = limitations
+
+    with pytest.raises(MetastudyContractError, match=message):
+        validate_decision_payload(payload)
+
+
 def test_decision_policy_identity_binds_the_actual_condition_ontology() -> None:
     readiness = EvidenceReadiness._from_validated_receipt(
         selected_experiment_count=8,

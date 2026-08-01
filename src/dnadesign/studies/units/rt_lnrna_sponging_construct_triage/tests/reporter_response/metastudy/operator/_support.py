@@ -19,6 +19,11 @@ import yaml
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
     DEFAULT_OBJECTIVE_READINESS,
     DEFAULT_PROTOCOL,
+    AcquisitionContribution,
+    AcquisitionCoordinate,
+    AcquisitionMetricProjection,
+    AcquisitionProjection,
+    acquisition_projection_payload,
     protocol_digest,
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.contracts import (
@@ -43,40 +48,48 @@ def _checked_state_path() -> Path:
 
 
 def _acquisition_projection_payload() -> dict[str, object]:
-    metric = {
-        "estimate": 1.0,
-        "method": "median_across_acquisitions",
-        "acquisition_count": 1,
-        "leave_one_acquisition_out_estimates": [],
-    }
-    body = {
-        "contract_id": "rt_lnrna_reporter_response_acquisition_projection.v1",
-        "selected_reduction": [6.0, 10.0],
-        "coordinates": [
-            {
-                "subject_id": "synthetic-subject",
-                "condition_role": "dose",
-                "dose_uM": 500.0,
-                "reduction_id": "window-6-10h",
-                "reduction_digest": _digest("1"),
-                "observation_policy_digest": _digest("2"),
-                "acquisition_ids": [DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[0]],
-                "contributions": [
-                    {
-                        "acquisition_id": DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[0],
-                        "profile_id": "synthetic-profile",
-                        "profile_digest": _digest("3"),
-                        "declared_biological_replicate_ids": [],
-                        "normalized_reporter_response": 1.0,
-                        "relative_od": 1.0,
-                    }
-                ],
-                "normalized_reporter_response": dict(metric),
-                "relative_od": dict(metric),
-            }
-        ],
-    }
-    return {**body, "projection_digest": canonical_digest(body)}
+    metric = AcquisitionMetricProjection(
+        estimate=1.0,
+        method="median_across_acquisitions",
+        acquisition_count=1,
+        leave_one_acquisition_out_estimates=(),
+    )
+    acquisition_id = DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[0]
+    projection = AcquisitionProjection(
+        contract_id="rt_lnrna_reporter_response_acquisition_projection.v2",
+        selected_reduction=(6.0, 10.0),
+        coordinates=(
+            AcquisitionCoordinate(
+                subject_id="synthetic-subject",
+                condition_role="dose",
+                metric_space="reference_normalized",
+                dose_uM=500.0,
+                reduction_id="window-6-10h",
+                reduction_digest=_digest("1"),
+                observation_policy_digest=_digest("2"),
+                acquisition_ids=(acquisition_id,),
+                contributions=(
+                    AcquisitionContribution(
+                        acquisition_id=acquisition_id,
+                        profile_id="synthetic-profile",
+                        profile_digest=_digest("3"),
+                        declared_biological_replicate_ids=(),
+                        rfp=None,
+                        od600=None,
+                        rfp_over_od600=None,
+                        normalized_reporter_response=1.0,
+                        relative_od=1.0,
+                    ),
+                ),
+                rfp=None,
+                od600=None,
+                rfp_over_od600=None,
+                normalized_reporter_response=metric,
+                relative_od=metric,
+            ),
+        ),
+    )
+    return acquisition_projection_payload(projection)
 
 
 def _state_for_external_registry(phd_root: Path) -> dict[str, object]:
@@ -85,6 +98,7 @@ def _state_for_external_registry(phd_root: Path) -> dict[str, object]:
     registry.write_text('{"routes": []}\n', encoding="utf-8")
     payload = yaml.safe_load(_checked_state_path().read_text(encoding="utf-8"))
     payload["schema_id"] = "rt_lnrna_reporter_response_metastudy_state.v6"
+    payload["decision"]["condition_ontology_digest"] = DEFAULT_PROTOCOL.condition_ontology_digest
     payload["decision"]["policy_digest"] = protocol_digest()
     attempt_digests: dict[str, str] = {}
     for attempt in payload["decision"]["materialization_attempts"]:

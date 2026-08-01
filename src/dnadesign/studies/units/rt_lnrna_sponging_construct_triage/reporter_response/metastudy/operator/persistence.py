@@ -23,7 +23,7 @@ import yaml
 
 from ..acquisition_projection import acquisition_projection_payload
 from ..contracts._values import MetastudyContractError
-from ..contracts.decision import decision_to_dict, validate_decision_payload
+from ..contracts.decision_codec import decision_to_dict, validate_decision_payload
 from ..contracts.protocol import DEFAULT_PROTOCOL
 from ..sensitivity import sensitivity_evaluations_to_payload
 from ..sensitivity_coverage import sensitivity_coverage_receipt_payload

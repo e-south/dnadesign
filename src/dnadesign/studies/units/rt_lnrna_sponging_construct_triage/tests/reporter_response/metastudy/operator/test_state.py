@@ -155,6 +155,31 @@ def test_state_validation_rejects_float_experiment_count(tmp_path: Path) -> None
         operator.validate_source_controlled_state(state_path, phd_root=phd_root)
 
 
+def test_state_validation_rejects_redigested_noncanonical_decision_limitations(tmp_path: Path) -> None:
+    phd_root = tmp_path / "phd"
+    payload = _state_for_external_registry(phd_root)
+    payload["decision"]["limitations"] = ["duplicate", "duplicate"]
+    payload["generation_digest"] = operator_state.canonical_digest(
+        {
+            key: payload[key]
+            for key in (
+                "readiness",
+                "decision",
+                "objective_readiness",
+                "sensitivity_evaluations",
+                "sensitivity_coverage_receipts",
+                "acquisition_projection",
+            )
+            if key in payload
+        }
+    )
+    state_path = tmp_path / "noncanonical-limitations-state.yaml"
+    state_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(MetastudyContractError, match="must not contain duplicates"):
+        operator.validate_source_controlled_state(state_path, phd_root=phd_root)
+
+
 def test_state_validation_rejects_duplicate_yaml_key(tmp_path: Path) -> None:
     phd_root = tmp_path / "phd"
     payload = _state_for_external_registry(phd_root)

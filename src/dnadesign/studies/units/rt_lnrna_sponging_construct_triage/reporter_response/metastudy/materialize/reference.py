@@ -5,7 +5,8 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass
 
-from ... import ConditionMeasurement, ReferenceNormalizationUnavailable
+from ...measurement_profile import ReferenceNormalizationUnavailable
+from ...profile.measurement import ConditionMeasurement
 from ..condition_ontology import ConditionDefinition
 
 

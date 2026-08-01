@@ -14,8 +14,8 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
-from ... import profile_to_dict
-from ...profile import TimeWindowReduction
+from ...profile.measurement import TimeWindowReduction
+from ...serialization import profile_to_dict
 from ..audits import profile_audit_payload, profile_source_identity_payload
 from ..contracts._values import MetastudyContractError, canonical_digest
 from ..contracts.decision import MetastudyDecision
@@ -26,7 +26,7 @@ from ..contracts.materialization import (
 )
 from ..contracts.profile import ProfileEvidence
 from ..contracts.protocol import DEFAULT_PROTOCOL, MetastudyProtocol, Window
-from ..evidence_projection import (
+from ..evidence_projection.contracts import (
     ProfileEvidenceProjection,
     profile_source_identity_projection,
 )

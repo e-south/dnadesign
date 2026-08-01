@@ -8,10 +8,10 @@ from collections.abc import Iterable
 from dataclasses import asdict
 
 from ...measurement_profile import ReporterMeasurementProfile
-from ...profile import TimeWindowReduction
+from ...profile.measurement import TimeWindowReduction
 from ..contracts._values import MetastudyContractError, canonical_digest
 from ..contracts.profile import ProfileEvidence
-from ..evidence_projection import ProfileEvidenceProjection
+from ..evidence_projection.contracts import ProfileEvidenceProjection
 from ._values import window
 from .contracts import (
     ACQUISITION_PROJECTION_CONTRACT_ID,
@@ -31,7 +31,7 @@ def build_acquisition_projection(
     """Summarize one window without treating acquisitions as biological replicates."""
 
     selected_window = window(selected_reduction)
-    grouped: dict[tuple[str, float, str, str, str, bool], list[AcquisitionContribution]] = defaultdict(list)
+    grouped: dict[tuple[str, float, str, str, str, str], list[AcquisitionContribution]] = defaultdict(list)
     for row in evidence:
         if not isinstance(row, (ProfileEvidence, ProfileEvidenceProjection)):
             raise MetastudyContractError("acquisition projection requires typed profile evidence")
@@ -63,24 +63,26 @@ def build_acquisition_projection(
             raise MetastudyContractError("normalized responses differ from measured dose coordinates")
         for dose, measurements in measurements_by_dose.items():
             responses = responses_by_dose[dose]
-            key = (
-                profile.subject_id,
-                dose,
-                reduction_id,
-                reduction_digest,
-                profile.observation_policy.digest,
-                normalization_available,
-            )
-            grouped[key].append(
-                _contribution(
-                    acquisition_id=acquisition_id,
-                    profile_id=profile.profile_id,
-                    profile_digest=row.audit.profile_digest,
-                    measurements=measurements,
-                    responses=responses,
-                    normalization_available=normalization_available,
+            spaces = ("raw_measurement", "reference_normalized") if normalization_available else ("raw_measurement",)
+            for metric_space in spaces:
+                key = (
+                    profile.subject_id,
+                    dose,
+                    reduction_id,
+                    reduction_digest,
+                    profile.observation_policy.digest,
+                    metric_space,
                 )
-            )
+                grouped[key].append(
+                    _contribution(
+                        acquisition_id=acquisition_id,
+                        profile_id=profile.profile_id,
+                        profile_digest=row.audit.profile_digest,
+                        measurements=measurements,
+                        responses=responses,
+                        metric_space=metric_space,
+                    )
+                )
     if not grouped:
         raise MetastudyContractError("acquisition projection requires evidence for the selected reduction")
 
@@ -99,8 +101,9 @@ def _contribution(
     profile_digest: str,
     measurements: list[object],
     responses: list[object],
-    normalization_available: bool,
+    metric_space: str,
 ) -> AcquisitionContribution:
+    normalization_available = metric_space == "reference_normalized"
     replicate_ids = tuple(
         sorted(
             {
@@ -126,10 +129,11 @@ def _contribution(
 
 
 def _coordinate(
-    key: tuple[str, float, str, str, str, bool],
+    key: tuple[str, float, str, str, str, str],
     values: list[AcquisitionContribution],
 ) -> AcquisitionCoordinate:
-    subject_id, dose, reduction_id, reduction_digest, policy_digest, normalization_available = key
+    subject_id, dose, reduction_id, reduction_digest, policy_digest, metric_space = key
+    normalization_available = metric_space == "reference_normalized"
     contributions = tuple(sorted(values, key=lambda row: row.acquisition_id))
     acquisition_ids = tuple(row.acquisition_id for row in contributions)
     if len(acquisition_ids) != len(set(acquisition_ids)):
@@ -139,6 +143,7 @@ def _coordinate(
     return AcquisitionCoordinate(
         subject_id=subject_id,
         condition_role="dose",
+        metric_space=metric_space,
         dose_uM=dose,
         reduction_id=reduction_id,
         reduction_digest=reduction_digest,
