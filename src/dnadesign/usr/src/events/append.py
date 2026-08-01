@@ -16,7 +16,7 @@ import stat
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 try:
     import fcntl
@@ -123,15 +123,22 @@ def event_log_lock(event_path: str | Path) -> Iterator[None]:
             pass
 
 
-def _append_event_payload_locked(path: Path, payload: bytes) -> None:
-    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
+def _append_event_payload_locked(
+    path: Path,
+    payload: bytes,
+    *,
+    on_start: Callable[[], None] | None = None,
+) -> None:
     descriptor = -1
     try:
         try:
+            if on_start is not None:
+                on_start()
+            flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
+            if hasattr(os, "O_CLOEXEC"):
+                flags |= os.O_CLOEXEC
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
             descriptor = os.open(path, flags, 0o600)
             file_stat = os.fstat(descriptor)
             if not stat.S_ISREG(file_stat.st_mode):
@@ -174,35 +181,51 @@ def _append_event_payload_locked(path: Path, payload: bytes) -> None:
                 pass
 
 
-def append_event_line(event_path: str | Path, encoded: str) -> None:
-    """Append one JSONL record or report its committed/restored state.
+def encode_event_line(encoded: str) -> bytes:
+    """Validate and encode one event before entering an append transaction."""
+
+    if not encoded or "\n" in encoded or "\r" in encoded:
+        raise ValueError("Event log records must be one non-empty JSONL line.")
+    return f"{encoded}\n".encode("utf-8")
+
+
+def append_event_payload(
+    event_path: str | Path,
+    payload: bytes,
+    *,
+    on_start: Callable[[], None] | None = None,
+) -> None:
+    """Append one prepared JSONL payload or report its observable state.
 
     Callers that coordinate another mutation may roll that mutation back only
     when a raised :class:`EventAppendFailure` reports ``RESTORED``. A committed
     or indeterminate append must retain the referenced artifact.
     """
 
-    if not encoded or "\n" in encoded or "\r" in encoded:
-        raise ValueError("Event log records must be one non-empty JSONL line.")
-    payload = f"{encoded}\n".encode("utf-8")
     path = Path(event_path)
-    lock_entered = False
+    append_started = False
     append_completed = False
+
+    def mark_append_started() -> None:
+        nonlocal append_started
+        append_started = True
+
     try:
+        if on_start is not None:
+            on_start()
         path.parent.mkdir(parents=True, exist_ok=True)
         with event_log_lock(path):
-            lock_entered = True
-            _append_event_payload_locked(path, payload)
+            _append_event_payload_locked(path, payload, on_start=mark_append_started)
             append_completed = True
     except EventAppendFailure:
         raise
     except BaseException as lock_error:
-        if not lock_entered:
-            state = EventAppendState.RESTORED
-        elif append_completed:
+        if append_completed:
             state = EventAppendState.COMMITTED
-        else:
+        elif append_started:
             state = EventAppendState.INDETERMINATE
+        else:
+            state = EventAppendState.RESTORED
         raise EventAppendFailure(
             path,
             state=state,
@@ -210,10 +233,18 @@ def append_event_line(event_path: str | Path, encoded: str) -> None:
         ) from lock_error
 
 
+def append_event_line(event_path: str | Path, encoded: str) -> None:
+    """Prepare and append one encoded JSONL event."""
+
+    append_event_payload(event_path, encode_event_line(encoded))
+
+
 __all__ = [
     "EventAppendFailure",
     "EventAppendState",
     "EVENT_LOCK_FILENAME",
     "append_event_line",
+    "append_event_payload",
+    "encode_event_line",
     "event_log_lock",
 ]

@@ -23,7 +23,13 @@ import pyarrow.parquet as pq
 from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 
 from ...contracts import NamespaceError, SchemaError
-from ...events import EventAppendFailure, EventAppendState, validate_event_metadata, validate_event_target
+from ...events import (
+    EventAppendAttempt,
+    EventAppendFailure,
+    EventAppendState,
+    prepare_event,
+    validate_event_metadata,
+)
 from ...overlays import overlay_dir_path, overlay_path, with_overlay_metadata
 from ...overlays.support.digest_ledger import overlay_digest_ledger_path, update_overlay_digest_ledger
 from ...registry import namespace_contract_hash_for_entries
@@ -349,35 +355,65 @@ def write_overlay_part_dataset(
 
         return rows_written, rows_incoming, rows_missing, part_path
 
+    def _write_event_fields(
+        result: tuple[int, int, int, Path],
+    ) -> tuple[int, dict[str, object], dict[str, int], dict[str, dict[str, str]]]:
+        rows_written, rows_incoming, rows_missing, _ = result
+        args = _merge_write_overlay_part_event_args(
+            namespace=namespace,
+            key=key,
+            columns=attach_cols,
+            rows_incoming=rows_incoming,
+            rows_written=rows_written,
+            rows_missing=rows_missing,
+            allow_missing=allow_missing,
+            event_args=event_args,
+        )
+        metrics = {
+            "rows_incoming": rows_incoming,
+            "rows_written": rows_written,
+            "rows_missing": rows_missing,
+        }
+        artifacts = {"overlay": {"namespace": namespace, "key": key}}
+        return rows_written, args, metrics, artifacts
+
     def _record_write(
         result: tuple[int, int, int, Path],
         *,
         target_path: Path,
     ) -> int:
-        rows_written, rows_incoming, rows_missing, _ = result
-
+        rows_written, args, metrics, artifacts = _write_event_fields(result)
         dataset._record_event(
             "write_overlay_part",
-            args=_merge_write_overlay_part_event_args(
-                namespace=namespace,
-                key=key,
-                columns=attach_cols,
-                rows_incoming=rows_incoming,
-                rows_written=rows_written,
-                rows_missing=rows_missing,
-                allow_missing=allow_missing,
-                event_args=event_args,
-            ),
-            metrics={
-                "rows_incoming": rows_incoming,
-                "rows_written": rows_written,
-                "rows_missing": rows_missing,
-            },
-            artifacts={"overlay": {"namespace": namespace, "key": key}},
+            args=args,
+            metrics=metrics,
+            artifacts=artifacts,
             target_path=target_path,
             actor=actor,
         )
         return rows_written
+
+    def _rollback_publication(
+        publication: CreateOnlyDirectoryPublication,
+    ) -> bool:
+        try:
+            return publication.rollback()
+        except BaseException as rollback_error:
+            raise PublicationError(
+                f"Overlay namespace '{namespace}' rollback after a failed publication boundary also failed."
+            ) from rollback_error
+
+    def _rollback_when_event_uncommitted(
+        publication: CreateOnlyDirectoryPublication,
+        failure: BaseException,
+        *,
+        require_published: bool,
+    ) -> None:
+        rolled_back = _rollback_publication(publication)
+        if not rolled_back and (require_published or _entry_exists(dir_path)):
+            raise PublicationError(
+                f"Overlay namespace '{namespace}' could not be rolled back safely after an uncommitted event."
+            ) from failure
 
     with write_lock(dataset.dir):
         if create_only and (_entry_exists(file_path) or _entry_exists(dir_path)):
@@ -406,29 +442,50 @@ def write_overlay_part_dataset(
             if _entry_exists(file_path):
                 raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.")
             staged_part = result[3]
-            validate_event_target(staged_part)
+            rows_written, args, metrics, artifacts = _write_event_fields(result)
+            event_append = EventAppendAttempt(
+                prepare_event(
+                    "write_overlay_part",
+                    dataset=dataset.name,
+                    args=args,
+                    metrics=metrics,
+                    artifacts=artifacts,
+                    target_path=staged_part,
+                    dataset_root=dataset.root,
+                    actor=actor,
+                )
+            )
+            publication_completed = False
             try:
                 publication.publish(required_manifest=staged_part.name)
+                publication_completed = True
+                event_append.append_to(dataset.events_path)
+                return rows_written
             except PublicationError as exc:
+                if publication_completed:
+                    raise
+                if _rollback_publication(publication):
+                    raise
                 if _entry_exists(file_path) or _entry_exists(dir_path):
                     raise FileExistsError(
                         f"Overlay namespace '{namespace}' already exists for {dataset.name}."
                     ) from exc
                 raise
-            final_part = dir_path / staged_part.name
-            try:
-                return _record_write(result, target_path=final_part)
             except EventAppendFailure as event_error:
                 if event_error.state is not EventAppendState.RESTORED:
                     raise
-                try:
-                    rolled_back = publication.rollback()
-                except BaseException as rollback_error:
-                    raise PublicationError(
-                        f"Event recording failed and overlay namespace '{namespace}' rollback also failed."
-                    ) from rollback_error
-                if not rolled_back:
-                    raise PublicationError(
-                        f"Event recording failed and overlay namespace '{namespace}' could not be rolled back safely."
-                    ) from event_error
+                _rollback_when_event_uncommitted(
+                    publication,
+                    event_error,
+                    require_published=True,
+                )
+                raise
+            except BaseException as boundary_error:
+                if event_append.started:
+                    raise
+                _rollback_when_event_uncommitted(
+                    publication,
+                    boundary_error,
+                    require_published=False,
+                )
                 raise
