@@ -17,9 +17,11 @@ from pathlib import Path
 import pyarrow as pa
 import pytest
 
+from dnadesign.artifacts import PublicationError
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import Dataset, SchemaError
 from dnadesign.usr.src.datasets.overlay import write as dataset_overlay_write_module
+from dnadesign.usr.src.events import recording as event_recording_module
 
 
 def _make_dataset(tmp_path: Path) -> Dataset:
@@ -228,3 +230,75 @@ def test_create_overlay_rejects_invalid_event_metadata_before_publication(
     assert not final.exists()
     assert dataset.events_path.read_bytes() == events_before
     assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+def test_create_overlay_rolls_back_publication_when_event_recording_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    record_event = dataset._record_event
+
+    def fail_event(*_args, **_kwargs) -> None:
+        raise OSError("injected event write failure")
+
+    monkeypatch.setattr(dataset, "_record_event", fail_event)
+    with pytest.raises(OSError, match="injected event write failure"):
+        dataset.create_overlay("mock", table, key="id")
+
+    assert not final.exists()
+    assert dataset.events_path.read_bytes() == events_before
+
+    monkeypatch.setattr(dataset, "_record_event", record_event)
+    assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+def test_create_overlay_rolls_back_when_event_fingerprinting_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    fingerprint_parquet = event_recording_module.fingerprint_parquet
+
+    def fail_fingerprint(_path: Path):
+        raise OSError("injected event fingerprint failure")
+
+    monkeypatch.setattr(event_recording_module, "fingerprint_parquet", fail_fingerprint)
+    with pytest.raises(OSError, match="injected event fingerprint failure"):
+        dataset.create_overlay("mock", table, key="id")
+
+    assert not final.exists()
+    assert dataset.events_path.read_bytes() == events_before
+
+    monkeypatch.setattr(event_recording_module, "fingerprint_parquet", fingerprint_parquet)
+    assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+def test_event_failure_rollback_preserves_a_swapped_namespace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    displaced = dataset.dir / "_derived/displaced"
+    sentinel = final / "keep.txt"
+
+    def swap_then_fail(*_args, **_kwargs) -> None:
+        final.rename(displaced)
+        final.mkdir()
+        sentinel.write_text("keep\n", encoding="utf-8")
+        raise OSError("injected event write failure")
+
+    monkeypatch.setattr(dataset, "_record_event", swap_then_fail)
+    with pytest.raises(PublicationError, match="could not be rolled back safely"):
+        dataset.create_overlay("mock", table, key="id")
+
+    assert sentinel.read_text(encoding="utf-8") == "keep\n"
+    assert len(list(displaced.glob("part-*.parquet"))) == 1

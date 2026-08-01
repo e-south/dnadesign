@@ -122,3 +122,35 @@ def test_private_stale_recovery_never_removes_a_swapped_replacement(
 
     assert (stale / "keep.txt").read_text(encoding="utf-8") == "keep\n"
     assert (displaced_stale / "stale.txt").read_text(encoding="utf-8") == "stale\n"
+
+
+def test_published_bundle_can_be_rolled_back_by_anchored_identity(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        publication.publish(required_manifest="manifest.json")
+
+        assert bundle.is_dir()
+        assert publication.rollback()
+        assert not bundle.exists()
+    finally:
+        publication.close()
+
+
+def test_publication_rollback_preserves_a_swapped_replacement(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        publication.publish(required_manifest="manifest.json")
+        displaced = bundle.parent / "displaced"
+        bundle.rename(displaced)
+        bundle.mkdir()
+        (bundle / "keep.txt").write_text("keep\n", encoding="utf-8")
+
+        assert not publication.rollback()
+        assert (bundle / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+        assert (displaced / "manifest.json").read_text(encoding="utf-8") == "{}\n"
+    finally:
+        publication.close()

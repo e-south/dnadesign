@@ -389,25 +389,43 @@ def write_overlay_part_dataset(
                 return 0
             return _record_write(result, target_path=result[3])
 
-        result: tuple[int, int, int, Path] | None = None
         try:
-            with CreateOnlyDirectoryPublication.prepare(dir_path) as publication:
-                result = _write_part(
-                    output_dir=publication.stage,
-                    promote_existing_file=False,
-                    verify_written=True,
-                )
-                if result is None:
-                    return 0
-                if _entry_exists(file_path):
-                    raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.")
-                staged_part = result[3]
-                publication.publish(required_manifest=staged_part.name)
+            publication = CreateOnlyDirectoryPublication.prepare(dir_path)
         except PublicationError as exc:
             if _entry_exists(file_path) or _entry_exists(dir_path):
                 raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.") from exc
             raise
-        if result is None:  # pragma: no cover - guarded by the early return above
-            raise RuntimeError("Create-only overlay publication completed without a write result.")
-        final_part = dir_path / result[3].name
-        return _record_write(result, target_path=final_part)
+        with publication:
+            result = _write_part(
+                output_dir=publication.stage,
+                promote_existing_file=False,
+                verify_written=True,
+            )
+            if result is None:
+                return 0
+            if _entry_exists(file_path):
+                raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.")
+            staged_part = result[3]
+            try:
+                publication.publish(required_manifest=staged_part.name)
+            except PublicationError as exc:
+                if _entry_exists(file_path) or _entry_exists(dir_path):
+                    raise FileExistsError(
+                        f"Overlay namespace '{namespace}' already exists for {dataset.name}."
+                    ) from exc
+                raise
+            final_part = dir_path / staged_part.name
+            try:
+                return _record_write(result, target_path=final_part)
+            except BaseException as event_error:
+                try:
+                    rolled_back = publication.rollback()
+                except BaseException as rollback_error:
+                    raise PublicationError(
+                        f"Event recording failed and overlay namespace '{namespace}' rollback also failed."
+                    ) from rollback_error
+                if not rolled_back:
+                    raise PublicationError(
+                        f"Event recording failed and overlay namespace '{namespace}' could not be rolled back safely."
+                    ) from event_error
+                raise

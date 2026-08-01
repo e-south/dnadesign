@@ -93,6 +93,18 @@ def remove_owned_directory(
         return False
     if not owner_matches_descriptor(owned_descriptor, expected_owner, owner_file=owner_file):
         return False
+    return remove_descriptor_anchored_directory(parent_descriptor, name, owned_descriptor)
+
+
+def remove_descriptor_anchored_directory(
+    parent_descriptor: int,
+    name: str,
+    owned_descriptor: int,
+) -> bool:
+    """Remove only the directory entry still matching an open descriptor."""
+
+    if not descriptor_matches_entry(parent_descriptor, name, owned_descriptor):
+        return False
     _remove_contents(owned_descriptor)
     if not descriptor_matches_entry(parent_descriptor, name, owned_descriptor):
         return False
@@ -130,6 +142,7 @@ __all__ = [
     "descriptor_matches_entry",
     "owner_matches_descriptor",
     "read_owner_from_descriptor",
+    "remove_descriptor_anchored_directory",
     "remove_owned_directory",
     "remove_owned_named_directory",
 ]

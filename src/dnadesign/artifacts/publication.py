@@ -23,7 +23,7 @@ import sys
 import tempfile
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .errors import PublicationError
@@ -31,6 +31,7 @@ from .owned_directory import (
     descriptor_matches_entry,
     owner_matches_descriptor,
     read_owner_from_descriptor,
+    remove_descriptor_anchored_directory,
     remove_owned_directory,
     remove_owned_named_directory,
 )
@@ -316,6 +317,7 @@ class CreateOnlyDirectoryPublication:
     parent_descriptor: int
     _owner: dict[str, object]
     _closed: bool = False
+    _published_descriptor: int | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def prepare(cls, bundle_root: str | Path) -> CreateOnlyDirectoryPublication:
@@ -398,6 +400,10 @@ class CreateOnlyDirectoryPublication:
         )
 
     def publish(self, *, required_manifest: str) -> None:
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        if self._published_descriptor is not None:
+            raise PublicationError(f"Artifact bundle is already published: {self.final}")
         manifest_relative = Path(required_manifest)
         if not required_manifest.strip() or manifest_relative.is_absolute() or ".." in manifest_relative.parts:
             raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
@@ -454,6 +460,8 @@ class CreateOnlyDirectoryPublication:
             _restore_published_modes(self.stage, published_descriptor)
             os.fchmod(published_descriptor, _FINAL_ROOT_MODE)
             os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
+            self._published_descriptor = published_descriptor
+            published_descriptor = None
         except Exception:
             if renamed and published_descriptor is not None:
                 remove_owned_directory(
@@ -483,6 +491,24 @@ class CreateOnlyDirectoryPublication:
             if published_descriptor is not None:
                 os.close(published_descriptor)
 
+    def rollback(self) -> bool:
+        """Remove this transaction's still-named publication by anchored identity."""
+
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            return False
+        removed = remove_descriptor_anchored_directory(
+            self.parent_descriptor,
+            self.final.name,
+            published_descriptor,
+        )
+        if removed:
+            os.close(published_descriptor)
+            self._published_descriptor = None
+        return removed
+
     def close(self) -> None:
         if self._closed:
             return
@@ -495,6 +521,9 @@ class CreateOnlyDirectoryPublication:
                 owner_file=_OWNER_FILE,
             )
         finally:
+            if self._published_descriptor is not None:
+                os.close(self._published_descriptor)
+                self._published_descriptor = None
             os.close(self.parent_descriptor)
             self._closed = True
 
