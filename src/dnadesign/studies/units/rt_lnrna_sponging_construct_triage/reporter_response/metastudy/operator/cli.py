@@ -80,7 +80,11 @@ def main(argv: list[str] | None = None) -> int:
     result = regenerate_metastudy(phd_root=args.phd_root)
     state_paths = None
     if args.state_dir is not None:
-        state_paths = write_source_controlled_state(result, destination=args.state_dir)
+        state_paths = write_source_controlled_state(
+            result,
+            destination=args.state_dir,
+            phd_root=args.phd_root,
+        )
     publication = None
     if args.publication is not None:
         publication = publish_metastudy(

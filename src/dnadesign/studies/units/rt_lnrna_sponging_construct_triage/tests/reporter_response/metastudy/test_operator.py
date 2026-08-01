@@ -339,7 +339,8 @@ def test_state_publication_rejects_registry_drift_since_regeneration(
 ) -> None:
     phd_root = tmp_path / "phd"
     destination = (
-        phd_root / "dnadesign/docs/studies/rt_lnrna_sponging_construct_triage/contexts/reporter-response-metastudy"
+        phd_root / "dnadesign/.worktrees/feature/docs/studies/rt_lnrna_sponging_construct_triage/contexts/"
+        "reporter-response-metastudy"
     )
     destination.mkdir(parents=True)
     registry = phd_root / operator_state.ROUTE_REGISTRY_PATH
@@ -371,7 +372,11 @@ def test_state_publication_rejects_registry_drift_since_regeneration(
     monkeypatch.setattr(operator_persistence, "validate_decision_payload", lambda _payload: None)
 
     with pytest.raises(MetastudyContractError, match="route registry changed since regeneration"):
-        operator.write_source_controlled_state(result, destination=destination)
+        operator.write_source_controlled_state(
+            result,
+            destination=destination,
+            phd_root=phd_root,
+        )
 
     assert not (destination / "metastudy-state.yaml").exists()
 

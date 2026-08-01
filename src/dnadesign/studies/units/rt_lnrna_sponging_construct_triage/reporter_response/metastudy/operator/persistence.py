@@ -44,7 +44,12 @@ if TYPE_CHECKING:
     from .regeneration import RegenerationResult
 
 
-def write_source_controlled_state(result: RegenerationResult, *, destination: Path) -> tuple[Path]:
+def write_source_controlled_state(
+    result: RegenerationResult,
+    *,
+    destination: Path,
+    phd_root: Path,
+) -> tuple[Path]:
     """Atomically replace one combined readiness-and-decision generation."""
 
     from .regeneration import RegenerationResult
@@ -56,9 +61,9 @@ def write_source_controlled_state(result: RegenerationResult, *, destination: Pa
         raise MetastudyContractError("state destination must be an existing directory")
     decision_payload = json.loads(json.dumps(decision_to_dict(result.decision), allow_nan=False))
     validate_decision_payload(decision_payload)
-    route_registry = target.parents[5] / ROUTE_REGISTRY_PATH
+    route_registry = Path(phd_root).resolve() / ROUTE_REGISTRY_PATH
     if not route_registry.is_file():
-        raise MetastudyContractError("state destination does not resolve to the canonical PhD route registry")
+        raise MetastudyContractError("PhD root does not contain the canonical route registry")
     if digest_file(route_registry) != result.route_registry_digest:
         raise MetastudyContractError("route registry changed since regeneration")
     readiness = result.decision.readiness
