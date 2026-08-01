@@ -71,10 +71,12 @@ publication carries the full offline-verifiable profiles and Cartesian
 coverage ledgers. No weighted score, optimization label, or objective is
 implemented here.
 
-`materialize.py` derives profiles and audit artifacts from one source-closed
+`materialize/` derives profiles and audit artifacts from one source-closed
 Reader dataframe record, its source-closed subject bindings, and the exact
-pinned ontology and observation policy. Evidence insufficiency returns typed
-blockers; only those derivation-closed outputs can enter selection.
+pinned ontology and observation policy. Its service owns orchestration and
+blocked receipts, profiles own identity joins and descriptive uncertainty, and
+temporal owns trace selection and condition summaries. Evidence insufficiency
+returns typed blockers; only those derivation-closed outputs can enter selection.
 
 Run the focused contract:
 

@@ -33,9 +33,7 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.condition_ontology import (
     DEFAULT_CONDITION_ONTOLOGY,
 )
-from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.materialize import (
-    _condition_summary,
-)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.materialize import temporal
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.temporal import (
     endpoint_temporal_policy_projection,
     reduce_temporal_input_trace,
@@ -126,7 +124,7 @@ def test_ratio_then_reduce_vector_exercises_actual_condition_summary() -> None:
         summary_statistic="median",
         ratio_reduction_order="ratio_then_reduce",
     )
-    summary = _condition_summary(
+    summary = temporal._condition_summary(
         pd.DataFrame(expanded),
         DEFAULT_CONDITION_ONTOLOGY,
         reduction=reduction,
@@ -159,7 +157,7 @@ def test_historical_endpoint_scalar_remains_distinct_from_shared_ratio_then_redu
                 }
             )
 
-    summary = _condition_summary(
+    summary = temporal._condition_summary(
         pd.DataFrame(expanded),
         DEFAULT_CONDITION_ONTOLOGY,
         reduction=EndpointReduction(recorded_time_h=10.0),

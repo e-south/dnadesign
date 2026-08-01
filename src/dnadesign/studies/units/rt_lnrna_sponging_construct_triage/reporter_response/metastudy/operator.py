@@ -54,7 +54,7 @@ from .contracts.materialization import (
 from .contracts.profile import ProfileEvidence
 from .contracts.protocol import DEFAULT_PROTOCOL
 from .evaluation import evaluate_metastudy, readiness_from_live_bridge
-from .materialize import materialize_record_evidence
+from .materialize.service import materialize_record_evidence
 from .publication import publish_metastudy, verify_publication
 from .sensitivity import evaluate_sensitivity, parse_sensitivity_evaluations, sensitivity_evaluations_to_payload
 from .sensitivity_coverage import (

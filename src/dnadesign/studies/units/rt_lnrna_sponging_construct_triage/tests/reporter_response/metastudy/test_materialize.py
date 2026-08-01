@@ -48,9 +48,8 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
     DEFAULT_CONDITION_ONTOLOGY,
     ReporterResponseConditionOntology,
 )
-from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.materialize import (
-    _condition_summary,
-    _growth_phase_strata,
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.materialize import temporal
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.materialize.service import (
     materialize_record_evidence,
 )
 
@@ -733,7 +732,7 @@ def test_nonnumeric_normalizer_outside_reduction_is_excluded_from_growth_phase_s
     ]
     frame = pd.DataFrame(rows)
     invalid = frame["treatment"].eq("0 nm aTc; 0 uM IPTG") & frame["time"].eq(2.0)
-    expected = _growth_phase_strata(
+    expected = temporal._growth_phase_strata(
         frame.loc[~invalid],
         reduction=reduction,
         ontology=_ontology(),
@@ -741,7 +740,7 @@ def test_nonnumeric_normalizer_outside_reduction_is_excluded_from_growth_phase_s
     )
     frame.loc[invalid, "value"] = "not-numeric"
 
-    observed = _growth_phase_strata(
+    observed = temporal._growth_phase_strata(
         frame,
         reduction=reduction,
         ontology=_ontology(),
@@ -767,7 +766,7 @@ def test_condition_summary_uses_reader_absolute_boundary_tolerance_without_relat
                 rows.append({"position": position, "time": time_h, "channel": channel, "value": value})
 
     assert (
-        _condition_summary(
+        temporal._condition_summary(
             pd.DataFrame(rows),
             _ontology(),
             reduction=reduction,
