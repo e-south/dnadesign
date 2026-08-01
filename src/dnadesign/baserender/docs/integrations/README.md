@@ -1,7 +1,7 @@
 # Integration Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 
 This section contains tool-specific contracts between upstream producers and `baserender`.

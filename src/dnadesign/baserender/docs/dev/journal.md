@@ -1,7 +1,7 @@
 # Baserender Dev Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 
 ## 2026-02-12 - Critical audit for Cruncher substrate refactor

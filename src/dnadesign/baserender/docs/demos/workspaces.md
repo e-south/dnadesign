@@ -1,7 +1,7 @@
 # Workspace And Demo Guide
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 
 This guide defines workspace operations and the curated demo entrypoints.

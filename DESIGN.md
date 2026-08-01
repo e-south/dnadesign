@@ -2,14 +2,14 @@
 doc_id: design
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 ---
 
 # DESIGN
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 ## At a glance
 This document defines repo-wide engineering principles, invariants, and boundary rules.

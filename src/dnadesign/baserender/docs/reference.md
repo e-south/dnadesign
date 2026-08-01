@@ -3,13 +3,13 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 ---
 
 # baserender Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 
 Single technical reference for operators and integrators.

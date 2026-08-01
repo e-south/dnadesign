@@ -3,13 +3,13 @@ doc_id: baserender-docs-index
 title: BaseRender documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 ---
 
 ## baserender docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 Use this index for package-local `baserender` documentation. The public surface stays small: validate or run a `RenderJobV4`, render records through the stable package API, and use integrations only when a source tool needs a contract-specific adapter or render-contract descriptor.
 

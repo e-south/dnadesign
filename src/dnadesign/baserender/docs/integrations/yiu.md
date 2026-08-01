@@ -1,7 +1,7 @@
 # YIU Integration Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 
 This page defines the YIU visual-contract handoff used by `baserender`.
