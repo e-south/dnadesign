@@ -67,6 +67,12 @@ def validate_event_metadata(
     json.dumps(metadata, separators=(",", ":"))
 
 
+def validate_event_target(target_path: Path) -> None:
+    """Fail before publication when a staged event target cannot be fingerprinted."""
+
+    fingerprint_parquet(Path(target_path))
+
+
 def record_event(
     event_path: Path,
     action: str,

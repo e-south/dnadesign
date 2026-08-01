@@ -235,7 +235,7 @@ def test_create_overlay_rejects_invalid_event_metadata_before_publication(
     assert dataset.create_overlay("mock", table, key="id") == 1
 
 
-def test_create_overlay_rolls_back_publication_when_event_recording_fails(
+def test_create_overlay_preserves_publication_when_event_commit_is_unclassified(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -252,11 +252,45 @@ def test_create_overlay_rolls_back_publication_when_event_recording_fails(
     with pytest.raises(OSError, match="injected event write failure"):
         dataset.create_overlay("mock", table, key="id")
 
-    assert not final.exists()
+    assert final.is_dir()
+    assert len(list(final.glob("part-*.parquet"))) == 1
     assert dataset.events_path.read_bytes() == events_before
 
     monkeypatch.setattr(dataset, "_record_event", record_event)
-    assert dataset.create_overlay("mock", table, key="id") == 1
+    with pytest.raises(FileExistsError, match="already exists"):
+        dataset.create_overlay("mock", table, key="id")
+    assert len(list(final.glob("part-*.parquet"))) == 1
+
+
+def test_create_overlay_preserves_publication_after_post_append_keyboard_interrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    record_event = dataset._record_event
+
+    def record_then_interrupt(*args, **kwargs) -> None:
+        record_event(*args, **kwargs)
+        raise KeyboardInterrupt("injected interrupt after durable append")
+
+    monkeypatch.setattr(dataset, "_record_event", record_then_interrupt)
+    with pytest.raises(KeyboardInterrupt, match="after durable append"):
+        dataset.create_overlay("mock", table, key="id")
+
+    assert final.is_dir()
+    assert len(list(final.glob("part-*.parquet"))) == 1
+    events_after = dataset.events_path.read_bytes()
+    assert events_after.startswith(events_before)
+    assert b'"action":"write_overlay_part"' in events_after
+
+    monkeypatch.setattr(dataset, "_record_event", record_event)
+    with pytest.raises(FileExistsError, match="already exists"):
+        dataset.create_overlay("mock", table, key="id")
+    assert len(list(final.glob("part-*.parquet"))) == 1
+    assert dataset.events_path.read_bytes() == events_after
 
 
 def test_create_overlay_restores_partial_event_append_before_rollback(
@@ -390,7 +424,7 @@ def test_create_overlay_opens_event_log_only_after_stable_sidecar_lock(
     assert b'"action":"write_overlay_part"' in live_events
 
 
-def test_create_overlay_rolls_back_when_event_fingerprinting_fails(
+def test_create_overlay_rejects_event_fingerprinting_failure_before_publication(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -401,6 +435,7 @@ def test_create_overlay_rolls_back_when_event_fingerprinting_fails(
     fingerprint_parquet = event_recording_module.fingerprint_parquet
 
     def fail_fingerprint(_path: Path):
+        assert not final.exists()
         raise OSError("injected event fingerprint failure")
 
     monkeypatch.setattr(event_recording_module, "fingerprint_parquet", fail_fingerprint)
