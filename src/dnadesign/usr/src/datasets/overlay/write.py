@@ -23,6 +23,7 @@ import pyarrow.parquet as pq
 from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 
 from ...contracts import NamespaceError, SchemaError
+from ...events import validate_event_metadata
 from ...overlays import overlay_dir_path, overlay_path, with_overlay_metadata
 from ...overlays.support.digest_ledger import overlay_digest_ledger_path, update_overlay_digest_ledger
 from ...registry import namespace_contract_hash_for_entries
@@ -207,6 +208,22 @@ def write_overlay_part_dataset(
     tbl = coerce_null_overlay_columns_to_registry_schema(dataset=dataset, namespace=namespace, tbl=tbl, key=key)
     dataset._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
     _validate_write_overlay_part_event_args(event_args)
+    validate_event_metadata(
+        "write_overlay_part",
+        args=_merge_write_overlay_part_event_args(
+            namespace=namespace,
+            key=key,
+            columns=attach_cols,
+            rows_incoming=0,
+            rows_written=0,
+            rows_missing=0,
+            allow_missing=allow_missing,
+            event_args=event_args,
+        ),
+        metrics={"rows_incoming": 0, "rows_written": 0, "rows_missing": 0},
+        artifacts={"overlay": {"namespace": namespace, "key": key}},
+        actor=actor,
+    )
 
     def _write_part(
         *,

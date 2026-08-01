@@ -201,3 +201,30 @@ def test_create_overlay_rejects_reserved_event_args_before_publication(tmp_path:
 
     assert not final.exists()
     assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+@pytest.mark.parametrize(
+    ("invalid_metadata", "error_type", "error_match"),
+    [
+        ({"actor": {}}, ValueError, "actor.tool must be a non-empty string"),
+        ({"event_args": {"source_context": object()}}, TypeError, "not JSON serializable"),
+    ],
+    ids=("invalid-actor", "non-serializable-event-args"),
+)
+def test_create_overlay_rejects_invalid_event_metadata_before_publication(
+    tmp_path: Path,
+    invalid_metadata: dict[str, object],
+    error_type: type[Exception],
+    error_match: str,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+
+    with pytest.raises(error_type, match=error_match):
+        dataset.create_overlay("mock", table, key="id", **invalid_metadata)
+
+    assert not final.exists()
+    assert dataset.events_path.read_bytes() == events_before
+    assert dataset.create_overlay("mock", table, key="id") == 1
