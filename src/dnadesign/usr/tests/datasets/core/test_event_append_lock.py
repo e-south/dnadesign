@@ -16,7 +16,12 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.usr.src.events.append import EVENT_LOCK_FILENAME, append_event_line
+from dnadesign.usr.src.events.append import (
+    EVENT_LOCK_FILENAME,
+    EventAppendFailure,
+    EventAppendState,
+    append_event_line,
+)
 
 
 def test_event_append_rejects_symlinked_lock_without_touching_target(tmp_path: Path) -> None:
@@ -25,9 +30,10 @@ def test_event_append_rejects_symlinked_lock_without_touching_target(tmp_path: P
     lock_path = tmp_path / EVENT_LOCK_FILENAME
     lock_path.symlink_to(outside)
 
-    with pytest.raises(OSError):
+    with pytest.raises(EventAppendFailure, match="restored") as exc_info:
         append_event_line(tmp_path / ".events.log", "{}")
 
+    assert exc_info.value.state is EventAppendState.RESTORED
     assert outside.read_text(encoding="utf-8") == "keep\n"
     assert not (tmp_path / ".events.log").exists()
 
@@ -37,8 +43,9 @@ def test_event_append_rejects_hard_linked_lock(tmp_path: Path) -> None:
     outside.write_text("keep\n", encoding="utf-8")
     os.link(outside, tmp_path / EVENT_LOCK_FILENAME)
 
-    with pytest.raises(OSError, match="one regular file"):
+    with pytest.raises(EventAppendFailure, match="restored") as exc_info:
         append_event_line(tmp_path / ".events.log", "{}")
 
+    assert exc_info.value.state is EventAppendState.RESTORED
     assert outside.read_text(encoding="utf-8") == "keep\n"
     assert not (tmp_path / ".events.log").exists()

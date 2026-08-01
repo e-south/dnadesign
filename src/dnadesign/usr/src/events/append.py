@@ -123,6 +123,57 @@ def event_log_lock(event_path: str | Path) -> Iterator[None]:
             pass
 
 
+def _append_event_payload_locked(path: Path, payload: bytes) -> None:
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = -1
+    try:
+        try:
+            descriptor = os.open(path, flags, 0o600)
+            file_stat = os.fstat(descriptor)
+            if not stat.S_ISREG(file_stat.st_mode):
+                raise OSError(f"Event log is not a regular file: {path}")
+            prior_size = file_stat.st_size
+        except BaseException as prewrite_error:
+            raise EventAppendFailure(path, state=EventAppendState.RESTORED) from prewrite_error
+        committed = False
+        try:
+            _write_all(descriptor, payload)
+            os.fsync(descriptor)
+            if not _path_matches_descriptor(path, descriptor):
+                raise OSError(f"Event log identity changed during append: {path}")
+            committed = True
+        except BaseException as append_error:
+            if committed:
+                raise EventAppendFailure(path, state=EventAppendState.COMMITTED) from append_error
+            try:
+                restored = _restore_prior_length(path, descriptor, prior_size)
+            except BaseException as restore_error:
+                raise EventAppendFailure(
+                    path,
+                    state=EventAppendState.INDETERMINATE,
+                    detail=f"rollback failed: {restore_error}",
+                ) from append_error
+            if not restored:
+                raise EventAppendFailure(path, state=EventAppendState.INDETERMINATE) from append_error
+            raise EventAppendFailure(path, state=EventAppendState.RESTORED) from append_error
+        closing_descriptor = descriptor
+        descriptor = -1
+        try:
+            _close_descriptor(closing_descriptor)
+        except BaseException as close_error:
+            raise EventAppendFailure(path, state=EventAppendState.COMMITTED) from close_error
+    finally:
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except BaseException:
+                pass
+
+
 def append_event_line(event_path: str | Path, encoded: str) -> None:
     """Append one JSONL record or report its committed/restored state.
 
@@ -135,57 +186,28 @@ def append_event_line(event_path: str | Path, encoded: str) -> None:
         raise ValueError("Event log records must be one non-empty JSONL line.")
     payload = f"{encoded}\n".encode("utf-8")
     path = Path(event_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with event_log_lock(path):
-        flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
-        if hasattr(os, "O_CLOEXEC"):
-            flags |= os.O_CLOEXEC
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        descriptor = -1
-        try:
-            try:
-                descriptor = os.open(path, flags, 0o600)
-                file_stat = os.fstat(descriptor)
-                if not stat.S_ISREG(file_stat.st_mode):
-                    raise OSError(f"Event log is not a regular file: {path}")
-                prior_size = file_stat.st_size
-            except BaseException as prewrite_error:
-                raise EventAppendFailure(path, state=EventAppendState.RESTORED) from prewrite_error
-            committed = False
-            try:
-                _write_all(descriptor, payload)
-                os.fsync(descriptor)
-                if not _path_matches_descriptor(path, descriptor):
-                    raise OSError(f"Event log identity changed during append: {path}")
-                committed = True
-            except BaseException as append_error:
-                if committed:
-                    raise EventAppendFailure(path, state=EventAppendState.COMMITTED) from append_error
-                try:
-                    restored = _restore_prior_length(path, descriptor, prior_size)
-                except BaseException as restore_error:
-                    raise EventAppendFailure(
-                        path,
-                        state=EventAppendState.INDETERMINATE,
-                        detail=f"rollback failed: {restore_error}",
-                    ) from append_error
-                if not restored:
-                    raise EventAppendFailure(path, state=EventAppendState.INDETERMINATE) from append_error
-                raise EventAppendFailure(path, state=EventAppendState.RESTORED) from append_error
-            closing_descriptor = descriptor
-            descriptor = -1
-            try:
-                _close_descriptor(closing_descriptor)
-            except BaseException as close_error:
-                raise EventAppendFailure(path, state=EventAppendState.COMMITTED) from close_error
-        finally:
-            if descriptor >= 0:
-                try:
-                    os.close(descriptor)
-                except BaseException:
-                    pass
+    lock_entered = False
+    append_completed = False
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with event_log_lock(path):
+            lock_entered = True
+            _append_event_payload_locked(path, payload)
+            append_completed = True
+    except EventAppendFailure:
+        raise
+    except BaseException as lock_error:
+        if not lock_entered:
+            state = EventAppendState.RESTORED
+        elif append_completed:
+            state = EventAppendState.COMMITTED
+        else:
+            state = EventAppendState.INDETERMINATE
+        raise EventAppendFailure(
+            path,
+            state=state,
+            detail=f"event lock failure: {lock_error}",
+        ) from lock_error
 
 
 __all__ = [

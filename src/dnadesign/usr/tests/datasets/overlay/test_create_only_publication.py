@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event
@@ -384,6 +385,29 @@ def test_create_overlay_rolls_back_when_event_prewrite_fails(
 
     monkeypatch.setattr(event_append_module.os, "open", real_open)
     monkeypatch.setattr(event_append_module.os, "fstat", real_fstat)
+    assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+def test_create_overlay_rolls_back_when_event_lock_is_invalid(tmp_path: Path) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    lock_path = dataset.dir / event_append_module.EVENT_LOCK_FILENAME
+    outside_lock = tmp_path / "outside.lock"
+    outside_lock.write_text("keep\n", encoding="utf-8")
+    lock_path.unlink()
+    os.link(outside_lock, lock_path)
+
+    with pytest.raises(EventAppendFailure, match="restored") as exc_info:
+        dataset.create_overlay("mock", table, key="id")
+
+    assert exc_info.value.state is EventAppendState.RESTORED
+    assert not final.exists()
+    assert dataset.events_path.read_bytes() == events_before
+    assert outside_lock.read_text(encoding="utf-8") == "keep\n"
+
+    lock_path.unlink()
     assert dataset.create_overlay("mock", table, key="id") == 1
 
 
