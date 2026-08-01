@@ -1849,7 +1849,9 @@ def test_verify_publication_rejects_forged_selection_with_recomputed_digests(tmp
 
 
 def test_selected_source_state_is_compact_and_rejects_phase_ineligible_forgery() -> None:
-    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import operator
+    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+        state as operator_state,
+    )
 
     evidence = _evidence()
     selected = evaluate_metastudy(evidence, readiness=_ready())
@@ -1877,7 +1879,7 @@ def test_selected_source_state_is_compact_and_rejects_phase_ineligible_forgery()
         "objective_readiness": asdict(DEFAULT_OBJECTIVE_READINESS),
         "sensitivity_evaluations": [],
         "sensitivity_coverage_receipts": [
-            operator.sensitivity_coverage_receipt_payload(row)
+            sensitivity_coverage_contracts.sensitivity_coverage_receipt_payload(row)
             for row in _sensitivity_coverages(
                 _complete_sensitivity_evidence(evidence),
                 selected.materialization_attempts,
@@ -1892,23 +1894,23 @@ def test_selected_source_state_is_compact_and_rejects_phase_ineligible_forgery()
     }
     payload = {
         "schema_id": "rt_lnrna_reporter_response_metastudy_state.v6",
-        "generation_digest": operator._canonical_digest(body),
+        "generation_digest": operator_state.canonical_digest(body),
         **body,
     }
-    operator._validate_state_payload(payload)
+    operator_state.validate_state_payload(payload)
 
     with_embedded_evidence = {
         **payload,
         "evidence": json.loads(json.dumps(decision_evidence_payload(evidence, decision=selected))),
     }
-    with_embedded_evidence["generation_digest"] = operator._canonical_digest(
+    with_embedded_evidence["generation_digest"] = operator_state.canonical_digest(
         {
             **body,
             "evidence": with_embedded_evidence["evidence"],
         }
     )
     with pytest.raises(MetastudyContractError, match="fields do not match"):
-        operator._validate_state_payload(with_embedded_evidence)
+        operator_state.validate_state_payload(with_embedded_evidence)
 
     decision["selected_reduction"] = [12.0, 16.0]
     for evaluation in decision["evaluations"]:
@@ -1924,10 +1926,10 @@ def test_selected_source_state_is_compact_and_rejects_phase_ineligible_forgery()
                 eligible=True,
                 blockers=[],
             )
-    payload["generation_digest"] = operator._canonical_digest(body)
+    payload["generation_digest"] = operator_state.canonical_digest(body)
 
     with pytest.raises(MetastudyContractError, match="descriptive support and phase gates"):
-        operator._validate_state_payload(payload)
+        operator_state.validate_state_payload(payload)
 
 
 @pytest.mark.parametrize(
@@ -1949,7 +1951,9 @@ def test_source_state_rejects_noncanonical_readiness_snapshot_with_recomputed_ge
     readiness_path: tuple[str, ...],
     replacement: object,
 ) -> None:
-    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import operator
+    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+        state as operator_state,
+    )
 
     state_path = next(
         parent
@@ -1968,7 +1972,7 @@ def test_source_state_rejects_noncanonical_readiness_snapshot_with_recomputed_ge
         decision = copy.deepcopy(payload["decision"])
         decision["readiness"]["receipt_digest"] = replacement
         payload["decision"] = decision
-    payload["generation_digest"] = operator._canonical_digest(
+    payload["generation_digest"] = operator_state.canonical_digest(
         {
             key: payload[key]
             for key in (
@@ -1984,7 +1988,7 @@ def test_source_state_rejects_noncanonical_readiness_snapshot_with_recomputed_ge
     )
 
     with pytest.raises(MetastudyContractError, match="readiness"):
-        operator._validate_state_payload(payload)
+        operator_state.validate_state_payload(payload)
 
 
 def test_publication_projection_parser_mints_no_live_source_or_audit_closure() -> None:
@@ -2262,7 +2266,7 @@ def test_decision_rejects_attempt_reader_identity_drift_from_primary_profiles() 
 def test_metastudy_has_no_reader_opal_or_historical_spop_import_dependency() -> None:
     package = Path(__file__).resolve().parents[3] / "reporter_response" / "metastudy"
     forbidden_import_roots = {"reader", "reader_workbench", "opal"}
-    paths = tuple(package.glob("*.py"))
+    paths = tuple(package.rglob("*.py"))
     assert paths
     for path in paths:
         text = path.read_text(encoding="utf-8")
@@ -2294,10 +2298,12 @@ def test_checked_in_protocol_and_live_descriptive_selection_match_runtime_contra
     assert protocol_payload == expected_protocol
     assert canonical_digest(protocol_payload) == protocol_digest()
 
-    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import operator
+    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+        state as operator_state,
+    )
 
     state = yaml.safe_load((docs / "metastudy-state.yaml").read_text(encoding="utf-8"))
-    operator._validate_state_payload(state)
+    operator_state.validate_state_payload(state)
     snapshot = state["readiness"]
     decision_payload = state["decision"]
     validate_decision_payload(decision_payload)

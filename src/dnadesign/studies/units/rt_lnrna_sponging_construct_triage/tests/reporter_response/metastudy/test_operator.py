@@ -31,6 +31,18 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.contracts import (
     canonical_digest,
 )
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+    cli as operator_cli,
+)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+    persistence as operator_persistence,
+)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+    regeneration as operator_regeneration,
+)
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
+    state as operator_state,
+)
 
 
 def _digest(character: str) -> str:
@@ -111,7 +123,7 @@ def _state_for_external_registry(phd_root: Path) -> dict[str, object]:
     payload["readiness"]["source_identity"]["route_registry_digest"] = (
         "sha256:" + hashlib.sha256(registry.read_bytes()).hexdigest()
     )
-    payload["generation_digest"] = operator._canonical_digest(
+    payload["generation_digest"] = operator_state.canonical_digest(
         {
             key: payload[key]
             for key in (
@@ -139,28 +151,28 @@ def test_operator_preserves_complete_partial_and_blocked_materialization_states(
         blocked_experiment_ids=(DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[-1],),
         receipt_digest="sha256:" + "a" * 64,
     )
-    monkeypatch.setattr(operator, "readiness_from_live_bridge", lambda **_kwargs: readiness)
-    monkeypatch.setattr(operator, "_digest_file", lambda _path: _digest("a"))
+    monkeypatch.setattr(operator_regeneration, "readiness_from_live_bridge", lambda **_kwargs: readiness)
+    monkeypatch.setattr(operator_regeneration, "digest_file", lambda _path: _digest("a"))
     members = tuple(
         SimpleNamespace(experiment_id=experiment_id, reader_config=f"reader/{experiment_id}/config.yaml")
         for experiment_id in DEFAULT_PROTOCOL.planned_kinetic_experiment_ids
     )
     monkeypatch.setattr(
-        operator,
+        operator_regeneration,
         "selected_experiments_for_route",
         lambda *_args, **_kwargs: members,
     )
-    monkeypatch.setattr(operator, "load_registered_subject_bindings", lambda **_kwargs: object())
+    monkeypatch.setattr(operator_regeneration, "load_registered_subject_bindings", lambda **_kwargs: object())
     resolved_ids: list[str] = []
 
     def resolve_record(_config, **kwargs):
         resolved_ids.append(kwargs["experiment_id"])
         return SimpleNamespace(experiment_id=kwargs["experiment_id"])
 
-    monkeypatch.setattr(operator, "resolve_digest_verified_dataframe_record", resolve_record)
-    monkeypatch.setattr(operator, "build_reader_evidence_bindings", lambda **_kwargs: object())
+    monkeypatch.setattr(operator_regeneration, "resolve_digest_verified_dataframe_record", resolve_record)
+    monkeypatch.setattr(operator_regeneration, "build_reader_evidence_bindings", lambda **_kwargs: object())
     monkeypatch.setattr(
-        operator,
+        operator_regeneration,
         "materialize_record_evidence",
         lambda **kwargs: SimpleNamespace(
             attempt=SimpleNamespace(
@@ -179,18 +191,18 @@ def test_operator_preserves_complete_partial_and_blocked_materialization_states(
         captured.update(evidence=tuple(evidence), readiness=readiness, attempts=tuple(attempts))
         return object()
 
-    monkeypatch.setattr(operator, "evaluate_metastudy", evaluate)
+    monkeypatch.setattr(operator_regeneration, "evaluate_metastudy", evaluate)
     monkeypatch.setattr(
-        operator,
+        operator_regeneration,
         "evaluate_sensitivity",
         lambda evidence: (SimpleNamespace(kind="endpoint", evidence=tuple(evidence)),),
     )
-    monkeypatch.setattr(operator, "validate_sensitivity_coverage_set", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(operator_regeneration, "validate_sensitivity_coverage_set", lambda *_args, **_kwargs: None)
 
     result = operator.regenerate_metastudy(phd_root=Path("unused"))
 
     blocked_id = DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[-1]
-    assert result.route_registry_path == operator._ROUTE_REGISTRY_PATH
+    assert result.route_registry_path == operator_state.ROUTE_REGISTRY_PATH
     assert result.route_registry_digest == _digest("a")
     assert resolved_ids == list(ready_ids)
     assert result.attempts == captured["attempts"]
@@ -225,10 +237,10 @@ def test_operator_fails_before_source_resolution_below_minimum_readiness(
         blocked_experiment_ids=DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[-2:],
         receipt_digest="sha256:" + "a" * 64,
     )
-    monkeypatch.setattr(operator, "readiness_from_live_bridge", lambda **_kwargs: readiness)
-    monkeypatch.setattr(operator, "_digest_file", lambda _path: _digest("a"))
+    monkeypatch.setattr(operator_regeneration, "readiness_from_live_bridge", lambda **_kwargs: readiness)
+    monkeypatch.setattr(operator_regeneration, "digest_file", lambda _path: _digest("a"))
     monkeypatch.setattr(
-        operator,
+        operator_regeneration,
         "selected_experiments_for_route",
         lambda *_args, **_kwargs: pytest.fail("source resolution must not start"),
     )
@@ -240,11 +252,11 @@ def test_operator_fails_before_source_resolution_below_minimum_readiness(
 def test_regeneration_result_rejects_incoherent_sensitivity_summary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(operator, "evaluate_sensitivity", lambda _evidence: ("canonical",))
+    monkeypatch.setattr(operator_regeneration, "evaluate_sensitivity", lambda _evidence: ("canonical",))
 
     with pytest.raises(MetastudyContractError, match="summaries differ"):
         operator.RegenerationResult(
-            route_registry_path=operator._ROUTE_REGISTRY_PATH,
+            route_registry_path=operator_state.ROUTE_REGISTRY_PATH,
             route_registry_digest=_digest("a"),
             decision=SimpleNamespace(status="blocked"),
             primary_evidence=(),
@@ -258,7 +270,7 @@ def test_regeneration_result_rejects_incoherent_sensitivity_summary(
 
 
 def test_operator_parser_exposes_regenerate_status_and_verify() -> None:
-    parser = operator.build_parser()
+    parser = operator_cli.build_parser()
 
     regenerate = parser.parse_args(["regenerate", "--phd-root", "/tmp/phd"])
     status = parser.parse_args(["status", "--phd-root", "/tmp/phd", "--state-dir", "/tmp/state"])
@@ -274,7 +286,7 @@ def test_regenerate_cli_emits_sibling_readiness_and_sensitivity_evaluations(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     result = operator.RegenerationResult(
-        route_registry_path=operator._ROUTE_REGISTRY_PATH,
+        route_registry_path=operator_state.ROUTE_REGISTRY_PATH,
         route_registry_digest=_digest("a"),
         decision=SimpleNamespace(status="blocked"),
         primary_evidence=(),
@@ -285,10 +297,10 @@ def test_regenerate_cli_emits_sibling_readiness_and_sensitivity_evaluations(
         attempts=(),
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
     )
-    monkeypatch.setattr(operator, "regenerate_metastudy", lambda **_kwargs: result)
-    monkeypatch.setattr(operator, "decision_to_dict", lambda _decision: {"status": "blocked"})
+    monkeypatch.setattr(operator_cli, "regenerate_metastudy", lambda **_kwargs: result)
+    monkeypatch.setattr(operator_cli, "decision_to_dict", lambda _decision: {"status": "blocked"})
 
-    assert operator.main(["regenerate", "--phd-root", "unused"]) == 0
+    assert operator_cli.main(["regenerate", "--phd-root", "unused"]) == 0
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["objective_readiness"] == {
@@ -309,10 +321,14 @@ def test_atomic_state_replace_preserves_prior_generation_when_replace_fails(
     target = tmp_path / "metastudy-state.yaml"
     original = {"generation": "prior"}
     target.write_text(yaml.safe_dump(original), encoding="utf-8")
-    monkeypatch.setattr(operator.os, "replace", lambda *_args: (_ for _ in ()).throw(OSError("injected")))
+    monkeypatch.setattr(
+        operator_persistence.os,
+        "replace",
+        lambda *_args: (_ for _ in ()).throw(OSError("injected")),
+    )
 
     with pytest.raises(OSError, match="injected"):
-        operator._atomic_replace_yaml(target, {"generation": "next"})
+        operator_persistence.atomic_replace_yaml(target, {"generation": "next"})
 
     assert yaml.safe_load(target.read_text(encoding="utf-8")) == original
 
@@ -326,12 +342,12 @@ def test_state_publication_rejects_registry_drift_since_regeneration(
         phd_root / "dnadesign/docs/studies/rt_lnrna_sponging_construct_triage/contexts/reporter-response-metastudy"
     )
     destination.mkdir(parents=True)
-    registry = phd_root / operator._ROUTE_REGISTRY_PATH
+    registry = phd_root / operator_state.ROUTE_REGISTRY_PATH
     registry.parent.mkdir(parents=True)
     registry.write_text('{"generation": "destination"}\n', encoding="utf-8")
-    source_digest = operator._canonical_digest({"generation": "source"})
+    source_digest = operator_state.canonical_digest({"generation": "source"})
     result = operator.RegenerationResult(
-        route_registry_path=operator._ROUTE_REGISTRY_PATH,
+        route_registry_path=operator_state.ROUTE_REGISTRY_PATH,
         route_registry_digest=source_digest,
         decision=SimpleNamespace(
             status="blocked",
@@ -351,8 +367,8 @@ def test_state_publication_rejects_registry_drift_since_regeneration(
         attempts=(),
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
     )
-    monkeypatch.setattr(operator, "decision_to_dict", lambda _decision: {"status": "blocked"})
-    monkeypatch.setattr(operator, "validate_decision_payload", lambda _payload: None)
+    monkeypatch.setattr(operator_persistence, "decision_to_dict", lambda _decision: {"status": "blocked"})
+    monkeypatch.setattr(operator_persistence, "validate_decision_payload", lambda _payload: None)
 
     with pytest.raises(MetastudyContractError, match="route registry changed since regeneration"):
         operator.write_source_controlled_state(result, destination=destination)
@@ -366,7 +382,7 @@ def test_state_validation_rejects_canonical_shaped_digest_for_wrong_route_regist
     phd_root = tmp_path / "phd"
     payload = _state_for_external_registry(phd_root)
     payload["readiness"]["source_identity"]["route_registry_digest"] = _digest("a")
-    payload["generation_digest"] = operator._canonical_digest(
+    payload["generation_digest"] = operator_state.canonical_digest(
         {
             key: payload[key]
             for key in (
@@ -400,7 +416,7 @@ def test_state_validation_rejects_incomplete_sensitivity_coverage_receipt(tmp_pa
     phd_root = tmp_path / "phd"
     payload = _state_for_external_registry(phd_root)
     payload["sensitivity_coverage_receipts"][0]["profile_count"] -= 1
-    payload["generation_digest"] = operator._canonical_digest(
+    payload["generation_digest"] = operator_state.canonical_digest(
         {
             key: payload[key]
             for key in (
@@ -425,7 +441,7 @@ def test_state_validation_rejects_sensitivity_receipt_attempt_drift(tmp_path: Pa
     phd_root = tmp_path / "phd"
     payload = _state_for_external_registry(phd_root)
     payload["sensitivity_coverage_receipts"][0]["materialization_attempt_digest"] = _digest("f")
-    payload["generation_digest"] = operator._canonical_digest(
+    payload["generation_digest"] = operator_state.canonical_digest(
         {
             key: payload[key]
             for key in (
@@ -467,18 +483,18 @@ def test_live_state_validation_accepts_exact_canonical_regeneration(
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
         acquisition_projection=validate_acquisition_projection_payload(payload["acquisition_projection"]),
     )
-    monkeypatch.setattr(operator, "regenerate_metastudy", lambda **_kwargs: result)
+    monkeypatch.setattr(operator_regeneration, "regenerate_metastudy", lambda **_kwargs: result)
     monkeypatch.setattr(
-        operator,
+        operator_regeneration,
         "decision_to_dict",
         lambda _decision: json.loads(json.dumps(payload["decision"])),
     )
     monkeypatch.setattr(
-        operator,
+        operator_regeneration,
         "sensitivity_coverage_receipt_payload",
         lambda coverage: coverage_receipts[coverages.index(coverage)],
     )
-    validated = operator.validate_live_source_controlled_state(state_path, phd_root=phd_root)
+    validated = operator_regeneration.validate_live_source_controlled_state(state_path, phd_root=phd_root)
 
     assert validated.state == payload
     assert validated.regeneration is result
@@ -492,23 +508,23 @@ def test_live_state_validation_rejects_decision_drift_after_structural_validatio
     attempt = stale["decision"]["materialization_attempts"][0]
     attempt["candidate_profile_digests"][0] = _digest("0")
     attempt["candidate_profile_digests"].sort()
-    attempt["attempt_digest"] = operator._canonical_digest(
+    attempt["attempt_digest"] = operator_state.canonical_digest(
         {key: value for key, value in attempt.items() if key != "attempt_digest"}
     )
     result = SimpleNamespace(
         decision=SimpleNamespace(status=canonical["decision"]["status"]),
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
     )
-    monkeypatch.setattr(operator, "validate_source_controlled_state", lambda *_args, **_kwargs: stale)
-    monkeypatch.setattr(operator, "regenerate_metastudy", lambda **_kwargs: result)
+    monkeypatch.setattr(operator_regeneration, "validate_source_controlled_state", lambda *_args, **_kwargs: stale)
+    monkeypatch.setattr(operator_regeneration, "regenerate_metastudy", lambda **_kwargs: result)
     monkeypatch.setattr(
-        operator,
+        operator_regeneration,
         "decision_to_dict",
         lambda _decision: json.loads(json.dumps(canonical["decision"])),
     )
 
     with pytest.raises(MetastudyContractError, match="differs from canonical live regeneration"):
-        operator.validate_live_source_controlled_state(Path("unused"), phd_root=Path("unused"))
+        operator_regeneration.validate_live_source_controlled_state(Path("unused"), phd_root=Path("unused"))
 
 
 def test_live_state_validation_accepts_compact_selected_state_without_full_evidence(
@@ -528,7 +544,7 @@ def test_live_state_validation_accepts_compact_selected_state_without_full_evide
         "acquisition_projection": None,
     }
     result = operator.RegenerationResult(
-        route_registry_path=operator._ROUTE_REGISTRY_PATH,
+        route_registry_path=operator_state.ROUTE_REGISTRY_PATH,
         route_registry_digest=_digest("a"),
         decision=SimpleNamespace(status="selected"),
         primary_evidence=(),
@@ -539,10 +555,10 @@ def test_live_state_validation_accepts_compact_selected_state_without_full_evide
         attempts=(),
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
     )
-    monkeypatch.setattr(operator, "validate_source_controlled_state", lambda *_args, **_kwargs: state)
-    monkeypatch.setattr(operator, "regenerate_metastudy", lambda **_kwargs: result)
-    monkeypatch.setattr(operator, "decision_to_dict", lambda _decision: decision)
-    validated = operator.validate_live_source_controlled_state(
+    monkeypatch.setattr(operator_regeneration, "validate_source_controlled_state", lambda *_args, **_kwargs: state)
+    monkeypatch.setattr(operator_regeneration, "regenerate_metastudy", lambda **_kwargs: result)
+    monkeypatch.setattr(operator_regeneration, "decision_to_dict", lambda _decision: decision)
+    validated = operator_regeneration.validate_live_source_controlled_state(
         Path("unused"),
         phd_root=Path("unused"),
     )
@@ -567,7 +583,7 @@ def test_live_state_validation_rejects_sensitivity_summary_drift(
         "acquisition_projection": None,
     }
     result = operator.RegenerationResult(
-        route_registry_path=operator._ROUTE_REGISTRY_PATH,
+        route_registry_path=operator_state.ROUTE_REGISTRY_PATH,
         route_registry_digest=_digest("a"),
         decision=SimpleNamespace(status="blocked"),
         primary_evidence=(),
@@ -578,12 +594,12 @@ def test_live_state_validation_rejects_sensitivity_summary_drift(
         attempts=(),
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
     )
-    monkeypatch.setattr(operator, "validate_source_controlled_state", lambda *_args, **_kwargs: state)
-    monkeypatch.setattr(operator, "regenerate_metastudy", lambda **_kwargs: result)
-    monkeypatch.setattr(operator, "decision_to_dict", lambda _decision: decision)
+    monkeypatch.setattr(operator_regeneration, "validate_source_controlled_state", lambda *_args, **_kwargs: state)
+    monkeypatch.setattr(operator_regeneration, "regenerate_metastudy", lambda **_kwargs: result)
+    monkeypatch.setattr(operator_regeneration, "decision_to_dict", lambda _decision: decision)
 
     with pytest.raises(MetastudyContractError, match="sensitivity state differs"):
-        operator.validate_live_source_controlled_state(Path("unused"), phd_root=Path("unused"))
+        operator_regeneration.validate_live_source_controlled_state(Path("unused"), phd_root=Path("unused"))
 
 
 def test_live_state_validation_rejects_objective_readiness_drift(
@@ -603,7 +619,7 @@ def test_live_state_validation_rejects_objective_readiness_drift(
         "acquisition_projection": None,
     }
     result = operator.RegenerationResult(
-        route_registry_path=operator._ROUTE_REGISTRY_PATH,
+        route_registry_path=operator_state.ROUTE_REGISTRY_PATH,
         route_registry_digest=_digest("a"),
         decision=SimpleNamespace(status="blocked"),
         primary_evidence=(),
@@ -614,12 +630,12 @@ def test_live_state_validation_rejects_objective_readiness_drift(
         attempts=(),
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
     )
-    monkeypatch.setattr(operator, "validate_source_controlled_state", lambda *_args, **_kwargs: state)
-    monkeypatch.setattr(operator, "regenerate_metastudy", lambda **_kwargs: result)
-    monkeypatch.setattr(operator, "decision_to_dict", lambda _decision: decision)
+    monkeypatch.setattr(operator_regeneration, "validate_source_controlled_state", lambda *_args, **_kwargs: state)
+    monkeypatch.setattr(operator_regeneration, "regenerate_metastudy", lambda **_kwargs: result)
+    monkeypatch.setattr(operator_regeneration, "decision_to_dict", lambda _decision: decision)
 
     with pytest.raises(MetastudyContractError, match="objective readiness differs"):
-        operator.validate_live_source_controlled_state(Path("unused"), phd_root=Path("unused"))
+        operator_regeneration.validate_live_source_controlled_state(Path("unused"), phd_root=Path("unused"))
 
 
 def test_state_validation_fails_closed_without_external_route_registry(tmp_path: Path) -> None:
@@ -640,7 +656,7 @@ def test_state_validation_rejects_float_experiment_count(tmp_path: Path) -> None
     selected_count = payload["readiness"]["selected_experiment_count"]
     payload["readiness"]["selected_experiment_count"] = float(selected_count)
     payload["decision"]["readiness"]["selected_experiment_count"] = float(selected_count)
-    payload["generation_digest"] = operator._canonical_digest(
+    payload["generation_digest"] = operator_state.canonical_digest(
         {
             key: payload[key]
             for key in (

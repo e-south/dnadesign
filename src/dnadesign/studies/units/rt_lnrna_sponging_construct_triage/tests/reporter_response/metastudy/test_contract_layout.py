@@ -17,11 +17,13 @@ from pathlib import Path
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
     contracts,
     evaluation,
+    operator,
 )
 
 _METASTUDY_ROOT = Path(__file__).parents[3] / "reporter_response" / "metastudy"
 _CONTRACTS_ROOT = _METASTUDY_ROOT / "contracts"
 _EVALUATION_ROOT = _METASTUDY_ROOT / "evaluation"
+_OPERATOR_ROOT = _METASTUDY_ROOT / "operator"
 _EXPECTED_CONTRACT_MODULES = {
     "__init__.py",
     "_values.py",
@@ -44,6 +46,22 @@ _EVALUATION_LINE_BUDGETS = {
     "evidence.py": 240,
     "readiness.py": 250,
     "selection.py": 480,
+}
+_EXPECTED_OPERATOR_MODULES = {
+    "__init__.py",
+    "__main__.py",
+    "cli.py",
+    "persistence.py",
+    "regeneration.py",
+    "state.py",
+}
+_OPERATOR_LINE_BUDGETS = {
+    "__init__.py": 60,
+    "__main__.py": 30,
+    "cli.py": 150,
+    "persistence.py": 160,
+    "regeneration.py": 320,
+    "state.py": 330,
 }
 
 
@@ -100,6 +118,27 @@ def test_evaluation_facade_exposes_only_supported_operations() -> None:
         "reevaluate_evidence_projection",
         "readiness_from_live_bridge",
         "readiness_from_receipt",
+    }
+
+
+def test_operator_package_has_one_semantic_module_per_owner() -> None:
+    assert not (_METASTUDY_ROOT / "operator.py").exists()
+    assert {path.name for path in _OPERATOR_ROOT.glob("*.py")} == _EXPECTED_OPERATOR_MODULES
+    for filename, line_budget in _OPERATOR_LINE_BUDGETS.items():
+        line_count = len((_OPERATOR_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
+
+
+def test_operator_facade_exposes_only_supported_operator_names() -> None:
+    assert set(operator.__all__) == {
+        "LiveStateValidation",
+        "RegenerationResult",
+        "build_parser",
+        "main",
+        "regenerate_metastudy",
+        "validate_live_source_controlled_state",
+        "validate_source_controlled_state",
+        "write_source_controlled_state",
     }
 
 

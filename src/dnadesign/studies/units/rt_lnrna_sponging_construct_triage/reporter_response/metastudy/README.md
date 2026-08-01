@@ -27,10 +27,12 @@ The public surface is intentionally small:
   biological-replicate identity comes only from an explicit source field.
 - `sensitivity_coverage.py` binds every ready attempt to the exact
   subject-by-reduction profile-or-omission Cartesian ledger.
-- `operator.py` owns the single live regeneration path. Its status check
-  requires exact parity between that regeneration and the source-controlled
-  decision, compact coverage receipts, and sibling sensitivity summaries; an
-  internally valid but stale profile or sensitivity digest cannot pass.
+- `operator/` exposes one supported operator facade while keeping state YAML
+  validation, regeneration, atomic persistence, and CLI adaptation in separate
+  leaves. Its status check requires exact parity between live regeneration and
+  the source-controlled decision, compact coverage receipts, and sibling
+  sensitivity summaries; an internally valid but stale profile or sensitivity
+  digest cannot pass.
 - `publication.py` creates one deterministic meta-study envelope in a new
   directory. Every bundle contains `manifest.json`, `report.md`, and
   `sensitivity.json`; every evaluated bundle, whether selected or
