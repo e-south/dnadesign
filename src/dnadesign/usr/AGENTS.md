@@ -61,7 +61,10 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Notebooks: `src/dnadesign/usr/notebooks/`
 - Archived PyTorch manager: `src/dnadesign/usr/scripts/archived_pytorch_manager.py`
   - Inspects and updates the legacy PyTorch archive bucket under `datasets/archived/promoter_misc_pytorch/`.
-- Remote sync config: prefer `uv run usr --remotes-config <remotes.yaml> ...`; `USR_REMOTES_PATH` is the fallback for shell-scoped sessions
+- Remote sync config: copy `remotes.example.yaml` to an untracked local path,
+  replace its example values, and pass that path with
+  `uv run usr --remotes-config <remotes.yaml> ...`; `USR_REMOTES_PATH` is the
+  fallback for shell-scoped sessions
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync/README.md`
 - Repo-local BU SCC sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
@@ -73,7 +76,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Human-readable record names belong in `usr_label__primary` / `usr_label__aliases`.
 
 ### Generated vs hand-edited
-- Hand-edited: `datasets/**/meta.md`, `remotes.yaml`, `src/dnadesign/usr/docs/operations/sync/README.md`
+- Hand-edited: `datasets/**/meta.md`, an untracked local `remotes.yaml`, `src/dnadesign/usr/docs/operations/sync/README.md`
 - Generated / run artifacts: `datasets/**/.events.log`, `datasets/**/_snapshots/**`, `datasets/**/_derived/**`, `datasets/archived/**`
 - Ask before committing: changed `records.parquet`, large datasets/logs, any bulk sync outputs/caches.
 

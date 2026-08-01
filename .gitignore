@@ -95,6 +95,9 @@ yarn-error.log*
 temp.md
 tmp/
 
+# Local operator configuration (copy the tracked example before use)
+src/dnadesign/usr/remotes.yaml
+
 # -----------------------------------------------------------------------------
 # Archives
 # -----------------------------------------------------------------------------

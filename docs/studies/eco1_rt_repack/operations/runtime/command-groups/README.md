@@ -2,7 +2,7 @@
 doc_id: eco1-rt-repack-command-groups
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-15
+last_verified: 2026-07-30
 status: active
 ---
 
@@ -62,10 +62,20 @@ MSA-observed and introduce no new D/E, P, or G. V3 also uses global
 The SCC job maps one complete policy to each array task. It does not compose
 mutations across policies.
 
+Set the operator roots once and create the scheduler-log directory before
+submission:
+
+```bash
+export SCC_LOG_ROOT="<scc_project_root>/dnadesign-sge-logs/eco1-rt-repack"
+export SCC_PROJECTNB_ROOT="<scc_projectnb_root>"
+mkdir -p "$SCC_LOG_ROOT"
+```
+
 Smoke one policy:
 
 ```bash
 qsub -t 1 \
+  -o "${SCC_LOG_ROOT}/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
   -v DNADESIGN_REPO=<scc_dnadesign_repo>,PROTEINMPNN_ROOT=<scc_dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
 ```
@@ -75,6 +85,7 @@ all policies:
 
 ```bash
 qsub -t 1-3 \
+  -o "${SCC_LOG_ROOT}/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
   -v DNADESIGN_REPO=<scc_dnadesign_repo>,PROTEINMPNN_ROOT=<scc_dnadesign_repo>/.var/tools/proteinmpnn \
   docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
 ```
@@ -107,10 +118,11 @@ For a six-sequence ColabFold smoke on SCC:
 
 ```bash
 qsub \
+  -o "${SCC_LOG_ROOT}/colabfold-smoke.\$JOB_ID.out" \
   -v DNADESIGN_REPO=<scc_dnadesign_repo>,\
 FOLDCHECK_REQUEST_MANIFEST=src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_request/foldcheck_request_manifest.yaml,\
 FOLDCHECK_SEQUENCE_LIMIT=6,\
-COLABFOLD_BATCH=/projectnb/dunlop/esouth/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,\
+COLABFOLD_BATCH=${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch,\
 COLABFOLD_EXTRA_ARGS='--num-models 1' \
   docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 ```

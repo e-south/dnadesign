@@ -339,7 +339,7 @@ def test_cli_runtime_support_module_exports_expected_symbols() -> None:
 def test_sync_remote_config_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.sync.remote.config")
     assert hasattr(module, "SSHRemoteConfig")
-    assert hasattr(module, "default_config_path")
+    assert not hasattr(module, "default_config_path")
     assert hasattr(module, "locate_config")
     assert hasattr(module, "load_all")
     assert hasattr(module, "save_remote")

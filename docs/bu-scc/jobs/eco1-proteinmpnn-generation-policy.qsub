@@ -5,7 +5,6 @@
 #$ -pe omp 1
 #$ -l mem_per_core=8G
 #$ -j y
-#$ -o /project/dunlop/esouth/proteinmpnn/eco1_rt_generation_policies/sge_logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
 
 set -euo pipefail
 

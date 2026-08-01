@@ -1,5 +1,5 @@
 study_id: stress_ethanol_cipro_growth
-usr_remotes_path: src/dnadesign/usr/remotes.yaml
+usr_remotes_path: n/a
 datasets:
   - role: densegen_anchor
     dataset: densegen_prom_eth_cip_source
