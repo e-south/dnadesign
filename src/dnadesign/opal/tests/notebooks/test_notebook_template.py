@@ -2189,7 +2189,7 @@ def test_reader_evidence_artifact_rows_preserve_zero_hour_snapshot() -> None:
                 {
                     "label": "baseline",
                     "time_selected_h": 0.0,
-                    "semantic_kind": "reader.sfxi_triptych",
+                    "semantic_kind": "promoter_response_evidence",
                     "path": "baseline.png",
                     "exists": True,
                 }

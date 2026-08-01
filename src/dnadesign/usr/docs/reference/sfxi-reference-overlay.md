@@ -43,7 +43,7 @@ Study recipes must fail before asking USR to write when any of these are true:
 - metric provenance is empty;
 - Reader score rows do not map to the target USR dataset by sequence.
 
-## Command
+## Publication
 
 Dry run:
 

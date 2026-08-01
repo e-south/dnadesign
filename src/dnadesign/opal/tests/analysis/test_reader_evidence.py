@@ -69,11 +69,11 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     workdir = tmp_path / "campaign"
     raw_pdf = tmp_path / "reader" / "raw.pdf"
     triptych_pdf = tmp_path / "reader" / "triptych.pdf"
-    heatmap_png = tmp_path / "reader" / "heatmap.png"
+    diagnostic_png = tmp_path / "reader" / "four_state_event_window_diagnostic.png"
     raw_pdf.parent.mkdir(parents=True)
     raw_pdf.write_bytes(b"%PDF-1.4\n")
     triptych_pdf.write_bytes(b"%PDF-1.4\n")
-    heatmap_png.write_bytes(b"png")
+    diagnostic_png.write_bytes(b"png")
     manifest = workdir / "inputs" / "r0" / "reader_evidence_manifest.json"
     manifest.parent.mkdir(parents=True)
     manifest.write_text(
@@ -93,8 +93,8 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
                     {
                         "id": "candidate-1",
                         "design_id": "pDual-10-SECG-B0-ETH-01",
-                        "reader_experiment_id": "20260706_sfxi",
-                        "time_selected_h": 12.041,
+                        "reader_experiment_id": "20260706_response-window-opal-20-28",
+                        "reduction_id": "event_logmean_4_8h_post",
                         "artifacts": [
                             {
                                 "semantic_kind": "raw_kinetics",
@@ -115,11 +115,11 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
                                 "media_type": "application/pdf",
                             },
                             {
-                                "semantic_kind": "sfxi_vec8_heatmap",
-                                "kind": "reader_plot",
-                                "record_id": "plot:sfxi_vec8_heatmap",
-                                "scope": "design",
-                                "path": str(heatmap_png),
+                                "semantic_kind": "promoter_response_evidence",
+                                "kind": "reader_publication",
+                                "record_id": "plot:four_state_event_window_diagnostic",
+                                "scope": "design_reduction",
+                                "path": str(diagnostic_png),
                                 "exists": True,
                                 "media_type": "image/png",
                             },
@@ -142,12 +142,12 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     assert build_notebook_reader_evidence_plot_type_options(surface) == [
         "Raw Kinetics",
         "Intensity Overview",
-        "Sfxi Vec8 Heatmap",
+        "Promoter response evidence",
     ]
     assert build_notebook_reader_evidence_artifact_options(
         surface,
-        selected_plot_type_label="Sfxi Vec8 Heatmap",
-    ) == ["Round 0 · 2026-07-06 · SFXI · pDual-10-SECG-B0-ETH-01 · 12.04 h"]
+        selected_plot_type_label="Promoter response evidence",
+    ) == ["Round 0 · 2026-07-06 · Response window OPAL 20–28 · pDual-10-SECG-B0-ETH-01 · 4–8 h post-event"]
 
 
 def test_reader_evidence_labels_disambiguate_media_without_exposing_paths(tmp_path: Path) -> None:
@@ -418,7 +418,7 @@ def test_reader_evidence_record_memory_key_is_campaign_and_deliverable_scoped() 
     )
     assert key != build_notebook_reader_evidence_record_memory_key(
         campaign_slug="secg_msrb_greedy",
-        reader_plot_type_label="SFXI vec8 heatmap",
+        reader_plot_type_label="Raw kinetics",
     )
 
 
@@ -488,7 +488,7 @@ def test_reader_evidence_record_control_updates_campaign_deliverable_memory() ->
     assert state == {key: "Round 0 · first"}
 
 
-def test_reader_sfxi_triptych_pdf_renders_as_completed_static_artifact(tmp_path: Path, monkeypatch) -> None:
+def test_reader_generic_pdf_renders_as_completed_static_artifact(tmp_path: Path, monkeypatch) -> None:
     pdf_path = tmp_path / "reader.pdf"
     preview_path = tmp_path / "reader-preview.png"
     pdf_path.write_bytes(b"%PDF-1.4\n")
@@ -497,8 +497,8 @@ def test_reader_sfxi_triptych_pdf_renders_as_completed_static_artifact(tmp_path:
     surface = {
         "media_rows": [
             {
-                "label": "r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h",
-                "plot_type_label": "Time series + snapshot",
+                "label": "Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event",
+                "plot_type_label": "Intensity overview",
                 "semantic_kind": "intensity_overview",
                 "path": str(pdf_path),
                 "exists": True,
@@ -509,8 +509,8 @@ def test_reader_sfxi_triptych_pdf_renders_as_completed_static_artifact(tmp_path:
 
     rendered = render_notebook_reader_evidence_artifact_visual(
         surface,
-        selected_plot_type_label="Time series + snapshot",
-        selected_artifact_label="r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h",
+        selected_plot_type_label="Intensity overview",
+        selected_artifact_label="Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event",
         mo=_FakeMo(),
     )
 
@@ -525,13 +525,13 @@ def test_reader_sfxi_triptych_pdf_renders_as_completed_static_artifact(tmp_path:
 
 
 def test_reader_evidence_png_renders_zoomable_visual(tmp_path: Path) -> None:
-    image_path = tmp_path / "reader-heatmap.png"
+    image_path = tmp_path / "four_state_event_window_diagnostic.png"
     image_path.write_bytes(b"png")
     surface = {
         "media_rows": [
             {
-                "label": "r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h",
-                "plot_type_label": "SFXI vec8 heatmap",
+                "label": "Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event",
+                "plot_type_label": "Four state event window diagnostic",
                 "path": str(image_path),
                 "exists": True,
                 "media_type": "image/png",
@@ -541,8 +541,8 @@ def test_reader_evidence_png_renders_zoomable_visual(tmp_path: Path) -> None:
 
     rendered = render_notebook_reader_evidence_artifact_visual(
         surface,
-        selected_plot_type_label="SFXI vec8 heatmap",
-        selected_artifact_label="r0 | 20260706_sfxi | pDual-10-SECG-B0-ETH-01 | 12.04 h",
+        selected_plot_type_label="Four state event window diagnostic",
+        selected_artifact_label="Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event",
         mo=_FakeMo(),
     )
 

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,28 @@ def _scaffold_top_level_layout(tmp_path: Path) -> None:
         _write(src_root / name / "__init__.py", "")
     for name in TOP_LEVEL_LEGACY_DIRECTORIES:
         (src_root / name).mkdir(parents=True, exist_ok=True)
+
+
+def test_dnadesign_source_does_not_import_external_reader_packages() -> None:
+    source_root = Path("src/dnadesign")
+    forbidden_roots = {"reader", "reader_workbench"}
+    violations: list[str] = []
+
+    for path in sorted(source_root.rglob("*.py")):
+        if "tests" in path.parts or "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.split(".", maxsplit=1)[0] in forbidden_roots:
+                        violations.append(f"{path}:{node.lineno}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if node.level == 0 and module.split(".", maxsplit=1)[0] in forbidden_roots:
+                    violations.append(f"{path}:{node.lineno}: from {module} import ...")
+
+    assert violations == []
 
 
 def test_find_undeclared_cross_tool_imports_allows_declared_edge(tmp_path: Path) -> None:

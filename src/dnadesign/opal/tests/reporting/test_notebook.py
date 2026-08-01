@@ -314,7 +314,16 @@ def test_notebook_view_model_includes_reader_evidence_manifests(tmp_path: Path) 
     write_records(records_path)
     config_path = workdir / "campaign.yaml"
     write_campaign_yaml(config_path, workdir=workdir, records_path=records_path)
-    reader_plot = tmp_path / "reader" / "experiments" / "2026" / "20260706_sfxi" / "outputs" / "plots" / "ts_ETH-01.pdf"
+    reader_plot = (
+        tmp_path
+        / "reader"
+        / "experiments"
+        / "2026"
+        / "20260706_response-window-opal-20-28"
+        / "outputs"
+        / "plots"
+        / "four_state_event_window_diagnostic.pdf"
+    )
     reader_plot.parent.mkdir(parents=True, exist_ok=True)
     reader_plot.write_bytes(b"%PDF-1.4\n")
     evidence_manifest = workdir / "inputs" / "r0" / "reader_evidence_manifest.json"
@@ -338,14 +347,14 @@ def test_notebook_view_model_includes_reader_evidence_manifests(tmp_path: Path) 
                     {
                         "id": "candidate-1",
                         "design_id": "pDual-10-SECG-B0-ETH-01",
-                        "reader_experiment_id": "20260706_sfxi",
-                        "time_selected_h": 12.04,
+                        "reader_experiment_id": "20260706_response-window-opal-20-28",
+                        "reduction_id": "event_logmean_4_8h_post",
                         "artifacts": [
                             {
-                                "semantic_kind": "raw_kinetics",
-                                "kind": "reader_plot",
-                                "record_id": "plot:raw_kinetics",
-                                "scope": "design",
+                                "semantic_kind": "promoter_response_evidence",
+                                "kind": "reader_publication",
+                                "record_id": "plot:four_state_event_window_diagnostic",
+                                "scope": "design_reduction",
                                 "path": str(reader_plot),
                                 "exists": True,
                                 "media_type": "application/pdf",

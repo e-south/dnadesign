@@ -263,6 +263,22 @@ def test_opal_source_does_not_import_reader_or_mutate_python_import_paths() -> N
     assert violations == []
 
 
+def test_opal_review_surfaces_do_not_advertise_retired_reader_sfxi_plots() -> None:
+    forbidden = ("sfxi_vec8_" + "heatmap", "reader.sfxi_" + "triptych")
+    violations: list[str] = []
+    review_paths = [*sorted((OPAL_ROOT / "docs").rglob("*.md")), *sorted((OPAL_ROOT / "tests").rglob("*.py"))]
+
+    for path in review_paths:
+        if path == Path(__file__):
+            continue
+        text = path.read_text(encoding="utf-8")
+        for retired_identifier in forbidden:
+            if retired_identifier in text:
+                violations.append(f"{path}: {retired_identifier}")
+
+    assert violations == []
+
+
 def test_notebook_api_has_separate_generated_and_progress_surfaces() -> None:
     import dnadesign.opal.notebooks.api as notebook_api
     from dnadesign.opal.notebooks.api import generated, progress

@@ -3,7 +3,7 @@ id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-17
+last_verified: 2026-08-01
 audience:
   - operator
   - maintainer
@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-17
+**Last verified:** 2026-08-01
 
 ## OPAL Notebooks
 
@@ -181,9 +181,9 @@ The generated notebook renders the view model as an app-mode review surface:
 - plot-local method, math, failure-mode, and evidence tables in a compact
   progressively disclosed evidence section;
 - Reader evidence manifests, artifact tables, and renderable Reader plot
-  artifacts when a campaign stages measured Reader evidence. Reader SFXI
-  time-series plus snapshot plots expose a time slider for the displayed
-  triptych snapshot; the staged Vec8 snapshot time remains shown separately;
+  artifacts when a campaign stages measured Reader evidence. Current
+  four-state event-window diagnostic records retain their Reader record ID,
+  reduction identity, and selected event-relative window;
 - artifact garden rows with local-only status, stale siblings, byte counts, and
   prune plans that require explicit apply outside the notebook;
 - limitations and evidence rows in the campaign status detail section.
