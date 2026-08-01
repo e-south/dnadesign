@@ -18,11 +18,11 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.studies.core import reader_records as records_module
 from dnadesign.studies.core.reader_records import (
     ReaderDataframeRecordError,
     resolve_digest_verified_dataframe_record,
 )
+from dnadesign.studies.core.reader_records import transport as reader_transport
 
 _REVISION_DIGEST = "sha256:" + ("a" * 64)
 
@@ -174,7 +174,7 @@ def _resolve(reader_root: Path, config: Path):
 def test_public_reader_record_preserves_identity_metadata_and_digest(tmp_path: Path, monkeypatch) -> None:
     reader_root, config, artifact, digest = _fixture(tmp_path)
     payload = _page(config=config, artifact=artifact, digest=digest, records=[_record(digest=digest)], total=1)
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
 
     record = _resolve(reader_root, config)
 
@@ -208,7 +208,7 @@ def test_public_reader_record_preserves_unknown_replicate_status_without_inventi
             "replicate_identity_field": None,
         },
     )
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
 
     record = _resolve(reader_root, config)
 
@@ -240,7 +240,7 @@ def test_public_reader_record_preserves_replicate_scope_without_reinterpreting_i
             "replicate_identity_field": replicate_identity_field,
         },
     )
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
 
     record = _resolve(reader_root, config)
 
@@ -267,7 +267,7 @@ def test_public_reader_record_follows_bounded_pages(tmp_path: Path, monkeypatch)
         commands.append(tuple(command))
         return _verify_page() if "verify" in command else next(pages)
 
-    monkeypatch.setattr(records_module, "_run_reader_json", run)
+    monkeypatch.setattr(reader_transport, "run_reader_json", run)
 
     assert _resolve(reader_root, config).record_id == "ratio_reporter_normalizer/df"
     assert "--continuation" not in commands[0]
@@ -298,7 +298,7 @@ def test_public_reader_record_rejects_repeated_continuation_token(tmp_path: Path
         continuation="opaque",
     )
     pages = iter((first_page, repeated_page))
-    monkeypatch.setattr(records_module, "_run_reader_json", lambda *_args, **_kwargs: next(pages))
+    monkeypatch.setattr(reader_transport, "run_reader_json", lambda *_args, **_kwargs: next(pages))
 
     with pytest.raises(ReaderDataframeRecordError, match="repeated continuation token"):
         _resolve(reader_root, config)
@@ -315,7 +315,7 @@ def test_public_reader_record_rejects_truncated_empty_page(tmp_path: Path, monke
         truncated=True,
         continuation="opaque",
     )
-    monkeypatch.setattr(records_module, "_run_reader_json", lambda *_args, **_kwargs: payload)
+    monkeypatch.setattr(reader_transport, "run_reader_json", lambda *_args, **_kwargs: payload)
 
     with pytest.raises(ReaderDataframeRecordError, match="truncated page must contain at least one record"):
         _resolve(reader_root, config)
@@ -339,8 +339,8 @@ def test_public_reader_record_rejects_pagination_beyond_page_bound(tmp_path: Pat
         calls += 1
         return payload
 
-    monkeypatch.setattr(records_module, "_MAX_RECORD_PAGES", 1, raising=False)
-    monkeypatch.setattr(records_module, "_run_reader_json", run)
+    monkeypatch.setattr(reader_transport, "MAX_RECORD_PAGES", 1)
+    monkeypatch.setattr(reader_transport, "run_reader_json", run)
 
     with pytest.raises(ReaderDataframeRecordError, match="exceeded the 1-page safety bound"):
         _resolve(reader_root, config)
@@ -354,10 +354,10 @@ def test_reader_cli_timeout_fails_closed(tmp_path: Path, monkeypatch) -> None:
         observed.update(kwargs)
         raise subprocess.TimeoutExpired(command, kwargs["timeout"])
 
-    monkeypatch.setattr(records_module.subprocess, "run", run)
+    monkeypatch.setattr(reader_transport.subprocess, "run", run)
 
     with pytest.raises(ReaderDataframeRecordError, match="timed out after 60 seconds"):
-        records_module._run_reader_json(("reader-fixture", "records"), cwd=tmp_path)
+        reader_transport.run_reader_json(("reader-fixture", "records"), cwd=tmp_path)
     assert observed["timeout"] == 60
 
 
@@ -380,7 +380,7 @@ def test_public_reader_record_rejects_invalid_contracts(tmp_path: Path, monkeypa
     reader_root, config, artifact, digest = _fixture(tmp_path)
     payload = _page(config=config, artifact=artifact, digest=digest, records=[_record(digest=digest)], total=1)
     mutation(payload)
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
 
     with pytest.raises(ReaderDataframeRecordError, match=message):
         _resolve(reader_root, config)
@@ -402,8 +402,8 @@ def test_public_reader_record_requires_successful_public_verification(
     reader_root, config, artifact, digest = _fixture(tmp_path)
     payload = _page(config=config, artifact=artifact, digest=digest, records=[_record(digest=digest)], total=1)
     monkeypatch.setattr(
-        records_module,
-        "_run_reader_json",
+        reader_transport,
+        "run_reader_json",
         _reader_runner(payload, verify_payload=verify_payload),
     )
 
@@ -439,8 +439,8 @@ def test_public_reader_record_rejects_malformed_successful_verification(
     verification = _verify_page()
     mutation(verification)
     monkeypatch.setattr(
-        records_module,
-        "_run_reader_json",
+        reader_transport,
+        "run_reader_json",
         _reader_runner(payload, verify_payload=verification),
     )
 
@@ -468,7 +468,7 @@ def test_public_reader_record_rejects_invalid_exact_revision_identity(
     reader_root, config, artifact, digest = _fixture(tmp_path)
     payload = _page(config=config, artifact=artifact, digest=digest, records=[_record(digest=digest)], total=1)
     payload["data"]["records"][0][field] = value
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
 
     with pytest.raises(ReaderDataframeRecordError, match=message):
         _resolve(reader_root, config)
@@ -492,7 +492,7 @@ def test_public_reader_record_rejects_identity_change_during_resolution(
     def run(command, **_kwargs):
         return _verify_page() if "verify" in command else next(payloads)
 
-    monkeypatch.setattr(records_module, "_run_reader_json", run)
+    monkeypatch.setattr(reader_transport, "run_reader_json", run)
 
     with pytest.raises(ReaderDataframeRecordError, match="identity changed during resolution"):
         _resolve(reader_root, config)
@@ -501,7 +501,7 @@ def test_public_reader_record_rejects_identity_change_during_resolution(
 def test_public_reader_record_rejects_digest_drift(tmp_path: Path, monkeypatch) -> None:
     reader_root, config, artifact, digest = _fixture(tmp_path)
     payload = _page(config=config, artifact=artifact, digest=digest, records=[_record(digest=digest)], total=1)
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
     artifact.write_bytes(b"drift")
 
     with pytest.raises(ReaderDataframeRecordError, match="content digest mismatch"):
@@ -517,7 +517,7 @@ def test_public_reader_record_rejects_input_config_outside_reader_root(tmp_path:
     def unexpected_cli_call(*_args, **_kwargs):
         raise AssertionError("Reader CLI must not run for an out-of-root config")
 
-    monkeypatch.setattr(records_module, "_run_reader_json", unexpected_cli_call)
+    monkeypatch.setattr(reader_transport, "run_reader_json", unexpected_cli_call)
 
     with pytest.raises(ReaderDataframeRecordError, match="Reader config escapes"):
         _resolve(reader_root, outside_config)
@@ -549,7 +549,7 @@ def test_public_reader_record_rejects_public_paths_outside_reader_root(
         catalog["outputs_root"] = str(outside)
     else:
         catalog["path"] = str(outside)
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
 
     with pytest.raises(ReaderDataframeRecordError, match=message):
         _resolve(reader_root, config)
@@ -579,7 +579,7 @@ def test_public_reader_record_rejects_noncanonical_public_paths(
         catalog["outputs_root"] = str(config.parent / "alternate_outputs")
     else:
         catalog["path"] = str(config.parent / "outputs" / "manifests" / "alternate.json")
-    monkeypatch.setattr(records_module, "_run_reader_json", _reader_runner(payload))
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload))
 
     with pytest.raises(ReaderDataframeRecordError, match=message):
         _resolve(reader_root, config)
