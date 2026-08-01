@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/devtools/tests/architecture/test_lazy_public_facades.py
 
-Static-symbol coverage tests for lazy public package facades.
+Static and runtime symbol coverage tests for lazy public package facades.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,6 +14,8 @@ from __future__ import annotations
 import ast
 import importlib
 import pkgutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -61,3 +63,27 @@ def test_lazy_public_facade_exports_do_not_collide_with_child_modules(module_nam
     collisions = sorted(set(module.__all__).intersection(child_module_names))
 
     assert not collisions, f"Lazy exports collide with importable child modules: {collisions}"
+
+
+@pytest.mark.parametrize("module_name", _LAZY_PUBLIC_FACADES)
+def test_lazy_public_facade_resolves_every_export_in_fresh_process(
+    module_name: str,
+    tmp_path: Path,
+) -> None:
+    probe = """
+import importlib
+import sys
+
+module = importlib.import_module(sys.argv[1])
+for export in module.__all__:
+    getattr(module, export)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", probe, module_name],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
