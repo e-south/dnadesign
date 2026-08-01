@@ -13,27 +13,19 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
 
-MARKDOWN_INLINE_IMAGE_PATTERN = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<image>[^)\s]+)(?:\s+[^)]*)?\)")
-MARKDOWN_REFERENCE_IMAGE_PATTERN = re.compile(r"!\[(?P<alt>[^\]]*)\]\[(?P<label>[^\]]*)\]")
-MARKDOWN_SHORTCUT_REFERENCE_IMAGE_PATTERN = re.compile(r"!\[(?P<alt>[^\]]+)\](?![\[(])")
-MARKDOWN_REFERENCE_DEFINITION_PATTERN = re.compile(
-    r"^\[(?P<label>[^\]]+)\]:\s*<?(?P<target>[^\s>]+)>?",
-    flags=re.MULTILINE,
-)
-HTML_IMAGE_PATTERN = re.compile(r"<img\b(?P<attributes>[^>]*)>", flags=re.IGNORECASE)
-HTML_ATTRIBUTE_PATTERN = re.compile(
-    r"(?P<name>[A-Za-z_:][-A-Za-z0-9_:.]*)\s*=\s*"
-    r'(?:"(?P<double>[^"]*)"|\'(?P<single>[^\']*)\'|(?P<bare>[^\s"\'=<>`]+))'
-)
-HTML_COMMENT_PATTERN = re.compile(r"<!--[\s\S]*?-->")
-HTML_ANCHOR_OPEN_PATTERN = re.compile(r"<a(?:\s|>)", flags=re.IGNORECASE)
+from markdown_it import MarkdownIt
+from markdown_it.token import Token
+
 BADGE_SOURCE_PATTERN = re.compile(
     r"(?:shields\.io|codecov\.io|(?:^|[/_.-])badge(?:[./?_-]|$))",
     flags=re.IGNORECASE,
 )
 BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags=re.IGNORECASE)
+MARKDOWN = MarkdownIt("commonmark")
 ROOT_README_ALLOWED_BADGES = frozenset(
     {
         "[![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg?branch=main)]"
@@ -45,95 +37,52 @@ ROOT_README_ALLOWED_BADGES = frozenset(
 )
 
 
-def _mask_fenced_code(content: str) -> str:
-    masked: list[str] = []
-    fence_character: str | None = None
-    fence_length = 0
-    for line in content.splitlines(keepends=True):
-        candidate = line.lstrip(" ")
-        indent = len(line) - len(candidate)
-        body = candidate.rstrip("\r\n")
-        fence = re.match(r"(?P<fence>`{3,}|~{3,})", body) if indent <= 3 else None
-        inside_fence = fence_character is not None
-        if inside_fence:
-            closing = re.fullmatch(
-                rf"{re.escape(fence_character)}{{{fence_length},}}[ \t]*",
-                body,
+@dataclass(frozen=True, slots=True)
+class _ImageSpec:
+    label: str
+    source: str
+    linked: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _ImageOccurrence:
+    line_no: int
+    spec: _ImageSpec
+
+
+class _HTMLImageParser(HTMLParser):
+    def __init__(self, *, anchor_depth: int, markdown_link_depth: int) -> None:
+        super().__init__(convert_charrefs=True)
+        self.anchor_depth = anchor_depth
+        self.markdown_link_depth = markdown_link_depth
+        self.images: list[tuple[int, _ImageSpec]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized_tag = tag.casefold()
+        if normalized_tag == "a":
+            self.anchor_depth += 1
+            return
+        if normalized_tag != "img":
+            return
+        attributes = {name.casefold(): value or "" for name, value in attrs}
+        self.images.append(
+            (
+                self.getpos()[0] - 1,
+                _ImageSpec(
+                    label=attributes.get("alt", ""),
+                    source=attributes.get("src", ""),
+                    linked=self.markdown_link_depth > 0 or self.anchor_depth > 0,
+                ),
             )
-            masked.append("".join(character if character in "\r\n" else " " for character in line))
-            if closing is not None:
-                fence_character = None
-                fence_length = 0
-            continue
-        if fence is not None:
-            marker = fence.group("fence")
-            fence_character = marker[0]
-            fence_length = len(marker)
-            masked.append("".join(character if character in "\r\n" else " " for character in line))
-            continue
-        masked.append(line)
-    return "".join(masked)
+        )
 
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.casefold() == "img":
+            self.handle_starttag(tag, attrs)
 
-def _mask_range(content: str, start: int, end: int) -> str:
-    masked_range = "".join(character if character in "\r\n" else " " for character in content[start:end])
-    return content[:start] + masked_range + content[end:]
-
-
-def _mask_html_comments(content: str) -> str:
-    masked = content
-    for match in reversed(tuple(HTML_COMMENT_PATTERN.finditer(content))):
-        masked = _mask_range(masked, match.start(), match.end())
-    return masked
-
-
-def _mask_inline_code(content: str) -> str:
-    masked = content
-    cursor = 0
-    while cursor < len(content):
-        if content[cursor] != "`":
-            cursor += 1
-            continue
-        opening_end = cursor
-        while opening_end < len(content) and content[opening_end] == "`":
-            opening_end += 1
-        delimiter = content[cursor:opening_end]
-        search_from = opening_end
-        closing_start = -1
-        while True:
-            candidate = content.find(delimiter, search_from)
-            if candidate < 0:
-                break
-            candidate_end = candidate + len(delimiter)
-            if (candidate == 0 or content[candidate - 1] != "`") and (
-                candidate_end == len(content) or content[candidate_end] != "`"
-            ):
-                closing_start = candidate
-                break
-            search_from = candidate_end
-        if closing_start < 0:
-            cursor = opening_end
-            continue
-        closing_end = closing_start + len(delimiter)
-        masked = _mask_range(masked, cursor, closing_end)
-        cursor = closing_end
-    return masked
-
-
-def _mask_non_rendered_spans(content: str) -> str:
-    return _mask_inline_code(_mask_html_comments(_mask_fenced_code(content)))
-
-
-def _html_attributes(raw_attributes: str) -> dict[str, str]:
-    attributes: dict[str, str] = {}
-    for match in HTML_ATTRIBUTE_PATTERN.finditer(raw_attributes):
-        value = match.group("double") or match.group("single") or match.group("bare") or ""
-        attributes[match.group("name").casefold()] = value
-    return attributes
-
-
-def _is_markdown_image_linked(content: str, position: int) -> bool:
-    return position > 0 and content[position - 1] == "["
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() == "a":
+            self.anchor_depth = max(0, self.anchor_depth - 1)
 
 
 def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
@@ -142,60 +91,130 @@ def _looks_like_badge(*, label: str, source: str, linked: bool) -> bool:
     )
 
 
-def _is_html_image_linked(content: str, start: int, end: int) -> bool:
-    lowered = content.casefold()
-    openings = tuple(HTML_ANCHOR_OPEN_PATTERN.finditer(content, 0, start))
-    opening = openings[-1].start() if openings else -1
-    prior_closing = lowered.rfind("</a>", 0, start)
-    next_closing = lowered.find("</a>", end)
-    return opening > prior_closing and next_closing >= 0
+def _html_fragment_image_specs(
+    fragment: str,
+    *,
+    markdown_link_depth: int,
+    anchor_depth: int,
+) -> tuple[tuple[tuple[int, _ImageSpec], ...], int]:
+    parser = _HTMLImageParser(anchor_depth=anchor_depth, markdown_link_depth=markdown_link_depth)
+    parser.feed(fragment)
+    parser.close()
+    return tuple(parser.images), parser.anchor_depth
 
 
-def _badge_image_positions(content: str) -> tuple[int, ...]:
-    visible_content = _mask_non_rendered_spans(content)
-    reference_targets = {
-        match.group("label").casefold(): match.group("target")
-        for match in MARKDOWN_REFERENCE_DEFINITION_PATTERN.finditer(visible_content)
-    }
-    positions: set[int] = set()
+def _inline_image_specs(children: Iterable[Token], *, anchor_depth: int) -> tuple[tuple[_ImageSpec, ...], int]:
+    images: list[_ImageSpec] = []
+    markdown_link_depth = 0
+    for token in children:
+        if token.type == "link_open":
+            markdown_link_depth += 1
+            continue
+        if token.type == "link_close":
+            markdown_link_depth = max(0, markdown_link_depth - 1)
+            continue
+        if token.type == "image":
+            images.append(
+                _ImageSpec(
+                    label=token.content,
+                    source=token.attrGet("src") or "",
+                    linked=markdown_link_depth > 0 or anchor_depth > 0,
+                )
+            )
+            continue
+        if token.type == "html_inline":
+            html_images, anchor_depth = _html_fragment_image_specs(
+                token.content,
+                markdown_link_depth=markdown_link_depth,
+                anchor_depth=anchor_depth,
+            )
+            images.extend(spec for _offset, spec in html_images)
+    return tuple(images), anchor_depth
 
-    for match in MARKDOWN_INLINE_IMAGE_PATTERN.finditer(visible_content):
+
+def _match_image_lines(
+    specs: tuple[_ImageSpec, ...],
+    *,
+    line_candidates: list[tuple[int, _ImageSpec]],
+    fallback_line_no: int,
+) -> tuple[_ImageOccurrence, ...]:
+    occurrences: list[_ImageOccurrence] = []
+    candidate_cursor = 0
+    for spec in specs:
+        line_no = fallback_line_no
+        for candidate_index in range(candidate_cursor, len(line_candidates)):
+            candidate_line_no, candidate_spec = line_candidates[candidate_index]
+            if candidate_spec == spec:
+                line_no = candidate_line_no
+                candidate_cursor = candidate_index + 1
+                break
+        occurrences.append(_ImageOccurrence(line_no=line_no, spec=spec))
+    return tuple(occurrences)
+
+
+def _rendered_image_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
+    lines = content.splitlines()
+    environment: dict[str, object] = {}
+    tokens = MARKDOWN.parse(content, environment)
+    occurrences: list[_ImageOccurrence] = []
+    anchor_depth = 0
+    for token in tokens:
+        if token.type == "inline" and token.map is not None:
+            initial_anchor_depth = anchor_depth
+            specs, anchor_depth = _inline_image_specs(token.children or (), anchor_depth=anchor_depth)
+            if not specs:
+                continue
+            start_line, end_line = token.map
+            line_candidates: list[tuple[int, _ImageSpec]] = []
+            candidate_anchor_depth = initial_anchor_depth
+            for line_index in range(start_line, min(end_line, len(lines))):
+                line_tokens = MARKDOWN.parseInline(lines[line_index], environment)
+                for line_token in line_tokens:
+                    line_specs, candidate_anchor_depth = _inline_image_specs(
+                        line_token.children or (),
+                        anchor_depth=candidate_anchor_depth,
+                    )
+                    line_candidates.extend((line_index + 1, spec) for spec in line_specs)
+            occurrences.extend(
+                _match_image_lines(
+                    specs,
+                    line_candidates=line_candidates,
+                    fallback_line_no=start_line + 1,
+                )
+            )
+            continue
+        if token.type == "html_block" and token.map is not None:
+            html_images, anchor_depth = _html_fragment_image_specs(
+                token.content,
+                markdown_link_depth=0,
+                anchor_depth=anchor_depth,
+            )
+            for relative_line, spec in html_images:
+                occurrences.append(
+                    _ImageOccurrence(
+                        line_no=token.map[0] + relative_line + 1,
+                        spec=spec,
+                    )
+                )
+    return tuple(occurrences)
+
+
+def _rendered_badge_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
+    return tuple(
+        occurrence
+        for occurrence in _rendered_image_occurrences(content)
         if _looks_like_badge(
-            label=match.group("alt"),
-            source=match.group("image"),
-            linked=_is_markdown_image_linked(visible_content, match.start()),
-        ):
-            positions.add(match.start())
+            label=occurrence.spec.label,
+            source=occurrence.spec.source,
+            linked=occurrence.spec.linked,
+        )
+    )
 
-    for match in MARKDOWN_REFERENCE_IMAGE_PATTERN.finditer(visible_content):
-        label = match.group("label") or match.group("alt")
-        target = reference_targets.get(label.casefold(), "")
-        if _looks_like_badge(
-            label=match.group("alt"),
-            source=target,
-            linked=_is_markdown_image_linked(visible_content, match.start()),
-        ):
-            positions.add(match.start())
 
-    for match in MARKDOWN_SHORTCUT_REFERENCE_IMAGE_PATTERN.finditer(visible_content):
-        target = reference_targets.get(match.group("alt").casefold(), "")
-        if target and _looks_like_badge(
-            label=match.group("alt"),
-            source=target,
-            linked=_is_markdown_image_linked(visible_content, match.start()),
-        ):
-            positions.add(match.start())
-
-    for match in HTML_IMAGE_PATTERN.finditer(visible_content):
-        attributes = _html_attributes(match.group("attributes"))
-        if _looks_like_badge(
-            label=attributes.get("alt", ""),
-            source=attributes.get("src", ""),
-            linked=_is_html_image_linked(visible_content, match.start(), match.end()),
-        ):
-            positions.add(match.start())
-
-    return tuple(sorted(positions))
+def rendered_markdown_badge_lines(content: str) -> tuple[str, ...]:
+    """Return rendered badge lines after excluding literal Markdown examples."""
+    lines = content.splitlines()
+    return tuple(lines[occurrence.line_no - 1].strip() for occurrence in _rendered_badge_occurrences(content))
 
 
 def find_markdown_badge_policy_issues(repo_root: Path, markdown_files: Iterable[Path]) -> list[str]:
@@ -207,14 +226,15 @@ def find_markdown_badge_policy_issues(repo_root: Path, markdown_files: Iterable[
     for path in markdown_files:
         content = path.read_text(encoding="utf-8")
         lines = content.splitlines()
-        for position in _badge_image_positions(content):
-            line_no = content[:position].count("\n") + 1
+        is_root_readme = path.resolve() == root_readme
+        for occurrence in _rendered_badge_occurrences(content):
+            line_no = occurrence.line_no
             location = (path, line_no)
             if location in reported_locations:
                 continue
             reported_locations.add(location)
             line = lines[line_no - 1].strip()
-            if path.resolve() != root_readme:
+            if not is_root_readme:
                 issues.append(
                     f"{path}:{line_no}: badges belong only in the root README; use a plain text link instead."
                 )

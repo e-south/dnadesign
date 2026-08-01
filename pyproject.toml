@@ -17,6 +17,7 @@ dependencies = [
   "igraph",
   "leidenalg",
   "logomaker",
+  "markdown-it-py>=4.0.0",
   "matplotlib",
   "numpy",
   "openpyxl",
