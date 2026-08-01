@@ -14,10 +14,14 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import contracts
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
+    contracts,
+    evaluation,
+)
 
 _METASTUDY_ROOT = Path(__file__).parents[3] / "reporter_response" / "metastudy"
 _CONTRACTS_ROOT = _METASTUDY_ROOT / "contracts"
+_EVALUATION_ROOT = _METASTUDY_ROOT / "evaluation"
 _EXPECTED_CONTRACT_MODULES = {
     "__init__.py",
     "_values.py",
@@ -33,6 +37,13 @@ _LINE_BUDGETS = {
     "materialization.py": 400,
     "profile.py": 170,
     "protocol.py": 270,
+}
+_EXPECTED_EVALUATION_MODULES = {"__init__.py", "evidence.py", "readiness.py", "selection.py"}
+_EVALUATION_LINE_BUDGETS = {
+    "__init__.py": 35,
+    "evidence.py": 240,
+    "readiness.py": 250,
+    "selection.py": 480,
 }
 
 
@@ -70,6 +81,25 @@ def test_contract_facade_exposes_only_supported_contract_names() -> None:
         "objective_readiness_from_payload",
         "protocol_digest",
         "validate_decision_payload",
+    }
+
+
+def test_evaluation_package_has_one_semantic_module_per_owner() -> None:
+    assert not (_METASTUDY_ROOT / "evaluation.py").exists()
+    assert {path.name for path in _EVALUATION_ROOT.glob("*.py")} == _EXPECTED_EVALUATION_MODULES
+    for filename, line_budget in _EVALUATION_LINE_BUDGETS.items():
+        line_count = len((_EVALUATION_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
+
+
+def test_evaluation_facade_exposes_only_supported_operations() -> None:
+    assert set(evaluation.__all__) == {
+        "decision_evidence_payload",
+        "decision_from_readiness",
+        "evaluate_metastudy",
+        "reevaluate_evidence_projection",
+        "readiness_from_live_bridge",
+        "readiness_from_receipt",
     }
 
 

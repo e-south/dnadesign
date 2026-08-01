@@ -10,11 +10,14 @@ as a prospective validation study.
 
 The public surface is intentionally small:
 
-- `contracts.py` defines the fixed protocol and typed `selected|blocked` decision.
-- `evaluation.py` verifies comparable profiles, gates evidence, evaluates the
-  primary 500 uM cohort, and applies the lexicographic selection and leave-one-
-  acquisition-out stability rules. The 5/50 uM cohort is retained only for
-  sensitivity analysis.
+- `contracts/` owns the fixed protocol and typed `selected|blocked` decision.
+- `evaluation/readiness.py` validates bridge receipts and readiness-only
+  blocked decisions.
+- `evaluation/selection.py` verifies comparable profiles, evaluates the primary
+  500 uM cohort, and applies lexicographic selection plus leave-one-acquisition-
+  out stability. The 5/50 uM cohort remains sensitivity evidence only.
+- `evaluation/evidence.py` closes attempts, profile coordinates, Reader source
+  identity, and publication evidence digests.
 - `sensitivity.py` emits digest-bound endpoint, alternate-window, and optional
   dose-cohort summaries that are structurally non-selectable.
 - `acquisition_projection.py` keeps every acquisition profile immutable and projects the selected
