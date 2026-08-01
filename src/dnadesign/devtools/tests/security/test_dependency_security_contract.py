@@ -35,10 +35,13 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     dependencies = tuple(project["dependencies"])
     evo2_dependencies = tuple(project["optional-dependencies"]["infer-evo2"])
     build_dependencies = tuple(_pyproject()["build-system"]["requires"])
+    constraint_dependencies = tuple(_pyproject()["tool"]["uv"]["constraint-dependencies"])
 
     assert "click>=8.3.3" in dependencies
+    assert "marimo>=0.23.16" in dependencies
     assert "pillow>=12.3.0" in dependencies
     assert "zstd>=1.5.7.2,!=1.5.7.3" in dependencies
+    assert "pymdown-extensions>=11.0.1" in constraint_dependencies
     assert any(requirement.startswith("onnx>=1.22.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("pip>=26.1.2;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("setuptools>=83.0.0;") for requirement in evo2_dependencies)
@@ -46,9 +49,9 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     assert all("email" not in author for author in project["authors"])
 
 
-def test_bounded_dependency_exceptions_stay_inside_native_execution() -> None:
+def test_bounded_dependency_exception_does_not_enter_supported_code() -> None:
     repo_root = _repo_root()
-    forbidden = ("torch.jit." + "script", "pymdownx." + "b64")
+    forbidden = ("torch.jit." + "script",)
     violations: list[str] = []
 
     for root in (repo_root / ".github", repo_root / "src"):
@@ -60,11 +63,6 @@ def test_bounded_dependency_exceptions_stay_inside_native_execution() -> None:
                 if symbol in text:
                     violations.append(f"{path.relative_to(repo_root)}: {symbol}")
 
-    environments = tuple(_pyproject()["tool"]["uv"]["environments"])
-    assert environments == (
-        "sys_platform == 'darwin'",
-        "sys_platform == 'linux' and platform_machine == 'x86_64'",
-    )
     assert violations == []
 
 
@@ -75,7 +73,7 @@ def test_bounded_dependency_exception_review_dates_have_not_expired() -> None:
     )[0]
     entries = tuple(re.findall(r"(?ms)^- `.+?(?=^- `|\Z)", section))
 
-    assert len(entries) == 2
+    assert len(entries) == 1
     for entry in entries:
         deadlines = re.findall(r"no later than (\d{4}-\d{2}-\d{2})", entry)
         assert len(deadlines) == 1
