@@ -264,7 +264,7 @@ def comparability_key(
 ) -> str:
     payload = {
         "observation_policy_digest": observation_policy_digest,
-        "uncertainty_methods": _uncertainty_method_payload(dose_uncertainties),
+        "uncertainty": _uncertainty_comparability_payload(dose_uncertainties),
         "reduction": _json_value(asdict(reduction)),
         "dose_grid_uM": list(dose_grid_uM),
     }
@@ -272,12 +272,24 @@ def comparability_key(
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
-def _uncertainty_method_payload(
+def _uncertainty_comparability_payload(
     dose_uncertainties: tuple[DoseUncertainty, ...],
 ) -> list[dict[str, object]]:
     payload: list[dict[str, object]] = []
     for row in dose_uncertainties:
-        dose_payload: dict[str, object] = {"dose_uM": row.dose_uM}
+        support_modes = {
+            _biological_replicate_support_mode(row.normalized_reporter_response),
+            _biological_replicate_support_mode(row.relative_od),
+        }
+        if len(support_modes) != 1:
+            raise ReporterResponseContractError(f"dose {row.dose_uM:g}: metric identity-support modes must agree")
+        dose_payload: dict[str, object] = {
+            "dose_uM": row.dose_uM,
+            "biological_replicate_support": {
+                "mode": support_modes.pop(),
+                "count": row.biological_replicate_count,
+            },
+        }
         for metric_name in ("normalized_reporter_response", "relative_od"):
             metric = getattr(row, metric_name)
             if isinstance(metric, EstimatedMetricUncertainty):
@@ -289,9 +301,26 @@ def _uncertainty_method_payload(
                     "draws": metric.draws,
                 }
             else:
-                dose_payload[metric_name] = {"status": metric.status}
+                dose_payload[metric_name] = {
+                    "status": metric.status,
+                    "reason": metric.reason,
+                }
         payload.append(dose_payload)
     return payload
+
+
+def _biological_replicate_support_mode(
+    metric: EstimatedMetricUncertainty | NotEstimableMetricUncertainty,
+) -> Literal[
+    "identity_unknown",
+    "identity_declared_below_minimum",
+    "identity_declared_sufficient",
+]:
+    if isinstance(metric, EstimatedMetricUncertainty) or metric.reason == "insufficient_valid_resamples":
+        return "identity_declared_sufficient"
+    if metric.reason == "biological_replicate_identity_unknown":
+        return "identity_unknown"
+    return "identity_declared_below_minimum"
 
 
 def _reduce_biological_replicate_values(

@@ -39,6 +39,9 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
     profile_to_dict,
     require_comparable_profiles,
 )
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.canonical import (
+    comparability_key,
+)
 
 
 def _digest(character: str) -> str:
@@ -355,6 +358,59 @@ def test_comparability_requires_exact_shared_contract_identity() -> None:
     right = _profile(measurements=right_rows, bindings=right_bindings, subject_id="subject-b")
 
     assert require_comparable_profiles((left, right)) == left.comparability_key
+
+
+def test_comparability_distinguishes_biological_replicate_support_modes() -> None:
+    def key_for(*, count: int, reason: str) -> str:
+        uncertainty = DoseUncertainty(
+            dose_uM=500.0,
+            biological_replicate_count=count,
+            normalized_reporter_response=NotEstimableMetricUncertainty(
+                estimate=3.25,
+                reason=reason,
+            ),
+            relative_od=NotEstimableMetricUncertainty(
+                estimate=1.0,
+                reason=reason,
+            ),
+        )
+        return comparability_key(
+            observation_policy_digest=_policy().digest,
+            reduction=EndpointReduction(recorded_time_h=10.0),
+            dose_grid_uM=(500.0,),
+            dose_uncertainties=(uncertainty,),
+        )
+
+    keys = {
+        key_for(count=0, reason="biological_replicate_identity_unknown"),
+        key_for(count=1, reason="below_minimum_biological_replicates"),
+        key_for(count=2, reason="insufficient_valid_resamples"),
+    }
+
+    assert len(keys) == 3
+
+
+def test_comparability_rejects_conflicting_metric_identity_support_modes() -> None:
+    uncertainty = DoseUncertainty(
+        dose_uM=500.0,
+        biological_replicate_count=1,
+        normalized_reporter_response=NotEstimableMetricUncertainty(
+            estimate=3.25,
+            reason="biological_replicate_identity_unknown",
+        ),
+        relative_od=NotEstimableMetricUncertainty(
+            estimate=1.0,
+            reason="below_minimum_biological_replicates",
+        ),
+    )
+
+    with pytest.raises(ReporterResponseContractError, match="identity-support modes"):
+        comparability_key(
+            observation_policy_digest=_policy().digest,
+            reduction=EndpointReduction(recorded_time_h=10.0),
+            dose_grid_uM=(500.0,),
+            dose_uncertainties=(uncertainty,),
+        )
 
 
 def test_profile_pins_complete_neutral_temporal_policy_without_reader_runtime() -> None:
