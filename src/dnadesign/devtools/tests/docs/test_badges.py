@@ -65,7 +65,10 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         "[inner](report) ![Coverage](status.svg)\n\n"
         "</a>\n\n"
         '[outer <a href="inner">inner</a> ![Coverage](status.svg)](report)\n\n'
+        "[before </a> ![Coverage](status.svg)](report)\n\n"
+        '<a id="coverage"><img alt="Coverage" src="status.svg"></a>\n\n'
         '<template><img src="badge.svg"></template>\n\n'
+        '<template></script><img src="badge.svg"></template>\n\n'
         "<template>\n\n"
         "![Coverage](badge.svg)\n\n"
         "</template>\n\n"
@@ -136,6 +139,7 @@ def test_badge_policy_rejects_component_badge_outside_root(tmp_path: Path) -> No
             '<img alt="build" src="diagram.svg"></picture>\n',
             1,
         ),
+        ('<image src="https://img.shields.io/badge/build-passing.svg">\n', 1),
         ('<a href="report" />\n\n<img alt="Coverage" src="status.svg">\n', 3),
         ('intro\n<img\n alt="Coverage"\n src="badge.svg">\noutro\n', 2),
         ('intro `code\nspan`\n<img\n alt="Coverage"\n src="badge.svg">\n', 3),
@@ -178,6 +182,16 @@ def test_badge_policy_requires_root_badges_to_be_rendered(tmp_path: Path, conten
     _write(root_readme, content)
 
     assert rendered_markdown_badge_lines(root_readme.read_text(encoding="utf-8")) == ()
+
+
+def test_badge_policy_keeps_plaintext_content_inert_through_eof(tmp_path: Path) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(
+        tool_readme,
+        "<plaintext>\n\n</plaintext>\n\n[![Coverage](badge.svg)](report)\n",
+    )
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == []
 
 
 def test_checked_in_root_readme_uses_the_restrained_badge_set() -> None:

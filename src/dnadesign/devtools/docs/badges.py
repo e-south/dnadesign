@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -73,15 +73,21 @@ class _RelativeImageOccurrence:
 
 @dataclass(slots=True)
 class _HTMLContext:
-    anchor_depth: int = 0
-    inert_depth: int = 0
+    inert_elements: list[str] = field(default_factory=list)
     picture_depth: int = 0
+    plaintext: bool = False
+    raw_anchor_linked: bool = False
+
+    @property
+    def is_inert(self) -> bool:
+        return self.plaintext or bool(self.inert_elements)
 
     def clone(self) -> _HTMLContext:
         return _HTMLContext(
-            anchor_depth=self.anchor_depth,
-            inert_depth=self.inert_depth,
+            inert_elements=list(self.inert_elements),
             picture_depth=self.picture_depth,
+            plaintext=self.plaintext,
+            raw_anchor_linked=self.raw_anchor_linked,
         )
 
 
@@ -94,13 +100,20 @@ class _HTMLImageParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         normalized_tag = tag.casefold()
-        if normalized_tag in INERT_HTML_CONTAINERS:
-            self.context.inert_depth += 1
+        if self.context.plaintext:
             return
-        if self.context.inert_depth > 0:
+        if normalized_tag == "image":
+            normalized_tag = "img"
+        if normalized_tag in INERT_HTML_CONTAINERS:
+            if normalized_tag == "plaintext":
+                self.context.plaintext = True
+            else:
+                self.context.inert_elements.append(normalized_tag)
+            return
+        if self.context.is_inert:
             return
         if normalized_tag == "a":
-            self.context.anchor_depth = 1
+            self.context.raw_anchor_linked = any(name.casefold() == "href" for name, _value in attrs)
             self.markdown_link_depth = 0
             return
         if normalized_tag == "picture":
@@ -119,7 +132,7 @@ class _HTMLImageParser(HTMLParser):
                 _ImageSpec(
                     label=attributes.get("alt", ""),
                     source=sources,
-                    linked=self.markdown_link_depth > 0 or self.context.anchor_depth > 0,
+                    linked=self.markdown_link_depth > 0 or self.context.raw_anchor_linked,
                 ),
             )
         )
@@ -129,13 +142,17 @@ class _HTMLImageParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         normalized_tag = tag.casefold()
-        if normalized_tag in INERT_HTML_CONTAINERS:
-            self.context.inert_depth = max(0, self.context.inert_depth - 1)
+        if self.context.plaintext:
             return
-        if self.context.inert_depth > 0:
+        if self.context.inert_elements:
+            if normalized_tag == self.context.inert_elements[-1]:
+                self.context.inert_elements.pop()
+            return
+        if normalized_tag in INERT_HTML_CONTAINERS:
             return
         if normalized_tag == "a":
-            self.context.anchor_depth = max(0, self.context.anchor_depth - 1)
+            self.context.raw_anchor_linked = False
+            self.markdown_link_depth = 0
         elif normalized_tag == "picture":
             self.context.picture_depth = max(0, self.context.picture_depth - 1)
 
@@ -170,22 +187,22 @@ def _inline_image_specs(
     source_cursor = 0
     for token in children:
         if token.type == "link_open":
-            if context.inert_depth == 0:
-                context.anchor_depth = 0
+            if not context.is_inert:
+                context.raw_anchor_linked = False
             markdown_link_depth += 1
             continue
         if token.type == "link_close":
             markdown_link_depth = max(0, markdown_link_depth - 1)
             continue
         if token.type == "image":
-            if context.inert_depth == 0:
+            if not context.is_inert:
                 images.append(
                     _RelativeImageOccurrence(
                         line_offset=line_offset,
                         spec=_ImageSpec(
                             label=token.content,
                             source=token.attrGet("src") or "",
-                            linked=markdown_link_depth > 0 or context.anchor_depth > 0,
+                            linked=markdown_link_depth > 0 or context.raw_anchor_linked,
                         ),
                     )
                 )
