@@ -268,6 +268,11 @@ class SSHRemote:
             "IFS= read -r _usr_sync_unlock || true"
         )
 
+    def _remote_event_locked_rsync_program(self, dataset: str, *, timeout_seconds: int = 300) -> str:
+        lock_path = PurePosixPath(self.cfg.dataset_path(dataset)) / ".events.lock"
+        timeout = max(1, int(timeout_seconds))
+        return f"flock -x -w {timeout} {shlex.quote(str(lock_path))} rsync"
+
     @contextmanager
     def dataset_transfer_lock(self, dataset: str, *, timeout_seconds: int = 300) -> Iterator[None]:
         script = self._dataset_lock_script(dataset, timeout_seconds=timeout_seconds)
@@ -573,6 +578,7 @@ class SSHRemote:
         if primary_only:
             include_args += ["--include", "records.parquet", "--exclude", "*"]
         else:
+            include_args += ["--rsync-path", self._remote_event_locked_rsync_program(dataset)]
             if skip_snapshots:
                 include_args += ["--exclude", "_snapshots/**"]
 
@@ -598,6 +604,7 @@ class SSHRemote:
         if primary_only:
             include_args += ["--include", "records.parquet", "--exclude", "*"]
         else:
+            include_args += ["--rsync-path", self._remote_event_locked_rsync_program(dataset)]
             if skip_snapshots:
                 include_args += ["--exclude", "_snapshots/**"]
 

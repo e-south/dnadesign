@@ -154,3 +154,31 @@ def test_publication_rollback_preserves_a_swapped_replacement(tmp_path: Path) ->
         assert (displaced / "manifest.json").read_text(encoding="utf-8") == "{}\n"
     finally:
         publication.close()
+
+
+def test_post_rename_termination_after_owner_removal_cleans_publication(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+    real_unlink = publication_module.os.unlink
+    terminated = False
+
+    def unlink_then_terminate(path, *args, **kwargs) -> None:
+        nonlocal terminated
+        real_unlink(path, *args, **kwargs)
+        if path == publication_module._OWNER_FILE and not terminated:
+            terminated = True
+            raise SystemExit("injected termination after owner removal")
+
+    monkeypatch.setattr(publication_module.os, "unlink", unlink_then_terminate)
+    try:
+        with pytest.raises(SystemExit, match="after owner removal"):
+            publication.publish(required_manifest="manifest.json")
+    finally:
+        publication.close()
+
+    assert not bundle.exists()
+    assert not list(bundle.parent.glob(".render-v1.staging-*"))

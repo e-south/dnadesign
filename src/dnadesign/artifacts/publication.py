@@ -462,14 +462,12 @@ class CreateOnlyDirectoryPublication:
             os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
             self._published_descriptor = published_descriptor
             published_descriptor = None
-        except Exception:
+        except BaseException:
             if renamed and published_descriptor is not None:
-                remove_owned_directory(
+                remove_descriptor_anchored_directory(
                     self.parent_descriptor,
                     self.final.name,
                     published_descriptor,
-                    self._owner,
-                    owner_file=_OWNER_FILE,
                 )
             elif published_descriptor is not None:
                 remove_owned_directory(

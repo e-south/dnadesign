@@ -143,12 +143,16 @@ def append_event_line(event_path: str | Path, encoded: str) -> None:
             flags |= os.O_CLOEXEC
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
-        descriptor = os.open(path, flags, 0o600)
+        descriptor = -1
         try:
-            file_stat = os.fstat(descriptor)
-            if not stat.S_ISREG(file_stat.st_mode):
-                raise OSError(f"Event log is not a regular file: {path}")
-            prior_size = file_stat.st_size
+            try:
+                descriptor = os.open(path, flags, 0o600)
+                file_stat = os.fstat(descriptor)
+                if not stat.S_ISREG(file_stat.st_mode):
+                    raise OSError(f"Event log is not a regular file: {path}")
+                prior_size = file_stat.st_size
+            except BaseException as prewrite_error:
+                raise EventAppendFailure(path, state=EventAppendState.RESTORED) from prewrite_error
             committed = False
             try:
                 _write_all(descriptor, payload)
@@ -180,7 +184,7 @@ def append_event_line(event_path: str | Path, encoded: str) -> None:
             if descriptor >= 0:
                 try:
                     os.close(descriptor)
-                except OSError:
+                except BaseException:
                     pass
 
 

@@ -19,6 +19,7 @@ import pyarrow as pa
 import pytest
 
 from dnadesign.artifacts import PublicationError
+from dnadesign.artifacts import publication as publication_module
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import Dataset, SchemaError
 from dnadesign.usr.src.datasets.overlay import write as dataset_overlay_write_module
@@ -165,6 +166,31 @@ def test_create_overlay_cleans_stage_on_cooperative_termination(
     assert staged_parents and all(not parent.exists() for parent in staged_parents)
 
     monkeypatch.setattr(dataset_overlay_write_module.pq, "write_table", real_write_table)
+    assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+def test_create_overlay_rolls_back_after_post_rename_termination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    restore_modes = publication_module._restore_published_modes
+
+    def terminate_after_rename(_source: Path, _destination_descriptor: int) -> None:
+        raise KeyboardInterrupt("injected termination after atomic rename")
+
+    monkeypatch.setattr(publication_module, "_restore_published_modes", terminate_after_rename)
+    with pytest.raises(KeyboardInterrupt, match="after atomic rename"):
+        dataset.create_overlay("mock", table, key="id")
+
+    assert not final.exists()
+    assert dataset.events_path.read_bytes() == events_before
+    assert not list(final.parent.glob(".mock.staging-*"))
+
+    monkeypatch.setattr(publication_module, "_restore_published_modes", restore_modes)
     assert dataset.create_overlay("mock", table, key="id") == 1
 
 
@@ -316,6 +342,48 @@ def test_create_overlay_restores_partial_event_append_before_rollback(
     assert dataset.events_path.read_bytes() == events_before
 
     monkeypatch.setattr(event_append_module, "_write_all", write_all)
+    assert dataset.create_overlay("mock", table, key="id") == 1
+
+
+@pytest.mark.parametrize("failure_point", ["open", "fstat"])
+def test_create_overlay_rolls_back_when_event_prewrite_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_point: str,
+) -> None:
+    dataset = _make_dataset(tmp_path)
+    table = _overlay_input(dataset)
+    final = dataset.dir / "_derived/mock"
+    events_before = dataset.events_path.read_bytes()
+    real_open = event_append_module.os.open
+    real_fstat = event_append_module.os.fstat
+    event_descriptor: int | None = None
+
+    def fail_or_open(path, *args, **kwargs):
+        nonlocal event_descriptor
+        if Path(path) == dataset.events_path:
+            if failure_point == "open":
+                raise OSError("injected event-log open failure")
+            event_descriptor = real_open(path, *args, **kwargs)
+            return event_descriptor
+        return real_open(path, *args, **kwargs)
+
+    def fail_or_fstat(descriptor: int):
+        if failure_point == "fstat" and descriptor == event_descriptor:
+            raise OSError("injected event-log stat failure")
+        return real_fstat(descriptor)
+
+    monkeypatch.setattr(event_append_module.os, "open", fail_or_open)
+    monkeypatch.setattr(event_append_module.os, "fstat", fail_or_fstat)
+    with pytest.raises(EventAppendFailure, match="restored") as exc_info:
+        dataset.create_overlay("mock", table, key="id")
+
+    assert exc_info.value.state is EventAppendState.RESTORED
+    assert not final.exists()
+    assert dataset.events_path.read_bytes() == events_before
+
+    monkeypatch.setattr(event_append_module.os, "open", real_open)
+    monkeypatch.setattr(event_append_module.os, "fstat", real_fstat)
     assert dataset.create_overlay("mock", table, key="id") == 1
 
 

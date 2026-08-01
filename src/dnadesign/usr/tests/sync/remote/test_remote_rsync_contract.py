@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -76,3 +77,53 @@ def test_dataset_rsync_excludes_host_local_runtime_locks(
     for command in commands:
         assert any(command[index : index + 2] == ["--exclude", ".events.lock"] for index in range(len(command)))
         assert any(command[index : index + 2] == ["--exclude", ".usr.lock"] for index in range(len(command)))
+        assert "--rsync-path" in command
+
+
+def test_full_push_holds_remote_event_lock_for_rsync(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    remote = _remote(batch_mode=True)
+    commands: list[list[str]] = []
+
+    def capture_run(command: list[str]):
+        commands.append(command)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(remote_module.subprocess, "run", capture_run)
+    monkeypatch.setattr(remote, "_ssh_run", lambda *_args, **_kwargs: (0, "", ""))
+
+    remote.push_from_local("demo", tmp_path / "source")
+
+    assert len(commands) == 1
+    command = commands[0]
+    rsync_path = command[command.index("--rsync-path") + 1]
+    assert shlex.split(rsync_path) == [
+        "flock",
+        "-x",
+        "-w",
+        "300",
+        "/project/alice/dnadesign/src/dnadesign/usr/datasets/demo/.events.lock",
+        "rsync",
+    ]
+
+
+def test_primary_only_push_does_not_acquire_remote_event_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    remote = _remote(batch_mode=True)
+    commands: list[list[str]] = []
+
+    def capture_run(command: list[str]):
+        commands.append(command)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(remote_module.subprocess, "run", capture_run)
+    monkeypatch.setattr(remote, "_ssh_run", lambda *_args, **_kwargs: (0, "", ""))
+
+    remote.push_from_local("demo", tmp_path / "source", primary_only=True)
+
+    assert len(commands) == 1
+    assert "--rsync-path" not in commands[0]
