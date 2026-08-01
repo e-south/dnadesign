@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-opal-context-index
 title: Stress OPAL context
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-22
+last_verified: 2026-08-01
 audience:
   - operator
   - agent
@@ -11,11 +11,20 @@ audience:
 
 ## Stress OPAL Context
 
+This index separates the data passed to OPAL from the objective used to score
+it and the campaign that records decisions.
+
+| Need | Open |
+| --- | --- |
+| Current phase, blockers, and accepted handoff | [Study status](../../record/status.md) |
+| Candidate universe, model features, and label sources | [Candidate-table contract](candidate-table.md) |
+| Reader measurement to study label lineage | [MSRB evidence path](multistate-response-behavior.md#end-to-end-evidence-path) |
+| Objective definition and study-specific interpretation | [MSRB study application](multistate-response-behavior.md) and [symbol walkthrough](multistate-response-behavior-walkthrough.html) |
+| Read-only campaign checks | [Campaign commands](../../routes/decision/opal/campaign-commands.md#read-only-campaign-verification) |
+
 `secg_msrb_greedy` is the sole executable stress-study campaign and uses
 `multistate_response_behavior_v1`. SFXI and RMF remain source or comparator
-evidence. Start with the [study status](../../record/status.md), the [MSRB assay
-binding](multistate-response-behavior.md), or [read-only campaign
-verification](../../routes/decision/opal/campaign-commands.md#read-only-campaign-verification).
+evidence; neither is an alternate active campaign.
 
 ### Current campaign
 
