@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 import yaml
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
+from dnadesign.devtools.docs.badges import find_markdown_badge_policy_issues
 from dnadesign.devtools.docs.banners.catalog import BANNERS
 from dnadesign.devtools.docs.banners.render import check_banners
 from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
@@ -2935,6 +2936,13 @@ def main(argv: list[str] | None = None) -> int:
     if readme_tool_catalog_issues:
         print("README tool catalog check failed:")
         for issue in readme_tool_catalog_issues:
+            print(f" - {issue}")
+        return 1
+
+    markdown_badge_policy_issues = find_markdown_badge_policy_issues(repo_root, all_md_files)
+    if markdown_badge_policy_issues:
+        print("Markdown badge policy check failed:")
+        for issue in markdown_badge_policy_issues:
             print(f" - {issue}")
         return 1
 
