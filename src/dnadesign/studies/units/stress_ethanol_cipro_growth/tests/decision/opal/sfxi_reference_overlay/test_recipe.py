@@ -1,4 +1,13 @@
-"""Contract tests for the study-owned SFXI reference-overlay recipe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/sfxi_reference_overlay/test_recipe.py
+
+Test contracts for the study-owned SFXI reference-overlay recipe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -6,6 +15,7 @@ import ast
 import hashlib
 import inspect
 import json
+import tomllib
 from pathlib import Path
 
 import numpy as np
@@ -196,6 +206,16 @@ def test_verified_preview_has_literal_full_table_parity_and_does_not_write(tmp_p
     assert preview.table.schema == expected.schema
     assert preview.table.equals(expected)
     assert list((usr_root / recipe.DEFAULT_OUTPUT_DATASET).glob("_derived/**/*")) == []
+
+
+def test_default_reader_selection_is_declared_as_package_data() -> None:
+    pyproject = tomllib.loads((_checkout_root() / "pyproject.toml").read_text(encoding="utf-8"))
+    studies_package_data = pyproject["tool"]["setuptools"]["package-data"]["dnadesign.studies"]
+
+    assert (
+        "units/stress_ethanol_cipro_growth/decision/opal/sfxi_reference_overlay/reader_records.json"
+        in studies_package_data
+    )
 
 
 def test_verified_preview_leaves_unknown_replicate_identity_uninterpreted(tmp_path: Path) -> None:
