@@ -1,7 +1,7 @@
 # SFXI Reference Overlay Contract
 
 **Owner:** USR maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-01
 
 The `sfxi_ref` namespace stores provenance-aware SFXI reference metrics for downstream annotation overlays. It is an additive USR overlay keyed by canonical `id`; it must not mutate base `records.parquet` rows or existing Infer overlays.
 
