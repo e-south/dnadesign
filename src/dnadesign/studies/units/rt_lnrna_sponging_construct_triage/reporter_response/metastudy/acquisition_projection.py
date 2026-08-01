@@ -1,4 +1,13 @@
-"""Descriptive aggregation and leave-one-acquisition-out robustness."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/acquisition_projection.py
+
+Build descriptive acquisition projections without inventing replicate identity.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
