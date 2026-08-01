@@ -42,6 +42,20 @@ def test_checked_in_lineage_exactly_links_selected_variants_195_through_204() ->
     assert {entry.variant_id for entry in lineage.entries} == expected
 
 
+def test_selected_lineage_uses_semantic_package_layout() -> None:
+    repo_root = repo_root_from(__file__)
+    source_ingest = repo_root / "src/dnadesign/studies/units/retron_hairpin_design/source_ingest"
+    lineage_package = source_ingest / "selected_lineage"
+
+    assert not (source_ingest / "selected_lineage.py").exists()
+    assert {path.name for path in lineage_package.glob("*.py")} == {
+        "__init__.py",
+        "contracts.py",
+        "loading.py",
+        "validation.py",
+    }
+
+
 def test_lineage_rejects_missing_selected_variant_ids(tmp_path: Path) -> None:
     repo_root, lineage_path = _single_entry_fixture(tmp_path, source_root=repo_root_from(__file__))
     payload = yaml.safe_load(lineage_path.read_text(encoding="utf-8"))

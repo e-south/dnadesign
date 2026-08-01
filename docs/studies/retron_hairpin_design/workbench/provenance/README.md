@@ -85,7 +85,7 @@ The source-ingest code is split by record lifecycle:
   classification.
 - `source_ingest/comparison.py`: drift checks against older materialized
   outputs.
-- `source_ingest/selected_lineage.py`: typed selected-cohort lineage and
+- `source_ingest/selected_lineage/`: typed selected-cohort lineage and
   fail-fast selection, path, identity, primitive, and digest validation.
 - `source_ingest/bundle_manifest.py`: portable manifest projection from
   normalized records.
