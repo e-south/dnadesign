@@ -48,12 +48,13 @@ def test_teto_retained_span_trim_tetr_pwm_elite_deliverable_plan_maps_review_and
     assert "workbench/deliverables" in plan["output_policy"]["durable_records"]
     assert "GenBank exports" in plan["output_policy"]["do_not_commit_by_default"]
     assert plan["reader_boundary"]["status"] == "experiment_time_only"
+    assert plan["assay_handoff_ref"] == design_set["assay_handoff"]
 
     families = plan["artifact_families"]
     assert set(families) == {
         "benchling_genbank_import",
         "sequence_handoff",
-        "future_reader_outcome_overlay",
+        "rt_lnrna_assay_handoff",
         "msd_sequence_review_stills",
         "msd_sequence_review_video",
         "pwm_trim_review_panel",
@@ -111,9 +112,8 @@ def test_teto_retained_span_trim_tetr_pwm_elite_deliverable_plan_maps_review_and
         "reviews/handoff/teto_retained_span_trim_tetr_pwm_elite_v1.handoff.tsv",
         "reviews/handoff/teto-retained-span-trim-tetr-pwm-elite-v1.handoff.md",
     ]
-    assert families["future_reader_outcome_overlay"]["owner_surface"] == (
-        "Reader SPOP bridge and future trim-outcome join"
-    )
+    assert families["rt_lnrna_assay_handoff"]["contract_ref"] == design_set["assay_handoff"]
+    assert set(families["rt_lnrna_assay_handoff"]) == {"status", "contract_ref"}
 
     pwm_panel_ids = {panel["payload_trim_id"] for panel in families["pwm_trim_review_panel"]["panels"]}
     assert pwm_panel_ids == set(design_set["payload_trims"])

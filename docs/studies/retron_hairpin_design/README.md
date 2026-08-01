@@ -61,7 +61,7 @@ current state, `operations/ops.study.yaml` for lifecycle/preflight declarations,
 `operations/runtime/command-groups/pipeline.yaml` for the machine-loaded command
 payload, `workbench/` when the question is why a cohort exists or what
 experimental direction it tests, `workbench/deliverables/` when the question is
-which PWM, sequence-review, video, GenBank, or future outcome artifacts should
-exist for a hypothesis, `workbench/outputs/` only for generated local review
+which PWM, sequence-review, video, GenBank, or typed downstream assay handoff
+should exist for a hypothesis, `workbench/outputs/` only for generated local review
 bundles, and `compiler/` for Retron MSD label normalization or catalog
 compilation.

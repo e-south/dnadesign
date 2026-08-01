@@ -66,6 +66,19 @@ CURRENT_SELECTION_PLOTS = (
         not_a_selector_reason=("Audits selected-row mutation locations; it does not add a hidden selection rule."),
     ),
     SelectionPlot(
+        plot_id="selection_distal_pair_n_terminal_comparison",
+        file_name="selection_distal_pair_n_terminal_comparison.svg",
+        plain_title="WT, D01, and D02 N-terminal sequence and charge-proxy comparison",
+        selection_role="selected_distal_pair_sequence_context",
+        funnel_stage_id="selected_panel",
+        notebook_group="context_checks",
+        not_a_selector_reason=(
+            "Compares canonical selected sequences after panel selection; the charge proxy does not select rows or "
+            "identify causal residues."
+        ),
+        role="review_only",
+    ),
+    SelectionPlot(
         plot_id="selection_regional_mutation_burden",
         file_name="selection_regional_mutation_burden.svg",
         plain_title="Selected mutation burden by region",

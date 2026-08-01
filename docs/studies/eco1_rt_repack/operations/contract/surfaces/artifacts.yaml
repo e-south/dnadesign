@@ -26,6 +26,11 @@ thread_artifact_chain_schema:
   ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/thread-artifact-chain.schema.yaml
 rt_lnrna_candidate_acceptance_schema:
   ref: repo:docs/studies/eco1_rt_repack/operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml
+rt_part_publication_contract:
+  ref: repo:src/dnadesign/contracts/sequence/rt_part_publication_v1.py
+eco1_g3_distal_pair_rt_parts:
+  status: materialized
+  ref: repo:docs/studies/eco1_rt_repack/record/rt-parts/eco1-g3-distal-pair-v1.yaml
 structure_sources:
   ref: repo:docs/studies/eco1_rt_repack/workbench/provenance/structure-sources.yaml
 residue_numbering_audit:

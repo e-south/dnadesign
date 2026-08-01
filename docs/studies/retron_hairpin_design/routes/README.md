@@ -3,7 +3,7 @@ doc_id: study-retron-hairpin-design-routes
 surface: study-route-map
 study_id: retron_hairpin_design
 owner: dnadesign-maintainers
-last_verified: 2026-06-20
+last_verified: 2026-07-30
 entrypoint: docs/studies/retron_hairpin_design/routes/README.md
 status_surface: studies.retron-hairpin-design.status
 preflight_surface: studies.retron-hairpin-design.preflight
@@ -12,7 +12,7 @@ preflight_surface: studies.retron-hairpin-design.preflight
 ## Retron Hairpin Design Effort Routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-20
+**Last verified:** 2026-07-30
 
 Retron MSD product work starts from the user's provided parts and desired
 output, not from study phase. Status/preflight surfaces are only for explicit
@@ -32,8 +32,9 @@ progress or blocker questions.
 | Need | Open |
 | --- | --- |
 | MSD label, complete parts, design catalog, GenBank, plots, or Reader join | [MSD design references](compiler/msd-design-references.md) |
+| Exact design, compiler, primitive, and sequence lineage for selected `pES-retron-195` through `pES-retron-204` | [Selected materialized-variant lineage](../workbench/provenance/materialized_variant_lineage/pes_retron_195_204.yaml) |
 | Persistent hypotheses, effect tags, design-set membership, or compiler/materialization provenance | [Experimental workbench](../workbench/README.md) |
-| Hypothesis-specific PWM panels, sequence-review stills/video, review package manifests, GenBank handoff map, or future outcome overlay map | [Workbench deliverables](../workbench/deliverables/README.md) |
+| Hypothesis-specific PWM panels, sequence-review stills/video, review package manifests, GenBank handoff map, or typed downstream assay handoff | [Workbench deliverables](../workbench/deliverables/README.md) |
 | Missing cap or shortening geometry | [Released-product Snapback](product/released-product-snapback.md) |
 | Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile | [Scar-nick base-junction](product/scar-nick-base-junction.md) |
 | Whole-product sequence composition boundary | [Linear ssDNA composition](composition/linear-ssdna-composition.md) |
@@ -44,8 +45,7 @@ progress or blocker questions.
 
 Repo-local study shortcut: `.agents/skills/retron-hairpin-study/SKILL.md`.
 
-Pair with `harness-engineering` for study-surface hardening and
-`code-change-discipline` for boundary or contract changes.
+Pair with `harness-engineering` for study-surface hardening and `code-change-discipline` for boundary or contract changes.
 
 ### Routing Contract
 

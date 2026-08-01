@@ -23,9 +23,11 @@ running or interpreting output generation.
 - `teto_retained_span_trim_tetr_pwm_elite_v1.yaml`: deliverable plan for the nine-design
   bidirectional TetR PWM trim pilot. It links the design set, compiler spec,
   PWM provenance, materialized sequence bundle, PWM trim triptych, sequence
-  montage video, review manifest, and GenBank handoff surfaces. Its Benchling
-  import records are MSD-only files named by `record_ids`, not whole-plasmid
-  pES records.
+  montage video, review manifest, GenBank handoff surfaces, and a typed
+  subject-identity-only handoff to the RT-lnRNA reporter-response route. Its
+  Benchling import records are MSD-only files named by `record_ids`, not
+  whole-plasmid pES records. Reporter-response interpretation and outcome bins
+  are not owned here.
 - `teto_retained_span_trim_ecoli_working_v1.yaml`: deliverable plan for the six-design
   Eco1 tetO retained-span trim cohort. It assigns pES-retron-201 through pES-retron-206
   and keeps the same retained-span extents as the 195-200 TetR PWM pilot. Its
@@ -203,8 +205,9 @@ facade instead of importing the individual renderer packages.
 4. Compact run evidence lives in `../provenance/`.
 5. Bulky generated artifacts live in ignored `../outputs/` by default, or in an
    explicit transient output root when a caller needs isolation.
-6. Reader SPOP evidence is added only after the experiment has run; it is not
-   produced by this deliverable lane.
+6. Descriptive Reader reporter-response evidence is added only after the
+   experiment has run; it is not produced by this deliverable lane and is not
+   an optimization label without a study-owned meta-study objective.
 
 ### Boundary
 

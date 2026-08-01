@@ -2,7 +2,7 @@ contract: retron_msd_region_record_bundle_v1
 schema_version: 1
 source_policy: per_variant_genbank_sources_are_authority
 source_kind: variant_genbank_dir
-source_path: /Users/Shockwing/Dropbox/projects/phd/dnadesign/docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/source_inputs/variants
+source_path: source_inputs/variants
 source_sha256: 049752ad2d1b94cdc19ae889cd1efccf338a46dda7ad66e517ab6d59bcd0b049  # pragma: allowlist secret
 source_inputs:
 - variant_id: retron26

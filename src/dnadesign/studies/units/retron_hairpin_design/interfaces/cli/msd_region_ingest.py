@@ -25,7 +25,7 @@ from .io import emit, exit_with_error, format_option
 
 _DEFAULT_STUDY_DIR = Path("docs/studies/retron_hairpin_design")
 _DEFAULT_MSD_REGION_RECORD_DIR = Path(
-    "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1"
+    "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1"
 )
 _PAYLOAD_BINDING_CATALOG_REL = Path("workbench/ontology/payload_binding_sites.yaml")
 
@@ -93,7 +93,7 @@ def ingest_msd_regions_command(
             "variant_record_count": len(written.variant_record_paths),
             "next_step": (
                 "Review discrepancies.yaml, then materialize with the emitted compiler spec into a fresh "
-                "workbench/outputs/reader_spop_msd_structure_panel_v1/materialized directory."
+                "revisioned workbench/outputs/retron_msd_structure_panel_v1/materialized directory."
             ),
         },
         output_format=format_norm,

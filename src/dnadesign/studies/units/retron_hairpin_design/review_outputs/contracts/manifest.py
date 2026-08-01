@@ -101,7 +101,12 @@ def write_review_manifest(
         },
         "reader_boundary": {
             "status": "experiment_time_only",
-            "note": "Reader owns SPOP and viability math; this manifest records pre-assay review outputs only.",
+            "note": (
+                "Reader owns generic measurement records, treatment metadata, and replicate "
+                "metadata; rt_lnrna_sponging_construct_triage owns descriptive reporter-response "
+                "profiles and the meta-study boundary for any future objective. This manifest "
+                "records pre-assay review outputs only."
+            ),
         },
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)

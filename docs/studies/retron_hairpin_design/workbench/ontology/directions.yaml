@@ -43,7 +43,7 @@ directions:
     effect_tags: [mxmm_replicate, top_nick]
   - id: teto_retained_span_trim_tetr_pwm_elite
     label: TetR PWM elite retained-span trim
-    question: How does retained-span shortening of the bidirectional TetR PWM elite payload affect SPOP in retron43 and retron180 contexts under WT Eco1 RT?
+    question: How does retained-span shortening of the bidirectional TetR PWM elite payload affect reporter response in retron43 and retron180 contexts under WT Eco1 RT?
     effect_tags:
       - teto_pwm_elite_full_parent
       - teto_pwm_elite_mild_retained_span_trim
@@ -86,7 +86,7 @@ effect_tags:
   s3_s1_double_hard: S3/S1 double-hard profile.
   s3_s2_double_hard: S3/S2 double-hard profile.
   single_wobble_control: Single G:T wobble control.
-  cargo_length_test: Tests whether shortening the TetR/tetO cargo/P4 burden improves SPOP.
+  cargo_length_test: Tests whether shortening the TetR/tetO cargo/P4 burden changes reporter response.
   retron180_target: Uses the pES-retron-180 C172/AGTG/CATG/XWMM cap and stem-base context.
   retron26_control: Uses retron26 as a positive scaffold or binding control, not as the optimization target.
   retron43_target: Uses the retron43 target scaffold.

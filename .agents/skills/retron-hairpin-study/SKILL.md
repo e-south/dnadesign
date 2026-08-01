@@ -2,7 +2,7 @@
 name: retron-hairpin-study
 description: Route Retron MSD product work. Use for MSD IDs, sequence bundles, design catalogs, GenBank/native-structure PNG outputs, Finder opens, or missing MSD parts. Do not use for generic Cruncher/snapback.
 metadata:
-  version: 0.7.29
+  version: 0.7.30
   category: workflow-automation
   tags: [retron, msd, genetic-compiler, snapback, scar-nick, composition, study]
 ---
@@ -14,7 +14,7 @@ In scope:
 - Retron MSD shorthand IDs and explicit part sets.
 - Typed `retron_msd_compiler_spec_v1` files with labels, explicit designs, literal payloads or trim metadata, and selected public cap/stem-base primitive sources.
 - Study-owned `msd_design_reference_v1` / `msd_design_catalog_v1` compilation and workbench provenance.
-- Reader SPOP MSD-region source ingest from one-variant GenBank files, plus decomposed primitive and pairing records under workbench provenance.
+- MSD-region source ingest from one-variant GenBank files, plus decomposed primitive and pairing records under workbench provenance. The retained `reader_spop_msd_structure_panel_v1` name is an immutable historical evidence identity, not an active metric route or a future output default. New runs start from the neutral `retron_msd_structure_panel_v1` identity and mint a new neutral revision rather than rewriting the historical bundle.
 - Routing missing cap/shortening constraints to Snapback.
 - Routing missing stem-base or terminal-nick constraints to scar-nick base-junction.
 - Routing mismatch-display questions to YIU as contrast only.
@@ -67,7 +67,7 @@ Out of scope:
   payload/cap sequences; `C###` cap IDs never imply a de033 sequence by pattern.
 - Need an intentional non-ligatable S0 control: materialize with `--allow-non-ligatable-s0` or a typed spec that sets `allow_non_ligatable_s0: true`; do not use this for profile-drift errors.
 - Need hypotheses, effect tags, design sets, or run provenance: open `docs/studies/retron_hairpin_design/workbench/`.
-- Need Reader SPOP MSD source primitives, stem lengths, or pairing status: open `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/`. Active GenBank sources are one file per variant under `source_inputs/variants/`; retired bulk source metadata is provenance only.
+- Need MSD source primitives, stem lengths, or pairing status: open the historically named `docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/reader_spop_msd_structure_panel_v1/manifest.yaml`. For exact design/compiler/deliverable lineage of the selected `pES-retron-195` through `pES-retron-204` cohort, open `docs/studies/retron_hairpin_design/workbench/provenance/materialized_variant_lineage/pes_retron_195_204.yaml`. The selection points to the source bundle; the historical bundle does not point back. Active GenBank sources are one file per variant under `source_inputs/variants/`; retired bulk source metadata is provenance only.
 - Missing cap, shortening, or stem/cap geometry: route to Snapback in `docs/studies/retron_hairpin_design/routes/README.md`.
 - Missing left/right base feasibility, terminal-nick route, nickase, or `S3/S2/S1/S0` profile: route to scar-nick.
 - Mismatch-only display or boundary contrast: route to YIU; it is not the
@@ -124,7 +124,7 @@ Out of scope:
 - Folding has no workspace; it consumes producer bundles or explicit files.
 - BaseRender renders visual contracts; it does not run ViennaRNA.
 - Reader consumes frozen design catalogs, not live dnadesign workspaces.
-- Reader SPOP structure-panel source ingest must use per-variant GenBank files
+- MSD structure-evidence ingest must use per-variant GenBank files
   or the materialized provenance records. Steady-state commands must not read
   retired bulk source files.
 - Narrow foldback spans and explicit complement arms are annotation notes unless

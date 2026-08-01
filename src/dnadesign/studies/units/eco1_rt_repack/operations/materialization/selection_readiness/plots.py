@@ -26,6 +26,7 @@ from .local_structure_plot import (
 from .mutation_distance_plot import (
     write_selected_mutation_dissimilarity_plot,
 )
+from .n_terminal_pair_plot import write_n_terminal_pair_comparison_plot
 from .region_msa_support_plot import write_regionwise_msa_support_plot
 from .regional_plots import (
     write_regional_mutation_burden_plot,
@@ -43,6 +44,7 @@ def write_selection_readiness_plots(
     triage_rows: list[dict[str, object]],
     panel_rows: list[dict[str, object]],
     candidate_rows: list[dict[str, object]],
+    canonical_sequences_by_id: dict[str, str],
     mask_residues: list[dict[str, object]],
     local_structure_rows: list[dict[str, object]],
     local_structure_threshold_sensitivity_rows: list[dict[str, object]],
@@ -80,6 +82,12 @@ def write_selection_readiness_plots(
             mask_residues=mask_residues,
             input_hashes=input_hashes,
             rt_annotation_context=rt_annotation_context,
+        ),
+        write_n_terminal_pair_comparison_plot(
+            plot_root,
+            panel_rows=panel_rows,
+            canonical_sequences_by_id=canonical_sequences_by_id,
+            input_hashes=input_hashes,
         ),
         write_regional_mutation_burden_plot(
             plot_root,

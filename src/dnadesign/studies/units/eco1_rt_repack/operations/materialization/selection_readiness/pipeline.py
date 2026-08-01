@@ -218,11 +218,12 @@ def materialize_selection_readiness(
         local_structure_threshold_sensitivity_rows,
         schema_id="eco1_rt.local_structure_threshold_sensitivity",
     )
+    canonical_sequences_by_id = read_fasta_sequences(paths["foldcheck_input_sequences"])
     handoff_sequence_rows = write_candidate_handoff_sequence_csv(
         handoff_sequence_csv_path,
         panel_rows=panel_rows,
         candidate_rows=candidate_rows,
-        canonical_sequences_by_id=read_fasta_sequences(paths["foldcheck_input_sequences"]),
+        canonical_sequences_by_id=canonical_sequences_by_id,
         source_candidate_pool_sha256=sha256_uri(paths["candidate_pool"]),
         source_panel_sha256=sha256_uri(panel_path),
         source_foldcheck_input_sequences_sha256=sha256_uri(paths["foldcheck_input_sequences"]),
@@ -243,6 +244,7 @@ def materialize_selection_readiness(
         triage_rows=triage_rows,
         panel_rows=panel_rows,
         candidate_rows=candidate_rows,
+        canonical_sequences_by_id=canonical_sequences_by_id,
         mask_residues=mask_residues,
         local_structure_rows=local_structure_rows,
         local_structure_threshold_sensitivity_rows=local_structure_threshold_sensitivity_rows,

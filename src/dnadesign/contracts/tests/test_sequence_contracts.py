@@ -11,17 +11,124 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
 import dnadesign.contracts as contracts
 from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1
-from dnadesign.contracts.sequence import LinearSsdnaCompositionV1, MsdDesignCatalogV1, MsdDesignReferenceV1
+from dnadesign.contracts.sequence import (
+    LinearSsdnaCompositionV1,
+    MsdDesignCatalogV1,
+    MsdDesignReferenceV1,
+    RtPartPublicationV1,
+)
 from dnadesign.contracts.visual import CompositionReviewSvgV1
+
+
+def _sha256(value: str) -> str:
+    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _rt_part_publication_payload() -> dict[str, object]:
+    return {
+        "contract": "rt_part_publication_v1",
+        "schema_version": 1,
+        "owner_study_id": "literature_rt_parts",
+        "publication_id": "literature_rt_parts_v1",
+        "provenance": {
+            "source_ref": "docs/studies/literature_rt_parts/record/source.yaml",
+            "source_contract": "curated_rt_source_v1",
+            "source_sha256": _sha256("curated-source"),
+        },
+        "parts": [
+            {
+                "part_id": "LiteratureRT-Short",
+                "provider_ref": "provider:literature_rt_parts/rt-short",
+                "cds_sha256": _sha256("private-cds"),
+                "cds_length_nt": 9,
+                "terminal_stop_codon": "included",
+                "protein_sha256": _sha256("MK"),
+                "protein_length_aa": 2,
+            }
+        ],
+    }
 
 
 def test_root_contract_exports_include_composition_review_manifest() -> None:
     assert contracts.CompositionReviewSvgV1 is CompositionReviewSvgV1
+
+
+def test_rt_part_publication_accepts_provider_neutral_short_rt() -> None:
+    publication = RtPartPublicationV1.model_validate(_rt_part_publication_payload())
+
+    assert publication.owner_study_id == "literature_rt_parts"
+    assert publication.parts[0].provider_ref == "provider:literature_rt_parts/rt-short"
+    assert publication.parts[0].cds_length_nt == 9
+    assert contracts.RtPartPublicationV1 is RtPartPublicationV1
+
+
+def test_rt_part_publication_accepts_cds_without_terminal_stop_when_declared() -> None:
+    payload = _rt_part_publication_payload()
+    payload["parts"][0]["cds_length_nt"] = 6
+    payload["parts"][0]["terminal_stop_codon"] = "omitted"
+
+    publication = RtPartPublicationV1.model_validate(payload)
+
+    assert publication.parts[0].terminal_stop_codon == "omitted"
+
+
+def test_rt_part_publication_rejects_private_sequence_bytes() -> None:
+    payload = _rt_part_publication_payload()
+    part = payload["parts"][0]
+    part["cds_sequence_5to3"] = "ATGAAATAA"
+
+    with pytest.raises(PydanticValidationError, match=r"(?s)cds_sequence_5to3.*Extra inputs are not permitted"):
+        RtPartPublicationV1.model_validate(payload)
+
+
+def test_rt_part_publication_rejects_internal_provider_record_ids() -> None:
+    payload = _rt_part_publication_payload()
+    part = payload["parts"][0]
+    part["provider_record_id"] = "internal-generated-candidate-id"
+
+    with pytest.raises(PydanticValidationError, match=r"(?s)provider_record_id.*Extra inputs are not permitted"):
+        RtPartPublicationV1.model_validate(payload)
+
+
+def test_rt_part_publication_rejects_declared_protein_length_drift() -> None:
+    payload = _rt_part_publication_payload()
+    payload["parts"][0]["protein_length_aa"] = 3
+
+    with pytest.raises(PydanticValidationError, match="declared CDS length 9 does not match protein length 3"):
+        RtPartPublicationV1.model_validate(payload)
+
+
+def test_rt_part_publication_rejects_malformed_sequence_digest() -> None:
+    payload = _rt_part_publication_payload()
+    payload["parts"][0]["cds_sha256"] = "sha256:not-a-digest"
+
+    with pytest.raises(PydanticValidationError, match="lowercase sha256"):
+        RtPartPublicationV1.model_validate(payload)
+
+
+def test_rt_part_publication_rejects_duplicate_part_ids() -> None:
+    payload = _rt_part_publication_payload()
+    payload["parts"].append(dict(payload["parts"][0]))
+
+    with pytest.raises(PydanticValidationError, match="Duplicate part_id"):
+        RtPartPublicationV1.model_validate(payload)
+
+
+def test_rt_part_publication_rejects_duplicate_provider_refs() -> None:
+    payload = _rt_part_publication_payload()
+    duplicate = dict(payload["parts"][0])
+    duplicate["part_id"] = "LiteratureRT-Other"
+    payload["parts"].append(duplicate)
+
+    with pytest.raises(PydanticValidationError, match="Duplicate provider_ref"):
+        RtPartPublicationV1.model_validate(payload)
 
 
 def test_msd_design_reference_contract_accepts_scar_nick_reference() -> None:

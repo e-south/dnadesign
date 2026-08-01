@@ -23,7 +23,14 @@ output_policy:
     - compiled catalogs
 reader_boundary:
   status: experiment_time_only
-  note: Reader SPOP and viability evidence are ingested after the trim constructs are assayed; this plan does not reimplement Reader SPOP math or treat assay output as a design-set source.
+  note: Reader assay records are not design-set inputs. Downstream assay interpretation remains outside this deliverable contract.
+assay_handoff_ref:
+  contract: retron_msd_assay_handoff_ref_v1
+  owner_study_id: rt_lnrna_sponging_construct_triage
+  route_ref: docs/studies/rt_lnrna_sponging_construct_triage/routes/reporter-response-evidence.md
+  subject_set_id: teto_retained_span_trim_tetr_pwm_elite_v1
+  subject_identity_field: construct_id
+  handoff_role: subject_identity_only
 source_refs:
   design_set: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_tetr_pwm_elite_v1.yaml
   compiler_spec: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml
@@ -214,15 +221,15 @@ artifact_families:
       - Full parent payload rows are excluded because pES-retron-26, pES-retron-43, and the pES-retron-180 precedent already cover the non-trim controls.
       - Each imported record keeps complete MSD-unit annotations from the materialized reverse-complement GenBank source.
       - Metadata for verification stays in reviews/handoff/ and reviews/review_manifest.json.
-  future_reader_outcome_overlay:
+  rt_lnrna_assay_handoff:
     status: experiment_time_only
-    owner_surface: Reader SPOP bridge and future trim-outcome join
-    purpose: Join post-assay SPOP, viability, product evidence, and outcome bins onto the design-set rows.
-    expected_output_group: outcomes/teto_retained_span_trim_tetr_pwm_elite_v1/
-    invariants:
-      - Reader owns SPOP math.
-      - Viability-confounded signal is not a positive trim-effect outcome.
-      - Product or abundance evidence is required before separating binding failure from production failure.
+    contract_ref:
+      contract: retron_msd_assay_handoff_ref_v1
+      owner_study_id: rt_lnrna_sponging_construct_triage
+      route_ref: docs/studies/rt_lnrna_sponging_construct_triage/routes/reporter-response-evidence.md
+      subject_set_id: teto_retained_span_trim_tetr_pwm_elite_v1
+      subject_identity_field: construct_id
+      handoff_role: subject_identity_only
   review_package_manifest:
     status: current_review_renderer_output
     owner_surface: study-owned review renderer
@@ -233,7 +240,7 @@ artifact_families:
     invariants:
       - The manifest records pre-assay review outputs only.
       - It must cite sequence_index.tsv, record review-local handoff indexes, and verify all row-referenced handoff files.
-      - Reader SPOP and viability evidence are future experiment-time overlays, not inputs to this manifest.
+      - Reporter-response profiles and relative-biomass evidence are future experiment-time overlays, not inputs to this manifest.
 quality_gates:
   - The compiler spec lints with 9 records.
   - Materialized sequence_index.tsv has 9 rows and no missing row-referenced files.

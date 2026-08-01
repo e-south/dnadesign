@@ -36,5 +36,6 @@ Do not put generated compiler catalogs here. Generated catalogs belong in
 caller-chosen transient output directories or a future owning Reader snapshot.
 Convenience label inputs remain under `../../compiler/`.
 Hypothesis-specific expectations for PWM panels, sequence-review stills/videos,
-GenBank handoff files, and future outcome overlays belong in
-`../deliverables/`.
+GenBank handoff files, and typed downstream assay handoff references belong in
+`../deliverables/`. Assay interpretation and outcome policy stay with the
+owning assay study.
