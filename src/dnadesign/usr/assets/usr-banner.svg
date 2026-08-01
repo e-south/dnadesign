@@ -1,12 +1,12 @@
 <svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img"
   aria-labelledby="usr-banner-title usr-banner-description" shape-rendering="crispEdges">
-  <title id="usr-banner-title">usr: store sequence records</title>
-  <desc id="usr-banner-description">Store sequence records, overlays, and mutation events.</desc>
+  <title id="usr-banner-title">usr: manage sequence tables</title>
+  <desc id="usr-banner-description">Store, check, and sync tables of sequence records.</desc>
   <rect width="1200" height="180" fill="#1E1D1A"/>
   <g font-family="Menlo, Monaco, Consolas, monospace">
     <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">usr</text>
-    <text x="50" y="114" fill="#969087" font-size="12" font-weight="700" letter-spacing="1.2">STORE SEQUENCE RECORDS</text>
+    <text x="50" y="114" fill="#969087" font-size="12" font-weight="700" letter-spacing="1.2">MANAGE SEQUENCE TABLES</text>
     <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
   </g>
   <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>

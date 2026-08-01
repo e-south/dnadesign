@@ -24,43 +24,43 @@ Use the docs index to choose a workflow, inspect existing work, or jump to a too
 Pick the tool that matches the work you need to do. Each link opens the tool
 README for commands, inputs, and outputs.
 
-### Workspace and analysis tools
+### Design, modeling, and analysis
 
-| Tool | Description | Coverage |
-| --- | --- | --- |
-| [**usr**](src/dnadesign/usr/README.md) | Store, inspect, validate, and sync tabular sequence records. | [![usr coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=usr)](https://codecov.io/gh/e-south/dnadesign?component=usr) |
-| [**densegen**](src/dnadesign/densegen/README.md) | Generate DNA sequence libraries from declared design workspaces. | [![densegen coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=densegen)](https://codecov.io/gh/e-south/dnadesign?component=densegen) |
-| [**infer**](src/dnadesign/infer/README.md) | Run sequence-model inference and write features back to datasets. | [![infer coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=infer)](https://codecov.io/gh/e-south/dnadesign?component=infer) |
-| [**construct**](src/dnadesign/construct/README.md) | Build template-based constructs and declared sequence products. | [![construct coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=construct)](https://codecov.io/gh/e-south/dnadesign?component=construct) |
-| [**opal**](src/dnadesign/opal/README.md) | Choose the next DNA designs from measured sequence results. | [![opal coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=opal)](https://codecov.io/gh/e-south/dnadesign?component=opal) |
-| [**cluster**](src/dnadesign/cluster/README.md) | Group and visualize rows in numerical feature tables. | [![cluster coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=cluster)](https://codecov.io/gh/e-south/dnadesign?component=cluster) |
-| [**latentdna**](src/dnadesign/latentdna/README.md) | Compare numerical sequence representations and publish review artifacts. | [![latentdna coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=latentdna)](https://codecov.io/gh/e-south/dnadesign?component=latentdna) |
-| [**cruncher**](src/dnadesign/cruncher/README.md) | Solve constrained DNA sequence and assembly design tasks. | [![cruncher coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=cruncher)](https://codecov.io/gh/e-south/dnadesign?component=cruncher) |
-| [**billboard**](src/dnadesign/billboard/README.md) | Measure how varied sequence motifs are within a library. | [![billboard coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=billboard)](https://codecov.io/gh/e-south/dnadesign?component=billboard) |
-| [**libshuffle**](src/dnadesign/libshuffle/README.md) | Select representative subsets from large sequence libraries. | [![libshuffle coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=libshuffle)](https://codecov.io/gh/e-south/dnadesign?component=libshuffle) |
-| [**nmf**](src/dnadesign/nmf/README.md) | Find recurring motif combinations with non-negative matrix factorization. | [![nmf coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=nmf)](https://codecov.io/gh/e-south/dnadesign?component=nmf) |
-| [**permuter**](src/dnadesign/permuter/README.md) | Generate sequence variants and evaluate them with declared scoring tools. | [![permuter coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=permuter)](https://codecov.io/gh/e-south/dnadesign?component=permuter) |
-| [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md) | Summarize measured responses after transcription-factor knockdown. | [![tfkdanalysis coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=tfkdanalysis)](https://codecov.io/gh/e-south/dnadesign?component=tfkdanalysis) |
-| [**aligner**](src/dnadesign/aligner/README.md) | Score pairwise sequence alignments with Biopython. | [![aligner coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=aligner)](https://codecov.io/gh/e-south/dnadesign?component=aligner) |
-| [**thread**](src/dnadesign/thread/README.md) | Prepare protein-design requests and check predicted structures. | [![thread coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=thread)](https://codecov.io/gh/e-south/dnadesign?component=thread) |
+| Tool | Description |
+| --- | --- |
+| [**usr**](src/dnadesign/usr/README.md) | Store, check, and sync tables of sequence records. |
+| [**densegen**](src/dnadesign/densegen/README.md) | Generate DNA sequence libraries from saved design inputs. |
+| [**infer**](src/dnadesign/infer/README.md) | Run sequence models and add their results to datasets. |
+| [**construct**](src/dnadesign/construct/README.md) | Build DNA constructs from reusable templates. |
+| [**opal**](src/dnadesign/opal/README.md) | Choose the next DNA designs from measured results. |
+| [**cluster**](src/dnadesign/cluster/README.md) | Group and visualize rows in numerical data tables. |
+| [**latentdna**](src/dnadesign/latentdna/README.md) | Compare numerical sequence features and save review-ready results. |
+| [**cruncher**](src/dnadesign/cruncher/README.md) | Find DNA sequences and assembly plans that satisfy stated constraints. |
+| [**billboard**](src/dnadesign/billboard/README.md) | Measure how varied sequence motifs are within a library. |
+| [**libshuffle**](src/dnadesign/libshuffle/README.md) | Select representative subsets from large sequence libraries. |
+| [**nmf**](src/dnadesign/nmf/README.md) | Find recurring groups of sequence motifs in data tables. |
+| [**permuter**](src/dnadesign/permuter/README.md) | Generate sequence variants and score them with chosen tools. |
+| [**tfkdanalysis**](src/dnadesign/tfkdanalysis/README.md) | Summarize measured responses after transcription-factor knockdown. |
+| [**aligner**](src/dnadesign/aligner/README.md) | Compare pairs or sets of DNA and protein sequences. |
+| [**thread**](src/dnadesign/thread/README.md) | Prepare requests for protein-design models and check predicted structures. |
 
-### Artifact services
+### Draw and inspect results
 
-| Tool | Description | Coverage |
-| --- | --- | --- |
-| [**folding**](src/dnadesign/folding/README.md) | Predict and draw RNA secondary structures from sequence records. | [![folding coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=folding)](https://codecov.io/gh/e-south/dnadesign?component=folding) |
-| [**baserender**](src/dnadesign/baserender/README.md) | Render sequence visuals from job files and visual contracts. | [![baserender coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=baserender)](https://codecov.io/gh/e-south/dnadesign?component=baserender) |
+| Tool | Description |
+| --- | --- |
+| [**folding**](src/dnadesign/folding/README.md) | Predict and draw RNA secondary structures from sequence records. |
+| [**baserender**](src/dnadesign/baserender/README.md) | Draw annotated sequence diagrams from saved job files. |
 
-### Operator surfaces
+### Run and monitor jobs
 
-| Tool | Description | Coverage |
-| --- | --- | --- |
-| [**ops**](src/dnadesign/ops/README.md) | Discover, run, and inspect jobs owned by repository tools. | [![ops coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=ops)](https://codecov.io/gh/e-south/dnadesign?component=ops) |
-| [**notify**](src/dnadesign/notify/README.md) | Send webhook notifications for local runs and scheduler-backed jobs. | [![notify coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=notify)](https://codecov.io/gh/e-south/dnadesign?component=notify) |
+| Tool | Description |
+| --- | --- |
+| [**ops**](src/dnadesign/ops/README.md) | Find, run, and inspect jobs owned by repository tools. |
+| [**notify**](src/dnadesign/notify/README.md) | Send webhook notifications for local and scheduled jobs. |
 
-### Shared contracts
+### Data shared between tools
 
-| Tool | Description | Coverage |
-| --- | --- | --- |
-| [**contracts**](src/dnadesign/contracts/README.md) | Versioned schemas shared between tools. | [![contracts coverage](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg?component=contracts)](https://codecov.io/gh/e-south/dnadesign?component=contracts) |
+| Tool | Description |
+| --- | --- |
+| [**contracts**](src/dnadesign/contracts/README.md) | Define versioned data formats shared between tools. |
 ---

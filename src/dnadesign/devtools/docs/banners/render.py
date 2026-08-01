@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 from .catalog import BANNERS, REPOSITORY_BANNER_PATH, BannerSpec
@@ -18,6 +19,33 @@ from .glyphs import ACCENT, DIM, INK, MUTED, glyph
 
 BACKGROUND = "#1E1D1A"
 FONT_STACK = "Menlo, Monaco, Consolas, monospace"
+
+
+def _resolve_repo_root(repo_root: Path) -> Path:
+    root = repo_root.expanduser().resolve()
+    pyproject_path = root / "pyproject.toml"
+    package_marker = root / "src" / "dnadesign" / "__init__.py"
+    if not pyproject_path.is_file() or not package_marker.is_file():
+        raise ValueError(f"Not a dnadesign repository root: {root}")
+    try:
+        project_name = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))["project"]["name"]
+    except (KeyError, OSError, tomllib.TOMLDecodeError) as error:
+        raise ValueError(f"Not a dnadesign repository root: {root}") from error
+    if project_name != "dnadesign":
+        raise ValueError(f"Not a dnadesign repository root: {root}")
+    return root
+
+
+def _resolve_output_path(root: Path, relative_path: str) -> Path:
+    declared_path = Path(relative_path)
+    if declared_path.is_absolute():
+        raise ValueError(f"Banner output path escapes repository root: {relative_path}")
+    output_path = (root / declared_path).resolve()
+    try:
+        output_path.relative_to(root)
+    except ValueError as error:
+        raise ValueError(f"Banner output path escapes repository root: {relative_path}") from error
+    return output_path
 
 
 def repository_svg() -> str:
@@ -85,9 +113,16 @@ def tool_svg(spec: BannerSpec) -> str:
 
 
 def expected_banners(repo_root: Path) -> dict[Path, str]:
-    root = repo_root.resolve()
-    expected = {root / REPOSITORY_BANNER_PATH: repository_svg()}
-    expected.update({root / spec.path: tool_svg(spec) for spec in BANNERS})
+    root = _resolve_repo_root(repo_root)
+    declarations = ((REPOSITORY_BANNER_PATH, repository_svg()),) + tuple(
+        (spec.path, tool_svg(spec)) for spec in BANNERS
+    )
+    expected: dict[Path, str] = {}
+    for relative_path, content in declarations:
+        output_path = _resolve_output_path(root, relative_path)
+        if output_path in expected:
+            raise ValueError(f"Duplicate banner output path: {relative_path}")
+        expected[output_path] = content
     return expected
 
 
@@ -101,8 +136,9 @@ def render_banners(repo_root: Path) -> tuple[Path, ...]:
 
 
 def check_banners(repo_root: Path) -> tuple[Path, ...]:
+    root = _resolve_repo_root(repo_root)
     return tuple(
-        path.relative_to(repo_root.resolve())
-        for path, content in expected_banners(repo_root).items()
+        path.relative_to(root)
+        for path, content in expected_banners(root).items()
         if not path.exists() or path.read_text(encoding="utf-8") != content
     )

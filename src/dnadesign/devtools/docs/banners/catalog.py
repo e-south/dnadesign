@@ -37,8 +37,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/baserender/assets/baserender-banner.svg",
         "baserender",
-        "RENDER SEQUENCES",
-        "Render sequence records from explicit visual contracts.",
+        "DRAW SEQUENCE MAPS",
+        "Draw annotated sequence diagrams from saved job files.",
         "render",
     ),
     BannerSpec(
@@ -65,15 +65,15 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/contracts/assets/contracts-banner.svg",
         "contracts",
-        "DEFINE DATA SHAPES",
-        "Define versioned data shapes shared between tools.",
+        "SHARE DATA FORMATS",
+        "Define versioned data formats shared between tools.",
         "contracts",
     ),
     BannerSpec(
         "src/dnadesign/cruncher/assets/cruncher-banner.svg",
         "cruncher",
-        "OPTIMIZE SEQUENCES",
-        "Solve explicit sequence-design and assembly workflows.",
+        "DESIGN TO CONSTRAINTS",
+        "Find sequences and assembly plans that satisfy stated constraints.",
         "optimize",
     ),
     BannerSpec(
@@ -93,22 +93,22 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/folding/assets/folding-banner.svg",
         "folding",
-        "PREDICT STRUCTURE",
-        "Predict and render secondary structure for sequence artifacts.",
+        "DRAW RNA STRUCTURES",
+        "Predict and draw RNA secondary structures from sequence records.",
         "fold",
     ),
     BannerSpec(
         "src/dnadesign/infer/assets/infer-banner.svg",
         "infer",
-        "RUN SEQUENCE MODELS",
-        "Run sequence models and publish namespaced results.",
+        "ADD MODEL RESULTS",
+        "Run sequence models and add their results to datasets.",
         "infer",
     ),
     BannerSpec(
         "src/dnadesign/latentdna/docs/assets/latentdna-banner.svg",
         "latentdna",
-        "COMPARE SEQUENCE FEATURES",
-        "Compare numerical sequence features in declared workspaces.",
+        "COMPARE SEQUENCE DATA",
+        "Compare numerical sequence features and save review-ready results.",
         "latent",
     ),
     BannerSpec(
@@ -128,8 +128,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/notify/assets/notify-banner.svg",
         "notify",
-        "WATCH DATA EVENTS",
-        "Watch sequence-record events and send notifications.",
+        "SEND RUN UPDATES",
+        "Send notifications for local and scheduled jobs.",
         "notify",
     ),
     BannerSpec(
@@ -142,15 +142,15 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/ops/assets/ops-banner.svg",
         "ops",
-        "RUN SHARED WORKFLOWS",
-        "Discover, inspect, and run tool-owned workflows.",
+        "FIND AND RUN JOBS",
+        "Find, run, and inspect jobs owned by repository tools.",
         "route",
     ),
     BannerSpec(
         "src/dnadesign/permuter/assets/permuter-banner.svg",
         "permuter",
-        "GENERATE VARIANTS",
-        "Generate and score sequence variants through explicit evaluators.",
+        "MAKE AND SCORE VARIANTS",
+        "Generate sequence variants and score them with chosen tools.",
         "permute",
     ),
     BannerSpec(
@@ -177,8 +177,8 @@ BANNERS = (
     BannerSpec(
         "src/dnadesign/usr/assets/usr-banner.svg",
         "usr",
-        "STORE SEQUENCE RECORDS",
-        "Store sequence records, overlays, and mutation events.",
+        "MANAGE SEQUENCE TABLES",
+        "Store, check, and sync tables of sequence records.",
         "records",
     ),
 )

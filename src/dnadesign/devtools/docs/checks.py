@@ -17,7 +17,7 @@ import re
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 import yaml
 
@@ -40,7 +40,7 @@ from dnadesign.ops.status import list_status_kind_specs_for_repo
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
-README_COVERAGE_LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
+README_TOOL_COMPONENT_COVERAGE_PATTERN = re.compile(r"codecov\.io/[^\s)]+[?&]component=", flags=re.IGNORECASE)
 TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
 TOOL_README_BANNER_DIMENSION_PATTERN = re.compile(
     r"<svg[^>]*\bwidth=\"1200\"[^>]*\bheight=\"180\"[^>]*\bviewBox=\"0 0 1200 180\"",
@@ -649,20 +649,6 @@ def _normalize_relative_markdown_path(value: str) -> str:
     return str(Path(value).as_posix().lstrip("./"))
 
 
-def _is_valid_codecov_component_link(*, tool_name: str, link: str) -> bool:
-    parsed = urlparse(link)
-    if parsed.scheme != "https":
-        return False
-    if parsed.netloc not in {"codecov.io", "www.codecov.io", "app.codecov.io"}:
-        return False
-    if not parsed.path.startswith("/gh/"):
-        return False
-    component_values = parse_qs(parsed.query).get("component")
-    if component_values is None:
-        return False
-    return any(value.strip() == tool_name for value in component_values)
-
-
 def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
     readme_path = repo_root / "README.md"
     src_root = repo_root / "src" / "dnadesign"
@@ -679,14 +665,16 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
         return [f"{readme_path}: section '## Available tools' must include a markdown tool table."]
 
     issues: list[str] = []
+    available_tools_text = "\n".join(_extract_level2_section_lines(readme_text, "Available tools"))
+    if README_TOOL_COMPONENT_COVERAGE_PATTERN.search(available_tools_text):
+        issues.append(f"{readme_path}: tool catalog must not repeat per-tool Codecov badges or component links.")
     declared_tools: set[str] = set()
     for row in rows:
-        if len(row) < 3:
-            issues.append(f"{readme_path}: tool table rows must include Tool, Description, and Coverage columns.")
+        if len(row) != 2:
+            issues.append(f"{readme_path}: tool table rows must include exactly Tool and Description columns.")
             continue
 
         tool_cell = row[0]
-        coverage_cell = row[2]
         match = README_TOOL_LINK_PATTERN.search(tool_cell)
         if match is None:
             issues.append(f"{readme_path}: tool cell must use [**tool**](src/dnadesign/tool) format ({tool_cell}).")
@@ -709,20 +697,6 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
         if not tool_readme.exists() or not tool_readme.is_file():
             issues.append(
                 f"{readme_path}: tool '{tool_name}' link target does not exist as a markdown file: {tool_link}."
-            )
-
-        coverage_match = README_COVERAGE_LINK_PATTERN.search(coverage_cell)
-        if coverage_match is None:
-            issues.append(
-                f"{readme_path}: coverage cell for '{tool_name}' must include a markdown link "
-                "to a Codecov component URL."
-            )
-            continue
-        coverage_link = coverage_match.group("link")
-        if not _is_valid_codecov_component_link(tool_name=tool_name, link=coverage_link):
-            issues.append(
-                f"{readme_path}: coverage link for '{tool_name}' must target Codecov with query "
-                f"'component={tool_name}' (found '{coverage_link}')."
             )
 
     missing_tools = sorted(repo_tools - declared_tools)
