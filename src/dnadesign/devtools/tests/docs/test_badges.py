@@ -288,16 +288,16 @@ def test_badge_policy_normalizes_browser_equivalent_provider_hosts(
 @pytest.mark.parametrize(
     "provider_url",
     [
-        r"https:\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
         r"https:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
         r"https:/\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
-        r"https:ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
-        r"https:\img%E3%80%82shields%E3%80%82io\status.svg",
-        " https:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
-        "\thttps:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
-        "ht\ttps:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
-        "https\n:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg",
-        "\x1fhttps:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\\status.svg ",
+        r" https:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        "\t" + r"https:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        "ht\ttps:" + r"\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        "https\n:" + r"\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
+        "\x1f" + r"https:\\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg" + " ",
+        r"http:ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
+        r"http:/ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ/status.svg",
+        r"http:\ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ\status.svg",
     ],
 )
 def test_badge_policy_normalizes_browser_special_scheme_separators(
@@ -362,6 +362,10 @@ def test_badge_policy_rejects_unapproved_root_badge(tmp_path: Path) -> None:
     assert find_markdown_badge_policy_issues(tmp_path, [root_readme]) == [
         f"{root_readme}:1: root README badge is not in the restrained CI, coverage, and license set."
     ]
+
+
+def test_badge_renderer_ignores_unpaired_surrogates_in_synthesized_content() -> None:
+    assert rendered_markdown_badge_lines('<img alt="diagram" src="\ud800">\n') == ()
 
 
 @pytest.mark.parametrize(

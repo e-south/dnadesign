@@ -15,7 +15,6 @@ dependencies = [
   "biopython>=1.87",
   "click>=8.3.3",
   "html5lib>=1.1",
-  "idna>=3.15",
   "igraph",
   "leidenalg",
   "logomaker",
@@ -39,6 +38,7 @@ dependencies = [
   "tqdm",
   "typer",
   "umap-learn>=0.5.11",
+  "upa-url>=1.1.0,<2",
   "duckdb>=0.10.0",
   "xlrd",
   # Compatibility-pinned for the Evo2/CUDA stack; the bounded security exception is documented in SECURITY.md.
@@ -238,7 +238,6 @@ environments = [
 constraint-dependencies = [
   "cryptography>=48.0.1",
   "click>=8.3.3",
-  "idna>=3.15",
   "onnx>=1.22.0",
   "pillow>=12.3.0",
   "pymdown-extensions>=11.0.1",

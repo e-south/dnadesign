@@ -14,7 +14,6 @@ supported-markers = [
 constraints = [
     { name = "click", specifier = ">=8.3.3" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "idna", specifier = ">=3.15" },
     { name = "onnx", specifier = ">=1.22.0" },
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "pymdown-extensions", specifier = ">=11.0.1" },
@@ -413,7 +412,6 @@ dependencies = [
     { name = "duckdb", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "fastparquet", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "html5lib", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "idna", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "igraph", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "keyring", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "leidenalg", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
@@ -448,6 +446,7 @@ dependencies = [
     { name = "tqdm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "typer", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "umap-learn", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "upa-url", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "vegafusion", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "viennarna", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "vl-convert-python", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
@@ -505,7 +504,6 @@ requires-dist = [
     { name = "fastparquet", specifier = ">=2025.12.0" },
     { name = "flash-attn", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.8.0.post2,<3" },
     { name = "html5lib", specifier = ">=1.1" },
-    { name = "idna", specifier = ">=3.15" },
     { name = "igraph" },
     { name = "keyring", specifier = ">=25.6.0" },
     { name = "leidenalg" },
@@ -549,6 +547,7 @@ requires-dist = [
     { name = "transformers", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
     { name = "typer" },
     { name = "umap-learn", specifier = ">=0.5.11" },
+    { name = "upa-url", specifier = ">=1.1.0,<2" },
     { name = "vegafusion", specifier = ">=2.0.3" },
     { name = "viennarna", specifier = ">=2.7.2" },
     { name = "vl-convert-python", specifier = ">=1.9.0" },
@@ -2666,6 +2665,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/94/9a/a1e4a257a9aa979dac4f6d5781dac929cbb0949959e2003ed82657d10b0f/umap_learn-0.5.11.tar.gz", hash = "sha256:31566ffd495fbf05d7ab3efcba703861c0f5e6fc6998a838d0e2becdd00e54f5", size = 96409, upload-time = "2026-01-12T20:44:47.553Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/d2/fcf7192dd1cd8c090b6cfd53fa223c4fb2887a17c47e06bc356d44f40dfb/umap_learn-0.5.11-py3-none-any.whl", hash = "sha256:cb17adbde9d544ba79481b3ab4d81ac222e940f3d9219307bea6044f869af3cc", size = 90890, upload-time = "2026-01-12T20:44:46.511Z" },
+]
+
+[[package]]
+name = "upa-url"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/f4/2686ce2c3f860be0ebe65cac6493d2a12c33ee4115f59ce2f03ecaeafaf4/upa_url-1.1.0.tar.gz", hash = "sha256:1919d265f70d3522745c1413f5530c5cae8369d2ae1daa79b4c3daa09ef96d5f", size = 129382, upload-time = "2025-11-22T17:39:26.05Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/da/501342a9d0e1a7544e755f644aa9a3d75f83e26ebafd2dedee28a77a4dcc/upa_url-1.1.0-cp312-abi3-macosx_10_15_x86_64.whl", hash = "sha256:15ef927f5d8f33081abcfd94ca0bdff16c3c4a52b1479f2089cf089d8f5505ed", size = 131079, upload-time = "2025-11-22T17:38:39.517Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/49/a93c25f0fccf504f2695dbc6b85a606521446d318de4c0bd4a4bd83674ee/upa_url-1.1.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:c35251fb76588aa78dbdca1153fb57575d34ceacb8e0deee08f6dda8d29e4664", size = 126151, upload-time = "2025-11-22T17:38:40.506Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/52/c55e3359ecfea3885c1ff7c9f2e6ba6122c25965db80826ef83959e93e56/upa_url-1.1.0-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:791e6d93e922b300bb804ca8f7481b2ebc32ab15c2df6c23dc46a69e5df0f270", size = 168143, upload-time = "2025-11-22T17:38:42.804Z" },
+    { url = "https://files.pythonhosted.org/packages/26/f2/775d1eafddc951bb840f5b364b1c713a830bc6f77d07e2ec42f6bac706b4/upa_url-1.1.0-cp312-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:0c2ca12107b94e3195064b9cb35f07c0c589a76891df6ea0d3d76cf657fdc600", size = 651733, upload-time = "2025-11-22T17:38:45.261Z" },
 ]
 
 [[package]]

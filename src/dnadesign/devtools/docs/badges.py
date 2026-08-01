@@ -19,11 +19,10 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from itertools import count
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote
 from xml.etree.ElementTree import Element
 
 import html5lib
-import idna
 from html5lib._tokenizer import HTMLTokenizer, tokenTypes
 from html5lib.html5parser import HTMLParser, _ReparseException
 from markdown_it import MarkdownIt
@@ -31,11 +30,10 @@ from markdown_it.rules_inline import html_inline as markdown_html_inline_rule
 from markdown_it.rules_inline import image as markdown_image_rule
 from markdown_it.rules_inline.state_inline import StateInline
 from markdown_it.token import Token
+from upa_url import URL
 
-BADGE_SOURCE_PATTERN = re.compile(
-    r"(?:shields\.io|codecov\.io|(?:^|[/_.-])badge(?:[./?_-]|$))",
-    flags=re.IGNORECASE,
-)
+BADGE_PATH_PATTERN = re.compile(r"(?:^|[/_.-])badge(?:[./?_-]|$)", flags=re.IGNORECASE)
+BADGE_PROVIDER_HOSTS = frozenset({"shields.io", "codecov.io"})
 BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags=re.IGNORECASE)
 FLOATING_POINT_PATTERN = re.compile(r"-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
 NON_NEGATIVE_INTEGER_PATTERN = re.compile(r"[0-9]+")
@@ -44,8 +42,7 @@ C0_CONTROL_OR_SPACE = "".join(chr(codepoint) for codepoint in range(0x21))
 CSS_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", flags=re.DOTALL)
 MIME_SUBTYPE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*")
 RAW_IMAGE_TAGS = frozenset({"image", "img", "source"})
-SPECIAL_URL_SCHEMES = frozenset({"file", "ftp", "http", "https", "ws", "wss"})
-URL_PREPROCESS_TRANSLATION = str.maketrans("", "", "\t\n\r")
+MARKDOWN_RENDER_BASE_URL = "https://example.test/docs/"
 XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
 XLINK_HREF_ATTRIBUTE = "{http://www.w3.org/1999/xlink}href"
@@ -190,31 +187,23 @@ MARKDOWN.inline.ruler.at("html_inline", _source_mapped_html_inline_rule)
 
 
 def _source_has_badge_hint(source: str) -> bool:
-    preprocessed_source = source.translate(URL_PREPROCESS_TRANSLATION).strip(C0_CONTROL_OR_SPACE)
-    scheme, separator, remainder = preprocessed_source.partition(":")
-    if separator and scheme.casefold() in SPECIAL_URL_SCHEMES:
-        remainder = remainder.replace("\\", "/").lstrip("/")
-        preprocessed_source = f"{scheme}://{remainder}"
-    else:
-        network_path = preprocessed_source.lstrip("/\\")
-        leading_separators = len(preprocessed_source) - len(network_path)
-        if leading_separators >= 2:
-            preprocessed_source = f"//{network_path.replace('\\', '/')}"
-    hint_source = unquote(preprocessed_source) if "%" in preprocessed_source else preprocessed_source
-    if BADGE_SOURCE_PATTERN.search(hint_source) is not None:
+    if any("\ud800" <= character <= "\udfff" for character in source):
+        return False
+    parsed_source = URL.parse(source, MARKDOWN_RENDER_BASE_URL)
+    if parsed_source is None:
+        return False
+    if _is_badge_provider_hostname(parsed_source.hostname):
         return True
-    try:
-        hostname = urlsplit(preprocessed_source).hostname
-    except ValueError:
-        return False
-    if hostname is None:
-        return False
-    hostname = unquote(hostname) if "%" in hostname else hostname
-    try:
-        canonical_hostname = idna.encode(hostname, uts46=True, std3_rules=True).decode("ascii")
-    except idna.IDNAError:
-        return False
-    return BADGE_SOURCE_PATTERN.search(canonical_hostname) is not None
+    path = unquote(parsed_source.pathname)
+    return BADGE_PATH_PATTERN.search(path) is not None
+
+
+def _is_badge_provider_hostname(hostname: str) -> bool:
+    normalized_hostname = hostname[:-1] if hostname.endswith(".") else hostname
+    return any(
+        normalized_hostname == provider or normalized_hostname.endswith(f".{provider}")
+        for provider in BADGE_PROVIDER_HOSTS
+    )
 
 
 def _looks_like_badge(*, label: str, sources: Sequence[str], linked: bool) -> bool:
