@@ -26,6 +26,23 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _qsub_commands(bash_blocks: list[str]) -> list[str]:
+    commands: list[str] = []
+    current: list[str] = []
+    for line in "\n".join(bash_blocks).splitlines():
+        if not current:
+            if not line.startswith("qsub"):
+                continue
+            current.append(line)
+        else:
+            current.append(line)
+        if not line.rstrip().endswith("\\"):
+            commands.append("\n".join(current))
+            current = []
+    assert not current, "Documented qsub command has an unterminated line continuation."
+    return commands
+
+
 def test_eco1_proteinmpnn_generation_policy_qsub_is_submit_ready() -> None:
     qsub_script = _read(BU_SCC_JOBS / "eco1-proteinmpnn-generation-policy.qsub")
 
@@ -75,9 +92,10 @@ def test_eco1_submission_and_log_pull_share_one_scc_log_root() -> None:
 def test_bu_scc_readme_routes_every_qsub_to_a_parameterized_log_path() -> None:
     jobs_readme = _read(BU_SCC_JOBS / "README.md")
     bash_blocks = re.findall(r"```bash\n(.*?)```", jobs_readme, flags=re.DOTALL)
-    qsub_commands = re.findall(r"qsub(?: \\\n.*?)*?\.qsub", "\n".join(bash_blocks), flags=re.DOTALL)
+    qsub_commands = _qsub_commands(bash_blocks)
 
     assert qsub_commands
+    assert all(command.endswith(".qsub") for command in qsub_commands)
     assert all(" -o " in command or "\n  -o " in command for command in qsub_commands)
     assert all("${SCC_LOG_ROOT}/" in command and r"\$JOB_ID" in command for command in qsub_commands)
 
@@ -99,8 +117,9 @@ def test_eco1_command_groups_include_scc_generation_policy_execution_lanes() -> 
 
     assert "docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub" in command_groups
     command_group_blocks = re.findall(r"```bash\n(.*?)```", command_groups, flags=re.DOTALL)
-    documented_qsub = re.findall(r"qsub(?: \\\n.*?)*?\.qsub", "\n".join(command_group_blocks), flags=re.DOTALL)
+    documented_qsub = _qsub_commands(command_group_blocks)
     assert documented_qsub
+    assert all(command.endswith(".qsub") for command in documented_qsub)
     assert all("${SCC_LOG_ROOT}/" in command and r"\$JOB_ID" in command for command in documented_qsub)
     assert "/project/dunlop/esouth" not in command_groups
     assert "/projectnb/dunlop/esouth" not in command_groups
