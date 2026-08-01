@@ -42,7 +42,10 @@ def _write_registry(
                 "routes": {
                     _RESPONSE_ROUTE_ID: {
                         "first_owner": "reader",
-                        "continue_with": "dnadesign/.agents/skills/rt-lnrna-reporter-response/SKILL.md",
+                        "continue_with": (
+                            "dnadesign/docs/studies/rt_lnrna_sponging_construct_triage/routes/"
+                            "reporter-response-evidence.md"
+                        ),
                         "required_reader_state": "records_ready",
                     },
                     "rt_competence_subject_binding": {

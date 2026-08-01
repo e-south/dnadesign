@@ -19,14 +19,16 @@ that selects controls, declares pairing, chooses an endpoint or time window,
 and decides whether evidence is comparable enough to support a later
 preference objective.
 
-The current handoff contract is
-`rt_lnrna_reporter_response_profile.v3`. It preserves within-acquisition observation
-counts and, where applicable, time-reduced RFP, OD600, and RFP/OD600 summaries; exact
-Reader record and evidence-binding provenance;
-design-declared control pairing; an ordered dose grid; and uncertainty at the
-declared biological-replicate level. It emits descriptive dose-wise reporter
-response and `relative_od`. It does not emit a score, scalar objective, rank,
-or OPAL label. There is no active scalar objective.
+The handoff publishes exactly one descriptive profile variant. When reference
+normalization is unavailable, `rt_lnrna_reporter_measurement_profile.v1`
+retains raw time-reduced RFP, OD600, and RFP/OD600 summaries plus a typed reason.
+When normalization is available, `rt_lnrna_reporter_response_profile.v3`
+retains those same raw measurements and adds dose-wise reporter response,
+`relative_od`, and supported biological-replicate uncertainty. Both carry
+exact Reader record and evidence-binding provenance, declared condition roles,
+the ordered dose grid, and within-acquisition observation counts. Neither emits
+a score, scalar objective, rank, or OPAL label. There is no active scalar
+objective.
 
 The evidence-binding artifact is not a caller-authored metadata bag. Its
 builder accepts only a source-closed Reader record, publication derives a
@@ -43,7 +45,8 @@ rate objective is currently named or published.
 ### Comparability and uncertainty
 
 Profiles may be compared or aggregated only when their comparability keys
-match. Every profile embeds a typed
+match and their contract variants support the requested operation. Every
+profile embeds a typed
 `rt_lnrna_reporter_response_observation_policy.v3`; its digest is derived from
 fixed formulas, clipping policy, pairing kind, and reduction semantics rather
 than supplied as provenance. The comparability key binds that policy digest,

@@ -32,14 +32,14 @@ study-owned reduction recommendation.
    binding. Profile construction and parsing require the source-closed binding
    set and derive provenance from exactly one bound subject row. Do not copy
    measurements into the identity registry.
-3. Always preserve the recorded interval, ordered dose grid, explicit condition
-   roles, raw reporter signal, OD600, and reporter/OD600 in
-   `rt_lnrna_reporter_measurement_profile.v1`. A positive control is optional
-   and must be declared by role; its name is never inferred. When exactly one
-   declared positive control has positive separation from baseline, the stricter
-   `rt_lnrna_reporter_response_profile.v3` also carries normalized response,
-   relative OD, and biological-replicate uncertainty. Otherwise the measurement
-   profile records a typed reason that reference normalization is unavailable.
+3. Publish exactly one descriptive profile variant. A positive control is
+   optional and must be declared by role; its name is never inferred. When
+   reference normalization is unavailable, use
+   `rt_lnrna_reporter_measurement_profile.v1` and record the typed reason.
+   Otherwise use the stricter `rt_lnrna_reporter_response_profile.v3`, which
+   retains the recorded interval, dose grid, condition roles, raw reporter,
+   OD600, and reporter/OD600 measurements and adds normalized response,
+   relative OD, and supported biological-replicate uncertainty.
 4. Declare a typed observation policy whose fixed formulas and reduction
    semantics derive its digest. Never supply a policy digest as provenance.
 5. Compare profiles only when their comparability keys match. Otherwise stop

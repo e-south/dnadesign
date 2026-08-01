@@ -14,7 +14,7 @@ The study keeps three result layers separate:
 | --- | --- | --- |
 | `AbundancePriorOverlay` | Literature/source msDNA or RT-DNA abundance. | No |
 | `InferFeatureAlias` | Model-derived `X` for a declared construct view. | Yes, as `X` only |
-| `rt_lnrna_reporter_response_profile.v3` | Descriptive lab reporter-response evidence. | No |
+| `rt_lnrna_reporter_measurement_profile.v1` or `rt_lnrna_reporter_response_profile.v3` | One alternative descriptive lab profile: raw when normalization is unavailable, otherwise reference-normalized with raw measurements retained. | No |
 
 ### Khan
 
@@ -137,8 +137,10 @@ path.
 
 ### Reader-derived reporter response
 
-Reader retron reporter experiments are the measurement source for descriptive
-`rt_lnrna_reporter_response_profile.v3` evidence. Profiles are not
+Reader retron reporter experiments are the measurement source for one
+descriptive profile variant: `rt_lnrna_reporter_measurement_profile.v1` when
+normalization is unavailable, otherwise
+`rt_lnrna_reporter_response_profile.v3`. Profiles are not
 Khan/Crawford overlays, optimization labels, or Construct sequence authority.
 
 Reader owns generic measurement records and recorded time. The RT-lnRNA study
@@ -151,8 +153,9 @@ Only rows with resolved RT plus lnRNA sequence authority can join the
 consolidated Construct output that feeds Infer. Unresolved Reader retron rows
 remain descriptive evidence until their sequence authority is supplied.
 
-Profiles preserve declared RFP, OD600, and RFP/OD600 summaries, dose-wise
-normalized reporter response, uncapped relative OD, exact Reader provenance,
-and uncertainty. Endpoint `relative_od` is an OD ratio, not viability or
-growth; biomass interpretation requires meta-study validation. Profiles cannot
-be used as LatentDNA labels or OPAL `Y`.
+Both variants preserve declared RFP, OD600, and RFP/OD600 summaries plus exact
+Reader provenance. Only the reference-normalized variant adds dose-wise
+normalized reporter response, uncapped relative OD, and supported uncertainty.
+Endpoint `relative_od` is an OD ratio, not viability or growth; biomass
+interpretation requires meta-study validation. Profiles cannot be used as
+LatentDNA labels or OPAL `Y`.

@@ -146,7 +146,8 @@ validated OD linearity, and biological-replicate support.
 ### Evidence and publication
 
 The operator accepts only source-closed Reader dataframe records, exact
-study-owned evidence bindings, the pinned condition ontology, and
+study-owned evidence bindings, the pinned condition ontology, and the typed
+descriptive profile union: `rt_lnrna_reporter_measurement_profile.v1` or
 `rt_lnrna_reporter_response_profile.v3`. Raw workbooks, notebook cells,
 screenshots, and caller-supplied digests are not evidence inputs.
 

@@ -41,8 +41,11 @@ Reader intake, generic Reader plots, and MSD design remain outside this skill.
 4. Require a source-closed Reader record and a separately source-closed,
    canonically digested evidence-binding artifact. Never accept caller-supplied
    provenance lookalikes.
-5. Use `rt_lnrna_reporter_response_profile.v3` for descriptive evidence. It
-   derives exact provenance from one bound subject row and derives its typed
+5. Publish exactly one descriptive profile variant. Use
+   `rt_lnrna_reporter_measurement_profile.v1` when reference normalization is
+   unavailable; otherwise use `rt_lnrna_reporter_response_profile.v3`, which
+   retains the raw measurements and adds normalized response. Both derive
+   exact provenance from one bound subject row and derive their typed
    observation-policy digest.
 6. Compare only profiles with the same comparability key.
    Biological-replicate identity comes only from Reader's declared replicate
