@@ -1,4 +1,13 @@
-"""Failure and concurrency contracts for create-only overlay publication."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/tests/datasets/overlay/test_create_only_publication.py
+
+Test failure and concurrency contracts for create-only overlay publication.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

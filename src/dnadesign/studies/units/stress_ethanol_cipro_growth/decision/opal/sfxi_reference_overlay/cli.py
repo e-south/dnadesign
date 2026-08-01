@@ -1,4 +1,13 @@
-"""Command-line preview and publication for the study-owned SFXI overlay."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/sfxi_reference_overlay/cli.py
+
+Preview and publish the study-owned SFXI reference overlay from the command line.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

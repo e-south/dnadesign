@@ -1,4 +1,13 @@
-"""Build the stress-study SFXI overlay from neutral Reader four-state vectors."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/sfxi_reference_overlay/recipe.py
+
+Build the stress-study SFXI overlay from neutral Reader four-state vectors.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""CLI mutation-gate tests for the SFXI reference-overlay recipe."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/sfxi_reference_overlay/test_cli.py
+
+Test the CLI mutation gate for the SFXI reference-overlay recipe.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

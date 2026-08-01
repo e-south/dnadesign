@@ -1,4 +1,13 @@
-"""Verify and load selected neutral four-state Reader records."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/sfxi_reference_overlay/reader_records.py
+
+Verify and load selected neutral four-state Reader records.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
