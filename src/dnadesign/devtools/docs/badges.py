@@ -25,6 +25,21 @@ BADGE_SOURCE_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 BADGE_LABEL_PATTERN = re.compile(r"\s*(?:ci|coverage|codecov|license)\s*", flags=re.IGNORECASE)
+INERT_HTML_CONTAINERS = frozenset(
+    {
+        "iframe",
+        "noembed",
+        "noframes",
+        "noscript",
+        "plaintext",
+        "script",
+        "style",
+        "template",
+        "textarea",
+        "title",
+        "xmp",
+    }
+)
 MARKDOWN = MarkdownIt("commonmark")
 ROOT_README_ALLOWED_BADGES = frozenset(
     {
@@ -59,10 +74,15 @@ class _RelativeImageOccurrence:
 @dataclass(slots=True)
 class _HTMLContext:
     anchor_depth: int = 0
+    inert_depth: int = 0
     picture_depth: int = 0
 
     def clone(self) -> _HTMLContext:
-        return _HTMLContext(anchor_depth=self.anchor_depth, picture_depth=self.picture_depth)
+        return _HTMLContext(
+            anchor_depth=self.anchor_depth,
+            inert_depth=self.inert_depth,
+            picture_depth=self.picture_depth,
+        )
 
 
 class _HTMLImageParser(HTMLParser):
@@ -74,8 +94,14 @@ class _HTMLImageParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         normalized_tag = tag.casefold()
+        if normalized_tag in INERT_HTML_CONTAINERS:
+            self.context.inert_depth += 1
+            return
+        if self.context.inert_depth > 0:
+            return
         if normalized_tag == "a":
             self.context.anchor_depth = 1
+            self.markdown_link_depth = 0
             return
         if normalized_tag == "picture":
             self.context.picture_depth += 1
@@ -99,11 +125,15 @@ class _HTMLImageParser(HTMLParser):
         )
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.casefold() in {"a", "img", "picture", "source"}:
-            self.handle_starttag(tag, attrs)
+        self.handle_starttag(tag, attrs)
 
     def handle_endtag(self, tag: str) -> None:
         normalized_tag = tag.casefold()
+        if normalized_tag in INERT_HTML_CONTAINERS:
+            self.context.inert_depth = max(0, self.context.inert_depth - 1)
+            return
+        if self.context.inert_depth > 0:
+            return
         if normalized_tag == "a":
             self.context.anchor_depth = max(0, self.context.anchor_depth - 1)
         elif normalized_tag == "picture":
@@ -121,11 +151,11 @@ def _html_fragment_image_specs(
     *,
     markdown_link_depth: int,
     context: _HTMLContext,
-) -> tuple[tuple[int, _ImageSpec], ...]:
+) -> tuple[tuple[tuple[int, _ImageSpec], ...], int]:
     parser = _HTMLImageParser(context=context, markdown_link_depth=markdown_link_depth)
     parser.feed(fragment)
     parser.close()
-    return tuple(parser.images)
+    return tuple(parser.images), parser.markdown_link_depth
 
 
 def _inline_image_specs(
@@ -140,29 +170,31 @@ def _inline_image_specs(
     source_cursor = 0
     for token in children:
         if token.type == "link_open":
-            context.anchor_depth = 0
+            if context.inert_depth == 0:
+                context.anchor_depth = 0
             markdown_link_depth += 1
             continue
         if token.type == "link_close":
             markdown_link_depth = max(0, markdown_link_depth - 1)
             continue
         if token.type == "image":
-            images.append(
-                _RelativeImageOccurrence(
-                    line_offset=line_offset,
-                    spec=_ImageSpec(
-                        label=token.content,
-                        source=token.attrGet("src") or "",
-                        linked=markdown_link_depth > 0 or context.anchor_depth > 0,
-                    ),
+            if context.inert_depth == 0:
+                images.append(
+                    _RelativeImageOccurrence(
+                        line_offset=line_offset,
+                        spec=_ImageSpec(
+                            label=token.content,
+                            source=token.attrGet("src") or "",
+                            linked=markdown_link_depth > 0 or context.anchor_depth > 0,
+                        ),
+                    )
                 )
-            )
         elif token.type == "html_inline":
             fragment_start = source.find(token.content, source_cursor)
             if fragment_start >= 0:
                 line_offset = source[:fragment_start].count("\n")
                 source_cursor = fragment_start + len(token.content)
-            html_images = _html_fragment_image_specs(
+            html_images, markdown_link_depth = _html_fragment_image_specs(
                 token.content,
                 markdown_link_depth=markdown_link_depth,
                 context=context,
@@ -249,7 +281,7 @@ def _rendered_image_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
             )
             continue
         if token.type == "html_block" and token.map is not None:
-            html_images = _html_fragment_image_specs(
+            html_images, _markdown_link_depth = _html_fragment_image_specs(
                 token.content,
                 markdown_link_depth=0,
                 context=context,

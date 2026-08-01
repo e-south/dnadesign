@@ -64,6 +64,11 @@ def test_badge_policy_allows_restrained_root_badges_and_text_coverage_link(tmp_p
         '<a href="outer">\n\n'
         "[inner](report) ![Coverage](status.svg)\n\n"
         "</a>\n\n"
+        '[outer <a href="inner">inner</a> ![Coverage](status.svg)](report)\n\n'
+        '<template><img src="badge.svg"></template>\n\n'
+        "<template>\n\n"
+        "![Coverage](badge.svg)\n\n"
+        "</template>\n\n"
         "```markdown\n"
         "[![Coverage](https://example.test/coverage.svg)](https://example.test/report)\n"
         "```\n",
