@@ -872,6 +872,7 @@ def test_tool_readme_banner_check_rejects_uncatalogued_and_orphaned_paths(
         (
             BannerSpec(
                 path=catalog_path,
+                readme_path="src/dnadesign/alpha/README.md",
                 name="alpha",
                 capability="TEST ALPHA",
                 description="Test alpha banners.",
@@ -885,6 +886,54 @@ def test_tool_readme_banner_check_rejects_uncatalogued_and_orphaned_paths(
 
     assert any("alternate-banner.svg" in issue and "not declared in the banner catalog" in issue for issue in issues)
     assert any(catalog_path in issue and "not referenced by a tool README" in issue for issue in issues)
+
+
+def test_tool_readme_banner_check_rejects_swapped_catalog_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    alpha_banner = "src/dnadesign/alpha/assets/alpha-banner.svg"
+    beta_banner = "src/dnadesign/beta/assets/beta-banner.svg"
+    alpha_readme = "src/dnadesign/alpha/README.md"
+    beta_readme = "src/dnadesign/beta/README.md"
+    _write(
+        tmp_path / alpha_readme,
+        "![Alpha banner](../beta/assets/beta-banner.svg)\n\nAlpha narrative.\n",
+    )
+    _write(
+        tmp_path / beta_readme,
+        "![Beta banner](../alpha/assets/alpha-banner.svg)\n\nBeta narrative.\n",
+    )
+    _write(tmp_path / alpha_banner, VALID_TOOL_BANNER_SVG)
+    _write(tmp_path / beta_banner, VALID_TOOL_BANNER_SVG)
+    (tmp_path / "src" / "dnadesign" / "devtools" / "docs" / "banners").mkdir(parents=True)
+    monkeypatch.setattr(
+        docs_checks,
+        "BANNERS",
+        (
+            BannerSpec(
+                path=alpha_banner,
+                readme_path=alpha_readme,
+                name="alpha",
+                capability="TEST ALPHA",
+                description="Test alpha banners.",
+                glyph="align",
+            ),
+            BannerSpec(
+                path=beta_banner,
+                readme_path=beta_readme,
+                name="beta",
+                capability="TEST BETA",
+                description="Test beta banners.",
+                glyph="align",
+            ),
+        ),
+        raising=False,
+    )
+
+    issues = _find_tool_readme_banner_issues(tmp_path)
+
+    assert any(alpha_readme in issue and alpha_banner in issue and beta_banner in issue for issue in issues)
+    assert any(beta_readme in issue and beta_banner in issue and alpha_banner in issue for issue in issues)
 
 
 def test_tool_readme_banner_check_rejects_nonstandard_banner_dimensions(tmp_path: Path) -> None:

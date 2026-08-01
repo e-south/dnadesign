@@ -141,6 +141,7 @@ def test_render_preflights_every_output_before_mutation(tmp_path: Path, monkeypa
     outside = tmp_path / "escaped.svg"
     malicious = banner_render.BannerSpec(
         path="../escaped.svg",
+        readme_path="src/dnadesign/escaped/README.md",
         name="escaped",
         capability="ESCAPE",
         description="Must not be written.",

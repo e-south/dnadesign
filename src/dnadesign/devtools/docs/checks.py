@@ -2099,7 +2099,7 @@ def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
     if not banner_source.is_dir():
         return []
 
-    referenced_paths: set[str] = set()
+    referenced_paths_by_readme: dict[str, str] = {}
     for readme_path in sorted((repo_root / "src" / "dnadesign").rglob("README.md")):
         top_block = "\n".join(readme_path.read_text(encoding="utf-8").splitlines()[:25])
         banner_match = TOOL_README_BANNER_PATTERN.search(top_block)
@@ -2120,9 +2120,11 @@ def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
             )
         except ValueError:
             continue
-        referenced_paths.add(declared_relative.as_posix())
+        readme_relative = readme_path.relative_to(repo_root).as_posix()
+        referenced_paths_by_readme[readme_relative] = declared_relative.as_posix()
 
     catalog_paths = {Path(spec.path).as_posix() for spec in BANNERS}
+    referenced_paths = set(referenced_paths_by_readme.values())
     issues = [
         f"{path}: tool README banner path is not declared in the banner catalog."
         for path in sorted(referenced_paths - catalog_paths)
@@ -2131,6 +2133,31 @@ def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
         f"{path}: banner catalog path is not referenced by a tool README."
         for path in sorted(catalog_paths - referenced_paths)
     )
+
+    catalog_paths_by_readme: dict[str, str] = {}
+    for spec in BANNERS:
+        readme_path = Path(spec.readme_path).as_posix()
+        banner_path = Path(spec.path).as_posix()
+        existing_path = catalog_paths_by_readme.get(readme_path)
+        if existing_path is not None:
+            issues.append(
+                f"{readme_path}: banner catalog declares more than one README binding ({existing_path}, {banner_path})."
+            )
+            continue
+        catalog_paths_by_readme[readme_path] = banner_path
+
+    for readme_path, referenced_path in sorted(referenced_paths_by_readme.items()):
+        expected_path = catalog_paths_by_readme.get(readme_path)
+        if expected_path is None:
+            issues.append(f"{readme_path}: tool README is not bound to a banner catalog entry.")
+            continue
+        if referenced_path != expected_path:
+            issues.append(
+                f"{readme_path}: banner path must match catalog entry {expected_path}; found {referenced_path}."
+            )
+
+    for readme_path in sorted(catalog_paths_by_readme.keys() - referenced_paths_by_readme.keys()):
+        issues.append(f"{readme_path}: banner catalog README is missing or does not reference a local .svg banner.")
     return issues
 
 
