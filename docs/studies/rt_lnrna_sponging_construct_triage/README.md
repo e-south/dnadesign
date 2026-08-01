@@ -11,9 +11,6 @@ preflight_surface: planned-contract-checks
 
 ## RT-lnRNA Sponging Construct Triage Study
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
-
 Start with the [route map](routes/README.md). For reporter-response work, the
 plain path is bridge admission, study-owned subject binding, the
 [reporter-response meta-study](contexts/reporter-response-metastudy/README.md),
