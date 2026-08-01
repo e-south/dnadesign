@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import shutil
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -44,6 +45,7 @@ class SyncRuntime:
     verify_after_push: Callable[..., object]
     event_delta_requires_push: Callable[[Path, int], bool]
     dataset_write_lock: Callable[[Path], object]
+    event_log_lock: Callable[[Path], object]
     record_event: Callable[..., None]
 
 
@@ -199,6 +201,7 @@ def execute_pull_file(
 def execute_push(root: Path, dataset: str, remote_name: str, opts, *, runtime: SyncRuntime) -> DiffSummary:
     remote = _remote_for_name(runtime, remote_name)
     runtime.ensure_sidecar_verify_compatible(opts)
+    src = Path(root) / dataset
 
     summary, _ = runtime.plan_diff_with_remote(
         remote,
@@ -210,11 +213,12 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
     if not summary.primary_local.exists:
         raise VerificationError(f"Refusing push for dataset '{dataset}': local records.parquet is missing.")
     if not summary.has_change and summary.primary_remote.exists:
-        src = Path(root) / dataset
-        if not runtime.event_delta_requires_push(src / ".events.log", summary.events_remote_lines):
+        if opts.primary_only:
             return summary
+        with runtime.event_log_lock(src / ".events.log"):
+            if not runtime.event_delta_requires_push(src / ".events.log", summary.events_remote_lines):
+                return summary
 
-    src = Path(root) / dataset
     if opts.dry_run:
         remote.push_from_local(
             dataset,
@@ -227,43 +231,54 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
 
     with runtime.dataset_write_lock(src):
         with runtime.remote_dataset_lock(remote, dataset):
-            summary, _ = runtime.plan_diff_with_remote(
-                remote,
-                root,
-                dataset,
-                verify=opts.verify,
-                include_derived_hashes=opts.verify_derived_hashes,
-            )
-            if not summary.primary_local.exists:
-                raise VerificationError(f"Refusing push for dataset '{dataset}': local records.parquet is missing.")
-            if not summary.has_change and summary.primary_remote.exists:
-                if not runtime.event_delta_requires_push(src / ".events.log", summary.events_remote_lines):
-                    return summary
-
-            local_sidecars = (
-                local_sidecar_state(src, include_derived_hashes=opts.verify_derived_hashes)
-                if opts.verify_sidecars
-                else None
-            )
-            remote.push_from_local(
-                dataset,
-                src,
-                primary_only=opts.primary_only,
-                skip_snapshots=opts.skip_snapshots,
-                dry_run=False,
-            )
-            remote_after = runtime.verify_after_push(
-                remote,
-                dataset,
-                summary,
-                include_derived_hashes=opts.verify_derived_hashes,
-            )
-            if opts.verify_sidecars and local_sidecars is not None:
-                verify_sidecar_state_match(
-                    local_sidecars,
-                    remote_sidecar_state(remote_after, include_derived_hashes=opts.verify_derived_hashes),
-                    context="post-push-sidecars",
+            # Full-transfer lock order is local dataset, remote dataset, local
+            # event log, then the remote event log acquired inside rsync. All
+            # sync paths use this direction so direct event writers cannot form
+            # a local/remote lock cycle.
+            local_event_lock = nullcontext() if opts.primary_only else runtime.event_log_lock(src / ".events.log")
+            with local_event_lock:
+                summary, _ = runtime.plan_diff_with_remote(
+                    remote,
+                    root,
+                    dataset,
+                    verify=opts.verify,
+                    include_derived_hashes=opts.verify_derived_hashes,
                 )
+                if not summary.primary_local.exists:
+                    raise VerificationError(f"Refusing push for dataset '{dataset}': local records.parquet is missing.")
+                if not summary.has_change and summary.primary_remote.exists:
+                    if opts.primary_only or not runtime.event_delta_requires_push(
+                        src / ".events.log", summary.events_remote_lines
+                    ):
+                        return summary
+
+                local_sidecars = (
+                    local_sidecar_state(src, include_derived_hashes=opts.verify_derived_hashes)
+                    if opts.verify_sidecars
+                    else None
+                )
+                remote.push_from_local(
+                    dataset,
+                    src,
+                    primary_only=opts.primary_only,
+                    skip_snapshots=opts.skip_snapshots,
+                    dry_run=False,
+                )
+                remote_after = runtime.verify_after_push(
+                    remote,
+                    dataset,
+                    summary,
+                    include_derived_hashes=opts.verify_derived_hashes,
+                )
+                if opts.verify_sidecars and local_sidecars is not None:
+                    verify_sidecar_state_match(
+                        local_sidecars,
+                        remote_sidecar_state(remote_after, include_derived_hashes=opts.verify_derived_hashes),
+                        context="post-push-sidecars",
+                    )
+
+            # The audit event belongs to the next local revision and therefore
+            # must be recorded only after the transferred revision is unlocked.
             runtime.record_event(
                 src / ".events.log",
                 "push",

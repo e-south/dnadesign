@@ -18,6 +18,7 @@ from pathlib import Path
 
 from ..contracts import VerificationError
 from ..events import record_event
+from ..events.append import event_log_lock
 from ..storage.locking import dataset_write_lock
 from .remote import execution as sync_execution
 from .remote.config import get_remote
@@ -147,6 +148,7 @@ def _runtime() -> sync_execution.SyncRuntime:
             remote_lines=remote_lines,
         ),
         dataset_write_lock=dataset_write_lock,
+        event_log_lock=event_log_lock,
         record_event=record_event,
     )
 
