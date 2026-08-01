@@ -21,6 +21,7 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 )
 
 _METASTUDY_ROOT = Path(__file__).parents[3] / "reporter_response" / "metastudy"
+_TEST_ROOT = Path(__file__).parent
 _CONTRACTS_ROOT = _METASTUDY_ROOT / "contracts"
 _EVALUATION_ROOT = _METASTUDY_ROOT / "evaluation"
 _OPERATOR_ROOT = _METASTUDY_ROOT / "operator"
@@ -62,6 +63,40 @@ _OPERATOR_LINE_BUDGETS = {
     "persistence.py": 160,
     "regeneration.py": 320,
     "state.py": 330,
+}
+_MATERIALIZE_TEST_ROOT = _TEST_ROOT / "materialize"
+_EXPECTED_MATERIALIZE_TEST_MODULES = {
+    "__init__.py",
+    "_support.py",
+    "test_identity.py",
+    "test_profiles.py",
+    "test_service.py",
+    "test_temporal.py",
+}
+_MATERIALIZE_TEST_LINE_BUDGETS = {
+    "__init__.py": 20,
+    "_support.py": 340,
+    "test_identity.py": 380,
+    "test_profiles.py": 370,
+    "test_service.py": 150,
+    "test_temporal.py": 150,
+}
+_OPERATOR_TEST_ROOT = _TEST_ROOT / "operator"
+_EXPECTED_OPERATOR_TEST_MODULES = {
+    "__init__.py",
+    "_support.py",
+    "test_cli.py",
+    "test_persistence.py",
+    "test_regeneration.py",
+    "test_state.py",
+}
+_OPERATOR_TEST_LINE_BUDGETS = {
+    "__init__.py": 20,
+    "_support.py": 200,
+    "test_cli.py": 100,
+    "test_persistence.py": 120,
+    "test_regeneration.py": 380,
+    "test_state.py": 200,
 }
 
 
@@ -140,6 +175,22 @@ def test_operator_facade_exposes_only_supported_operator_names() -> None:
         "validate_source_controlled_state",
         "write_source_controlled_state",
     }
+
+
+def test_materialization_tests_are_split_by_behavior_owner() -> None:
+    assert not (_TEST_ROOT / "test_materialize.py").exists()
+    assert {path.name for path in _MATERIALIZE_TEST_ROOT.glob("*.py")} == _EXPECTED_MATERIALIZE_TEST_MODULES
+    for filename, line_budget in _MATERIALIZE_TEST_LINE_BUDGETS.items():
+        line_count = len((_MATERIALIZE_TEST_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line test-owner budget"
+
+
+def test_operator_tests_are_split_by_behavior_owner() -> None:
+    assert not (_TEST_ROOT / "test_operator.py").exists()
+    assert {path.name for path in _OPERATOR_TEST_ROOT.glob("*.py")} == _EXPECTED_OPERATOR_TEST_MODULES
+    for filename, line_budget in _OPERATOR_TEST_LINE_BUDGETS.items():
+        line_count = len((_OPERATOR_TEST_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line test-owner budget"
 
 
 def test_production_leaves_import_contract_owners_not_facade() -> None:
