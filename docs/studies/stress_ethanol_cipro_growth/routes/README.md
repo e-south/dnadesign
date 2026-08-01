@@ -31,7 +31,7 @@ Each step verifies its input before publishing the next artifact.
 
 | Step | Owner | Input and output | Open next |
 | --- | --- | --- | --- |
-| Measured records | Reader | Raw assay sources become verified measurement, event-window, and plot records. Reader does not assign study candidates or objectives. | [Study observation adapter](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/README.md) |
+| Measured records and assay review | Reader plus the stress-study display adapter | Raw assay sources become verified measurement, event-window, and plot records. The study adapter verifies and presents the pinned Reader plot without assigning candidates, labels, or objectives. | [Reader evidence display](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/reader_promoter_evidence/README.md) |
 | Candidate identity | Stress study | Reader aliases resolve to exact promoter candidates and sequence digests. | [Candidate bindings](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/promoter_candidate_bindings/README.md) |
 | Candidate observations | Stress study | Verified Reader reductions plus explicit repeat decisions become objective-neutral candidate observations. | [Response-window observations](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/README.md) |
 | Candidate features | Stress study and LatentDNA | The candidate table binds each candidate to the selected fixed-length model input. | [Candidate-table contract](../contexts/opal/candidate-table.md) |

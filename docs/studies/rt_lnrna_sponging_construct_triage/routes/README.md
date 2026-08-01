@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-routes
 surface: study-route-map
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 entrypoint: self
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -63,5 +63,7 @@ known, not as a competing navigation surface.
 - Infer owns feature aliases and vector sidecars.
 - LatentDNA reviews geometry from current Infer sidecars.
 - OPAL starts only after one construct-subject table has one fixed-size vector
-  `X`, the meta-study has defined a constrained objective, and comparable
-  uncertainty-bearing reporter-response profiles exist.
+  `X`, the reporter-response study has activated a constrained objective under
+  [its evidence policy](../contexts/reporter-response-evidence.md), and
+  comparable uncertainty-bearing profiles exist. The meta-study selects only
+  the descriptive reduction.

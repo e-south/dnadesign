@@ -43,10 +43,11 @@ Reader canonical records
 ```
 
 Each arrow is a verified artifact boundary, not a second runtime lifecycle.
-Reader owns assay records and plots; the study owns identity and observation
-policy; OPAL owns labels, model fitting, scoring, and campaign ledgers; the
-study owns the physical handoff. The completed round remains digest-pinned and
-must not be regenerated merely because the future Reader adapter changed.
+Reader owns assay records and plots. The study owns identity, observation
+policy, and immutable label publication. OPAL verifies and consumes those
+labels and owns model fitting, scoring, and campaign ledgers; the study owns
+the physical handoff. The completed round remains digest-pinned and must not
+be regenerated merely because the future Reader adapter changed.
 
 ### Route coordinates
 
@@ -89,9 +90,9 @@ support or prospective enrichment; `model_support_ready` remains false.
 
 ### Boundaries
 
-- OPAL consumes the study-owned candidate table and owns labels, fitting,
-  scoring, selection, and ledgers; it does not own DenseGen/Construct/Infer
-  lineage or physical synthesis.
+- OPAL consumes the study-owned candidate table and label publication, then
+  owns fitting, scoring, selection, and campaign ledgers. It does not own label
+  truth, DenseGen/Construct/Infer lineage, or physical synthesis.
 - The unified notebook renders registered manifests. Study evidence and
   per-record provenance remain study-owned and read-only.
 - Prune shared USR data only by campaign scope. A selection view owns one
