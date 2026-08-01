@@ -33,10 +33,13 @@ def test_dataset_attach_and_write_overlay_delegate_to_overlay_package() -> None:
     attach_source = inspect.getsource(Dataset.attach)
     write_overlay_source = inspect.getsource(Dataset.write_overlay)
     write_part_source = inspect.getsource(Dataset.write_overlay_part)
+    create_overlay_source = inspect.getsource(Dataset.create_overlay)
 
     assert "attach_dataset(" in attach_source
     assert "write_overlay_dataset(" in write_overlay_source
     assert "write_overlay_part_dataset(" in write_part_source
+    assert "write_overlay_part_dataset(" in create_overlay_source
+    assert "create_only=True" in create_overlay_source
 
 
 def test_overlay_table_from_registry_preserves_ndarray_lists_and_string_nulls(tmp_path: Path) -> None:

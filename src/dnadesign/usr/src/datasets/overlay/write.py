@@ -128,10 +128,11 @@ def write_overlay_part_dataset(
     allow_missing: bool = False,
     actor: Optional[dict] = None,
     event_args: Mapping[str, object] | None = None,
+    create_only: bool = False,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
 ) -> int:
-    """Append an overlay part file under _derived/<namespace>/part-*.parquet."""
+    """Write an overlay part, optionally requiring an absent namespace."""
     dataset._require_exists()
     if namespace in reserved_namespaces:
         raise NamespaceError(f"Namespace '{namespace}' is reserved.")
@@ -309,5 +310,7 @@ def write_overlay_part_dataset(
         return rows_written
 
     with write_lock(dataset.dir):
+        if create_only and (file_path.exists() or dir_path.exists()):
+            raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.")
         dataset._auto_freeze_registry()
         return _write_part()
