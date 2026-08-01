@@ -77,15 +77,19 @@ def _publish_bundle(publication: _BundlePublication) -> None:
         raise SchemaError(str(exc).replace("Artifact bundle", "Render bundle")) from exc
 
 
-def _iter_records(job: RenderJobV4, report: RunReport) -> Iterator[Record]:
+def _iter_records(job: RenderJobV4, report: RunReport, *, source_content: bytes) -> Iterator[Record]:
     adapter = build_adapter(job.input.adapter, alphabet=job.input.alphabet)
     transforms = load_transforms(job.pipeline.plugins)
     if job.input.kind == "parquet":
-        rows: Iterable[dict] = iter_parquet_rows(job.input.path, columns=required_source_columns(job.input.adapter))
+        rows: Iterable[dict] = iter_parquet_rows(
+            job.input.path,
+            columns=required_source_columns(job.input.adapter),
+            content=source_content,
+        )
     elif job.input.kind == "json":
-        rows = iter_json_rows(job.input.path)
+        rows = iter_json_rows(job.input.path, content=source_content)
     else:
-        rows = iter_jsonl_rows(job.input.path)
+        rows = iter_jsonl_rows(job.input.path, content=source_content)
 
     for row_index, row in enumerate(rows):
         report.total_rows_seen += 1
@@ -157,10 +161,18 @@ def run_render_job(
 
     palette = Palette(style.palette)
 
-    records: Iterable[Record] | list[Record] = _iter_records(job, report)
+    records: Iterable[Record] | list[Record] = _iter_records(
+        job,
+        report,
+        source_content=report.source_content("input"),
+    )
 
     if job.selection is not None:
-        selected, missing = apply_selection(list(records), job.selection)
+        selected, missing = apply_selection(
+            list(records),
+            job.selection,
+            source_content=report.source_content("selection"),
+        )
         report.missing_selection_keys = missing
         enforce_selection_policy(job.selection, missing)
         records = selected
@@ -168,6 +180,7 @@ def run_render_job(
         records = _sample_or_limit_unselected(records, job)
 
     records = _materialize_before_strict_outputs(records, job, report)
+    report.release_source_content()
 
     publication = _prepare_bundle_publication(job.bundle.path)
     original_job = job

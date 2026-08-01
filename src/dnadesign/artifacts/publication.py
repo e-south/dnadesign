@@ -16,7 +16,6 @@ import errno
 import hashlib
 import json
 import os
-import re
 import shutil
 import socket
 import stat
@@ -31,6 +30,7 @@ from .errors import PublicationError
 from .owned_directory import (
     descriptor_matches_entry,
     owner_matches_descriptor,
+    read_owner_from_descriptor,
     remove_owned_directory,
     remove_owned_named_directory,
 )
@@ -96,17 +96,6 @@ def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
     except FileNotFoundError:
         return False
     return True
-
-
-def _remove_entry_at(parent_descriptor: int, name: str) -> None:
-    try:
-        entry_stat = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
-    except FileNotFoundError:
-        return
-    if stat.S_ISDIR(entry_stat.st_mode):
-        shutil.rmtree(name, dir_fd=parent_descriptor)
-    else:
-        os.unlink(name, dir_fd=parent_descriptor)
 
 
 def _copy_file(source: Path, parent_descriptor: int, name: str) -> None:
@@ -244,17 +233,62 @@ def _is_recoverable_stale_stage(path: Path, *, final: Path, uid: int | None) -> 
         if not stat.S_ISREG(owner_stat.st_mode):
             return False
         payload = json.loads(owner_path.read_text(encoding="utf-8"))
-        owner_pid = int(payload.get("pid", -1))
     except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
         return False
-    expected = hashlib.sha256(os.fsencode(final)).hexdigest()
+    return isinstance(payload, dict) and _owner_payload_is_recoverable(payload, final=final, uid=uid)
+
+
+def _owner_payload_is_recoverable(
+    payload: dict[str, object],
+    *,
+    final: Path,
+    uid: int | None,
+) -> bool:
+    try:
+        owner_pid = int(payload.get("pid", -1))
+    except (TypeError, ValueError):
+        return False
     return (
         payload.get("schema") == "dnadesign.artifact_publication_owner.v1"
-        and payload.get("target_sha256") == expected
+        and payload.get("target_sha256") == hashlib.sha256(os.fsencode(final)).hexdigest()
         and payload.get("uid") == uid
         and payload.get("host") == socket.gethostname()
         and not _pid_is_alive(owner_pid)
     )
+
+
+def _remove_recoverable_stale_stage(
+    parent_descriptor: int,
+    name: str,
+    *,
+    final: Path,
+    uid: int | None,
+) -> bool:
+    """Remove a stale stage only after descriptor-anchored owner revalidation."""
+
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(name, flags, dir_fd=parent_descriptor)
+    except OSError:
+        return False
+    try:
+        entry_stat = os.fstat(descriptor)
+        if uid is not None and entry_stat.st_uid != uid:
+            return False
+        observed_owner = read_owner_from_descriptor(descriptor, owner_file=_OWNER_FILE)
+        if observed_owner is None or not _owner_payload_is_recoverable(observed_owner, final=final, uid=uid):
+            return False
+        return remove_owned_directory(
+            parent_descriptor,
+            name,
+            descriptor,
+            observed_owner,
+            owner_file=_OWNER_FILE,
+        )
+    finally:
+        os.close(descriptor)
 
 
 def _bounded_named_candidates(directory: Path, *, prefix: str) -> list[Path]:
@@ -268,19 +302,8 @@ def _bounded_named_candidates(directory: Path, *, prefix: str) -> list[Path]:
     return candidates
 
 
-def _is_recoverable_adjacent_stage(path: Path, *, final: Path, uid: int | None, prefix: str) -> bool:
-    if _is_recoverable_stale_stage(path, final=final, uid=uid):
-        return True
-    if uid is None:
-        return False
-    try:
-        entry_stat = path.lstat()
-    except OSError:
-        return False
-    if not stat.S_ISDIR(entry_stat.st_mode) or entry_stat.st_uid != uid:
-        return False
-    match = re.fullmatch(rf"{re.escape(prefix)}u(?P<uid>\d+)-p(?P<pid>\d+)-[0-9a-f]{{32}}", path.name)
-    return match is not None and int(match.group("uid")) == uid and not _pid_is_alive(int(match.group("pid")))
+def _is_recoverable_adjacent_stage(path: Path, *, final: Path, uid: int | None) -> bool:
+    return _is_recoverable_stale_stage(path, final=final, uid=uid)
 
 
 @dataclass
@@ -311,9 +334,13 @@ class CreateOnlyDirectoryPublication:
                     candidate,
                     final=final,
                     uid=uid if isinstance(uid, int) else None,
-                    prefix=adjacent_prefix,
                 ):
-                    _remove_entry_at(parent_descriptor, candidate.name)
+                    _remove_recoverable_stale_stage(
+                        parent_descriptor,
+                        candidate.name,
+                        final=final,
+                        uid=uid if isinstance(uid, int) else None,
+                    )
             private_parent = Path(tempfile.gettempdir()) / f"dnadesign-artifact-publication-{uid}"
             try:
                 private_parent.mkdir(mode=0o700)
@@ -326,9 +353,25 @@ class CreateOnlyDirectoryPublication:
                 ):
                     raise PublicationError(f"Private publication staging root is not owner-only: {private_parent}")
             private_prefix = f"stage-{target_digest[:16]}-"
-            for candidate in _bounded_named_candidates(private_parent, prefix=private_prefix):
-                if _is_recoverable_stale_stage(candidate, final=final, uid=uid if isinstance(uid, int) else None):
-                    shutil.rmtree(candidate)
+            private_flags = os.O_RDONLY | os.O_DIRECTORY
+            if hasattr(os, "O_NOFOLLOW"):
+                private_flags |= os.O_NOFOLLOW
+            private_descriptor = os.open(private_parent, private_flags)
+            try:
+                for candidate in _bounded_named_candidates(private_parent, prefix=private_prefix):
+                    if _is_recoverable_stale_stage(
+                        candidate,
+                        final=final,
+                        uid=uid if isinstance(uid, int) else None,
+                    ):
+                        _remove_recoverable_stale_stage(
+                            private_descriptor,
+                            candidate.name,
+                            final=final,
+                            uid=uid if isinstance(uid, int) else None,
+                        )
+            finally:
+                os.close(private_descriptor)
             stage = Path(tempfile.mkdtemp(prefix=private_prefix, dir=private_parent))
             stage.chmod(_PRIVATE_DIRECTORY_MODE)
             _write_owner(stage / _OWNER_FILE, owner)

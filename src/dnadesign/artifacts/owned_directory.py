@@ -28,30 +28,38 @@ def descriptor_matches_entry(parent_descriptor: int, name: str, descriptor: int)
     )
 
 
-def owner_matches_descriptor(
+def read_owner_from_descriptor(
     descriptor: int,
-    expected: dict[str, object],
     *,
     owner_file: str,
-) -> bool:
+) -> dict[str, object] | None:
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
         owner_descriptor = os.open(owner_file, flags, dir_fd=descriptor)
     except OSError:
-        return False
+        return None
     try:
         owner_stat = os.fstat(owner_descriptor)
         if not stat.S_ISREG(owner_stat.st_mode):
-            return False
+            return None
         with os.fdopen(os.dup(owner_descriptor), "r", encoding="utf-8") as handle:
             observed = json.load(handle)
-        return observed == expected
+        return observed if isinstance(observed, dict) else None
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        return False
+        return None
     finally:
         os.close(owner_descriptor)
+
+
+def owner_matches_descriptor(
+    descriptor: int,
+    expected: dict[str, object],
+    *,
+    owner_file: str,
+) -> bool:
+    return read_owner_from_descriptor(descriptor, owner_file=owner_file) == expected
 
 
 def _remove_contents(descriptor: int) -> None:
@@ -121,6 +129,7 @@ def remove_owned_named_directory(
 __all__ = [
     "descriptor_matches_entry",
     "owner_matches_descriptor",
+    "read_owner_from_descriptor",
     "remove_owned_directory",
     "remove_owned_named_directory",
 ]

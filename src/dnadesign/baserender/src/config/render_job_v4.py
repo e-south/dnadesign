@@ -686,6 +686,10 @@ def _resolve_output_file(
 
 def _ensure_not_reserved_bundle_metadata(path: Path, *, bundle_root: Path, field: str) -> None:
     relative_identity = portable_path_identity(path.relative_to(bundle_root))
+    owner_name = ".dnadesign-publication-owner.json"
+    owner_identity = portable_path_identity(owner_name)[0]
+    if owner_identity in relative_identity:
+        raise SchemaError(f"{field} is reserved for bundle publication metadata: {owner_name}")
     for name in _RESERVED_BUNDLE_METADATA_NAMES:
         reserved_identity = portable_path_identity(name)
         if relative_identity == reserved_identity:

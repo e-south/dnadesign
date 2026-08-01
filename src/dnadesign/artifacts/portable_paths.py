@@ -66,6 +66,13 @@ def validate_publication_metadata_paths(
             f"{required_manifest}"
         )
     entries = _entries_by_identity(stage)
+    owner_identity = portable_path_identity(Path(owner_file))[0]
+    for identity, entry in entries.items():
+        relative = entry.relative_to(stage)
+        if owner_identity in identity and relative != Path(owner_file):
+            raise PublicationError(
+                f"Artifact bundle staging contains a reserved publication owner metadata name: {relative}"
+            )
     reserved = (canonical_manifest, Path(owner_file))
     for canonical in reserved:
         match = entries.get(portable_path_identity(canonical))

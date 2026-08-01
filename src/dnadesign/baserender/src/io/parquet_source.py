@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -26,13 +27,19 @@ def _ensure_pyarrow():
         raise SchemaError("Reading Parquet requires pyarrow to be installed and importable.") from exc
 
 
-def iter_parquet_rows(path: str | Path, columns: Sequence[str], batch_size: int = 4096) -> Iterable[dict]:
+def iter_parquet_rows(
+    path: str | Path,
+    columns: Sequence[str],
+    batch_size: int = 4096,
+    *,
+    content: bytes | None = None,
+) -> Iterable[dict]:
     pq = _ensure_pyarrow()
     p = Path(path)
-    if not p.exists():
+    if content is None and not p.exists():
         raise SchemaError(f"Parquet input does not exist: {p}")
 
-    pf = pq.ParquetFile(p)
+    pf = pq.ParquetFile(p if content is None else BytesIO(content))
     schema_names = set(pf.schema_arrow.names)
     required = [str(c) for c in columns]
     missing = [c for c in required if c not in schema_names]

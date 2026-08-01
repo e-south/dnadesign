@@ -18,12 +18,23 @@ from typing import Iterable
 from ..core import SchemaError
 
 
-def iter_json_rows(path: str | Path) -> Iterable[dict]:
-    p = Path(path)
-    if not p.exists():
-        raise SchemaError(f"JSON input does not exist: {p}")
+def _text(path: Path, *, content: bytes | None, kind: str) -> str:
+    if content is None:
+        if not path.exists():
+            raise SchemaError(f"{kind} input does not exist: {path}")
+        return path.read_text(encoding="utf-8")
     try:
-        payload = json.loads(p.read_text(encoding="utf-8"))
+        return content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SchemaError(f"Could not decode {kind} input as UTF-8: {path}") from exc
+
+
+def iter_json_rows(path: str | Path, *, content: bytes | None = None) -> Iterable[dict]:
+    p = Path(path)
+    try:
+        payload = json.loads(_text(p, content=content, kind="JSON"))
+    except SchemaError:
+        raise
     except Exception as exc:
         raise SchemaError(f"Could not parse JSON input: {p}") from exc
     if isinstance(payload, dict):
@@ -38,19 +49,16 @@ def iter_json_rows(path: str | Path) -> Iterable[dict]:
     raise SchemaError("JSON input must contain a single object or an array of objects")
 
 
-def iter_jsonl_rows(path: str | Path) -> Iterable[dict]:
+def iter_jsonl_rows(path: str | Path, *, content: bytes | None = None) -> Iterable[dict]:
     p = Path(path)
-    if not p.exists():
-        raise SchemaError(f"JSONL input does not exist: {p}")
-    with p.open("r", encoding="utf-8") as handle:
-        for line_number, raw_line in enumerate(handle, start=1):
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception as exc:
-                raise SchemaError(f"Could not parse JSONL line {line_number} in {p}") from exc
-            if not isinstance(payload, dict):
-                raise SchemaError(f"JSONL line {line_number} must be an object")
-            yield payload
+    for line_number, raw_line in enumerate(_text(p, content=content, kind="JSONL").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except Exception as exc:
+            raise SchemaError(f"Could not parse JSONL line {line_number} in {p}") from exc
+        if not isinstance(payload, dict):
+            raise SchemaError(f"JSONL line {line_number} must be an object")
+        yield payload

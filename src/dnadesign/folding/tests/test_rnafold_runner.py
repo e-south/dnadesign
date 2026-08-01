@@ -730,6 +730,29 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert not list(output_dir.parent.glob(f".{output_dir.name}.staging-*"))
 
 
+def test_publish_viennarna_structure_svg_rejects_symlinked_output_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assembled_path, sequence_sha256 = _write_assembled_sequence(tmp_path, sequence=_CONTIGUOUS_STEM_SEQUENCE)
+    prediction = _contiguous_stem_prediction(sequence_sha256=sequence_sha256)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    redirect = tmp_path / "redirect"
+    redirect.symlink_to(outside, target_is_directory=True)
+    requested_output = redirect / "visual" / "viennarna_secondary_structure"
+    monkeypatch.setattr("dnadesign.folding.src.viennarna_plot.importlib.import_module", lambda _name: object())
+
+    with pytest.raises(FoldingConfigError, match="symlinked path component"):
+        publish_viennarna_structure_svg(
+            prediction,
+            assembled_sequence_path=assembled_path,
+            output_dir=requested_output,
+        )
+
+    assert not (outside / "visual").exists()
+
+
 @pytest.mark.parametrize("mutated_source", ["prediction", "visual_contract"])
 def test_publish_viennarna_structure_svg_rejects_source_mutation_during_svg_write(
     tmp_path: Path,

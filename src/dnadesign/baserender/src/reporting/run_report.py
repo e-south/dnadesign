@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import stat
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from ..io.captured_source import CapturedSource
 
 
 def _sha256_file(path: Path) -> str:
@@ -26,46 +26,6 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-@dataclass(frozen=True)
-class _SourceEvidence:
-    sha256: str
-    bytes: int
-    fingerprint: tuple[int, int, int, int, int]
-
-    def portable(self) -> dict[str, int | str]:
-        return {"sha256": self.sha256, "bytes": self.bytes}
-
-
-def _capture_source_evidence(path: Path) -> _SourceEvidence:
-    flags = os.O_RDONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
-        raise ValueError(f"Render source is unavailable or unsafe: {path}") from exc
-    try:
-        before = os.fstat(descriptor)
-        if not stat.S_ISREG(before.st_mode):
-            raise ValueError(f"Render source is unavailable or unsafe: {path}")
-        digest = hashlib.sha256()
-        with os.fdopen(os.dup(descriptor), "rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-        after = os.fstat(descriptor)
-        before_fingerprint = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-        after_fingerprint = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
-        if before_fingerprint != after_fingerprint:
-            raise ValueError(f"Render source changed while evidence was captured: {path}")
-        return _SourceEvidence(
-            sha256=digest.hexdigest(),
-            bytes=after.st_size,
-            fingerprint=after_fingerprint,
-        )
-    finally:
-        os.close(descriptor)
 
 
 @dataclass
@@ -80,7 +40,7 @@ class RunReport:
     missing_selection_keys: list[str] = field(default_factory=list)
     outputs: dict[str, str] = field(default_factory=dict)
     output_metrics: dict[str, dict[str, int | float | str]] = field(default_factory=dict)
-    _source_evidence: dict[str, _SourceEvidence] = field(default_factory=dict, init=False, repr=False)
+    _source_evidence: dict[str, CapturedSource] = field(default_factory=dict, init=False, repr=False)
 
     def note_skip_row(self, reason: str) -> None:
         self.skipped_rows_by_reason[reason] = self.skipped_rows_by_reason.get(reason, 0) + 1
@@ -92,9 +52,18 @@ class RunReport:
         return bool(self.skipped_rows_by_reason or self.skipped_records_by_reason or self.missing_selection_keys)
 
     def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload.pop("_source_evidence", None)
-        return payload
+        return {
+            "job_name": self.job_name,
+            "input_path": self.input_path,
+            "selection_path": self.selection_path,
+            "total_rows_seen": self.total_rows_seen,
+            "yielded_records": self.yielded_records,
+            "skipped_rows_by_reason": dict(self.skipped_rows_by_reason),
+            "skipped_records_by_reason": dict(self.skipped_records_by_reason),
+            "missing_selection_keys": list(self.missing_selection_keys),
+            "outputs": dict(self.outputs),
+            "output_metrics": {key: dict(value) for key, value in self.output_metrics.items()},
+        }
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2, sort_keys=True)
@@ -107,7 +76,18 @@ class RunReport:
         sources = {"input": self.input_path}
         if self.selection_path is not None:
             sources["selection"] = self.selection_path
-        self._source_evidence = {label: _capture_source_evidence(Path(source)) for label, source in sources.items()}
+        self._source_evidence = {label: CapturedSource.capture(source) for label, source in sources.items()}
+
+    def source_content(self, label: str) -> bytes:
+        evidence = self._source_evidence.get(label)
+        if evidence is None:
+            raise ValueError(f"Render source evidence was not captured for {label}")
+        if evidence.content is None:
+            raise ValueError(f"Render source bytes were already released for {label}")
+        return evidence.content
+
+    def release_source_content(self) -> None:
+        self._source_evidence = {label: evidence.without_content() for label, evidence in self._source_evidence.items()}
 
     def verify_source_evidence(self) -> None:
         if not self._source_evidence:
@@ -117,8 +97,9 @@ class RunReport:
             sources["selection"] = self.selection_path
         for label, source in sources.items():
             expected = self._source_evidence.get(label)
-            if expected is None or _capture_source_evidence(Path(source)) != expected:
+            if expected is None:
                 raise ValueError(f"Render source changed during execution: {source}")
+            expected.verify_unchanged()
 
     def write_portable_manifest(self, path: Path, *, bundle_root: Path, staging_root: Path) -> None:
         """Write the portable, complete catalog for one immutable render bundle."""
@@ -139,7 +120,7 @@ class RunReport:
 
         artifacts: list[dict[str, int | str]] = []
         for artifact in sorted(staging_root.rglob("*")):
-            if artifact == path or artifact.name == ".dnadesign-publication-owner.json":
+            if artifact == path or artifact == staging_root / ".dnadesign-publication-owner.json":
                 continue
             if artifact.is_symlink() or not artifact.is_file():
                 continue
@@ -166,7 +147,7 @@ class RunReport:
             "outputs": portable_outputs,
             "output_metrics": self.output_metrics,
             "artifact_inventory": {
-                "scope": "all_regular_files_except_this_manifest",
+                "scope": "all_published_regular_files_except_this_manifest",
                 "artifacts": artifacts,
             },
         }

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -87,6 +88,85 @@ def test_images_output_publishes_one_manifested_bundle(tmp_path: Path) -> None:
         if path.is_file() and path.name != "manifest.json"
     }
     assert all(len(item["sha256"]) == 64 and item["bytes"] > 0 for item in artifacts)
+
+
+def test_render_uses_the_exact_input_bytes_recorded_in_the_manifest(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from dnadesign.baserender.src.reporting import RunReport
+
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    parquet = _make_input_parquet(source_dir)
+    expected_source_sha256 = hashlib.sha256(parquet.read_bytes()).hexdigest()
+
+    replacement_dir = tmp_path / "replacement"
+    replacement_dir.mkdir()
+    write_parquet(
+        replacement_dir / parquet.name,
+        [
+            {
+                "id": "replacement",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [],
+                "details": "replacement row",
+            }
+        ],
+    )
+    original_dir = tmp_path / "captured-source"
+    consumed_replacement_dir = tmp_path / "consumed-replacement"
+    swapped = False
+
+    real_capture = RunReport.capture_source_evidence
+    real_verify = RunReport.verify_source_evidence
+
+    def _capture_then_swap(self: RunReport) -> None:
+        nonlocal swapped
+        real_capture(self)
+        source_dir.rename(original_dir)
+        replacement_dir.rename(source_dir)
+        swapped = True
+
+    def _restore_then_verify(self: RunReport) -> None:
+        nonlocal swapped
+        if swapped:
+            source_dir.rename(consumed_replacement_dir)
+            original_dir.rename(source_dir)
+            swapped = False
+        real_verify(self)
+
+    monkeypatch.setattr(RunReport, "capture_source_evidence", _capture_then_swap)
+    monkeypatch.setattr(RunReport, "verify_source_evidence", _restore_then_verify)
+
+    def _write_record_id(records, *, output, renderer_name, style, palette):
+        del renderer_name, style, palette
+        assert output.dir is not None
+        output.dir.mkdir(parents=True, exist_ok=True)
+        (output.dir / "record-id.txt").write_text(records[0].id + "\n", encoding="utf-8")
+        return output.dir
+
+    monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _write_record_id)
+    bundle = tmp_path / "results" / "render-v1"
+    job_path = write_job(
+        tmp_path / "captured-input.yaml",
+        densegen_job_payload(
+            parquet_path=parquet,
+            bundle_path=bundle,
+            outputs=[{"kind": "images", "fmt": "png"}],
+        ),
+    )
+
+    try:
+        run_render_job(str(job_path))
+    finally:
+        if swapped:
+            source_dir.rename(consumed_replacement_dir)
+            original_dir.rename(source_dir)
+
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["sources"]["input"]["sha256"] == expected_source_sha256
+    assert (bundle / "images" / "record-id.txt").read_text(encoding="utf-8") == "r1\n"
 
 
 def test_portable_manifest_fails_when_source_evidence_is_unavailable(tmp_path: Path) -> None:
@@ -671,7 +751,7 @@ finally:
 
 
 @pytest.mark.skipif(os.name != "posix", reason="requires POSIX process termination")
-def test_killed_copy_never_exposes_final_and_stale_stage_cannot_block_retry(tmp_path: Path) -> None:
+def test_ownerless_killed_copy_is_left_safely_and_cannot_block_retry(tmp_path: Path) -> None:
     from dnadesign.baserender.src.execution.runner import _prepare_bundle_publication, _publish_bundle
 
     bundle = tmp_path / "results" / "render-v1"
@@ -721,7 +801,8 @@ signal.pause()
             os.close(retry.parent_descriptor)
 
         assert (bundle / "manifest.json").read_text(encoding="utf-8") == "retry"
-        assert not stale[0].exists()
+        assert stale[0].is_dir()
+        assert not (stale[0] / ".dnadesign-publication-owner.json").exists()
     finally:
         if process.poll() is None:
             process.kill()

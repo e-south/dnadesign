@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,11 +62,14 @@ def _output_dir_for(request_path: Path, output_dir: Path | None) -> Path:
 
 
 def _plot_output_dir_for(prediction_path: Path, output_dir: Path) -> Path:
-    if output_dir.is_absolute():
-        return output_dir
-    if output_dir.parts and output_dir.parts[0] == "..":
-        return (prediction_path.parent / output_dir).resolve()
-    return output_dir.expanduser().resolve()
+    expanded = output_dir.expanduser()
+    if expanded.is_absolute():
+        candidate = expanded
+    elif expanded.parts and expanded.parts[0] == "..":
+        candidate = prediction_path.parent / expanded
+    else:
+        candidate = Path.cwd() / expanded
+    return Path(os.path.abspath(candidate))
 
 
 def _load_bundle(bundle: Path) -> _FoldingBundle:

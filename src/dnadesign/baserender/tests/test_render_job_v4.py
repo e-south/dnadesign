@@ -461,6 +461,8 @@ def test_bundle_path_rejects_symlinked_parent_without_creating_redirected_tree(t
         "MANIFEST.JSON",
         ".dnadesign-publication-owner.json",
         ".DNADESIGN-PUBLICATION-OWNER.JSON",
+        "images/.dnadesign-publication-owner.json",
+        "images/.DNADESIGN-PUBLICATION-OWNER.JSON",
     ],
 )
 def test_bundle_publication_metadata_paths_are_reserved(

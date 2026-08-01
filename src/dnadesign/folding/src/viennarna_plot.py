@@ -102,7 +102,7 @@ def publish_viennarna_structure_svg(
     except ImportError as exc:
         raise FoldingConfigError(f"ViennaRNA Python module '{python_module}' is not available: {exc}") from exc
 
-    output_path = Path(output_dir).expanduser().resolve()
+    output_path = Path(output_dir).expanduser()
     try:
         publication = CreateOnlyDirectoryPublication.prepare(output_path)
     except PublicationError as exc:

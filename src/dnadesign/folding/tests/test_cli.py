@@ -60,6 +60,24 @@ def test_plot_output_dir_parent_relative_paths_stay_bundle_relative(tmp_path: Pa
     assert output_dir == (tmp_path / "bundle" / "visual" / "viennarna_secondary_structure").resolve()
 
 
+def test_plot_output_dir_preserves_symlink_components_for_publication_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prediction = tmp_path / "prediction.json"
+    prediction.write_text("{}\n", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    redirect = tmp_path / "redirect"
+    redirect.symlink_to(outside, target_is_directory=True)
+    relative_output = Path("redirect") / "viennarna_secondary_structure"
+
+    monkeypatch.chdir(tmp_path)
+    output_dir = _plot_output_dir_for(prediction, relative_output)
+
+    assert output_dir == redirect / "viennarna_secondary_structure"
+
+
 def test_bundle_plot_output_rejects_symlinked_escape(tmp_path: Path) -> None:
     bundle_root = tmp_path / "bundle"
     bundle_root.mkdir()
