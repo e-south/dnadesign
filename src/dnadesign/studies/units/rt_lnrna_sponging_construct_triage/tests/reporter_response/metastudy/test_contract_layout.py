@@ -25,6 +25,7 @@ _TEST_ROOT = Path(__file__).parent
 _CONTRACTS_ROOT = _METASTUDY_ROOT / "contracts"
 _EVALUATION_ROOT = _METASTUDY_ROOT / "evaluation"
 _OPERATOR_ROOT = _METASTUDY_ROOT / "operator"
+_ACQUISITION_PROJECTION_ROOT = _METASTUDY_ROOT / "acquisition_projection"
 _EXPECTED_CONTRACT_MODULES = {
     "__init__.py",
     "_values.py",
@@ -105,6 +106,13 @@ _OPERATOR_TEST_LINE_BUDGETS = {
     "test_regeneration.py": 380,
     "test_state.py": 200,
 }
+_ACQUISITION_PROJECTION_LINE_BUDGETS = {
+    "__init__.py": 30,
+    "_values.py": 60,
+    "building.py": 220,
+    "contracts.py": 230,
+    "serialization.py": 130,
+}
 
 
 def test_contract_package_has_one_semantic_module_per_owner() -> None:
@@ -182,6 +190,16 @@ def test_operator_facade_exposes_only_supported_operator_names() -> None:
         "validate_source_controlled_state",
         "write_source_controlled_state",
     }
+
+
+def test_acquisition_projection_has_one_semantic_module_per_owner() -> None:
+    assert not (_METASTUDY_ROOT / "acquisition_projection.py").exists()
+    assert {path.name for path in _ACQUISITION_PROJECTION_ROOT.glob("*.py")} == set(
+        _ACQUISITION_PROJECTION_LINE_BUDGETS
+    )
+    for filename, line_budget in _ACQUISITION_PROJECTION_LINE_BUDGETS.items():
+        line_count = len((_ACQUISITION_PROJECTION_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 
 def test_materialization_tests_are_split_by_behavior_owner() -> None:

@@ -192,3 +192,43 @@ def test_publication_projection_rejects_empty_raw_identity_coordinate(field_name
 
     with pytest.raises(ValueError, match=rf"{field_name} must be non-empty text"):
         parse_profile_evidence_projection(row, index=0)
+
+
+def _rehashed_raw_profile_row() -> dict[str, object]:
+    evidence = _evidence(reference_normalized=False)
+    selected = evaluate_metastudy(evidence, readiness=_ready())
+    row = copy.deepcopy(decision_evidence_payload(evidence, decision=selected)["profiles"][0])
+    profile = row["profile"]
+    audit = row["audit"]
+    audit["profile_digest"] = canonical_digest(profile)
+    audit_without_digest = {key: value for key, value in audit.items() if key != "artifact_digest"}
+    audit["artifact_digest"] = canonical_digest(audit_without_digest)
+    return row
+
+
+def test_publication_projection_rejects_rehashed_raw_profile_without_baseline() -> None:
+    row = _rehashed_raw_profile_row()
+    row["profile"]["measurements"] = [
+        measurement for measurement in row["profile"]["measurements"] if measurement["role"] != "baseline"
+    ]
+    audit = row["audit"]
+    audit["profile_digest"] = canonical_digest(row["profile"])
+    audit["artifact_digest"] = canonical_digest(
+        {key: value for key, value in audit.items() if key != "artifact_digest"}
+    )
+
+    with pytest.raises(ValueError, match="baseline and dose observations"):
+        parse_profile_evidence_projection(row, index=0)
+
+
+def test_publication_projection_rejects_rehashed_raw_profile_comparability_forgery() -> None:
+    row = _rehashed_raw_profile_row()
+    row["profile"]["comparability_key"] = "sha256:" + "f" * 64
+    audit = row["audit"]
+    audit["profile_digest"] = canonical_digest(row["profile"])
+    audit["artifact_digest"] = canonical_digest(
+        {key: value for key, value in audit.items() if key != "artifact_digest"}
+    )
+
+    with pytest.raises(ValueError, match="comparability_key"):
+        parse_profile_evidence_projection(row, index=0)

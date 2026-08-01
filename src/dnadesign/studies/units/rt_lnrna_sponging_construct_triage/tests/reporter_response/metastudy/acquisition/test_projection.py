@@ -66,6 +66,43 @@ def test_acquisition_projection_keeps_single_acquisition_descriptive() -> None:
     assert coordinate.normalized_reporter_response.leave_one_acquisition_out_estimates == ()
 
 
+def test_acquisition_projection_preserves_raw_measurements_without_inventing_normalized_values() -> None:
+    projection = build_acquisition_projection(
+        _evidence(reference_normalized=False),
+        selected_reduction=(6.0, 10.0),
+    )
+
+    high = next(
+        row
+        for row in projection.coordinates
+        if row.subject_id == HIGH_ANCHOR and row.reduction_id == "window-6-10h" and row.dose_uM == 500.0
+    )
+    assert high.rfp.acquisition_count == 8
+    assert high.od600.acquisition_count == 8
+    assert high.rfp_over_od600.acquisition_count == 8
+    assert high.normalized_reporter_response is None
+    assert high.relative_od is None
+    assert all(row.normalized_reporter_response is None and row.relative_od is None for row in high.contributions)
+
+
+def test_acquisition_projection_keeps_raw_and_normalized_metric_spaces_distinct() -> None:
+    normalized = _evidence()
+    raw = _evidence(reference_normalized=False)
+    mixed = tuple(
+        raw_row if raw_row.profile.provenance.reader_experiment_id == KINETIC_IDS[0] else normalized_row
+        for normalized_row, raw_row in zip(normalized, raw, strict=True)
+    )
+
+    projection = build_acquisition_projection(mixed, selected_reduction=(6.0, 10.0))
+    high = tuple(
+        row
+        for row in projection.coordinates
+        if row.subject_id == HIGH_ANCHOR and row.reduction_id == "window-6-10h" and row.dose_uM == 500.0
+    )
+    assert len(high) == 2
+    assert {row.rfp is not None for row in high} == {False, True}
+
+
 def test_acquisition_projection_rejects_duplicate_acquisition_coordinate() -> None:
     source = _evidence()[0]
     with pytest.raises(MetastudyContractError, match="duplicate acquisition"):

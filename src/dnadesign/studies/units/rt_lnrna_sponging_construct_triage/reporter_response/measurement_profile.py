@@ -49,9 +49,7 @@ class ReferenceNormalizationUnavailable:
                     "an absent positive control cannot declare positive_control_condition_id"
                 )
         elif self.positive_control_condition_id is None:
-            raise ReporterResponseContractError(
-                "non-positive control separation requires the declared positive-control condition id"
-            )
+            raise ReporterResponseContractError("declared positive-control unavailability requires its condition id")
         else:
             required_text(
                 self.positive_control_condition_id,
@@ -77,84 +75,112 @@ class ReporterMeasurementProfile:
     comparability_key: str = field(init=False)
 
     def __post_init__(self) -> None:
-        from .profile import STUDY_ID
-
-        if self.contract_id != MEASUREMENT_PROFILE_CONTRACT_ID:
-            raise ReporterResponseContractError("measurement profile contract_id changed")
-        if self.study_id != STUDY_ID:
-            raise ReporterResponseContractError("measurement profile study_id changed")
-        required_text(self.profile_id, field_name="profile_id")
-        required_text(self.subject_id, field_name="subject_id")
         if not isinstance(self.provenance, ReaderEvidenceProvenance) or not self.provenance.is_source_closed:
             raise ReporterResponseContractError("measurement profile requires source-closed Reader provenance")
         self.provenance.require_bound_subject(self.subject_id)
-        if not isinstance(self.observation_policy, ReporterResponseObservationPolicy):
-            raise ReporterResponseContractError("observation_policy must be ReporterResponseObservationPolicy")
-        if not isinstance(self.reference_normalization, ReferenceNormalizationUnavailable):
-            raise ReporterResponseContractError("measurement profile must type why reference normalization is absent")
-        if not isinstance(self.eligibility, ProfileEligibility):
-            raise ReporterResponseContractError("eligibility must be ProfileEligibility")
-        dose_grid = ordered_dose_grid(self.dose_grid_uM)
-        if dose_grid != self.dose_grid_uM:
-            raise ReporterResponseContractError("dose_grid_uM must be stored as its canonical tuple")
-        rows = self.measurements
-        if not rows or not all(isinstance(row, ConditionMeasurement) for row in rows):
-            raise ReporterResponseContractError("measurement profile requires typed condition measurements")
-        if len({row.observation_id for row in rows}) != len(rows):
-            raise ReporterResponseContractError("measurement observation_id values must be unique")
-        baseline_rows = tuple(row for row in rows if row.role == "baseline")
-        positive_rows = tuple(row for row in rows if row.role == "positive_control")
-        dose_rows = tuple(row for row in rows if row.role == "dose")
-        if not baseline_rows or not dose_rows:
-            raise ReporterResponseContractError("measurement profile requires baseline and dose observations")
-        observed_doses = tuple(sorted({float(row.dose_uM) for row in dose_rows if row.dose_uM is not None}))
-        if observed_doses != dose_grid:
-            raise ReporterResponseContractError("dose observations must cover the declared dose grid exactly")
-        if self.reference_normalization.reason == "positive_control_not_declared" and positive_rows:
-            raise ReporterResponseContractError("positive-control measurements contradict not-declared status")
-        if self.reference_normalization.reason in {
-            "positive_control_observations_missing",
-            "positive_control_separation_not_positive",
-        }:
-            expected_id = self.reference_normalization.positive_control_condition_id
-            if self.reference_normalization.reason == "positive_control_observations_missing" and positive_rows:
-                raise ReporterResponseContractError("missing positive-control observations cannot be present")
-            if self.reference_normalization.reason == "positive_control_separation_not_positive" and (
-                not positive_rows or {row.condition_id for row in positive_rows} != {expected_id}
-            ):
-                raise ReporterResponseContractError(
-                    "non-positive separation status must name the observed positive-control condition"
-                )
-            if (
-                positive_rows
-                and statistics.median(row.rfp_over_od600 for row in positive_rows)
-                - statistics.median(row.rfp_over_od600 for row in baseline_rows)
-                > 0.0
-            ):
-                raise ReporterResponseContractError(
-                    "positive baseline separation requires the reference-normalized profile variant"
-                )
-        statistics_used = {row.within_acquisition_reduction_statistic for row in rows}
-        if statistics_used != {self.observation_policy.within_acquisition_reduction_statistic}:
-            raise ReporterResponseContractError("measurement reduction statistic must equal the observation policy")
-        dose_unit_keys = tuple(
-            (float(row.dose_uM), row.acquisition_id, row.biological_replicate_id) for row in dose_rows
+        comparability = validate_measurement_profile_contract(
+            contract_id=self.contract_id,
+            study_id=self.study_id,
+            profile_id=self.profile_id,
+            subject_id=self.subject_id,
+            observation_policy=self.observation_policy,
+            reduction=self.reduction,
+            dose_grid_uM=self.dose_grid_uM,
+            measurements=self.measurements,
+            reference_normalization=self.reference_normalization,
+            eligibility=self.eligibility,
         )
-        if len(dose_unit_keys) != len(set(dose_unit_keys)):
-            raise ReporterResponseContractError(
-                "duplicate dose rows for one scoped biological replicate and acquisition are not allowed"
-            )
         self.provenance.require_biological_replicate_scopes(
-            tuple((row.source_condition_value, row.biological_replicate_id) for row in rows)
+            tuple((row.source_condition_value, row.biological_replicate_id) for row in self.measurements)
         )
-        payload = {
-            "observation_policy_digest": self.observation_policy.digest,
-            "reduction": json_value(asdict(self.reduction)),
-            "dose_grid_uM": list(dose_grid),
-            "reference_normalization_status": self.reference_normalization.status,
-        }
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-        object.__setattr__(self, "comparability_key", "sha256:" + hashlib.sha256(encoded).hexdigest())
+        object.__setattr__(self, "comparability_key", comparability)
+
+
+def validate_measurement_profile_contract(
+    *,
+    contract_id: object,
+    study_id: object,
+    profile_id: object,
+    subject_id: object,
+    observation_policy: object,
+    reduction: Reduction,
+    dose_grid_uM: tuple[float, ...],
+    measurements: tuple[ConditionMeasurement, ...],
+    reference_normalization: object,
+    eligibility: object,
+) -> str:
+    """Validate canonical raw-profile content and return its comparison identity."""
+
+    from .profile import STUDY_ID
+
+    if contract_id != MEASUREMENT_PROFILE_CONTRACT_ID:
+        raise ReporterResponseContractError("measurement profile contract_id changed")
+    if study_id != STUDY_ID:
+        raise ReporterResponseContractError("measurement profile study_id changed")
+    required_text(profile_id, field_name="profile_id")
+    required_text(subject_id, field_name="subject_id")
+    if not isinstance(observation_policy, ReporterResponseObservationPolicy):
+        raise ReporterResponseContractError("observation_policy must be ReporterResponseObservationPolicy")
+    if not isinstance(reference_normalization, ReferenceNormalizationUnavailable):
+        raise ReporterResponseContractError("measurement profile must type why reference normalization is absent")
+    if not isinstance(eligibility, ProfileEligibility):
+        raise ReporterResponseContractError("eligibility must be ProfileEligibility")
+    dose_grid = ordered_dose_grid(dose_grid_uM)
+    if dose_grid != dose_grid_uM:
+        raise ReporterResponseContractError("dose_grid_uM must be stored as its canonical tuple")
+    rows = measurements
+    if not rows or not all(isinstance(row, ConditionMeasurement) for row in rows):
+        raise ReporterResponseContractError("measurement profile requires typed condition measurements")
+    if len({row.observation_id for row in rows}) != len(rows):
+        raise ReporterResponseContractError("measurement observation_id values must be unique")
+    baseline_rows = tuple(row for row in rows if row.role == "baseline")
+    positive_rows = tuple(row for row in rows if row.role == "positive_control")
+    dose_rows = tuple(row for row in rows if row.role == "dose")
+    if not baseline_rows or not dose_rows:
+        raise ReporterResponseContractError("measurement profile requires baseline and dose observations")
+    observed_doses = tuple(sorted({float(row.dose_uM) for row in dose_rows if row.dose_uM is not None}))
+    if observed_doses != dose_grid:
+        raise ReporterResponseContractError("dose observations must cover the declared dose grid exactly")
+    if reference_normalization.reason == "positive_control_not_declared" and positive_rows:
+        raise ReporterResponseContractError("positive-control measurements contradict not-declared status")
+    if reference_normalization.reason in {
+        "positive_control_observations_missing",
+        "positive_control_separation_not_positive",
+    }:
+        expected_id = reference_normalization.positive_control_condition_id
+        if reference_normalization.reason == "positive_control_observations_missing" and positive_rows:
+            raise ReporterResponseContractError("missing positive-control observations cannot be present")
+        if reference_normalization.reason == "positive_control_separation_not_positive" and (
+            not positive_rows or {row.condition_id for row in positive_rows} != {expected_id}
+        ):
+            raise ReporterResponseContractError(
+                "non-positive separation status must name the observed positive-control condition"
+            )
+        if (
+            positive_rows
+            and statistics.median(row.rfp_over_od600 for row in positive_rows)
+            - statistics.median(row.rfp_over_od600 for row in baseline_rows)
+            > 0.0
+        ):
+            raise ReporterResponseContractError(
+                "positive baseline separation requires the reference-normalized profile variant"
+            )
+    statistics_used = {row.within_acquisition_reduction_statistic for row in rows}
+    if statistics_used != {observation_policy.within_acquisition_reduction_statistic}:
+        raise ReporterResponseContractError("measurement reduction statistic must equal the observation policy")
+    dose_unit_keys = tuple((float(row.dose_uM), row.acquisition_id, row.biological_replicate_id) for row in dose_rows)
+    if len(dose_unit_keys) != len(set(dose_unit_keys)):
+        raise ReporterResponseContractError(
+            "duplicate dose rows for one scoped biological replicate and acquisition are not allowed"
+        )
+    payload = {
+        "observation_policy_digest": observation_policy.digest,
+        "reduction": json_value(asdict(reduction)),
+        "dose_grid_uM": list(dose_grid),
+        "reference_normalization_status": reference_normalization.status,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 DescriptiveReporterProfile: TypeAlias = ReporterMeasurementProfile | ReporterResponseProfile
@@ -209,4 +235,5 @@ __all__ = [
     "ReferenceNormalizationUnavailable",
     "ReporterMeasurementProfile",
     "build_reporter_measurement_profile",
+    "validate_measurement_profile_contract",
 ]

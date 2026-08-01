@@ -76,6 +76,19 @@ def test_selected_publication_is_create_only_and_evidence_bearing(tmp_path: Path
         _publish_selected(selected, destination)
 
 
+def test_selected_raw_profile_publication_keeps_normalized_metrics_unavailable(tmp_path: Path) -> None:
+    evidence = _evidence(reference_normalized=False)
+    selected = evaluate_metastudy(evidence, readiness=_ready())
+    destination = _publish_selected(selected, tmp_path / "selected-raw", evidence=evidence)
+
+    verify_publication(destination)
+    payload = json.loads((destination / "acquisition.json").read_text(encoding="utf-8"))
+    coordinate = payload["coordinates"][0]
+    assert {"rfp", "od600", "rfp_over_od600"} <= set(coordinate)
+    assert coordinate["normalized_reporter_response"] is None
+    assert coordinate["relative_od"] is None
+
+
 def test_selected_publication_rejects_missing_or_tampered_evidence(tmp_path: Path) -> None:
     selected = evaluate_metastudy(_evidence(), readiness=_ready())
     with pytest.raises(

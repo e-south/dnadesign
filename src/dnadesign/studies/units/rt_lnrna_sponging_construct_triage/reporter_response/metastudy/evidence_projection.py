@@ -20,6 +20,7 @@ from ..canonical import comparability_key, derive_profile_rows
 from ..measurement_profile import (
     MEASUREMENT_PROFILE_CONTRACT_ID,
     ReferenceNormalizationUnavailable,
+    validate_measurement_profile_contract,
 )
 from ..policy import ReporterResponseObservationPolicy
 from ..profile import (
@@ -274,20 +275,35 @@ def _parse_measurement_profile_projection(
     )
     eligibility_values = _strict_dataclass(profile_payload["eligibility"], ProfileEligibility)
     eligibility_values["reasons"] = tuple(eligibility_values["reasons"])
-    ProfileEligibility(**eligibility_values)
+    eligibility = ProfileEligibility(**eligibility_values)
+    dose_grid = _number_tuple(profile_payload["dose_grid_uM"], label="dose_grid_uM")
+    expected_key = validate_measurement_profile_contract(
+        contract_id=profile_payload["contract_id"],
+        study_id=profile_payload["study_id"],
+        profile_id=profile_payload["profile_id"],
+        subject_id=profile_payload["subject_id"],
+        observation_policy=policy,
+        reduction=reduction,
+        dose_grid_uM=dose_grid,
+        measurements=measurements,
+        reference_normalization=reference,
+        eligibility=eligibility,
+    )
+    if profile_payload["comparability_key"] != expected_key:
+        raise ValueError("serialized comparability_key differs from canonical measurement-profile derivation")
     projection = ProfileContentProjection(
         profile_id=_required_text(profile_payload["profile_id"], label="profile_id"),
         subject_id=_required_text(profile_payload["subject_id"], label="subject_id"),
         provenance=provenance,
         observation_policy=policy,
         reduction=reduction,
-        dose_grid_uM=_number_tuple(profile_payload["dose_grid_uM"], label="dose_grid_uM"),
+        dose_grid_uM=dose_grid,
         measurements=measurements,
         pairing_policy=None,
         dose_uncertainties=(),
         dose_responses=(),
         reference_normalization=reference,
-        comparability_key=_required_text(profile_payload["comparability_key"], label="comparability_key"),
+        comparability_key=expected_key,
         serialized_payload=dict(profile_payload),
     )
     audit_payload = _strict_object(
