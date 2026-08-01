@@ -1,12 +1,12 @@
 schema_id: rt_lnrna_reporter_response_metastudy_state.v6
-generation_digest: sha256:1a050778ae126b719b58320d525fa01ed429c4768523cfcacf0f9e464e097501
+generation_digest: sha256:4380360529c1336ea083651c1a3d9b30f0ffcc9e59dedeb91aa6af09bd30db72
 readiness:
   schema_id: rt_lnrna_reporter_response_readiness_snapshot.v1
   source_identity:
     route_id: rt_lnrna_reporter_response_metastudy
     route_registry_path: .agents/skills/retron-assay-study-bridge/references/reader-experiment-routes.json
     route_registry_digest: sha256:6f60bfa71405bf24ee599e9c7a9904902fc12249678e723bd33efd61d7529106
-    normalized_full_receipt_digest: sha256:3b5148dffe109d524294e137f17d14d78f32d8a99edac13c22f80bf60df648b3
+    normalized_full_receipt_digest: sha256:92e7fc046e3b2bf4957cffcfddeced8af95517b0ce9df1336c2a6501d637555c
     normalization: omit environment-specific reader_command before canonical JSON
       hashing
   last_verified: '2026-08-01'
@@ -46,7 +46,7 @@ decision:
   - loo_choice_same_or_adjacent_below_75_percent
   - subject_window_omissions_present
   policy_digest: sha256:b01a69f30b608ea28fe580edf2ca01347284d41b52ba048095daa2cf2f6ed711
-  evidence_digest: sha256:e2ce76aa92697c44aa62a7ac91426b98f77e3a513f41292e34e52e97d8d07725
+  evidence_digest: sha256:a34514c452f738bae842c96d0ba473b70179ba60e35f18520569b4234516e0c6
   readiness:
     selected_experiment_count: 8
     ready_experiment_count: 8
@@ -60,7 +60,7 @@ decision:
     - 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
     - 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
     blocked_experiment_ids: []
-    receipt_digest: sha256:3b5148dffe109d524294e137f17d14d78f32d8a99edac13c22f80bf60df648b3
+    receipt_digest: sha256:92e7fc046e3b2bf4957cffcfddeced8af95517b0ce9df1336c2a6501d637555c
   evaluations:
   - reduction:
     - 4.0
@@ -165,31 +165,31 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:05a3a05ee2b927c33fb87e6f836db1b2bc437cc30552b9b5230d8d35b2a130b1
+      reader_record_revision_digest: sha256:555971e94ae788a130113186668bcf6cfb4160224e5f0cacef6e9d94a4d44969
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:08823964a85c927c8acad421bd72a07e5e22b3e22bf0e9fb1d8f31f6b510dcff
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250622_retron_Eco1_26_43_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:e96aa8b3b8fd0fc15d8342ea7b529770dd7b2919c1acf6245e8132b1e4db834e
+    evidence_binding_artifact_digest: sha256:c6b643716a534193df910c0624cd98a17be852bc53b37c222f5aa6e6a9d2b9fb
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
     status: complete
     candidate_profile_count: 10
     candidate_profile_digests:
-    - sha256:05b5eaeb0feb27a0f7be160bef1a8a9384a20cff9ef29aa92e3aec5df37830e1
-    - sha256:194b5f63326ff96b9a233df70fa7c60829e4216464147cfd4246d0cb1995a629
-    - sha256:2ff3d7ebe83a22bca5b0813f54ded5f599ed7a7686b4a97c3441b234afa8437b
-    - sha256:39327bc4d4f404b597c02ac8f326ada4378c0a1d1ce93216292f1ab1448bf7b0
-    - sha256:652204035729abe79c90e8a46596c084a9019f664cf583fa54611d97cf09388a
-    - sha256:6f559f8be42aa4f23c67a1504978d3e8e2fa297c6b2f5a42f37da284db5fc7e4
-    - sha256:9eaee14dc05b0b41dff0a76b43fb5c951710535c82c372c395ce266c44301325
-    - sha256:aef55e23bcd13f6974db9b899b7c704e7c1510b7b3bb971e1b299e8ebdf5c917
-    - sha256:b86b20cafedd39ee320a32a88e4f2a48802327660e9af859c679326b2fa7ad1e
-    - sha256:ba8aaa49b69aefc691ece54b7eb907ad33d38120b019150bf8a416388e1b143f
+    - sha256:05b344f523e77175765f61895ab3c780119cfd9f9b787bc0d0260679c1121fcb
+    - sha256:0bc33fc810dbd642e3d7f1afd8d6ff2d95f9984d63722576f0e104f0a5833c97
+    - sha256:31d456c6d85a82ab7de399203ec430544c3540c62f97722a864e68cfd833d094
+    - sha256:48fe0953f11b9cc3707a16b7171cff08294bfeed71a66a8b1c5c2d530c72529f
+    - sha256:7b8e07fb69e87928eec45c33f2ac784acd9d31332d7d807874e4638dd9067cff
+    - sha256:dfddb62e621cef93308fbd8df997ad47717a98d844108840ed102e94a2330afc
+    - sha256:e5749d507a2800f0a77e18711eb84e107ab75f8ba0ffd676d982cfec9c2ebfc6
+    - sha256:fbd74a0a4e69002a064467e31a49c029aba6ba51661dcc11e2f41333d2111c9c
+    - sha256:fda281ab980fb4c9c81af7336f2edf12073092d2869dd311102a8ce211f6a403
+    - sha256:ff2ac04ec20815b9e554b39ee3ba1c523b6ec2f0070fb1f1d41eae43d7e6f947
     candidate_omissions: []
     blockers: []
-    attempt_digest: sha256:374397cd5efbe2d36e7db3675ff51ff52fa54ddefee1d855864ecc421d4cbf52
+    attempt_digest: sha256:7b33dcd2d648ccd58aef7eb5aa24c11bd678174cc12ae9a2043e3c5c6718bfc9
   - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
     experiment_id: 20250707_retron_Eco1_26_43_45_46_benchmark
     reader_record_identity:
@@ -199,12 +199,12 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:d41999ea7ec681c06c923e1947f0b66698da543f62546ba460a6bc67a4eab134
+      reader_record_revision_digest: sha256:edb5be299606a6a105f2430cb3aff4f86438bfb73efb40bffcff863ae50c4f21
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:0b380ce9ec75c02404dc71821c3f3e2d5c3c40b8451164af23d3d0ccc98bd3a2
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250707_retron_Eco1_26_43_45_46_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:77335672e43c396af13e2b7db2a43702ead2d09bdb57a5db1021b4f30fcacefe
+    evidence_binding_artifact_digest: sha256:5ce949177485b879a73ab6663bfede17c0be64d2fa7b846281e699e69d299540
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
@@ -213,29 +213,29 @@ decision:
     status: complete
     candidate_profile_count: 20
     candidate_profile_digests:
-    - sha256:07f0342751fd88d8d6349ed5f3b79e8ef71f02b485c6cfaba9f0228c998fc666
-    - sha256:203b5d34d8513a6e9394100f5c52d5e6ed2b751f1d93e2d91e244de8546265da
-    - sha256:20ba65692020fc3c23c3de08a519e16482ac9881cc02b4c0c19325112aebd123
-    - sha256:2495fcbcdc4bfb704c4e836b8fd68eafde32014a11102cd4ce8b8e1a27f1fc28
-    - sha256:27adfbb2c089f6363da7445d2f057137be6a9e44cc3cf4fbfc9ae63615a23416
-    - sha256:4f535be7e35aba7bd61ae24f05cf058bd2508adf3df79bcaecae92269d4ddea2
-    - sha256:5f63f3eaaec52f5d102916f7653298d7779803030d01d7a2844d3a2d44b3082b
-    - sha256:89b1134db22ced0c08bd6ff01dd98b71b1b2d7966af0f23e1192173dbbfc310e
-    - sha256:8b3f82748f1b9cf347f3ff54a0dbebd9f5faa1b6677dd2048f8c3841f78578f0
-    - sha256:9b7048e18d70c0b39f32707db4c29bf6ad08bf6a70dd7e319a8dac8595ab7221
-    - sha256:9f63c8ec439facd96f57e9cba59ce78ac646fb5ba733363f65c6ef42abf539de
-    - sha256:b070f0fb61e4f880560098fbff230ebc4a885861dacabb414c159bd6c9390282
-    - sha256:b9b4e417758aaf076f8305f32e576770b207b4192cbcb2c46fb7912b14ba3ea8
-    - sha256:befba0ce04a8c31577f00caafe663a5825fd2bbc54b7ee1a1aec19700cd63190
-    - sha256:c5051aa4f8b16cede64cf31fcaf22b7ea8a49e13c3b1e90038d203f0c6ee74e2
-    - sha256:ccdbefa56fdf759e01434a5c096b67eb3eec2acf7cf3e74577b4dbb427d99c9d
-    - sha256:da21a0c2d085dd9ccafe9a0814685d40b94ee6ccf37406c2e2d1ae52c8c663b0
-    - sha256:ecf8c7f82387e4b7548017099cd78a3f9e4d32fbd99d97f85cbcb7f8c3897426
-    - sha256:eec760ce325d56e95aa224e13b9444df9888c77691ff4a7a11330c0a5a9be902
-    - sha256:ff676582708f15c286ac8add754c6ee717c26705c324b17d1fa7bef09bdf2a58
+    - sha256:18183a0fdd80d398a5da92161fc78d9dfdb75f744752d627085d393a893597ca
+    - sha256:1cd3389f3b1e7fc60fbef9c54a250795432b8cbb19f1b804c7aea59dabf72fe3
+    - sha256:1d6b69a524b8cb0c8863b391ee67faaa523c40e201dba239d74f1f3cbf497675
+    - sha256:347a53dd499c49ecf4cbce85966973557666cf21f4695441be4e6b8c74d8d72f
+    - sha256:53a31bcee6010c14e77176c1df1fd463d5d7d9470e6b4fe0a15ce576b58c4ce8
+    - sha256:55732077713568e00d33258a45ebc44f52cc3fa1b46782bd5f1aeaa447f2d24a
+    - sha256:5a58e885cc6d87267933b2c2e27433cee1089a0c1477b576bbdda86a83675ba4
+    - sha256:5a5af5ad1959ccd5897e914d8a00eea530dd782cee02ecf5cbf97c877d19e672
+    - sha256:61dfe16238a8bda324b10a79aa436dfd42ea37c3a0f54087de40adf61d36e1d7
+    - sha256:697f14c02b60373e5b7d51dc934da2061d193c7b386d96a98df3cd1f5582f4d0
+    - sha256:7162aa2dda68d31189287e6340befca6af037d580a9a4878cf53dc44f49b3661
+    - sha256:74e32182b52f9171655c057a2419fb411024de8b7666c40ff7882e961f3ebf98
+    - sha256:7eb86cec5152d249fa10150c6b8fb5c8af57fa05c823b06ee4aa76ec8ada190e
+    - sha256:83e1cd458a499039042fdb413106dfc46da496389b43dfa3d6c13e54b8dc8e16
+    - sha256:a9e7e1690afcc044159be2b2855169fc591a2b4bd62d62c3edba8b9003c3f6ef
+    - sha256:bb599c13e6431f86309a596b304d2f435cc79664a89a8bf736eebed9cedfb146
+    - sha256:bddc0c59971039876971f0b7ba31fc6a8f0cf1a93d8a59b06706351e7a505339
+    - sha256:c7f68047dc899f32b9d21d85e09e009b7c6e95cbf007d0b6c1eb294fba015ca3
+    - sha256:dcf2096a4380f4fb84e8da41223a8b1f752cbf5b0eb60740edf55f7e0f3ee463
+    - sha256:ee77daeb970367ead70c81ee866d5c2de1504e7fbdfe6f15e6383950dcc32a1f
     candidate_omissions: []
     blockers: []
-    attempt_digest: sha256:c5690aca60c9563b5002e8f7977b92a7b0f59da32ac1e52c17d314512752d652
+    attempt_digest: sha256:ce962f08e8e029310147a1ba1da07aac85b2e76a2e366ee4c45d876f30dfb182
   - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
     experiment_id: 20250718_retron_Eco1_26_45_47_48_benchmark
     reader_record_identity:
@@ -245,12 +245,12 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:1ca4826ec7c0d48f6ce86db1e480c21a9ab4d536dc79184b7ebe7dc2f3e4d1ef
+      reader_record_revision_digest: sha256:778fc8b00a0f9322fa3ba7f4f9890e84f1a2db328a1a2da3d80d98160c050712
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:1ef85d112b7246555995e23e07c2c83b08e6b8088bff3176d6af317f8aedc892
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250718_retron_Eco1_26_45_47_48_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:63b40cd40ce4f8f70e5b0702be335483083ef8f7f61a9f60d89e9aa7cf539ec1
+    evidence_binding_artifact_digest: sha256:5413ea1d8cad33a051bb9c6e27ddc7e57d843d1dbaf0fab81fb157052d6ab15c
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO
@@ -259,29 +259,29 @@ decision:
     status: complete
     candidate_profile_count: 20
     candidate_profile_digests:
-    - sha256:0f7aea448fe3e056adef1c575f45f52e94c401214bf299e6d5273485c78f74ff
-    - sha256:20d27f980fada335cebc0eeace6c122b76c9424eb4926e856708e88913abf119
-    - sha256:45bbb3e4a11c11bbebd04d4cd50eb40ee8f8347710655451d6cd8ababe9cd9ed
-    - sha256:4e9583cf7c607d541594b55bf37d25c3cb100c5782b779e377bacba9aac697a2
-    - sha256:58125f456ccade43144251f9379d9318cd1be62bd7b7be2774e49557d63526e3
-    - sha256:6d06d38cad9dabfe0314da4065d6dea66914c3aee26c312878c66b21a9ca8f94
-    - sha256:78c15c5eaca310e32dbbee989ab59fa090933e48cabad640795ecc4b0fae6f03
-    - sha256:8bc6e4107b3d931115d0d9c7807d2a2bfe439a8344caf5d2a9625427fa26ac69
-    - sha256:923a4a017390e481e9dcec223af41d4821dfe9a1b5c14dd55a376439b483d28f
-    - sha256:a02e5358330b496c0417493b13e0445eec4d21698395220121704f80d14ea541
-    - sha256:ab9e2f109e5b8d80340967d8aed8baeb3bf45e153497eec5af1711e9dc1bc8a9
-    - sha256:c3c52afa6893d1dc8d77d9c5ee00f4e33bf528711e055159b18050362c7e8c92
-    - sha256:d1023131ad205cfb42c503f7a0b42f46687551a47958b8041288388e86ce6bc9
-    - sha256:de4887d55bcab9009484227cb0e3bc96f998fb600a3e5054e7327dfd81c5d179
-    - sha256:e0905014e4f9e7d3d9f87c5d48b1c6ecc815c446be9cfbfda26ceee0d7764b6b
-    - sha256:eb17f24d975bf8732ef3c351e7cbbf3dc66a6a7c9f2a153e3c6e847338962335
-    - sha256:edfac63757ba0cb1253ecea0b35397d95519ab4dac2ef1241246cae9a6b6aefe
-    - sha256:f2b899ff4dd0210c36a758ee2a4483b0d47172b5b85f7c1960c9adf9c62599ee
-    - sha256:fc0d8aa90ca4c8ffa62121cd4d0882dd7d04e496ba67f3538f50dfd4d2bcec2f
-    - sha256:fddc23c78e5f4627e56c670cea419b77829974594b5bf3c47fe844434dbcc0a7
+    - sha256:10f94c259536bd967e701fbd21064c7104b39714c31a66e45a9dcb65bf723ac7
+    - sha256:1c0a827d0cbef209e1c121cfedd9d487832e6fe945be8cc2e1cfa96039033178
+    - sha256:209a6d42a1b82aed7e11582af0aea1a0311bd0b6b2e7fe53904ea3ecb4caee17
+    - sha256:2345df385620de32bdc07b27a8181d414cd68d7bc94a732ecbb0eb4ab02374be
+    - sha256:346a35896de1e56221daa26e1a13616d9545fb07778ea7bba0e2956762004009
+    - sha256:41f672caac50284eec9cfb0359174090f4cd6076b5a94118fc1457e1475b15a8
+    - sha256:4be43c66a0ed1aa29f8d4ee7bc05277c8c7231ae414ee44ec96d7f0d9f93e092
+    - sha256:60eb5bb66ee3cdf90f6a47ce9d3dce6df82626e5a418385020991f44209b5b06
+    - sha256:674e0beba81ca13ce217b55e60e1f3d2f3b1f3009f801e95f45491d54067d09f
+    - sha256:82bb9c4622432019b608ce48557cc1882b38eda77cec5cfcc584998edf84cc13
+    - sha256:8da2ffdd0343dec28e631a20570f3828a8f065248ed6d5253efd01763ac9b293
+    - sha256:8db16ef57f52dddf80c0bd6e1a88454c65515e018b065ea8a3041465260fb56f
+    - sha256:93781536657d464d08e9ecd9baaee91cc159fdff80b5575ef7149899ebc0b085
+    - sha256:9ad57baf060e8972bf500d5ce5cdf95f96b63880ab2208ced85d956a3c3e1e2d
+    - sha256:b691e706d9b40bd4533919f4891ca64212742acd67694f0b4534ddabeaddb6b2
+    - sha256:c6a2350984d2afa314e3b959dce9e5e739e56b1d9016f33d280bf7d20de1365e
+    - sha256:de466fa093ac7b981bee2524b2b75e188a7d6b725967aa0e66ef0276b784ff45
+    - sha256:e5eb57d8d06985b6a8edfd8d5404dcea745b9273b5cee3b7d74ee17d86965db5
+    - sha256:e75ef48e4ad0d61cecbb57c7353acb70cd11a6d436b32efdf032607078454816
+    - sha256:fae4681cbd2f88251ee6b3344d0624ba7ec127d29ce2044c94b3ac6ea68f42f9
     candidate_omissions: []
     blockers: []
-    attempt_digest: sha256:bdd206cfac03f44771360e6d2d642c5f14d994d8bbec5b611d96a7b69da77194
+    attempt_digest: sha256:7e1ad7d08c914f057fbe85fb8ae8e579490a9e55f82323c16782f932440dd9cf
   - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
     experiment_id: 20260418_retron_Eco1_26_43_170_171_benchmark
     reader_record_identity:
@@ -291,12 +291,12 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:d786aff2b83b01b414029de4ef4c2d4dbe71012211e52e7e0478a6c0355f5cd1
+      reader_record_revision_digest: sha256:362d9abdaec8b412e7dcebde7aa6eb51fe8f6bb0cc46d78cfa52717b558da227
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:094f16c2631b3aa94086b1c8fe83e01825c4ae261ffbe2fac80e05ac640a48a8
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260418_retron_Eco1_26_43_170_171_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:d8577bba466967a9b8cbedc9d95e17b0be7386ce9be6e198bbe7283d0757d720
+    evidence_binding_artifact_digest: sha256:3f043ce68447cf9f98fa1b47f14953ecef94abb0e38f1c91bf6797fd9de09b40
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO
@@ -305,29 +305,29 @@ decision:
     status: complete
     candidate_profile_count: 20
     candidate_profile_digests:
-    - sha256:04178198b48b76905c9bced96cea1685092f04c80c7ae762b6f2ec3a1ac79177
-    - sha256:0b9aa08abfb7ea83633e751b2cf59a95f63fd01474366606ec2f82c526a2d796
-    - sha256:0d0be8956c84b7f16cdad8cb534b33bd7517ac7ab83e2c537e829380a22d5647
-    - sha256:1a421cb3b3fc17cbbe5d8012e7897c60d484ffa76c947a9691bdb7e8e37aadc6
-    - sha256:2011e939cebd531fb6a6b79df42f33da0e193b6443f15ce60621be3d425475a9
-    - sha256:2e3dd864c36ea5d87930f00bfd7ad0e6801e73c148c7893f7c1b61ebaa51c286
-    - sha256:2edffeda71b9936b12ae908308079bfe56647630426ee1cd14d80747d603aae7
-    - sha256:368a3461936816553d192818e244b66b3f935ca76277e1be9829f0305bee984c
-    - sha256:46d4bb25ca8a3f93e5ab22bf6acb9678967ce1f1cdfbb654323ac948b406cde2
-    - sha256:53a797d1f78418839bb8db84888907792b644bda2cee7affab82ba03b46a485f
-    - sha256:60f2973ed40be83a6441c7947cd80524bd7079e808532272c4a90f4d0bdf7636
-    - sha256:93f0b8c5d6717eed7b9d4f8e276d58a0e675b536ebbed6670e5e4d243ca38dbe
-    - sha256:a0e47d3ec6798004a48b84ec067ef133e93141f4fc944cec8061b12fd4a8a035
-    - sha256:a3f60012e8928569803d0da6225bd62a41a484e8895687adb68ceeebfe32111f
-    - sha256:b122fc8665d3eae04740524c53b8292027f28f8d2f0aca42d507af30406df87f
-    - sha256:beeecd64ab1a00b569a8f3b9a246c3926b22a58a04636cad239d614fe1a99d3f
-    - sha256:e3748e5958ed04d56184778b2953698f218dae18e1bae948bf73add7170ac88b
-    - sha256:ee37584e11b2ca38062ed9c7a82b28001090499b1fc99f48fe888fe4c48da7b6
-    - sha256:f2e49c386877c1048776934f53a362f28095adf23b180005d359de378f7fcd74
-    - sha256:f4006d5ca7b3dac84e2d9fe66d6ee181e48804e3c20a8a7ff4bdef6379af50f6
+    - sha256:01474860c40d5006c68fb35b91b3add3eaa289c9ba0ee601575a4ad04be6ab71
+    - sha256:0317cf861e2d8fc7f96b33ff69a59bff5fca1e79751da03b3ac34fa5e869d6f3
+    - sha256:18770793d58df433ea7599955ab08c38621dc48e4e7256bda522a7d78495603f
+    - sha256:1cf29b69ec6a5ef086dab0ac88b49e6fc34e6df27c416629367bb12e76b24cc9
+    - sha256:2a6e6094bcc362c0e646534169685ff7ca86b8582e3e43826e89efeda259a2c3
+    - sha256:3e6c59dcd898b3676386d928f25626ea12a8a01255088f4529094328dd131051
+    - sha256:3f93914e4e30588c8d776d74069b19386d9aa66ae23f6e3c992dc221faa2aa09
+    - sha256:4574f858db06af5eea313910980887af5e91c4d53032e960d810566b7e2462a2
+    - sha256:79bab9a8eb52a3cbd78b8081b7c72e3e7aa5eecdd8ed33707338970b51877de2
+    - sha256:8ef5ed93f2c5c9248e598ed37a6042e7d6f9e0937d26bcbb6ddee4294614840d
+    - sha256:9b707013a42ce1bf4b92d5c7b3dd3b4fd1a19042ac74bb8a6302bcc94dc91948
+    - sha256:9b8093d3644469eb0f9395c0f5f1b767c61f89def07c6972f430284b02139226
+    - sha256:a6554cf84ce8a270f5e186750084d7cd98bf8a81d010d14b108786d99978c10b
+    - sha256:adffec5be15761f1605eecd675960e00c53feca4a5e59f2a62500364924e446b
+    - sha256:cf8f62a43fe033e48b25788cb0073628e9b1575fc5f8f25ce2b6d478aedd5131
+    - sha256:dcd13ba0973351fd9a1ef37cc3a8bd09703738494052486450e5517966f09502
+    - sha256:de2bcd3714bc6eecf8e7beb089d80a8adadc7795d4d519578d93dfa49c955d2e
+    - sha256:f45b604b0cc53d5351c3fed093516063e8840f7b30b0581f8bd12f8647792aea
+    - sha256:f7237ddc81ee67aa41bed10f7b076b982a68cc1097436178da2f5ceaef17d61e
+    - sha256:fd053a92cacf27030691938254e2e3706f955063322699fb3c438529849940e2
     candidate_omissions: []
     blockers: []
-    attempt_digest: sha256:d6b0834d8aebffabd60e6b1269327d2566f4d5caa1357132a5de135de116c8a7
+    attempt_digest: sha256:edb45b81da7b3f7ec3b555fa30ff88f04aa9c3bd54762eef03b170c1fe34575c
   - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
     experiment_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
     reader_record_identity:
@@ -337,12 +337,12 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:176924c7744da54ebddf883c74e51be9fcf174f54850fd5db93dde56a49b7822
+      reader_record_revision_digest: sha256:d852dce33a9051e7f564801dae029a556dc0ab865e76535b50cede47db2e511e
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:2932657f151e02692a2abe7c1c5d4d858a0cc7c19c477c646ff6ec88ab497878
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:e4d5ace6ec54ffd4efad5b5c39e97e0dd3cbb0cc065d369d0a1edfce39b6d9f8
+    evidence_binding_artifact_digest: sha256:d30c0af2cf64156f3fcb09ad33812ef07a0fa1b1ddfd0028373299e5e4ae6a49
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO
@@ -354,36 +354,36 @@ decision:
     status: partial
     candidate_profile_count: 30
     candidate_profile_digests:
-    - sha256:071891ee80a0ccb92a700f57f3822e0ee5c80b3cebf0691298cb26cf75301f15
-    - sha256:186d52a9245762bb68c9c6f1f21a5c11d54b751334b81a1dd87b1103094eef75
-    - sha256:1c8d69d5cbe80195add445eb6ff876e971b709c718a1153769b88c417c733088
-    - sha256:1d132d1375986ee48a229fbb81a04636543b25f4758069849f5cc72aa507150c
-    - sha256:1dfa1111cc543426d860d502824f7b49cd0e7de1c74402d01eeef99120c26e9d
-    - sha256:31aa3f8bd666626d69ee858f0df05681edb1c42a5eca860cc2d7daa4ae41def7
-    - sha256:48c9942507be13678d3bd63b184b0ad7387c3aeb624d685787c7c4fa9d24d9cf
-    - sha256:5194bc2968c268ba6d958c39d5610e7ed302b65db04e616e50e2c92e675ac5d0
-    - sha256:525ad33086010d312b3b1adf118d7b29e479f9fe24af04585d266d6071942529
-    - sha256:5f7519ab6d1f52641de2a8216dca1d7bae447a869fa4253522f0c326f6eaeaea
-    - sha256:6367a3fce8c74f2ee105e595b313b77d7c6d36beb7f6efa367c92a25d78fc925
-    - sha256:644020f5a2a30b5c7a79e31893282050d8ab297eb57764004063ef41cc2db4e1
-    - sha256:6ee1e51ca2bd4442e6c40dc1935efb375d9fd2ef75f01c9658217df7d04d2177
-    - sha256:70f001d6d185e9b19718da6075add5cb3d58c2881fc773fbd2693ae85350d5c7
-    - sha256:76879ef9bc60200b05cb9f9ebd7e18b584bf0096ca4796aa0cc6c343372a3814
-    - sha256:9aa32262873cb58a64c55eff6a225493af31a0770f303642e7893db74b0a047b
-    - sha256:9e0ce352943904971a172c0ebbc534c181e148c3d1cf5bffa79e332919bc18c4
-    - sha256:a0123edaf2593ec629dfa97b3b0c8002cf4333169424a08b3c365479e85d6b39
-    - sha256:b92ab3b5863a053d172f9300bbc6fae908898043a44b15787231100e42823d68
-    - sha256:bc149a7c68910ce8a9c6f926f2cb01f759e4d54de3aaba938cb739051e7f4dd8
-    - sha256:d130b24f67f1012f03bd135868aa781bf33e326b9ea8a25ecb5649e7121e348a
-    - sha256:d6cdd38aa28e4a7d58733f983d00e9925c8d8d04d3618ee313f34385838f53e8
-    - sha256:d74b7603bb84c51465c9996e01ee7100c540645e570af6c4bfb99576e5c1ac45
-    - sha256:d8139cdcbd9d4ccc87a80c3e53e7c7b5c46bc0653a61d4a589a641f7f6ae707c
-    - sha256:dadd832b6d31f48eb670d85f5dbf8a3517a44a5c1909a62e9bac7a85f2a34ed5
-    - sha256:dd375487bc5df5aece77f2ea470206fbb9716c40f2487d428c5445e3a0efb728
-    - sha256:e0c27559656443cecb10091ad153af0c742ba94a5d8c9cd2397c6569ea0c702e
-    - sha256:e3b17bd8090fa7a8e82e7fb808f3662f5074333c38e8d8cb8dbf98fe049ded45
-    - sha256:e4c0fc066edcacf8f26451d9ea59f872fa341875b7c1b66662db625e8ae82a40
-    - sha256:e6171fe7f91c2a1f4c1eec84500de38298d98d87342e6c166710644d44c07349
+    - sha256:14b0195229e8fa51ed7e1142d67a8608bde96076d80dce33d8c561e775bcc440
+    - sha256:1a33aa350ab88ae5fc370b2a191789d9a2db1c6d445ce79898140251e579e6db
+    - sha256:1fc786adeba8b15c9357ce91392f8c7eab3a54ef6a10217d982cf69c8625bad7
+    - sha256:27d16755a3bac1915bc6e8fb99de399decf78040c76cb3cdcf6740e4b92f3426
+    - sha256:3474c946af9f19ddd89893663f2c8379fedd3e0d8067bb44a42be2285fdce3e0
+    - sha256:5a814931f03f97b9717ef332adbe5c56f1b59c2dbd2dfd366d5873706e020333
+    - sha256:69b3a70fc43aae580e1b6357c09bff03d43b2911909e7dd579d8987968ed3069
+    - sha256:7887c2aad6facf8f76bfb0cadd526165684e0167bb9d41ca0786b08a6bf673de
+    - sha256:7a82c6189bc59011184c93ccc9e28abe24115755e1e20145272d131051658814
+    - sha256:7bb5fb15e434be091981c73abe8f855e8444a3a6a4fb312926df5fd18235e512
+    - sha256:90e2f0a49ee74ab1d1ceea2514f93eafb873dab4f0cf504e47391f0020dd7e30
+    - sha256:92912f007519f738b71897359738685acf0981317a8ceb6176c14e74736c9cda
+    - sha256:940f266e3e1096c9dc4e2a4e666240f474fee027bbc07ac1e14f5c851aa57115
+    - sha256:961e0d60f5df4bade31bc52f0c4fc06e21f600324a9e1228457b9f09ef5b43db
+    - sha256:97b0e9b813b5fa3154ec53ec006b90ac9ccf0f86d8d317eecde13246c9ff9db5
+    - sha256:97dbc04e1457b1a30258bec03cc6d7b514c38ae2d424012c088017edf8b9b1be
+    - sha256:9bc94ae353fe4d4d42d8cdfa546606836c9f53ae91a090ab82211c3dd7d52361
+    - sha256:a3c53a6dda95d7984db66f2bf6f72a5c7be683cf650d45eda06be0c42c469aff
+    - sha256:b6b4d84ad577e64ba79febf29887627ac4b13b500d809e59ee48f95f1ae2d29b
+    - sha256:c825e498faca589e91bcc5b4abd78def7b31666515d1edfbc33adf863d098ffa
+    - sha256:cd53b5850435313f1a2cfcc9d418e166a04e0b219578a782333b5ad7cab9b4d2
+    - sha256:d0c5d8ca08a9cfba3161277c0ec2f0758d444495f6651355b5b04ab58d6c0e33
+    - sha256:d19850ece1d1b598da24009f9f98d30d15cc337097f9f9c44240a4e34d791476
+    - sha256:d26a0fa600318e368c76c91dfa095d6b4407196df66405c75498861f475d15d5
+    - sha256:d8eac74c955273e3400ab77756e49e7c37895fde4369a9fd2aea3484b3b973e4
+    - sha256:e579e98953ae62130c81c2af813ba562972bca5d76ebfea3a4eec4b3df888099
+    - sha256:e668b67aa384195de46bfb5438541f13719384a001ff96f8ad489dc88527f22d
+    - sha256:e804efb5fef85f2f08e385bfd790bd31cbdb0669fb055259c0c961057903b84f
+    - sha256:f0238610a1dd19ba29428356616a371b3ea3fd80e0af880ca12d4a734c8b4087
+    - sha256:f5e6384926e9359ad14b1486cdc72a7fcdd22154eefc01682c90a3432176c53f
     candidate_omissions:
     - code: positive_control_separation_failed
       subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
@@ -401,7 +401,7 @@ decision:
       subject_id: rt_lnrna_pair__eco1_wt_rt__retron176_lnrna__tetO
       reduction_id: window-8-12h
     blockers: []
-    attempt_digest: sha256:afe0c0226549de3dd7792eddeeb3f778d348230e7e97221ee4f1c7e96abe3738
+    attempt_digest: sha256:f07595b995703a2b1d5d513f37e15ad66ab3b09a4c42c1ba0c2c1aa467d106e4
   - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
     experiment_id: 20260529_retron_Eco1_26_43_177_186_benchmark
     reader_record_identity:
@@ -411,12 +411,12 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:7bcff1c5d9eb82a6ccbfeb57f561937e803e2980e2db0ce2835e5805fd3a79e4
+      reader_record_revision_digest: sha256:b12fecafad82736a47b7d0e9918381a9150ddd09b2403a47f18d692c9771f770
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:28e7b7a79004aca291df96b0b18e6425bcd1c724182114327380f03d4a744485
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260529_retron_Eco1_26_43_177_186_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:730973e8ffed6eebf4fdf25d8af728475009810ff5703d60aad7a054c8a87687
+    evidence_binding_artifact_digest: sha256:ff3eec8e0c25e2b06a25bc111fc2f1802eab93a6b9bc0d5436deef5f2a85d1e9
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO
@@ -433,56 +433,56 @@ decision:
     status: partial
     candidate_profile_count: 50
     candidate_profile_digests:
-    - sha256:02df521efb935c48ec41897aa49ead0ceb4a722bb1d9c9156dd42275135655f9
-    - sha256:03901b18868c4ce6ad763b0fbb47ab577c7976961ebc3e759fcf7675f47679a4
-    - sha256:09d6ee763fcab2d17540a91846f17fb74b04b249cfed86955513baa7394f9ef6
-    - sha256:115bad998dd282d82816a34ab606738647d44441efe91e6044d60255ba5f7259
-    - sha256:15ed660db1bb3e3c8ba30fd3676aab89d60e5350f43f074c9906bdf8fb62a5bd
-    - sha256:18d3d9c329af2fa32c6c922248f5628f77f78867af110d9f036e6c0681c72c2f
-    - sha256:1cae4ed82102291f8daf7c638dd6de9747087d41ad37242136585078a1a18e0f
-    - sha256:1feec0b0d7024e42b57be3b74da0639620f2c32cfa37eb1844e009c016afbeb3
-    - sha256:2451adee4392ab1ded21495dd1f66d5bdaa944f367935c30363a3892cc9362c3
-    - sha256:294167e735db1288b5fdd1b46ec88250c946a9eba0c057fed0aa5cee83c982fe
-    - sha256:2afa774c964fcdb368475ff92c449bfa8faca57f8484f874b79640442772bc17
-    - sha256:2b86b2bf17ee2d75bd207fe971bf3ab115e1b09bbdc51494d1372a1f0a16acf8
-    - sha256:2d7e7d3f38a56c66eaacc35b8f2f32885909e5480ce12d39c9646842d7ae465b
-    - sha256:4508ecb5a27a6d4b34a81d1b99e9282e6ea57dc884ac6df9498812fa480de302
-    - sha256:5179b242624fc32888feda3e1b733eeafe971eeac03024e69bae758463131cf4
-    - sha256:5ad0169ab8dadade96fb400e868c141770db22c9ab30b0390ea3d509ecb8fab5
-    - sha256:6484a1b27539b37e26a55c01f92b5bc7419b13d72dd3f2aa16ec020fa51f0718
-    - sha256:64dada0fc6d5e2a3750d826b4b01bd9a2f72279701a4282b3440895415bd2ab4
-    - sha256:6f0cd02c10c5675162083e1700efa880893b41ca9ede08ccfa6cf6d955eff8a8
-    - sha256:6f3f1fbca01570af610fae914d3496e681bbeb41134c3a00c10cfd0ac205c06d
-    - sha256:77db7e555af6148ea6a2a63eb74e417fba832149b237543817bc3672479314c0
-    - sha256:7ab587623810c269e8ab055fe398bc75b903cd775eb4ff43e5b6dc2a3484e861
-    - sha256:7dad576983c440519966f1d0f4a0dc29c6f6a3d8c0d060eee37e455365ee4934
-    - sha256:842dd0fa6e4edb1a798ea417ee5307a0290db1de3aea5e6a0ff4f746a80a997a
-    - sha256:8709a79414abebfb989a9c30afc57b57e3dd6ec68a365a730200a25ac0c6358f
-    - sha256:89068c5ae241da23bda5cf50ee5fb9220366977b469c9396615a2b556374147e
-    - sha256:892e6f2f56d8606e15ad6dcc5b33214f724dec3929cabda1387627abb551597d
-    - sha256:8dd36b1fafcdfd0bc4c3ade97c0476513cb58864ff3d12f2f42833da83d046d4
-    - sha256:98b6f19cfcac3e802e0ecc99cf0b42d742d58e82620e680d1a62110ecc7ad2d2
-    - sha256:9cf0d4714eba81219fbc08720519d890696f3ab18521943308717998d4732734
-    - sha256:a5331bbbcfe00b25d46f0437d178999fa83f908bdcd7207583260b24e1776a49
-    - sha256:a64d3d04d1da018ae382eb3cc19495b70fd2004461e6b04f8d294f586af3320a
-    - sha256:b1b12365e33def0c8a10d61aba0e523e89fc0958593727a4e6354384c00243ce
-    - sha256:c0fe3c7df28aea28901c977f1235990a0647b71a4d420e8e50ccf8379596c18e
-    - sha256:c3595b0642f30e7afa5697fdafc968aa6e7b81a1850016d496b718678507b6b0
-    - sha256:c55a2146e404987e33e59e7b102225c61c644c29fecb4a791fb7ee1ec6f6ea70
-    - sha256:c75f9746135abac825025feb0cbb2292feee4b9e0da2c25bcfa20b28b2074ae4
-    - sha256:cda60c0e2c88965bc4c131c128130fd410c6722d6f690e44d618e3cf60d9a341
-    - sha256:ce6b6eb081681d710f03a64fa6f44dfba2f66f3fc2056f1427140ffaf3197703
-    - sha256:d4534074b92f27d47c5654481d9528e5bf5c16ab978a0fa88122e9b75e776be3
-    - sha256:df88ae27ac8d353e07d9be8cadb137db1752b9e1135b24b07d440b6bb4dc67b2
-    - sha256:e0e539e8af87de944226ec14841add819c644754f603de127cad93bdaeae2f51
-    - sha256:e26d9dd8db61df319f6e708e0159d863fa9960ba4566825f562f4445070e98b6
-    - sha256:e2993d230271f0c42c1f273afe8b907db9317822c585045abff0b6c35872a2f5
-    - sha256:e716bf27f271712cc18638a577bcc162f8b317a1ca007fed1ff15ea492ef090d
-    - sha256:ea5e1cfd566b6a94fea4f6ccc56450eefd5b0a01970a31f0b128722147c11a76
-    - sha256:eb5ba7c63f7bfa0f29f8f19584d2ae2a670cbd6a797618e6956d236e784f1f1b
-    - sha256:ed3cbf3611bc9582d35d06658d41a7069b57bb654927fc45adf3582f3b035133
-    - sha256:fc2fc1237ba847c6be833b73a08d7a4f4f4c725162981035ebac59af59a1f7d9
-    - sha256:fcfff3eee9d89b4fe30ed8c1b434195dc263fb2c2b508aa0c87a79a4cb4eee5b
+    - sha256:0c9c22e21052748e31069e4b77d90a6db7d391f8ae2f5c21b47764b103368f87
+    - sha256:125186d275ad581ce8c10c32bd7083795be576e1bafe654373f118352e086e58
+    - sha256:151dec2226ed8126a880c93f0d5baca4937ca8d50026caaf6a33d040725099bc
+    - sha256:17d8a613f3296b007f92a056b8600d7b3fe8bbb1478002b971a99e18ef73956c
+    - sha256:2894c21396b152e7388db7a30a3e600125ca9f2cbef6eb046a09418a5ba7ab55
+    - sha256:28bfce340b98e24bdaef15a7033a881ade0d72a16495a7f5d61a364136ffd57b
+    - sha256:30befc9a069cfc6ccebfd32e20d5b80740c5b04a6d0a9805893588e82c1c81ff
+    - sha256:3cdf2e018f359368ae0b5fcb7e2d8ac34f058424d6ff4a7a37b0f63baab34791
+    - sha256:3eae7f273dc813f5b04b821844ff92c74dd4784a83e42d043e7451e8c12e8103
+    - sha256:430a2dd13d64800c17651b91e39f2f5cdc9101db909cc596cee0cd589ed10052
+    - sha256:47269cdc0d51ed37b1752e315a9110ac06ee527500c2ed7d3b46e4aeaed99fc0
+    - sha256:4a4522d5b6ec73c0168525eda2ee20d7e0fe873d3eaa6554589a58127c6771b1
+    - sha256:4a4623d2554083813c9487d332498505c771e4ac2aa0d80ff144ca49738ead7f
+    - sha256:5d8347e2d6d5e11d585ab53aa6965fe57d808dcd3372bfe91d2d6186b78df9ff
+    - sha256:5e7f05707ae019d4619c1becf866e77d703fd0e7536d82b68db387e2248ddeb1
+    - sha256:646b1444d7b4add5c927af6ea737a572fc4e0a9a8c6acb688724c229986392fc
+    - sha256:657444d57a6c612a0557403063ec84bcdb906dc474a8ccb33c3e4fdb70a5c207
+    - sha256:67878f441fb4361bb2cd49dd6e0caa2cf7a629851d63f7e265f407ecf3cea022
+    - sha256:6b615e8db385b372f72b4206b4754f666264c43fd39d0a5f47676564fde220a0
+    - sha256:6dd686332c4d05ca940d995d6379816b1e1c3a731af592716396cd64649cf9e9
+    - sha256:6f71ccc6dbcd677750925b25deb3dd518499ed7a2fb2304cca9bd1d64a24bf4d
+    - sha256:730a1c31bcc1b09541954d6b4ef183affe273ce9f82a645aa05f3b63411a291a
+    - sha256:7bef5864f0725708383ab2b277b6bf3354fd6365eea4edf21b01f044c153a5b0
+    - sha256:846fb7f12c8c2e3b0ee720342c44fe80ca3aad73ed3fe73fe3bb7281b2fe2174
+    - sha256:8e00c33809560e0add96b3f38e4efedb08a3b28b20e8ab64b53ff091391ac4b0
+    - sha256:97b09004efe4c10f65979cb723426a99bed2f86428bb5c30f334837a9d69d61b
+    - sha256:98c29ad167dd27086034a983cb954301a9dd5c695239ffdd8c15d11af6c30fda
+    - sha256:9d1a262dc62973f21cd6df118c7b56a7cf6cca2ff90adc47113379d676aca413
+    - sha256:a0c60f4ada2547331c4b7421ddf95336a2a906aebe6e85670e357a4bf2f19b0f
+    - sha256:a67f43ad3a61080c50e2913754e53a058395e3ec820b2720b27e402fdcb0ba32
+    - sha256:af0df472de1282e1c8d7a18bc4b4aad4e6a5fc6582716667e71cddfad782d756
+    - sha256:b6d66693913e1bb9dc30a992e3850d30feab6d1d82e8cfe1163a1c02e6c7561a
+    - sha256:bf60b6620d689f1f08cebc2321a2a53d93be88014416856af158373f2f32acd2
+    - sha256:c3bcb784ff2fd13355e0c385d28a73fa005a5b87d1515ccefaf35affa751fc98
+    - sha256:c616661eb8deea585e64eb5695bbfe08d19bf72c1d71cc04544ea06fc87654c3
+    - sha256:c6d65933edb6877a1e76b83d6363f30232aa68488f0891fdee132e22ffec97ec
+    - sha256:cf9807e8ba8df1e4520c3323f5b9a70fcfb63ced133e4c3e6ffeea25d2194dcc
+    - sha256:d27e0721e12b4f7f1f54f3e4b3e5ec9b03d72f3d33ce58037593d81f26437e72
+    - sha256:d3a0134548ef88cc06b617e0b157647f6a7ee4a8fce78f8ad33211f31c922c31
+    - sha256:e7a000d5cbabdf4ea3c50a82a535a022e6bb79f48cee079a846d13ff31482e3f
+    - sha256:eba71465a23868de02e9635f7c99e679bbd70fc082948bbc5aeb5df2d91102ad
+    - sha256:ec9db7119e7454099e0b0f4b425e1dfd080c13afda0c2cdfd23fee5f6c1b0861
+    - sha256:ecaa9b26fd80c9dbce6f47ea314038fcf219345a5685f5d84eb8019bc58c0ec7
+    - sha256:eccd6885d31bdc79a3d0009d8d57d532a589fb98e0012b390155a5380e653e6b
+    - sha256:ed9fe0561ee62fe5e8fc2b3f186c17852dc123810994f23094ca9d276ba9f230
+    - sha256:efc54fcffe3231602d4937fac8d25526befaebe40541ad0757ba11b664450882
+    - sha256:f0b8e0532677e7f647b056242f95b2bb290ffcd6e93091f8f3f68373f67335a2
+    - sha256:f50b98fd0f5c4ac167626df5610393c1dd787bd5966e4f287f67a7ae90c77536
+    - sha256:f685acb504a66d7232b82ab8ad9f6eff23023be6ebd08d21988a1c695b76ddc2
+    - sha256:f7f8d40e231dfe430c207e01fe12c13b95085816f6d3b98a405b14774b36937f
     candidate_omissions:
     - code: condition_or_channel_observations_incomplete
       subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
@@ -515,7 +515,7 @@ decision:
       subject_id: rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO
       reduction_id: window-8-12h
     blockers: []
-    attempt_digest: sha256:1c5a737fc9f28b3a27380c38a1e11994972bdfbcb759c05a3e771eae6e1c334a
+    attempt_digest: sha256:5b0aa223ad007d946a3649f40419ed505730f951841acdedbabd38fd5e2eadd0
   - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
     experiment_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
     reader_record_identity:
@@ -525,12 +525,12 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:6b778b43e100fb1a5914989a384952e9d05f6896b7125fa9a81344cd3c5d75ba
+      reader_record_revision_digest: sha256:88dbddbcdf754b25acc6c875be1b0f7b5ba4ae5ba7ec01fc0fd4017441aced8e
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:4b53221a45e2df8f84ce295bb186d6118d37786f9c5b16169714ee6f4a3e06cd
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:6d20c01b70063b5721b1990c2c57393a9756180d4ab083ea3ef201ec37b54bd4
+    evidence_binding_artifact_digest: sha256:bf6e04768d41f1ba5b2b20fd9daaf835c634f9a772339bf921b2f6465c21f686
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO
@@ -543,49 +543,49 @@ decision:
     status: complete
     candidate_profile_count: 40
     candidate_profile_digests:
-    - sha256:05ee66b5f5bafb3b75f609afd38eb255ae5eb893cff7635be5b8f1d463c836dd
-    - sha256:10a57a82071e83c92f5eea6b45f31410cecece111642abb1b38be275130ba959
-    - sha256:114b38a39ec7308c1c9bdf9cb87d44e9dd28c4bfe219a246510b271be39ea296
-    - sha256:1270e2ad8f5fc55fdccc371bdb2c5304d26ffa67025926366def065b2009a438
-    - sha256:1ebd99958f8e73ab640723832e0709ae882f1f67247f98929b990a620c930b85
-    - sha256:20bf3275cf24a741684af68a4ab979875f25b2af048ddde7713a912339604ca5
-    - sha256:21f6803b2e9ccad6f164c2f96267d52390c73f9310086841b621187e266d4e48
-    - sha256:23c519c8791800e5de83e4c8911454922c4db2f9b30916a38428befe40c5af32
-    - sha256:25415eebdf34496f340a2fb7740f8840307a7653d894cfbef7a5708cc6d29997
-    - sha256:34a94044ff570d360d9f996f2b5c91b3d442fe21835c89dff5c348e828db7a1b
-    - sha256:3ba770ef86dae352014e835688d472bef17e84571e8cfd827d9624a9bc943a5d
-    - sha256:3cf899248b955201c69d220eca4566208d184b07eaf60b353f32bb93ad63b240
-    - sha256:40f649b84bc74ebe39fa350662af72a1d3152c59d14a085b0e644e474f536968
-    - sha256:4529fa6fa910c7f328b0c25b97bf3c0fd887c72bf0583c5e632bc6b20f636460
-    - sha256:4ae413f403bf94d75357c8ebef8c1ef76ec0089c4eeb48d9c9d2644561364efa
-    - sha256:585f29d0681f21835e5cdc2923a43b42dff018607c95c796b41e5952737e5b78
-    - sha256:6c8f0a2863bb64f121e9f0757ab095756ae35b593d8be9ae973608cbf460faef
-    - sha256:70f26e937d8fe7c1598d0f99167aa63cc7912f8b756ebb985e893296efa5573b
-    - sha256:780c71e5c2c335ed58f38f03370fd111aae7418bce92d330f31e8f71b6d85efe
-    - sha256:78a5d407139a9a7678cd5b3ca4dc277c45c3f64c547067ca363f008ad850607a
-    - sha256:7ba8214c4fb540b67586f4171e23b21d1cf950a78d5b09cf471f434f9b4cb63c
-    - sha256:80be8c1f3dd40148a021ca67cee3c42f00556a8454c42a438c8b0b235e37cc71
-    - sha256:8ddcaeb5b2417981dac02a0ed4ec32ad57b209f9911fe217b5a21a8ca5dd52ce
-    - sha256:8f9294681812f3b758c761e25223921d14d05cbf5290881ef44c6f71070b8db1
-    - sha256:925d582b1ce95e8693726f18cee3dc288c1011124ec95dac93bf9adf1e8f5f22
-    - sha256:a27782292e138f364aef4ad880dd99ce0b28d822e91eff7a86c737ded0233ce0
-    - sha256:ab9a9d08551ac33dfbb47d9ae7ade17aa40314f405e817fa3bb797675cc96a86
-    - sha256:abdce7aa4560ed4547c62e5030e96cad75187060f14150651db1e8723e921bcd
-    - sha256:b05e6591355ebf74210f319fe2bab495b33d212fd64a070056f6ab8dc6e1bb54
-    - sha256:b0c73748914ac67c66bbb132fc627ea2cdf5e5e2efc30d0d64dfaea8dd524143
-    - sha256:c1f0866719024a915bb5294a8bcd1772d71feb0532d1532306cf325bbaa8ca43
-    - sha256:c33eede30694ee69a2b325d0c24efa5b5c071284db64aa73e4c9372d08b742bb
-    - sha256:c60f244e42de98aa89511a4c60abcc96ab0463262bef34d91960fb5262a631b2
-    - sha256:c98e2a2df33f76a02dde97c775eda422253d5cbebf3cd274be42d47d308dd280
-    - sha256:ca78fcb8ab8febd669a355b8fa3d8b4c64901fce63fd8d1b1f00f438b79d6eb9
-    - sha256:cfb760251d0faaa028a8e153265172a29dd76c0f200b7707661c7afaad5c373e
-    - sha256:e99c26fcd1b756a0b8dbb26b7872e1aaf876f4db8d85e8e78adaa7092f5fbb26
-    - sha256:ef296fbea3d8dbe67d8ee5f3ef01f6ee8a303948d6fb46a6c1f25a05d360e1b5
-    - sha256:f9c575b75df88ce26115fa54156309e43a704c70a124ea9877c488f9fa03ee5a
-    - sha256:fb418fa93f03a4df876f7fd32297794b49db0c464a9add99b923f3b61bb935fb
+    - sha256:09eef4b183d4c1187fa9db1d65613d2eac93f8f785b4d8b0e863a376b01834e3
+    - sha256:0bec4a306207eb5e3176c4d1112630556035aa9543aa7cc95968c2e66aa328c0
+    - sha256:1281d6e422b563fec4353a2fbce6c75af1bce550f88e1c5452db186d39417b82
+    - sha256:1796c62a9f23f3885e46c9eed9c2bd9249fe0913e770eca29cc02139fc08c2e2
+    - sha256:1c62604f04128b02916d758eb5ad43c73bf52ce825f8385fe454517ac1244947
+    - sha256:1e4a3d6d3149cf1d920e62be8c5548b094e4eb29916de446fd1d883b6b3345b4
+    - sha256:1e63e89709bc7c0905af8f97c9a3b4230fbcb74839d69ad30b28423bd10e8c54
+    - sha256:2751cf094ae6fccc075ab05e1ec15d0d9ba732310eb173deef594defd111e6c8
+    - sha256:2e3c7c7c4873801a6bc6b6c8c951625d95bb1d0ea7d554e7cf20fc9447a72c2b
+    - sha256:3ae4c618bc32f7b3b4baebb49ab7f85d05129ca2086734c03322cc33b06fcccc
+    - sha256:3b21a2a5983c74a84b88be47e2c3172915283fb6412c97061cfdbdc70691c931
+    - sha256:4697efc2d23352900c2453d9be365a96c997b6c26c08f649b7ed492915e0d268
+    - sha256:492804649e28f8ba6189f2b9827ce26075b242549dd0a44447e6b11b9fa9cf15
+    - sha256:51075a961fea112d0bc1553c97cf8b3f8ba819b8bd512092d03342773e8f27e1
+    - sha256:52263fa34ccda57d18f83b7413073fb0d27a145a7a1f3d2bf925dff066e4b8e5
+    - sha256:52a784b43ac88316445745797fce15a3f8736428aae32d1ebb6847250d654fd7
+    - sha256:555526078ab5462f2badaabb0c2383d874af43d979cba92f2e5223a4fd71db82
+    - sha256:5aa54c5becf348600ceb19d14c6174a5bd95f223b983df994b68c8188f7d87b2
+    - sha256:61009481e32f67c180f55cc595ecefb2b555e3416bbf8538ba817fb20b534b17
+    - sha256:64e0cfd96baf87393a0df3f3daebd1823c36fbb4a7e934cc390afd065b374a8a
+    - sha256:68daf7ec1ec92b05ee8253b87327f06e1a479de850cfde5602654c403b978e86
+    - sha256:709409fe520930452a2d8c4e320e7d562d3d193b76e5b6f1c835ac2e1bdca4ab
+    - sha256:7b9122a1f1304dffb70f7721a08bc72802604ccf4db813bfb9894d4881397aad
+    - sha256:7d343bb4f4c64e1f5453752583e6884c12aeed3f8e71b0138f4956bd5aa60130
+    - sha256:86783a2ccae94d8c2ad9a5235b3f5a22a0006131f8d2bb727c00267dc7c27cc1
+    - sha256:868e26bc616a0be035a38201625a0f4fff9ae441e395d7e5a50e3c18b2d60d40
+    - sha256:886532303bb06a2606416cbed4d207f7d585b212c0154281f59632eb5e9ffb19
+    - sha256:9e86ff2e735324bbf91e9897c953b4844cb803248295b37ebb8ac4c3bf77b2d7
+    - sha256:a10e63b53999f9bbf452a6a1f6dad2e4cc6230e7c0ef35cb694865df4051b34e
+    - sha256:b28ef53a0f2004c9bd4e787fd5fabdc550cb510ad25bb393580f6e6c0faf35b9
+    - sha256:b388c979c99a7add979fdff9f62d096533caf69e8ca1b0df865854c04f0f1287
+    - sha256:b840b314682df58afc6c0f7f7f0185d4148c5b3a32a2407de510ed00e7ea967c
+    - sha256:b9fea0f2c3869064721f912b470c1e691540e2d346855bdd65a5f37304e0c468
+    - sha256:bc95e7933850848b1be0379f099f6db8395daa4f1c930f76937c04e050356a96
+    - sha256:bfa691884ac8a21fe7975218d39eb00416ab5bb3dc97f73282a10229a0b9dba3
+    - sha256:d3d3ff2385e8be2cbc7a65641d3841cc3c2e66a3e574febe5ead6e81e1228d4a
+    - sha256:d5cd558261b67ddf59cd054311774272ceaebd6003aa26506e4623a75f0f0a84
+    - sha256:e1b65691eab0b3949b125628a4fa44b841046084f931bd8f0a953769c28965f0
+    - sha256:e7109ae853a8158665dc4e6d19bb1d3b0cabd7c78dbc44091a015a022c5bcce9
+    - sha256:eed10c3da355627856bea9c8c1e0f3e3f2b95fe78adab4fdcd28eb11f1f3e300
     candidate_omissions: []
     blockers: []
-    attempt_digest: sha256:f268916637520211e4668ad7048d6b740643e5efe05815b80ebe5c484d4f16b1
+    attempt_digest: sha256:0e744633a041255e222323ea63099b286e98ad63be161e7836726f1bdc790793
   - contract_id: rt_lnrna_reporter_response_materialization_attempt.v4
     experiment_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
     reader_record_identity:
@@ -595,12 +595,12 @@ decision:
       reader_record_kind: dataframe_artifact
       reader_record_schema_version: 6
       reader_record_revision: 1
-      reader_record_revision_digest: sha256:aaa83125e82be7fb769e5b8afa913374a7c0726509302e4ecdc4b2f80aea96fb
+      reader_record_revision_digest: sha256:74f6d582951e666bf286c78439f1f82088898ae310dc0438c50385a47338a2b6
       reader_record_contract_id: plate_reader.annotated.v1
       reader_record_content_digest: sha256:3fdecd950087cd8c84d20a1ded5f04fc441f73f2f44f3361060ccf4f148f7355
       reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
     evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260720_retron_Eco1_26_180_201_202_203_204_benchmark:sample_measurements/df:r1
-    evidence_binding_artifact_digest: sha256:0125c7f01cdfb8920c55d1718c13b176da51fb357f62b6339e1109ae49e4c9dc
+    evidence_binding_artifact_digest: sha256:55f38c363f0dd257a3460167fb0dd7343c1bb9169f4f545b27a88e1cae7a0332
     expected_subject_ids:
     - rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
     - rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO
@@ -611,39 +611,39 @@ decision:
     status: complete
     candidate_profile_count: 30
     candidate_profile_digests:
-    - sha256:11d9ebec560e5a9595fa75c66b7839350393ef3eb11c7ca03247f8f59a48648d
-    - sha256:13c7a5ee97947caa68a98dfdc10d021154e05e54b0a0954c2dac24a075620c77
-    - sha256:1f4404ebbebaf10a2a0a564ea0a215c5e2b25021e82fe0760ef871c1c27abe44
-    - sha256:2b89dc5ffa7c00ea6e67c1ab911f0c262c0ff6d1b9553021d52c9b4e3a5e8449
-    - sha256:3cc00199700738c3f026ff3e13e820935b69bbfbfc7cd475280ed9440133b4f6
-    - sha256:3d07dc45611a29a40f7cac8ec1dd3a39ddffc54aae182d9f3ced637fb5e475e2
-    - sha256:4053012929c2a62d6c114956d7cbfe970c84eb1ef693ae43caafaeff7250f5be
-    - sha256:45088a764bcbf4baeee3a724c06e31c44823069014c307503c4899f626c5d6af
-    - sha256:49de5bea680fffb09604c8b23b96357652d34fdeea9d669ccf644b733d205290
-    - sha256:56b80c4485a56dea035bf3765ff9247f345bbb76ac81528d95b07b71462fd6fe
-    - sha256:5876a6f4cf164802f677435ff60b54a2e6a5b9e92e5e820fe1f04a62700bbf96
-    - sha256:5b117ff61fd45dc1f3c4dfbe9bc9761f3cb4fa9e884cd1fb29a1b597562b397e
-    - sha256:5da9688c42b03837f6d0934ce0fa5913535bb33df3f09bfca7b7fef3d8063617
-    - sha256:5db89b9b68813c89ae4eab89c9865f67fdd75f5f577bf0119e3480256036c832
-    - sha256:5e8c06bc83cc59d1972b8cf5579c287e3c931dfced05aa0f56dda62769a830ef
-    - sha256:6406b05ace2079b2dca6770ada93ff58a09ec83223cde9a80294516079041b2a
-    - sha256:68be72a4ca113793b578834481a885a44e5ee217d6b7ae67389f098611126c9f
-    - sha256:6cc1c55d74b806c79ad2909f7333230184307a8a715857e745d2d1f4842c9a9a
-    - sha256:6db9f5466599649f6113fd52c98f3c99c0a7d4786eaab33194e2d56632706a2d
-    - sha256:73b3912e8ea9e8714565a9f1d14f7fff8c8bbfe4d057111ba3bdb4642acef2ac
-    - sha256:79935a236e62dd3a7a806358e87ee0d442c216aecb2605341c0f13f9bd8a84f0
-    - sha256:a7024318bfcb6fb657631e337a9112ab24bc09e9a607a5ef4bf045852e3e992f
-    - sha256:b342a62e9b8bf6903fb1a7c9dc9ea1056eb7f154efe0c9d690a96873aa54b941
-    - sha256:b5f77eecca2c48df90f829d3643aa2453ff8ff659eab00e5a444905ba0a7df32
-    - sha256:b980a99bbb50c7f8617e5cbdb6665bac37758c9bc810b6c1492bb7f7a05031e0
-    - sha256:cc4c7ef5772e134cb99c4398482c005b2a303abf102f81a0400611edc606592d
-    - sha256:dc0a79573fdd9e9eb1c9b8f175a065305f6a74628b15d77174290ff9b2d02afa
-    - sha256:e83676b6e84063fc18f70ba0f8151613c9b2624cf0b6eeadd03b3c64d86d94b6
-    - sha256:e95d04b37cf48d68f5edcff8afc818029b03ed124d0f59c1e870dcdc3055d9f0
-    - sha256:f1d78f6dfcacc55630504e5942704eaf152df9eca98f0c64276bc4169059bc8b
+    - sha256:0a3f6c02410f0e3c857a3dcf62504f764d07d57699aa5a532c67e908b8cc29da
+    - sha256:0d8ff89464d52ae7838e5b74483a61b3abbf6462d5e1effcdf3faee40c8e5186
+    - sha256:3049cbb04ef6f656218ddf0f1749052729a0bd9d4dd0790d1a349d900e0620f4
+    - sha256:47d73a49f1fb6ad55446b01b568b5290a9afda63243e938382b233b6cb10c60c
+    - sha256:490887731cc1093cf8347fc4128ab83c6fe808ed3c1e506e2ab5d653aa75e8bc
+    - sha256:49945c9e631c866949e1e2c5461627937d51244166615c1291d871a719c04c87
+    - sha256:4b3dfe7216230afe6fd44193c3a2c2e17ed823780f0309db78a0823c9d7a6712
+    - sha256:4cc9c30aa9ac52629a3ca3209bf6619d6fe613de8da41014ba0d8b1b51f39f41
+    - sha256:4eb51e1c560f5337decc63a59c7a1c4bb45801d6a38b31e09442ea41fcf92400
+    - sha256:6f690158d3e5cba6d66c21f3e4c172b298f70585fda8c214c85fa7ac8e56ac2f
+    - sha256:6fb87175e0b8862d00f0404d6a9db36d3332f8e23063d0b15e3a6a79da1e703c
+    - sha256:843a33d879a4b31ea98209076a12a4a3e617b8666f9a97c046673b7915a01861
+    - sha256:84e9a646459286fd6d66cef0a848c51ea143a74a35d9b4e54f1c233cc6b59001
+    - sha256:85632a238ab7bb6bfb0b7578f418af8a7ab98d1589b5a1eecbce8d8444221e32
+    - sha256:8ba0f081aa22d3d930b7e01bbfc9163862d5a39c337c2b82920198045390ca87
+    - sha256:8c0676d6b59cf0737d8e1d8602a7e33599fa0a57df82bf2c946f5de582b5e5ae
+    - sha256:91101aeb303d0e1dd81e1880fcc5192492251b822933b788b53a821f495046b1
+    - sha256:9a64133562ac685e49cb61faa08f23c20fc1cf82a620aa131c713b0f9693f570
+    - sha256:a07f293e2372941ad01d9a2b162db62e1c703091f462e52de134dec6113d4bbc
+    - sha256:a2c8cce02543e57633c52e69d759edc45c4519dcc7c7f9a4829daf9969916cc0
+    - sha256:a605d3e3fb1aac711390ce5a80561d101bd8242aa7efe468a50aacd764407ac2
+    - sha256:ad35a1344759a0af79065f3eed00b64ceb8fe883fd8e76c4b027635306769a27
+    - sha256:b3b509931d7a14043878e8ea3945427b22bde7e6eee27cb4c96c9bbfc2c86e4e
+    - sha256:bb90a1e1e91b46f480b7a34aa200de58a25aa0cbf18087abf799693ed4103726
+    - sha256:cea1f8a9c2ad4ac313390cbcfd031e8eb73cca3a03851a3f083a408c9b4491f9
+    - sha256:d37375e1cc80ec3904e8b5fc8158ab3aca1d636407da215addb194173037c20d
+    - sha256:e7a96ca70fa7b1dc1364ab04d05d3b6ab9a56466e38c118cfe0ed66fd637c95e
+    - sha256:ead64d1bb70784fef05f50ec8eaa5ff01f631e9e25205f7170918a7f35a0088e
+    - sha256:fa3c61040a908e45d9b5f4c88609d4dc65a6d084bfb4f675c6073ab61f573244
+    - sha256:ffdf7ac9ba094dd410c7917f37bd71adc6ed2631f211b8357b8ab43a22459eab
     candidate_omissions: []
     blockers: []
-    attempt_digest: sha256:fb179e775668f86b5c8eea60f98cc76631024bc609246952ded2d3d8fa6bef91
+    attempt_digest: sha256:640bf9ceaaaea91f8842bd965e49c60a56e96d927db0d4deb112cef661c8ed21
 objective_readiness:
   contract_id: rt_lnrna_reporter_response_objective_readiness.v3
   status: blocked
@@ -656,52 +656,52 @@ sensitivity_evaluations:
 - kind: centered_window
   value: 2.0
   profile_count: 220
-  evidence_digest: sha256:072289d5a38e43682681def6f912a0b8d587496c601a1dbed33786615507001c
+  evidence_digest: sha256:806588663e366a7262047c4f2f2efaa64d8f7ff0f357424ec14bfc51c3ae577a
   selectable: false
 - kind: centered_window
   value: 6.0
   profile_count: 217
-  evidence_digest: sha256:542f5ab86acb5db2c45d6fea24cfcefd8dbfe73b6f5e2128abe0dfd7d2656112
+  evidence_digest: sha256:5c842104d3cdb6539963d88c3725ad6dc286eb416a10e6bd1e16e9ee43dbaf4f
   selectable: false
 - kind: dose
   value: 5.0
   profile_count: 358
-  evidence_digest: sha256:2834ffe11b9e6da0c57d6c80fe121a863a557fd49510eb4de805d42add1b48f3
+  evidence_digest: sha256:f346d07d8cab773a4caf5fffb2c7b9affc373f739253fbacc2078d1a5259ab75
   selectable: false
 - kind: dose
   value: 50.0
   profile_count: 148
-  evidence_digest: sha256:b07fae2507cf3666c4ab32620090e492901cf8d7685b05af6158e655ce007229
+  evidence_digest: sha256:e3ee6c5d5ea96e2927fb4dbf4725ef2c3d61d5044b66a6bf0ae129749ab049a0
   selectable: false
 - kind: endpoint
   value: 8.0
   profile_count: 44
-  evidence_digest: sha256:6d39db1e96f51fca333188624018982b1e7d0df183df3ad58d66b16830762fb2
+  evidence_digest: sha256:f43f9a86b6ee9b0a4e20b6aa7132095ec508e11c33f3d11f23ac2f43c59bc84e
   selectable: false
 - kind: endpoint
   value: 10.0
   profile_count: 44
-  evidence_digest: sha256:c2b65c344c197114a50be7537bd30a8f9e282670a853c27714ee884b7f527d9e
+  evidence_digest: sha256:e6f2c012fe99d3d9e79e6b2f17d56c8abd11fa30fc70edfc504a28cd0a01901c
   selectable: false
 - kind: endpoint
   value: 12.0
   profile_count: 44
-  evidence_digest: sha256:95efa05d46382f399b81bf655a0841d564ea8d795f2165c42f4844d2cc3ecfeb
+  evidence_digest: sha256:4a92158c7db62e6a8765abd38167339c745d7622c41060483f8e47c1a6f5ade0
   selectable: false
 - kind: endpoint
   value: 14.0
   profile_count: 45
-  evidence_digest: sha256:e6ce1371454e3062aa2124e3237a0dc10454fd419258ac80befaf9c7db3893db
+  evidence_digest: sha256:1cea3e0e10655c0b52b0daa2dc9be97d4a7217092eefa76bb95b90c67704b611
   selectable: false
 - kind: endpoint
   value: 16.0
   profile_count: 44
-  evidence_digest: sha256:91f3dd382f9fa8829c072052c97558122a20754802c33a6b064e726fe1621bd4
+  evidence_digest: sha256:e0b880c066b3dbbca6583b7a9701d207a2edf1b725e63e8d4da890e9aa47a203
   selectable: false
 sensitivity_coverage_receipts:
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20250622_retron_Eco1_26_43_benchmark
-  materialization_attempt_digest: sha256:374397cd5efbe2d36e7db3675ff51ff52fa54ddefee1d855864ecc421d4cbf52
+  materialization_attempt_digest: sha256:7b33dcd2d648ccd58aef7eb5aa24c11bd678174cc12ae9a2043e3c5c6718bfc9
   reader_record_identity:
     reader_experiment_id: 20250622_retron_Eco1_26_43_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -709,12 +709,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:05a3a05ee2b927c33fb87e6f836db1b2bc437cc30552b9b5230d8d35b2a130b1
+    reader_record_revision_digest: sha256:555971e94ae788a130113186668bcf6cfb4160224e5f0cacef6e9d94a4d44969
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:08823964a85c927c8acad421bd72a07e5e22b3e22bf0e9fb1d8f31f6b510dcff
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250622_retron_Eco1_26_43_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:e96aa8b3b8fd0fc15d8342ea7b529770dd7b2919c1acf6245e8132b1e4db834e
+  evidence_binding_artifact_digest: sha256:c6b643716a534193df910c0624cd98a17be852bc53b37c222f5aa6e6a9d2b9fb
   expected_subjects:
   - raw_design_id: pES-retron-26; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -740,10 +740,10 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 30
   omission_count: 0
-  coverage_digest: sha256:33ba80cc9f1bd96d0b414f5413ec31d30e059070409637cfc12dd90c4dd8f8d3
+  coverage_digest: sha256:4c0b489cde044a4c3fae1f0f5d720616d367a75f647c85a4a71e3cb5d00e59e5
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20250707_retron_Eco1_26_43_45_46_benchmark
-  materialization_attempt_digest: sha256:c5690aca60c9563b5002e8f7977b92a7b0f59da32ac1e52c17d314512752d652
+  materialization_attempt_digest: sha256:ce962f08e8e029310147a1ba1da07aac85b2e76a2e366ee4c45d876f30dfb182
   reader_record_identity:
     reader_experiment_id: 20250707_retron_Eco1_26_43_45_46_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -751,12 +751,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:d41999ea7ec681c06c923e1947f0b66698da543f62546ba460a6bc67a4eab134
+    reader_record_revision_digest: sha256:edb5be299606a6a105f2430cb3aff4f86438bfb73efb40bffcff863ae50c4f21
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:0b380ce9ec75c02404dc71821c3f3e2d5c3c40b8451164af23d3d0ccc98bd3a2
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250707_retron_Eco1_26_43_45_46_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:77335672e43c396af13e2b7db2a43702ead2d09bdb57a5db1021b4f30fcacefe
+  evidence_binding_artifact_digest: sha256:5ce949177485b879a73ab6663bfede17c0be64d2fa7b846281e699e69d299540
   expected_subjects:
   - raw_design_id: pES-retron-26; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -788,10 +788,10 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 59
   omission_count: 1
-  coverage_digest: sha256:39f8c29b2a544a64671ca48a983856dd5e86a18dd134fdf690b0252f5b158ba6
+  coverage_digest: sha256:d2308bd10a7c678e544681f3ea077710eb22af2c2ce7feeaea02b7c9e1f6b1ff
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20250718_retron_Eco1_26_45_47_48_benchmark
-  materialization_attempt_digest: sha256:bdd206cfac03f44771360e6d2d642c5f14d994d8bbec5b611d96a7b69da77194
+  materialization_attempt_digest: sha256:7e1ad7d08c914f057fbe85fb8ae8e579490a9e55f82323c16782f932440dd9cf
   reader_record_identity:
     reader_experiment_id: 20250718_retron_Eco1_26_45_47_48_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -799,12 +799,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:1ca4826ec7c0d48f6ce86db1e480c21a9ab4d536dc79184b7ebe7dc2f3e4d1ef
+    reader_record_revision_digest: sha256:778fc8b00a0f9322fa3ba7f4f9890e84f1a2db328a1a2da3d80d98160c050712
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:1ef85d112b7246555995e23e07c2c83b08e6b8088bff3176d6af317f8aedc892
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20250718_retron_Eco1_26_45_47_48_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:63b40cd40ce4f8f70e5b0702be335483083ef8f7f61a9f60d89e9aa7cf539ec1
+  evidence_binding_artifact_digest: sha256:5413ea1d8cad33a051bb9c6e27ddc7e57d843d1dbaf0fab81fb157052d6ab15c
   expected_subjects:
   - raw_design_id: pES-retron-26; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -836,10 +836,10 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 59
   omission_count: 1
-  coverage_digest: sha256:291b12119ac7ef7e2a0269b4d3665554dbb55bb9511d9fedf6928967f6952d74
+  coverage_digest: sha256:f036e9bd2de2366c3c7257f069abe60ae0d9bd9795e337565cd37f9b3dcdd716
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20260418_retron_Eco1_26_43_170_171_benchmark
-  materialization_attempt_digest: sha256:d6b0834d8aebffabd60e6b1269327d2566f4d5caa1357132a5de135de116c8a7
+  materialization_attempt_digest: sha256:edb45b81da7b3f7ec3b555fa30ff88f04aa9c3bd54762eef03b170c1fe34575c
   reader_record_identity:
     reader_experiment_id: 20260418_retron_Eco1_26_43_170_171_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -847,12 +847,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:d786aff2b83b01b414029de4ef4c2d4dbe71012211e52e7e0478a6c0355f5cd1
+    reader_record_revision_digest: sha256:362d9abdaec8b412e7dcebde7aa6eb51fe8f6bb0cc46d78cfa52717b558da227
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:094f16c2631b3aa94086b1c8fe83e01825c4ae261ffbe2fac80e05ac640a48a8
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260418_retron_Eco1_26_43_170_171_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:d8577bba466967a9b8cbedc9d95e17b0be7386ce9be6e198bbe7283d0757d720
+  evidence_binding_artifact_digest: sha256:3f043ce68447cf9f98fa1b47f14953ecef94abb0e38f1c91bf6797fd9de09b40
   expected_subjects:
   - raw_design_id: pES-retron-170; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -884,10 +884,10 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 60
   omission_count: 0
-  coverage_digest: sha256:5e0d3b78d3e92e906a2ca841310e2121ead509543add32b3d48d9dd26577cb4b
+  coverage_digest: sha256:740d2b9d1e8662d162fe65fb60f4b25ccf9e8a8d1d46b2a1310c4404edaa04c0
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
-  materialization_attempt_digest: sha256:afe0c0226549de3dd7792eddeeb3f778d348230e7e97221ee4f1c7e96abe3738
+  materialization_attempt_digest: sha256:f07595b995703a2b1d5d513f37e15ad66ab3b09a4c42c1ba0c2c1aa467d106e4
   reader_record_identity:
     reader_experiment_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -895,12 +895,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:176924c7744da54ebddf883c74e51be9fcf174f54850fd5db93dde56a49b7822
+    reader_record_revision_digest: sha256:d852dce33a9051e7f564801dae029a556dc0ab865e76535b50cede47db2e511e
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:2932657f151e02692a2abe7c1c5d4d858a0cc7c19c477c646ff6ec88ab497878
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:e4d5ace6ec54ffd4efad5b5c39e97e0dd3cbb0cc065d369d0a1edfce39b6d9f8
+  evidence_binding_artifact_digest: sha256:d30c0af2cf64156f3fcb09ad33812ef07a0fa1b1ddfd0028373299e5e4ae6a49
   expected_subjects:
   - raw_design_id: pES-retron-172; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -941,10 +941,10 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 91
   omission_count: 14
-  coverage_digest: sha256:d2ac399df982301fb657f80704c39f18d6a8277f56daa702c5c99bf607cd3324
+  coverage_digest: sha256:c2c3ef3d215adaab57fb2b9ff4457239ce858bee49c4226885864652caacc0bf
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20260529_retron_Eco1_26_43_177_186_benchmark
-  materialization_attempt_digest: sha256:1c5a737fc9f28b3a27380c38a1e11994972bdfbcb759c05a3e771eae6e1c334a
+  materialization_attempt_digest: sha256:5b0aa223ad007d946a3649f40419ed505730f951841acdedbabd38fd5e2eadd0
   reader_record_identity:
     reader_experiment_id: 20260529_retron_Eco1_26_43_177_186_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -952,12 +952,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:7bcff1c5d9eb82a6ccbfeb57f561937e803e2980e2db0ce2835e5805fd3a79e4
+    reader_record_revision_digest: sha256:b12fecafad82736a47b7d0e9918381a9150ddd09b2403a47f18d692c9771f770
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:28e7b7a79004aca291df96b0b18e6425bcd1c724182114327380f03d4a744485
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260529_retron_Eco1_26_43_177_186_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:730973e8ffed6eebf4fdf25d8af728475009810ff5703d60aad7a054c8a87687
+  evidence_binding_artifact_digest: sha256:ff3eec8e0c25e2b06a25bc111fc2f1802eab93a6b9bc0d5436deef5f2a85d1e9
   expected_subjects:
   - raw_design_id: pES-retron-177; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -1013,10 +1013,10 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 149
   omission_count: 31
-  coverage_digest: sha256:ef4d4513de036df92249243dd08cbc91efa01444d21cd9142d2e7c16601f64e9
+  coverage_digest: sha256:072392af018ade39943db721b023c526ff5b6befd0268cac337a7351802227a2
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
-  materialization_attempt_digest: sha256:f268916637520211e4668ad7048d6b740643e5efe05815b80ebe5c484d4f16b1
+  materialization_attempt_digest: sha256:0e744633a041255e222323ea63099b286e98ad63be161e7836726f1bdc790793
   reader_record_identity:
     reader_experiment_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -1024,12 +1024,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:6b778b43e100fb1a5914989a384952e9d05f6896b7125fa9a81344cd3c5d75ba
+    reader_record_revision_digest: sha256:88dbddbcdf754b25acc6c875be1b0f7b5ba4ae5ba7ec01fc0fd4017441aced8e
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:4b53221a45e2df8f84ce295bb186d6118d37786f9c5b16169714ee6f4a3e06cd
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:6d20c01b70063b5721b1990c2c57393a9756180d4ab083ea3ef201ec37b54bd4
+  evidence_binding_artifact_digest: sha256:bf6e04768d41f1ba5b2b20fd9daaf835c634f9a772339bf921b2f6465c21f686
   expected_subjects:
   - raw_design_id: pES-retron-180; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -1073,10 +1073,10 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 120
   omission_count: 0
-  coverage_digest: sha256:a8a6c6023bfc9270a7411b2e8637985bea00b8e38e1399e44a82d8dd7619ec48
+  coverage_digest: sha256:0803728a69e686d992e492eba0d9bd226fd2d915900f52a1afb0e50e44573526
 - contract_id: rt_lnrna_reporter_response_sensitivity_coverage.v1
   experiment_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
-  materialization_attempt_digest: sha256:fb179e775668f86b5c8eea60f98cc76631024bc609246952ded2d3d8fa6bef91
+  materialization_attempt_digest: sha256:640bf9ceaaaea91f8842bd965e49c60a56e96d927db0d4deb112cef661c8ed21
   reader_record_identity:
     reader_experiment_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
     reader_protocol_id: plate_reader/single_reporter_screen
@@ -1084,12 +1084,12 @@ sensitivity_coverage_receipts:
     reader_record_kind: dataframe_artifact
     reader_record_schema_version: 6
     reader_record_revision: 1
-    reader_record_revision_digest: sha256:aaa83125e82be7fb769e5b8afa913374a7c0726509302e4ecdc4b2f80aea96fb
+    reader_record_revision_digest: sha256:74f6d582951e666bf286c78439f1f82088898ae310dc0438c50385a47338a2b6
     reader_record_contract_id: plate_reader.annotated.v1
     reader_record_content_digest: sha256:3fdecd950087cd8c84d20a1ded5f04fc441f73f2f44f3361060ccf4f148f7355
     reader_record_path: artifacts/sample_measurements.validator_to_tidy_plus_map/df.parquet
   evidence_binding_artifact_id: rt_lnrna_reader_evidence_bindings_v4:20260720_retron_Eco1_26_180_201_202_203_204_benchmark:sample_measurements/df:r1
-  evidence_binding_artifact_digest: sha256:0125c7f01cdfb8920c55d1718c13b176da51fb357f62b6339e1109ae49e4c9dc
+  evidence_binding_artifact_digest: sha256:55f38c363f0dd257a3460167fb0dd7343c1bb9169f4f545b27a88e1cae7a0332
   expected_subjects:
   - raw_design_id: pES-retron-180; pBbS2c-rfp
     raw_assay_subject_id: null
@@ -1127,7 +1127,7 @@ sensitivity_coverage_receipts:
   - window-11-17h
   profile_count: 90
   omission_count: 0
-  coverage_digest: sha256:669be949fc2ded0c68e2e11e6d1125f605ea3611c7297fbcd5863ec04e5175be
+  coverage_digest: sha256:e430cd6bd0190e820ef8819f991087e325c5adf1429c06befea5f4c675052a58
 acquisition_projection:
   contract_id: rt_lnrna_reporter_response_acquisition_projection.v1
   selected_reduction:
@@ -1145,7 +1145,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
       profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron170_lnrna__tetO:window-6-10h
-      profile_digest: sha256:04178198b48b76905c9bced96cea1685092f04c80c7ae762b6f2ec3a1ac79177
+      profile_digest: sha256:de2bcd3714bc6eecf8e7beb089d80a8adadc7795d4d519578d93dfa49c955d2e
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.024995911121421265
       relative_od: 0.8996138996138996
@@ -1170,7 +1170,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
       profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron171_lnrna__tetO:window-6-10h
-      profile_digest: sha256:2e3dd864c36ea5d87930f00bfd7ad0e6801e73c148c7893f7c1b61ebaa51c286
+      profile_digest: sha256:cf8f62a43fe033e48b25788cb0073628e9b1575fc5f8f25ce2b6d478aedd5131
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.104959315744197
       relative_od: 0.7544910179640718
@@ -1195,7 +1195,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
       profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron172_lnrna__tetO:window-6-10h
-      profile_digest: sha256:5f7519ab6d1f52641de2a8216dca1d7bae447a869fa4253522f0c326f6eaeaea
+      profile_digest: sha256:1fc786adeba8b15c9357ce91392f8c7eab3a54ef6a10217d982cf69c8625bad7
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.04030797301740879
       relative_od: 0.8937644341801386
@@ -1220,7 +1220,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
       profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron173_lnrna__tetO:window-6-10h
-      profile_digest: sha256:e0c27559656443cecb10091ad153af0c742ba94a5d8c9cd2397c6569ea0c702e
+      profile_digest: sha256:14b0195229e8fa51ed7e1142d67a8608bde96076d80dce33d8c561e775bcc440
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.032477436943800723
       relative_od: 0.9125295508274233
@@ -1245,7 +1245,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
       profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron174_lnrna__tetO:window-6-10h
-      profile_digest: sha256:31aa3f8bd666626d69ee858f0df05681edb1c42a5eca860cc2d7daa4ae41def7
+      profile_digest: sha256:b6b4d84ad577e64ba79febf29887627ac4b13b500d809e59ee48f95f1ae2d29b
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.01398743695272561
       relative_od: 0.9117647058823529
@@ -1270,7 +1270,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
       profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron175_lnrna__tetO:window-6-10h
-      profile_digest: sha256:e4c0fc066edcacf8f26451d9ea59f872fa341875b7c1b66662db625e8ae82a40
+      profile_digest: sha256:97b0e9b813b5fa3154ec53ec006b90ac9ccf0f86d8d317eecde13246c9ff9db5
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.01075500371640727
       relative_od: 0.9686800894854586
@@ -1295,7 +1295,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron177_lnrna__tetO:window-6-10h
-      profile_digest: sha256:c55a2146e404987e33e59e7b102225c61c644c29fecb4a791fb7ee1ec6f6ea70
+      profile_digest: sha256:97b09004efe4c10f65979cb723426a99bed2f86428bb5c30f334837a9d69d61b
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.026602622463084518
       relative_od: 0.6446469248291571
@@ -1320,7 +1320,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron178_lnrna__tetO:window-6-10h
-      profile_digest: sha256:115bad998dd282d82816a34ab606738647d44441efe91e6044d60255ba5f7259
+      profile_digest: sha256:f7f8d40e231dfe430c207e01fe12c13b95085816f6d3b98a405b14774b36937f
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.0031632027237602878
       relative_od: 0.9560853199498117
@@ -1345,7 +1345,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron179_lnrna__tetO:window-6-10h
-      profile_digest: sha256:ed3cbf3611bc9582d35d06658d41a7069b57bb654927fc45adf3582f3b035133
+      profile_digest: sha256:2894c21396b152e7388db7a30a3e600125ca9f2cbef6eb046a09418a5ba7ab55
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.0033293084505794874
       relative_od: 0.9084249084249085
@@ -1372,19 +1372,19 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO:window-6-10h
-      profile_digest: sha256:e2993d230271f0c42c1f273afe8b907db9317822c585045abff0b6c35872a2f5
+      profile_digest: sha256:eba71465a23868de02e9635f7c99e679bbd70fc082948bbc5aeb5df2d91102ad
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.004325103921105019
       relative_od: 0.9411764705882353
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO:window-6-10h
-      profile_digest: sha256:c33eede30694ee69a2b325d0c24efa5b5c071284db64aa73e4c9372d08b742bb
+      profile_digest: sha256:61009481e32f67c180f55cc595ecefb2b555e3416bbf8538ba817fb20b534b17
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.01821387705029175
       relative_od: 0.7773019271948608
     - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
       profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO:window-6-10h
-      profile_digest: sha256:1f4404ebbebaf10a2a0a564ea0a215c5e2b25021e82fe0760ef871c1c27abe44
+      profile_digest: sha256:a605d3e3fb1aac711390ce5a80561d101bd8242aa7efe468a50aacd764407ac2
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.01490788669996444
       relative_od: 0.837037037037037
@@ -1415,7 +1415,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron181_lnrna__tetO:window-6-10h
-      profile_digest: sha256:5179b242624fc32888feda3e1b733eeafe971eeac03024e69bae758463131cf4
+      profile_digest: sha256:646b1444d7b4add5c927af6ea737a572fc4e0a9a8c6acb688724c229986392fc
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.002516374694622425
       relative_od: 0.9086479902557857
@@ -1440,7 +1440,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron182_lnrna__tetO:window-6-10h
-      profile_digest: sha256:e26d9dd8db61df319f6e708e0159d863fa9960ba4566825f562f4445070e98b6
+      profile_digest: sha256:ec9db7119e7454099e0b0f4b425e1dfd080c13afda0c2cdfd23fee5f6c1b0861
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.0036828695051393965
       relative_od: 0.9313253012048194
@@ -1465,7 +1465,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron183_lnrna__tetO:window-6-10h
-      profile_digest: sha256:c0fe3c7df28aea28901c977f1235990a0647b71a4d420e8e50ccf8379596c18e
+      profile_digest: sha256:846fb7f12c8c2e3b0ee720342c44fe80ca3aad73ed3fe73fe3bb7281b2fe2174
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.002854018851532382
       relative_od: 0.8636871508379889
@@ -1490,7 +1490,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron184_lnrna__tetO:window-6-10h
-      profile_digest: sha256:eb5ba7c63f7bfa0f29f8f19584d2ae2a670cbd6a797618e6956d236e784f1f1b
+      profile_digest: sha256:8e00c33809560e0add96b3f38e4efedb08a3b28b20e8ab64b53ff091391ac4b0
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.002668999936683565
       relative_od: 0.9474969474969476
@@ -1515,7 +1515,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron185_lnrna__tetO:window-6-10h
-      profile_digest: sha256:4508ecb5a27a6d4b34a81d1b99e9282e6ea57dc884ac6df9498812fa480de302
+      profile_digest: sha256:4a4623d2554083813c9487d332498505c771e4ac2aa0d80ff144ca49738ead7f
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.0009085271642202043
       relative_od: 0.9041850220264316
@@ -1540,7 +1540,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260529_retron_Eco1_26_43_177_186_benchmark
       profile_id: 20260529_retron_Eco1_26_43_177_186_benchmark:rt_lnrna_pair__eco1_wt_rt__retron186_lnrna__tetO:window-6-10h
-      profile_digest: sha256:fc2fc1237ba847c6be833b73a08d7a4f4f4c725162981035ebac59af59a1f7d9
+      profile_digest: sha256:e7a000d5cbabdf4ea3c50a82a535a022e6bb79f48cee079a846d13ff31482e3f
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.00016043858992497294
       relative_od: 0.9887218045112782
@@ -1565,7 +1565,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron195_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:7ba8214c4fb540b67586f4171e23b21d1cf950a78d5b09cf471f434f9b4cb63c
+      profile_digest: sha256:492804649e28f8ba6189f2b9827ce26075b242549dd0a44447e6b11b9fa9cf15
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.049964918809411694
       relative_od: 0.5641025641025642
@@ -1590,7 +1590,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron196_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:ef296fbea3d8dbe67d8ee5f3ef01f6ee8a303948d6fb46a6c1f25a05d360e1b5
+      profile_digest: sha256:1281d6e422b563fec4353a2fbce6c75af1bce550f88e1c5452db186d39417b82
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.05077525794505674
       relative_od: 0.4270833333333333
@@ -1615,7 +1615,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron197_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:21f6803b2e9ccad6f164c2f96267d52390c73f9310086841b621187e266d4e48
+      profile_digest: sha256:5aa54c5becf348600ceb19d14c6174a5bd95f223b983df994b68c8188f7d87b2
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.0160829659207498
       relative_od: 0.7102102102102101
@@ -1640,7 +1640,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron198_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:ca78fcb8ab8febd669a355b8fa3d8b4c64901fce63fd8d1b1f00f438b79d6eb9
+      profile_digest: sha256:3b21a2a5983c74a84b88be47e2c3172915283fb6412c97061cfdbdc70691c931
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.01677106130354941
       relative_od: 0.7147335423197493
@@ -1665,7 +1665,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron199_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:10a57a82071e83c92f5eea6b45f31410cecece111642abb1b38be275130ba959
+      profile_digest: sha256:3ae4c618bc32f7b3b4baebb49ab7f85d05129ca2086734c03322cc33b06fcccc
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.010492360918235988
       relative_od: 0.8228155339805826
@@ -1690,7 +1690,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron200_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:b0c73748914ac67c66bbb132fc627ea2cdf5e5e2efc30d0d64dfaea8dd524143
+      profile_digest: sha256:7d343bb4f4c64e1f5453752583e6884c12aeed3f8e71b0138f4956bd5aa60130
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.039026533766524436
       relative_od: 0.6342229199372057
@@ -1715,7 +1715,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
       profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron201_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:3d07dc45611a29a40f7cac8ec1dd3a39ddffc54aae182d9f3ced637fb5e475e2
+      profile_digest: sha256:85632a238ab7bb6bfb0b7578f418af8a7ab98d1589b5a1eecbce8d8444221e32
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.04660335155550266
       relative_od: 0.6279491833030852
@@ -1740,7 +1740,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
       profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron202_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:6db9f5466599649f6113fd52c98f3c99c0a7d4786eaab33194e2d56632706a2d
+      profile_digest: sha256:8ba0f081aa22d3d930b7e01bbfc9163862d5a39c337c2b82920198045390ca87
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.041056311134851364
       relative_od: 0.5492424242424242
@@ -1765,7 +1765,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
       profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron203_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:2b89dc5ffa7c00ea6e67c1ab911f0c262c0ff6d1b9553021d52c9b4e3a5e8449
+      profile_digest: sha256:0d8ff89464d52ae7838e5b74483a61b3abbf6462d5e1effcdf3faee40c8e5186
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.04139623237629678
       relative_od: 0.651017214397496
@@ -1790,7 +1790,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
       profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron204_msd_lnrna__tetO:window-6-10h
-      profile_digest: sha256:5db89b9b68813c89ae4eab89c9865f67fdd75f5f577bf0119e3480256036c832
+      profile_digest: sha256:fa3c61040a908e45d9b5f4c88609d4dc65a6d084bfb4f675c6073ab61f573244
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.02528223710082584
       relative_od: 0.7012987012987013
@@ -1821,43 +1821,43 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20250622_retron_Eco1_26_43_benchmark
       profile_id: 20250622_retron_Eco1_26_43_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
-      profile_digest: sha256:194b5f63326ff96b9a233df70fa7c60829e4216464147cfd4246d0cb1995a629
+      profile_digest: sha256:dfddb62e621cef93308fbd8df997ad47717a98d844108840ed102e94a2330afc
       declared_biological_replicate_ids: []
       normalized_reporter_response: 1.0488523444338946
       relative_od: 0.5154121863799282
     - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
       profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
-      profile_digest: sha256:203b5d34d8513a6e9394100f5c52d5e6ed2b751f1d93e2d91e244de8546265da
+      profile_digest: sha256:61dfe16238a8bda324b10a79aa436dfd42ea37c3a0f54087de40adf61d36e1d7
       declared_biological_replicate_ids: []
       normalized_reporter_response: 1.2358578105567795
       relative_od: 0.49686520376175547
     - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
       profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
-      profile_digest: sha256:edfac63757ba0cb1253ecea0b35397d95519ab4dac2ef1241246cae9a6b6aefe
+      profile_digest: sha256:de466fa093ac7b981bee2524b2b75e188a7d6b725967aa0e66ef0276b784ff45
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.9261963863383745
       relative_od: 0.5459098497495827
     - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
       profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
-      profile_digest: sha256:beeecd64ab1a00b569a8f3b9a246c3926b22a58a04636cad239d614fe1a99d3f
+      profile_digest: sha256:79bab9a8eb52a3cbd78b8081b7c72e3e7aa5eecdd8ed33707338970b51877de2
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.9136462294277685
       relative_od: 0.6162528216704289
     - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
       profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
-      profile_digest: sha256:d6cdd38aa28e4a7d58733f983d00e9925c8d8d04d3618ee313f34385838f53e8
+      profile_digest: sha256:c825e498faca589e91bcc5b4abd78def7b31666515d1edfbc33adf863d098ffa
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.906185125936517
       relative_od: 0.611111111111111
     - acquisition_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark
       profile_id: 20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
-      profile_digest: sha256:925d582b1ce95e8693726f18cee3dc288c1011124ec95dac93bf9adf1e8f5f22
+      profile_digest: sha256:1796c62a9f23f3885e46c9eed9c2bd9249fe0913e770eca29cc02139fc08c2e2
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.5125297771420385
       relative_od: 0.7067307692307693
     - acquisition_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark
       profile_id: 20260720_retron_Eco1_26_180_201_202_203_204_benchmark:rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO:window-6-10h
-      profile_digest: sha256:dc0a79573fdd9e9eb1c9b8f175a065305f6a74628b15d77174290ff9b2d02afa
+      profile_digest: sha256:49945c9e631c866949e1e2c5461627937d51244166615c1291d871a719c04c87
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.5571348680246527
       relative_od: 0.6210268948655258
@@ -1899,25 +1899,25 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20250622_retron_Eco1_26_43_benchmark
       profile_id: 20250622_retron_Eco1_26_43_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
-      profile_digest: sha256:05b5eaeb0feb27a0f7be160bef1a8a9384a20cff9ef29aa92e3aec5df37830e1
+      profile_digest: sha256:0bc33fc810dbd642e3d7f1afd8d6ff2d95f9984d63722576f0e104f0a5833c97
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.03567023779402888
       relative_od: 0.925137903861308
     - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
       profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
-      profile_digest: sha256:20ba65692020fc3c23c3de08a519e16482ac9881cc02b4c0c19325112aebd123
+      profile_digest: sha256:347a53dd499c49ecf4cbce85966973557666cf21f4695441be4e6b8c74d8d72f
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.02447129124303192
       relative_od: 0.879746835443038
     - acquisition_id: 20260418_retron_Eco1_26_43_170_171_benchmark
       profile_id: 20260418_retron_Eco1_26_43_170_171_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
-      profile_digest: sha256:53a797d1f78418839bb8db84888907792b644bda2cee7affab82ba03b46a485f
+      profile_digest: sha256:1cf29b69ec6a5ef086dab0ac88b49e6fc34e6df27c416629367bb12e76b24cc9
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.056436938224164575
       relative_od: 0.8836206896551723
     - acquisition_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark
       profile_id: 20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark:rt_lnrna_pair__eco1_wt_rt__retron43_lnrna__tetO:window-6-10h
-      profile_digest: sha256:1c8d69d5cbe80195add445eb6ff876e971b709c718a1153769b88c417c733088
+      profile_digest: sha256:f5e6384926e9359ad14b1486cdc72a7fcdd22154eefc01682c90a3432176c53f
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.03923125207694863
       relative_od: 0.8413461538461539
@@ -1951,13 +1951,13 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
       profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO:window-6-10h
-      profile_digest: sha256:b9b4e417758aaf076f8305f32e576770b207b4192cbcb2c46fb7912b14ba3ea8
+      profile_digest: sha256:83e1cd458a499039042fdb413106dfc46da496389b43dfa3d6c13e54b8dc8e16
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.20920524222515566
       relative_od: 0.5790273556231003
     - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
       profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__eco1_wt_rt__retron45_lnrna__tetO:window-6-10h
-      profile_digest: sha256:4e9583cf7c607d541594b55bf37d25c3cb100c5782b779e377bacba9aac697a2
+      profile_digest: sha256:9ad57baf060e8972bf500d5ce5cdf95f96b63880ab2208ced85d956a3c3e1e2d
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.15764896231800787
       relative_od: 0.5996932515337423
@@ -1986,7 +1986,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20250707_retron_Eco1_26_43_45_46_benchmark
       profile_id: 20250707_retron_Eco1_26_43_45_46_benchmark:rt_lnrna_pair__eco1_wt_rt__retron46_lnrna__tetO:window-6-10h
-      profile_digest: sha256:2495fcbcdc4bfb704c4e836b8fd68eafde32014a11102cd4ce8b8e1a27f1fc28
+      profile_digest: sha256:697f14c02b60373e5b7d51dc934da2061d193c7b386d96a98df3cd1f5582f4d0
       declared_biological_replicate_ids: []
       normalized_reporter_response: 0.14181659469313845
       relative_od: 0.640625
@@ -2011,7 +2011,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
       profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__retron47_rt_fusion__retron47_lnrna__tetO:window-6-10h
-      profile_digest: sha256:e0905014e4f9e7d3d9f87c5d48b1c6ecc815c446be9cfbfda26ceee0d7764b6b
+      profile_digest: sha256:fae4681cbd2f88251ee6b3344d0624ba7ec127d29ce2044c94b3ac6ea68f42f9
       declared_biological_replicate_ids: []
       normalized_reporter_response: 2.425192386507761
       relative_od: 0.2817589576547231
@@ -2036,7 +2036,7 @@ acquisition_projection:
     contributions:
     - acquisition_id: 20250718_retron_Eco1_26_45_47_48_benchmark
       profile_id: 20250718_retron_Eco1_26_45_47_48_benchmark:rt_lnrna_pair__retron48_rt_fusion__retron48_lnrna__tetO:window-6-10h
-      profile_digest: sha256:fddc23c78e5f4627e56c670cea419b77829974594b5bf3c47fe844434dbcc0a7
+      profile_digest: sha256:c6a2350984d2afa314e3b959dce9e5e739e56b1d9016f33d280bf7d20de1365e
       declared_biological_replicate_ids: []
       normalized_reporter_response: 2.229612178544822
       relative_od: 0.39375
@@ -2050,4 +2050,4 @@ acquisition_projection:
       method: median_across_acquisitions
       acquisition_count: 1
       leave_one_acquisition_out_estimates: []
-  projection_digest: sha256:898def9ffb2e7390c8996ed946c8212ffef5731682f0e2732409ed024a3c5757
+  projection_digest: sha256:fafc9ba07b5d5add0acc9b0904178ca16c01aa7477b93bf43a30ebbd6926d07e
