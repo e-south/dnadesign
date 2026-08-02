@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import pytest
 
 import dnadesign.baserender as baserender
-import dnadesign.trijunction as trijunction
+import dnadesign.junction as junction
 from dnadesign.baserender.src.config import ImagesOutputCfg, VideoOutputCfg
 from dnadesign.baserender.src.core import RenderingError
 from dnadesign.baserender.src.outputs.images import write_images
@@ -35,10 +35,10 @@ from .three_way_junction_review.fixtures import (
 )
 
 
-def _trijunction_request() -> dict[str, object]:
+def _junction_request() -> dict[str, object]:
     sequence = ("ACGATTCGGTACCTGATGCACTGA" * 3)[:72]
     return {
-        "schema": "dnadesign.trijunction.request.v1",
+        "schema": "dnadesign.junction.request.v1",
         "seed": 17,
         "planning": {
             "oligo_length": 46,
@@ -59,7 +59,7 @@ def _trijunction_request() -> dict[str, object]:
         "targets": [
             {
                 "id": "target-a",
-                "pool_id": "pool-a",
+                "assembly_group_id": "assembly-a",
                 "sequence": sequence,
                 "recovery_primers": {
                     "mode": "target_specific",
@@ -87,7 +87,7 @@ def test_public_catalog_and_adapter_expose_the_review_contract() -> None:
 
     record = _adapt_payload(_payload())
 
-    assert descriptor.owner_tool == "trijunction"
+    assert descriptor.owner_tool == "junction"
     assert descriptor.supported_renderers == ("three_way_junction_review",)
     assert descriptor.output_kinds == ("images",)
     assert descriptor.image_output_modes == ("directory",)
@@ -344,11 +344,11 @@ def test_run_job_publishes_review_bundle_recursively_owner_only(tmp_path: Path, 
         assert stat.S_IMODE(path.stat().st_mode) == expected, path
 
 
-def test_run_job_consumes_the_verified_trijunction_review_array(tmp_path: Path) -> None:
-    request = trijunction.parse_request(_trijunction_request())
+def test_run_job_consumes_the_verified_junction_review_array(tmp_path: Path) -> None:
+    request = junction.parse_request(_junction_request())
     source_bundle = tmp_path / "verified-design"
-    trijunction.build(request, destination=source_bundle)
-    trijunction.verify(source_bundle)
+    junction.build(request, destination=source_bundle)
+    junction.verify(source_bundle)
     source = source_bundle / "views" / "three_way_junction_review.v1.json"
     source_before = source.read_bytes()
     job = {
@@ -415,7 +415,7 @@ def test_adapter_rejects_contradictory_or_nonfinite_search_metrics(updates: dict
         _adapt_payload(payload)
 
 
-def test_adapter_rejects_pool_receipt_smaller_than_target_geometry() -> None:
+def test_adapter_rejects_group_receipt_smaller_than_target_geometry() -> None:
     payload = _payload_with_many_junctions(junction_count=2)
     payload["search"]["locus_count"] = 1
 

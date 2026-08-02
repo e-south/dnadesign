@@ -32,7 +32,7 @@ README for commands, inputs, and outputs.
 | [**densegen**](src/dnadesign/densegen/README.md) | Generate DNA sequence libraries from saved design inputs. |
 | [**infer**](src/dnadesign/infer/README.md) | Run sequence models and add their results to datasets. |
 | [**construct**](src/dnadesign/construct/README.md) | Build DNA constructs from reusable templates. |
-| [**trijunction**](src/dnadesign/trijunction/README.md) | Turn exact DNA targets into checked three-way-junction oligo plans. |
+| [**junction**](src/dnadesign/junction/README.md) | Turn exact DNA targets into checked three-way-junction oligo plans. |
 | [**opal**](src/dnadesign/opal/README.md) | Choose the next DNA designs from measured results. |
 | [**cluster**](src/dnadesign/cluster/README.md) | Group and visualize rows in numerical data tables. |
 | [**latentdna**](src/dnadesign/latentdna/README.md) | Compare numerical sequence features and save review-ready results. |

@@ -18,7 +18,7 @@ Use this index for package-local `baserender` documentation. The public surface 
 - [Technical reference](reference.md): public API, CLI surface, and contract rules.
 - [Workspace demos](demos/workspaces.md): packaged job/workspace examples for the shortest runnable path.
 - [Integration contracts](integrations/README.md): adapter expectations for
-  upstream records, including TriJunction, YIU, cassette, Cruncher, and
+  upstream records, including junction, YIU, cassette, Cruncher, and
   DenseGen.
 - [Repository docs index](../../../../docs/README.md): repo-wide route map for adjacent tools.
 

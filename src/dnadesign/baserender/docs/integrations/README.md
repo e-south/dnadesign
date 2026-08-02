@@ -13,7 +13,7 @@ Choose the tool that wrote the records you want to render.
 - [DenseGen](densegen.md)
 - [Cruncher](cruncher.md)
 - [YIU](yiu.md)
-- [TriJunction](trijunction.md)
+- [junction](junction.md)
 
 ## Scope boundary
 

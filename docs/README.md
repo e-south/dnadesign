@@ -107,7 +107,7 @@ contract artifacts or bundle manifest.
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
 | `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
-| `trijunction` | `uv run trijunction --help` | [TriJunction docs](../src/dnadesign/trijunction/docs/README.md); plans oligos directly from a request file |
+| `junction` | `uv run junction --help` | [junction docs](../src/dnadesign/junction/docs/README.md); plans oligos directly from a request file |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `libshuffle` | n/a | [libshuffle docs](../src/dnadesign/libshuffle/docs/README.md) |

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/artifacts/publication.py
 
-Publish immutable directory artifacts atomically and without replacement.
+Publish create-only directory artifacts atomically and without replacement.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -94,7 +94,7 @@ def preflight_create_only_directory_publication(bundle_root: str | Path) -> Path
 
     This is an early advisory check. Callers must still use
     :meth:`CreateOnlyDirectoryPublication.prepare`, whose descriptor-anchored
-    checks remain authoritative for races and recovery.
+    checks handle races and recovery.
     """
 
     final = _lexical_absolute_path(Path(bundle_root))
@@ -107,7 +107,7 @@ def preflight_create_only_directory_publication(bundle_root: str | Path) -> Path
         raise
     except OSError as exc:
         raise PublicationError(f"Publication output could not be inspected safely: {final}") from exc
-    raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {final}")
+    raise PublicationExistsError(f"Artifact bundle already exists; publication is create-only: {final}")
 
 
 def _open_or_create_directory(path: Path) -> int:
@@ -236,7 +236,7 @@ def _rename_create_only(parent_descriptor: int, source: str, destination: str) -
         return
     error = ctypes.get_errno()
     if error in {errno.EEXIST, errno.ENOTEMPTY}:
-        raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {destination}")
+        raise PublicationExistsError(f"Artifact bundle already exists; publication is create-only: {destination}")
     raise OSError(error, os.strerror(error), destination)
 
 
@@ -324,7 +324,7 @@ def _recover_final_directory(
 
 @dataclass
 class CreateOnlyDirectoryPublication:
-    """One bounded transaction that publishes a new immutable directory."""
+    """One bounded transaction that publishes a new directory without replacement."""
 
     final: Path
     stage: Path
@@ -360,7 +360,7 @@ class CreateOnlyDirectoryPublication:
             recovery_uid = uid if isinstance(uid, int) else None
             _recover_final_directory(parent_descriptor, final, uid=recovery_uid)
             if _entry_exists_at(parent_descriptor, final.name):
-                raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {final}")
+                raise PublicationExistsError(f"Artifact bundle already exists; publication is create-only: {final}")
             target_digest = str(owner["target_sha256"])
             adjacent_prefix = f".{final.name}.staging-"
             rollback_prefix = f".{final.name}.rollback-"

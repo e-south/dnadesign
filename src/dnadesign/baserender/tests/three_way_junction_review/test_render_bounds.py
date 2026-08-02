@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/tests/three_way_junction_review/test_render_bounds.py
 
-Resource and layout bounds for TriJunction review rendering.
+Resource and layout bounds for Junction review rendering.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -140,7 +140,7 @@ def test_review_renderer_bounds_long_ids_and_integer_metrics() -> None:
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
 
         assert "10007 chars" in text
-        assert "10005 chars" in text
+        assert "10009 chars" in text
         assert "10001 digits" in text
         assert "SHA-256[:12]" in text
         assert payload["target"]["target_id"] not in text
@@ -159,8 +159,8 @@ def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
     payload = _payload()
     identifier = "W" * 32
     payload["target"]["target_id"] = identifier
-    payload["target"]["pool_id"] = identifier
-    payload["search"]["pool_id"] = identifier
+    payload["target"]["assembly_group_id"] = identifier
+    payload["search"]["assembly_group_id"] = identifier
     payload["checks"][0]["subject"]["id"] = identifier
     payload["checks"][1]["subject"]["id"] = identifier
     record = _adapt_payload(payload)
@@ -179,7 +179,7 @@ def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
         plt.close(figure)
 
 
-def test_review_renderer_distinguishes_target_junctions_from_pool_loci() -> None:
+def test_review_renderer_distinguishes_target_junctions_from_assembly_group_loci() -> None:
     first = _payload()
     second = _payload_with_long_recovery_primers()
     _rename_target_geometry(second, target_id="target-02")
@@ -198,17 +198,17 @@ def test_review_renderer_distinguishes_target_junctions_from_pool_loci() -> None
         search_text = "\n".join(item.get_text() for item in figure.axes[3].texts)
 
         assert "1 target junction · every target junction shown" in junction_text
-        assert "pool loci  2" in search_text
+        assert "assembly-group loci  2" in search_text
     finally:
         plt.close(figure)
 
 
 def test_review_renderer_escapes_control_characters_in_public_adapter_identifiers() -> None:
     payload = _payload()
-    identifier = "pool\n\t" * 100
+    identifier = "assembly\n\t" * 100
     payload["target"]["target_id"] = identifier
-    payload["target"]["pool_id"] = identifier
-    payload["search"]["pool_id"] = identifier
+    payload["target"]["assembly_group_id"] = identifier
+    payload["search"]["assembly_group_id"] = identifier
     payload["checks"][0]["subject"]["id"] = identifier
     payload["checks"][1]["subject"]["id"] = identifier
     record = _adapt_payload(payload)

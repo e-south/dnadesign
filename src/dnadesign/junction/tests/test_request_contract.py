@@ -1,0 +1,642 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/junction/tests/test_request_contract.py
+
+Boundary tests for strict junction request parsing and canonicalization.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+import yaml
+
+import dnadesign.junction as junction
+from dnadesign.junction.contracts import JunctionConfigError
+from dnadesign.junction.contracts import request as request_contract
+from dnadesign.junction.contracts.request import (
+    MAX_BARCODE_GENERATION_ATTEMPTS,
+    MAX_BARCODE_SUBSET_ITERATIONS,
+    MAX_MATCHING_ITERATIONS,
+    MAX_REQUEST_BYTES,
+    MAX_REQUEST_IDENTIFIER_BYTES,
+    MAX_REQUEST_PLAIN_TEXT_BYTES,
+    MAX_TOEHOLD_SEARCH_ITERATIONS,
+    ComplementEndPreparation,
+    Primer,
+    RecoveryPrimerPair,
+    load_request,
+    parse_request,
+    request_to_mapping,
+)
+from dnadesign.junction.contracts.request import files as request_files
+
+
+def _reverse_complement(sequence: str) -> str:
+    return sequence.translate(str.maketrans("ACGT", "TGCA"))[::-1]
+
+
+def _request_mapping() -> dict[str, object]:
+    sequence = "ACGTTGCA" * 10
+    return {
+        "schema": "dnadesign.junction.request.v1",
+        "seed": 17,
+        "planning": {
+            "oligo_length": 60,
+            "barcode_length": 12,
+            "toehold_length": 10,
+            "search_range": 20,
+            "toehold_search_iterations": 50,
+            "barcode_pool_factor": 5,
+            "barcode_generation_attempts": 1000,
+            "barcode_toehold_k": 5,
+            "barcode_pair_k": 6,
+            "barcode_subset_iterations": 100,
+            "matching_iterations": 200,
+            "barcode_gc_min": 0.35,
+            "barcode_gc_max": 0.65,
+            "barcode_max_homopolymer": 3,
+        },
+        "targets": [
+            {
+                "id": "target-b",
+                "assembly_group_id": "assembly-2",
+                "sequence": sequence,
+                "recovery_primers": {
+                    "mode": "target_specific",
+                    "forward": {
+                        "binding_sequence": sequence[:8],
+                        "five_prime_extension": "GGCC",
+                    },
+                    "reverse": {
+                        "binding_sequence": _reverse_complement(sequence[-8:]),
+                        "five_prime_extension": "AATT",
+                    },
+                },
+            },
+            {
+                "id": "target-a",
+                "assembly_group_id": "assembly-1",
+                "sequence": "TGCATGCA" * 10,
+                "recovery_primers": {
+                    "mode": "target_specific",
+                    "forward": {
+                        "binding_sequence": "TGCATGCA",
+                        "five_prime_extension": "",
+                    },
+                    "reverse": {
+                        "binding_sequence": "TGCATGCA",
+                        "five_prime_extension": "",
+                    },
+                },
+            },
+        ],
+        "order_policy": {
+            "synthesis_scale": "25 nmol",
+            "barcode_bearing_purification": "STD",
+            "complement_purification": "PAGE",
+            "primer_purification": "HPLC",
+            "complement_end_preparation": "vendor_5_prime_phosphate",
+            "max_oligo_length": 200,
+        },
+    }
+
+
+def test_request_contract_exports_are_anchored_at_the_canonical_package() -> None:
+    assert request_contract.load_request is load_request
+    assert request_contract.parse_request is parse_request
+    assert request_contract.request_to_mapping is request_to_mapping
+    assert request_contract.Primer is Primer
+    assert request_contract.RecoveryPrimerPair is RecoveryPrimerPair
+    assert request_contract.ComplementEndPreparation is ComplementEndPreparation
+    assert junction.Primer is Primer
+    assert junction.RecoveryPrimerPair is RecoveryPrimerPair
+    assert junction.ComplementEndPreparation is ComplementEndPreparation
+
+    for removed_name in ("CodingEndPreparation", "RecoveryPrimers", "TargetSpec"):
+        assert removed_name not in request_contract.__all__
+        assert removed_name not in junction.__all__
+        with pytest.raises(AttributeError):
+            getattr(junction, removed_name)
+
+
+def test_parse_request_is_immutable_and_canonicalizes_target_order() -> None:
+    raw = _request_mapping()
+    reversed_raw = {**raw, "targets": list(reversed(raw["targets"]))}  # type: ignore[arg-type]
+
+    request = parse_request(raw)
+    reordered = parse_request(reversed_raw)
+
+    assert request == reordered
+    assert [target.id for target in request.targets] == ["target-a", "target-b"]
+    assert request_to_mapping(request) == request_to_mapping(reordered)
+    assert request.to_mapping() == request_to_mapping(request)
+    target_b = next(target for target in request.targets if target.id == "target-b")
+    assert target_b.recovery_primers.forward.order_sequence == f"GGCC{target_b.sequence[:8]}"
+    assert target_b.recovery_primers.reverse.order_sequence == (f"AATT{_reverse_complement(target_b.sequence[-8:])}")
+    with pytest.raises(AttributeError):
+        request.seed = 3  # type: ignore[misc]
+
+
+def test_parse_request_accepts_the_universal_recovery_mode() -> None:
+    raw = _request_mapping()
+    raw["targets"] = [raw["targets"][0]]  # type: ignore[index]
+    raw["targets"][0]["recovery_primers"]["mode"] = "universal"  # type: ignore[index]
+
+    request = parse_request(raw)
+
+    assert request.targets[0].recovery_primers.mode == "universal"
+
+
+@pytest.mark.parametrize("field", ["id", "assembly_group_id"])
+def test_request_identifiers_accept_128_ascii_bytes_and_reject_129(field: str) -> None:
+    accepted = _request_mapping()
+    accepted["targets"][0][field] = "a" * MAX_REQUEST_IDENTIFIER_BYTES  # type: ignore[index]
+
+    request = parse_request(accepted)
+
+    assert any(
+        len(getattr(target, field).encode("ascii")) == MAX_REQUEST_IDENTIFIER_BYTES for target in request.targets
+    )
+
+    rejected = _request_mapping()
+    rejected["targets"][0][field] = "a" * (MAX_REQUEST_IDENTIFIER_BYTES + 1)  # type: ignore[index]
+    with pytest.raises(JunctionConfigError, match=rf"targets\[0\].{field}.*128 ASCII bytes"):
+        parse_request(rejected)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "synthesis_scale",
+        "barcode_bearing_purification",
+        "complement_purification",
+        "primer_purification",
+    ],
+)
+def test_repeated_order_policy_text_is_bounded_by_utf8_bytes(field: str) -> None:
+    accepted = _request_mapping()
+    accepted["order_policy"][field] = "é" * (MAX_REQUEST_PLAIN_TEXT_BYTES // 2)  # type: ignore[index]
+    assert len(getattr(parse_request(accepted).order_policy, field).encode("utf-8")) == 128
+
+    rejected = _request_mapping()
+    rejected["order_policy"][field] = "é" * (MAX_REQUEST_PLAIN_TEXT_BYTES // 2) + "a"  # type: ignore[index]
+    with pytest.raises(JunctionConfigError, match=rf"order_policy.{field}.*128 UTF-8 bytes"):
+        parse_request(rejected)
+
+
+def test_in_memory_contracts_enforce_repeated_label_limits() -> None:
+    request = parse_request(_request_mapping())
+
+    with pytest.raises(JunctionConfigError, match="target.id.*128 ASCII bytes"):
+        replace(request.targets[0], id="a" * (MAX_REQUEST_IDENTIFIER_BYTES + 1))
+    with pytest.raises(JunctionConfigError, match="order_policy.synthesis_scale.*128 UTF-8 bytes"):
+        replace(request.order_policy, synthesis_scale="é" * (MAX_REQUEST_PLAIN_TEXT_BYTES // 2 + 1))
+
+
+@pytest.mark.parametrize("suffix", [".yaml", ".json"])
+def test_load_request_supports_yaml_and_json(tmp_path: Path, suffix: str) -> None:
+    request_path = tmp_path / f"request{suffix}"
+    raw = _request_mapping()
+    if suffix == ".json":
+        request_path.write_text(json.dumps(raw), encoding="utf-8")
+    else:
+        request_path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    loaded = load_request(request_path)
+
+    assert loaded.schema == "dnadesign.junction.request.v1"
+    assert request_to_mapping(loaded)["targets"][0]["id"] == "target-a"  # type: ignore[index]
+    assert sorted(tmp_path.iterdir()) == [request_path]
+
+
+def test_load_request_opens_and_reads_one_bounded_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(_request_mapping()), encoding="utf-8")
+    real_open = os.open
+    real_read = os.read
+    open_calls: list[tuple[object, int]] = []
+    read_limits: list[int] = []
+
+    def recording_open(path: object, flags: int, *args: object, **kwargs: object) -> int:
+        open_calls.append((path, flags))
+        return real_open(path, flags, *args, **kwargs)  # type: ignore[arg-type]
+
+    def recording_read(fd: int, size: int) -> bytes:
+        read_limits.append(size)
+        return real_read(fd, size)
+
+    monkeypatch.setattr(request_files.os, "open", recording_open)
+    monkeypatch.setattr(request_files.os, "read", recording_read)
+
+    load_request(request_path)
+
+    assert len(open_calls) == 1
+    assert read_limits and max(read_limits) <= request_files._MAX_REQUEST_BYTES
+    if hasattr(os, "O_NOFOLLOW"):
+        assert open_calls[0][1] & os.O_NOFOLLOW
+    if hasattr(os, "O_NONBLOCK"):
+        assert open_calls[0][1] & os.O_NONBLOCK
+
+
+def test_load_request_rejects_descriptor_growth_after_bounded_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(_request_mapping()), encoding="utf-8")
+    real_fstat = os.fstat
+    calls = 0
+
+    def growing_fstat(fd: int) -> os.stat_result:
+        nonlocal calls
+        calls += 1
+        observed = real_fstat(fd)
+        if calls == 1:
+            return observed
+        fields = list(observed)
+        fields[6] = request_files._MAX_REQUEST_BYTES + 1
+        return os.stat_result(fields)
+
+    monkeypatch.setattr(request_files.os, "fstat", growing_fstat)
+
+    with pytest.raises(JunctionConfigError, match="exceeds.*input limit"):
+        load_request(request_path)
+
+
+def test_load_request_rejects_same_length_in_place_rewrite_during_partial_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_path = tmp_path / "request.json"
+    original = json.dumps(_request_mapping()).encode("utf-8")
+    request_path.write_bytes(original)
+    opened = request_path.stat()
+    real_read = os.read
+    split = len(original) // 2
+    first_read = True
+
+    def rewriting_read(fd: int, size: int) -> bytes:
+        nonlocal first_read
+        content = real_read(fd, min(size, split) if first_read else size)
+        if first_read:
+            first_read = False
+            with request_path.open("r+b") as mutable:
+                mutable.seek(split)
+                mutable.write(b" " * (len(original) - split))
+                mutable.flush()
+                os.fsync(mutable.fileno())
+            os.utime(
+                request_path,
+                ns=(opened.st_atime_ns, opened.st_mtime_ns + 1_000_000_000),
+            )
+        return content
+
+    monkeypatch.setattr(request_files.os, "read", rewriting_read)
+
+    with pytest.raises(JunctionConfigError, match="changed while it was being read"):
+        load_request(request_path)
+    rewritten = request_path.stat()
+    assert rewritten.st_ino == opened.st_ino
+    assert rewritten.st_size == opened.st_size
+
+
+def test_load_request_rejects_invalid_utf8_as_config_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.json"
+    request_path.write_bytes(b"\xff")
+
+    with pytest.raises(JunctionConfigError, match="UTF-8"):
+        load_request(request_path)
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="O_NOFOLLOW is unavailable")
+def test_load_request_rejects_symlink(tmp_path: Path) -> None:
+    target_path = tmp_path / "target.json"
+    target_path.write_text(json.dumps(_request_mapping()), encoding="utf-8")
+    request_path = tmp_path / "request.json"
+    request_path.symlink_to(target_path)
+
+    with pytest.raises(JunctionConfigError, match="Unable to open"):
+        load_request(request_path)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "match"),
+    [
+        (lambda raw: raw.update(extra=True), "unknown field.*extra"),
+        (lambda raw: raw.pop("seed"), "missing field.*seed"),
+        (lambda raw: raw.update(schema="old"), "schema"),
+        (lambda raw: raw.update(seed=-1), "seed"),
+        (lambda raw: raw.update(seed=True), "seed"),
+        (
+            lambda raw: raw["planning"].update(extra=True),  # type: ignore[union-attr]
+            "planning.*unknown field.*extra",
+        ),
+        (
+            lambda raw: raw["planning"].update(oligo_length=53),  # type: ignore[union-attr]
+            "oligo_length.*2.*barcode_length.*toehold_length.*search_range",
+        ),
+        (
+            lambda raw: raw["planning"].update(barcode_gc_min=0.8, barcode_gc_max=0.2),  # type: ignore[union-attr]
+            "barcode_gc_min.*barcode_gc_max",
+        ),
+        (lambda raw: raw.update(targets=[]), "at least one target"),
+        (
+            lambda raw: raw["targets"][0].update(sequence="acgt"),  # type: ignore[index,union-attr]
+            "uppercase ACGT",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"].update(mode="mixed"),  # type: ignore[index,union-attr]
+            "recovery_primers.mode",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"].update(mode="construct_specific"),  # type: ignore[index,union-attr]
+            "target_specific.*universal",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"]["forward"].update(  # type: ignore[index,union-attr]
+                binding_sequence="AAAAAAAA"
+            ),
+            "forward.*prefix",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"]["reverse"].update(  # type: ignore[index,union-attr]
+                binding_sequence="AAAAAAAA"
+            ),
+            "reverse.*suffix",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"]["forward"].update(  # type: ignore[index,union-attr]
+                five_prime_extension="ggcc"
+            ),
+            "five_prime_extension.*uppercase ACGT",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"]["forward"].pop(  # type: ignore[index,union-attr]
+                "five_prime_extension"
+            ),
+            "forward.*missing field.*five_prime_extension",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"]["forward"].update(  # type: ignore[index,union-attr]
+                annotation="downstream-only"
+            ),
+            "forward.*unknown field.*annotation",
+        ),
+        (
+            lambda raw: raw["targets"][0]["recovery_primers"].update(  # type: ignore[index,union-attr]
+                forward="ACGTTGCA"
+            ),
+            "forward.*object",
+        ),
+        (
+            lambda raw: raw["targets"].append({**raw["targets"][0], "id": "target-c"}),  # type: ignore[index,union-attr]
+            "duplicate sequence.*assembly-2",
+        ),
+        (
+            lambda raw: raw["targets"].append({**raw["targets"][0]}),  # type: ignore[index,union-attr]
+            "duplicate target id",
+        ),
+        (
+            lambda raw: raw["planning"].update(barcode_pool_factor=4),  # type: ignore[union-attr]
+            "barcode_pool_factor.*at least 5",
+        ),
+        (
+            lambda raw: raw["planning"].update(  # type: ignore[union-attr]
+                toehold_search_iterations=MAX_TOEHOLD_SEARCH_ITERATIONS + 1
+            ),
+            "toehold_search_iterations.*100000.*request.v1",
+        ),
+        (
+            lambda raw: raw["planning"].update(  # type: ignore[union-attr]
+                barcode_generation_attempts=MAX_BARCODE_GENERATION_ATTEMPTS + 1
+            ),
+            "barcode_generation_attempts.*10000000.*request.v1",
+        ),
+        (
+            lambda raw: raw["planning"].update(  # type: ignore[union-attr]
+                barcode_subset_iterations=MAX_BARCODE_SUBSET_ITERATIONS + 1
+            ),
+            "barcode_subset_iterations.*100000.*request.v1",
+        ),
+        (
+            lambda raw: raw["planning"].update(  # type: ignore[union-attr]
+                matching_iterations=MAX_MATCHING_ITERATIONS + 1
+            ),
+            "matching_iterations.*100000.*request.v1",
+        ),
+        (
+            lambda raw: raw["planning"].update(barcode_toehold_k=13),  # type: ignore[union-attr]
+            "barcode_toehold_k.*barcode_length",
+        ),
+        (
+            lambda raw: raw["planning"].update(barcode_pair_k=5),  # type: ignore[union-attr]
+            "barcode_pair_k.*greater than barcode_toehold_k",
+        ),
+        (
+            lambda raw: raw["order_policy"].update(complement_end_preparation="unknown"),  # type: ignore[union-attr]
+            "complement_end_preparation",
+        ),
+        (
+            lambda raw: raw["order_policy"].update(max_oligo_length=50),  # type: ignore[union-attr]
+            "max_oligo_length.*oligo_length",
+        ),
+    ],
+)
+def test_parse_request_rejects_invalid_input(mutation: object, match: str) -> None:
+    raw = _request_mapping()
+    mutation(raw)  # type: ignore[operator]
+
+    with pytest.raises(JunctionConfigError, match=match):
+        parse_request(raw)
+
+
+def test_parse_request_rejects_fraction_integer_too_large_for_float() -> None:
+    raw = _request_mapping()
+    raw["planning"]["barcode_gc_min"] = 10**400  # type: ignore[index]
+
+    with pytest.raises(
+        JunctionConfigError,
+        match=r"^planning\.barcode_gc_min must be between 0 and 1$",
+    ):
+        parse_request(raw)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "oligo_length",
+        "barcode_length",
+        "toehold_length",
+        "search_range",
+        "toehold_search_iterations",
+        "barcode_pool_factor",
+        "barcode_generation_attempts",
+        "barcode_toehold_k",
+        "barcode_pair_k",
+        "barcode_subset_iterations",
+        "matching_iterations",
+        "barcode_max_homopolymer",
+    ],
+)
+def test_parse_request_rejects_planning_integer_above_unsigned_64_bit_domain(field_name: str) -> None:
+    raw = _request_mapping()
+    planning = raw["planning"]
+    assert isinstance(planning, dict)
+    planning[field_name] = 1 << 64
+
+    with pytest.raises(
+        JunctionConfigError,
+        match=rf"^planning\.{field_name} must not exceed 18446744073709551615$",
+    ):
+        parse_request(raw)
+
+
+@pytest.mark.parametrize("field_name", ["seed", "order_policy.max_oligo_length"])
+def test_parse_request_rejects_request_integer_above_unsigned_64_bit_domain(field_name: str) -> None:
+    raw = _request_mapping()
+    if field_name == "seed":
+        raw["seed"] = 10**5000
+    else:
+        order_policy = raw["order_policy"]
+        assert isinstance(order_policy, dict)
+        order_policy["max_oligo_length"] = 1 << 64
+
+    with pytest.raises(
+        JunctionConfigError,
+        match=rf"^{field_name} must not exceed 18446744073709551615$",
+    ):
+        parse_request(raw)
+
+
+def test_public_dataclasses_reject_integer_above_unsigned_64_bit_domain() -> None:
+    request = parse_request(_request_mapping())
+
+    with pytest.raises(JunctionConfigError, match=r"^seed must not exceed 18446744073709551615$"):
+        replace(request, seed=10**5000)
+    with pytest.raises(
+        JunctionConfigError,
+        match=r"^planning\.oligo_length must not exceed 18446744073709551615$",
+    ):
+        replace(request.planning, oligo_length=1 << 64)
+    with pytest.raises(
+        JunctionConfigError,
+        match=r"^order_policy\.max_oligo_length must not exceed 18446744073709551615$",
+    ):
+        replace(request.order_policy, max_oligo_length=1 << 64)
+
+
+def test_parse_request_accepts_maximum_unsigned_64_bit_seed() -> None:
+    raw = _request_mapping()
+    raw["seed"] = (1 << 64) - 1
+
+    assert parse_request(raw).seed == (1 << 64) - 1
+
+
+def test_parse_request_rejects_canonical_payload_above_file_limit() -> None:
+    raw = _request_mapping()
+    target = raw["targets"][0]  # type: ignore[index]
+    sequence = "ACGT" * (MAX_REQUEST_BYTES // 4)
+    target["sequence"] = sequence
+    target["recovery_primers"]["forward"]["binding_sequence"] = sequence[:8]
+    target["recovery_primers"]["reverse"]["binding_sequence"] = _reverse_complement(sequence[-8:])
+
+    with pytest.raises(JunctionConfigError, match="canonical request exceeds.*input limit"):
+        parse_request(raw)
+
+
+@pytest.mark.parametrize(
+    "legacy_field",
+    ["barcode_purification", "coding_purification", "coding_end_preparation"],
+)
+def test_parse_request_rejects_legacy_order_policy_fields(legacy_field: str) -> None:
+    raw = _request_mapping()
+    raw["order_policy"][legacy_field] = "legacy"  # type: ignore[index]
+
+    with pytest.raises(JunctionConfigError, match=rf"unknown field.*{legacy_field}"):
+        parse_request(raw)
+
+
+def test_parse_request_rejects_extension_bearing_primer_above_order_ceiling() -> None:
+    raw = _request_mapping()
+    target = raw["targets"][0]
+    assert isinstance(target, dict)
+    primers = target["recovery_primers"]
+    assert isinstance(primers, dict)
+    forward = primers["forward"]
+    assert isinstance(forward, dict)
+    forward["five_prime_extension"] = "A" * 200
+
+    with pytest.raises(JunctionConfigError, match="recovery forward primer is .*max_oligo_length"):
+        parse_request(raw)
+
+
+def test_load_request_wraps_malformed_yaml(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.yaml"
+    request_path.write_text("targets: [", encoding="utf-8")
+
+    with pytest.raises(JunctionConfigError, match="Invalid YAML"):
+        load_request(request_path)
+
+
+def test_load_request_wraps_json_integer_limit_as_config_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.json"
+    request_path.write_text('{"seed":' + "9" * 10_000 + "}", encoding="utf-8")
+
+    with pytest.raises(JunctionConfigError, match="Invalid JSON"):
+        load_request(request_path)
+
+
+def test_load_request_wraps_yaml_integer_limit_as_config_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.yaml"
+    request_path.write_text("seed: " + "9" * 10_000, encoding="utf-8")
+
+    with pytest.raises(JunctionConfigError, match="Invalid YAML"):
+        load_request(request_path)
+
+
+def test_load_request_preserves_unsupported_extension_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.toml"
+    request_path.write_text("{}", encoding="utf-8")
+
+    expected = f"junction request must use a .json, .yaml, or .yml extension: {request_path}"
+    with pytest.raises(JunctionConfigError) as caught:
+        load_request(request_path)
+    assert str(caught.value) == expected
+
+
+def test_load_request_preserves_yaml_anchor_policy_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.yaml"
+    request_path.write_text("base: &base {}\ncopy: *base\n", encoding="utf-8")
+
+    with pytest.raises(JunctionConfigError) as caught:
+        load_request(request_path)
+    assert str(caught.value) == "junction YAML requests must not use anchors or aliases"
+
+
+@pytest.mark.parametrize(
+    ("suffix", "content"),
+    [
+        (".json", '{"schema":"first","schema":"second"}'),
+        (".yaml", "schema: first\nschema: second\n"),
+        (".json", '{"planning":{"seed":1,"seed":2}}'),
+        (".yaml", "planning:\n  seed: 1\n  seed: 2\n"),
+    ],
+)
+def test_load_request_rejects_duplicate_mapping_keys(tmp_path: Path, suffix: str, content: str) -> None:
+    request_path = tmp_path / f"request{suffix}"
+    request_path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(JunctionConfigError, match="[Dd]uplicate"):
+        load_request(request_path)

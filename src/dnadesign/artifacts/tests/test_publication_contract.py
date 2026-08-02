@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/artifacts/tests/test_publication_contract.py
 
-Public contracts for immutable directory publication.
+Public contracts for create-only directory publication.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ def test_destination_preflight_rejects_existing_target_without_mutation(tmp_path
     bundle.write_text("keep\n", encoding="utf-8")
     before = sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*"))
 
-    with pytest.raises(PublicationExistsError, match="already exists and is immutable"):
+    with pytest.raises(PublicationExistsError, match="already exists; publication is create-only"):
         preflight_create_only_directory_publication(bundle)
 
     after = sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*"))

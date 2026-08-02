@@ -17,11 +17,11 @@ from pathlib import Path
 import pytest
 
 import dnadesign.baserender as baserender
-from dnadesign.trijunction.contracts import parse_request
-from dnadesign.trijunction.design.planner import design_trijunction
-from dnadesign.trijunction.presentation.review_contract import review_contracts
-from dnadesign.trijunction.sequence import reverse_complement
-from dnadesign.trijunction.tests.scenarios.factories import deterministic_dna, scale_request_mapping
+from dnadesign.junction.contracts import parse_request
+from dnadesign.junction.design.planner import design_junction
+from dnadesign.junction.presentation.review_contract import review_contracts
+from dnadesign.junction.sequence import reverse_complement
+from dnadesign.junction.tests.scenarios.factories import deterministic_dna, scale_request_mapping
 
 from .fixtures import _payload, _payload_with_long_recovery_primers, _rename_target_geometry, _review_job
 
@@ -58,11 +58,11 @@ def _real_universal_rows_with_unequal_target_lengths() -> list[dict[str, object]
                 "five_prime_extension": "CGTCTCA",
             },
         }
-    reviews = review_contracts(design_trijunction(parse_request(mapping)))
+    reviews = review_contracts(design_junction(parse_request(mapping)))
     return [review.model_dump(mode="json") for review in reviews]
 
 
-def _target_specific_rows_with_exact_pool_receipt() -> tuple[dict[str, object], dict[str, object]]:
+def _target_specific_rows_with_exact_group_receipt() -> tuple[dict[str, object], dict[str, object]]:
     first, second = _distinct_target_rows()
     for row in (first, second):
         row["recovery"]["mode"] = "target_specific"  # type: ignore[index]
@@ -114,7 +114,7 @@ def test_filtered_parquet_helpers_reject_a_document_scoped_adapter(
         loader(**kwargs)
 
 
-def test_adapter_rejects_a_pool_junction_count_exceeding_locus_count() -> None:
+def test_adapter_rejects_a_group_junction_count_exceeding_locus_count() -> None:
     first, second = _distinct_target_rows()
     first["recovery"]["mode"] = "target_specific"  # type: ignore[index]
     second["recovery"]["mode"] = "target_specific"  # type: ignore[index]
@@ -126,7 +126,7 @@ def test_adapter_rejects_a_pool_junction_count_exceeding_locus_count() -> None:
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
 
-def test_adapter_finalization_rejects_an_underfilled_pool_locus_count() -> None:
+def test_adapter_finalization_rejects_an_underfilled_group_locus_count() -> None:
     first, second = _distinct_target_rows()
     for row in (first, second):
         row["recovery"]["mode"] = "target_specific"  # type: ignore[index]
@@ -167,25 +167,28 @@ def test_job_finalizes_before_publication(tmp_path: Path) -> None:
     assert not (tmp_path / "review-render").exists()
 
 
-def test_adapter_rejects_duplicate_physical_sequence_under_distinct_target_ids() -> None:
+def test_adapter_rejects_duplicate_sequence_under_distinct_target_ids() -> None:
     first = _payload()
     second = _payload()
     second["target"]["target_id"] = "target-02"  # type: ignore[index]
     second["checks"][0]["subject"]["id"] = "target-02"  # type: ignore[index]
 
-    with pytest.raises(baserender.SchemaError, match="document has duplicate physical target sequence"):
+    with pytest.raises(
+        baserender.SchemaError,
+        match="document has a duplicate target sequence in one assembly group",
+    ):
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
 
-def test_adapter_rejects_mixed_recovery_modes_within_one_pool() -> None:
+def test_adapter_rejects_mixed_recovery_modes_within_one_assembly_group() -> None:
     first, second = _distinct_target_rows()
     second["recovery"]["mode"] = "target_specific"  # type: ignore[index]
 
-    with pytest.raises(baserender.SchemaError, match="document mixes recovery modes within one physical pool"):
+    with pytest.raises(baserender.SchemaError, match="document mixes recovery modes within one assembly group"):
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
 
-def test_adapter_rejects_different_universal_primer_evidence_within_one_pool() -> None:
+def test_adapter_rejects_different_universal_primer_evidence_within_one_group() -> None:
     first, second = _distinct_target_rows()
     first["recovery"]["mode"] = "universal"  # type: ignore[index]
     second["recovery"]["mode"] = "universal"  # type: ignore[index]
@@ -194,7 +197,7 @@ def test_adapter_rejects_different_universal_primer_evidence_within_one_pool() -
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
 
-def test_adapter_rejects_target_specific_primers_that_resolve_another_pool_target() -> None:
+def test_adapter_rejects_target_specific_primers_that_resolve_another_group_target() -> None:
     rows = _real_universal_rows_with_unequal_target_lengths()
     for row in rows:
         row["recovery"]["mode"] = "target_specific"  # type: ignore[index]
@@ -203,15 +206,15 @@ def test_adapter_rejects_target_specific_primers_that_resolve_another_pool_targe
         baserender.adapt_records(rows, adapter_kind="three_way_junction_review_v1")
 
 
-def test_adapter_scopes_target_specific_recovery_to_one_physical_pool() -> None:
+def test_adapter_scopes_target_specific_recovery_to_one_assembly_group() -> None:
     first = _payload()
     second = _payload()
     _rename_target_geometry(second, target_id="target-02")
     for row in (first, second):
         row["recovery"]["mode"] = "target_specific"  # type: ignore[index]
-    second["target"]["pool_id"] = "pool-02"  # type: ignore[index]
-    second["search"]["pool_id"] = "pool-02"  # type: ignore[index]
-    second["checks"][1]["subject"]["id"] = "pool-02"  # type: ignore[index]
+    second["target"]["assembly_group_id"] = "assembly-02"  # type: ignore[index]
+    second["search"]["assembly_group_id"] = "assembly-02"  # type: ignore[index]
+    second["checks"][1]["subject"]["id"] = "assembly-02"  # type: ignore[index]
 
     records = baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
@@ -219,7 +222,7 @@ def test_adapter_scopes_target_specific_recovery_to_one_physical_pool() -> None:
 
 
 def test_adapter_rejects_duplicate_plan_scoped_junction_identity() -> None:
-    first, second = _target_specific_rows_with_exact_pool_receipt()
+    first, second = _target_specific_rows_with_exact_group_receipt()
     second["geometry"]["junctions"][0]["junction_id"] = "junction-01"  # type: ignore[index]
     second["strands"][0]["outgoing_junction_id"] = "junction-01"  # type: ignore[index]
     second["strands"][1]["incoming_junction_id"] = "junction-01"  # type: ignore[index]
@@ -229,7 +232,7 @@ def test_adapter_rejects_duplicate_plan_scoped_junction_identity() -> None:
 
 
 def test_adapter_rejects_duplicate_plan_scoped_fragment_identity() -> None:
-    first, second = _target_specific_rows_with_exact_pool_receipt()
+    first, second = _target_specific_rows_with_exact_group_receipt()
     second["geometry"]["fragments"][0]["fragment_id"] = "fragment-01"  # type: ignore[index]
     second["geometry"]["junctions"][0]["left_fragment_id"] = "fragment-01"  # type: ignore[index]
     second["strands"][0]["fragment_id"] = "fragment-01"  # type: ignore[index]
@@ -239,20 +242,23 @@ def test_adapter_rejects_duplicate_plan_scoped_fragment_identity() -> None:
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
 
-def test_adapter_rejects_reverse_complement_barcode_collision_within_pool() -> None:
-    first, second = _target_specific_rows_with_exact_pool_receipt()
+def test_adapter_rejects_reverse_complement_barcode_collision_within_group() -> None:
+    first, second = _target_specific_rows_with_exact_group_receipt()
     _replace_row_barcode(first, "ACGTTGCA")
     first_barcode = first["geometry"]["junctions"][0]["barcode"]  # type: ignore[index]
     collision = reverse_complement(first_barcode)
     assert collision != first_barcode
     _replace_row_barcode(second, collision)
 
-    with pytest.raises(baserender.SchemaError, match="duplicate physical barcode identity"):
+    with pytest.raises(
+        baserender.SchemaError,
+        match="duplicate barcode identity in one assembly group",
+    ):
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
 
 def test_adapter_accepts_a_complete_coherent_multi_target_document() -> None:
-    first, second = _target_specific_rows_with_exact_pool_receipt()
+    first, second = _target_specific_rows_with_exact_group_receipt()
 
     records = baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 
@@ -270,7 +276,7 @@ def test_adapter_accepts_a_complete_multi_target_document_from_the_real_producer
             barcode_generation_attempts=250_000,
         )
     )
-    reviews = review_contracts(design_trijunction(request))
+    reviews = review_contracts(design_junction(request))
 
     records = baserender.adapt_records(
         [review.model_dump(mode="json") for review in reviews],

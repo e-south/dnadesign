@@ -317,21 +317,34 @@ def _panel_strands_and_recovery(axis, review: ThreeWayJunctionReviewV1) -> None:
 
 def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
     search = review.search
-    pool_id = bounded_text_preview(search.pool_id)
-    if pool_id.abbreviated:
+    assembly_group_id = bounded_text_preview(search.assembly_group_id)
+    if assembly_group_id.abbreviated:
         axis.text(
             0.02,
             0.92,
-            f"Pool ID · {pool_id.length_chars} chars · SHA-256[:12] {pool_id.sha256_prefix}",
+            (
+                f"Assembly group ID · {assembly_group_id.length_chars} chars · "
+                f"SHA-256[:12] {assembly_group_id.sha256_prefix}"
+            ),
             fontsize=6.5,
             fontweight="semibold",
             color=_INK,
             va="top",
         )
-        axis.text(0.02, 0.86, f"preview {pool_id.preview}", fontsize=6.5, family="monospace", color=_INK, va="top")
+        axis.text(
+            0.02, 0.86, f"preview {assembly_group_id.preview}", fontsize=6.5, family="monospace", color=_INK, va="top"
+        )
         metrics_y = 0.70
     else:
-        axis.text(0.02, 0.92, f"Pool {pool_id.preview}", fontsize=9.0, fontweight="semibold", color=_INK, va="top")
+        axis.text(
+            0.02,
+            0.92,
+            f"Assembly group {assembly_group_id.preview}",
+            fontsize=9.0,
+            fontweight="semibold",
+            color=_INK,
+            va="top",
+        )
         metrics_y = 0.81
     locus_count, locus_abbreviated = _integer_preview(search.locus_count)
     toehold_paths, paths_abbreviated = _integer_preview(search.toehold_paths_evaluated)
@@ -339,7 +352,7 @@ def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
     barcode_subsets, subsets_abbreviated = _integer_preview(search.barcode_subsets_evaluated)
     matchings, matchings_abbreviated = _integer_preview(search.matchings_evaluated)
     metrics = (
-        f"pool loci  {locus_count}",
+        f"assembly-group loci  {locus_count}",
         f"toehold paths  {toehold_paths}",
         f"toehold min / mean  {search.toehold_min_distance:g} / {search.toehold_mean_distance:g}",
         f"barcode candidates  {barcode_candidates}",

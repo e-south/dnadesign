@@ -262,7 +262,7 @@ Tool-specific wiring examples live in:
 - [DenseGen](integrations/densegen.md)
 - [Cruncher](integrations/cruncher.md)
 - [YIU](integrations/yiu.md)
-- [TriJunction](integrations/trijunction.md)
+- [junction](integrations/junction.md)
 
 ## Runtime Flow
 

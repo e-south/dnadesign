@@ -175,9 +175,9 @@ BANNERS = (
         "thread",
     ),
     BannerSpec(
-        "src/dnadesign/trijunction/assets/trijunction-banner.svg",
-        "trijunction",
-        "PLAN JUNCTION OLIGOS",
+        "src/dnadesign/junction/assets/junction-banner.svg",
+        "junction",
+        "TARGETS / OLIGOS / CHECKS",
         "Compile exact DNA targets into checked three-way-junction oligo plans.",
         "junction",
     ),

@@ -32,7 +32,7 @@ _LAZY_PUBLIC_FACADES = (
     "dnadesign.folding",
     "dnadesign.folding.src",
     "dnadesign.notify",
-    "dnadesign.trijunction",
+    "dnadesign.junction",
 )
 
 

@@ -1,0 +1,38 @@
+schema_version: 1
+catalog_order: 14
+tool: junction
+summary: Plans three-way-junction oligos from exact DNA targets and verifies each saved bundle.
+keywords:
+  - three-way junction
+  - oligo planning
+  - deterministic design
+  - Sidewinder
+  - bundle verification
+routes:
+  - id: how-it-works
+    path: explanation/how-junction-works.md
+    summary: Learn the physical idea, software model, vocabulary, and evidence limits.
+  - id: getting-started
+    path: getting-started.md
+    summary: Build and verify one small software demonstration.
+  - id: prepare-a-request
+    path: guides/prepare-a-request.md
+    summary: Declare exact targets, assembly groups, primers, search policy, and order labels.
+  - id: inspect-and-verify
+    path: guides/inspect-and-verify.md
+    summary: Map review questions to bundle files and verify an existing design.
+  - id: scale
+    path: guides/scale.md
+    summary: Understand resource limits and tested software scenarios.
+  - id: request-contract
+    path: reference/request.md
+    summary: Look up exact request fields, validation rules, and resource ceilings.
+  - id: artifacts-api-errors
+    path: reference/artifacts-api-and-errors.md
+    summary: Look up public operations, errors, plans, bundles, and verification.
+  - id: method-v1
+    path: reference/method-v1.md
+    summary: Inspect paper-grounded geometry, strand orientation, search scores, recovery evidence, and v1 choices.
+  - id: sources
+    path: reference/sources.md
+    summary: Read the Sidewinder sources and how junction differs from the published methods.

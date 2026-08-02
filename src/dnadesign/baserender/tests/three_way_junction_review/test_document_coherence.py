@@ -23,7 +23,8 @@ from .fixtures import _payload, _payload_with_long_recovery_primers, _rename_tar
 
 def _second_target() -> tuple[dict[str, object], dict[str, object]]:
     first = _payload()
-    second = _payload()
+    second = _payload_with_long_recovery_primers()
+    first["recovery"]["mode"] = "target_specific"  # type: ignore[index]
     _rename_target_geometry(second, target_id="target-02")
     return first, second
 
@@ -41,7 +42,10 @@ def test_job_validates_the_complete_review_document_before_narrowing(
     source = tmp_path / "three_way_junction_review.v1.json"
     source.write_text(json.dumps([first, second]), encoding="utf-8")
 
-    with pytest.raises(baserender.SchemaError, match="contradictory pool-wide search receipt at row 1"):
+    with pytest.raises(
+        baserender.SchemaError,
+        match="contradictory assembly-group-wide search receipt at row 1",
+    ):
         baserender.run_job(_review_job(source, input_narrowing=input_narrowing), caller_root=tmp_path)
 
     assert not (tmp_path / "review-render").exists()
@@ -64,6 +68,41 @@ def test_adapter_rejects_inconsistent_metadata_for_one_plan_id(
 
     with pytest.raises(baserender.SchemaError, match="contradictory source metadata at row 1"):
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+
+
+@pytest.mark.parametrize("drift", ["changed_detail", "changed_status", "omitted"])
+def test_adapter_rejects_inconsistent_assembly_group_check_evidence(drift: str) -> None:
+    first, second = _second_target()
+    if drift == "changed_detail":
+        second["checks"][1]["detail"] = "different assembly-group evidence"  # type: ignore[index]
+    else:
+        additional_check = {
+            "subject": {"kind": "assembly_group", "id": "assembly-01"},
+            "check": "additional_group_check",
+            "status": "passed",
+            "detail": "present for every row or none",
+        }
+        first["checks"].append(additional_check)  # type: ignore[union-attr]
+        if drift == "changed_status":
+            second_check = {**additional_check, "status": "not_run"}
+            second["checks"].append(second_check)  # type: ignore[union-attr]
+
+    with pytest.raises(
+        baserender.SchemaError,
+        match="contradictory assembly-group-wide check evidence at row 1",
+    ):
+        baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+
+
+def test_adapter_compares_assembly_group_check_evidence_without_using_row_order() -> None:
+    first, second = _second_target()
+    for row in (first, second):
+        row["search"].update({"locus_count": 2, "barcode_candidates_generated": 50})  # type: ignore[union-attr]
+    second["checks"].reverse()  # type: ignore[union-attr]
+
+    records = baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+
+    assert [record.id for record in records] == ["target-01", "target-02"]
 
 
 @pytest.mark.parametrize("contradictory_payload", [False, True])
@@ -96,16 +135,16 @@ def test_adapter_allows_target_id_reuse_across_distinct_plans() -> None:
     assert [record.id for record in records] == ["target-01", "target-01"]
 
 
-@pytest.mark.parametrize("distinct_group", ["plan", "pool"])
-def test_adapter_allows_distinct_plan_or_pool_search_receipts(distinct_group: str) -> None:
+@pytest.mark.parametrize("distinct_group", ["plan", "assembly_group"])
+def test_adapter_allows_distinct_plan_or_assembly_group_search_receipts(distinct_group: str) -> None:
     first, second = _second_target()
     second["search"]["toehold_seed"] = 99  # type: ignore[index]
     if distinct_group == "plan":
         second["source"]["plan_id"] = f"sha256:{'c' * 64}"  # type: ignore[index]
     else:
-        second["target"]["pool_id"] = "pool-02"  # type: ignore[index]
-        second["search"]["pool_id"] = "pool-02"  # type: ignore[index]
-        second["checks"][1]["subject"]["id"] = "pool-02"  # type: ignore[index]
+        second["target"]["assembly_group_id"] = "assembly-02"  # type: ignore[index]
+        second["search"]["assembly_group_id"] = "assembly-02"  # type: ignore[index]
+        second["checks"][1]["subject"]["id"] = "assembly-02"  # type: ignore[index]
 
     records = baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
 

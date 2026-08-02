@@ -17,7 +17,7 @@ import pytest
 from pydantic import ValidationError
 
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
-from dnadesign.contracts.visual.three_way_junction_review_v1 import AssemblyGeometry, PoolSearchReview
+from dnadesign.contracts.visual.three_way_junction_review_v1 import AssemblyGeometry, AssemblyGroupSearchReview
 
 
 def _reverse_complement(sequence: str) -> str:
@@ -30,14 +30,14 @@ def three_way_junction_review_payload() -> dict[str, object]:
     return {
         "contract_kind": "three_way_junction_review_v1",
         "source": {
-            "plan_schema": "dnadesign.trijunction.plan.v1",
+            "plan_schema": "dnadesign.junction.plan.v1",
             "plan_id": f"sha256:{'a' * 64}",
             "request_sha256": f"sha256:{'b' * 64}",
-            "algorithm": "trijunction.v1",
+            "algorithm": "junction.v1",
         },
         "target": {
             "target_id": "target-01",
-            "pool_id": "pool-01",
+            "assembly_group_id": "assembly-01",
             "sequence_5to3": target,
             "sequence_sha256": f"sha256:{hashlib.sha256(target.encode()).hexdigest()}",
         },
@@ -66,7 +66,7 @@ def three_way_junction_review_payload() -> dict[str, object]:
                     "toehold_complement": _reverse_complement(target[26:30]),
                     "barcode": "GACTTGCA",
                     "barcode_complement": _reverse_complement("GACTTGCA"),
-                    "complement_nick_geometry_valid": True,
+                    "complement_nick_sequence_layout_valid": True,
                     "complement_end_preparation": "downstream_phosphorylation",
                 }
             ],
@@ -107,12 +107,12 @@ def three_way_junction_review_payload() -> dict[str, object]:
             },
             "first_fragment_id": "target-01.fragment-01",
             "last_fragment_id": "target-01.fragment-02",
-            "expected_product_sequence_5to3": target,
+            "expected_target_sequence_5to3": target,
             "extended_top_sequence_5to3": "GG" + target + _reverse_complement("TT"),
             "extended_bottom_sequence_5to3": "TT" + _reverse_complement(target) + _reverse_complement("GG"),
         },
         "search": {
-            "pool_id": "pool-01",
+            "assembly_group_id": "assembly-01",
             "toehold_seed": 11,
             "barcode_generation_seed": 12,
             "barcode_subset_seed": 13,
@@ -141,13 +141,99 @@ def three_way_junction_review_payload() -> dict[str, object]:
                 "detail": "exact",
             },
             {
-                "subject": {"kind": "pool", "id": "pool-01"},
+                "subject": {"kind": "assembly_group", "id": "assembly-01"},
                 "check": "thermodynamic_screening",
                 "status": "not_run",
                 "detail": "not part of this contract",
             },
         ],
     }
+
+
+def _two_junction_review_payload() -> dict[str, object]:
+    payload = three_way_junction_review_payload()
+    target = payload["target"]["sequence_5to3"]
+    first_toehold = target[18:22]
+    second_toehold = target[35:39]
+    first_barcode = "AACCGGTT"
+    second_barcode = "GACTTGCA"
+    payload["geometry"] = {
+        "fragments": [
+            {
+                "fragment_id": "target-01.fragment-01",
+                "index": 0,
+                "role": "first",
+                "domain_span": {"start": 0, "end": 18},
+            },
+            {
+                "fragment_id": "target-01.fragment-02",
+                "index": 1,
+                "role": "internal",
+                "domain_span": {"start": 22, "end": 35},
+            },
+            {
+                "fragment_id": "target-01.fragment-03",
+                "index": 2,
+                "role": "last",
+                "domain_span": {"start": 39, "end": len(target)},
+            },
+        ],
+        "junctions": [
+            {
+                "junction_id": "target-01.junction-01",
+                "toehold_span": {"start": 18, "end": 22},
+                "left_fragment_id": "target-01.fragment-01",
+                "right_fragment_id": "target-01.fragment-02",
+                "toehold": first_toehold,
+                "toehold_complement": _reverse_complement(first_toehold),
+                "barcode": first_barcode,
+                "barcode_complement": _reverse_complement(first_barcode),
+                "complement_nick_sequence_layout_valid": True,
+                "complement_end_preparation": "vendor_5_prime_phosphate",
+            },
+            {
+                "junction_id": "target-01.junction-02",
+                "toehold_span": {"start": 35, "end": 39},
+                "left_fragment_id": "target-01.fragment-02",
+                "right_fragment_id": "target-01.fragment-03",
+                "toehold": second_toehold,
+                "toehold_complement": _reverse_complement(second_toehold),
+                "barcode": second_barcode,
+                "barcode_complement": _reverse_complement(second_barcode),
+                "complement_nick_sequence_layout_valid": True,
+                "complement_end_preparation": "downstream_phosphorylation",
+            },
+        ],
+    }
+    payload["strands"] = [
+        {
+            "fragment_id": "target-01.fragment-01",
+            "role": "first",
+            "incoming_junction_id": None,
+            "outgoing_junction_id": "target-01.junction-01",
+            "barcode_bearing_sequence_5to3": target[:22] + first_barcode,
+            "complement_sequence_5to3": _reverse_complement(target[:18]),
+        },
+        {
+            "fragment_id": "target-01.fragment-02",
+            "role": "internal",
+            "incoming_junction_id": "target-01.junction-01",
+            "outgoing_junction_id": "target-01.junction-02",
+            "barcode_bearing_sequence_5to3": (_reverse_complement(first_barcode) + target[22:39] + second_barcode),
+            "complement_sequence_5to3": (_reverse_complement(target[22:35]) + _reverse_complement(first_toehold)),
+        },
+        {
+            "fragment_id": "target-01.fragment-03",
+            "role": "last",
+            "incoming_junction_id": "target-01.junction-02",
+            "outgoing_junction_id": None,
+            "barcode_bearing_sequence_5to3": _reverse_complement(second_barcode) + target[39:],
+            "complement_sequence_5to3": (_reverse_complement(target[39:]) + _reverse_complement(second_toehold)),
+        },
+    ]
+    payload["recovery"]["last_fragment_id"] = "target-01.fragment-03"
+    payload["search"].update({"locus_count": 2, "barcode_candidates_generated": 50})
+    return payload
 
 
 def test_review_contract_accepts_complete_neutral_evidence() -> None:
@@ -170,9 +256,9 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
     "field",
     ["toehold_paths_evaluated", "barcode_subsets_evaluated", "matchings_evaluated"],
 )
-def test_trijunction_string_v1_search_evaluations_respect_producer_budget(field: str) -> None:
+def test_junction_string_v1_search_evaluations_respect_producer_budget(field: str) -> None:
     payload = three_way_junction_review_payload()
-    payload["source"]["algorithm"] = "dnadesign.trijunction.string.v1"
+    payload["source"]["algorithm"] = "dnadesign.junction.string.v1"
     payload["search"]["locus_count"] = 10
     payload["search"]["barcode_candidates_generated"] = 50
     payload["search"][field] = 100_001
@@ -188,6 +274,79 @@ def test_trijunction_string_v1_search_evaluations_respect_producer_budget(field:
     payload["source"]["algorithm"] = "other.producer.algorithm.v2"
     extensible = ThreeWayJunctionReviewV1.model_validate(payload)
     assert getattr(extensible.search, field) == 100_002
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["toehold_seed", "barcode_generation_seed", "barcode_subset_seed", "matching_seed"],
+)
+@pytest.mark.parametrize("seed", [-1, 1 << 64])
+def test_junction_string_v1_search_seeds_respect_uint64_domain(field: str, seed: int) -> None:
+    payload = three_way_junction_review_payload()
+    payload["source"]["algorithm"] = "dnadesign.junction.string.v1"
+    payload["search"][field] = seed
+
+    with pytest.raises(ValidationError, match=rf"{field} must be between 0 and"):
+        ThreeWayJunctionReviewV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["toehold_seed", "barcode_generation_seed", "barcode_subset_seed", "matching_seed"],
+)
+def test_junction_string_v1_search_seeds_accept_uint64_boundaries(field: str) -> None:
+    payload = three_way_junction_review_payload()
+    payload["source"]["algorithm"] = "dnadesign.junction.string.v1"
+
+    for seed in (0, (1 << 64) - 1):
+        payload["search"][field] = seed
+        accepted = ThreeWayJunctionReviewV1.model_validate(payload)
+        assert getattr(accepted.search, field) == seed
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["toehold_seed", "barcode_generation_seed", "barcode_subset_seed", "matching_seed"],
+)
+@pytest.mark.parametrize("seed", [True, 1.0, "11"])
+def test_search_seeds_require_exact_integers(field: str, seed: object) -> None:
+    payload = three_way_junction_review_payload()
+    payload["search"][field] = seed
+
+    with pytest.raises(ValidationError, match="valid integer"):
+        ThreeWayJunctionReviewV1.model_validate(payload)
+
+
+def test_search_seed_domain_remains_extensible_for_other_algorithms() -> None:
+    payload = three_way_junction_review_payload()
+    payload["source"]["algorithm"] = "other.producer.algorithm.v2"
+    payload["search"]["toehold_seed"] = -1
+    payload["search"]["matching_seed"] = 1 << 64
+
+    accepted = ThreeWayJunctionReviewV1.model_validate(payload)
+
+    assert accepted.search.toehold_seed == -1
+    assert accepted.search.matching_seed == 1 << 64
+
+
+def test_junction_string_v1_requires_one_complement_end_preparation_per_target() -> None:
+    payload = _two_junction_review_payload()
+    payload["source"]["algorithm"] = "dnadesign.junction.string.v1"
+
+    with pytest.raises(ValidationError, match="must use one complement end preparation"):
+        ThreeWayJunctionReviewV1.model_validate(payload)
+
+
+def test_other_algorithms_may_declare_mixed_complement_end_preparation() -> None:
+    payload = _two_junction_review_payload()
+    payload["source"]["algorithm"] = "other.producer.algorithm.v2"
+
+    accepted = ThreeWayJunctionReviewV1.model_validate(payload)
+
+    assert {junction.complement_end_preparation for junction in accepted.geometry.junctions} == {
+        "vendor_5_prime_phosphate",
+        "downstream_phosphorylation",
+    }
 
 
 @pytest.mark.parametrize(
@@ -244,11 +403,11 @@ def test_trijunction_string_v1_search_evaluations_respect_producer_budget(field:
         ),
         (
             lambda payload: payload["checks"].pop(),
-            "exactly one pool-scoped thermodynamic_screening check",
+            "exactly one assembly-group-scoped thermodynamic_screening check",
         ),
         (
             lambda payload: payload["checks"][1]["subject"].update({"kind": "target", "id": "target-01"}),
-            "exactly one pool-scoped thermodynamic_screening check",
+            "exactly one assembly-group-scoped thermodynamic_screening check",
         ),
         (
             lambda payload: payload["checks"].append(
@@ -259,7 +418,7 @@ def test_trijunction_string_v1_search_evaluations_respect_producer_budget(field:
                     "detail": "duplicate scope",
                 }
             ),
-            "exactly one pool-scoped thermodynamic_screening check",
+            "exactly one assembly-group-scoped thermodynamic_screening check",
         ),
         (
             lambda payload: payload["recovery"].update({"mode": "construct_specific"}),
@@ -322,7 +481,7 @@ def test_review_contract_rejects_nonfinite_search_metrics(field: str, value: flo
         ({"matchings_evaluated": 2}, "exactly one matching evaluation"),
     ],
 )
-def test_singleton_pool_requires_exact_v1_pairwise_search_evidence(
+def test_singleton_assembly_group_requires_exact_v1_pairwise_search_evidence(
     updates: dict[str, float | int],
     message: str,
 ) -> None:
@@ -354,13 +513,13 @@ def test_singleton_pool_requires_exact_v1_pairwise_search_evidence(
         ),
     ],
 )
-def test_multi_locus_pool_search_respects_sequence_derived_bounds(
+def test_multi_locus_assembly_group_search_respects_sequence_derived_bounds(
     updates: dict[str, float | int],
     message: str,
 ) -> None:
     search_payload = three_way_junction_review_payload()["search"]
     search_payload.update({"locus_count": 2, "barcode_candidates_generated": 10, **updates})
-    search = PoolSearchReview.model_validate(search_payload)
+    search = AssemblyGroupSearchReview.model_validate(search_payload)
 
     with pytest.raises(ValueError, match=message):
         search._validate_sequence_bounds(toehold_length=4, barcode_length=8)
@@ -375,12 +534,12 @@ def test_barcode_subset_evaluations_do_not_exceed_combination_capacity() -> None
             "barcode_subsets_evaluated": 45,
         }
     )
-    accepted = PoolSearchReview.model_validate(search_payload)
+    accepted = AssemblyGroupSearchReview.model_validate(search_payload)
 
     accepted._validate_sequence_bounds(toehold_length=4, barcode_length=8)
 
     search_payload["barcode_subsets_evaluated"] = 46
-    rejected = PoolSearchReview.model_validate(search_payload)
+    rejected = AssemblyGroupSearchReview.model_validate(search_payload)
     with pytest.raises(ValueError, match="barcode_subsets_evaluated must not exceed the distinct combination count"):
         rejected._validate_sequence_bounds(toehold_length=4, barcode_length=8)
 
@@ -413,7 +572,7 @@ def test_review_geometry_requires_uniform_junction_sequence_lengths(
                 "toehold_complement": _reverse_complement("ACGT"),
                 "barcode": "AACCGGTT",
                 "barcode_complement": _reverse_complement("AACCGGTT"),
-                "complement_nick_geometry_valid": True,
+                "complement_nick_sequence_layout_valid": True,
                 "complement_end_preparation": "vendor_5_prime_phosphate",
             },
             {
@@ -425,7 +584,7 @@ def test_review_geometry_requires_uniform_junction_sequence_lengths(
                 "toehold_complement": _reverse_complement(second_toehold),
                 "barcode": second_barcode,
                 "barcode_complement": _reverse_complement(second_barcode),
-                "complement_nick_geometry_valid": True,
+                "complement_nick_sequence_layout_valid": True,
                 "complement_end_preparation": "vendor_5_prime_phosphate",
             },
         ],

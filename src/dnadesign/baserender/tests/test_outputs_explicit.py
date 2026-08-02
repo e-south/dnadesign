@@ -574,7 +574,7 @@ def test_existing_bundle_is_immutable(monkeypatch: pytest.MonkeyPatch, tmp_path:
     job_path = write_job(tmp_path / "conflict.yaml", payload)
     monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _fake_image_writer)
 
-    with pytest.raises(SchemaError, match="already exists and is immutable"):
+    with pytest.raises(SchemaError, match="already exists; publication is create-only"):
         run_render_job(str(job_path))
 
     assert bundle.is_dir()
@@ -677,7 +677,7 @@ def test_concurrent_runs_publish_exactly_one_complete_bundle(
     failures = [outcome for outcome in outcomes if isinstance(outcome, Exception)]
     assert len(failures) == 1
     assert isinstance(failures[0], SchemaError)
-    assert "already exists and is immutable" in str(failures[0])
+    assert "already exists; publication is create-only" in str(failures[0])
     assert (bundle / "manifest.json").is_file()
     assert (bundle / "images" / "rendered.png").read_bytes() in {b"batch-1", b"batch-2"}
     assert not list(bundle.parent.glob(".render-v1.staging-*"))
@@ -883,7 +883,7 @@ def test_case_aliases_obey_destination_filesystem_semantics(tmp_path: Path) -> N
             (publication.stage / "manifest.json").write_text(marker, encoding="utf-8")
         _publish_bundle(upper)
         if (parent / "render-v1").exists():
-            with pytest.raises(SchemaError, match="already exists and is immutable"):
+            with pytest.raises(SchemaError, match="already exists; publication is create-only"):
                 _publish_bundle(lower)
         else:
             _publish_bundle(lower)

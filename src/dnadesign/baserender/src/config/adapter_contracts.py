@@ -423,7 +423,7 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
     ),
     "three_way_junction_review_v1": AdapterDescriptor(
         kind="three_way_junction_review_v1",
-        owner_tool="trijunction",
+        owner_tool="junction",
         contract_kind="three_way_junction_review_v1",
         schema_model=ThreeWayJunctionReviewV1,
         supported_renderers=("three_way_junction_review",),

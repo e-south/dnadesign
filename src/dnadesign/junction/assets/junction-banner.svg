@@ -1,0 +1,17 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="junction-banner-title junction-banner-description" shape-rendering="crispEdges">
+  <title id="junction-banner-title">junction: targets / oligos / checks</title>
+  <desc id="junction-banner-description">Compile exact DNA targets into checked three-way-junction oligo plans.</desc>
+  <rect width="1200" height="180" fill="#1E1D1A"/>
+  <g font-family="Menlo, Monaco, Consolas, monospace">
+    <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">junction</text>
+    <text x="50" y="114" fill="#969087" font-size="12" font-weight="700" letter-spacing="1.2">TARGETS / OLIGOS / CHECKS</text>
+    <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
+  </g>
+  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
+  <path d="M584 124H1144" stroke="#5A5650" stroke-width="2"/>
+  <g transform="translate(720 48)">
+    <path d="M0 24H40M40 24L76 2M40 24L76 46" stroke="#F3EFE7" stroke-width="4" fill="none"/><path d="M0 36H44M44 36L80 14M44 36L80 58" stroke="#969087" stroke-width="3" fill="none"/><rect x="37" y="21" width="10" height="10" fill="#D97757"/>
+  </g>
+</svg>

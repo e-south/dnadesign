@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/tests/three_way_junction_review/fixtures.py
 
-Neutral review-contract fixtures for BaseRender TriJunction tests.
+Neutral review-contract fixtures for BaseRender Junction tests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -64,14 +64,14 @@ def _payload() -> dict[str, object]:
     return {
         "contract_kind": "three_way_junction_review_v1",
         "source": {
-            "plan_schema": "dnadesign.trijunction.plan.v1",
+            "plan_schema": "dnadesign.junction.plan.v1",
             "plan_id": f"sha256:{'a' * 64}",
             "request_sha256": f"sha256:{'b' * 64}",
-            "algorithm": "trijunction.v1",
+            "algorithm": "junction.v1",
         },
         "target": {
             "target_id": "target-01",
-            "pool_id": "pool-01",
+            "assembly_group_id": "assembly-01",
             "sequence_5to3": target,
             "sequence_sha256": f"sha256:{hashlib.sha256(target.encode()).hexdigest()}",
         },
@@ -100,7 +100,7 @@ def _payload() -> dict[str, object]:
                     "toehold_complement": _reverse_complement(toehold),
                     "barcode": "AACCGGTT",
                     "barcode_complement": "AACCGGTT",
-                    "complement_nick_geometry_valid": True,
+                    "complement_nick_sequence_layout_valid": True,
                     "complement_end_preparation": "vendor_5_prime_phosphate",
                 }
             ],
@@ -141,12 +141,12 @@ def _payload() -> dict[str, object]:
             },
             "first_fragment_id": "fragment-01",
             "last_fragment_id": "fragment-02",
-            "expected_product_sequence_5to3": target,
+            "expected_target_sequence_5to3": target,
             "extended_top_sequence_5to3": target,
             "extended_bottom_sequence_5to3": _reverse_complement(target),
         },
         "search": {
-            "pool_id": "pool-01",
+            "assembly_group_id": "assembly-01",
             "toehold_seed": 11,
             "barcode_generation_seed": 12,
             "barcode_subset_seed": 13,
@@ -175,7 +175,7 @@ def _payload() -> dict[str, object]:
                 "detail": "exact",
             },
             {
-                "subject": {"kind": "pool", "id": "pool-01"},
+                "subject": {"kind": "assembly_group", "id": "assembly-01"},
                 "check": "thermodynamic_screening",
                 "status": "not_run",
                 "detail": "not performed",
@@ -226,7 +226,7 @@ def _payload_with_long_recovery_primers() -> dict[str, object]:
 
     payload["target"] = {
         "target_id": "target-01",
-        "pool_id": "pool-01",
+        "assembly_group_id": "assembly-01",
         "sequence_5to3": target,
         "sequence_sha256": f"sha256:{hashlib.sha256(target.encode()).hexdigest()}",
     }
@@ -289,7 +289,7 @@ def _payload_with_long_recovery_primers() -> dict[str, object]:
         },
         "first_fragment_id": "fragment-01",
         "last_fragment_id": "fragment-02",
-        "expected_product_sequence_5to3": target,
+        "expected_target_sequence_5to3": target,
         "extended_top_sequence_5to3": forward_extension + target + _reverse_complement(reverse_extension),
         "extended_bottom_sequence_5to3": reverse_extension
         + _reverse_complement(target)
@@ -352,13 +352,13 @@ def _payload_with_long_junction_sequences() -> dict[str, object]:
 def _payload_with_large_display_scalars() -> dict[str, object]:
     payload = _payload()
     target_id = "target-" + ("x" * 10_000)
-    pool_id = "pool-" + ("y" * 10_000)
+    assembly_group_id = "assembly-" + ("y" * 10_000)
     payload["target"]["target_id"] = target_id
-    payload["target"]["pool_id"] = pool_id
-    payload["search"]["pool_id"] = pool_id
+    payload["target"]["assembly_group_id"] = assembly_group_id
+    payload["search"]["assembly_group_id"] = assembly_group_id
     payload["search"]["toehold_paths_evaluated"] = 10**10_000
     payload["checks"][0]["subject"]["id"] = target_id
-    payload["checks"][1]["subject"]["id"] = pool_id
+    payload["checks"][1]["subject"]["id"] = assembly_group_id
     return payload
 
 
@@ -429,7 +429,7 @@ def _payload_with_many_junctions(junction_count: int = 20) -> dict[str, object]:
                     "toehold_complement": _reverse_complement(toehold),
                     "barcode": following_barcode,
                     "barcode_complement": _reverse_complement(following_barcode),
-                    "complement_nick_geometry_valid": True,
+                    "complement_nick_sequence_layout_valid": True,
                     "complement_end_preparation": "vendor_5_prime_phosphate",
                 }
             )
@@ -455,7 +455,7 @@ def _payload_with_many_junctions(junction_count: int = 20) -> dict[str, object]:
         },
         "first_fragment_id": fragments[0]["fragment_id"],
         "last_fragment_id": fragments[-1]["fragment_id"],
-        "expected_product_sequence_5to3": target,
+        "expected_target_sequence_5to3": target,
         "extended_top_sequence_5to3": target,
         "extended_bottom_sequence_5to3": _reverse_complement(target),
     }

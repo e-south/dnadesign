@@ -15,17 +15,18 @@ import hashlib
 import re
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, StrictInt, field_validator, model_validator
 
 from .common import PositiveLengthSpan, VisualContractModel
 
 _DNA = re.compile(r"^[ACGT]+$")
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MIN_BARCODE_POOL_FACTOR_V1 = 5
-_TRIJUNCTION_STRING_V1_ALGORITHM = "dnadesign.trijunction.string.v1"
-# TriJunction request v1 permits 100,000 iterations in each randomized search
+_JUNCTION_STRING_V1_ALGORITHM = "dnadesign.junction.string.v1"
+_UINT64_MAX = (1 << 64) - 1
+# junction request v1 permits 100,000 iterations in each randomized search
 # stage; every v1 selector also evaluates one baseline before that budget.
-_TRIJUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS = 100_001
+_JUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS = 100_001
 
 
 def _reverse_complement(sequence: str) -> str:
@@ -76,7 +77,7 @@ def _require_sha256(value: str) -> str:
 
 
 class ReviewSource(VisualContractModel):
-    plan_schema: Literal["dnadesign.trijunction.plan.v1"]
+    plan_schema: Literal["dnadesign.junction.plan.v1"]
     plan_id: str
     request_sha256: str
     algorithm: str = Field(min_length=1)
@@ -87,7 +88,7 @@ class ReviewSource(VisualContractModel):
 
 class ReviewTarget(VisualContractModel):
     target_id: str = Field(min_length=1)
-    pool_id: str = Field(min_length=1)
+    assembly_group_id: str = Field(min_length=1)
     sequence_5to3: str
     sequence_sha256: str
 
@@ -122,7 +123,7 @@ class JunctionGeometry(VisualContractModel):
     toehold_complement: str
     barcode: str
     barcode_complement: str
-    complement_nick_geometry_valid: Literal[True]
+    complement_nick_sequence_layout_valid: Literal[True]
     complement_end_preparation: Literal["vendor_5_prime_phosphate", "downstream_phosphorylation"]
 
     @field_validator("toehold", "toehold_complement", "barcode", "barcode_complement")
@@ -221,18 +222,18 @@ class RecoveryReview(VisualContractModel):
     reverse: PrimerReview
     first_fragment_id: str = Field(min_length=1)
     last_fragment_id: str = Field(min_length=1)
-    expected_product_sequence_5to3: str
+    expected_target_sequence_5to3: str
     extended_top_sequence_5to3: str
     extended_bottom_sequence_5to3: str
 
     @field_validator(
-        "expected_product_sequence_5to3",
+        "expected_target_sequence_5to3",
         "extended_top_sequence_5to3",
         "extended_bottom_sequence_5to3",
     )
     @classmethod
     def _validate_expected_product(cls, value: str) -> str:
-        return _require_dna(value, field="recovery.expected_product_sequence_5to3")
+        return _require_dna(value, field="recovery.expected_target_sequence_5to3")
 
     @model_validator(mode="after")
     def _validate_directions(self) -> "RecoveryReview":
@@ -241,12 +242,12 @@ class RecoveryReview(VisualContractModel):
         return self
 
 
-class PoolSearchReview(VisualContractModel):
-    pool_id: str = Field(min_length=1)
-    toehold_seed: int
-    barcode_generation_seed: int
-    barcode_subset_seed: int
-    matching_seed: int
+class AssemblyGroupSearchReview(VisualContractModel):
+    assembly_group_id: str = Field(min_length=1)
+    toehold_seed: StrictInt
+    barcode_generation_seed: StrictInt
+    barcode_subset_seed: StrictInt
+    matching_seed: StrictInt
     locus_count: int = Field(ge=1)
     toehold_paths_evaluated: int = Field(ge=1)
     toehold_min_distance: float = Field(ge=0, allow_inf_nan=False)
@@ -264,7 +265,7 @@ class PoolSearchReview(VisualContractModel):
     thermodynamic_screening: Literal["not_run"]
 
     @model_validator(mode="after")
-    def _validate_distance_summaries(self) -> "PoolSearchReview":
+    def _validate_distance_summaries(self) -> "AssemblyGroupSearchReview":
         if self.toehold_min_distance > self.toehold_mean_distance:
             raise ValueError("toehold_min_distance must be <= toehold_mean_distance")
         if self.barcode_min_distance > self.barcode_mean_distance:
@@ -283,11 +284,13 @@ class PoolSearchReview(VisualContractModel):
                 self.matching_max_pairwise_lcs,
             )
             if any(value != 0 for value in pairwise_metrics):
-                raise ValueError("singleton pools require zero pairwise distance and shared-substring metrics")
+                raise ValueError(
+                    "singleton assembly groups require zero pairwise distance and shared-substring metrics"
+                )
             if self.toehold_rank_score != 1.5 or self.barcode_rank_score != 1.5:
-                raise ValueError("singleton pools require v1 rank scores of 1.5")
+                raise ValueError("singleton assembly groups require v1 rank scores of 1.5")
             if self.matchings_evaluated != 1:
-                raise ValueError("singleton pools require exactly one matching evaluation")
+                raise ValueError("singleton assembly groups require exactly one matching evaluation")
         if not _permutation_capacity_covers(
             locus_count=self.locus_count,
             evaluated=self.matchings_evaluated,
@@ -319,7 +322,7 @@ class PoolSearchReview(VisualContractModel):
 
 
 class CheckSubject(VisualContractModel):
-    kind: Literal["pool", "target"]
+    kind: Literal["assembly_group", "target"]
     id: str = Field(min_length=1)
 
 
@@ -339,7 +342,7 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
     geometry: AssemblyGeometry
     strands: tuple[FragmentStrands, ...] = Field(min_length=2)
     recovery: RecoveryReview
-    search: PoolSearchReview
+    search: AssemblyGroupSearchReview
     checks: tuple[ReviewCheck, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -397,8 +400,8 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
         recovery = self.recovery
         if recovery.first_fragment_id != fragment_ids[0] or recovery.last_fragment_id != fragment_ids[-1]:
             raise ValueError("recovery terminal fragment references must match geometry")
-        if recovery.expected_product_sequence_5to3 != target:
-            raise ValueError("recovery.expected_product_sequence_5to3 must equal the target sequence")
+        if recovery.expected_target_sequence_5to3 != target:
+            raise ValueError("recovery.expected_target_sequence_5to3 must equal the target sequence")
         for primer in (recovery.forward, recovery.reverse):
             if primer.target_binding_span.end > len(target):
                 raise ValueError("primer target_binding_span exceeds the target length")
@@ -426,18 +429,30 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
             raise ValueError("recovery.extended_bottom_sequence_5to3 does not match the declared primer extensions")
         if recovery.extended_bottom_sequence_5to3 != _reverse_complement(recovery.extended_top_sequence_5to3):
             raise ValueError("recovery extended top and bottom sequences must be reverse complements")
-        if self.search.pool_id != self.target.pool_id:
-            raise ValueError("search.pool_id must match target.pool_id")
-        if self.source.algorithm == _TRIJUNCTION_STRING_V1_ALGORITHM:
+        if self.search.assembly_group_id != self.target.assembly_group_id:
+            raise ValueError("search.assembly_group_id must match target.assembly_group_id")
+        if self.source.algorithm == _JUNCTION_STRING_V1_ALGORITHM:
+            if len({junction.complement_end_preparation for junction in junctions}) != 1:
+                raise ValueError(
+                    f"geometry.junctions must use one complement end preparation for {_JUNCTION_STRING_V1_ALGORITHM}"
+                )
+            for field, seed in (
+                ("toehold_seed", self.search.toehold_seed),
+                ("barcode_generation_seed", self.search.barcode_generation_seed),
+                ("barcode_subset_seed", self.search.barcode_subset_seed),
+                ("matching_seed", self.search.matching_seed),
+            ):
+                if not 0 <= seed <= _UINT64_MAX:
+                    raise ValueError(f"{field} must be between 0 and {_UINT64_MAX} for {_JUNCTION_STRING_V1_ALGORITHM}")
             for field, evaluated in (
                 ("toehold_paths_evaluated", self.search.toehold_paths_evaluated),
                 ("barcode_subsets_evaluated", self.search.barcode_subsets_evaluated),
                 ("matchings_evaluated", self.search.matchings_evaluated),
             ):
-                if evaluated > _TRIJUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS:
+                if evaluated > _JUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS:
                     raise ValueError(
-                        f"{field} must not exceed {_TRIJUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS} "
-                        f"for {_TRIJUNCTION_STRING_V1_ALGORITHM}"
+                        f"{field} must not exceed {_JUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS} "
+                        f"for {_JUNCTION_STRING_V1_ALGORITHM}"
                     )
         if self.search.locus_count < len(junctions):
             raise ValueError("search.locus_count must cover every target geometry junction")
@@ -451,17 +466,18 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
         thermodynamic_checks = [check for check in self.checks if check.check == "thermodynamic_screening"]
         if (
             len(thermodynamic_checks) != 1
-            or thermodynamic_checks[0].subject.kind != "pool"
-            or thermodynamic_checks[0].subject.id != self.target.pool_id
+            or thermodynamic_checks[0].subject.kind != "assembly_group"
+            or thermodynamic_checks[0].subject.id != self.target.assembly_group_id
         ):
             raise ValueError(
-                "checks must contain exactly one pool-scoped thermodynamic_screening check for target.pool_id"
+                "checks must contain exactly one assembly-group-scoped thermodynamic_screening "
+                "check for target.assembly_group_id"
             )
         for check in self.checks:
             if check.subject.kind == "target" and check.subject.id != self.target.target_id:
                 raise ValueError("target check subject id must match target.target_id")
-            if check.subject.kind == "pool" and check.subject.id != self.target.pool_id:
-                raise ValueError("pool check subject id must match target.pool_id")
+            if check.subject.kind == "assembly_group" and check.subject.id != self.target.assembly_group_id:
+                raise ValueError("assembly group check subject id must match target.assembly_group_id")
             if check.check == "thermodynamic_screening" and check.status != "not_run":
                 raise ValueError("thermodynamic_screening check status must be not_run")
         return self
