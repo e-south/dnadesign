@@ -30,6 +30,7 @@ from ..config import (
     resolve_style,
 )
 from ..config.adapter_contracts import adapter_contract
+from ..config.render_job_v4 import validate_adapter_output_compatibility
 from ..core import Record, SchemaError, SkipRecord
 from ..io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
 from ..pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
@@ -189,6 +190,7 @@ def run_render_job(
     )
     descriptor = render_contract_descriptor(job.contract.kind)
     adapter_descriptor = adapter_contract(job.input.adapter.kind)
+    validate_adapter_output_compatibility(job.input.adapter.kind, job.outputs)
     envelope = adapter_descriptor.input_envelope or descriptor.input_envelope
     try:
         if envelope is None:

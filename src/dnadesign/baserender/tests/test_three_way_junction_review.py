@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import stat
+from dataclasses import replace
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -20,8 +21,11 @@ import pytest
 
 import dnadesign.baserender as baserender
 import dnadesign.trijunction as trijunction
+from dnadesign.baserender.src.config import ImagesOutputCfg, VideoOutputCfg
 from dnadesign.baserender.src.core import RenderingError
+from dnadesign.baserender.src.outputs.images import write_images
 from dnadesign.baserender.src.outputs.names import _unique_stem
+from dnadesign.baserender.src.outputs.video import write_video
 
 from .three_way_junction_review.fixtures import _payload, _payload_with_many_junctions, _reverse_complement
 
@@ -80,6 +84,10 @@ def test_public_catalog_and_adapter_expose_the_review_contract() -> None:
 
     assert descriptor.owner_tool == "trijunction"
     assert descriptor.supported_renderers == ("three_way_junction_review",)
+    assert descriptor.output_kinds == ("images",)
+    assert descriptor.image_output_modes == ("directory",)
+    assert descriptor.max_grid_records == 1
+    assert baserender.get_renderer_descriptor("three_way_junction_review").max_grid_records == 1
     assert record.id == "target-01"
     assert record.meta["adapter"] == "three_way_junction_review_v1"
     assert record.meta["three_way_junction_review"]["search"]["thermodynamic_screening"] == "not_run"
@@ -117,14 +125,18 @@ def test_review_renderer_emits_one_semantic_four_panel_figure() -> None:
         plt.close(figure)
 
 
-def test_run_job_writes_a_separate_create_only_review_bundle(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "contract_kind",
+    ["three_way_junction_review_render_v1", "render_job_v4"],
+)
+def test_review_jobs_require_per_target_image_directory(tmp_path: Path, contract_kind: str) -> None:
     source = tmp_path / "verified-source" / "target-01.review.json"
     source.parent.mkdir()
     source.write_text(json.dumps(_payload(), indent=2), encoding="utf-8")
     source_before = source.read_bytes()
     job = {
         "version": 4,
-        "contract": {"kind": "three_way_junction_review_render_v1"},
+        "contract": {"kind": contract_kind},
         "bundle": {"path": "review-render"},
         "input": {
             "kind": "json",
@@ -140,14 +152,156 @@ def test_run_job_writes_a_separate_create_only_review_bundle(tmp_path: Path) -> 
         "run": {"strict": True, "fail_on_skips": True},
     }
 
-    report = baserender.run_job(job, caller_root=tmp_path)
-
-    output = Path(report.outputs["images_path"])
-    assert output == (tmp_path / "review-render" / "three-way-junction-review.svg").resolve()
-    assert output.exists()
-    assert source.read_bytes() == source_before
-    with pytest.raises(baserender.SchemaError, match="already exists"):
+    with pytest.raises(baserender.SchemaError, match="requires a directory for images output"):
         baserender.run_job(job, caller_root=tmp_path)
+
+    assert source.read_bytes() == source_before
+    assert not (tmp_path / "review-render").exists()
+
+
+def test_typed_review_job_cannot_bypass_image_directory_policy(tmp_path: Path) -> None:
+    source = tmp_path / "verified-source" / "target-01.review.json"
+    source.parent.mkdir()
+    source.write_text(json.dumps(_payload()), encoding="utf-8")
+    mapping = {
+        "version": 4,
+        "contract": {"kind": "render_job_v4"},
+        "bundle": {"path": "review-render"},
+        "input": {
+            "kind": "json",
+            "path": str(source.relative_to(tmp_path)),
+            "adapter": {"kind": "three_way_junction_review_v1"},
+            "alphabet": "DNA",
+        },
+        "render": {"renderer": "three_way_junction_review", "style": {}},
+        "outputs": [{"kind": "images", "dir": "images", "fmt": "svg"}],
+        "run": {"strict": True, "fail_on_skips": True},
+    }
+    job = baserender.validate_job(mapping, caller_root=tmp_path)
+    image_output = job.outputs[0]
+    forged = replace(
+        job,
+        outputs=(
+            replace(
+                image_output,
+                dir=None,
+                path=job.bundle.path / "combined.svg",
+            ),
+        ),
+    )
+
+    with pytest.raises(baserender.SchemaError, match="requires a directory for images output"):
+        baserender.run_job(forged)
+
+    forged_video = replace(
+        job,
+        outputs=(
+            VideoOutputCfg(
+                kind="video",
+                path=job.bundle.path / "review.mp4",
+                fmt="mp4",
+                fps=1,
+                frames_per_record=1,
+                pauses={},
+                width_px=100,
+                height_px=100,
+                aspect_ratio=None,
+                total_duration=None,
+            ),
+        ),
+    )
+    with pytest.raises(baserender.SchemaError, match="only supports output kinds: images"):
+        baserender.run_job(forged_video)
+
+    assert not job.bundle.path.exists()
+
+
+def test_review_job_rejects_video_before_rendering(tmp_path: Path) -> None:
+    source = tmp_path / "verified-source" / "target-01.review.json"
+    source.parent.mkdir()
+    source.write_text(json.dumps(_payload()), encoding="utf-8")
+    job = {
+        "version": 4,
+        "contract": {"kind": "render_job_v4"},
+        "bundle": {"path": "review-render"},
+        "input": {
+            "kind": "json",
+            "path": str(source.relative_to(tmp_path)),
+            "adapter": {"kind": "three_way_junction_review_v1"},
+            "alphabet": "DNA",
+        },
+        "render": {"renderer": "three_way_junction_review", "style": {}},
+        "outputs": [
+            {
+                "kind": "video",
+                "path": "review.mp4",
+                "width_px": 1_000_000,
+                "height_px": 1_000_000,
+                "frames_per_record": 2_147_483_647,
+            }
+        ],
+        "run": {"strict": True, "fail_on_skips": True},
+    }
+
+    with pytest.raises(baserender.SchemaError, match="only supports output kinds: images"):
+        baserender.validate_job(job, caller_root=tmp_path)
+
+    assert not (tmp_path / "review-render").exists()
+
+
+def test_review_renderer_rejects_multi_record_grids_on_public_and_writer_surfaces(tmp_path: Path) -> None:
+    records = [
+        baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1"),
+        baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1"),
+    ]
+
+    with pytest.raises(baserender.SchemaError, match="at most 1 record per grid"):
+        baserender.render(records, renderer="three_way_junction_review")
+    with pytest.raises(baserender.SchemaError, match="at most 1 record per grid"):
+        baserender.render(records, renderer="sequence_rows")
+
+    style = baserender.resolve_style(preset=None, overrides=None)
+    output_root = tmp_path / "unpublished"
+    output = ImagesOutputCfg(kind="images", dir=None, path=output_root / "combined.svg", fmt="svg")
+    with pytest.raises(baserender.SchemaError, match="requires a directory for images output"):
+        write_images(
+            records,
+            output=output,
+            renderer_name="three_way_junction_review",
+            style=style,
+            palette=baserender.Palette(style.palette),
+        )
+    with pytest.raises(baserender.SchemaError, match="requires a directory for images output"):
+        write_images(
+            records,
+            output=output,
+            renderer_name="sequence_rows",
+            style=style,
+            palette=baserender.Palette(style.palette),
+        )
+
+    video_output = VideoOutputCfg(
+        kind="video",
+        path=output_root / "review.mp4",
+        fmt="mp4",
+        fps=1,
+        frames_per_record=1,
+        pauses={},
+        width_px=100,
+        height_px=100,
+        aspect_ratio=None,
+        total_duration=None,
+    )
+    with pytest.raises(baserender.SchemaError, match="only supports output kinds: images"):
+        write_video(
+            records[:1],
+            output=video_output,
+            renderer_name="three_way_junction_review",
+            style=style,
+            palette=baserender.Palette(style.palette),
+        )
+
+    assert not output_root.exists()
 
 
 @pytest.mark.parametrize(
@@ -258,6 +412,33 @@ def test_adapter_rejects_contradictory_or_nonfinite_search_metrics(updates: dict
 def test_adapter_rejects_pool_receipt_smaller_than_target_geometry() -> None:
     payload = _payload_with_many_junctions(junction_count=2)
     payload["search"]["locus_count"] = 1
+
+    with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
+        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+
+def test_adapter_rejects_nonuniform_junction_sequence_lengths() -> None:
+    payload = _payload_with_many_junctions(junction_count=2)
+    payload["geometry"]["junctions"][1].update(
+        {"barcode": "AACCGGT", "barcode_complement": _reverse_complement("AACCGGT")}
+    )
+
+    with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
+        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+
+@pytest.mark.parametrize(
+    "updates",
+    [
+        {"barcode_candidates_generated": 4},
+        {"barcode_forbidden_toehold_k": 5},
+        {"toehold_min_distance": 9.0, "toehold_mean_distance": 9.0},
+        {"matching_max_pairwise_lcs": 13},
+    ],
+)
+def test_adapter_rejects_impossible_search_evidence(updates: dict[str, float | int]) -> None:
+    payload = _payload()
+    payload["search"].update(updates)
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
         baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")

@@ -378,4 +378,13 @@ def _payload_with_many_junctions(junction_count: int = 20) -> dict[str, object]:
         "extended_bottom_sequence_5to3": _reverse_complement(target),
     }
     payload["search"]["locus_count"] = junction_count
+    payload["search"].update(
+        {
+            "toehold_min_distance": 2.0,
+            "toehold_mean_distance": 2.0,
+            "barcode_candidates_generated": 5 * junction_count,
+            "barcode_forbidden_toehold_k": 1,
+            "barcode_forbidden_barcode_k": 4,
+        }
+    )
     return payload

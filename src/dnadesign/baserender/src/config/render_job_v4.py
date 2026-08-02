@@ -30,7 +30,11 @@ from ..core import (
     require_one_of,
 )
 from ..workspaces import WORKSPACE_MARKER_FILENAME
-from .adapter_contracts import adapter_contract, normalize_adapter_config
+from .adapter_contracts import (
+    adapter_contract,
+    normalize_adapter_config,
+    validate_adapter_output_policy,
+)
 from .job_contracts import (
     DEFAULT_RENDER_CONTRACT_KIND,
     render_contract_descriptor,
@@ -905,6 +909,23 @@ def _output_destination_for_validation(output: OutputCfg) -> Path:
     return output.path
 
 
+def validate_adapter_output_compatibility(
+    adapter_kind: str,
+    outputs: tuple[OutputCfg, ...],
+) -> None:
+    """Enforce adapter-owned publication modes for parsed or typed jobs."""
+
+    for output in outputs:
+        mode = None
+        if isinstance(output, ImagesOutputCfg):
+            mode = "single_file" if output.path is not None else "directory"
+        validate_adapter_output_policy(
+            adapter_kind,
+            output_kind=output.kind,
+            image_output_mode=mode,
+        )
+
+
 def _parse_run(raw: Any) -> RunCfg:
     if raw is None:
         data = {}
@@ -959,6 +980,7 @@ def _parse_sequence_rows_job_mapping(
     validate_render_contract_renderer(contract_cfg.kind, render_cfg.renderer, field="contract.kind")
     _validate_adapter_compatibility(input_cfg, render_cfg)
     outputs_cfg = _parse_outputs(job_path, bundle_cfg.path, data.get("outputs"))
+    validate_adapter_output_compatibility(input_cfg.adapter.kind, outputs_cfg)
     run_cfg = _parse_run(data.get("run"))
 
     return RenderJobV4(

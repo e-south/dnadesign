@@ -17,6 +17,7 @@ import pytest
 from pydantic import ValidationError
 
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
+from dnadesign.contracts.visual.three_way_junction_review_v1 import AssemblyGeometry
 
 
 def _reverse_complement(sequence: str) -> str:
@@ -194,6 +195,42 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
             "less than or equal to 1.5",
         ),
         (
+            lambda payload: payload["search"].update({"barcode_candidates_generated": 4}),
+            "inferred barcode pool factor must be at least 5",
+        ),
+        (
+            lambda payload: payload["search"].update({"locus_count": 2, "barcode_candidates_generated": 11}),
+            "barcode_candidates_generated must be a multiple of locus_count",
+        ),
+        (
+            lambda payload: payload["search"].update({"barcode_forbidden_toehold_k": 5}),
+            "barcode_forbidden_toehold_k must not exceed",
+        ),
+        (
+            lambda payload: payload["search"].update({"barcode_forbidden_barcode_k": 9}),
+            "barcode_forbidden_barcode_k must not exceed barcode length",
+        ),
+        (
+            lambda payload: payload["search"].update({"barcode_forbidden_barcode_k": 3}),
+            "barcode_forbidden_barcode_k must be greater than barcode_forbidden_toehold_k",
+        ),
+        (
+            lambda payload: payload["search"].update(
+                {"toehold_min_distance": 8.0000001, "toehold_mean_distance": 8.0000001}
+            ),
+            "toehold distances exceed the v1 sequence-derived maximum",
+        ),
+        (
+            lambda payload: payload["search"].update(
+                {"barcode_min_distance": 8.0000001, "barcode_mean_distance": 8.0000001}
+            ),
+            "barcode distances exceed the sequence-derived maximum",
+        ),
+        (
+            lambda payload: payload["search"].update({"matching_max_pairwise_lcs": 13}),
+            "matching_max_pairwise_lcs exceeds the combined junction length",
+        ),
+        (
             lambda payload: payload["checks"][1].update({"status": "passed"}),
             "thermodynamic_screening check status",
         ),
@@ -264,3 +301,53 @@ def test_review_contract_rejects_nonfinite_search_metrics(field: str, value: flo
 
     with pytest.raises(ValidationError, match="finite number"):
         ThreeWayJunctionReviewV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("second_toehold", "second_barcode", "message"),
+    [
+        ("ACG", "AACCGGTT", "uniform toehold length"),
+        ("ACGT", "AACCGGT", "uniform barcode length"),
+    ],
+)
+def test_review_geometry_requires_uniform_junction_sequence_lengths(
+    second_toehold: str,
+    second_barcode: str,
+    message: str,
+) -> None:
+    geometry = {
+        "fragments": [
+            {"fragment_id": "f1", "index": 0, "role": "first", "domain_span": {"start": 0, "end": 1}},
+            {"fragment_id": "f2", "index": 1, "role": "internal", "domain_span": {"start": 5, "end": 6}},
+            {"fragment_id": "f3", "index": 2, "role": "last", "domain_span": {"start": 10, "end": 11}},
+        ],
+        "junctions": [
+            {
+                "junction_id": "j1",
+                "toehold_span": {"start": 1, "end": 5},
+                "left_fragment_id": "f1",
+                "right_fragment_id": "f2",
+                "toehold": "ACGT",
+                "toehold_complement": _reverse_complement("ACGT"),
+                "barcode": "AACCGGTT",
+                "barcode_complement": _reverse_complement("AACCGGTT"),
+                "complement_nick_geometry_valid": True,
+                "complement_end_preparation": "vendor_5_prime_phosphate",
+            },
+            {
+                "junction_id": "j2",
+                "toehold_span": {"start": 6, "end": 6 + len(second_toehold)},
+                "left_fragment_id": "f2",
+                "right_fragment_id": "f3",
+                "toehold": second_toehold,
+                "toehold_complement": _reverse_complement(second_toehold),
+                "barcode": second_barcode,
+                "barcode_complement": _reverse_complement(second_barcode),
+                "complement_nick_geometry_valid": True,
+                "complement_end_preparation": "vendor_5_prime_phosphate",
+            },
+        ],
+    }
+
+    with pytest.raises(ValidationError, match=message):
+        AssemblyGeometry.model_validate(geometry)

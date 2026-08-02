@@ -178,6 +178,7 @@ def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
 def test_review_renderer_distinguishes_target_junctions_from_pool_loci() -> None:
     payload = _payload()
     payload["search"]["locus_count"] = 2
+    payload["search"]["barcode_candidates_generated"] = 10
     record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
 
     figure = baserender.render(record, renderer="three_way_junction_review")

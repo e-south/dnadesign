@@ -19,6 +19,7 @@ from typing import Iterable, Sequence
 import numpy as np
 
 from ..config import Style, VideoOutputCfg
+from ..config.adapter_contracts import validate_records_output_policy
 from ..core import Record, SchemaError
 from ..render import Palette, render_record
 
@@ -613,6 +614,7 @@ def write_video(
     materialized = list(records)
     if not materialized:
         raise SchemaError("No records to render after adapter, transforms, and selection")
+    validate_records_output_policy(materialized, output_kind="video")
     if output.fmt != "mp4":
         raise SchemaError("outputs.video.fmt must be 'mp4'")
     if not animation.writers.is_available("ffmpeg"):

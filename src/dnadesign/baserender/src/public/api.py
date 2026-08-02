@@ -29,7 +29,7 @@ from ..config import (
 from ..config import (
     validate_render_job as _validate_render_job,
 )
-from ..config.adapter_contracts import normalize_adapter_config
+from ..config.adapter_contracts import adapter_grid_record_limit, normalize_adapter_config
 from ..core import Record, SchemaError, ensure
 from ..execution import run_render_job as _run_render_job
 from ..io import iter_parquet_rows
@@ -384,6 +384,19 @@ def render_record_grid_figure(
     records_list = list(records)
     ensure(len(records_list) > 0, "render_record_grid_figure requires at least one record", SchemaError)
     ensure(isinstance(ncols, int) and ncols >= 1, "ncols must be >= 1", SchemaError)
+    limits = tuple(
+        limit
+        for limit in (
+            get_renderer_descriptor(renderer_name).max_grid_records,
+            adapter_grid_record_limit(records_list),
+        )
+        if limit is not None
+    )
+    grid_limit = min(limits) if limits else None
+    if grid_limit is not None and len(records_list) > grid_limit:
+        raise SchemaError(
+            f"renderer {renderer_name!r} supports at most {grid_limit} record per grid; render records individually"
+        )
 
     panel_images: list[object] = []
     for record in records_list:

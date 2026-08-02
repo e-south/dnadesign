@@ -136,7 +136,10 @@ capture, BaseRender rejects review JSON or an optional selection CSV larger
 than 64 MiB. Before record materialization, it also enforces at most 2,000
 review rows, 2,000 selection rows, and 10,000,000 total target bases.
 `input.limit` and selection narrow which records are rendered; neither bypasses
-these bounds. Do not edit or split the verified source file in place.
+these bounds. This adapter publishes per-target images only: it rejects video
+and `outputs[].path`. Combining many four-panel reviews into one in-memory
+contact sheet would make memory scale with the row count. Do not edit or split
+the verified source file in place.
 
 ## Literature and visual boundary
 

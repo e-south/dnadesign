@@ -21,6 +21,7 @@ from .common import PositiveLengthSpan, VisualContractModel
 
 _DNA = re.compile(r"^[ACGT]+$")
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+_MIN_BARCODE_POOL_FACTOR_V1 = 5
 
 
 def _reverse_complement(sequence: str) -> str:
@@ -128,6 +129,10 @@ class AssemblyGeometry(VisualContractModel):
         junction_ids = [junction.junction_id for junction in self.junctions]
         if len(junction_ids) != len(set(junction_ids)):
             raise ValueError("geometry.junctions junction_id values must be unique")
+        if len({len(junction.toehold) for junction in self.junctions}) != 1:
+            raise ValueError("geometry.junctions must use one uniform toehold length")
+        if len({len(junction.barcode) for junction in self.junctions}) != 1:
+            raise ValueError("geometry.junctions must use one uniform barcode length")
         for index, junction in enumerate(self.junctions):
             if junction.left_fragment_id != fragment_ids[index]:
                 raise ValueError("junction.left_fragment_id must reference the adjacent left fragment")
@@ -232,6 +237,27 @@ class PoolSearchReview(VisualContractModel):
         if self.barcode_min_distance > self.barcode_mean_distance:
             raise ValueError("barcode_min_distance must be <= barcode_mean_distance")
         return self
+
+    def _validate_sequence_bounds(self, *, toehold_length: int, barcode_length: int) -> None:
+        """Reject search receipts that are impossible for their v1 geometry."""
+
+        if self.barcode_candidates_generated % self.locus_count != 0:
+            raise ValueError("barcode_candidates_generated must be a multiple of locus_count")
+        inferred_pool_factor = self.barcode_candidates_generated // self.locus_count
+        if inferred_pool_factor < _MIN_BARCODE_POOL_FACTOR_V1:
+            raise ValueError("inferred barcode pool factor must be at least 5")
+        if self.barcode_forbidden_toehold_k > min(toehold_length, barcode_length):
+            raise ValueError("barcode_forbidden_toehold_k must not exceed toehold or barcode length")
+        if self.barcode_forbidden_barcode_k > barcode_length:
+            raise ValueError("barcode_forbidden_barcode_k must not exceed barcode length")
+        if self.barcode_forbidden_barcode_k <= self.barcode_forbidden_toehold_k:
+            raise ValueError("barcode_forbidden_barcode_k must be greater than barcode_forbidden_toehold_k")
+        if self.toehold_mean_distance > 2 * toehold_length:
+            raise ValueError("toehold distances exceed the v1 sequence-derived maximum")
+        if self.barcode_mean_distance > barcode_length:
+            raise ValueError("barcode distances exceed the sequence-derived maximum")
+        if self.matching_max_pairwise_lcs > toehold_length + barcode_length:
+            raise ValueError("matching_max_pairwise_lcs exceeds the combined junction length")
 
 
 class CheckSubject(VisualContractModel):
@@ -346,6 +372,10 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
             raise ValueError("search.pool_id must match target.pool_id")
         if self.search.locus_count < len(junctions):
             raise ValueError("search.locus_count must cover every target geometry junction")
+        self.search._validate_sequence_bounds(
+            toehold_length=len(junctions[0].toehold),
+            barcode_length=len(junctions[0].barcode),
+        )
         check_keys = [(check.subject.kind, check.subject.id, check.check) for check in self.checks]
         if len(check_keys) != len(set(check_keys)):
             raise ValueError("check subject and name tuples must be unique")

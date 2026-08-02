@@ -34,6 +34,7 @@ class RendererDescriptor:
     required_record_features: tuple[str, ...]
     optional_record_features: tuple[str, ...]
     docs_slug: str
+    max_grid_records: int | None = None
 
 
 @dataclass(frozen=True)
@@ -167,6 +168,7 @@ _REGISTRY = _RendererRegistry(
                 required_record_features=(),
                 optional_record_features=(),
                 docs_slug="three-way-junction-review",
+                max_grid_records=1,
             ),
             factory=_build_three_way_junction_review_renderer,
         ),
