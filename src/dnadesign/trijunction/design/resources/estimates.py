@@ -27,6 +27,14 @@ _SAMPLED_SUBSET_INDEX_BYTES = 64
 _SAMPLED_MATCHING_FIXED_BYTES = 512
 _SAMPLED_MATCHING_INDEX_BYTES = 96
 
+# A retained k-mer owns both an ASCII string object and one hash-table entry.
+# 128 bytes deliberately covers their fixed/object overhead and table slack;
+# the k-mer payload is then added explicitly instead of disappearing inside a
+# fixed per-entry assumption. The fixed set allowance exceeds an empty CPython
+# set and keeps the model conservative for small collections too.
+_KMER_SET_FIXED_BYTES = 256
+_KMER_ENTRY_OVERHEAD_BYTES = 128
+
 
 @dataclass(frozen=True, slots=True)
 class RequestWorkloadEstimate:
@@ -64,6 +72,46 @@ def barcode_distance_cache_bytes(candidate_count: int) -> int:
     """Return bytes required by the compact uint16 triangular cache."""
 
     return candidate_count * (candidate_count - 1) // 2 * 2
+
+
+def kmer_set_state_bytes(*, sequence_count: int, sequence_length: int, k: int) -> int:
+    """Conservatively model one forward/reverse-complement k-mer set."""
+
+    if sequence_count < 0 or sequence_length < 0 or k < 1:
+        raise ValueError("k-mer set inputs must be non-negative and k must be positive")
+    kmers_per_sequence = 2 * max(sequence_length - k + 1, 0)
+    return _KMER_SET_FIXED_BYTES + sequence_count * kmers_per_sequence * (_KMER_ENTRY_OVERHEAD_BYTES + k)
+
+
+def barcode_generation_state_bytes(
+    *,
+    toehold_count: int,
+    toehold_length: int,
+    forbidden_toehold_k: int,
+    barcode_count: int,
+    barcode_length: int,
+    forbidden_barcode_k: int,
+) -> int:
+    """Model retained strings/indexes plus the peak candidate toehold-k set."""
+
+    return (
+        barcode_count * barcode_length
+        + kmer_set_state_bytes(
+            sequence_count=toehold_count,
+            sequence_length=toehold_length,
+            k=forbidden_toehold_k,
+        )
+        + kmer_set_state_bytes(
+            sequence_count=barcode_count,
+            sequence_length=barcode_length,
+            k=forbidden_barcode_k,
+        )
+        + kmer_set_state_bytes(
+            sequence_count=1,
+            sequence_length=barcode_length,
+            k=forbidden_toehold_k,
+        )
+    )
 
 
 def sampled_barcode_subset_state_bytes(*, evaluations: int, selected_count: int) -> int:
@@ -105,7 +153,7 @@ def estimate_request_workload(
     toehold_distance_lookups = 0
     toehold_dp_cells = 0
     toehold_search_state_bytes = 0
-    barcode_generation_state_bytes = 0
+    barcode_generation_state_bytes_total = 0
     barcode_distance_cache_bytes_total = 0
     barcode_subset_lookups = 0
     barcode_dp_cells = 0
@@ -113,7 +161,6 @@ def estimate_request_workload(
     matching_substring_visits = 0
     matching_state_bytes = 0
 
-    barcode_kmers_per_candidate = 2 * max(profile.barcode_length - profile.barcode_pair_k + 1, 0)
     combined_length = profile.toehold_length + profile.barcode_length
     for locus_count in pool_locus_counts:
         toehold_candidate_count = locus_count * profile.search_range
@@ -129,9 +176,13 @@ def estimate_request_workload(
         toehold_search_state_bytes += profile.toehold_search_iterations * locus_count * 12
 
         barcode_candidate_count = locus_count * profile.barcode_pool_factor
-        barcode_generation_state_bytes += (
-            barcode_candidate_count * (profile.barcode_length + 96 * barcode_kmers_per_candidate)
-            + locus_count * profile.toehold_length * 96
+        barcode_generation_state_bytes_total += barcode_generation_state_bytes(
+            toehold_count=locus_count,
+            toehold_length=profile.toehold_length,
+            forbidden_toehold_k=profile.barcode_toehold_k,
+            barcode_count=barcode_candidate_count,
+            barcode_length=profile.barcode_length,
+            forbidden_barcode_k=profile.barcode_pair_k,
         )
         barcode_distance_cache_bytes_total += barcode_distance_cache_bytes(barcode_candidate_count)
         barcode_pairs = barcode_candidate_count * (barcode_candidate_count - 1) // 2
@@ -168,7 +219,7 @@ def estimate_request_workload(
         barcode_generation_base_visits=(
             len(pool_locus_counts) * profile.barcode_generation_attempts * profile.barcode_length
         ),
-        barcode_generation_state_bytes=barcode_generation_state_bytes,
+        barcode_generation_state_bytes=barcode_generation_state_bytes_total,
         barcode_encoded_bases=total_barcode_candidates * profile.barcode_length,
         barcode_distance_cache_bytes=barcode_distance_cache_bytes_total,
         barcode_subset_lookups=barcode_subset_lookups,

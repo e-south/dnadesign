@@ -153,6 +153,34 @@ def test_normal_multi_pool_workload_is_accepted_and_aggregated() -> None:
     guard_request_workload(estimate)
 
 
+def test_barcode_generation_state_models_kmer_payloads_and_peak_temporary_set() -> None:
+    profile = _profile()
+
+    estimate = estimate_request_workload(
+        input_bases=72,
+        target_count=1,
+        pool_locus_counts=(2,),
+        profile=profile,
+    )
+
+    # Each k-mer owns a conservatively modeled 128 bytes of Python object and
+    # hash-table overhead in addition to its sequence payload.
+    toehold_kmers = 2 * 2 * (profile.toehold_length - profile.barcode_toehold_k + 1)
+    barcode_kmers = 2 * 10 * (profile.barcode_length - profile.barcode_pair_k + 1)
+    temporary_candidate_kmers = 2 * (profile.barcode_length - profile.barcode_toehold_k + 1)
+    expected = (
+        10 * profile.barcode_length
+        + 256
+        + toehold_kmers * (128 + profile.barcode_toehold_k)
+        + 256
+        + barcode_kmers * (128 + profile.barcode_pair_k)
+        + 256
+        + temporary_candidate_kmers * (128 + profile.barcode_toehold_k)
+    )
+
+    assert estimate.barcode_generation_state_bytes == expected
+
+
 def test_sampled_state_estimates_cover_retained_python_containers() -> None:
     evaluations = 101
     count = 100
@@ -263,9 +291,11 @@ def test_sequence_and_sampled_state_envelopes_fail_before_allocation() -> None:
 def test_barcode_generation_and_subset_shapes_fail_before_allocation() -> None:
     with pytest.raises(TriJunctionDesignError, match="generation exceeds the explicit state"):
         guard_barcode_generation(
-            toehold_bases=1_000,
+            toehold_count=100,
+            toehold_length=10,
             length=22,
             count=100_000,
+            forbidden_toehold_k=5,
             forbidden_barcode_k=6,
             max_attempts=100_000,
         )
@@ -283,6 +313,86 @@ def test_barcode_generation_and_subset_shapes_fail_before_allocation() -> None:
             sequence_length=22,
             iterations=20_000_000,
         )
+
+
+def test_large_kmer_payload_fails_before_kmer_materialization(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_if_materialized(*_args: object, **_kwargs: object) -> set[str]:
+        raise AssertionError("k-mer materialization must not begin")
+
+    monkeypatch.setattr(barcode_module, "kmer_set_with_reverse_complements", fail_if_materialized)
+
+    with pytest.raises(TriJunctionDesignError, match="generation exceeds the explicit state"):
+        generate_barcode_candidates(
+            ("A" * 200_000,),
+            length=1_000_000,
+            count=5,
+            forbidden_toehold_k=199_999,
+            forbidden_barcode_k=1_000_000,
+            gc_min=0.0,
+            gc_max=1.0,
+            max_homopolymer=1_000_000,
+            max_attempts=5,
+            seed=17,
+        )
+
+
+def test_large_kmer_payload_fails_request_guard_before_locus_materialization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    barcode_length = 1_000_000
+    toehold_length = 200_000
+    oligo_length = 2_200_001
+    target_length = 2_400_001
+    sequence = "A" * target_length
+    profile = PlanningProfile(
+        oligo_length=oligo_length,
+        barcode_length=barcode_length,
+        toehold_length=toehold_length,
+        search_range=1,
+        toehold_search_iterations=1,
+        barcode_pool_factor=5,
+        barcode_generation_attempts=5,
+        barcode_toehold_k=199_999,
+        barcode_pair_k=1_000_000,
+        barcode_subset_iterations=1,
+        matching_iterations=1,
+        barcode_gc_min=0.0,
+        barcode_gc_max=1.0,
+        barcode_max_homopolymer=barcode_length,
+    )
+    request = TriJunctionRequest(
+        schema="dnadesign.trijunction.request.v1",
+        seed=17,
+        planning=profile,
+        targets=(
+            Target(
+                id="large-kmer-payload",
+                pool_id="pool",
+                sequence=sequence,
+                recovery_primers=RecoveryPrimerPair(
+                    mode="target_specific",
+                    forward=Primer(binding_sequence=sequence[:8], five_prime_extension=""),
+                    reverse=Primer(binding_sequence=reverse_complement(sequence[-8:]), five_prime_extension=""),
+                ),
+            ),
+        ),
+        order_policy=OrderPolicy(
+            synthesis_scale="declared-test-scale",
+            barcode_bearing_purification="declared-test-purification",
+            complement_purification="declared-test-purification",
+            primer_purification="declared-test-purification",
+            complement_end_preparation="vendor_5_prime_phosphate",
+            max_oligo_length=oligo_length,
+        ),
+    )
+
+    def fail_if_materialized(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("locus materialization must not begin")
+
+    monkeypatch.setattr(planner_module, "enumerate_loci", fail_if_materialized)
+
+    with pytest.raises(TriJunctionDesignError, match="Request-wide barcode-generation state bytes"):
+        planner_module.design_trijunction(request)
 
 
 def test_impossible_barcode_count_fails_before_the_generation_loop(monkeypatch: pytest.MonkeyPatch) -> None:

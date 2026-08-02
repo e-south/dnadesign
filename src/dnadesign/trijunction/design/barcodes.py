@@ -88,9 +88,11 @@ def generate_barcode_candidates(
     """Generate an explicit SSM-like pool without silent relaxation."""
 
     guard_barcode_generation(
-        toehold_bases=sum(map(len, toeholds)),
+        toehold_count=len(toeholds),
+        toehold_length=max(map(len, toeholds), default=0),
         length=length,
         count=count,
+        forbidden_toehold_k=forbidden_toehold_k,
         forbidden_barcode_k=forbidden_barcode_k,
         max_attempts=max_attempts,
     )

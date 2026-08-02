@@ -16,6 +16,7 @@ from dnadesign.trijunction.errors import TriJunctionDesignError
 from .estimates import (
     RequestWorkloadEstimate,
     barcode_distance_cache_bytes,
+    barcode_generation_state_bytes,
     sampled_barcode_subset_state_bytes,
     sampled_matching_state_bytes,
     toehold_distance_cache_bytes,
@@ -164,9 +165,11 @@ def guard_uniform_toehold_search(
 
 def guard_barcode_generation(
     *,
-    toehold_bases: int,
+    toehold_count: int,
+    toehold_length: int,
     length: int,
     count: int,
+    forbidden_toehold_k: int,
     forbidden_barcode_k: int,
     max_attempts: int,
 ) -> None:
@@ -185,8 +188,14 @@ def guard_barcode_generation(
             f"{max_attempts} attempts at length {length} require {base_visits} base visits, "
             f"limit {MAX_BARCODE_GENERATION_BASE_VISITS}. Lower barcode_generation_attempts or barcode_length."
         )
-    kmers_per_candidate = 2 * max(length - forbidden_barcode_k + 1, 0)
-    modeled_state_bytes = count * (length + 96 * kmers_per_candidate) + toehold_bases * 96
+    modeled_state_bytes = barcode_generation_state_bytes(
+        toehold_count=toehold_count,
+        toehold_length=toehold_length,
+        forbidden_toehold_k=forbidden_toehold_k,
+        barcode_count=count,
+        barcode_length=length,
+        forbidden_barcode_k=forbidden_barcode_k,
+    )
     if modeled_state_bytes > MAX_BARCODE_GENERATION_STATE_BYTES:
         raise TriJunctionDesignError(
             "Barcode generation exceeds the explicit state envelope: "
