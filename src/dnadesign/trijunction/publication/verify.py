@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -46,10 +47,17 @@ class BundleVerification:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class _StagedBundleExpectation:
+    payloads: Mapping[str, bytes]
+    plan_id: str
+    request_sha256: str
+
+
 def _load_json(content: bytes, *, path: Path, context: str) -> dict[str, Any]:
     try:
         value = json.loads(content.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError):
+    except (UnicodeDecodeError, ValueError, RecursionError):
         raise TriJunctionBundleError(f"{context} is not valid UTF-8 JSON: {path}") from None
     if not isinstance(value, dict):
         raise TriJunctionBundleError(f"{context} must contain one JSON object: {path}")
@@ -65,8 +73,13 @@ def _artifact_relative_path(relative: object, *, key: str) -> Path:
     return candidate
 
 
-def _verify_bundle(bundle: str | Path, *, reject_undeclared_entries: bool) -> BundleVerification:
-    """Recompute the plan and every declared artifact identity."""
+def _verify_bundle(
+    bundle: str | Path,
+    *,
+    reject_undeclared_entries: bool,
+    staged_expectation: _StagedBundleExpectation | None = None,
+) -> BundleVerification:
+    """Verify one stable bundle snapshot against replayed or staged evidence."""
 
     root = Path(bundle).expanduser().absolute()
     manifest_path = root / "manifest.json"
@@ -115,7 +128,7 @@ def _verify_bundle(bundle: str | Path, *, reject_undeclared_entries: bool) -> Bu
                 _artifact_relative_path(identity["path"], key=key),
                 limit=ARTIFACT_BYTE_LIMITS[key],
                 context=f"Bundle artifact '{key}'",
-                retain_content=key == "request",
+                retain_content=key == "request" and staged_expectation is None,
             )
             if declared_bytes != artifact_read.observed_bytes or identity["sha256"] != artifact_read.sha256:
                 raise TriJunctionBundleError(f"Bundle artifact '{key}' content identity does not match manifest.")
@@ -123,33 +136,45 @@ def _verify_bundle(bundle: str | Path, *, reject_undeclared_entries: bool) -> Bu
             if key == "request":
                 request_content = artifact_read.content
 
-        assert request_content is not None
-        try:
-            request_payload = json.loads(request_content.decode("utf-8"))
-        except (UnicodeDecodeError, ValueError):
-            raise TriJunctionBundleError("Bundle request cannot reproduce a valid TriJunction plan.") from None
-        try:
-            request = parse_request(request_payload)
-            recomputed_plan = design_trijunction(request)
-        except TriJunctionError as exc:
-            raise TriJunctionBundleError("Bundle request cannot reproduce a valid TriJunction plan.") from exc
-        expected_payloads = bundle_payloads(request, recomputed_plan)
+        if staged_expectation is None:
+            assert request_content is not None
+            try:
+                request_payload = json.loads(request_content.decode("utf-8"))
+            except (UnicodeDecodeError, ValueError, RecursionError):
+                raise TriJunctionBundleError("Bundle request cannot reproduce a valid TriJunction plan.") from None
+            try:
+                request = parse_request(request_payload)
+                recomputed_plan = design_trijunction(request)
+            except TriJunctionError as exc:
+                raise TriJunctionBundleError("Bundle request cannot reproduce a valid TriJunction plan.") from exc
+            expected_payloads = bundle_payloads(request, recomputed_plan)
+            plan_id = recomputed_plan.plan_id
+            request_sha256 = recomputed_plan.request_sha256
+        else:
+            expected_payloads = staged_expectation.payloads
+            plan_id = staged_expectation.plan_id
+            request_sha256 = staged_expectation.request_sha256
+        expectation_label = "reproduced plan" if staged_expectation is None else "staged canonical payload"
+        if set(expected_payloads) != set(ARTIFACT_PATHS):
+            raise TriJunctionBundleError("Expected TriJunction payloads do not match the v1 artifact set.")
         for key, expected in expected_payloads.items():
             identity = identities[key]
             if identity["bytes"] != len(expected) or identity["sha256"] != sha256_bytes(expected):
-                raise TriJunctionBundleError(f"Bundle artifact '{key}' does not match the reproduced plan.")
-        if manifest["plan_id"] != recomputed_plan.plan_id:
-            raise TriJunctionBundleError("TriJunction manifest plan_id does not match the reproduced plan.")
-        if manifest["request_sha256"] != recomputed_plan.request_sha256:
-            raise TriJunctionBundleError("TriJunction manifest request_sha256 does not match the reproduced request.")
+                raise TriJunctionBundleError(f"Bundle artifact '{key}' does not match the {expectation_label}.")
+        if manifest["plan_id"] != plan_id:
+            raise TriJunctionBundleError("TriJunction manifest plan_id does not match the verified plan identity.")
+        if manifest["request_sha256"] != request_sha256:
+            raise TriJunctionBundleError(
+                "TriJunction manifest request_sha256 does not match the verified request identity."
+            )
         if canonical_json_bytes(manifest) != manifest_read.content:
             raise TriJunctionBundleError("TriJunction manifest is not canonically serialized.")
         snapshot.assert_stable()
         return BundleVerification(
             status="verified",
             bundle=root,
-            plan_id=recomputed_plan.plan_id,
-            request_sha256=recomputed_plan.request_sha256,
+            plan_id=plan_id,
+            request_sha256=request_sha256,
             artifact_count=len(identities),
         )
 
@@ -165,11 +190,25 @@ def _verify_published_bundle(bundle: str | Path) -> BundleVerification:
         raise TriJunctionBundleError(f"Unable to read TriJunction bundle: {exc}") from exc
 
 
-def _verify_staged_bundle(bundle: str | Path) -> BundleVerification:
-    """Verify staged payloads while publication metadata is still present."""
+def _verify_staged_bundle(
+    bundle: str | Path,
+    *,
+    expected_payloads: Mapping[str, bytes],
+    plan_id: str,
+    request_sha256: str,
+) -> BundleVerification:
+    """Verify staged bytes against the already-derived canonical payloads."""
 
     try:
-        return _verify_bundle(bundle, reject_undeclared_entries=False)
+        return _verify_bundle(
+            bundle,
+            reject_undeclared_entries=False,
+            staged_expectation=_StagedBundleExpectation(
+                payloads=expected_payloads,
+                plan_id=plan_id,
+                request_sha256=request_sha256,
+            ),
+        )
     except TriJunctionBundleError:
         raise
     except OSError as exc:

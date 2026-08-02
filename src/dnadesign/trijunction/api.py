@@ -13,10 +13,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from dnadesign.trijunction.contracts.plan import TriJunctionPlan
 from dnadesign.trijunction.contracts.request import TriJunctionRequest, canonical_request_bytes, load_request
 from dnadesign.trijunction.design.planner import design_trijunction
+from dnadesign.trijunction.errors import TriJunctionDesignError
 from dnadesign.trijunction.publication import BundleVerification, PublishedTriJunctionBundle
 from dnadesign.trijunction.publication.verify import _verify_published_bundle
 from dnadesign.trijunction.publication.writer import _preflight_bundle_destination, _publish_bundle
@@ -32,7 +34,7 @@ class PlanSummary:
     pool_count: int
     junction_count: int
     order_count: int
-    thermodynamic_screening: str
+    thermodynamic_screening: Literal["not_run"]
 
     def to_mapping(self) -> dict[str, object]:
         return {
@@ -55,18 +57,24 @@ def _request(value: TriJunctionRequest | str | Path) -> TriJunctionRequest:
     return load_request(value)
 
 
+def _design_v1(request: TriJunctionRequest) -> TriJunctionPlan:
+    result = design_trijunction(request)
+    screening_statuses = {pool.search.thermodynamic_screening for pool in result.pools}
+    if screening_statuses != {"not_run"}:
+        raise TriJunctionDesignError("TriJunction v1 requires thermodynamic screening to remain explicitly not_run.")
+    return result
+
+
 def plan(value: TriJunctionRequest | str | Path) -> TriJunctionPlan:
     """Return a pure, deterministic design without writing artifacts."""
 
-    return design_trijunction(_request(value))
+    return _design_v1(_request(value))
 
 
 def preflight(value: TriJunctionRequest | str | Path) -> PlanSummary:
     """Run every design check and return a compact no-write receipt."""
 
     result = plan(value)
-    screening_statuses = {pool.search.thermodynamic_screening for pool in result.pools}
-    thermodynamic_screening = "not_run" if "not_run" in screening_statuses else "not_applicable"
     return PlanSummary(
         status="planned",
         validation_scope="string_only",
@@ -76,7 +84,7 @@ def preflight(value: TriJunctionRequest | str | Path) -> PlanSummary:
         pool_count=len(result.pools),
         junction_count=sum(len(target.junctions) for target in result.targets),
         order_count=len(result.orders),
-        thermodynamic_screening=thermodynamic_screening,
+        thermodynamic_screening="not_run",
     )
 
 
@@ -89,7 +97,7 @@ def build(
 
     request = _request(value)
     _preflight_bundle_destination(destination)
-    result = design_trijunction(request)
+    result = _design_v1(request)
     return _publish_bundle(request, result, destination)
 
 

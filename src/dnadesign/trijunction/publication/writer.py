@@ -91,7 +91,12 @@ def _publish_bundle(
             manifest_path = publication.stage / "manifest.json"
             manifest_path.write_bytes(canonical_json_bytes(manifest))
             manifest_path.chmod(0o600)
-            _verify_staged_bundle(publication.stage)
+            _verify_staged_bundle(
+                publication.stage,
+                expected_payloads=payloads,
+                plan_id=plan.plan_id,
+                request_sha256=plan.request_sha256,
+            )
             publication.publish(required_manifest="manifest.json")
             try:
                 _verify_published_bundle(publication.final)

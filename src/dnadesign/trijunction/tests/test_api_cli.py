@@ -25,7 +25,7 @@ from dnadesign.trijunction import api as api_module
 from dnadesign.trijunction import preflight
 from dnadesign.trijunction.cli import app
 from dnadesign.trijunction.contracts.request import MAX_REQUEST_BYTES, MAX_REQUEST_IDENTIFIER_BYTES, parse_request
-from dnadesign.trijunction.errors import TriJunctionBundleError, TriJunctionConfigError
+from dnadesign.trijunction.errors import TriJunctionBundleError, TriJunctionConfigError, TriJunctionDesignError
 from dnadesign.trijunction.tests.test_planner import _request_mapping
 
 runner = CliRunner()
@@ -60,6 +60,26 @@ def test_preflight_api_creates_no_durable_artifacts(tmp_path: Path) -> None:
     assert result.validation_scope == "string_only"
     assert result.to_mapping()["validation_scope"] == "string_only"
     assert before == after == [Path("request.json")]
+
+
+def test_preflight_fails_closed_when_internal_thermodynamic_status_drifts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    request = _request_file(tmp_path)
+    canonical = api_module.plan(request)
+    mutated_pools = tuple(
+        replace(pool, search=replace(pool.search, thermodynamic_screening="passed"))  # type: ignore[arg-type]
+        for pool in canonical.pools
+    )
+    monkeypatch.setattr(
+        api_module,
+        "design_trijunction",
+        lambda _request: replace(canonical, pools=mutated_pools),
+    )
+
+    with pytest.raises(TriJunctionDesignError, match="requires thermodynamic screening.*not_run"):
+        api_module.preflight(request)
 
 
 def test_cli_exposes_one_canonical_lifecycle() -> None:

@@ -141,6 +141,14 @@ def test_public_planner_is_hermetic_and_does_not_export_search_composition() -> 
     ]
 
 
+def test_string_v1_has_a_fixed_conformance_vector() -> None:
+    result = design_trijunction(parse_request(_request_mapping()))
+
+    assert result.algorithm == "dnadesign.trijunction.string.v1"
+    assert result.request_sha256 == "sha256:4caebc9151c5725c061b5859d8b48f3f791124d1a1fe80e7a7febf4b0e8d3f4c"
+    assert result.plan_id == "sha256:800b70eb114688a244502b0c39849e70071657130511f1e27244c602de4469aa"
+
+
 def test_publication_package_does_not_export_an_alternate_lifecycle() -> None:
     assert publication_module.__all__ == ["BundleVerification", "PublishedTriJunctionBundle"]
     assert not hasattr(publication_module, "preflight_bundle_destination")

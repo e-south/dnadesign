@@ -53,7 +53,7 @@ class PoolSearchEvidence:
     barcode_rank_score: float
     matchings_evaluated: int
     matching_max_pairwise_lcs: int
-    thermodynamic_screening: str
+    thermodynamic_screening: Literal["not_run"]
 
 
 @dataclass(frozen=True, slots=True)
