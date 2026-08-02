@@ -17,6 +17,7 @@ from .estimates import (
     RequestWorkloadEstimate,
     barcode_distance_cache_bytes,
     barcode_generation_state_bytes,
+    estimated_matching_substring_character_visits,
     estimated_toehold_distance_lookups,
     estimated_toehold_dp_cells,
     sampled_barcode_subset_state_bytes,
@@ -32,7 +33,7 @@ from .limits import (
     MAX_BARCODE_SUBSET_LOOKUPS,
     MAX_BARCODE_SUBSET_STATE_BYTES,
     MAX_MATCHING_STATE_BYTES,
-    MAX_MATCHING_SUBSTRING_VISITS,
+    MAX_MATCHING_SUBSTRING_CHARACTER_VISITS,
     MAX_REQUEST_BARCODE_CANDIDATES,
     MAX_REQUEST_BARCODE_DISTANCE_CACHE_BYTES,
     MAX_REQUEST_BARCODE_DP_CELLS,
@@ -44,7 +45,7 @@ from .limits import (
     MAX_REQUEST_INPUT_BASES,
     MAX_REQUEST_LOCUS_COUNT,
     MAX_REQUEST_MATCHING_STATE_BYTES,
-    MAX_REQUEST_MATCHING_SUBSTRING_VISITS,
+    MAX_REQUEST_MATCHING_SUBSTRING_CHARACTER_VISITS,
     MAX_REQUEST_POOL_COUNT,
     MAX_REQUEST_TARGET_COUNT,
     MAX_REQUEST_TOEHOLD_CACHE_BYTES,
@@ -96,7 +97,11 @@ _REQUEST_WORKLOAD_LIMITS = (
         "barcode_subset_state_bytes",
         MAX_REQUEST_BARCODE_SUBSET_STATE_BYTES,
     ),
-    ("matching substring visits", "matching_substring_visits", MAX_REQUEST_MATCHING_SUBSTRING_VISITS),
+    (
+        "matching substring character visits",
+        "matching_substring_character_visits",
+        MAX_REQUEST_MATCHING_SUBSTRING_CHARACTER_VISITS,
+    ),
     ("matching sampled-state bytes", "matching_state_bytes", MAX_REQUEST_MATCHING_STATE_BYTES),
 )
 
@@ -271,13 +276,18 @@ def guard_barcode_subset_search(
 def guard_matching_search(*, count: int, combined_length: int, evaluations: int) -> None:
     """Reject unsafe final matching work and sampled state before search."""
 
-    substring_visits = evaluations * count * combined_length * (combined_length + 1) // 2
-    if substring_visits > MAX_MATCHING_SUBSTRING_VISITS:
+    substring_character_visits = estimated_matching_substring_character_visits(
+        evaluations=evaluations,
+        count=count,
+        combined_length=combined_length,
+    )
+    if substring_character_visits > MAX_MATCHING_SUBSTRING_CHARACTER_VISITS:
         raise TriJunctionDesignError(
-            "Toehold/barcode matching exceeds the explicit CPU envelope: "
-            f"{count} junctions, {evaluations} candidate matchings, at most {substring_visits} "
-            f"substring visits; limit {MAX_MATCHING_SUBSTRING_VISITS}. Lower matching_iterations, or use "
-            "separate pool IDs only for physically independent reactions."
+            "Toehold/barcode matching exceeds the explicit substring character-work envelope: "
+            f"{count} junctions, {evaluations} candidate matchings, at most {substring_character_visits} "
+            f"substring character visits; limit {MAX_MATCHING_SUBSTRING_CHARACTER_VISITS}. Lower "
+            "matching_iterations, toehold_length, or barcode_length; TriJunction does not run an "
+            "unbounded search."
         )
     sampled_state_bytes = sampled_matching_state_bytes(evaluations=evaluations, count=count)
     if sampled_state_bytes > MAX_MATCHING_STATE_BYTES:

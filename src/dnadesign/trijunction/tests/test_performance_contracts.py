@@ -29,6 +29,7 @@ from dnadesign.trijunction.contracts import (
     TriJunctionRequest,
 )
 from dnadesign.trijunction.design import barcodes as barcode_module
+from dnadesign.trijunction.design import matching as matching_module
 from dnadesign.trijunction.design import planner as planner_module
 from dnadesign.trijunction.design import toeholds as toehold_module
 from dnadesign.trijunction.design.barcodes import generate_barcode_candidates
@@ -126,6 +127,24 @@ def test_duplicate_substring_matching_equals_pairwise_lcs_semantics() -> None:
     assert _matching_score(candidates, barcodes) == reference
 
 
+def test_matching_guard_rejects_unbounded_substring_character_work_before_scoring(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates = (
+        _candidate(0, "A" * 4_000),
+        _candidate(1, "C" * 4_000),
+    )
+    barcodes = ("G" * 4_000, "T" * 4_000)
+
+    def fail_if_scored(*_args: object, **_kwargs: object) -> int:
+        raise AssertionError("substring scoring must not begin")
+
+    monkeypatch.setattr(matching_module, "_maximum_shared_substring", fail_if_scored)
+
+    with pytest.raises(TriJunctionDesignError, match="substring character"):
+        matching_module.match_barcodes(candidates, barcodes, iterations=2, seed=17)
+
+
 def test_paper_scale_cache_is_bounded_and_full_iteration_budget_is_explicit() -> None:
     loci = 296
     search_range = 15
@@ -188,7 +207,23 @@ def test_normal_multi_pool_workload_is_accepted_and_aggregated() -> None:
     assert estimate.toehold_candidate_count == 8
     assert estimate.barcode_candidate_count == 20
     assert estimate.barcode_generation_base_visits == 3_200_000
+    assert estimate.matching_substring_character_visits == 83_200
     guard_request_workload(estimate)
+
+
+def test_matching_character_work_is_aggregated_across_individually_safe_pools() -> None:
+    profile = replace(_profile(), barcode_generation_attempts=40)
+
+    estimate = estimate_request_workload(
+        input_bases=701 * 300,
+        target_count=701,
+        pool_locus_counts=(8,) * 701,
+        profile=profile,
+    )
+
+    assert estimate.matching_substring_character_visits == 3_003_644_800
+    with pytest.raises(TriJunctionDesignError, match="Request-wide matching substring character visits"):
+        guard_request_workload(estimate)
 
 
 def test_barcode_generation_state_models_kmer_payloads_and_peak_temporary_set() -> None:

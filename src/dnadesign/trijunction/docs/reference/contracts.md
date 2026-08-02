@@ -158,15 +158,16 @@ request:
 | Barcode-subset lookups | 100,000,000 | 400,000,000 |
 | Barcode dynamic-programming cells | 1,000,000,000 | 4,000,000,000 |
 | Barcode sampled-state bytes | 67,108,864 | 268,435,456 |
-| Matching substring visits | 250,000,000 | 1,000,000,000 |
+| Matching substring character visits | 750,000,000 | 3,000,000,000 |
 | Matching sampled-state bytes | 67,108,864 | 268,435,456 |
 
 These are deterministic software envelopes, not forecasts of wall-clock time
-or available host memory. The first exceeded dimension fails before its large
-state is materialized. Lower an explicit budget or split only genuinely
-independent physical pools; splitting one intended shared pool would weaken
-the required joint string checks. See [scale and quality
-review](../guides/scale-and-review.md).
+or available host memory. Substring character visits conservatively count both
+copying and hashing every materialized character, including the two fixed
+lower-bound scans. The first exceeded dimension fails before its large state
+is materialized. Lower an explicit budget or split only genuinely independent
+physical pools; splitting one intended shared pool would weaken the required
+joint string checks. See [scale and quality review](../guides/scale-and-review.md).
 
 ### Recovery Invariants
 

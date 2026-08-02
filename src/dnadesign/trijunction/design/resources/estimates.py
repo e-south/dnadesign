@@ -68,7 +68,7 @@ class RequestWorkloadEstimate:
     barcode_subset_lookups: int
     barcode_dp_cells: int
     barcode_subset_state_bytes: int
-    matching_substring_visits: int
+    matching_substring_character_visits: int
     matching_state_bytes: int
 
 
@@ -134,6 +134,27 @@ def sampled_matching_state_bytes(*, evaluations: int, count: int) -> int:
     """Conservatively model retained tuple/set state and its sorted index."""
 
     return evaluations * (_SAMPLED_MATCHING_FIXED_BYTES + _SAMPLED_MATCHING_INDEX_BYTES * count)
+
+
+def estimated_matching_substring_character_visits(
+    *,
+    evaluations: int,
+    count: int,
+    combined_length: int,
+) -> int:
+    """Bound characters copied and hashed by exact substring matching.
+
+    The v1 matcher materializes every substring at each visited length, then
+    hashes that substring for set membership. The two additional evaluations
+    conservatively cover the fixed toehold-only and barcode-only lower-bound
+    scans using the longer combined sequence length.
+    """
+
+    if evaluations < 0 or count < 0 or combined_length < 0:
+        raise ValueError("matching substring-work inputs must be non-negative")
+    substring_bases = combined_length * (combined_length + 1) * (combined_length + 2) // 6
+    copy_and_hash_passes = 2
+    return (evaluations + 2) * count * substring_bases * copy_and_hash_passes
 
 
 def capped_toehold_path_count(candidate_counts: tuple[int, ...], *, iterations: int) -> int:
@@ -226,7 +247,7 @@ def estimate_request_workload(
     barcode_subset_lookups = 0
     barcode_dp_cells = 0
     barcode_subset_state_bytes = 0
-    matching_substring_visits = 0
+    matching_substring_character_visits = 0
     matching_state_bytes = 0
 
     combined_length = profile.toehold_length + profile.barcode_length
@@ -272,7 +293,11 @@ def estimate_request_workload(
         factorial = math.factorial(locus_count) if locus_count <= 8 else profile.matching_iterations + 1
         exhaustive = locus_count <= 8 and factorial <= profile.matching_iterations
         matching_evaluations = factorial if exhaustive else profile.matching_iterations + 1
-        matching_substring_visits += matching_evaluations * locus_count * combined_length * (combined_length + 1) // 2
+        matching_substring_character_visits += estimated_matching_substring_character_visits(
+            evaluations=matching_evaluations,
+            count=locus_count,
+            combined_length=combined_length,
+        )
         matching_state_bytes += sampled_matching_state_bytes(
             evaluations=matching_evaluations,
             count=locus_count,
@@ -299,6 +324,6 @@ def estimate_request_workload(
         barcode_subset_lookups=barcode_subset_lookups,
         barcode_dp_cells=barcode_dp_cells,
         barcode_subset_state_bytes=barcode_subset_state_bytes,
-        matching_substring_visits=matching_substring_visits,
+        matching_substring_character_visits=matching_substring_character_visits,
         matching_state_bytes=matching_state_bytes,
     )
