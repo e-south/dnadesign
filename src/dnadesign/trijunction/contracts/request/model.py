@@ -1,4 +1,13 @@
-"""Frozen values for the canonical TriJunction request."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/request/model.py
+
+Frozen values for the canonical TriJunction request.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

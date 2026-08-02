@@ -1,4 +1,13 @@
-"""Strict mapping parser and stable serializer for TriJunction requests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/request/codec.py
+
+Strict mapping parser and stable serializer for TriJunction requests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

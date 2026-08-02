@@ -1,4 +1,13 @@
-"""Compact factories for exact-DNA scale scenarios without checked-in sequence blobs."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/scenarios/factories.py
+
+Compact factories for exact-DNA scale scenarios without checked-in sequence blobs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

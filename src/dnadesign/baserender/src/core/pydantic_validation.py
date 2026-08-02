@@ -1,4 +1,13 @@
-"""Safe formatting for Pydantic validation failures at BaseRender boundaries."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/src/core/pydantic_validation.py
+
+Safe formatting for Pydantic validation failures at BaseRender boundaries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

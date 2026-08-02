@@ -1,4 +1,13 @@
-"""Lossless vendor-neutral tabular projection of orderable oligos."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/publication/orders.py
+
+Lossless vendor-neutral tabular projection of orderable oligos.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Deterministic orchestration of the pure TriJunction design stages."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/planner.py
+
+Deterministic orchestration of the pure TriJunction design stages.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

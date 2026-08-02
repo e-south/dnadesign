@@ -1,4 +1,13 @@
-"""End-to-end contracts for the pure TriJunction planner."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_planner.py
+
+End-to-end contracts for the pure TriJunction planner.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Paper-grounded strand composition and exact reconstruction proofs."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/strands.py
+
+Paper-grounded strand composition and exact reconstruction proofs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

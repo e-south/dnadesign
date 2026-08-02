@@ -1,4 +1,13 @@
-"""End-to-end scale evidence for supported and refused request topologies."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/scenarios/test_scale_dogfood.py
+
+End-to-end scale evidence for supported and refused request topologies.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

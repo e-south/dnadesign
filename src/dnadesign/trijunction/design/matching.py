@@ -1,4 +1,13 @@
-"""One-to-one toehold/barcode assignment with explicit search evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/matching.py
+
+One-to-one toehold/barcode assignment with explicit search evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

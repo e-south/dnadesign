@@ -1,4 +1,13 @@
-"""Explicit rank aggregation for maximin sequence searches."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/scoring.py
+
+Explicit rank aggregation for maximin sequence searches.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

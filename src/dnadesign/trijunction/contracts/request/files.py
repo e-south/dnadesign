@@ -1,4 +1,13 @@
-"""Read-only JSON and YAML loading for TriJunction requests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/request/files.py
+
+Read-only JSON and YAML loading for TriJunction requests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

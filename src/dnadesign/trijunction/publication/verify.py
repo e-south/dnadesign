@@ -1,4 +1,13 @@
-"""Offline semantic verification of one published TriJunction bundle."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/publication/verify.py
+
+Offline semantic verification of one published TriJunction bundle.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -150,7 +159,7 @@ def _verify_bundle(bundle: str | Path, *, reject_undeclared_entries: bool) -> Bu
         )
 
 
-def verify_bundle(bundle: str | Path) -> BundleVerification:
+def _verify_published_bundle(bundle: str | Path) -> BundleVerification:
     """Strictly verify one published bundle, including its complete inventory."""
 
     try:
@@ -161,7 +170,7 @@ def verify_bundle(bundle: str | Path) -> BundleVerification:
         raise TriJunctionBundleError(f"Unable to read TriJunction bundle: {exc}") from exc
 
 
-def verify_staged_bundle(bundle: str | Path) -> BundleVerification:
+def _verify_staged_bundle(bundle: str | Path) -> BundleVerification:
     """Verify staged payloads while publication metadata is still present."""
 
     try:

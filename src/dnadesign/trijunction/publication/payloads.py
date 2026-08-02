@@ -1,4 +1,13 @@
-"""Canonical payload construction shared by publication and verification."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/publication/payloads.py
+
+Canonical payload construction shared by publication and verification.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""TriJunction request and plan boundary contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/__init__.py
+
+TriJunction request and plan boundary contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .plan import OrderRecord, TriJunctionPlan
 from .request import (

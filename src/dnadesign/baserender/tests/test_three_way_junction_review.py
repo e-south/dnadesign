@@ -1,4 +1,13 @@
-"""End-to-end tests for neutral three-way-junction QA rendering."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/tests/test_three_way_junction_review.py
+
+End-to-end tests for neutral three-way-junction QA rendering.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

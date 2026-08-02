@@ -1,4 +1,13 @@
-"""Fixed-point edit distances for reproducible TriJunction design."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/sequence/distances.py
+
+Fixed-point edit distances for reproducible TriJunction design.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

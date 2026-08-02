@@ -1,4 +1,13 @@
-"""Adversarial contracts at TriJunction's public and publication boundaries."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_hardening_contracts.py
+
+Adversarial contracts at TriJunction's public and publication boundaries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -12,13 +21,12 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.trijunction import parse_request, plan
+from dnadesign.trijunction import build, parse_request, plan, verify
 from dnadesign.trijunction.errors import (
     TriJunctionBundleError,
     TriJunctionConfigError,
     TriJunctionDesignError,
 )
-from dnadesign.trijunction.publication import publish_bundle, verify_bundle
 from dnadesign.trijunction.sequence import reverse_complement
 
 
@@ -96,7 +104,7 @@ def _request_mapping(*, targets: list[dict[str, object]] | None = None) -> dict[
 
 def _publish_test_bundle(destination: Path) -> None:
     request = parse_request(_request_mapping())
-    publish_bundle(request, plan(request), destination)
+    build(request, destination=destination)
 
 
 def test_three_way_junction_rejects_targets_below_junction_geometry() -> None:
@@ -193,7 +201,7 @@ def test_verification_rejects_undeclared_entries(
         extra.symlink_to("request.json")
 
     with pytest.raises(TriJunctionBundleError, match=match):
-        verify_bundle(destination)
+        verify(destination)
 
 
 def test_verification_rejects_artifact_replaced_by_symlink_before_open(
@@ -238,7 +246,7 @@ def test_verification_rejects_artifact_replaced_by_symlink_before_open(
     monkeypatch.setattr(os, "open", racing_os_open)
 
     with pytest.raises(TriJunctionBundleError):
-        verify_bundle(destination)
+        verify(destination)
 
     assert request_path.is_symlink()
 
@@ -274,7 +282,7 @@ def test_verification_rejects_artifact_replaced_after_read(
     monkeypatch.setattr(os, "read", racing_os_read)
 
     with pytest.raises(TriJunctionBundleError):
-        verify_bundle(destination)
+        verify(destination)
 
     assert replaced
 
@@ -305,7 +313,7 @@ def test_verification_rejects_undeclared_file_added_after_initial_inventory(
     monkeypatch.setattr(os, "open", racing_os_open)
 
     with pytest.raises(TriJunctionBundleError, match="undeclared file"):
-        verify_bundle(destination)
+        verify(destination)
 
     assert introduced
 
@@ -339,7 +347,7 @@ def test_verification_rejects_artifact_mutated_during_late_path_revalidation(
     monkeypatch.setattr(os, "open", racing_os_open)
 
     with pytest.raises(TriJunctionBundleError):
-        verify_bundle(destination)
+        verify(destination)
 
     assert mutated
 

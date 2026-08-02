@@ -1,4 +1,13 @@
-"""Task-oriented public API for TriJunction planning and publication."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/api.py
+
+Task-oriented public API for TriJunction planning and publication.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -8,13 +17,9 @@ from pathlib import Path
 from dnadesign.trijunction.contracts.plan import TriJunctionPlan
 from dnadesign.trijunction.contracts.request import TriJunctionRequest, canonical_request_bytes, load_request
 from dnadesign.trijunction.design.planner import design_trijunction
-from dnadesign.trijunction.publication import (
-    BundleVerification,
-    PublishedTriJunctionBundle,
-    preflight_bundle_destination,
-    publish_bundle,
-    verify_bundle,
-)
+from dnadesign.trijunction.publication import BundleVerification, PublishedTriJunctionBundle
+from dnadesign.trijunction.publication.verify import _verify_published_bundle
+from dnadesign.trijunction.publication.writer import _preflight_bundle_destination, _publish_bundle
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,12 +88,12 @@ def build(
     """Design and publish one verified create-only bundle."""
 
     request = _request(value)
-    preflight_bundle_destination(destination)
+    _preflight_bundle_destination(destination)
     result = design_trijunction(request)
-    return publish_bundle(request, result, destination)
+    return _publish_bundle(request, result, destination)
 
 
 def verify(bundle: str | Path) -> BundleVerification:
     """Verify a bundle without relying on its original checkout."""
 
-    return verify_bundle(bundle)
+    return _verify_published_bundle(bundle)

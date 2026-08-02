@@ -1,4 +1,13 @@
-"""Behavior tests for TriJunction's dependency-free DNA sequence primitives."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_sequence_primitives.py
+
+Behavior tests for TriJunction's dependency-free DNA sequence primitives.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

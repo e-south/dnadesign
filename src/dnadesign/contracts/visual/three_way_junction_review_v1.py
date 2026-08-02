@@ -1,4 +1,13 @@
-"""Neutral review evidence for one three-way-junction assembly target."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/contracts/visual/three_way_junction_review_v1.py
+
+Neutral review evidence for one three-way-junction assembly target.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

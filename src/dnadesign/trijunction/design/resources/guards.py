@@ -1,4 +1,13 @@
-"""Fail-fast resource guards for every allocation-heavy search stage."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/resources/guards.py
+
+Fail-fast resource guards for every allocation-heavy search stage.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

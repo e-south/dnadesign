@@ -1,4 +1,13 @@
-"""Canonical serialization and content identities for TriJunction contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/identity.py
+
+Canonical serialization and content identities for TriJunction contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Versioned junction-locus geometry and complete candidate enumeration."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/loci.py
+
+Versioned junction-locus geometry and complete candidate enumeration.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Projection of verified plans into the shared visual-review contract."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_review_projection.py
+
+Projection of verified plans into the shared visual-review contract.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

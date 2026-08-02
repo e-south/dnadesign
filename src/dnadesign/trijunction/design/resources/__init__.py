@@ -1,4 +1,13 @@
-"""Stable facade for versioned TriJunction workload policy and guards."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/resources/__init__.py
+
+Stable facade for versioned TriJunction workload policy and guards.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .estimates import (
     RequestWorkloadEstimate,

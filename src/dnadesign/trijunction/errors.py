@@ -1,4 +1,13 @@
-"""Typed failures exposed by the TriJunction public boundary."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/errors.py
+
+Typed failures exposed by the TriJunction public boundary.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

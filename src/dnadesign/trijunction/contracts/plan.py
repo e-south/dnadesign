@@ -1,4 +1,13 @@
-"""Immutable output contracts for a TriJunction design."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/plan.py
+
+Immutable output contracts for a TriJunction design.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

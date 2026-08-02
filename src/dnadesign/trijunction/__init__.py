@@ -1,4 +1,13 @@
-"""Lazy public facade for three-way-junction oligo planning."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/__init__.py
+
+Lazy public facade for three-way-junction oligo planning.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

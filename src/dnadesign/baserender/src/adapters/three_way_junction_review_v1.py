@@ -1,4 +1,13 @@
-"""Adapter from neutral three-way-junction review evidence to Record v1."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/src/adapters/three_way_junction_review_v1.py
+
+Adapter from neutral three-way-junction review evidence to Record v1.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Strict DNA alphabet validation and strand-orientation helpers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/sequence/alphabet.py
+
+Strict DNA alphabet validation and strand-orientation helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

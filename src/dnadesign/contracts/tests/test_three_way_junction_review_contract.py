@@ -1,4 +1,13 @@
-"""Validation tests for the neutral three-way-junction review contract."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/contracts/tests/test_three_way_junction_review_contract.py
+
+Validation tests for the neutral three-way-junction review contract.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

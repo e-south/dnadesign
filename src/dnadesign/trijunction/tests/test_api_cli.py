@@ -1,4 +1,13 @@
-"""Public-facade and CLI lifecycle tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_api_cli.py
+
+Public-facade and CLI lifecycle tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

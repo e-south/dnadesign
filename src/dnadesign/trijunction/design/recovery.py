@@ -1,4 +1,13 @@
-"""Physical-pool recovery validation and primer-order consolidation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/recovery.py
+
+Physical-pool recovery validation and primer-order consolidation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

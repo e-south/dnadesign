@@ -1,4 +1,13 @@
-"""Tool-owned TriJunction bundle manifest contract."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/publication/manifest.py
+
+Tool-owned TriJunction bundle manifest contract.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

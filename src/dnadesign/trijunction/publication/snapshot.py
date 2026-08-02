@@ -1,4 +1,13 @@
-"""Private stable-filesystem snapshots for TriJunction bundle verification."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/publication/snapshot.py
+
+Private stable-filesystem snapshots for TriJunction bundle verification.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

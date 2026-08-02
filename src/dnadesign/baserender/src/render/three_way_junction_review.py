@@ -1,4 +1,13 @@
-"""Four-panel QA renderer for neutral three-way-junction review evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/src/render/three_way_junction_review.py
+
+Four-panel QA renderer for neutral three-way-junction review evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

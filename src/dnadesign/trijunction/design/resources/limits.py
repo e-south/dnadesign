@@ -1,4 +1,13 @@
-"""Versioned software resource ceilings for TriJunction design searches."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/resources/limits.py
+
+Versioned software resource ceilings for TriJunction design searches.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 MAX_TOEHOLD_CACHE_BYTES = 256 * 1024 * 1024
 MAX_TOEHOLD_DISTANCE_LOOKUPS = 1_000_000_000

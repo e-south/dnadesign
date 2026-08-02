@@ -1,4 +1,13 @@
-"""Correctness and resource contracts for TriJunction's hot search paths."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_performance_contracts.py
+
+Correctness and resource contracts for TriJunction's hot search paths.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

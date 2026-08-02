@@ -1,4 +1,13 @@
-"""Create-only publication of verified TriJunction bundles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/publication/writer.py
+
+Create-only publication of verified TriJunction bundles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -16,7 +25,7 @@ from dnadesign.trijunction.contracts.request import TriJunctionRequest
 from dnadesign.trijunction.errors import TriJunctionBundleError
 from dnadesign.trijunction.publication.manifest import ArtifactIdentity, manifest_mapping
 from dnadesign.trijunction.publication.payloads import ARTIFACT_PATHS, bundle_payloads
-from dnadesign.trijunction.publication.verify import verify_bundle, verify_staged_bundle
+from dnadesign.trijunction.publication.verify import _verify_published_bundle, _verify_staged_bundle
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +43,7 @@ class PublishedTriJunctionBundle:
         }
 
 
-def preflight_bundle_destination(destination: str | Path) -> Path:
+def _preflight_bundle_destination(destination: str | Path) -> Path:
     """Reject a known-invalid publication destination without mutation."""
 
     try:
@@ -45,7 +54,7 @@ def preflight_bundle_destination(destination: str | Path) -> Path:
         raise TriJunctionBundleError(f"TriJunction bundle publication failed: {exc}") from exc
 
 
-def publish_bundle(
+def _publish_bundle(
     request: TriJunctionRequest,
     plan: TriJunctionPlan,
     destination: str | Path,
@@ -82,10 +91,10 @@ def publish_bundle(
             manifest_path = publication.stage / "manifest.json"
             manifest_path.write_bytes(canonical_json_bytes(manifest))
             manifest_path.chmod(0o600)
-            verify_staged_bundle(publication.stage)
+            _verify_staged_bundle(publication.stage)
             publication.publish(required_manifest="manifest.json")
             try:
-                verify_bundle(publication.final)
+                _verify_published_bundle(publication.final)
             except BaseException:
                 publication.rollback()
                 raise

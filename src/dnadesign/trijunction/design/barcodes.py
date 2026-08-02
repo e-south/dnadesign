@@ -1,4 +1,13 @@
-"""Deterministic barcode-pool generation and maximin subset selection."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/barcodes.py
+
+Deterministic barcode-pool generation and maximin subset selection.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

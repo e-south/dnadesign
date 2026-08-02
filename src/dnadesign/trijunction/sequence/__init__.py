@@ -1,4 +1,13 @@
-"""Public DNA sequence primitives for TriJunction."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/sequence/__init__.py
+
+Public DNA sequence primitives for TriJunction.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .alphabet import DNA_ALPHABET, reverse_complement, validate_dna
 from .distances import (

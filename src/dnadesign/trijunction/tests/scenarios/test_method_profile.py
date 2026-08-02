@@ -1,4 +1,13 @@
-"""Bounded evidence for literature-starting parameters and v1 deviations."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/scenarios/test_method_profile.py
+
+Bounded evidence for literature-starting parameters and v1 deviations.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

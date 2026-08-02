@@ -1,4 +1,13 @@
-"""Tool-owned deterministic random streams for reproducible search."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/randomness.py
+
+Tool-owned deterministic random streams for reproducible search.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

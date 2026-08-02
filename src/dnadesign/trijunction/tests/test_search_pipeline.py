@@ -1,4 +1,13 @@
-"""Internal search-composition seam and public-lifecycle boundaries."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_search_pipeline.py
+
+Internal search-composition seam and public-lifecycle boundaries.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -8,6 +17,7 @@ from dataclasses import replace
 import pytest
 
 import dnadesign.trijunction as trijunction
+from dnadesign.trijunction import publication as publication_module
 from dnadesign.trijunction.contracts import parse_request
 from dnadesign.trijunction.design import search_pipeline as search_pipeline_module
 from dnadesign.trijunction.design.barcodes import BarcodeSelection
@@ -129,6 +139,13 @@ def test_public_planner_is_hermetic_and_does_not_export_search_composition() -> 
     assert [name for name, value in vars(search_pipeline_module).items() if isinstance(value, _SearchPipeline)] == [
         "_STRING_SEARCH_V1"
     ]
+
+
+def test_publication_package_does_not_export_an_alternate_lifecycle() -> None:
+    assert publication_module.__all__ == ["BundleVerification", "PublishedTriJunctionBundle"]
+    assert not hasattr(publication_module, "preflight_bundle_destination")
+    assert not hasattr(publication_module, "publish_bundle")
+    assert not hasattr(publication_module, "verify_bundle")
 
 
 def test_v1_toehold_selection_jointly_receives_every_target_in_a_physical_pool() -> None:

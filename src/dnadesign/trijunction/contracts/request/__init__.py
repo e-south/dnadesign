@@ -1,4 +1,13 @@
-"""Immutable public request contract for TriJunction planning."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/request/__init__.py
+
+Immutable public request contract for TriJunction planning.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from ...errors import TriJunctionConfigError
 from .codec import canonical_request_bytes, parse_request, request_to_mapping

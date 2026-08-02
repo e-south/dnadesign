@@ -1,4 +1,13 @@
-"""Pure integer workload estimates used before search-state allocation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/resources/estimates.py
+
+Pure integer workload estimates used before search-state allocation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

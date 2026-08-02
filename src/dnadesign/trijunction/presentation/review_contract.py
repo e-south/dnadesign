@@ -1,4 +1,13 @@
-"""Project one plan into strict, study-neutral visual-review rows."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/presentation/review_contract.py
+
+Project one plan into strict, study-neutral visual-review rows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

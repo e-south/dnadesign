@@ -1,4 +1,13 @@
-"""Bounded deterministic selection of one toehold per enumerated locus."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/toeholds.py
+
+Bounded deterministic selection of one toehold per enumerated locus.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

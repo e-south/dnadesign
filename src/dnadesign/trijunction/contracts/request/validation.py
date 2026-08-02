@@ -1,4 +1,13 @@
-"""Primitive validation rules for the TriJunction request boundary."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/request/validation.py
+
+Primitive validation rules for the TriJunction request boundary.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Immutable bundle publication and offline-verification tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_publication.py
+
+Immutable bundle publication and offline-verification tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -8,11 +17,12 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.trijunction import build, verify
 from dnadesign.trijunction.contracts import parse_request
 from dnadesign.trijunction.design.planner import design_trijunction
 from dnadesign.trijunction.errors import TriJunctionBundleError
-from dnadesign.trijunction.publication import publish_bundle, verify_bundle
 from dnadesign.trijunction.publication import writer as writer_module
+from dnadesign.trijunction.publication.writer import _publish_bundle
 from dnadesign.trijunction.tests.test_planner import _request_mapping
 
 
@@ -21,8 +31,8 @@ def test_publish_and_verify_complete_create_only_bundle(tmp_path: Path) -> None:
     plan = design_trijunction(request)
     destination = tmp_path / "runs" / "design-v1"
 
-    published = publish_bundle(request, plan, destination)
-    verified = verify_bundle(destination)
+    published = build(request, destination=destination)
+    verified = verify(destination)
 
     assert published.path == destination.absolute()
     assert verified.status == "verified"
@@ -39,28 +49,26 @@ def test_publish_and_verify_complete_create_only_bundle(tmp_path: Path) -> None:
     assert {row["search"]["thermodynamic_screening"] for row in review_rows} == {"not_run"}
 
 
-def test_existing_bundle_is_immutable(tmp_path: Path) -> None:
+def test_existing_bundle_is_not_replaced(tmp_path: Path) -> None:
     request = parse_request(_request_mapping())
-    plan = design_trijunction(request)
     destination = tmp_path / "design-v1"
-    publish_bundle(request, plan, destination)
+    build(request, destination=destination)
     before = (destination / "manifest.json").read_bytes()
 
     with pytest.raises(TriJunctionBundleError, match="already exists and is immutable"):
-        publish_bundle(request, plan, destination)
+        build(request, destination=destination)
 
     assert (destination / "manifest.json").read_bytes() == before
 
 
 def test_tampered_artifact_fails_offline_verification(tmp_path: Path) -> None:
     request = parse_request(_request_mapping())
-    plan = design_trijunction(request)
     destination = tmp_path / "design-v1"
-    publish_bundle(request, plan, destination)
+    build(request, destination=destination)
     (destination / "plan.json").write_text("{}\n", encoding="utf-8")
 
     with pytest.raises(TriJunctionBundleError, match="content identity does not match"):
-        verify_bundle(destination)
+        verify(destination)
 
 
 def test_request_plan_mismatch_fails_before_payload_work_or_filesystem_mutation(
@@ -80,6 +88,6 @@ def test_request_plan_mismatch_fails_before_payload_work_or_filesystem_mutation(
     monkeypatch.setattr(writer_module, "bundle_payloads", fail_if_serialized)
 
     with pytest.raises(TriJunctionBundleError, match="request does not match"):
-        publish_bundle(second_request, mismatched_plan, destination)
+        _publish_bundle(second_request, mismatched_plan, destination)
 
     assert not destination.parent.exists()

@@ -1,4 +1,13 @@
-"""Thin command-line adapter for the TriJunction public API."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/cli.py
+
+Thin command-line adapter for the TriJunction public API.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

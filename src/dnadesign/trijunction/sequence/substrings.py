@@ -1,4 +1,13 @@
-"""Contiguous-substring and k-mer primitives for strict DNA sequences."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/sequence/substrings.py
+
+Contiguous-substring and k-mer primitives for strict DNA sequences.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

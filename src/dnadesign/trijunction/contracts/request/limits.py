@@ -1,4 +1,13 @@
-"""Shared resource limits for every TriJunction request boundary."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/contracts/request/limits.py
+
+Shared resource limits for every TriJunction request boundary.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
 

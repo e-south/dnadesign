@@ -1,9 +1,17 @@
-"""Internal-only composition for one versioned TriJunction string search.
-
-This module is not a plugin API. The public planner always selects the single
-built-in composition; the injectable compiler seam exists only for internal
-verification and future versioned implementation work.
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/design/search_pipeline.py
+
+Internal-only composition for one versioned TriJunction string search.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+# This module is not a plugin API. The public planner always selects the single
+# built-in composition; the injectable compiler seam exists only for internal
+# verification and future versioned implementation work.
 
 from __future__ import annotations
 

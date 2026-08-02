@@ -1,12 +1,18 @@
-"""Immutable TriJunction bundle publication and verification."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/publication/__init__.py
 
-from .verify import BundleVerification, verify_bundle
-from .writer import PublishedTriJunctionBundle, preflight_bundle_destination, publish_bundle
+Result types for TriJunction's internal publication mechanics.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from .verify import BundleVerification
+from .writer import PublishedTriJunctionBundle
 
 __all__ = [
     "BundleVerification",
     "PublishedTriJunctionBundle",
-    "preflight_bundle_destination",
-    "publish_bundle",
-    "verify_bundle",
 ]
