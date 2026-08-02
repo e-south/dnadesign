@@ -462,6 +462,17 @@ def test_parse_request_rejects_invalid_input(mutation: object, match: str) -> No
         parse_request(raw)
 
 
+def test_parse_request_rejects_fraction_integer_too_large_for_float() -> None:
+    raw = _request_mapping()
+    raw["planning"]["barcode_gc_min"] = 10**400  # type: ignore[index]
+
+    with pytest.raises(
+        TriJunctionConfigError,
+        match=r"^planning\.barcode_gc_min must be between 0 and 1$",
+    ):
+        parse_request(raw)
+
+
 def test_parse_request_rejects_canonical_payload_above_file_limit() -> None:
     raw = _request_mapping()
     target = raw["targets"][0]  # type: ignore[index]

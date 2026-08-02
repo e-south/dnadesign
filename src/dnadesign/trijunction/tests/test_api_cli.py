@@ -208,6 +208,28 @@ def test_cli_failure_wraps_parser_integer_limit_as_config_error(
     assert oversized_integer not in result.stderr
 
 
+def test_cli_rejects_fraction_integer_too_large_for_float_without_echoing_it(tmp_path: Path) -> None:
+    raw = _request_mapping()
+    oversized_fraction = 10**400
+    raw["planning"]["barcode_gc_min"] = oversized_fraction  # type: ignore[index]
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps(raw), encoding="utf-8")
+
+    result = runner.invoke(app, ["preflight", str(request), "--format", "json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stderr)
+    assert payload == {
+        "error": {
+            "code": "config_error",
+            "message": "planning.barcode_gc_min must be between 0 and 1",
+            "retryable": False,
+        },
+        "status": "error",
+    }
+    assert str(oversized_fraction) not in result.stderr
+
+
 def test_cli_rejects_oversized_identifier_without_echoing_it(tmp_path: Path) -> None:
     raw = _request_mapping()
     oversized_identifier = "a" * (MAX_REQUEST_IDENTIFIER_BYTES + 1)

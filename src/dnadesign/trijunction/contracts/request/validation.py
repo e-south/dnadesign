@@ -102,7 +102,10 @@ def require_fraction(value: object, *, context: str) -> float:
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TriJunctionConfigError(f"{context} must be a number between 0 and 1")
-    result = float(value)
+    try:
+        result = float(value)
+    except OverflowError:
+        raise TriJunctionConfigError(f"{context} must be between 0 and 1") from None
     if not 0.0 <= result <= 1.0:
         raise TriJunctionConfigError(f"{context} must be between 0 and 1")
     return result
