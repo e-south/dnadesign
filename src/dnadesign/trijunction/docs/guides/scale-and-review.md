@@ -57,6 +57,11 @@ uv run trijunction plan request.yaml --format json
 `preflight` runs the complete design path without a durable write. It rejects
 unsafe work before candidate pools or large search state are materialized.
 `plan` returns the full in-memory evidence only after the same checks pass.
+Before search starts, preflight also checks conservative size bounds for every
+derived bundle artifact against the shared publication and verification
+limits. An oversized projection fails without writing files or allocating
+search state. Reduce the request, or split only genuinely independent physical
+pools; never divide one intended shared pool to bypass this check.
 
 The v1 contract has several independent limits:
 

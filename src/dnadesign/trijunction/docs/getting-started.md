@@ -70,7 +70,10 @@ Requests are strict: every target is exact linear uppercase `ACGT` DNA.
 Lowercase, RNA, ambiguous bases, circular topology, unknown fields, invalid
 primer geometry, duplicate target identities, targets without a complete
 junction locus, or infeasible search budgets fail before publication. JSON and
-YAML request files are capped at 16 MiB.
+YAML request files are capped at 16 MiB. Target `id` and `pool_id` values use
+the documented ASCII identifier alphabet and are capped at 128 characters.
+Each free-text order-policy label is capped at 128 UTF-8 bytes, so a non-ASCII
+label can reach the limit in fewer than 128 characters.
 
 Both primer objects require an explicit `five_prime_extension`; use `""` when
 there is none. A non-empty extension is preserved verbatim before the binding

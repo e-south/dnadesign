@@ -17,22 +17,14 @@ from pathlib import Path
 from typing import Any
 
 from dnadesign.trijunction.contracts.identity import canonical_json_bytes, sha256_bytes
-from dnadesign.trijunction.contracts.request import MAX_REQUEST_BYTES, parse_request
+from dnadesign.trijunction.contracts.publication.limits import ARTIFACT_BYTE_LIMITS, MANIFEST_BYTE_LIMIT
+from dnadesign.trijunction.contracts.request import parse_request
 from dnadesign.trijunction.design.planner import design_trijunction
 from dnadesign.trijunction.errors import TriJunctionBundleError, TriJunctionError
 from dnadesign.trijunction.publication.manifest import BUNDLE_SCHEMA
 from dnadesign.trijunction.publication.payloads import ARTIFACT_PATHS, bundle_payloads
 from dnadesign.trijunction.publication.snapshot import open_bundle_snapshot
 
-_MIB = 1024 * 1024
-_MANIFEST_BYTE_LIMIT = _MIB
-_ARTIFACT_BYTE_LIMITS = {
-    "request": MAX_REQUEST_BYTES,
-    "plan": 256 * _MIB,
-    "checks": 16 * _MIB,
-    "orders": 256 * _MIB,
-    "review": 256 * _MIB,
-}
 _EXPECTED_FILES = frozenset({"manifest.json", *ARTIFACT_PATHS.values()})
 
 
@@ -85,7 +77,7 @@ def _verify_bundle(bundle: str | Path, *, reject_undeclared_entries: bool) -> Bu
     ) as snapshot:
         manifest_read = snapshot.read_file(
             Path("manifest.json"),
-            limit=_MANIFEST_BYTE_LIMIT,
+            limit=MANIFEST_BYTE_LIMIT,
             context="TriJunction manifest",
             retain_content=True,
         )
@@ -113,15 +105,15 @@ def _verify_bundle(bundle: str | Path, *, reject_undeclared_entries: bool) -> Bu
             declared_bytes = identity["bytes"]
             if isinstance(declared_bytes, bool) or not isinstance(declared_bytes, int) or declared_bytes < 0:
                 raise TriJunctionBundleError(f"Bundle artifact '{key}' byte length must be a nonnegative integer.")
-            if declared_bytes > _ARTIFACT_BYTE_LIMITS[key]:
+            if declared_bytes > ARTIFACT_BYTE_LIMITS[key]:
                 raise TriJunctionBundleError(
-                    f"Bundle artifact '{key}' exceeds the {_ARTIFACT_BYTE_LIMITS[key]}-byte verification limit."
+                    f"Bundle artifact '{key}' exceeds the {ARTIFACT_BYTE_LIMITS[key]}-byte verification limit."
                 )
             if identity["path"] != expected_relative:
                 raise TriJunctionBundleError(f"Bundle artifact '{key}' must use path {expected_relative!r}.")
             artifact_read = snapshot.read_file(
                 _artifact_relative_path(identity["path"], key=key),
-                limit=_ARTIFACT_BYTE_LIMITS[key],
+                limit=ARTIFACT_BYTE_LIMITS[key],
                 context=f"Bundle artifact '{key}'",
                 retain_content=key == "request",
             )

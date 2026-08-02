@@ -24,7 +24,7 @@ from typer.testing import CliRunner
 from dnadesign.trijunction import api as api_module
 from dnadesign.trijunction import preflight
 from dnadesign.trijunction.cli import app
-from dnadesign.trijunction.contracts.request import MAX_REQUEST_BYTES, parse_request
+from dnadesign.trijunction.contracts.request import MAX_REQUEST_BYTES, MAX_REQUEST_IDENTIFIER_BYTES, parse_request
 from dnadesign.trijunction.errors import TriJunctionBundleError, TriJunctionConfigError
 from dnadesign.trijunction.tests.test_planner import _request_mapping
 
@@ -133,9 +133,16 @@ def test_preflight_and_build_reject_oversized_in_memory_request_before_work(
     tmp_path: Path,
 ) -> None:
     request = parse_request(_request_mapping())
+    source_target = request.targets[0]
+    sequence = "ACGT" * (MAX_REQUEST_BYTES // 4)
+    recovery_primers = replace(
+        source_target.recovery_primers,
+        forward=replace(source_target.recovery_primers.forward, binding_sequence=sequence[:8]),
+        reverse=replace(source_target.recovery_primers.reverse, binding_sequence="ACGTACGT"),
+    )
     oversized = replace(
         request,
-        order_policy=replace(request.order_policy, synthesis_scale="x" * MAX_REQUEST_BYTES),
+        targets=(replace(source_target, sequence=sequence, recovery_primers=recovery_primers),),
     )
     destination = tmp_path / "design-v1"
 
@@ -199,6 +206,25 @@ def test_cli_failure_wraps_parser_integer_limit_as_config_error(
         "status": "error",
     }
     assert oversized_integer not in result.stderr
+
+
+def test_cli_rejects_oversized_identifier_without_echoing_it(tmp_path: Path) -> None:
+    raw = _request_mapping()
+    oversized_identifier = "a" * (MAX_REQUEST_IDENTIFIER_BYTES + 1)
+    raw["targets"][0]["id"] = oversized_identifier  # type: ignore[index]
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps(raw), encoding="utf-8")
+
+    result = runner.invoke(app, ["preflight", str(request), "--format", "json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stderr)
+    assert payload["error"] == {
+        "code": "config_error",
+        "message": "targets[0].id must not exceed 128 ASCII bytes",
+        "retryable": False,
+    }
+    assert oversized_identifier not in result.stderr
 
 
 def test_cli_rejects_output_format_before_publication(tmp_path: Path) -> None:

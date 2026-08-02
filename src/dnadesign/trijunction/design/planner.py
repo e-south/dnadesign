@@ -36,6 +36,10 @@ from dnadesign.trijunction.design.resources import (
     guard_request_workload,
     guard_uniform_toehold_search,
 )
+from dnadesign.trijunction.design.resources.artifact_projection import (
+    guard_artifact_projection,
+    project_artifact_bytes,
+)
 from dnadesign.trijunction.design.search_pipeline import _STRING_SEARCH_V1, _SearchPipeline
 from dnadesign.trijunction.design.strands import compose_target
 from dnadesign.trijunction.errors import TriJunctionDesignError
@@ -49,6 +53,12 @@ def design_trijunction(request: TriJunctionRequest) -> TriJunctionPlan:
     return _compile_trijunction(request, pipeline=_STRING_SEARCH_V1)
 
 
+def _predict_loci(request: TriJunctionRequest) -> dict[str, int]:
+    """Predict per-target locus counts without allocating candidates or search state."""
+
+    return {target.id: predict_locus_count(len(target.sequence), request.planning) for target in request.targets}
+
+
 def _compile_trijunction(
     request: TriJunctionRequest,
     *,
@@ -57,12 +67,11 @@ def _compile_trijunction(
     """Compile with one explicit internal search composition."""
 
     profile = request.planning
-    predicted_loci_by_target: dict[str, int] = {}
+    predicted_loci_by_target = _predict_loci(request)
     pool_locus_counts_by_id: dict[str, int] = defaultdict(int)
     input_bases = 0
     for target in request.targets:
-        locus_count = predict_locus_count(len(target.sequence), profile)
-        predicted_loci_by_target[target.id] = locus_count
+        locus_count = predicted_loci_by_target[target.id]
         pool_locus_counts_by_id[target.pool_id] += locus_count
         input_bases += len(target.sequence)
     missing_loci = sorted(target_id for target_id, locus_count in predicted_loci_by_target.items() if locus_count == 0)
@@ -72,6 +81,12 @@ def _compile_trijunction(
             f"Three-way-junction target(s) have no complete toehold locus: {joined}. "
             "Adjust the declared geometry or use a direct-synthesis workflow outside TriJunction."
         )
+    guard_artifact_projection(
+        project_artifact_bytes(
+            request,
+            predicted_loci_by_target=predicted_loci_by_target,
+        )
+    )
     request_workload = estimate_request_workload(
         input_bases=input_bases,
         target_count=len(request.targets),

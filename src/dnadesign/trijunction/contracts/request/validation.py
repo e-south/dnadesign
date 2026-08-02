@@ -16,6 +16,7 @@ from collections.abc import Mapping
 
 from ...errors import TriJunctionConfigError
 from ...sequence import DNA_ALPHABET
+from .limits import MAX_REQUEST_IDENTIFIER_BYTES, MAX_REQUEST_PLAIN_TEXT_BYTES
 
 COMPLEMENT_END_PREPARATIONS = frozenset(
     {
@@ -69,6 +70,8 @@ def require_identifier(value: object, *, context: str) -> str:
         raise TriJunctionConfigError(
             f"{context} must start with an alphanumeric character and contain only alphanumerics, '.', '_', or '-'"
         )
+    if len(identifier.encode("ascii")) > MAX_REQUEST_IDENTIFIER_BYTES:
+        raise TriJunctionConfigError(f"{context} must not exceed {MAX_REQUEST_IDENTIFIER_BYTES} ASCII bytes")
     return identifier
 
 
@@ -80,6 +83,8 @@ def require_plain_text(value: object, *, context: str) -> str:
         raise TriJunctionConfigError(f"{context} must not contain control characters")
     if text[0] in "=+-@":
         raise TriJunctionConfigError(f"{context} must not begin with a spreadsheet formula marker")
+    if len(text.encode("utf-8")) > MAX_REQUEST_PLAIN_TEXT_BYTES:
+        raise TriJunctionConfigError(f"{context} must not exceed {MAX_REQUEST_PLAIN_TEXT_BYTES} UTF-8 bytes")
     return text
 
 

@@ -83,13 +83,14 @@ explicit route to a direct-synthesis workflow outside TriJunction; there is no
 implicit fallback or second assembly lifecycle.
 
 Target IDs are unique. IDs and pool IDs use alphanumerics plus `.`, `_`, or
-`-`, starting with an alphanumeric character. Target and primer-binding
-sequences are non-empty uppercase `ACGT`; primer extensions are uppercase
-`ACGT` or an explicit empty string. Inputs represent exact linear DNA. V1 does
-not accept RNA, IUPAC ambiguity codes, lowercase normalization, or circular
-topology. Duplicate sequences inside one physical pool are rejected. The same
-sequence may appear under distinct globally unique target IDs only when those
-targets use different physical pools.
+`-`, starting with an alphanumeric character, and are capped at 128 ASCII
+characters. Target and primer-binding sequences are non-empty uppercase
+`ACGT`; primer extensions are uppercase `ACGT` or an explicit empty string.
+Inputs represent exact linear DNA. V1 does not accept RNA, IUPAC ambiguity
+codes, lowercase normalization, or circular topology. Duplicate sequences
+inside one physical pool are rejected. The same sequence may appear under
+distinct globally unique target IDs only when those targets use different
+physical pools.
 
 `barcode_toehold_k` and `barcode_pair_k` are explicit policy, not hidden
 derivations. Paper-inspired starting values are `floor(t / 2)` and
@@ -121,6 +122,21 @@ physical-pool search:
 | Loci | 250,000 |
 | Toehold candidates | 1,000,000 |
 | Barcode candidates | 4,000,000 |
+
+The canonical request is measured exactly against its input limit. After pure
+locus-count prediction and before sequence search, TriJunction also computes
+conservative upper bounds for the four derived artifacts. A request fails if
+any bound exceeds the same limit used by publication and offline verification;
+the bound is intentionally an upper limit, not a prediction of final file
+size.
+
+| Artifact | Limit |
+| --- | ---: |
+| `request.json` | 16 MiB (exact) |
+| `plan.json` | 256 MiB (upper bound) |
+| `checks.json` | 16 MiB (upper bound) |
+| `orders/oligos.tsv` | 256 MiB (upper bound) |
+| `views/three_way_junction_review.v1.json` | 256 MiB (upper bound) |
 
 Per-pool and aggregate guards then model the work implied by the complete
 request:
@@ -174,7 +190,9 @@ The order policy contains exactly `synthesis_scale`,
 `barcode_bearing_purification`, `complement_purification`,
 `primer_purification`, `complement_end_preparation`, and `max_oligo_length`.
 Its text is explicit, non-empty plain text and cannot begin with a spreadsheet
-formula marker. Complement-strand ends declare exactly one supported state:
+formula marker. Each of the four free-text fields is capped at 128 bytes after
+UTF-8 encoding; this is a byte limit, not a character-count limit.
+Complement-strand ends declare exactly one supported state:
 `vendor_5_prime_phosphate` or `downstream_phosphorylation`. TriJunction records
 these caller-owned choices; it does not select a supplier or submit an order.
 Every complete order sequence—including a recovery primer's extension and

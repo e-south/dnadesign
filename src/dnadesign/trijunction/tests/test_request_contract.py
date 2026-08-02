@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,8 @@ from dnadesign.trijunction.contracts.request import (
     MAX_BARCODE_SUBSET_ITERATIONS,
     MAX_MATCHING_ITERATIONS,
     MAX_REQUEST_BYTES,
+    MAX_REQUEST_IDENTIFIER_BYTES,
+    MAX_REQUEST_PLAIN_TEXT_BYTES,
     MAX_TOEHOLD_SEARCH_ITERATIONS,
     ComplementEndPreparation,
     Primer,
@@ -151,6 +154,52 @@ def test_parse_request_accepts_the_universal_recovery_mode() -> None:
     request = parse_request(raw)
 
     assert request.targets[0].recovery_primers.mode == "universal"
+
+
+@pytest.mark.parametrize("field", ["id", "pool_id"])
+def test_request_identifiers_accept_128_ascii_bytes_and_reject_129(field: str) -> None:
+    accepted = _request_mapping()
+    accepted["targets"][0][field] = "a" * MAX_REQUEST_IDENTIFIER_BYTES  # type: ignore[index]
+
+    request = parse_request(accepted)
+
+    assert any(
+        len(getattr(target, field).encode("ascii")) == MAX_REQUEST_IDENTIFIER_BYTES for target in request.targets
+    )
+
+    rejected = _request_mapping()
+    rejected["targets"][0][field] = "a" * (MAX_REQUEST_IDENTIFIER_BYTES + 1)  # type: ignore[index]
+    with pytest.raises(TriJunctionConfigError, match=rf"targets\[0\].{field}.*128 ASCII bytes"):
+        parse_request(rejected)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "synthesis_scale",
+        "barcode_bearing_purification",
+        "complement_purification",
+        "primer_purification",
+    ],
+)
+def test_repeated_order_policy_text_is_bounded_by_utf8_bytes(field: str) -> None:
+    accepted = _request_mapping()
+    accepted["order_policy"][field] = "é" * (MAX_REQUEST_PLAIN_TEXT_BYTES // 2)  # type: ignore[index]
+    assert len(getattr(parse_request(accepted).order_policy, field).encode("utf-8")) == 128
+
+    rejected = _request_mapping()
+    rejected["order_policy"][field] = "é" * (MAX_REQUEST_PLAIN_TEXT_BYTES // 2) + "a"  # type: ignore[index]
+    with pytest.raises(TriJunctionConfigError, match=rf"order_policy.{field}.*128 UTF-8 bytes"):
+        parse_request(rejected)
+
+
+def test_in_memory_contracts_enforce_repeated_label_limits() -> None:
+    request = parse_request(_request_mapping())
+
+    with pytest.raises(TriJunctionConfigError, match="target.id.*128 ASCII bytes"):
+        replace(request.targets[0], id="a" * (MAX_REQUEST_IDENTIFIER_BYTES + 1))
+    with pytest.raises(TriJunctionConfigError, match="order_policy.synthesis_scale.*128 UTF-8 bytes"):
+        replace(request.order_policy, synthesis_scale="é" * (MAX_REQUEST_PLAIN_TEXT_BYTES // 2 + 1))
 
 
 @pytest.mark.parametrize("suffix", [".yaml", ".json"])
@@ -415,7 +464,11 @@ def test_parse_request_rejects_invalid_input(mutation: object, match: str) -> No
 
 def test_parse_request_rejects_canonical_payload_above_file_limit() -> None:
     raw = _request_mapping()
-    raw["order_policy"]["synthesis_scale"] = "x" * MAX_REQUEST_BYTES  # type: ignore[index]
+    target = raw["targets"][0]  # type: ignore[index]
+    sequence = "ACGT" * (MAX_REQUEST_BYTES // 4)
+    target["sequence"] = sequence
+    target["recovery_primers"]["forward"]["binding_sequence"] = sequence[:8]
+    target["recovery_primers"]["reverse"]["binding_sequence"] = _reverse_complement(sequence[-8:])
 
     with pytest.raises(TriJunctionConfigError, match="canonical request exceeds.*input limit"):
         parse_request(raw)
