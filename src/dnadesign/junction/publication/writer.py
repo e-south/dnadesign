@@ -101,7 +101,11 @@ def _publish_bundle(
             )
             publication.publish(required_manifest="manifest.json")
             try:
-                _verify_published_bundle(publication.final)
+                publication.assert_published_path_identity()
+                verified = _verify_published_bundle(publication.final)
+                if verified.plan_id != plan.plan_id or verified.request_sha256 != plan.request_sha256:
+                    raise JunctionBundleError("Published junction bundle does not match the supplied plan and request.")
+                publication.assert_published_path_identity()
             except BaseException:
                 publication.rollback()
                 raise

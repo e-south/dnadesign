@@ -14,6 +14,7 @@ from __future__ import annotations
 import gc
 import json
 import os
+import shutil
 from dataclasses import fields, replace
 from pathlib import Path
 
@@ -129,6 +130,54 @@ def test_publication_and_replay_retain_at_most_one_rendered_artifact(
     assert rendered_keys == [*ARTIFACT_PATHS, *ARTIFACT_PATHS]
     assert TrackedPayload.peak == 1
     assert TrackedPayload.live == 0
+
+
+def test_build_rejects_a_different_valid_bundle_swapped_into_the_final_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    alternate_mapping = _request_mapping()
+    alternate_mapping["seed"] = 99
+    alternate = tmp_path / "alternate"
+    alternate_publication = build(parse_request(alternate_mapping), destination=alternate)
+    destination = tmp_path / "design-v1"
+    displaced = tmp_path / "displaced-intended"
+    original_verify = writer_module._verify_published_bundle
+
+    def swap_then_verify(path: Path):  # type: ignore[no-untyped-def]
+        path.rename(displaced)
+        shutil.copytree(alternate, path)
+        return original_verify(path)
+
+    monkeypatch.setattr(writer_module, "_verify_published_bundle", swap_then_verify)
+
+    with pytest.raises(JunctionBundleError, match="does not match the supplied plan and request"):
+        build(parse_request(_request_mapping()), destination=destination)
+
+    assert displaced.is_dir()
+    assert verify(destination).plan_id == alternate_publication.plan_id
+
+
+def test_build_rejects_an_equivalent_bundle_copied_over_the_final_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "design-v1"
+    displaced = tmp_path / "displaced-intended"
+    original_verify = writer_module._verify_published_bundle
+
+    def swap_then_verify(path: Path):  # type: ignore[no-untyped-def]
+        path.rename(displaced)
+        shutil.copytree(displaced, path)
+        return original_verify(path)
+
+    monkeypatch.setattr(writer_module, "_verify_published_bundle", swap_then_verify)
+
+    with pytest.raises(JunctionBundleError, match="path identity changed after publication"):
+        build(parse_request(_request_mapping()), destination=destination)
+
+    assert displaced.is_dir()
+    assert verify(destination).status == "verified"
 
 
 def test_snapshot_retains_file_identity_without_retaining_payload_bytes() -> None:

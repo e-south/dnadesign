@@ -524,6 +524,23 @@ class CreateOnlyDirectoryPublication:
             if published_descriptor is not None:
                 os.close(published_descriptor)
 
+    def assert_published_path_identity(self) -> None:
+        """Require the final path to still name this transaction's published directory."""
+
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            raise PublicationError(f"Artifact bundle is not published: {self.final}")
+        if not self._parent_matches_anchor():
+            raise PublicationError(f"Artifact bundle parent changed after publication: {self.final.parent}")
+        if not descriptor_matches_entry(
+            self.parent_descriptor,
+            self.final.name,
+            published_descriptor,
+        ):
+            raise PublicationError(f"Artifact bundle path identity changed after publication: {self.final}")
+
     def rollback(self) -> bool:
         """Atomically hide this transaction's publication before recursive cleanup."""
 

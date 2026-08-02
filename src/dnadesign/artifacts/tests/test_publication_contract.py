@@ -107,6 +107,26 @@ def test_private_sensitivity_keeps_the_complete_published_tree_owner_only(tmp_pa
         assert stat.S_IMODE(path.stat().st_mode) == expected, path
 
 
+def test_published_path_identity_rejects_a_replacement_directory(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    displaced = tmp_path / "results" / "displaced-render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        publication.publish(required_manifest="manifest.json")
+        publication.assert_published_path_identity()
+        bundle.rename(displaced)
+        bundle.mkdir()
+
+        with pytest.raises(PublicationError, match="path identity changed after publication"):
+            publication.assert_published_path_identity()
+    finally:
+        publication.close()
+
+    assert displaced.is_dir()
+    assert bundle.is_dir()
+
+
 @pytest.mark.parametrize("mode", [True, "700", -1, 0o1000, 0o600])
 def test_invalid_published_root_mode_fails_before_filesystem_mutation(
     tmp_path: Path,

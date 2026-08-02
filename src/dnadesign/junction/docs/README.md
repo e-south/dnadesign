@@ -42,7 +42,7 @@ those scientific choices from a FASTA file or a bare sequence.
 | --- | --- | --- |
 | Full design with a short, no-file summary | `uv run junction preflight <request>` | Runs the complete search; writes nothing. |
 | Full design as JSON | `uv run junction plan <request> --format json` | Runs the complete search; writes nothing. |
-| Publish a new, internally verified bundle | `uv run junction build <request> --output <new-directory>` | Runs the design once, publishes create-only files, then verifies the installed bundle by replay. |
+| Publish a new, internally verified bundle | `uv run junction build <request> --output <new-directory>` | Runs the design, publishes create-only files, then repeats the design while verifying the installed bundle by replay. |
 | Check an existing bundle later | `uv run junction verify <bundle>` | Replays the recorded request and checks every file and identity. |
 
 These commands are alternatives, not four stages of one efficient run.
