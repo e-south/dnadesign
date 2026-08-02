@@ -1,17 +1,17 @@
 # Getting Started
 
 **Type:** tutorial
-**Audience:** operators evaluating one synthetic planning request
+**Audience:** first-time users running one synthetic request
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-08-02
 
-This path validates, plans, publishes, and verifies one small synthetic
-example. Replace every example sequence and order-policy label before using a
-bundle outside a software review.
+This tutorial validates, plans, publishes, and verifies one small synthetic
+example. Replace the example sequences and ordering labels before using the
+request for real work.
 
-This tutorial uses one target in one physical pool. Before preparing pooled or
-multi-pool work, choose the intended [`pool_id` request
-shape](guides/request-shapes.md); the lifecycle and commands remain the same.
+The example has one target in one physical pool. For pooled work, first decide
+which targets should share a [`pool_id`](guides/request-shapes.md). The commands
+do not change.
 
 ## 1. Prepare the Environment
 
@@ -22,10 +22,10 @@ uv sync --locked
 uv run trijunction --help
 ```
 
-## 2. Save an Explicit Request
+## 2. Save a Request
 
-Save the following as `request.yaml`. The target is synthetic; the order
-policy values are labels for exercising the contract, not purchasing advice.
+Save the following as `request.yaml`. The target is synthetic. The ordering
+values only exercise the file format; they are not purchasing advice.
 
 ```yaml
 schema: dnadesign.trijunction.request.v1
@@ -66,19 +66,21 @@ order_policy:
   max_oligo_length: 64
 ```
 
-Requests are strict: every target is exact linear uppercase `ACGT` DNA.
-Lowercase, RNA, ambiguous bases, circular topology, unknown fields, invalid
-primer geometry, duplicate target identities, targets without a complete
-junction locus, or infeasible search budgets fail before publication. JSON and
-YAML request files are capped at 16 MiB. Target `id` and `pool_id` values use
-the documented ASCII identifier alphabet and are capped at 128 characters.
-Each free-text order-policy label is capped at 128 UTF-8 bytes, so a non-ASCII
-label can reach the limit in fewer than 128 characters.
+Every target must be an uppercase `ACGT` sequence that you have already
+linearized. V1 has no topology field and does not plan circular targets.
+TriJunction rejects
+lowercase or ambiguous sequences, RNA, unknown fields, invalid primer geometry,
+duplicate target identities, targets that cannot fit one complete junction,
+and requests that exceed the search limits. JSON and
+YAML request files are capped at 16 MiB. Target and pool IDs use a restricted
+ASCII alphabet and may contain at most 128 characters. Free-text ordering
+labels are capped at 128 UTF-8 bytes, which may be fewer than 128 non-ASCII
+characters.
 
-Both primer objects require an explicit `five_prime_extension`; use `""` when
-there is none. A non-empty extension is preserved verbatim before the binding
-sequence in the order row. TriJunction does not infer or interpret restriction
-sites, spacers, adapters, or Type IIS cleavage behavior from that sequence.
+Both primer objects require `five_prime_extension`; use `""` when there is no
+extension. A non-empty value is placed unchanged before the binding sequence
+in the order row. TriJunction does not infer restriction sites, spacers,
+adapters, or Type IIS cleavage behavior from that sequence.
 
 ## 3. Preflight and Inspect
 
@@ -87,8 +89,8 @@ uv run trijunction preflight request.yaml --format json
 uv run trijunction plan request.yaml --format json
 ```
 
-`preflight` runs the same design checks as `plan` but returns a compact receipt.
-Neither command writes a durable bundle. A successful receipt says
+`preflight` runs the same design checks as `plan` but returns a short summary.
+Neither command writes a bundle. A successful summary says
 `status: planned`, `validation_scope: string_only`, and
 `thermodynamic_screening: not_run`; it does not say the design is ready for the
 laboratory.
@@ -106,24 +108,23 @@ uv run trijunction build request.yaml \
 uv run trijunction verify "$trijunction_demo_root/design-v1" --format json
 ```
 
-The physical-path step matters on systems where a temporary-directory prefix
-is itself a symlink. TriJunction rejects symlinked destination components.
+The `pwd -P` step resolves the temporary directory to its physical path.
+TriJunction rejects destinations reached through a symlink.
 
-For durable work, use a study- or project-owned output root, for example
-`<study-workspace>/outputs/trijunction/<bundle-id>`. The publisher creates
-private bundle directories (`0700`) and files (`0600`). These modes reduce
-accidental local disclosure; they do not make sequence data safe to commit,
-sync, or share. Keep the request with its owning project or study rather than
-turning TriJunction into a study registry.
+For work you want to keep, save the bundle under the project that owns the
+sequences, for example `<project>/outputs/trijunction/<bundle-id>`. New
+directories use mode `0700` and new files use `0600`. Those permissions reduce
+accidental local disclosure, but they do not make sequence data safe to commit,
+sync, or share. Keep the request with its project or study.
 
 ## 5. Review the Bundle
 
-Read `checks.json` first, then `plan.json` and `orders/oligos.tsv`. Use
-`views/three_way_junction_review.v1.json` for a compact target-by-target QA
-projection or as the input to the optional BaseRender view. Treat the TSV as a
-vendor-neutral projection that still requires scientific, thermodynamic,
-synthesis, and ordering review. See the [contract
-reference](reference/contracts.md) for the full artifact contract and [sources
-and scope](reference/sources.md) for the evidence boundary. For larger request
-shapes and the separate optional BaseRender review boundary, continue to
+Read `checks.json` first, then `plan.json` and `orders/oligos.tsv`.
+`views/three_way_junction_review.v1.json` contains one compact review record
+per target and can feed the optional BaseRender image. The TSV is
+vendor-neutral and still needs scientific, thermodynamic, synthesis, and
+ordering review. See the [contract
+reference](reference/contracts.md) for the bundle file rules and [sources and
+scope](reference/sources.md) for what the checks do and do not prove. For larger
+request shapes and optional BaseRender images, continue to
 [scale and quality review](guides/scale-and-review.md).

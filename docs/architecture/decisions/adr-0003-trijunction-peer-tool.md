@@ -12,8 +12,8 @@ strand ligation, in the papers' terminology; the barcode helices are later
 removed during recovery. The later bioRxiv preprint describes pooled
 construction and a stochastic string-search procedure named PyWinder.
 
-DNA Design needs a local planner for exact targets without making a study,
-Construct, or Cruncher own this molecular lifecycle. The repository owner has
+DNA Design needs a local planner for exact targets. Study code, Construct, and
+Cruncher should not absorb this method-specific planning. The repository owner has
 authorized an independently derived implementation and public PR review. That
 engineering authorization is not a representation of institutional, patent,
 trademark, or method-use clearance.
@@ -21,16 +21,17 @@ trademark, or method-use clearance.
 ### Decision
 
 Add `dnadesign.trijunction` as a peer tool with one public `trijunction`
-command. TriJunction compiles exact DNA targets into checked
+command. TriJunction turns exact DNA targets into checked
 three-way-junction oligo plans and vendor-neutral order rows. It is an
 independent, Sidewinder-inspired implementation, not the paper-described
 PyWinder procedure and not an official Sidewinder product.
 
 TriJunction owns strict request parsing, bounded deterministic search, fragment
-and strand composition, method-specific checks, recovery geometry, neutral order
-rows, and create-only local bundle publication. It uses sibling public contracts
-only. Its executable schemas, algorithms, tests, and operator guide live with
-the feature code in a separate reviewed PR; this ADR does not repeat them.
+and strand composition, method-specific checks, recovery geometry,
+vendor-neutral order rows, and local bundles that never overwrite an existing
+destination. It uses only public contracts from sibling tools. Its schemas,
+algorithms, tests, and user guide live with the feature code; this ADR does
+not repeat them.
 
 Public contracts use `target_specific`, `barcode_bearing_strand`,
 `complement_strand`, and `assembled_complement`, with corresponding
@@ -39,7 +40,7 @@ paper terms "construct-specific", "barcode strand", and "coding strand" appear
 only when describing the cited method. No legacy aliases or compatibility shims
 are introduced: "coding" would be false for arbitrary noncoding targets.
 
-### Primary-source boundary
+### Sources and evidence
 
 The implementation is derived from these two primary sources:
 
@@ -58,7 +59,7 @@ permission. Its later Type IIS/Golden Gate processing removes universal flanks
 for hierarchical assembly; that is a downstream use of recovered amplicons,
 not a Sidewinder junction-planning contract. Adjacent draft schemas,
 specifications, scripts, and examples in the workspace's
-`resources/sidewinder-papers/` directory are excluded from normative evidence.
+`resources/sidewinder-papers/` directory are not used as sources.
 No unreleased PyWinder source is copied or treated as a compatibility target.
 
 The papers leave complete seed, tie-break, coordinate, and serialization
@@ -99,8 +100,8 @@ either a vendor-applied phosphate or a phosphorylation precondition to be
 fulfilled downstream. The plan and each complement-strand order preserve that
 distinction. The paper's laboratory phosphorylation, ligase, buffer, and
 temperature conditions are not silently promoted to a TriJunction protocol.
-Order rows are a purchasing projection, not evidence that chemistry
-preconditions were fulfilled or that a laboratory protocol was approved.
+Order rows describe what to purchase. They do not show that chemistry
+preconditions were met or that a laboratory protocol was approved.
 
 Recovery primers may be `target_specific` or `universal`. Each primer separates
 its target-annealing `binding_sequence` from an exact, possibly empty,
@@ -125,13 +126,13 @@ Primer binding sequences already occur at the target termini and are not
 duplicated in either formula. Both exact recovered strands are persisted and
 verified independently from the unextended assembly target.
 
-Five-prime extensions are semantically opaque payloads for later adapters,
-Type IIS sites, or other caller-owned processing. The first release does not
+Five-prime extensions are preserved without interpretation for later adapters,
+Type IIS sites, or other project-owned processing. The first release does not
 select an enzyme or validate recognition sites, strand orientation, digestion,
 cut offsets, or resulting overhangs. A downstream tool or study that assigns
 those meanings owns their design and verification.
 
-### Verification boundary
+### What verification proves
 
 TriJunction's edit-distance, shared-substring, GC, homopolymer, reconstruction,
 and recovery checks verify the software plan only. They do not prove molecular
@@ -141,8 +142,8 @@ experimental success.
 Thermodynamic screening is explicitly `not_run` in the first release. The tool
 does not add a private NUPACK wrapper or present string heuristics as
 thermodynamic evidence. A future multi-strand DNA screen requires a separate
-Folding public-contract decision, named backend and version, persisted inputs
-and outputs, and a TriJunction-owned acceptance policy.
+Folding API decision, a named backend and version, saved inputs and outputs,
+and a TriJunction acceptance policy.
 
 ### Ownership and non-goals
 
@@ -151,8 +152,8 @@ and outputs, and a TriJunction-owned acceptance policy.
 - Construct owns realization of declared sequence compositions, not junction
   search or orthogonality policy.
 - Cruncher keeps its current sequence-optimization families and does not absorb
-  TriJunction's molecular-plan lifecycle.
-- Folding owns reusable thermodynamic execution and receipts, not
+  TriJunction planning.
+- Folding owns reusable thermodynamic execution and result records, not
   junction-specific interpretation.
 - TriJunction does not approve orders, execute laboratory protocols, or
   interpret assay evidence.
@@ -160,27 +161,30 @@ and outputs, and a TriJunction-owned acceptance policy.
 Automatic primer design, hierarchical assembly planning, empirical read
 classification, automatic target mutation, vendor submission, remote jobs, and
 laboratory-protocol execution are outside the first release. Type IIS
-recognition, orientation, digestion, and overhang validation are also outside
-the boundary even when an exact primer extension contains such a site.
+recognition, orientation, digestion, and overhang validation are also not
+covered, even when an exact primer extension contains such a site.
 
 ### Security and publication
 
 - Planning is local and makes no network, vendor, or ordering calls.
-- Targets, identifiers, and order metadata are validated before durable writes;
-  output text cannot carry spreadsheet formulas or control characters.
-- Input sizes and search budgets are explicit and fail closed.
-- Preflight and planning perform no durable writes.
-- Final publication uses DNA Design's create-only staged directory primitive
-  and installs a new destination only when that path is absent and the staged
-  bundle has passed validation.
+- Targets, identifiers, and order metadata are validated before files are
+  written; output text cannot carry spreadsheet formulas or control characters.
+- Input sizes and search budgets are explicit; exceeding them stops the run.
+- Preflight and planning write no files.
+- Final publication stages and validates the bundle, then installs it only when
+  the destination does not already exist.
 - The manifest binds the canonical request, plan, checks, order rows, and
-  study-neutral review records by digest. Verification reads a stable
-  descriptor-held snapshot, replays the plan, and rejects tampering or a
-  concurrent filesystem change.
-- TriJunction does not copy study records into its bundle or transmit target
-  sequences. An operator must explicitly move or submit order data.
+  review records by digest. These records include user-supplied target and
+  pool IDs but no dedicated study fields. Verification reads a stable
+  descriptor-held snapshot, replays the plan, and rejects manifest mismatches
+  or a concurrent filesystem change. Detecting a coherently replaced bundle
+  requires comparing its plan ID or manifest digest with an expected identity
+  stored elsewhere.
+- TriJunction does not copy external study records into its bundle or transmit
+  target sequences. A person or separate tool must explicitly move or submit
+  order data.
 
-### Rights and naming boundary
+### Naming and rights
 
 Documentation and package metadata describe TriJunction as
 "Sidewinder-inspired" and link both primary papers. `Sidewinder` and
@@ -196,12 +200,12 @@ laboratory use require the owner's applicable institutional and legal review.
 
 ### Consequences
 
-- Three-way-junction planning gains a coherent peer boundary instead of
-  expanding Cruncher or Construct.
+- Three-way-junction planning has a separate tool instead of expanding Cruncher
+  or Construct.
 - Pool-wide design, exact reverse-complement reconstruction, end-state policy,
-  recovery geometry, and create-only publication are enforceable contracts.
-- Fail-closed search can reject requests the paper-described procedure might
-  satisfy through constraint relaxation.
+  recovery geometry, and no-overwrite publication are enforceable contracts.
+- Search fails instead of relaxing constraints, so it can reject requests that
+  the procedure described in the paper might satisfy.
 - A string-verified plan remains explicitly weaker than thermodynamic or
   experimental evidence.
 - Supporting new chemistry, thermodynamics, recovery design, remote services,
@@ -210,7 +214,6 @@ laboratory use require the owner's applicable institutional and legal review.
 
 ### Links
 
-- Archived proposal:
-  `docs/dev/plans/archive/2026-08-01-trijunction-boundary-proposal.md`
+- [Archived proposal](../../dev/plans/archive/2026-08-01-trijunction-boundary-proposal.md)
 - Documentation decision PR: [#64](https://github.com/e-south/dnadesign/pull/64)
 - Feature implementation: [#67](https://github.com/e-south/dnadesign/pull/67)

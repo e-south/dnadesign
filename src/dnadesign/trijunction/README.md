@@ -1,24 +1,25 @@
 ![TriJunction banner](assets/trijunction-banner.svg)
 
-TriJunction turns exact linear DNA targets into deterministic, checked
-three-way-junction oligo plans and create-only, vendor-neutral bundles. Inputs
-are explicit uppercase `ACGT` sequences. It is an independent implementation
-inspired by Sidewinder; the scientific lineage and current validation boundary
-are documented separately.
+TriJunction plans oligos for assembling exact linear DNA sequences with
+three-way junctions. It accepts uppercase `ACGT` sequences and produces
+deterministic bundles with sequence checks and vendor-neutral order rows,
+without overwriting existing work. The implementation is inspired by
+Sidewinder but is independent of the authors' software. The method reference
+explains the relationship in detail.
 
 ## Documentation
 
-- [TriJunction docs](docs/README.md): choose a command or reference.
+- [TriJunction docs](docs/README.md): choose the shortest route for your task.
 - [Getting started](docs/getting-started.md): preflight, plan, build, and verify
   one synthetic example.
-- [Request shapes](docs/guides/request-shapes.md): choose one target, one shared
-  physical pool, or several independent pools without adding another lifecycle.
-- [Scale and quality review](docs/guides/scale-and-review.md): preflight larger
-  requests and keep optional visual review outside the planning lifecycle.
+- [Request shapes](docs/guides/request-shapes.md): describe one target, a shared
+  oligo pool, or several independent pools.
+- [Scale and quality review](docs/guides/scale-and-review.md): check larger
+  requests before writing files and create optional review images separately.
 - [Contracts](docs/reference/contracts.md): request, plan, bundle, and failure
   invariants.
-- [Method](docs/reference/method.md): paper-grounded geometry, strand formulas,
-  string objectives, recovery evidence, and explicit implementation choices.
+- [Method](docs/reference/method.md): geometry, strand formulas, search scores,
+  recovery evidence, and the choices that differ from the papers.
 - [Sources](docs/reference/sources.md): Sidewinder papers, attribution, and
   implementation scope.
 - [Repository docs](../../../docs/README.md): route to sibling tools and shared

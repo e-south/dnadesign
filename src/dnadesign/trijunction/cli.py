@@ -28,7 +28,7 @@ from dnadesign.trijunction.errors import (
 app = typer.Typer(
     add_completion=True,
     no_args_is_help=True,
-    help="Plan checked three-way-junction oligos from exact DNA targets.",
+    help="Plan three-way-junction oligos from exact DNA sequences.",
 )
 
 
@@ -91,7 +91,7 @@ def preflight_command(
     request: Path = typer.Argument(..., exists=True, readable=True, dir_okay=False),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
-    """Validate and design in memory without durable writes."""
+    """Validate the request and run the design without writing files."""
 
     _run(lambda: preflight(request), output_format=output_format)
 
@@ -99,9 +99,13 @@ def preflight_command(
 @app.command("plan")
 def plan_command(
     request: Path = typer.Argument(..., exists=True, readable=True, dir_okay=False),
-    output_format: str = typer.Option("json", "--format", help="Output format: text or json."),
+    output_format: str = typer.Option(
+        "json",
+        "--format",
+        help="Output format: json for the complete plan, or text for a summary.",
+    ),
 ) -> None:
-    """Print the complete deterministic plan without publishing it."""
+    """Print the complete plan as JSON, or a short text summary."""
 
     _run(lambda: plan(request), output_format=output_format)
 
@@ -109,10 +113,10 @@ def plan_command(
 @app.command("build")
 def build_command(
     request: Path = typer.Argument(..., exists=True, readable=True, dir_okay=False),
-    destination: Path = typer.Option(..., "--output", help="New create-only bundle directory."),
+    destination: Path = typer.Option(..., "--output", help="New bundle directory; it must not already exist."),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
-    """Design, verify, and publish one create-only bundle."""
+    """Design, verify, and publish a bundle in a new directory."""
 
     _run(lambda: build(request, destination=destination), output_format=output_format)
 

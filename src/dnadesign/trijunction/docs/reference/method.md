@@ -1,7 +1,7 @@
 # TriJunction Method Reference
 
 **Type:** reference
-**Owner-boundary:** paper-inspired three-way-junction geometry, string-level
+**Scope:** paper-inspired three-way-junction geometry, string-level
 design objectives, and reconstruction evidence
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-08-02
@@ -16,9 +16,9 @@ Sidewinder three-way-junction method and its pooled-oligo extension:
   pools,” *bioRxiv* preprint (2026),
   [doi:10.64898/2026.05.01.722326](https://doi.org/10.64898/2026.05.01.722326).
 
-This page states the implemented string contract precisely. It does not claim
-exact equivalence with the authors' PyWinder software, reproduce their
-experimental validation, or establish laboratory fitness.
+This reference describes exactly what the current implementation computes. It
+does not claim equivalence with the authors' PyWinder software, reproduce their
+experiments, or show that a plan will work in the laboratory.
 
 ## Geometry and Locus Enumeration
 
@@ -61,9 +61,9 @@ N - (p_m + t) <= c_max.
 Otherwise, it advances to `p_(m+1)`. This stopping rule bounds the last
 barcode-bearing strand by `L`; the candidate offset bounds first and internal
 strands by `L + R - 1`. Truncated candidates are errors; a target with no
-complete locus is outside the TriJunction v1 route. This is a versioned
-TriJunction correction, not the pooled paper's literal next-locus predicate;
-the distinction is recorded in the policy table below.
+complete locus cannot be planned by v1. This stopping rule deliberately differs
+from the pooled paper's literal next-locus predicate. The policy table below
+records the difference.
 
 ## Selected Domains and Strand Orientation
 
@@ -90,9 +90,9 @@ B_j = rc(b_j) D_j t_(j+1) b_(j+1)    for 1 <= j < n
 B_n = rc(b_n) D_n.
 ```
 
-The cited papers call the paired complementary oligos “coding oligos.” The
-TriJunction schema uses the target-neutral term **complement strand** because an
-input target need not encode a protein. For those strands:
+The papers call the paired complementary oligos “coding oligos.” TriJunction
+calls them **complement strands** because an input target need not encode a
+protein. For those strands:
 
 ```text
 K_0 = rc(D_0)
@@ -116,11 +116,16 @@ Each junction record also names its left and right fragments, `t_i`,
 complement-end preparation. These are sequence-geometry proofs, not
 chemical-readiness or assembly-yield claims.
 
-## String-Design Objectives
+## Sequence Search Scores
 
 All searches operate within one declared physical pool. Target, locus, and
 candidate identities are sorted before search; the request seed derives
 separate pool-and-stage seeds.
+
+The toehold and barcode searches are maximin-oriented: a larger distance for
+the least-separated pair is better. V1 ranks both minimum and mean pairwise
+distance, gives the minimum-distance rank twice the weight, and then applies
+stable lexical tie-breaking. The formulas below are authoritative.
 
 ### Toehold path
 
@@ -205,35 +210,36 @@ extended_bottom = rc(extended_top).
 
 Target-specific binding pairs must not resolve another target in the same
 pool. Universal mode requires one complete pair—including extensions—for the
-whole pool, and the order projection emits that pair once with every consuming
+whole pool, and the order table lists that pair once with every consuming
 target in `target_ids`. These checks do not predict primer efficiency,
 off-target behavior outside the declared pool, or PCR success.
 
-An extension may carry a caller-chosen adapter or restriction-site sequence,
+An extension may carry a user-supplied adapter or restriction-site sequence,
 including a sequence intended for later Type IIS cloning. TriJunction preserves
 the exact 5-prime DNA but does not identify enzymes, add spacers, infer cleavage
-sites, prove post-cleavage overhangs, or own the downstream cloning plan.
+sites, prove post-cleavage overhangs, or plan later cloning.
 
-## Literature Lineage and V1 Policy
+## How V1 Differs from the Papers
 
 The papers establish the scientific method and motivate the sequence-design
-objectives. TriJunction makes additional software choices so a request is
-reproducible, reviewable, and fail-closed.
+objectives. TriJunction makes additional software choices so each request is
+reproducible, inspectable, and rejected explicitly when a constraint cannot be
+met.
 
 | Topic | Paper-stated behavior | TriJunction v1 contract |
 | --- | --- | --- |
-| Terminal locus | The pooled Methods text stops when `N - p_(m+1) <= c_max`. For some lengths that leaves a terminal barcode-bearing oligo longer than the stated geometry. | V1 stops when `N - (p_m + t) <= c_max`, retaining another junction when necessary so the last barcode-bearing strand is at most `L` and every candidate-offset order is at most `L + R - 1`. Boundary tests make this deliberate correction explicit. |
+| Terminal locus | The pooled Methods text stops when `N - p_(m+1) <= c_max`. For some lengths that leaves a terminal barcode-bearing oligo longer than the stated geometry. | V1 stops when `N - (p_m + t) <= c_max`, retaining another junction when necessary so the last barcode-bearing strand is at most `L` and every candidate-offset order is at most `L + R - 1`. Edge-case tests preserve this deliberate correction. |
 | Toehold selection scope | The pooled procedure selects a toehold set target by target before global barcode design. | V1 jointly optimizes all toehold loci that share one declared physical pool. Adding a target to that pool may therefore change existing target junctions; the stronger cross-target maximin objective is intentional and tested. |
 | Substring exclusion | The pooled method starts with `q = floor(t / 2)` for barcode-to-toehold exclusion and `k = max(floor(b / 4), q + 1)` for barcode-to-barcode exclusion, including reverse complements. | `barcode_toehold_k` and `barcode_pair_k` are fixed request fields. The paper-derived values are documented starting points, never inferred at runtime. |
 | Constraint pressure | The pooled method requires at least `5|T|` admissible barcodes. If its generator returns fewer, the described software reruns while alternating constraint relaxation: increment `k` on even iterations (or whenever `q >= t`) and increment `q` on eligible odd iterations, halting if the threshold still cannot be met. | Attempt and iteration budgets are explicit. Candidate exhaustion fails under the declared `q` and `k`; TriJunction never changes them automatically. A reviewed replacement request may declare different values. |
 | Barcode generation | The pooled Methods text describes seqwalk generation of a maximally sized shared-substring-constrained pool. | V1 uses seeded rejection sampling with explicit GC and homopolymer filters and stops at the declared candidate count. Exhaustion can be a conservative false negative even when another generator could find a feasible pool; it fails rather than changing algorithms or constraints silently. |
 | Stochastic search | The design methods use stochastic or sampled selection. | Canonical ordering, stage-specific derived seeds, a baseline candidate, fixed-point scoring, and stable tie-breaking make a request reproducible. |
-| Weighted edit distance and rank aggregation | The pooled method gives `w(u) = 1 + exp(-u)` but does not fully specify directional insertion/deletion coordinates, rank normalization, or tie policy. | V1 names the directional recurrence, symmetrizes by the minimum direction, gives equal values a shared descending dense rank normalized to `[0, 1]`, aggregates as `1.0 * minimum-rank + 0.5 * mean-rank`, and records evaluated-path receipts. |
+| Weighted edit distance and rank aggregation | The pooled method gives `w(u) = 1 + exp(-u)` but does not fully specify directional insertion/deletion coordinates, rank normalization, or tie policy. | V1 names the directional recurrence, symmetrizes by the minimum direction, gives equal values a shared descending dense rank normalized to `[0, 1]`, aggregates as `1.0 * minimum-rank + 0.5 * mean-rank`, and records how many paths it evaluated. |
 | Thermodynamics and performance | The publications report experimental assemblies and method validation. | `thermodynamic_screening` is always `not_run`; string checks do not imply thermodynamic orthogonality, assembly yield, or laboratory validity. |
-| Recovery and ordering | The pooled paper describes construct-specific (its term) and universal PCR recovery and experimental oligo use. | V1 names the neutral mode `target_specific` and records binding geometry, exact 5-prime extensions, and vendor-neutral order rows in a create-only, digest-verified bundle; it does not execute a protocol, interpret downstream adapters, or place an order. |
+| Recovery and ordering | The pooled paper describes construct-specific (its term) and universal PCR recovery and experimental oligo use. | V1 names the mode `target_specific` and records binding geometry, exact 5-prime extensions, and vendor-neutral order rows in a new, digest-verified bundle; it does not execute a protocol, interpret downstream adapters, or place an order. |
 
-For schema fields, lifecycle guarantees, and publication rules, continue to the
+For schema fields, commands, and publication rules, continue to the
 [contract reference](contracts.md). For full authorship and implementation
 scope, see [sources and scope](sources.md). For resource-sensitive request
-shapes and the separate optional visual-review boundary, see [scale and quality
+shapes and optional BaseRender review, see [scale and quality
 review](../guides/scale-and-review.md).

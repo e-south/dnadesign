@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/trijunction/publication/writer.py
 
-Create-only publication of verified TriJunction bundles.
+Writes verified TriJunction bundles without overwriting existing directories.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ def _publish_bundle(
     plan: TriJunctionPlan,
     destination: str | Path,
 ) -> PublishedTriJunctionBundle:
-    """Write, verify, and atomically install one create-only bundle."""
+    """Write, verify, and atomically install a bundle in a new directory."""
 
     if not plan.request_sha256:
         raise TriJunctionBundleError("TriJunction plan has no request identity.")

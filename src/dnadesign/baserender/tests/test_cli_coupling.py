@@ -48,7 +48,7 @@ def test_cli_source_has_no_plotting_tokens() -> None:
         assert token not in source
 
 
-def test_cli_help_uses_base_render_contract_language() -> None:
+def test_cli_help_uses_plain_job_language() -> None:
     proc = subprocess.run(
         [sys.executable, "-m", "dnadesign.baserender.src.cli.app", "job", "--help"],
         check=True,
@@ -56,5 +56,6 @@ def test_cli_help_uses_base_render_contract_language() -> None:
         text=True,
     )
 
-    assert "BaseRender v3 render commands" in proc.stdout
+    assert "Validate and run render jobs." in proc.stdout
+    assert "BaseRender v3 render commands" not in proc.stdout
     assert "Sequence Rows v3 job commands" not in proc.stdout

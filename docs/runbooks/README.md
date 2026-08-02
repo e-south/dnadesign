@@ -77,7 +77,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `baserender` | [BaseRender documentation](../../src/dnadesign/baserender/docs/README.md) | Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces. |
 | `folding` | [Folding Docs](../../src/dnadesign/folding/docs/README.md) | Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts. |
 | `permuter` | [Permuter Docs](../../src/dnadesign/permuter/docs/README.md) | Tool-owned variant generation, workspace execution, plotting, and handoff contracts for USR, Construct, Infer, and study-owned promotion. |
-| `trijunction` | [TriJunction Docs](../../src/dnadesign/trijunction/docs/README.md) | Plans checked three-way-junction oligos from exact DNA targets and verifies each published bundle. |
+| `trijunction` | [TriJunction Docs](../../src/dnadesign/trijunction/docs/README.md) | Plans three-way-junction oligos from exact DNA targets and verifies each saved bundle. |
 
 ### Status views
 

@@ -9,37 +9,36 @@ last_verified: 2026-08-02
 # TriJunction review integration
 
 **Type:** runbook
-**Plane:** downstream-tool
-**Owner-boundary:** TriJunction owns the verified design bundle; BaseRender owns the separate review bundle
-**Entry artifact:** verified `views/three_way_junction_review.v1.json` from a TriJunction bundle
-**Exit artifact:** create-only private BaseRender bundle with one optional QA image per selected target
+**Use when:** you want one optional four-panel review image per selected target
+**Input:** `views/three_way_junction_review.v1.json` from a verified TriJunction bundle
+**Output:** a separate private BaseRender bundle
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-08-02
 
-TriJunction owns sequence planning, search evidence, strand composition,
-recovery-primer declarations, and verification. BaseRender consumes the
-verified bundle's strict, study-neutral review records and produces optional
-four-panel QA images. It does not recompute the design or change its verified
-source bundle.
+Use BaseRender to make optional review images from a TriJunction design.
+TriJunction plans and verifies the sequences. BaseRender reads the saved review
+records and draws them; it does not recompute the design or change the source
+bundle.
 
-## Contract and renderer
+## What the image shows
 
 The shared `dnadesign.contracts.visual.ThreeWayJunctionReviewV1` model defines
-the file boundary. Its exact `contract_kind` is
+each JSON row. Its exact `contract_kind` is
 `three_way_junction_review_v1`; unknown fields fail validation.
 
-The four panels have stable meanings:
+Each image has four panels:
 
 1. target coordinates, fragment domains, and selected toeholds;
-2. explicit toehold-to-barcode assignments;
+2. the selected toehold-to-barcode assignments;
 3. strand roles and declared recovery primers;
-4. search receipts, checks, and the unresolved thermodynamic boundary.
+4. search counts, checks, and the fact that thermodynamic screening was not run.
 
-The fixed-width junction and recovery panels display bounded sequence previews
-with total nucleotide length and a 12-hex-character SHA-256 prefix. The
-ellipsis is explicit: rendered labels are review aids, not exact ordering
-evidence. Complete toehold, barcode, primer-binding, extension, and order
-sequences remain in the typed review record and TriJunction order evidence.
+For targets with at most five junctions, the junction panel shows bounded
+sequence previews with the total nucleotide length and a 12-character SHA-256
+prefix. Larger targets show a bounded set of junction identifiers instead. The
+recovery panel also uses bounded sequence previews. An ellipsis means the label
+is only a review aid; use the review JSON and `orders/oligos.tsv` for complete
+sequences.
 
 The contract keeps primer mechanics separate:
 
@@ -48,46 +47,52 @@ The contract keeps primer mechanics separate:
 - `order_sequence_5to3` must equal extension plus binding sequence;
 - `target_binding_span` proves the terminal target match.
 
-The same contract proves every barcode-bearing and complement sequence from
-the target domains and adjacent junction assignments. It also carries the
-extension-aware top and bottom recovery products and requires them to be exact
-reverse complements. Checks identify their structural subject explicitly as
-the current `target` or `pool`; renderer code never assigns scope by parsing a
-free-text detail.
+The contract checks every barcode-bearing and complement sequence against the
+target domains and adjacent junctions. It also records the extension-aware top
+and bottom recovery products and requires them to be reverse complements.
+Every check names either a `target` or a `pool` as its subject.
 
-This representation supports target-specific and universal recovery without
-making cloning assumptions. A later Type IIS workflow can declare a reviewed
-5-prime extension, but BaseRender does not infer an enzyme, cut geometry, or
-cloning plan from that sequence.
+The same file supports target-specific and universal recovery. A primer may
+carry a reviewed 5-prime extension for later Type IIS work, but BaseRender does
+not infer an enzyme, cut geometry, or cloning plan.
 
 `thermodynamic_screening` is restricted to `not_run`. String-distance search
 receipts are not thermodynamic or experimental validation.
 
+## Verify the design first
+
+BaseRender validates the review records, but it does not read the TriJunction
+manifest or establish where the JSON came from. Verify the source bundle before
+rendering:
+
+```bash
+uv run trijunction verify review-root/verified-design --format json
+```
+
 ## Create a separate review bundle
 
-Keep the job file, verified source bundle, and review destinations under one
-explicit review root. Save the job as `review-root/target-01.review.job.yaml`
-and run BaseRender from `review-root/`:
+Keep the job file, verified source bundle, and review destination under one
+review directory. Save the job as `review-root/review.job.yaml`:
 
 ```text
 review-root/
-├── target-01.review.job.yaml
+├── review.job.yaml
 ├── verified-design/
 │   └── views/
 │       └── three_way_junction_review.v1.json
 └── reviews/
 ```
 
-Paths in the job are resolved relative to the job file. Point the input at the
-canonical review array in the published TriJunction bundle, and choose a new
-output directory beside—not inside—that verified source bundle:
+Paths are resolved relative to the job file. Point the input at the review JSON
+in the TriJunction bundle, and choose a new output directory beside, not inside,
+the source bundle:
 
 ```yaml
 version: 4
 contract:
   kind: three_way_junction_review_render_v1
 bundle:
-  path: reviews/target-01-v1
+  path: reviews/design-v1
 input:
   kind: json
   path: verified-design/views/three_way_junction_review.v1.json
@@ -113,54 +118,50 @@ Run through the stable API or CLI:
 ```python
 import dnadesign.baserender as baserender
 
-job = baserender.validate_job("target-01.review.job.yaml")
+job = baserender.validate_job("review-root/review.job.yaml")
 report = baserender.run_job(job)
 ```
 
 ```bash
-uv run baserender job validate target-01.review.job.yaml
-uv run baserender job run target-01.review.job.yaml
+uv run baserender job validate review-root/review.job.yaml
+uv run baserender job run review-root/review.job.yaml
 ```
 
-The review records contain complete DNA sequences, so BaseRender creates this
-review bundle with owner-only access: directories use mode `0700` and files use
-mode `0600`. It creates `bundle.path` atomically and fails when that destination
-already exists. The input JSON and its verified TriJunction bundle remain
-unchanged. Other BaseRender contract kinds keep their declared publication
-permissions.
+The review records contain complete DNA sequences. BaseRender therefore creates
+directories with mode `0700` and files with `0600`. It installs `bundle.path`
+atomically and fails if that path already exists. The input JSON and the
+TriJunction bundle remain unchanged.
 
-The JSON file is an array with one row per target. `dir: images` therefore
-writes one stable target-named image per row. Sanitized or case-insensitive
-filename collisions receive deterministic numeric suffixes. Before full source
-capture, BaseRender rejects review JSON or an optional selection CSV larger
-than 64 MiB. Before record materialization, it also enforces at most 2,000
-review rows, 2,000 selection rows, and 10,000,000 total target bases.
-`input.limit` and selection narrow which records are rendered; neither bypasses
-these bounds. This adapter publishes per-target images only: it rejects video
-and `outputs[].path`. Combining many four-panel reviews into one in-memory
-contact sheet would make memory scale with the row count. Do not edit or split
-the verified source file in place.
+The JSON file has one row per target, so `dir: images` writes one target-named
+image per row. Filename collisions receive deterministic numeric suffixes.
+BaseRender rejects review JSON or an optional selection CSV above 64 MiB. It
+also accepts at most 2,000 review rows, 2,000 selection rows, and 10,000,000
+target bases. These checks run on the complete source before `input.limit` or a
+selection narrows the rendered rows. Filtering cannot make an oversized source
+acceptable, and there is no direct BaseRender route for a source above these
+limits.
 
-## Literature and visual boundary
+This adapter writes per-target images only. It rejects video and
+`outputs[].path`. Do not edit or split the verified source file in place.
 
-The review vocabulary follows the three-way-junction and pooled-recovery
-concepts described by Robinson *et al.* in
+## Literature and visual design
+
+The review terms follow the three-way-junction and pooled-recovery concepts
+described by Robinson *et al.* in
 [the Sidewinder paper](https://doi.org/10.1038/s41586-025-10006-0) and
 [the pooled extension](https://doi.org/10.64898/2026.05.01.722326).
-The BaseRender panel is an original QA composition: it is informed by the
-papers' assembly stages but does not reproduce their figures or claim their
-experimental results.
+The four-panel layout is original. It follows the assembly stages without
+copying the papers' figures or claiming their experimental results.
 
 For the method mapping and implementation limits, use TriJunction's
 [method reference](../../../trijunction/docs/reference/method.md) and
-[source boundary](../../../trijunction/docs/reference/sources.md).
+[sources and scope](../../../trijunction/docs/reference/sources.md).
 
-## Ownership rules
+## Code boundaries
 
-- Producers may import `dnadesign.contracts.visual` to publish the shared
-  contract.
-- Consumers use `dnadesign.baserender`; they do not import
-  `dnadesign.baserender.src.*`.
+- Tools that write these records may import `dnadesign.contracts.visual`.
+- Code that renders them uses `dnadesign.baserender`; it does not import
+  the private `dnadesign.baserender.src.*` package.
 - Study names, objectives, rankings, and campaign state do not belong in this
   contract.
 - The review image is advisory. It is not part of TriJunction plan identity,

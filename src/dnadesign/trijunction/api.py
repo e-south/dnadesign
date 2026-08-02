@@ -66,13 +66,13 @@ def _design_v1(request: TriJunctionRequest) -> TriJunctionPlan:
 
 
 def plan(value: TriJunctionRequest | str | Path) -> TriJunctionPlan:
-    """Return a pure, deterministic design without writing artifacts."""
+    """Return the deterministic plan without writing files."""
 
     return _design_v1(_request(value))
 
 
 def preflight(value: TriJunctionRequest | str | Path) -> PlanSummary:
-    """Run every design check and return a compact no-write receipt."""
+    """Run the full design and return a summary without writing files."""
 
     result = plan(value)
     return PlanSummary(
@@ -93,7 +93,7 @@ def build(
     *,
     destination: str | Path,
 ) -> PublishedTriJunctionBundle:
-    """Design and publish one verified create-only bundle."""
+    """Design and publish a verified bundle in a new destination."""
 
     request = _request(value)
     _preflight_bundle_destination(destination)

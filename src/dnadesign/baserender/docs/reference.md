@@ -94,7 +94,7 @@ Render-contract descriptors:
 - `hairpin_cartoon_render_v3`: hairpin topology cartoon visualization; accepts `hairpin_cartoon`
 - `topology_cartoon_render_v3`: explicit segment-topology cartoon visualization; accepts `topology_cartoon`
 - `snapback_map_render_v3`: snapback visual-map rendering; accepts `snapback_map`
-- `three_way_junction_review_render_v1`: private semantic four-panel QA rendering; accepts `three_way_junction_review` and declares a 64 MiB / 2,000-record / 10,000,000-target-base input envelope
+- `three_way_junction_review_render_v1`: private four-panel quality review; accepts `three_way_junction_review` and limits input to 64 MiB, 2,000 records, and 10,000,000 target bases
 
 Adapters:
 - `densegen_tfbs`
@@ -259,10 +259,10 @@ Boundary rule:
 - unsupported/private imports: `dnadesign.baserender.src.*`
 
 Tool-specific wiring examples live in:
-- `docs/integrations/densegen.md`
-- `docs/integrations/cruncher.md`
-- `docs/integrations/yiu.md`
-- `docs/integrations/trijunction.md`
+- [DenseGen](integrations/densegen.md)
+- [Cruncher](integrations/cruncher.md)
+- [YIU](integrations/yiu.md)
+- [TriJunction](integrations/trijunction.md)
 
 ## Runtime Flow
 

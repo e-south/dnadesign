@@ -4,20 +4,21 @@
 **Last verified:** 2026-08-02
 
 
-This section contains tool-specific contracts between upstream producers and `baserender`.
+These guides connect outputs from other dnadesign tools to BaseRender.
 
-Use these pages when wiring a specific producer schema to BaseRender adapters and public API helpers.
+Choose the tool that wrote the records you want to render.
 
 ## Available integrations
 
-- `densegen`: `docs/integrations/densegen.md`
-- `cruncher`: `docs/integrations/cruncher.md`
-- `yiu`: `docs/integrations/yiu.md`
-- `trijunction`: `docs/integrations/trijunction.md`
+- [DenseGen](densegen.md)
+- [Cruncher](cruncher.md)
+- [YIU](yiu.md)
+- [TriJunction](trijunction.md)
 
 ## Scope boundary
 
-- `README.md` stays tool-agnostic.
-- `docs/reference.md` defines core architecture and public API boundaries.
-- Tool-specific schema mapping and usage live only in this `docs/integrations/` directory.
-- The default sibling-tool policy is file-contract-first: producers write JSON or JSONL contracts plus `RenderJobV4` YAML, and consumers use `dnadesign.baserender` public APIs or CLI only.
+- The package README remains general.
+- The [technical reference](../reference.md) defines the public API.
+- Each integration page explains its tool's fields and gives an example.
+- Other tools write JSON or JSONL records and `RenderJobV4` YAML. Render them
+  through the public `dnadesign.baserender` API or CLI.

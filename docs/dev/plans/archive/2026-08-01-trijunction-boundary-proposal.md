@@ -10,21 +10,19 @@
 Where should a planner for Sidewinder-inspired three-way-junction oligos live,
 and what should its first boundary include?
 
-The proposal evaluated the two primary papers, DNA Design's existing tool
-boundaries, local publication mechanics, and the adjacent workspace drafts.
-The drafts were excluded from normative evidence because they were exploratory
-and not independently verified.
+The proposal compared the two primary papers, DNA Design's existing tools,
+local bundle publication, and adjacent workspace drafts. The drafts were not
+used as sources because they were exploratory and had not been independently
+verified.
 
 ### Options considered
 
-1. Add the planner to Cruncher. Rejected because junction planning has a
-   molecular-plan, recovery, verification, and ordering lifecycle distinct from
-   Cruncher's current sequence-optimization families.
+1. Add the planner to Cruncher. Rejected because junction planning, recovery,
+   verification, and ordering differ from Cruncher's current sequence searches.
 2. Add it to Construct. Rejected because Construct realizes declared sequence
    compositions and should not own junction search or orthogonality policy.
-3. Add a peer tool. Preferred because it gives the method one explicit public
-   contract while allowing studies and sibling tools to pass exact sequences
-   through public boundaries.
+3. Add a peer tool. Preferred because it gives the method one public API while
+   allowing studies and sibling tools to pass exact sequences to it.
 4. Name the package Sidewinder or PyWinder. Rejected because those names belong
    to the published method and paper-described procedure and would overstate
    provenance or compatibility.
@@ -35,18 +33,21 @@ and not independently verified.
   ligation of what it calls coding strands, barcode-helix removal, and exact
   product recovery. TriJunction names those oligos complement strands because
   arbitrary targets need not encode proteins.
-- The later preprint designs one global toehold and barcode set for targets that
-  co-react before partitioning assignments back to targets.
+- The later preprint selects toeholds target by target, then designs one barcode
+  set across the union of toeholds for targets that co-react.
 - Complement-strand phosphorylation is a chemistry precondition and cannot be
   omitted from ordering semantics.
 - Target-specific and universal recovery have different terminal geometry.
 - The preprint's later Type IIS/Golden Gate step is downstream processing, so a
-  generic 5-prime primer extension can preserve caller intent without making
-  enzyme or overhang semantics part of TriJunction.
+  generic 5-prime primer extension can preserve the supplied sequence without
+  making TriJunction responsible for enzyme or overhang handling.
 - String-distance checks and optional thermodynamic ranking are different
   evidence classes; neither proves experimental assembly success.
-- DNA Design already provides a create-only staged publication primitive for
-  immutable local bundles.
+- DNA Design already publishes digest-verified local bundles without
+  overwriting existing directories. Files remain writable, but later
+  verification detects changes that no longer match the manifest or replayed
+  request. Detecting a coherently replaced bundle requires an expected identity
+  stored elsewhere.
 
 ### Resolution
 

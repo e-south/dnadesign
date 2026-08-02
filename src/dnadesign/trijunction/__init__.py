@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/trijunction/__init__.py
 
-Lazy public facade for three-way-junction oligo planning.
+Lazy imports for the public three-way-junction planning API.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
