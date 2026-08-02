@@ -12,9 +12,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
+from fractions import Fraction
 from itertools import combinations
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from dnadesign.trijunction.contracts import (
@@ -27,13 +30,15 @@ from dnadesign.trijunction.contracts import (
 )
 from dnadesign.trijunction.design import barcodes as barcode_module
 from dnadesign.trijunction.design import planner as planner_module
+from dnadesign.trijunction.design import toeholds as toehold_module
 from dnadesign.trijunction.design.barcodes import generate_barcode_candidates
-from dnadesign.trijunction.design.loci import ToeholdCandidate, enumerate_loci
+from dnadesign.trijunction.design.loci import ToeholdCandidate, ToeholdLocus, enumerate_loci
 from dnadesign.trijunction.design.matching import _matching_score
 from dnadesign.trijunction.design.randomness import StablePrng
 from dnadesign.trijunction.design.resources import (
     MAX_REQUEST_BARCODE_GENERATION_BASE_VISITS,
     MAX_TOEHOLD_CACHE_BYTES,
+    capped_toehold_path_count,
     estimate_request_workload,
     estimated_toehold_distance_lookups,
     guard_barcode_generation,
@@ -42,8 +47,10 @@ from dnadesign.trijunction.design.resources import (
     guard_uniform_toehold_search,
     sampled_barcode_subset_state_bytes,
     sampled_matching_state_bytes,
+    sampled_toehold_search_state_bytes,
     toehold_distance_cache_bytes,
 )
+from dnadesign.trijunction.design.scoring import RankAggregate
 from dnadesign.trijunction.errors import TriJunctionDesignError
 from dnadesign.trijunction.sequence import (
     longest_common_substring_length,
@@ -126,12 +133,43 @@ def test_paper_scale_cache_is_bounded_and_full_iteration_budget_is_explicit() ->
 
     assert toehold_distance_cache_bytes(candidate_count) == 78_836_640
     assert toehold_distance_cache_bytes(candidate_count) < MAX_TOEHOLD_CACHE_BYTES
-    assert estimated_toehold_distance_lookups((search_range,) * loci, 1_000) == 654_900_000
+    assert estimated_toehold_distance_lookups((search_range,) * loci, 1_000) == 698_603_660
     guard_uniform_toehold_search(
         locus_count=loci,
         candidates_per_locus=search_range,
         sequence_length=10,
         iterations=1_000,
+    )
+
+
+def test_toehold_workload_includes_final_unique_path_scoring() -> None:
+    profile = replace(_profile(), oligo_length=64, search_range=10, toehold_search_iterations=2)
+
+    estimate = estimate_request_workload(
+        input_bases=72,
+        target_count=1,
+        pool_locus_counts=(4,),
+        profile=profile,
+    )
+
+    construction_lookups = 2 * 10 * 4 * 3 // 2
+    scoring_lookups = 3 * 4 * 3 // 2
+    combined_lookups = construction_lookups + scoring_lookups
+    unique_pairs = min((4 * 10) * (4 * 10 - 1) // 2, combined_lookups)
+    assert estimated_toehold_distance_lookups((10,) * 4, 2) == combined_lookups
+    assert estimate.toehold_distance_lookups == combined_lookups
+    assert estimate.toehold_dp_cells == unique_pairs * 2 * 8 * 8
+
+
+def test_toehold_unique_path_count_caps_cartesian_product_without_materializing_it() -> None:
+    assert capped_toehold_path_count((2, 2, 2, 2), iterations=40) == 16
+    assert capped_toehold_path_count((15,) * 296, iterations=1_000) == 1_001
+    assert sampled_toehold_search_state_bytes(iterations=100_000, candidate_counts=(1,)) < 64 * 1024 * 1024
+    guard_uniform_toehold_search(
+        locus_count=1,
+        candidates_per_locus=1,
+        sequence_length=10,
+        iterations=100_000,
     )
 
 
@@ -201,6 +239,106 @@ def test_sampled_state_estimates_cover_retained_python_containers() -> None:
 
     assert sampled_barcode_subset_state_bytes(evaluations=evaluations, selected_count=count) >= subset_observed
     assert sampled_matching_state_bytes(evaluations=evaluations, count=count) >= matching_observed
+
+
+def test_toehold_state_estimate_covers_simultaneously_retained_search_and_scoring_state() -> None:
+    iterations = 101
+    locus_count = 100
+    evaluations = iterations + 1
+    trial_rngs = [StablePrng(index) for index in range(iterations)]
+    visit_orders = np.empty((iterations, locus_count), dtype=np.int32)
+    selected = np.empty_like(visit_orders)
+    canonical_paths = np.empty_like(selected)
+    stacked_paths = np.empty((evaluations, locus_count), dtype=np.int32)
+    unique_paths = np.empty_like(stacked_paths)
+    identities = tuple(
+        tuple(("target", index, evaluation if index == 0 else 0) for index in range(locus_count))
+        for evaluation in range(evaluations)
+    )
+    paths = tuple(
+        tuple((evaluation + index) % evaluations for index in range(locus_count)) for evaluation in range(evaluations)
+    )
+    paths_by_identity = dict(zip(identities, paths, strict=True))
+    scores = {identity: (0, Fraction(0)) for identity in identities}
+    ranks = {
+        identity: RankAggregate(
+            minimum_rank_fraction=Fraction(1),
+            mean_rank_fraction=Fraction(1),
+            weighted_score_fraction=Fraction(3, 2),
+        )
+        for identity in identities
+    }
+
+    array_peak = (
+        sum(sys.getsizeof(array) for array in (visit_orders, selected, canonical_paths, stacked_paths, unique_paths))
+        + sys.getsizeof(trial_rngs)
+        + sum(sys.getsizeof(rng) + sys.getsizeof(0) for rng in trial_rngs)
+    )
+    scoring_peak = (
+        sum(sys.getsizeof(array) for array in (visit_orders, selected, canonical_paths, unique_paths))
+        + sys.getsizeof(trial_rngs)
+        + sum(sys.getsizeof(rng) + sys.getsizeof(0) for rng in trial_rngs)
+        + sys.getsizeof(paths_by_identity)
+        + sys.getsizeof(scores)
+        + sys.getsizeof(ranks)
+        + sum(sys.getsizeof(identity) + sum(sys.getsizeof(item) for item in identity) for identity in identities)
+        + sum(sys.getsizeof(path) + sum(sys.getsizeof(index) for index in path) for path in paths)
+        + sum(sys.getsizeof(score) + sum(sys.getsizeof(value) for value in score) for score in scores.values())
+        + sum(
+            sys.getsizeof(rank)
+            + sys.getsizeof(rank.minimum_rank_fraction)
+            + sys.getsizeof(rank.mean_rank_fraction)
+            + sys.getsizeof(rank.weighted_score_fraction)
+            for rank in ranks.values()
+        )
+    )
+
+    estimate = sampled_toehold_search_state_bytes(
+        iterations=iterations,
+        candidate_counts=(2,) * locus_count,
+    )
+    assert estimate >= max(array_peak, scoring_peak)
+
+
+def test_confirmed_toehold_resource_undercount_fails_before_numpy_search_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loci = tuple(
+        ToeholdLocus(
+            target_id="target",
+            pool_id="pool",
+            index=locus_index,
+            candidates=tuple(
+                ToeholdCandidate(
+                    target_id="target",
+                    pool_id="pool",
+                    locus_index=locus_index,
+                    candidate_offset=offset,
+                    start=locus_index + offset,
+                    sequence="ACGATTCGGT",
+                )
+                for offset in range(2)
+            ),
+        )
+        for locus_index in range(14)
+    )
+
+    def fail_if_allocated(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("NumPy search allocation must not begin")
+
+    monkeypatch.setattr(toehold_module.np, "asarray", fail_if_allocated)
+
+    assert estimated_toehold_distance_lookups((2,) * 14, 20_000) < 1_000_000_000
+    assert 20_000 * 14 * 12 < 64 * 1024 * 1024
+    assert (
+        sampled_toehold_search_state_bytes(
+            iterations=20_000,
+            candidate_counts=(2,) * 14,
+        )
+        > 64 * 1024 * 1024
+    )
+    with pytest.raises(TriJunctionDesignError, match="sampled-path state"):
+        toehold_module.select_toeholds(loci, iterations=20_000, seed=17)
 
 
 def test_many_safe_pools_fail_request_guard_before_candidate_materialization(monkeypatch: pytest.MonkeyPatch) -> None:

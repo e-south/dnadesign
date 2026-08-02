@@ -17,8 +17,11 @@ from .estimates import (
     RequestWorkloadEstimate,
     barcode_distance_cache_bytes,
     barcode_generation_state_bytes,
+    estimated_toehold_distance_lookups,
+    estimated_toehold_dp_cells,
     sampled_barcode_subset_state_bytes,
     sampled_matching_state_bytes,
+    sampled_toehold_search_state_bytes,
     toehold_distance_cache_bytes,
 )
 from .limits import (
@@ -137,7 +140,8 @@ def guard_uniform_toehold_search(
             f"limit {MAX_TOEHOLD_CACHE_BYTES}. Reduce search_range, or use separate pool IDs only for "
             "physically independent reactions."
         )
-    requested_lookups = iterations * candidates_per_locus * locus_count * (locus_count - 1) // 2
+    candidate_counts = (candidates_per_locus,) * locus_count
+    requested_lookups = estimated_toehold_distance_lookups(candidate_counts, iterations)
     if requested_lookups > MAX_TOEHOLD_DISTANCE_LOOKUPS:
         raise TriJunctionDesignError(
             "Toehold search exceeds the explicit CPU envelope: "
@@ -146,15 +150,22 @@ def guard_uniform_toehold_search(
             "separate pool IDs only for physically independent reactions; TriJunction does not run an "
             "unbounded search."
         )
-    unique_pairs = min(candidate_count * (candidate_count - 1) // 2, requested_lookups)
-    dp_cells = unique_pairs * 2 * sequence_length * sequence_length
+    dp_cells = estimated_toehold_dp_cells(
+        candidate_counts,
+        iterations=iterations,
+        sequence_length=sequence_length,
+    )
     if dp_cells > MAX_TOEHOLD_DP_CELLS:
+        unique_pairs = dp_cells // (2 * sequence_length * sequence_length)
         raise TriJunctionDesignError(
             "Toehold search exceeds the explicit edit-distance envelope: "
             f"up to {unique_pairs} unique pairs at length {sequence_length} require {dp_cells} DP cells, "
             f"limit {MAX_TOEHOLD_DP_CELLS}. Reduce toehold_length, search_range, or iterations."
         )
-    sampled_state_bytes = iterations * locus_count * 12
+    sampled_state_bytes = sampled_toehold_search_state_bytes(
+        iterations=iterations,
+        candidate_counts=candidate_counts,
+    )
     if sampled_state_bytes > MAX_TOEHOLD_SEARCH_STATE_BYTES:
         raise TriJunctionDesignError(
             "Toehold sampled-path state exceeds the explicit memory envelope: "

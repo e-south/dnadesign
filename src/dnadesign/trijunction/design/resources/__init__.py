@@ -13,11 +13,14 @@ from .estimates import (
     RequestWorkloadEstimate,
     barcode_distance_cache_bytes,
     barcode_generation_state_bytes,
+    capped_toehold_path_count,
     estimate_request_workload,
     estimated_toehold_distance_lookups,
+    estimated_toehold_dp_cells,
     kmer_set_state_bytes,
     sampled_barcode_subset_state_bytes,
     sampled_matching_state_bytes,
+    sampled_toehold_search_state_bytes,
     toehold_distance_cache_bytes,
 )
 from .guards import (
@@ -40,8 +43,10 @@ __all__ = [
     "RequestWorkloadEstimate",
     "barcode_distance_cache_bytes",
     "barcode_generation_state_bytes",
+    "capped_toehold_path_count",
     "estimate_request_workload",
     "estimated_toehold_distance_lookups",
+    "estimated_toehold_dp_cells",
     "guard_barcode_generation",
     "guard_barcode_subset_search",
     "guard_matching_search",
@@ -50,5 +55,6 @@ __all__ = [
     "kmer_set_state_bytes",
     "sampled_barcode_subset_state_bytes",
     "sampled_matching_state_bytes",
+    "sampled_toehold_search_state_bytes",
     "toehold_distance_cache_bytes",
 ]

@@ -27,6 +27,16 @@ _SAMPLED_SUBSET_INDEX_BYTES = 64
 _SAMPLED_MATCHING_FIXED_BYTES = 512
 _SAMPLED_MATCHING_INDEX_BYTES = 96
 
+# Toehold search retains one PRNG per trial, three int32 path matrices, and at
+# the array peak both the vstack input and unique-path output. During scoring,
+# the unique paths coexist with Python path/identity tuples and three mappings
+# (paths, scores, and ranks). These allowances include owned Python integers,
+# tuple and mapping slack, Fraction/rank values, and ndarray headers.
+_TOEHOLD_PRNG_BYTES = 128
+_TOEHOLD_NDARRAY_HEADER_BYTES = 128
+_TOEHOLD_SCORING_FIXED_BYTES = 2_048
+_TOEHOLD_SCORING_LOCUS_BYTES = 128
+
 # A retained k-mer owns both an ASCII string object and one hash-table entry.
 # 128 bytes deliberately covers their fixed/object overhead and table slack;
 # the k-mer payload is then added explicitly instead of disappearing inside a
@@ -126,10 +136,68 @@ def sampled_matching_state_bytes(*, evaluations: int, count: int) -> int:
     return evaluations * (_SAMPLED_MATCHING_FIXED_BYTES + _SAMPLED_MATCHING_INDEX_BYTES * count)
 
 
-def estimated_toehold_distance_lookups(candidate_counts: tuple[int, ...], iterations: int) -> int:
-    """Return the uniform-locus pairwise lookup ceiling used by the search."""
+def capped_toehold_path_count(candidate_counts: tuple[int, ...], *, iterations: int) -> int:
+    """Cap the Cartesian path count without constructing an enormous product."""
 
-    return iterations * sum(index * count for index, count in enumerate(sorted(candidate_counts)))
+    if iterations < 0 or any(count < 0 for count in candidate_counts):
+        raise ValueError("toehold path-count inputs must be non-negative")
+    cap = iterations + 1
+    product = 1
+    for count in candidate_counts:
+        if count == 0:
+            return 0
+        if product > (cap - 1) // count:
+            return cap
+        product *= count
+    return product
+
+
+def sampled_toehold_search_state_bytes(*, iterations: int, candidate_counts: tuple[int, ...]) -> int:
+    """Conservatively model the peak retained sampled-path search state."""
+
+    evaluations = iterations + 1
+    unique_paths = capped_toehold_path_count(candidate_counts, iterations=iterations)
+    locus_count = len(candidate_counts)
+    prng_state = iterations * _TOEHOLD_PRNG_BYTES
+    array_peak = (
+        prng_state
+        + ((3 * iterations + evaluations + unique_paths) * locus_count * 4)
+        + 5 * _TOEHOLD_NDARRAY_HEADER_BYTES
+    )
+    scoring_peak = (
+        prng_state
+        + ((3 * iterations + unique_paths) * locus_count * 4)
+        + 4 * _TOEHOLD_NDARRAY_HEADER_BYTES
+        + unique_paths * (_TOEHOLD_SCORING_FIXED_BYTES + _TOEHOLD_SCORING_LOCUS_BYTES * locus_count)
+    )
+    return max(array_peak, scoring_peak)
+
+
+def estimated_toehold_distance_lookups(candidate_counts: tuple[int, ...], iterations: int) -> int:
+    """Return search-construction plus final unique-path scoring lookups."""
+
+    locus_count = len(candidate_counts)
+    path_pairs = locus_count * (locus_count - 1) // 2
+    construction_lookups = iterations * sum(index * count for index, count in enumerate(sorted(candidate_counts)))
+    scoring_lookups = capped_toehold_path_count(candidate_counts, iterations=iterations) * path_pairs
+    return construction_lookups + scoring_lookups
+
+
+def estimated_toehold_dp_cells(
+    candidate_counts: tuple[int, ...],
+    *,
+    iterations: int,
+    sequence_length: int,
+) -> int:
+    """Return the combined unique-pair edit-distance ceiling."""
+
+    candidate_count = sum(candidate_counts)
+    candidate_pairs = candidate_count * (candidate_count - 1) // 2
+    unique_pairs = min(
+        candidate_pairs,
+        estimated_toehold_distance_lookups(candidate_counts, iterations),
+    )
+    return unique_pairs * 2 * sequence_length * sequence_length
 
 
 def estimate_request_workload(
@@ -164,16 +232,22 @@ def estimate_request_workload(
     combined_length = profile.toehold_length + profile.barcode_length
     for locus_count in pool_locus_counts:
         toehold_candidate_count = locus_count * profile.search_range
-        pool_toehold_pairs = toehold_candidate_count * (toehold_candidate_count - 1) // 2
-        pool_toehold_lookups = (
-            profile.toehold_search_iterations * profile.search_range * locus_count * (locus_count - 1) // 2
+        candidate_counts = (profile.search_range,) * locus_count
+        pool_toehold_lookups = estimated_toehold_distance_lookups(
+            candidate_counts,
+            profile.toehold_search_iterations,
         )
         toehold_cache_bytes += toehold_distance_cache_bytes(toehold_candidate_count)
         toehold_distance_lookups += pool_toehold_lookups
-        toehold_dp_cells += (
-            min(pool_toehold_pairs, pool_toehold_lookups) * 2 * profile.toehold_length * profile.toehold_length
+        toehold_dp_cells += estimated_toehold_dp_cells(
+            candidate_counts,
+            iterations=profile.toehold_search_iterations,
+            sequence_length=profile.toehold_length,
         )
-        toehold_search_state_bytes += profile.toehold_search_iterations * locus_count * 12
+        toehold_search_state_bytes += sampled_toehold_search_state_bytes(
+            iterations=profile.toehold_search_iterations,
+            candidate_counts=candidate_counts,
+        )
 
         barcode_candidate_count = locus_count * profile.barcode_pool_factor
         barcode_generation_state_bytes_total += barcode_generation_state_bytes(
