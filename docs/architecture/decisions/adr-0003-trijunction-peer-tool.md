@@ -213,4 +213,4 @@ laboratory use require the owner's applicable institutional and legal review.
 - Archived proposal:
   `docs/dev/plans/archive/2026-08-01-trijunction-boundary-proposal.md`
 - Documentation decision PR: [#64](https://github.com/e-south/dnadesign/pull/64)
-- Feature implementation: separate reviewed PR; link when opened
+- Feature implementation: [#67](https://github.com/e-south/dnadesign/pull/67)
