@@ -105,6 +105,38 @@ def test_adapter_compares_assembly_group_check_evidence_without_using_row_order(
     assert [record.id for record in records] == ["target-01", "target-02"]
 
 
+def test_adapter_rejects_plan_wide_v1_complement_preparation_drift_across_groups() -> None:
+    first, second = _second_target()
+    for row in (first, second):
+        row["source"]["algorithm"] = "dnadesign.junction.string.v1"  # type: ignore[index]
+    second["target"]["assembly_group_id"] = "assembly-02"  # type: ignore[index]
+    second["search"]["assembly_group_id"] = "assembly-02"  # type: ignore[index]
+    second["checks"][1]["subject"]["id"] = "assembly-02"  # type: ignore[index]
+    second["geometry"]["junctions"][0]["complement_end_preparation"] = (  # type: ignore[index]
+        "downstream_phosphorylation"
+    )
+
+    with pytest.raises(
+        baserender.SchemaError,
+        match="contradictory plan-wide complement-end preparation at row 1",
+    ):
+        baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+
+
+def test_adapter_scopes_v1_complement_preparation_to_one_plan() -> None:
+    first, second = _second_target()
+    for row in (first, second):
+        row["source"]["algorithm"] = "dnadesign.junction.string.v1"  # type: ignore[index]
+    second["source"]["plan_id"] = f"sha256:{'c' * 64}"  # type: ignore[index]
+    second["geometry"]["junctions"][0]["complement_end_preparation"] = (  # type: ignore[index]
+        "downstream_phosphorylation"
+    )
+
+    records = baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+
+    assert [record.id for record in records] == ["target-01", "target-02"]
+
+
 @pytest.mark.parametrize("contradictory_payload", [False, True])
 def test_adapter_rejects_duplicate_target_identity_within_one_plan(
     contradictory_payload: bool,

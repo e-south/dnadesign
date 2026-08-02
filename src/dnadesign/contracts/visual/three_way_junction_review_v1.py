@@ -22,7 +22,7 @@ from .common import PositiveLengthSpan, VisualContractModel
 _DNA = re.compile(r"^[ACGT]+$")
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MIN_BARCODE_POOL_FACTOR_V1 = 5
-_JUNCTION_STRING_V1_ALGORITHM = "dnadesign.junction.string.v1"
+JUNCTION_STRING_V1_ALGORITHM = "dnadesign.junction.string.v1"
 _UINT64_MAX = (1 << 64) - 1
 # junction request v1 permits 100,000 iterations in each randomized search
 # stage; every v1 selector also evaluates one baseline before that budget.
@@ -431,10 +431,10 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
             raise ValueError("recovery extended top and bottom sequences must be reverse complements")
         if self.search.assembly_group_id != self.target.assembly_group_id:
             raise ValueError("search.assembly_group_id must match target.assembly_group_id")
-        if self.source.algorithm == _JUNCTION_STRING_V1_ALGORITHM:
+        if self.source.algorithm == JUNCTION_STRING_V1_ALGORITHM:
             if len({junction.complement_end_preparation for junction in junctions}) != 1:
                 raise ValueError(
-                    f"geometry.junctions must use one complement end preparation for {_JUNCTION_STRING_V1_ALGORITHM}"
+                    f"geometry.junctions must use one complement end preparation for {JUNCTION_STRING_V1_ALGORITHM}"
                 )
             for field, seed in (
                 ("toehold_seed", self.search.toehold_seed),
@@ -443,7 +443,7 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
                 ("matching_seed", self.search.matching_seed),
             ):
                 if not 0 <= seed <= _UINT64_MAX:
-                    raise ValueError(f"{field} must be between 0 and {_UINT64_MAX} for {_JUNCTION_STRING_V1_ALGORITHM}")
+                    raise ValueError(f"{field} must be between 0 and {_UINT64_MAX} for {JUNCTION_STRING_V1_ALGORITHM}")
             for field, evaluated in (
                 ("toehold_paths_evaluated", self.search.toehold_paths_evaluated),
                 ("barcode_subsets_evaluated", self.search.barcode_subsets_evaluated),
@@ -452,7 +452,7 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
                 if evaluated > _JUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS:
                     raise ValueError(
                         f"{field} must not exceed {_JUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS} "
-                        f"for {_JUNCTION_STRING_V1_ALGORITHM}"
+                        f"for {JUNCTION_STRING_V1_ALGORITHM}"
                     )
         if self.search.locus_count < len(junctions):
             raise ValueError("search.locus_count must cover every target geometry junction")
@@ -483,4 +483,4 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
         return self
 
 
-__all__ = ["ThreeWayJunctionReviewV1"]
+__all__ = ["JUNCTION_STRING_V1_ALGORITHM", "ThreeWayJunctionReviewV1"]

@@ -17,6 +17,7 @@ from typing import Any, Mapping
 from pydantic import ValidationError
 
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
+from dnadesign.contracts.visual.three_way_junction_review_v1 import JUNCTION_STRING_V1_ALGORITHM
 
 from ..core import ContractError, Record, SchemaError
 from ..core.pydantic_validation import format_validation_error
@@ -44,6 +45,12 @@ class ThreeWayJunctionReviewV1Adapter:
         tuple[str, str],
         tuple[tuple[str, str, str, str, str], ...],
     ] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _v1_complement_end_preparation: dict[str, str] = field(
         default_factory=dict,
         init=False,
         repr=False,
@@ -122,6 +129,16 @@ class ThreeWayJunctionReviewV1Adapter:
                 f"three_way_junction_review_v1 document has contradictory source metadata at row {row_index}"
             )
         self._source_receipts[review.source.plan_id] = source_receipt
+
+        if review.source.algorithm == JUNCTION_STRING_V1_ALGORITHM:
+            complement_end_preparation = review.geometry.junctions[0].complement_end_preparation
+            previous_preparation = self._v1_complement_end_preparation.get(review.source.plan_id)
+            if previous_preparation is not None and previous_preparation != complement_end_preparation:
+                raise SchemaError(
+                    "three_way_junction_review_v1 document has contradictory plan-wide "
+                    f"complement-end preparation at row {row_index}"
+                )
+            self._v1_complement_end_preparation[review.source.plan_id] = complement_end_preparation
 
         plan_and_group = (review.source.plan_id, review.search.assembly_group_id)
         search_receipt = review.search.model_dump(mode="json")
