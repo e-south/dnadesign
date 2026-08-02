@@ -72,11 +72,14 @@ class RunReport:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.to_json())
 
-    def capture_source_evidence(self) -> None:
+    def capture_source_evidence(self, *, input_max_bytes: int | None = None) -> None:
         sources = {"input": self.input_path}
         if self.selection_path is not None:
             sources["selection"] = self.selection_path
-        self._source_evidence = {label: CapturedSource.capture(source) for label, source in sources.items()}
+        self._source_evidence = {
+            label: CapturedSource.capture(source, max_bytes=input_max_bytes if label == "input" else None)
+            for label, source in sources.items()
+        }
 
     def source_content(self, label: str) -> bytes:
         evidence = self._source_evidence.get(label)

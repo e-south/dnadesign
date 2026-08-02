@@ -21,14 +21,16 @@ def _safe_stem(raw: str) -> str:
 
 
 def _unique_stem(base: str, used: set[str]) -> str:
-    if base not in used:
-        used.add(base)
+    normalized = base.casefold()
+    if normalized not in used:
+        used.add(normalized)
         return base
     i = 2
     while True:
         candidate = f"{base}_{i}"
-        if candidate not in used:
-            used.add(candidate)
+        normalized_candidate = candidate.casefold()
+        if normalized_candidate not in used:
+            used.add(normalized_candidate)
             return candidate
         i += 1
 

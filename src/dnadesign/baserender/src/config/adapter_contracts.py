@@ -13,12 +13,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from dnadesign.contracts.visual import (
     ScarNickVisualV1,
     SequenceEvidenceMapV1,
     SnapbackVisualV1,
+    ThreeWayJunctionReviewV1,
     YiuHairpinTopologyV1,
     YiuLinearStateV1,
     YiuPayloadVisualV1,
@@ -26,6 +27,7 @@ from dnadesign.contracts.visual import (
 )
 
 from ..core import ContractError, SchemaError, ensure, reject_unknown_keys, require_one_of
+from .job_contracts import THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE, InputEnvelope
 
 PolicyNormalizer = Callable[[Mapping[str, Any], str], dict[str, Any]]
 AdapterFactory = Callable[[Any, str], Any]
@@ -188,6 +190,12 @@ def _build_snapback_visual(cfg: Any, alphabet: str) -> Any:
     return SnapbackVisualV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
+def _build_three_way_junction_review(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.three_way_junction_review_v1 import ThreeWayJunctionReviewV1Adapter
+
+    return ThreeWayJunctionReviewV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
 def _build_duplex_sequence(cfg: Any, alphabet: str) -> Any:
     from ..adapters.duplex_sequence_v1 import DuplexSequenceV1Adapter
 
@@ -241,6 +249,8 @@ class AdapterDescriptor:
     allowed_policy_keys: tuple[str, ...] = ()
     resolved_path_columns: tuple[str, ...] = ()
     normalize_policies: PolicyNormalizer = _normalize_policies_passthrough
+    sensitivity: Literal["public", "private"] = "public"
+    input_envelope: InputEnvelope | None = None
 
 
 AdapterContract = AdapterDescriptor
@@ -403,6 +413,21 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
         allowed_config_columns=(),
         required_config_columns=(),
         required_source_columns=(),
+    ),
+    "three_way_junction_review_v1": AdapterDescriptor(
+        kind="three_way_junction_review_v1",
+        owner_tool="trijunction",
+        contract_kind="three_way_junction_review_v1",
+        schema_model=ThreeWayJunctionReviewV1,
+        supported_renderers=("three_way_junction_review",),
+        supported_alphabets=("DNA",),
+        factory=_build_three_way_junction_review,
+        docs_slug="three-way-junction-review-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+        sensitivity="private",
+        input_envelope=THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE,
     ),
     "duplex_sequence_v1": AdapterDescriptor(
         kind="duplex_sequence_v1",

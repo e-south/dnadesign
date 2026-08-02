@@ -12,8 +12,27 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from ..core import SchemaError
+
+
+@dataclass(frozen=True)
+class InputEnvelope:
+    max_bytes: int
+    max_records: int
+    max_bases: int
+    base_field_path: tuple[str, ...]
+    accepted_input_kinds: tuple[str, ...]
+
+
+THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE = InputEnvelope(
+    max_bytes=64 * 1024 * 1024,
+    max_records=2_000,
+    max_bases=10_000_000,
+    base_field_path=("target", "sequence_5to3"),
+    accepted_input_kinds=("json",),
+)
 
 
 @dataclass(frozen=True)
@@ -25,6 +44,8 @@ class RenderContractDescriptor:
     accepted_renderers: tuple[str, ...]
     compatibility_aliases: tuple[str, ...] = ()
     docs_slug: str | None = None
+    sensitivity: Literal["public", "private"] = "public"
+    input_envelope: InputEnvelope | None = None
 
 
 _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
@@ -39,6 +60,7 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
             "hairpin_cartoon",
             "topology_cartoon",
             "snapback_map",
+            "three_way_junction_review",
         ),
         docs_slug="render-job-v4",
     ),
@@ -90,6 +112,16 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
         accepted_renderers=("snapback_map",),
         docs_slug="snapback-map-render-v3",
     ),
+    "three_way_junction_review_render_v1": RenderContractDescriptor(
+        kind="three_way_junction_review_render_v1",
+        schema_version=1,
+        display_name="Three-way-junction review render contract",
+        purpose="Four-panel QA rendering from explicit three-way-junction design evidence.",
+        accepted_renderers=("three_way_junction_review",),
+        docs_slug="three-way-junction-review-render-v1",
+        sensitivity="private",
+        input_envelope=THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE,
+    ),
 }
 
 _ALIASES: dict[str, str] = {
@@ -106,6 +138,14 @@ def render_contract_kinds(*, include_aliases: bool = False) -> tuple[str, ...]:
     if include_aliases:
         kinds.update(_ALIASES)
     return tuple(sorted(kinds))
+
+
+def render_contract_renderer_kinds() -> tuple[str, ...]:
+    """Return renderer names declared by at least one render contract."""
+
+    return tuple(
+        sorted({renderer for descriptor in _DESCRIPTORS.values() for renderer in descriptor.accepted_renderers})
+    )
 
 
 def render_contract_descriptor(kind: str) -> RenderContractDescriptor:
@@ -133,9 +173,12 @@ DEFAULT_RENDER_CONTRACT_KIND = "render_job_v4"
 
 __all__ = [
     "DEFAULT_RENDER_CONTRACT_KIND",
+    "InputEnvelope",
+    "THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE",
     "RenderContractDescriptor",
     "render_contract_descriptor",
     "render_contract_descriptors",
     "render_contract_kinds",
+    "render_contract_renderer_kinds",
     "validate_render_contract_renderer",
 ]

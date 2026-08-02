@@ -72,6 +72,12 @@ def _build_snapback_map_renderer() -> Renderer:
     return SnapbackMapRenderer()
 
 
+def _build_three_way_junction_review_renderer() -> Renderer:
+    from .three_way_junction_review import ThreeWayJunctionReviewRenderer
+
+    return ThreeWayJunctionReviewRenderer()
+
+
 @dataclass(frozen=True)
 class _RendererRegistry:
     renderers: dict[str, _RegisteredRenderer]
@@ -152,6 +158,17 @@ _REGISTRY = _RendererRegistry(
                 docs_slug="snapback-map",
             ),
             factory=_build_snapback_map_renderer,
+        ),
+        "three_way_junction_review": _RegisteredRenderer(
+            descriptor=RendererDescriptor(
+                name="three_way_junction_review",
+                topology_kinds=("fragment_pool",),
+                accepted_alphabets=("DNA",),
+                required_record_features=(),
+                optional_record_features=(),
+                docs_slug="three-way-junction-review",
+            ),
+            factory=_build_three_way_junction_review_renderer,
         ),
     }
 )

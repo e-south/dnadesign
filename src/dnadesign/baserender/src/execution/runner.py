@@ -21,12 +21,15 @@ from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 from ..adapters import build_adapter, required_source_columns
 from ..config import (
     ImagesOutputCfg,
+    InputEnvelope,
     RenderJobV4,
     VideoOutputCfg,
     load_render_job,
     output_kind,
+    render_contract_descriptor,
     resolve_style,
 )
+from ..config.adapter_contracts import adapter_contract
 from ..core import Record, SchemaError, SkipRecord
 from ..io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
 from ..pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
@@ -45,9 +48,9 @@ def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
     return output.path
 
 
-def _prepare_bundle_publication(bundle_root: Path) -> _BundlePublication:
+def _prepare_bundle_publication(bundle_root: Path, *, sensitivity: str = "public") -> _BundlePublication:
     try:
-        return CreateOnlyDirectoryPublication.prepare(bundle_root)
+        return CreateOnlyDirectoryPublication.prepare(bundle_root, sensitivity=sensitivity)
     except PublicationError as exc:
         raise SchemaError(str(exc).replace("Artifact bundle", "Render bundle")) from exc
 
@@ -99,6 +102,36 @@ def _iter_records(job: RenderJobV4, report: RunReport, *, source_content: bytes)
             yield record
         except SkipRecord as skip:
             report.note_skip_row(str(skip) or "skip_record")
+
+
+def _validate_input_envelope(
+    job: RenderJobV4,
+    *,
+    source_content: bytes,
+    envelope: InputEnvelope | None,
+) -> None:
+    if envelope is None:
+        return
+    if job.input.kind not in envelope.accepted_input_kinds:
+        allowed = ", ".join(envelope.accepted_input_kinds)
+        raise SchemaError(f"contract input kind must be one of: {allowed}")
+
+    record_count = 0
+    base_count = 0
+    for row in iter_json_rows(job.input.path, content=source_content):
+        record_count += 1
+        if record_count > envelope.max_records:
+            raise SchemaError(f"Render source exceeds the maximum of {envelope.max_records} records")
+        value: object = row
+        for field in envelope.base_field_path:
+            if not isinstance(value, dict) or field not in value:
+                value = None
+                break
+            value = value[field]
+        if isinstance(value, str):
+            base_count += len(value)
+            if base_count > envelope.max_bases:
+                raise SchemaError(f"Render source exceeds the maximum of {envelope.max_bases} bases")
 
 
 def _sample_or_limit_unselected(records: Iterable[Record], job: RenderJobV4) -> Iterable[Record] | list[Record]:
@@ -154,7 +187,17 @@ def run_render_job(
         input_path=str(job.input.path),
         selection_path=str(job.selection.path) if job.selection else None,
     )
-    report.capture_source_evidence()
+    descriptor = render_contract_descriptor(job.contract.kind)
+    adapter_descriptor = adapter_contract(job.input.adapter.kind)
+    envelope = adapter_descriptor.input_envelope or descriptor.input_envelope
+    try:
+        if envelope is None:
+            report.capture_source_evidence()
+        else:
+            report.capture_source_evidence(input_max_bytes=envelope.max_bytes)
+    except ValueError as exc:
+        raise SchemaError(str(exc)) from exc
+    _validate_input_envelope(job, source_content=report.source_content("input"), envelope=envelope)
 
     style = resolve_style(preset=job.render.style_preset, overrides=job.render.style_overrides)
     from ..render import Palette
@@ -182,7 +225,8 @@ def run_render_job(
     records = _materialize_before_strict_outputs(records, job, report)
     report.release_source_content()
 
-    publication = _prepare_bundle_publication(job.bundle.path)
+    sensitivity = "private" if "private" in {descriptor.sensitivity, adapter_descriptor.sensitivity} else "public"
+    publication = _prepare_bundle_publication(job.bundle.path, sensitivity=sensitivity)
     original_job = job
     try:
         job = _staged_job(job, publication)

@@ -10,10 +10,12 @@ Module Author(s): Eric J. South
 """
 
 from .job_contracts import (
+    InputEnvelope,
     RenderContractDescriptor,
     render_contract_descriptor,
     render_contract_descriptors,
     render_contract_kinds,
+    render_contract_renderer_kinds,
     validate_render_contract_renderer,
 )
 from .jobs.base_render_v4 import (
@@ -67,6 +69,7 @@ __all__ = [
     "RenderJobV4",
     "RenderContractCfg",
     "RenderContractDescriptor",
+    "InputEnvelope",
     "InputCfg",
     "AdapterCfg",
     "SampleCfg",
@@ -88,5 +91,6 @@ __all__ = [
     "render_contract_descriptor",
     "render_contract_descriptors",
     "render_contract_kinds",
+    "render_contract_renderer_kinds",
     "validate_render_contract_renderer",
 ]

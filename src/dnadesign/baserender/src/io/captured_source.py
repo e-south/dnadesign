@@ -29,7 +29,7 @@ class CapturedSource:
     fingerprint: tuple[int, int, int, int, int]
 
     @classmethod
-    def capture(cls, path: str | Path) -> CapturedSource:
+    def capture(cls, path: str | Path, *, max_bytes: int | None = None) -> CapturedSource:
         source_path = Path(path)
         flags = os.O_RDONLY
         if hasattr(os, "O_NOFOLLOW"):
@@ -42,8 +42,12 @@ class CapturedSource:
             before = os.fstat(descriptor)
             if not stat.S_ISREG(before.st_mode):
                 raise ValueError(f"Render source is unavailable or unsafe: {source_path}")
+            if max_bytes is not None and before.st_size > max_bytes:
+                raise ValueError(f"Render source exceeds the maximum of {max_bytes} bytes: {source_path}")
             with os.fdopen(os.dup(descriptor), "rb") as handle:
-                content = handle.read()
+                content = handle.read() if max_bytes is None else handle.read(max_bytes + 1)
+            if max_bytes is not None and len(content) > max_bytes:
+                raise ValueError(f"Render source exceeds the maximum of {max_bytes} bytes: {source_path}")
             after = os.fstat(descriptor)
             before_fingerprint = _fingerprint(before)
             after_fingerprint = _fingerprint(after)

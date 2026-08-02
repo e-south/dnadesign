@@ -34,6 +34,7 @@ from .adapter_contracts import adapter_contract, normalize_adapter_config
 from .job_contracts import (
     DEFAULT_RENDER_CONTRACT_KIND,
     render_contract_descriptor,
+    render_contract_renderer_kinds,
     validate_render_contract_renderer,
 )
 
@@ -625,7 +626,7 @@ def _parse_render(raw: Any) -> RenderCfg:
     renderer = str(data.get("renderer", "")).strip()
     require_one_of(
         renderer,
-        {"sequence_rows", "nucleotide_evidence_map", "hairpin_cartoon", "topology_cartoon", "snapback_map"},
+        set(render_contract_renderer_kinds()),
         "render.renderer",
     )
 
