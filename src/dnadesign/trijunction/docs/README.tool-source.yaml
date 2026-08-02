@@ -1,0 +1,29 @@
+schema_version: 1
+catalog_order: 14
+tool: trijunction
+summary: Plans checked three-way-junction oligos from exact DNA targets and verifies each published bundle.
+keywords:
+  - three-way junction
+  - oligo planning
+  - deterministic design
+  - Sidewinder
+  - bundle verification
+routes:
+  - id: getting-started
+    path: getting-started.md
+    summary: Run the preflight, plan, build, and verify lifecycle on a synthetic request.
+  - id: request-shapes
+    path: guides/request-shapes.md
+    summary: Choose one target, a jointly designed physical pool, or independent pools.
+  - id: scale-and-review
+    path: guides/scale-and-review.md
+    summary: Preflight larger requests and route optional visual quality review.
+  - id: contracts
+    path: reference/contracts.md
+    summary: Review request, design, plan, bundle, and failure contracts.
+  - id: method
+    path: reference/method.md
+    summary: Inspect paper-grounded geometry, strand orientation, string objectives, recovery evidence, and explicit v1 policy.
+  - id: sources
+    path: reference/sources.md
+    summary: Trace the Sidewinder literature and TriJunction implementation boundary.

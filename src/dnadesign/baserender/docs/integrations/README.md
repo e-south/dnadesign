@@ -1,7 +1,7 @@
 # Integration Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-02
 
 
 This section contains tool-specific contracts between upstream producers and `baserender`.
@@ -13,6 +13,7 @@ Use these pages when wiring a specific producer schema to BaseRender adapters an
 - `densegen`: `docs/integrations/densegen.md`
 - `cruncher`: `docs/integrations/cruncher.md`
 - `yiu`: `docs/integrations/yiu.md`
+- `trijunction`: `docs/integrations/trijunction.md`
 
 ## Scope boundary
 

@@ -2,13 +2,13 @@
 doc_id: documentation-index
 surface: docs-router
 owner: dnadesign-maintainers
-last_verified: 2026-06-30
+last_verified: 2026-08-02
 ---
 
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-30
+**Last verified:** 2026-08-02
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -27,8 +27,8 @@ Start with:
 
 Use this table when the first question is "what is available right now?"
 rather than "which workflow should I run?" It lists durable workspace and
-dataset roots only. Folding is workspace-less and consumes producer-owned
-bundles. BaseRender can run optional demo/ad hoc workspaces, but most
+dataset roots only. Folding reads producer-owned bundles and does not create a
+workspace. BaseRender can run optional examples and one-off jobs, but most
 cross-tool use should target producer-emitted render job files or visual
 contracts.
 
@@ -97,7 +97,7 @@ columns. Prefer workspace/dataset routers for user work; call artifact services
 such as `folding` only when a producer has already emitted the required
 contract artifacts or bundle manifest.
 
-#### Workspace and analysis tools
+#### Design, workspace, and analysis tools
 
 | Tool | CLI | Docs |
 | --- | --- | --- |
@@ -107,6 +107,7 @@ contract artifacts or bundle manifest.
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
 | `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
+| `trijunction` | `uv run trijunction --help` | [TriJunction docs](../src/dnadesign/trijunction/docs/README.md); plans oligos directly from a request file |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `libshuffle` | n/a | [libshuffle docs](../src/dnadesign/libshuffle/docs/README.md) |
@@ -120,8 +121,8 @@ contract artifacts or bundle manifest.
 
 | Tool | CLI | Docs |
 | --- | --- | --- |
-| `baserender` | `uv run baserender --help` | [baserender README](../src/dnadesign/baserender/README.md); contract renderer, job files, optional demo/ad hoc workspaces |
-| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); workspace-less service |
+| `baserender` | `uv run baserender --help` | [baserender README](../src/dnadesign/baserender/README.md); draws producer-supplied visual records from job files |
+| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); predicts structures from producer-owned bundles without creating a workspace |
 
 #### Operator surfaces
 
