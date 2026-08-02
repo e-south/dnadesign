@@ -10,7 +10,10 @@ Module Author(s): Eric J. South
 """
 
 MAX_TOEHOLD_CACHE_BYTES = 256 * 1024 * 1024
-MAX_TOEHOLD_DISTANCE_LOOKUPS = 1_000_000_000
+# Two explicit streamed passes preserve the former admitted search shapes:
+# one pass discovers per-trial maxima and one reads cached distances to form
+# exact fixed-point weights. The DP-cell ceiling still bounds computations.
+MAX_TOEHOLD_DISTANCE_LOOKUPS = 2_000_000_000
 MAX_TOEHOLD_SEARCH_STATE_BYTES = 64 * 1024 * 1024
 MAX_TOEHOLD_ENCODED_BASES = 64 * 1024 * 1024
 MAX_TOEHOLD_DP_CELLS = 2_000_000_000
@@ -21,6 +24,10 @@ MAX_BARCODE_DISTANCE_CACHE_BYTES = 128 * 1024 * 1024
 MAX_BARCODE_DP_CELLS = 1_000_000_000
 MAX_BARCODE_SUBSET_LOOKUPS = 100_000_000
 MAX_BARCODE_SUBSET_STATE_BYTES = 64 * 1024 * 1024
+
+# Peak transient work for one cache-backed pair-distance batch. Retained
+# triangular caches have separate limits above.
+MAX_PAIR_DISTANCE_SCRATCH_BYTES = 64 * 1024 * 1024
 
 MAX_MATCHING_SUBSTRING_CHARACTER_VISITS = 750_000_000
 MAX_MATCHING_STATE_BYTES = 64 * 1024 * 1024

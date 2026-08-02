@@ -194,14 +194,21 @@ def sampled_toehold_search_state_bytes(*, iterations: int, candidate_counts: tup
     return max(array_peak, scoring_peak)
 
 
-def estimated_toehold_distance_lookups(candidate_counts: tuple[int, ...], iterations: int) -> int:
-    """Return search-construction plus final unique-path scoring lookups."""
-
+def _toehold_lookup_components(candidate_counts: tuple[int, ...], iterations: int) -> tuple[int, int]:
     locus_count = len(candidate_counts)
     path_pairs = locus_count * (locus_count - 1) // 2
     construction_lookups = iterations * sum(index * count for index, count in enumerate(sorted(candidate_counts)))
     scoring_lookups = capped_toehold_path_count(candidate_counts, iterations=iterations) * path_pairs
-    return construction_lookups + scoring_lookups
+    return construction_lookups, scoring_lookups
+
+
+def estimated_toehold_distance_lookups(candidate_counts: tuple[int, ...], iterations: int) -> int:
+    """Return two-pass search construction plus final path-scoring lookups."""
+
+    construction_lookups, scoring_lookups = _toehold_lookup_components(candidate_counts, iterations)
+    # Exact fixed-point choice weights require a maximum pass followed by a
+    # cache-only contribution pass over the same construction pairs.
+    return 2 * construction_lookups + scoring_lookups
 
 
 def estimated_toehold_dp_cells(
@@ -214,10 +221,9 @@ def estimated_toehold_dp_cells(
 
     candidate_count = sum(candidate_counts)
     candidate_pairs = candidate_count * (candidate_count - 1) // 2
-    unique_pairs = min(
-        candidate_pairs,
-        estimated_toehold_distance_lookups(candidate_counts, iterations),
-    )
+    construction_lookups, scoring_lookups = _toehold_lookup_components(candidate_counts, iterations)
+    # The second construction pass is cache-only and cannot add a DP pair.
+    unique_pairs = min(candidate_pairs, construction_lookups + scoring_lookups)
     return unique_pairs * 2 * sequence_length * sequence_length
 
 

@@ -148,7 +148,7 @@ request:
 | --- | ---: | ---: |
 | Toehold encoded bases | 67,108,864 | 268,435,456 |
 | Toehold distance-cache bytes | 268,435,456 | 1,073,741,824 |
-| Toehold distance lookups | 1,000,000,000 | 4,000,000,000 |
+| Toehold distance lookups | 2,000,000,000 | 8,000,000,000 |
 | Toehold dynamic-programming cells | 2,000,000,000 | 8,000,000,000 |
 | Toehold sampled-state bytes | 67,108,864 | 268,435,456 |
 | Barcode-generation base visits | 250,000,000 | 1,000,000,000 |
@@ -162,7 +162,11 @@ request:
 | Matching sampled-state bytes | 67,108,864 | 268,435,456 |
 
 These are deterministic software envelopes, not forecasts of wall-clock time
-or available host memory. Substring character visits conservatively count both
+or available host memory. Toehold lookup totals include both streamed search
+passes: one discovers each trial's maximum and one reads the resulting cached
+distances to form exact fixed-point choice weights. Dynamic-programming cells
+count only pairs that can require computation; the second pass is cache-only.
+Substring character visits conservatively count both
 copying and hashing every materialized character, including the two fixed
 lower-bound scans. The first exceeded dimension fails before its large state
 is materialized. Lower an explicit budget or split only genuinely independent

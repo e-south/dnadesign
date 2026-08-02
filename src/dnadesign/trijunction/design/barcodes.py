@@ -23,15 +23,41 @@ from dnadesign.trijunction.sequence import (
     reverse_complement,
     validate_dna,
 )
-from dnadesign.trijunction.sequence.distances import _levenshtein_distance_encoded_many
+from dnadesign.trijunction.sequence.distances import (
+    _levenshtein_chunk_size,
+    _levenshtein_distance_encoded_many,
+    _levenshtein_scratch_bytes,
+)
 
 from .randomness import StablePrng
-from .resources import guard_barcode_generation, guard_barcode_subset_search
+from .resources import (
+    MAX_PAIR_DISTANCE_SCRATCH_BYTES,
+    guard_barcode_generation,
+    guard_barcode_subset_search,
+    pair_lookup_scratch_bytes,
+    upper_triangle_index_batches,
+)
 from .scoring import rank_aggregate_maximin
 
 # This ordering is part of the v1 seeded-search contract, not biological order.
 _DNA = "AGTC"
 _UNSET_BARCODE_DISTANCE = np.iinfo(np.uint16).max
+
+
+def _barcode_pair_scratch_bytes(pair_count: int, sequence_length: int) -> int:
+    """Estimate DP plus pair-index/cache scratch for one barcode batch."""
+
+    return _levenshtein_scratch_bytes(pair_count, sequence_length) + pair_lookup_scratch_bytes(pair_count)
+
+
+def _barcode_pair_chunk_size(sequence_length: int) -> int:
+    """Return one barcode pair batch inside the combined scratch budget."""
+
+    return _levenshtein_chunk_size(
+        sequence_length,
+        additional_per_pair_bytes=pair_lookup_scratch_bytes(1),
+        budget_bytes=MAX_PAIR_DISTANCE_SCRATCH_BYTES,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,38 +193,64 @@ class _BarcodeDistanceCache:
         upper = np.maximum(left, right)
         return self._size * lower - lower * (lower + 1) // 2 + (upper - lower - 1)
 
+    @property
+    def pair_chunk_size(self) -> int:
+        return _barcode_pair_chunk_size(self._encoded.shape[1])
+
     def distances(self, left: np.ndarray, right: np.ndarray) -> np.ndarray:
         if left.shape != right.shape:
             raise ValueError("barcode-index arrays must have equal shape")
         output = np.zeros(left.shape, dtype=np.uint16)
-        distinct_mask = left != right
-        if not np.any(distinct_mask):
+        if output.size == 0:
             return output
-        distinct_left = left[distinct_mask].astype(np.int64, copy=False)
-        distinct_right = right[distinct_mask].astype(np.int64, copy=False)
-        flat_indices = self._flat_indices(distinct_left, distinct_right)
-        missing_positions = np.flatnonzero(self._values[flat_indices] == _UNSET_BARCODE_DISTANCE)
-        if missing_positions.size:
-            missing_flat = flat_indices[missing_positions]
-            unique_flat, first_offsets = np.unique(missing_flat, return_index=True)
-            first_positions = missing_positions[first_offsets]
-            values = _levenshtein_distance_encoded_many(
-                self._encoded[distinct_left[first_positions]],
-                self._encoded[distinct_right[first_positions]],
-            )
-            self._values[unique_flat] = values.astype(np.uint16)
-        output[distinct_mask] = self._values[flat_indices]
+
+        output_flat = output.reshape(-1)
+        left_flat = left.reshape(-1) if left.flags.c_contiguous else None
+        right_flat = right.reshape(-1) if right.flags.c_contiguous else None
+        pair_chunk_size = self.pair_chunk_size
+        for start in range(0, output.size, pair_chunk_size):
+            stop = min(start + pair_chunk_size, output.size)
+            output_chunk = output_flat[start:stop]
+            chunk_left = left_flat[start:stop] if left_flat is not None else left.flat[start:stop]
+            chunk_right = right_flat[start:stop] if right_flat is not None else right.flat[start:stop]
+            distinct_mask = chunk_left != chunk_right
+            if not np.any(distinct_mask):
+                continue
+            distinct_left = chunk_left[distinct_mask].astype(np.int64, copy=False)
+            distinct_right = chunk_right[distinct_mask].astype(np.int64, copy=False)
+            flat_indices = self._flat_indices(distinct_left, distinct_right)
+            missing_positions = np.flatnonzero(self._values[flat_indices] == _UNSET_BARCODE_DISTANCE)
+            if missing_positions.size:
+                missing_flat = flat_indices[missing_positions]
+                still_missing = self._values[missing_flat] == _UNSET_BARCODE_DISTANCE
+                positions = missing_positions[still_missing]
+                missing_flat = missing_flat[still_missing]
+                if positions.size:
+                    unique_flat, first_offsets = np.unique(missing_flat, return_index=True)
+                    first_positions = positions[first_offsets]
+                    values = _levenshtein_distance_encoded_many(
+                        self._encoded[distinct_left[first_positions]],
+                        self._encoded[distinct_right[first_positions]],
+                    )
+                    self._values[unique_flat] = values.astype(np.uint16)
+            output_chunk[distinct_mask] = self._values[flat_indices]
         return output
 
 
 def _subset_score_indices(indices: tuple[int, ...], cache: _BarcodeDistanceCache) -> tuple[int, Fraction]:
     if len(indices) < 2:
         return (0, Fraction(0))
-    row, column = np.triu_indices(len(indices), 1)
-    values = np.asarray(indices, dtype=np.int64)
-    distances = cache.distances(values[row], values[column])
-    total = sum(int(distance) for distance in distances)
-    return (int(distances.min()), Fraction(total, len(distances)))
+    minimum: int | None = None
+    total = 0
+    pair_count = 0
+    for left, right in upper_triangle_index_batches(indices, batch_size=cache.pair_chunk_size):
+        distances = cache.distances(left, right)
+        batch_minimum = int(distances.min())
+        minimum = batch_minimum if minimum is None else min(minimum, batch_minimum)
+        total += sum(int(distance) for distance in distances)
+        pair_count += len(distances)
+    assert minimum is not None
+    return (minimum, Fraction(total, pair_count))
 
 
 def select_barcodes(

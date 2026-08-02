@@ -150,10 +150,10 @@ def guard_uniform_toehold_search(
     if requested_lookups > MAX_TOEHOLD_DISTANCE_LOOKUPS:
         raise TriJunctionDesignError(
             "Toehold search exceeds the explicit CPU envelope: "
-            f"{locus_count} loci, {iterations} iterations, at most {requested_lookups} distance lookups; "
-            f"limit {MAX_TOEHOLD_DISTANCE_LOOKUPS}. Lower the declared toehold_search_iterations, or use "
-            "separate pool IDs only for physically independent reactions; TriJunction does not run an "
-            "unbounded search."
+            f"{locus_count} loci, {iterations} iterations, at most {requested_lookups} distance-cache "
+            f"lookups across both exact-weight passes and final scoring; limit {MAX_TOEHOLD_DISTANCE_LOOKUPS}. "
+            "Lower the declared toehold_search_iterations, or use separate pool IDs only for physically "
+            "independent reactions; TriJunction does not run an unbounded search."
         )
     dp_cells = estimated_toehold_dp_cells(
         candidate_counts,

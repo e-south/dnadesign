@@ -9,6 +9,13 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+from .batching import (
+    pair_lookup_scratch_bytes,
+    pair_selection_fixed_scratch_bytes,
+    pair_selection_reduction_chunk_size,
+    pair_selection_reduction_scratch_bytes,
+    upper_triangle_index_batches,
+)
 from .estimates import (
     RequestWorkloadEstimate,
     barcode_distance_cache_bytes,
@@ -32,12 +39,14 @@ from .guards import (
     guard_uniform_toehold_search,
 )
 from .limits import (
+    MAX_PAIR_DISTANCE_SCRATCH_BYTES,
     MAX_REQUEST_BARCODE_GENERATION_BASE_VISITS,
     MAX_TOEHOLD_CACHE_BYTES,
     REQUEST_WORKLOAD_POLICY,
 )
 
 __all__ = [
+    "MAX_PAIR_DISTANCE_SCRATCH_BYTES",
     "MAX_REQUEST_BARCODE_GENERATION_BASE_VISITS",
     "MAX_TOEHOLD_CACHE_BYTES",
     "REQUEST_WORKLOAD_POLICY",
@@ -55,8 +64,13 @@ __all__ = [
     "guard_request_workload",
     "guard_uniform_toehold_search",
     "kmer_set_state_bytes",
+    "pair_lookup_scratch_bytes",
+    "pair_selection_fixed_scratch_bytes",
+    "pair_selection_reduction_chunk_size",
+    "pair_selection_reduction_scratch_bytes",
     "sampled_barcode_subset_state_bytes",
     "sampled_matching_state_bytes",
     "sampled_toehold_search_state_bytes",
     "toehold_distance_cache_bytes",
+    "upper_triangle_index_batches",
 ]

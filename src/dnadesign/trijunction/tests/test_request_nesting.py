@@ -1,4 +1,13 @@
-"""Regression coverage for deeply nested request documents."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/trijunction/tests/test_request_nesting.py
+
+Regression coverage for deeply nested request documents.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
