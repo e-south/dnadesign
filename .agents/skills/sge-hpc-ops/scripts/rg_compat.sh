@@ -6,6 +6,7 @@ fi
 
 rg() {
   local fixed=0
+  local recursive=0
   local grep_opts=()
   while (($#)); do
     case "$1" in
@@ -47,6 +48,19 @@ rg() {
         ;;
     esac
   done
+
+  local argument_index=0
+  local argument
+  for argument in "$@"; do
+    argument_index=$((argument_index + 1))
+    if ((argument_index > 1)) && [[ -d "$argument" ]]; then
+      recursive=1
+      break
+    fi
+  done
+  if ((recursive)); then
+    grep_opts+=("-r")
+  fi
 
   if (( fixed )); then
     command grep -F "${grep_opts[@]}" -- "$@"

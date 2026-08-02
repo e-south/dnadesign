@@ -703,7 +703,7 @@ if not dates:
     raise SystemExit(1)
 
 max_age_days = 45
-today = datetime.date.today()
+today = datetime.datetime.now(datetime.timezone.utc).date()
 errors = []
 for raw in sorted(set(dates)):
     try:
