@@ -10,10 +10,11 @@ Module Author(s): Eric J. South
 """
 
 from .actor import _default_actor, _normalize_actor
+from .append import EventAppendFailure, EventAppendState, append_event_line
 from .defaults import USR_EVENT_VERSION, _event_defaults
 from .fingerprint import _sha256_file, fingerprint_parquet
 from .gardening import EventLogGardenResult, garden_event_log
-from .recording import record_event
+from .recording import EventAppendAttempt, PreparedEvent, prepare_event, record_event, validate_event_metadata
 from .redaction import _arg_key_is_sensitive, _redact_arg_value, _redact_args
 
 __all__ = [
@@ -25,8 +26,15 @@ __all__ = [
     "_redact_arg_value",
     "_redact_args",
     "_sha256_file",
+    "append_event_line",
+    "EventAppendFailure",
+    "EventAppendAttempt",
+    "EventAppendState",
     "EventLogGardenResult",
     "fingerprint_parquet",
     "garden_event_log",
+    "prepare_event",
+    "PreparedEvent",
     "record_event",
+    "validate_event_metadata",
 ]

@@ -19,6 +19,7 @@ import pytest
 
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.usr import USR_EVENT_VERSION, Dataset
+from dnadesign.usr.src.events import EventAppendAttempt, prepare_event
 
 
 def test_event_schema_includes_actor_and_registry_hash(tmp_path: Path) -> None:
@@ -157,6 +158,40 @@ def test_event_schema_normalizes_explicit_actor_tool_and_run_id(tmp_path: Path) 
     assert payload["actor"]["run_id"] == "run-3"
     assert payload["actor"]["host"] == "host-c"
     assert payload["actor"]["pid"] == 303
+
+
+def test_prepared_event_defers_one_append_attempt(tmp_path: Path) -> None:
+    root = tmp_path / "datasets"
+    register_test_namespace(root, namespace="mock", columns_spec="mock__score:float64")
+    ds = Dataset(root, "demo")
+    ds.init(source="unit-test")
+    events_before = ds.events_path.read_bytes()
+
+    attempt = EventAppendAttempt(
+        prepare_event(
+            "custom_action",
+            dataset=ds.name,
+            target_path=ds.records_path,
+            dataset_root=ds.root,
+        )
+    )
+
+    assert not attempt.started
+    assert not attempt.completed
+    assert ds.events_path.read_bytes() == events_before
+
+    attempt.append_to(ds.events_path)
+
+    assert attempt.started
+    assert attempt.completed
+    events_after = ds.events_path.read_bytes()
+    assert events_after.startswith(events_before)
+    payload = json.loads(events_after.decode("utf-8").splitlines()[-1])
+    assert payload["action"] == "custom_action"
+    assert payload["dataset"]["name"] == ds.name
+    with pytest.raises(RuntimeError, match="already been attempted"):
+        attempt.append_to(ds.events_path)
+    assert ds.events_path.read_bytes() == events_after
 
 
 def test_usr_public_api_exports_event_version() -> None:

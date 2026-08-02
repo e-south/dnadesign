@@ -11,13 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
-from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..contracts import VerificationError
-from ..events import record_event
+from ..events.append import event_log_lock
 from ..storage.locking import dataset_write_lock
 from .remote import execution as sync_execution
 from .remote.config import get_remote
@@ -25,12 +23,14 @@ from .remote.diff import (
     DiffSummary,
     FileStat,
     compute_diff,
+    event_content_changed,
     parquet_stats,
     resolve_verify_mode,
     verify_primary_match,
 )
 from .remote.remote import RemoteDatasetStat, SSHRemote
 from .remote.sidecars import ensure_sidecar_verify_compatible
+from .remote.transfer import capture_validated_event_log_content_revision
 
 
 @dataclass
@@ -42,9 +42,6 @@ class SyncOptions:
     verify: str = "auto"
     verify_sidecars: bool = False
     verify_derived_hashes: bool = False
-
-
-_SYNC_ONLY_ACTIONS = {"pull", "push", "pull_file", "push_file"}
 
 
 def _ensure_sidecar_verify_compatible(opts: SyncOptions) -> None:
@@ -59,8 +56,29 @@ def _ensure_sidecar_verify_compatible(opts: SyncOptions) -> None:
 def _remote_dataset_lock(remote: SSHRemote, dataset: str):
     lock_fn = getattr(remote, "dataset_transfer_lock", None)
     if lock_fn is None:
-        return nullcontext()
+        raise VerificationError(f"Remote transport cannot lease the dataset for transfer: {dataset}")
     return lock_fn(dataset)
+
+
+def _remote_event_log_lock(remote: SSHRemote, dataset: str):
+    lock_fn = getattr(remote, "event_log_transfer_lock", None)
+    if lock_fn is None:
+        raise VerificationError(f"Remote transport cannot lease the event log for full push: {dataset}")
+    return lock_fn(dataset)
+
+
+def _remote_event_log_revision(remote: SSHRemote, dataset: str, event_lease: object):
+    revision_fn = getattr(remote, "event_log_revision", None)
+    if revision_fn is None:
+        raise VerificationError(f"Remote transport cannot verify the event log for full push: {dataset}")
+    return revision_fn(dataset, event_lease=event_lease)
+
+
+def _remote_event_log_observation(remote: SSHRemote, dataset: str):
+    observe_fn = getattr(remote, "observe_event_log_revision", None)
+    if observe_fn is None:
+        raise VerificationError(f"Remote transport cannot inspect the event-log content revision: {dataset}")
+    return observe_fn(dataset)
 
 
 def _plan_diff_with_remote(
@@ -70,6 +88,7 @@ def _plan_diff_with_remote(
     *,
     verify: str,
     include_derived_hashes: bool = False,
+    include_event_content: bool = True,
 ) -> tuple[DiffSummary, RemoteDatasetStat]:
     remote_stat = remote.stat_dataset(dataset, verify=verify, include_derived_hashes=include_derived_hashes)
     verify_mode, notes = resolve_verify_mode(verify, remote_stat.primary)
@@ -80,29 +99,13 @@ def _plan_diff_with_remote(
         verify_mode=verify_mode,
         verify_notes=notes,
     )
+    if include_event_content:
+        local_event_revision = capture_validated_event_log_content_revision(Path(root) / dataset / ".events.log")
+        remote_event_revision = _remote_event_log_observation(remote, dataset)
+        content_diff = event_content_changed(local_event_revision, remote_event_revision)
+        summary.changes["events_content_diff"] = content_diff
+        summary.has_change = bool(summary.has_change or content_diff)
     return summary, remote_stat
-
-
-def _event_delta_requires_push(events_path: Path, *, remote_lines: int) -> bool:
-    events_path = Path(events_path)
-    if not events_path.exists():
-        return False
-    start_line = max(0, int(remote_lines))
-    with events_path.open("r", encoding="utf-8") as handle:
-        for index, raw_line in enumerate(handle):
-            if index < start_line:
-                continue
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise VerificationError(f"Failed to parse local event log line {index + 1}: {events_path}") from exc
-            action = str(payload.get("action", "")).strip()
-            if action and action not in _SYNC_ONLY_ACTIONS:
-                return True
-    return False
 
 
 def _verify_after_pull(local_dir: Path, summary: DiffSummary) -> None:
@@ -142,12 +145,11 @@ def _runtime() -> sync_execution.SyncRuntime:
         plan_diff_with_remote=_plan_diff_with_remote,
         verify_after_pull=_verify_after_pull,
         verify_after_push=_verify_after_push,
-        event_delta_requires_push=lambda events_path, remote_lines: _event_delta_requires_push(
-            events_path,
-            remote_lines=remote_lines,
-        ),
         dataset_write_lock=dataset_write_lock,
-        record_event=record_event,
+        event_log_lock=event_log_lock,
+        remote_event_log_lock=_remote_event_log_lock,
+        remote_event_log_revision=_remote_event_log_revision,
+        remote_event_log_observation=_remote_event_log_observation,
     )
 
 

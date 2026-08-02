@@ -77,6 +77,7 @@ PACKAGE_FILES = {
     ("events",): {
         "__init__.py",
         "actor.py",
+        "append.py",
         "defaults.py",
         "fingerprint.py",
         "gardening.py",
@@ -147,6 +148,7 @@ PACKAGE_FILES = {
         "config.py",
         "diff.py",
         "execution.py",
+        "locks.py",
         "remote.py",
         "sidecars.py",
         "transfer.py",

@@ -133,11 +133,14 @@ def test_remotes_doctor_reports_success(tmp_path: Path, monkeypatch) -> None:
             return f"/usr/bin/{name}"
         return None
 
+    commands: list[str] = []
+
     class _FakeRemote:
         def __init__(self, _cfg):
             pass
 
         def _ssh_run(self, remote_cmd: str, check: bool = True):
+            commands.append(remote_cmd)
             if "command -v rsync" in remote_cmd or "command -v flock" in remote_cmd:
                 return 0, "", ""
             if "test -d" in remote_cmd:
@@ -151,6 +154,50 @@ def test_remotes_doctor_reports_success(tmp_path: Path, monkeypatch) -> None:
     result = runner.invoke(cli_module.app, ["remotes", "doctor", "--remote", "bu-scc"])
     assert result.exit_code == 0, result.output
     assert "doctor checks passed" in result.output.lower()
+    assert "Remote process identity: ok" in result.output
+    assert 'test -n "$(LC_ALL=C TZ=UTC0 ps -o lstart= -p "$$" 2>/dev/null | tr -d \'[:space:]\')"' in commands
+
+
+def test_remotes_doctor_rejects_missing_process_start_identity(tmp_path: Path, monkeypatch) -> None:
+    remotes_path = tmp_path / "config" / "usr-remotes.yaml"
+    _write_remotes(
+        remotes_path,
+        text=(
+            "remotes:\n"
+            "  bu-scc:\n"
+            "    type: ssh\n"
+            "    host: scc1.bu.edu\n"
+            "    user: alice\n"
+            "    base_dir: /project/alice/usr_datasets\n"
+        ),
+    )
+    monkeypatch.setenv("USR_REMOTES_PATH", str(remotes_path))
+
+    monkeypatch.setattr(
+        cli_module.shutil,
+        "which",
+        lambda name: f"/usr/bin/{name}" if name in {"ssh", "rsync"} else None,
+    )
+
+    class _FakeRemote:
+        def __init__(self, _cfg):
+            pass
+
+        def _ssh_run(self, remote_cmd: str, check: bool = True):
+            del check
+            if "ps -o lstart=" in remote_cmd:
+                return 1, "", ""
+            return 0, "", ""
+
+    monkeypatch.setattr(cli_module, "SSHRemote", _FakeRemote)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_module.app, ["remotes", "doctor", "--remote", "bu-scc"])
+
+    assert result.exit_code != 0
+    assert "Remote process-start identity is unavailable" in result.output
+    assert "LC_ALL=C TZ=UTC0 ps -o lstart= -p $$" in result.output
+    assert "Doctor checks passed" not in result.output
 
 
 def test_remotes_doctor_guides_keyboard_interactive_auth(tmp_path: Path, monkeypatch) -> None:

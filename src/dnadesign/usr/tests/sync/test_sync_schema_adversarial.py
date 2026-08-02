@@ -25,6 +25,10 @@ from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.contracts import REQUIRED_COLUMNS, VerificationError
 from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
+from dnadesign.usr.src.sync.remote.transfer import (
+    EventLogContentRevision,
+    capture_locked_event_log_content_revision,
+)
 
 
 def _write_records(path: Path, rows: int) -> None:
@@ -56,6 +60,42 @@ def _row(sequence: str, source: str) -> dict[str, str]:
         "alphabet": "dna_4",
         "source": source,
     }
+
+
+def _install_remote_event_transport(
+    monkeypatch: pytest.MonkeyPatch,
+    local_event_path: Path,
+) -> None:
+    revision_calls = 0
+
+    @contextmanager
+    def remote_event_lock(_remote: object, _dataset: str):
+        yield object()
+
+    def remote_event_revision(_remote: object, _dataset: str, event_lease: object):
+        nonlocal revision_calls
+        assert event_lease is not None
+        revision_calls += 1
+        if revision_calls == 1:
+            return EventLogContentRevision(exists=False, size_bytes=0, sha256=None)
+        return capture_locked_event_log_content_revision(local_event_path)
+
+    monkeypatch.setattr(sync_module, "_remote_event_log_lock", remote_event_lock)
+    monkeypatch.setattr(sync_module, "_remote_event_log_revision", remote_event_revision)
+    monkeypatch.setattr(
+        sync_module,
+        "_remote_event_log_observation",
+        lambda _remote, _dataset: EventLogContentRevision(exists=False, size_bytes=0, sha256=None),
+    )
+
+
+class _NoopDatasetLeaseRemote:
+    @contextmanager
+    def dataset_transfer_lock(self, _dataset: str):
+        yield
+
+    def observe_event_log_revision(self, _dataset: str) -> EventLogContentRevision:
+        return EventLogContentRevision(exists=False, size_bytes=0, sha256=None)
 
 
 def test_execute_pull_file_fails_on_post_transfer_parquet_row_mismatch(tmp_path: Path, monkeypatch) -> None:
@@ -150,7 +190,7 @@ def test_execute_pull_rejects_staged_symlink_payload_without_mutating_local_prim
     remote_records = tmp_path / "remote_records.parquet"
     _write_records(remote_records, rows=2)
 
-    class _Remote:
+    class _Remote(_NoopDatasetLeaseRemote):
         def __init__(self, _cfg) -> None:
             pass
 
@@ -266,6 +306,14 @@ def test_execute_pull_verify_sidecars_rejects_mismatched_staged_sidecars_before_
                 snapshot_names=snapshot_names,
             )
 
+        def observe_event_log_revision(self, _dataset: str) -> EventLogContentRevision:
+            payload = (remote_root / dataset_id / ".events.log").read_bytes()
+            return EventLogContentRevision(
+                exists=True,
+                size_bytes=len(payload),
+                sha256=hashlib.sha256(payload).hexdigest(),
+            )
+
         def pull_to_local(
             self,
             _dataset: str,
@@ -345,13 +393,19 @@ def test_execute_push_verify_sidecars_fails_when_remote_sidecars_do_not_match_lo
             primary_only: bool = False,
             skip_snapshots: bool = False,
             dry_run: bool = False,
+            event_lease: object | None = None,
         ) -> None:
             assert dry_run is False
             assert primary_only is False
             assert skip_snapshots is False
+            assert event_lease is not None
 
     monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
     monkeypatch.setattr(sync_module, "SSHRemote", _Remote)
+    _install_remote_event_transport(
+        monkeypatch,
+        root / "densegen_demo_sidecar_push" / ".events.log",
+    )
 
     with pytest.raises(VerificationError, match="post-push-sidecars"):
         sync_module.execute_push(
@@ -373,7 +427,7 @@ def test_execute_pull_verify_sidecars_rejects_missing_derived_overlay_payload(tm
     remote_size = int(remote_records.stat().st_size)
     remote_mtime = str(int(remote_records.stat().st_mtime))
 
-    class _Remote:
+    class _Remote(_NoopDatasetLeaseRemote):
         def __init__(self, _cfg) -> None:
             pass
 
@@ -485,13 +539,16 @@ def test_execute_push_verify_sidecars_rejects_remote_missing_derived_overlay_inv
             primary_only: bool = False,
             skip_snapshots: bool = False,
             dry_run: bool = False,
+            event_lease: object | None = None,
         ) -> None:
             assert dry_run is False
             assert primary_only is False
             assert skip_snapshots is False
+            assert event_lease is not None
 
     monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
     monkeypatch.setattr(sync_module, "SSHRemote", _Remote)
+    _install_remote_event_transport(monkeypatch, local_dataset_dir / ".events.log")
 
     with pytest.raises(VerificationError, match=r"post-push-sidecars: sidecar mismatch; .*_derived"):
         sync_module.execute_push(
@@ -513,7 +570,7 @@ def test_execute_pull_verify_sidecars_rejects_missing_auxiliary_payload(tmp_path
     remote_size = int(remote_records.stat().st_size)
     remote_mtime = str(int(remote_records.stat().st_mtime))
 
-    class _Remote:
+    class _Remote(_NoopDatasetLeaseRemote):
         def __init__(self, _cfg) -> None:
             pass
 
@@ -622,13 +679,16 @@ def test_execute_push_verify_sidecars_rejects_remote_missing_auxiliary_inventory
             primary_only: bool = False,
             skip_snapshots: bool = False,
             dry_run: bool = False,
+            event_lease: object | None = None,
         ) -> None:
             assert dry_run is False
             assert primary_only is False
             assert skip_snapshots is False
+            assert event_lease is not None
 
     monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
     monkeypatch.setattr(sync_module, "SSHRemote", _Remote)
+    _install_remote_event_transport(monkeypatch, local_dataset_dir / ".events.log")
 
     with pytest.raises(VerificationError, match=r"post-push-sidecars: sidecar mismatch; .*auxiliary"):
         sync_module.execute_push(
@@ -652,7 +712,7 @@ def test_execute_pull_verify_derived_hashes_rejects_mismatched_overlay_hashes(tm
     remote_derived = tmp_path / "remote_derived.parquet"
     remote_derived.write_bytes(b"remote-derived")
 
-    class _Remote:
+    class _Remote(_NoopDatasetLeaseRemote):
         def __init__(self, _cfg) -> None:
             pass
 
@@ -765,13 +825,16 @@ def test_execute_push_verify_derived_hashes_rejects_remote_hash_mismatch(tmp_pat
             primary_only: bool = False,
             skip_snapshots: bool = False,
             dry_run: bool = False,
+            event_lease: object | None = None,
         ) -> None:
             assert dry_run is False
             assert primary_only is False
             assert skip_snapshots is False
+            assert event_lease is not None
 
     monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
     monkeypatch.setattr(sync_module, "SSHRemote", _Remote)
+    _install_remote_event_transport(monkeypatch, local_dataset_dir / ".events.log")
 
     with pytest.raises(VerificationError, match=r"post-push-sidecars: sidecar mismatch; .*_derived hashes"):
         sync_module.execute_push(
@@ -795,7 +858,7 @@ def test_execute_pull_verify_derived_hashes_rejects_auxiliary_hash_mismatch(tmp_
     remote_aux = tmp_path / "remote_checkpoint.json"
     remote_aux.write_text('{"state":"remote"}\n', encoding="utf-8")
 
-    class _Remote:
+    class _Remote(_NoopDatasetLeaseRemote):
         def __init__(self, _cfg) -> None:
             pass
 
@@ -907,13 +970,16 @@ def test_execute_push_verify_derived_hashes_rejects_remote_auxiliary_hash_mismat
             primary_only: bool = False,
             skip_snapshots: bool = False,
             dry_run: bool = False,
+            event_lease: object | None = None,
         ) -> None:
             assert dry_run is False
             assert primary_only is False
             assert skip_snapshots is False
+            assert event_lease is not None
 
     monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
     monkeypatch.setattr(sync_module, "SSHRemote", _Remote)
+    _install_remote_event_transport(monkeypatch, local_dataset_dir / ".events.log")
 
     with pytest.raises(VerificationError, match=r"post-push-sidecars: sidecar mismatch; .*auxiliary hashes"):
         sync_module.execute_push(

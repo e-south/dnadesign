@@ -48,6 +48,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
     - `datasets/<dataset_id>/_derived/` (derived overlays)
     - `datasets/<dataset_id>/meta.md` (hand-edited notes/snippets)
     - `datasets/<dataset_id>/.events.log` (append-only; generated)
+    - `datasets/<dataset_id>/.events.lock` (local event-log coordination; generated, never synced)
     - `datasets/<dataset_id>/_snapshots/` (generated)
     - `datasets/archived/<dataset_id-or-qualified-path>/...` (canonical dataset archive location)
   - Archive handling:
@@ -77,7 +78,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 
 ### Generated vs hand-edited
 - Hand-edited: `datasets/**/meta.md`, an untracked local `remotes.yaml`, `src/dnadesign/usr/docs/operations/sync/README.md`
-- Generated / run artifacts: `datasets/**/.events.log`, `datasets/**/_snapshots/**`, `datasets/**/_derived/**`, `datasets/archived/**`
+- Generated / run artifacts: `datasets/**/.events.log`, `datasets/**/.events.lock`, `datasets/**/_snapshots/**`, `datasets/**/_derived/**`, `datasets/archived/**`
 - Ask before committing: changed `records.parquet`, large datasets/logs, any bulk sync outputs/caches.
 
 ### Commands

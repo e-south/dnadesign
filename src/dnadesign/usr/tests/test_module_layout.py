@@ -142,8 +142,14 @@ def test_dataset_package_exports_expected_symbols() -> None:
 
 def test_events_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.events")
+    assert hasattr(module, "EventAppendAttempt")
+    assert hasattr(module, "EventAppendFailure")
+    assert hasattr(module, "EventAppendState")
+    assert hasattr(module, "PreparedEvent")
     assert hasattr(module, "USR_EVENT_VERSION")
+    assert hasattr(module, "append_event_line")
     assert hasattr(module, "fingerprint_parquet")
+    assert hasattr(module, "prepare_event")
     assert hasattr(module, "record_event")
 
 
@@ -758,6 +764,8 @@ def test_dataset_state_module_exports_expected_symbols() -> None:
 
 def test_sync_remote_transfer_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.sync.remote.transfer")
+    assert hasattr(module, "EventLogRevision")
+    assert hasattr(module, "capture_event_log_revision")
     assert hasattr(module, "make_pull_staging_dir")
     assert hasattr(module, "copy_file_atomic")
     assert hasattr(module, "collect_staged_entries")

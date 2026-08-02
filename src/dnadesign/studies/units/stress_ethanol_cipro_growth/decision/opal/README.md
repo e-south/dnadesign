@@ -32,6 +32,9 @@ prospective enrichment remain unproven.
   digest-pinned SFXI and RMF comparator evidence plus Reader's response-window
   bundle. It records evidence and risk without changing campaign state or
   promoting a model.
+- `sfxi_reference_overlay/`: applies OPAL's study-owned SFXI objective to
+  neutral Reader four-state vectors, then publishes the historical USR overlay.
+  Reader, OPAL, the study, and USR retain separate contracts.
 - `synthesis_handoff/`: study-owned physical synthesis handoff for selected
   OPAL promoters, including cloning-strategy transforms, vendor-neutral
   manifests, and vendor export adapters. It wraps the checked-in batch0

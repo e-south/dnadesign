@@ -1,7 +1,7 @@
 # USR sync quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-01
 
 
 Use this page for the minimum reliable loop: preflight diff, transfer, verify.
@@ -86,7 +86,14 @@ Safety guardrails:
 - `usr diff` / `usr pull` / `usr push` fail fast on SSH auth or transport errors instead of treating the remote dataset as silently missing.
 - `usr pull` fails fast when remote `records.parquet` is missing.
 - `usr push` fails fast when local `records.parquet` is missing.
-- Dataset transfers acquire the shared remote dataset lock (`.usr.lock`) to avoid cross-host write races.
+- Dataset transfers acquire the remote dataset's exclusive `.usr.lock` to avoid cross-host write races.
+- A live dataset lease hands transfer ownership to rsync through `.usr.transfer.lock`; ephemeral dataset-local `.usr.lease.*` marker files bind that handoff to the exact lock-holder process. These runtime paths are never synchronized or inventoried as data.
+- Event writers use the dataset's runtime-only `.events.lock`; sync excludes it so a transfer cannot replace the shared advisory lock.
+- Diff and full-transfer planning compare the complete event-log content revision, not only its line count.
+- A full push validates the local log as complete UTF-8 JSONL, proves that the remote event log is a complete-line prefix, and holds both event locks through transfer and verification.
+- Pull, push, and single-file transport are operational actions outside the replicated dataset history. They never append local-only transport entries to `.events.log`; successful full transfers leave both copies byte-identical.
+- `--dry-run` does not create remote directories or lock files. It makes a read-only event-prefix observation; the real push repeats that proof under transaction locks.
+- Use one sync coordinator for a dataset during each transfer. Later work on either copy is supported: push accepts a remote history that is an exact prefix, and pull accepts a remote history that extends the local prefix. Concurrent reciprocal transfers wait only to the bounded lock timeout, while overlapping or branched histories fail closed instead of silently choosing one copy.
 - The remote lock handshake tolerates benign shell noise before the lock marker, so SCC environment chatter does not break normal `usr pull` / `usr push`.
 - `usr pull` and `usr push` skip transfer when no changes are detected.
 - Pull transfers stage into a temporary directory and only promote after verification.

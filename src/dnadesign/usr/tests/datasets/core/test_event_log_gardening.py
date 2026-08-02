@@ -12,10 +12,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
+
+import pytest
 
 from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
 from dnadesign.usr.src.events import garden_event_log
+from dnadesign.usr.src.events import gardening as event_gardening_module
 
 
 def _dataset_with_events(tmp_path: Path) -> Dataset:
@@ -70,6 +74,41 @@ def test_event_log_garden_write_archives_full_log_and_keeps_tail(tmp_path: Path)
     assert live_events[-1]["action"] == "event_log_garden"
     assert live_events[-1]["metrics"]["archived_lines"] == before_lines - 2
     assert live_events[-1]["maintenance"]["notify_cursor_reset_required"] is True
+
+
+def test_event_log_garden_holds_replacement_lock_through_path_swap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _dataset_with_events(tmp_path)
+    lifecycle: list[str] = []
+    replace_event_log = event_gardening_module._replace_event_log
+
+    @contextmanager
+    def tracked_lock(_event_path: Path):
+        lifecycle.append("lock-enter")
+        try:
+            yield
+        finally:
+            lifecycle.append("lock-exit")
+
+    def tracked_replace(path: Path, lines: list[str]) -> None:
+        assert lifecycle == ["lock-enter"]
+        replace_event_log(path, lines)
+        lifecycle.append("replace")
+
+    monkeypatch.setattr(event_gardening_module, "event_log_lock", tracked_lock)
+    monkeypatch.setattr(event_gardening_module, "_replace_event_log", tracked_replace)
+
+    garden_event_log(
+        dataset,
+        retain_last=2,
+        write=True,
+        acknowledge_notify_cursor_reset=True,
+        reason="lock contract",
+    )
+
+    assert lifecycle == ["lock-enter", "replace", "lock-exit"]
 
 
 def test_event_log_garden_write_requires_notify_cursor_ack(tmp_path: Path) -> None:

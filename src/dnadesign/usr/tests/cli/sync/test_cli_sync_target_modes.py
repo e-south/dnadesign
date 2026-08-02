@@ -719,6 +719,7 @@ def test_cmd_diff_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -
         changes={
             "primary_sha_diff": True,
             "meta_mtime_diff": True,
+            "events_content_diff": True,
             "snapshots_name_diff": False,
             "derived_files_diff": True,
             "aux_files_diff": True,
@@ -774,6 +775,7 @@ def test_cmd_diff_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -
     assert payload["data"]["_auxiliary"]["local_only"] == []
     assert payload["data"]["_auxiliary"]["remote_only"] == ["_registry/b.yaml"]
     assert payload["data"][".events.log"]["remote"] == 3
+    assert payload["data"][".events.log"]["changed"] is True
 
 
 def test_cmd_pull_file_mode_rejects_verify_sidecars(tmp_path: Path) -> None:

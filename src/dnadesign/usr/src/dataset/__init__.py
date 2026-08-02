@@ -654,6 +654,33 @@ class Dataset:
             write_lock=dataset_write_lock,
         )
 
+    def create_overlay(
+        self,
+        namespace: str,
+        table_or_batches,
+        *,
+        key: str = "id",
+        key_col: Optional[str] = None,
+        allow_missing: bool = False,
+        actor: Optional[dict] = None,
+        event_args: Mapping[str, object] | None = None,
+    ) -> int:
+        """Atomically create one overlay namespace and reject existing state."""
+
+        return write_overlay_part_dataset(
+            dataset=self,
+            namespace=namespace,
+            table_or_batches=table_or_batches,
+            key=key,
+            key_col=key_col,
+            allow_missing=allow_missing,
+            actor=actor,
+            event_args=event_args,
+            create_only=True,
+            reserved_namespaces=MUTATION_RESERVED_NAMESPACES,
+            write_lock=dataset_write_lock,
+        )
+
     def list_overlays(self) -> List[OverlayInfo]:
         return list_overlay_infos(self)
 

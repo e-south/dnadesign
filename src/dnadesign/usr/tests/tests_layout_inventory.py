@@ -69,6 +69,7 @@ TEST_FAMILY_FILES = {
     },
     "sync": {
         "__init__.py",
+        "test_sync_event_transactions.py",
         "test_sync_iterative_batch_flow.py",
         "test_sync_locking.py",
         "test_sync_module_layout.py",
@@ -192,6 +193,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_remote_rsync_contract.py",
         "test_remote_transport_failures.py",
         "test_remotes_config.py",
+        "test_transfer_runtime_locks.py",
         "test_verify_mode.py",
     },
     ("datasets", "core"): {
@@ -204,6 +206,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_dataset_layout.py",
         "test_dedupe.py",
         "test_duckdb_session_contract.py",
+        "test_event_append_lock.py",
         "test_event_log_gardening.py",
         "test_events_schema.py",
         "test_genbank_import.py",
@@ -234,6 +237,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_attach_duckdb.py",
         "test_attach_sequence_keys.py",
         "test_attach_strict.py",
+        "test_create_only_publication.py",
         "test_dataset_overlay_maintenance_module.py",
         "test_dataset_overlay_package_module.py",
         "test_dataset_reserved_overlay_module.py",

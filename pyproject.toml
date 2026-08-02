@@ -57,6 +57,7 @@ dependencies = [
   "zstd>=1.5.7.2,!=1.5.7.3",
   "py3dmol==2.5.5",
   "plotly>=6.9.0",
+  "psutil>=7.2.1",
 ]
 
 [project.scripts]
@@ -169,6 +170,7 @@ where = ["src"]
   "units/stress_ethanol_cipro_growth/response_window_observations/config/evidence/*.json",
   "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.yaml",
   "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.json",
+  "units/stress_ethanol_cipro_growth/decision/opal/sfxi_reference_overlay/reader_records.json",
   "units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/*.yaml",
 ]
 "dnadesign.usr" = [

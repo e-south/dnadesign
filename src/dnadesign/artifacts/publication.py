@@ -13,34 +13,50 @@ from __future__ import annotations
 
 import ctypes
 import errno
-import hashlib
-import json
 import os
 import shutil
-import socket
 import stat
 import sys
 import tempfile
-import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from .errors import PublicationError
+from .errors import PublicationError, PublicationExistsError
 from .owned_directory import (
     descriptor_matches_entry,
     owner_matches_descriptor,
-    read_owner_from_descriptor,
+    remove_descriptor_anchored_directory,
     remove_owned_directory,
     remove_owned_named_directory,
 )
 from .portable_paths import validate_publication_metadata_paths
+from .recovery import (
+    _OWNER_FILE,
+    _PUBLICATION_RECOVERY_SCHEMAS,
+    _ROLLBACK_OWNER_SCHEMA,
+    _ensure_owner_on_descriptor,
+    _open_recoverable_owned_directory,
+    _owner_payload,
+    _recover_owned_adjacent_directories,
+    _remove_owner_from_descriptor,
+    _rollback_owner_payload,
+    _write_owner,
+)
 
-_OWNER_FILE = ".dnadesign-publication-owner.json"
-_MAX_STALE_CANDIDATES = 64
 _PRIVATE_DIRECTORY_MODE = 0o700
 _PRIVATE_FILE_MODE = 0o600
-_FINAL_ROOT_MODE = 0o755
+_DEFAULT_PUBLISHED_ROOT_MODE = 0o755
+
+
+def _validate_published_root_mode(mode: int) -> int:
+    if isinstance(mode, bool) or not isinstance(mode, int):
+        raise PublicationError("Artifact bundle published root mode must be an integer permission mode")
+    if mode < 0 or mode > 0o777:
+        raise PublicationError("Artifact bundle published root mode must contain only permission bits")
+    if mode & 0o700 != 0o700:
+        raise PublicationError("Artifact bundle published root mode must grant its owner read, write, and execute")
+    return mode
 
 
 def _lexical_absolute_path(path: Path) -> Path:
@@ -191,119 +207,90 @@ def _rename_create_only(parent_descriptor: int, source: str, destination: str) -
         return
     error = ctypes.get_errno()
     if error in {errno.EEXIST, errno.ENOTEMPTY}:
-        raise PublicationError(f"Artifact bundle already exists and is immutable: {destination}")
+        raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {destination}")
     raise OSError(error, os.strerror(error), destination)
 
 
-def _pid_is_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
-def _owner_payload(final: Path) -> dict[str, object]:
-    return {
-        "schema": "dnadesign.artifact_publication_owner.v1",
-        "target_sha256": hashlib.sha256(os.fsencode(final)).hexdigest(),
-        "uid": os.getuid() if hasattr(os, "getuid") else None,
-        "pid": os.getpid(),
-        "host": socket.gethostname(),
-        "created_unix": time.time(),
-    }
-
-
-def _write_owner(path: Path, payload: dict[str, object]) -> None:
-    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
-    path.chmod(_PRIVATE_FILE_MODE)
-
-
-def _is_recoverable_stale_stage(path: Path, *, final: Path, uid: int | None) -> bool:
-    try:
-        entry_stat = path.lstat()
-        if not stat.S_ISDIR(entry_stat.st_mode) or (uid is not None and entry_stat.st_uid != uid):
-            return False
-        owner_path = path / _OWNER_FILE
-        owner_stat = owner_path.lstat()
-        if not stat.S_ISREG(owner_stat.st_mode):
-            return False
-        payload = json.loads(owner_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
-        return False
-    return isinstance(payload, dict) and _owner_payload_is_recoverable(payload, final=final, uid=uid)
-
-
-def _owner_payload_is_recoverable(
-    payload: dict[str, object],
+def _restore_entry_after_detachment_mismatch(
+    parent_descriptor: int,
+    rollback_name: str,
+    final_name: str,
+    published_descriptor: int,
     *,
-    final: Path,
-    uid: int | None,
-) -> bool:
+    clear_owner: bool = True,
+) -> None:
+    restore_error: BaseException | None = None
     try:
-        owner_pid = int(payload.get("pid", -1))
-    except (TypeError, ValueError):
-        return False
-    return (
-        payload.get("schema") == "dnadesign.artifact_publication_owner.v1"
-        and payload.get("target_sha256") == hashlib.sha256(os.fsencode(final)).hexdigest()
-        and payload.get("uid") == uid
-        and payload.get("host") == socket.gethostname()
-        and not _pid_is_alive(owner_pid)
+        _rename_create_only(
+            parent_descriptor,
+            rollback_name,
+            final_name,
+        )
+    except BaseException as exc:
+        restore_error = exc
+    if clear_owner:
+        try:
+            _remove_owner_from_descriptor(published_descriptor)
+        except BaseException as owner_error:
+            raise PublicationError(
+                "Artifact bundle identity changed during atomic rollback detachment, "
+                "and its rollback owner sentinel could not be cleared"
+            ) from owner_error
+    if restore_error is not None:
+        raise PublicationError(
+            "Artifact bundle identity changed during atomic rollback detachment, "
+            "and the displaced entry could not be restored"
+        ) from restore_error
+    raise PublicationError(
+        "Artifact bundle identity changed during atomic rollback detachment; "
+        "the displaced entry was restored without cleanup"
     )
 
 
-def _remove_recoverable_stale_stage(
+def _recover_final_directory(
     parent_descriptor: int,
-    name: str,
-    *,
     final: Path,
+    *,
     uid: int | None,
 ) -> bool:
-    """Remove a stale stage only after descriptor-anchored owner revalidation."""
-
-    flags = os.O_RDONLY | os.O_DIRECTORY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    try:
-        descriptor = os.open(name, flags, dir_fd=parent_descriptor)
-    except OSError:
+    owner_schemas = (*_PUBLICATION_RECOVERY_SCHEMAS, _ROLLBACK_OWNER_SCHEMA)
+    opened = _open_recoverable_owned_directory(
+        parent_descriptor,
+        final.name,
+        final=final,
+        uid=uid,
+        owner_schema=owner_schemas,
+    )
+    if opened is None:
         return False
+    descriptor, owner = opened
     try:
-        entry_stat = os.fstat(descriptor)
-        if uid is not None and entry_stat.st_uid != uid:
+        owner_pid = int(owner["pid"])
+        owner_uid = owner["uid"]
+        rollback_name = f".{final.name}.rollback-u{owner_uid}-p{owner_pid}-{uuid.uuid4().hex}"
+        if not descriptor_matches_entry(parent_descriptor, final.name, descriptor):
             return False
-        observed_owner = read_owner_from_descriptor(descriptor, owner_file=_OWNER_FILE)
-        if observed_owner is None or not _owner_payload_is_recoverable(observed_owner, final=final, uid=uid):
-            return False
-        return remove_owned_directory(
+        _rename_create_only(parent_descriptor, final.name, rollback_name)
+        if not descriptor_matches_entry(parent_descriptor, rollback_name, descriptor):
+            _restore_entry_after_detachment_mismatch(
+                parent_descriptor,
+                rollback_name,
+                final.name,
+                descriptor,
+                clear_owner=False,
+            )
+        removed = remove_owned_directory(
             parent_descriptor,
-            name,
+            rollback_name,
             descriptor,
-            observed_owner,
+            owner,
             owner_file=_OWNER_FILE,
         )
+        if not removed:
+            raise PublicationError(f"Interrupted artifact bundle could not be recovered safely: {final}")
+        return True
     finally:
         os.close(descriptor)
-
-
-def _bounded_named_candidates(directory: Path, *, prefix: str) -> list[Path]:
-    candidates: list[Path] = []
-    for candidate in directory.iterdir():
-        if not candidate.name.startswith(prefix):
-            continue
-        candidates.append(candidate)
-        if len(candidates) >= _MAX_STALE_CANDIDATES:
-            break
-    return candidates
-
-
-def _is_recoverable_adjacent_stage(path: Path, *, final: Path, uid: int | None) -> bool:
-    return _is_recoverable_stale_stage(path, final=final, uid=uid)
 
 
 @dataclass
@@ -315,32 +302,50 @@ class CreateOnlyDirectoryPublication:
     adjacent_stage_name: str
     parent_descriptor: int
     _owner: dict[str, object]
+    published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE
     _closed: bool = False
+    _published_descriptor: int | None = field(default=None, init=False, repr=False)
+    _rollback_name: str | None = field(default=None, init=False, repr=False)
 
     @classmethod
-    def prepare(cls, bundle_root: str | Path) -> CreateOnlyDirectoryPublication:
+    def prepare(
+        cls,
+        bundle_root: str | Path,
+        *,
+        published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE,
+    ) -> CreateOnlyDirectoryPublication:
+        """Prepare private staging after validating the publication policy."""
+
+        validated_published_root_mode = _validate_published_root_mode(published_root_mode)
         final = _lexical_absolute_path(Path(bundle_root))
+        owner = _owner_payload(final)
         _preflight_existing_path_components(final.parent)
         parent_descriptor = _open_or_create_directory(final.parent)
         try:
-            if _entry_exists_at(parent_descriptor, final.name):
-                raise PublicationError(f"Artifact bundle already exists and is immutable: {final}")
-            owner = _owner_payload(final)
             uid = owner["uid"]
+            recovery_uid = uid if isinstance(uid, int) else None
+            _recover_final_directory(parent_descriptor, final, uid=recovery_uid)
+            if _entry_exists_at(parent_descriptor, final.name):
+                raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {final}")
             target_digest = str(owner["target_sha256"])
             adjacent_prefix = f".{final.name}.staging-"
-            for candidate in _bounded_named_candidates(final.parent, prefix=adjacent_prefix):
-                if _is_recoverable_adjacent_stage(
-                    candidate,
-                    final=final,
-                    uid=uid if isinstance(uid, int) else None,
-                ):
-                    _remove_recoverable_stale_stage(
-                        parent_descriptor,
-                        candidate.name,
-                        final=final,
-                        uid=uid if isinstance(uid, int) else None,
-                    )
+            rollback_prefix = f".{final.name}.rollback-"
+            _recover_owned_adjacent_directories(
+                parent_descriptor,
+                final.parent,
+                prefix=adjacent_prefix,
+                final=final,
+                uid=recovery_uid,
+                owner_schema=_PUBLICATION_RECOVERY_SCHEMAS,
+            )
+            _recover_owned_adjacent_directories(
+                parent_descriptor,
+                final.parent,
+                prefix=rollback_prefix,
+                final=final,
+                uid=recovery_uid,
+                owner_schema=(*_PUBLICATION_RECOVERY_SCHEMAS, _ROLLBACK_OWNER_SCHEMA),
+            )
             private_parent = Path(tempfile.gettempdir()) / f"dnadesign-artifact-publication-{uid}"
             try:
                 private_parent.mkdir(mode=0o700)
@@ -358,18 +363,14 @@ class CreateOnlyDirectoryPublication:
                 private_flags |= os.O_NOFOLLOW
             private_descriptor = os.open(private_parent, private_flags)
             try:
-                for candidate in _bounded_named_candidates(private_parent, prefix=private_prefix):
-                    if _is_recoverable_stale_stage(
-                        candidate,
-                        final=final,
-                        uid=uid if isinstance(uid, int) else None,
-                    ):
-                        _remove_recoverable_stale_stage(
-                            private_descriptor,
-                            candidate.name,
-                            final=final,
-                            uid=uid if isinstance(uid, int) else None,
-                        )
+                _recover_owned_adjacent_directories(
+                    private_descriptor,
+                    private_parent,
+                    prefix=private_prefix,
+                    final=final,
+                    uid=recovery_uid,
+                    owner_schema=_PUBLICATION_RECOVERY_SCHEMAS,
+                )
             finally:
                 os.close(private_descriptor)
             stage = Path(tempfile.mkdtemp(prefix=private_prefix, dir=private_parent))
@@ -381,8 +382,9 @@ class CreateOnlyDirectoryPublication:
                 adjacent_stage_name=f"{adjacent_prefix}u{uid}-p{os.getpid()}-{uuid.uuid4().hex}",
                 parent_descriptor=parent_descriptor,
                 _owner=owner,
+                published_root_mode=validated_published_root_mode,
             )
-        except Exception:
+        except BaseException:
             os.close(parent_descriptor)
             raise
 
@@ -398,6 +400,11 @@ class CreateOnlyDirectoryPublication:
         )
 
     def publish(self, *, required_manifest: str) -> None:
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        if self._published_descriptor is not None:
+            raise PublicationError(f"Artifact bundle is already published: {self.final}")
+        validated_published_root_mode = _validate_published_root_mode(self.published_root_mode)
         manifest_relative = Path(required_manifest)
         if not required_manifest.strip() or manifest_relative.is_absolute() or ".." in manifest_relative.parts:
             raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
@@ -452,17 +459,15 @@ class CreateOnlyDirectoryPublication:
             if not descriptor_matches_entry(self.parent_descriptor, self.final.name, published_descriptor):
                 raise PublicationError("Published artifact bundle identity changed after atomic rename")
             _restore_published_modes(self.stage, published_descriptor)
-            os.fchmod(published_descriptor, _FINAL_ROOT_MODE)
+            os.fchmod(published_descriptor, validated_published_root_mode)
             os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
-        except Exception:
+            self._published_descriptor = published_descriptor
+            published_descriptor = None
+        except BaseException:
             if renamed and published_descriptor is not None:
-                remove_owned_directory(
-                    self.parent_descriptor,
-                    self.final.name,
-                    published_descriptor,
-                    self._owner,
-                    owner_file=_OWNER_FILE,
-                )
+                self._published_descriptor = published_descriptor
+                published_descriptor = None
+                self.rollback()
             elif published_descriptor is not None:
                 remove_owned_directory(
                     self.parent_descriptor,
@@ -483,6 +488,86 @@ class CreateOnlyDirectoryPublication:
             if published_descriptor is not None:
                 os.close(published_descriptor)
 
+    def rollback(self) -> bool:
+        """Atomically hide this transaction's publication before recursive cleanup."""
+
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            return False
+        rollback_name = self._rollback_name
+        if rollback_name is None:
+            rollback_name = f".{self.final.name}.rollback-u{self._owner['uid']}-p{os.getpid()}-{uuid.uuid4().hex}"
+            self._rollback_name = rollback_name
+        rollback_owner = _rollback_owner_payload(self._owner)
+        detached = descriptor_matches_entry(
+            self.parent_descriptor,
+            rollback_name,
+            published_descriptor,
+        )
+        if not detached:
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                self.final.name,
+                published_descriptor,
+            ):
+                return False
+            _ensure_owner_on_descriptor(
+                published_descriptor,
+                rollback_owner,
+                accepted_existing=self._owner,
+            )
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                self.final.name,
+                published_descriptor,
+            ):
+                _remove_owner_from_descriptor(published_descriptor)
+                return False
+            try:
+                _rename_create_only(
+                    self.parent_descriptor,
+                    self.final.name,
+                    rollback_name,
+                )
+            except BaseException:
+                if not descriptor_matches_entry(
+                    self.parent_descriptor,
+                    rollback_name,
+                    published_descriptor,
+                ):
+                    _remove_owner_from_descriptor(published_descriptor)
+                raise
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                rollback_name,
+                published_descriptor,
+            ):
+                _restore_entry_after_detachment_mismatch(
+                    self.parent_descriptor,
+                    rollback_name,
+                    self.final.name,
+                    published_descriptor,
+                )
+        else:
+            _ensure_owner_on_descriptor(
+                published_descriptor,
+                rollback_owner,
+                accepted_existing=self._owner,
+            )
+        removed = remove_descriptor_anchored_directory(
+            self.parent_descriptor,
+            rollback_name,
+            published_descriptor,
+            last_entry=_OWNER_FILE,
+        )
+        if removed:
+            os.close(published_descriptor)
+            self._published_descriptor = None
+            self._rollback_name = None
+        return removed
+
     def close(self) -> None:
         if self._closed:
             return
@@ -494,7 +579,13 @@ class CreateOnlyDirectoryPublication:
                 self._owner,
                 owner_file=_OWNER_FILE,
             )
+            if self._published_descriptor is not None and self._rollback_name is not None:
+                self.rollback()
         finally:
+            if self._published_descriptor is not None:
+                os.close(self._published_descriptor)
+                self._published_descriptor = None
+            self._rollback_name = None
             os.close(self.parent_descriptor)
             self._closed = True
 

@@ -1,10 +1,13 @@
 # USR event log contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-01
 
 
 `.events.log` is newline-delimited JSON and is the operator integration boundary.
+Each encoded record, including its terminal newline, is limited to 1 MiB. Store
+large data in an artifact and reference it from the event instead of embedding it
+in the ledger.
 
 ## Payload fields
 

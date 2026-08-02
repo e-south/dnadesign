@@ -68,3 +68,22 @@ def test_remote_inventory_normalizes_and_sorts_valid_relative_paths(monkeypatch:
         "densegen/part-001.parquet",
         "densegen/part-010.parquet",
     ]
+
+
+def test_remote_aux_inventory_excludes_runtime_locks(monkeypatch: pytest.MonkeyPatch) -> None:
+    remote = _remote()
+    commands: list[str] = []
+
+    def capture_probe(command: str):
+        commands.append(command)
+        return 0, "", ""
+
+    monkeypatch.setattr(remote, "_ssh_probe", capture_probe)
+
+    assert remote._remote_list_aux_files("/project/tester/usr/densegen_demo") == []
+    assert len(commands) == 1
+    assert "! -path './.events.lock'" in commands[0]
+    assert "! -path './.usr.lock'" in commands[0]
+    assert "! -path './.usr.transfer.lock'" in commands[0]
+    assert "! -path './.usr.lease.*'" in commands[0]
+    assert "! -path './.usr.lease.*/*'" in commands[0]

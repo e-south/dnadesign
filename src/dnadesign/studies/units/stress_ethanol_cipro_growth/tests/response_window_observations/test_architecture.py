@@ -84,11 +84,11 @@ def test_observation_modules_have_reviewed_size_caps() -> None:
 
 @pytest.mark.parametrize("module_path", sorted(PACKAGE_ROOT.glob("*.py")), ids=lambda path: path.name)
 def test_observations_do_not_import_reader_or_opal(module_path: Path) -> None:
+    reader_roots = {"reader", "reader_workbench"}
     offenders = [
         f"{module_path.name}:{line}:{module}"
         for line, module in _imported_modules(module_path)
-        if module == "reader"
-        or module.startswith("reader.")
+        if module.split(".", maxsplit=1)[0] in reader_roots
         or module == "dnadesign.opal"
         or module.startswith("dnadesign.opal.")
     ]

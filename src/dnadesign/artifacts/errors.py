@@ -14,4 +14,8 @@ class PublicationError(RuntimeError):
     """Raised when an immutable artifact bundle cannot be published safely."""
 
 
-__all__ = ["PublicationError"]
+class PublicationExistsError(PublicationError, FileExistsError):
+    """Raised when create-only publication would replace an existing artifact."""
+
+
+__all__ = ["PublicationError", "PublicationExistsError"]
