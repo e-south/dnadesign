@@ -32,6 +32,11 @@ from .owned_directory import (
 _OWNER_FILE = ".dnadesign-publication-owner.json"
 _PUBLICATION_OWNER_SCHEMA = "dnadesign.artifact_publication_owner.v2"
 _ROLLBACK_OWNER_SCHEMA = "dnadesign.artifact_rollback_owner.v2"
+_PRE_START_TOKEN_PUBLICATION_OWNER_SCHEMA = "dnadesign.artifact_publication_owner.v1"
+_PUBLICATION_RECOVERY_SCHEMAS = (
+    _PUBLICATION_OWNER_SCHEMA,
+    _PRE_START_TOKEN_PUBLICATION_OWNER_SCHEMA,
+)
 _MAX_STALE_CANDIDATES = 64
 _MAX_SUPPORTED_PID = (1 << 31) - 1
 _PRIVATE_FILE_MODE = 0o600
@@ -75,6 +80,20 @@ def _owner_process_is_active(pid: int, expected_start_token: object) -> bool | N
     except (OSError, OverflowError, ValueError, psutil.Error):
         return None
     return observed_start_token == canonical_start_token
+
+
+def _owner_process_is_definitely_absent(pid: int) -> bool:
+    """Return True only when the operating system reports that no such PID exists."""
+
+    if pid <= 0 or pid > _MAX_SUPPORTED_PID:
+        return False
+    try:
+        psutil.Process(pid)
+    except psutil.NoSuchProcess:
+        return True
+    except (OSError, OverflowError, ValueError, psutil.Error):
+        return False
+    return False
 
 
 def _owner_payload(final: Path) -> dict[str, object]:
@@ -159,14 +178,20 @@ def _owner_payload_is_recoverable(
     if owner_pid <= 0 or owner_pid > _MAX_SUPPORTED_PID:
         return False
     schemas = (owner_schema,) if isinstance(owner_schema, str) else owner_schema
+    observed_schema = payload.get("schema")
     owner_context_matches = (
-        payload.get("schema") in schemas
+        observed_schema in schemas
         and payload.get("target_sha256") == hashlib.sha256(os.fsencode(final)).hexdigest()
         and payload.get("uid") == uid
         and payload.get("host") == socket.gethostname()
     )
     if not owner_context_matches:
         return False
+    if observed_schema == _PRE_START_TOKEN_PUBLICATION_OWNER_SCHEMA:
+        # v1 was emitted by released code before process-start identity was
+        # recorded. It is accepted only for one-way cleanup when the recorded
+        # PID is absent; an existing or indeterminate PID is preserved.
+        return _owner_process_is_definitely_absent(owner_pid)
     return _owner_process_is_active(owner_pid, payload.get("process_start_token")) is False
 
 

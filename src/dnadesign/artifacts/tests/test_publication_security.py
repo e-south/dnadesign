@@ -397,6 +397,70 @@ def test_prepare_preserves_owner_bundle_with_unrepresentable_pid(tmp_path: Path)
     assert candidate.is_dir()
 
 
+@pytest.mark.parametrize("location", ["adjacent", "private", "final"])
+def test_prepare_recovers_v1_publication_stage_only_when_owner_pid_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    location: str,
+) -> None:
+    uid = os.getuid() if hasattr(os, "getuid") else None
+    temp_root = tmp_path / "temp"
+    temp_root.mkdir()
+    monkeypatch.setattr(publication_module.tempfile, "gettempdir", lambda: temp_root.as_posix())
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.parent.mkdir()
+    owner = recovery_module._owner_payload(bundle)
+    owner["schema"] = recovery_module._PRE_START_TOKEN_PUBLICATION_OWNER_SCHEMA
+    owner.pop("process_start_token")
+    owner["pid"] = 91_337_555
+
+    if location == "adjacent":
+        candidate = bundle.parent / f".{bundle.name}.staging-v1"
+    elif location == "private":
+        private_parent = temp_root / f"dnadesign-artifact-publication-{uid}"
+        private_parent.mkdir(mode=0o700)
+        candidate = private_parent / f"stage-{str(owner['target_sha256'])[:16]}-v1"
+    else:
+        candidate = bundle
+    candidate.mkdir()
+    recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
+    (candidate / "stale.txt").write_text("stale\n", encoding="utf-8")
+
+    monkeypatch.setattr(recovery_module, "_owner_process_is_definitely_absent", lambda _pid: True)
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        assert not candidate.exists()
+    finally:
+        publication.close()
+
+
+def test_prepare_preserves_v1_publication_stage_while_recorded_pid_exists(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    bundle.parent.mkdir()
+    candidate = bundle.parent / f".{bundle.name}.staging-v1"
+    candidate.mkdir()
+    owner = recovery_module._owner_payload(bundle)
+    owner["schema"] = recovery_module._PRE_START_TOKEN_PUBLICATION_OWNER_SCHEMA
+    owner.pop("process_start_token")
+    recovery_module._write_owner(candidate / recovery_module._OWNER_FILE, owner)
+
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    publication.close()
+
+    assert candidate.is_dir()
+
+
+def test_v1_publication_recovery_preserves_indeterminate_process_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def deny_process_lookup(pid: int) -> None:
+        raise recovery_module.psutil.AccessDenied(pid)
+
+    monkeypatch.setattr(recovery_module.psutil, "Process", deny_process_lookup)
+
+    assert not recovery_module._owner_process_is_definitely_absent(91_337_556)
+
+
 def test_prepare_recovers_owner_bundle_after_pid_reuse(tmp_path: Path) -> None:
     bundle = tmp_path / "results" / "render-v1"
     bundle.parent.mkdir()

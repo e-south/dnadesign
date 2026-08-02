@@ -33,7 +33,7 @@ from .owned_directory import (
 from .portable_paths import validate_publication_metadata_paths
 from .recovery import (
     _OWNER_FILE,
-    _PUBLICATION_OWNER_SCHEMA,
+    _PUBLICATION_RECOVERY_SCHEMAS,
     _ROLLBACK_OWNER_SCHEMA,
     _ensure_owner_on_descriptor,
     _open_recoverable_owned_directory,
@@ -253,7 +253,7 @@ def _recover_final_directory(
     *,
     uid: int | None,
 ) -> bool:
-    owner_schemas = (_PUBLICATION_OWNER_SCHEMA, _ROLLBACK_OWNER_SCHEMA)
+    owner_schemas = (*_PUBLICATION_RECOVERY_SCHEMAS, _ROLLBACK_OWNER_SCHEMA)
     opened = _open_recoverable_owned_directory(
         parent_descriptor,
         final.name,
@@ -336,7 +336,7 @@ class CreateOnlyDirectoryPublication:
                 prefix=adjacent_prefix,
                 final=final,
                 uid=recovery_uid,
-                owner_schema=_PUBLICATION_OWNER_SCHEMA,
+                owner_schema=_PUBLICATION_RECOVERY_SCHEMAS,
             )
             _recover_owned_adjacent_directories(
                 parent_descriptor,
@@ -344,7 +344,7 @@ class CreateOnlyDirectoryPublication:
                 prefix=rollback_prefix,
                 final=final,
                 uid=recovery_uid,
-                owner_schema=(_PUBLICATION_OWNER_SCHEMA, _ROLLBACK_OWNER_SCHEMA),
+                owner_schema=(*_PUBLICATION_RECOVERY_SCHEMAS, _ROLLBACK_OWNER_SCHEMA),
             )
             private_parent = Path(tempfile.gettempdir()) / f"dnadesign-artifact-publication-{uid}"
             try:
@@ -369,7 +369,7 @@ class CreateOnlyDirectoryPublication:
                     prefix=private_prefix,
                     final=final,
                     uid=recovery_uid,
-                    owner_schema=_PUBLICATION_OWNER_SCHEMA,
+                    owner_schema=_PUBLICATION_RECOVERY_SCHEMAS,
                 )
             finally:
                 os.close(private_descriptor)
