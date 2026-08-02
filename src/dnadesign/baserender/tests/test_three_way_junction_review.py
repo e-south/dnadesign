@@ -87,6 +87,7 @@ def test_public_catalog_and_adapter_expose_the_review_contract() -> None:
     assert descriptor.output_kinds == ("images",)
     assert descriptor.image_output_modes == ("directory",)
     assert descriptor.max_grid_records == 1
+    assert descriptor.validation_scope == "document"
     assert baserender.get_renderer_descriptor("three_way_junction_review").max_grid_records == 1
     assert record.id == "target-01"
     assert record.meta["adapter"] == "three_way_junction_review_v1"

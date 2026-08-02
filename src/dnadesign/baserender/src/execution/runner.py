@@ -211,6 +211,8 @@ def run_render_job(
         report,
         source_content=report.source_content("input"),
     )
+    if adapter_descriptor.validation_scope == "document":
+        records = list(records)
 
     if job.selection is not None:
         selected, missing = apply_selection(

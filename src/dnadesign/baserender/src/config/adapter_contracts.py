@@ -257,6 +257,7 @@ class AdapterDescriptor:
         "single_file",
     )
     max_grid_records: int | None = None
+    validation_scope: Literal["row", "document"] = "row"
 
 
 AdapterContract = AdapterDescriptor
@@ -437,6 +438,7 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
         output_kinds=("images",),
         image_output_modes=("directory",),
         max_grid_records=1,
+        validation_scope="document",
     ),
     "duplex_sequence_v1": AdapterDescriptor(
         kind="duplex_sequence_v1",
