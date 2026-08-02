@@ -17,7 +17,7 @@ import pytest
 from pydantic import ValidationError
 
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
-from dnadesign.contracts.visual.three_way_junction_review_v1 import AssemblyGeometry
+from dnadesign.contracts.visual.three_way_junction_review_v1 import AssemblyGeometry, PoolSearchReview
 
 
 def _reverse_complement(sequence: str) -> str:
@@ -119,18 +119,18 @@ def three_way_junction_review_payload() -> dict[str, object]:
             "matching_seed": 14,
             "locus_count": 1,
             "toehold_paths_evaluated": 20,
-            "toehold_min_distance": 4.0,
-            "toehold_mean_distance": 4.0,
-            "toehold_rank_score": 1.0,
+            "toehold_min_distance": 0.0,
+            "toehold_mean_distance": 0.0,
+            "toehold_rank_score": 1.5,
             "barcode_candidates_generated": 25,
             "barcode_forbidden_toehold_k": 3,
             "barcode_forbidden_barcode_k": 4,
             "barcode_subsets_evaluated": 20,
-            "barcode_min_distance": 6.0,
-            "barcode_mean_distance": 6.0,
-            "barcode_rank_score": 1.0,
+            "barcode_min_distance": 0.0,
+            "barcode_mean_distance": 0.0,
+            "barcode_rank_score": 1.5,
             "matchings_evaluated": 1,
-            "matching_max_pairwise_lcs": 2,
+            "matching_max_pairwise_lcs": 0,
             "thermodynamic_screening": "not_run",
         },
         "checks": [
@@ -215,22 +215,6 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
             "barcode_forbidden_barcode_k must be greater than barcode_forbidden_toehold_k",
         ),
         (
-            lambda payload: payload["search"].update(
-                {"toehold_min_distance": 8.0000001, "toehold_mean_distance": 8.0000001}
-            ),
-            "toehold distances exceed the v1 sequence-derived maximum",
-        ),
-        (
-            lambda payload: payload["search"].update(
-                {"barcode_min_distance": 8.0000001, "barcode_mean_distance": 8.0000001}
-            ),
-            "barcode distances exceed the sequence-derived maximum",
-        ),
-        (
-            lambda payload: payload["search"].update({"matching_max_pairwise_lcs": 13}),
-            "matching_max_pairwise_lcs exceeds the combined junction length",
-        ),
-        (
             lambda payload: payload["checks"][1].update({"status": "passed"}),
             "thermodynamic_screening check status",
         ),
@@ -301,6 +285,57 @@ def test_review_contract_rejects_nonfinite_search_metrics(field: str, value: flo
 
     with pytest.raises(ValidationError, match="finite number"):
         ThreeWayJunctionReviewV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"toehold_min_distance": 1.0, "toehold_mean_distance": 1.0}, "zero pairwise"),
+        ({"barcode_min_distance": 1.0, "barcode_mean_distance": 1.0}, "zero pairwise"),
+        ({"matching_max_pairwise_lcs": 1}, "zero pairwise"),
+        ({"toehold_rank_score": 1.0}, "rank scores of 1.5"),
+        ({"barcode_rank_score": 1.0}, "rank scores of 1.5"),
+        ({"matchings_evaluated": 2}, "exactly one matching evaluation"),
+    ],
+)
+def test_singleton_pool_requires_exact_v1_pairwise_search_evidence(
+    updates: dict[str, float | int],
+    message: str,
+) -> None:
+    payload = three_way_junction_review_payload()
+    payload["search"].update(updates)
+
+    with pytest.raises(ValidationError, match=message):
+        ThreeWayJunctionReviewV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        (
+            {"toehold_min_distance": 8.0000001, "toehold_mean_distance": 8.0000001},
+            "toehold distances exceed the v1 sequence-derived maximum",
+        ),
+        (
+            {"barcode_min_distance": 8.0000001, "barcode_mean_distance": 8.0000001},
+            "barcode distances exceed the sequence-derived maximum",
+        ),
+        (
+            {"matching_max_pairwise_lcs": 13},
+            "matching_max_pairwise_lcs exceeds the combined junction length",
+        ),
+    ],
+)
+def test_multi_locus_pool_search_respects_sequence_derived_bounds(
+    updates: dict[str, float | int],
+    message: str,
+) -> None:
+    search_payload = three_way_junction_review_payload()["search"]
+    search_payload.update({"locus_count": 2, "barcode_candidates_generated": 10, **updates})
+    search = PoolSearchReview.model_validate(search_payload)
+
+    with pytest.raises(ValueError, match=message):
+        search._validate_sequence_bounds(toehold_length=4, barcode_length=8)
 
 
 @pytest.mark.parametrize(

@@ -241,6 +241,20 @@ class PoolSearchReview(VisualContractModel):
     def _validate_sequence_bounds(self, *, toehold_length: int, barcode_length: int) -> None:
         """Reject search receipts that are impossible for their v1 geometry."""
 
+        if self.locus_count == 1:
+            pairwise_metrics = (
+                self.toehold_min_distance,
+                self.toehold_mean_distance,
+                self.barcode_min_distance,
+                self.barcode_mean_distance,
+                self.matching_max_pairwise_lcs,
+            )
+            if any(value != 0 for value in pairwise_metrics):
+                raise ValueError("singleton pools require zero pairwise distance and shared-substring metrics")
+            if self.toehold_rank_score != 1.5 or self.barcode_rank_score != 1.5:
+                raise ValueError("singleton pools require v1 rank scores of 1.5")
+            if self.matchings_evaluated != 1:
+                raise ValueError("singleton pools require exactly one matching evaluation")
         if self.barcode_candidates_generated % self.locus_count != 0:
             raise ValueError("barcode_candidates_generated must be a multiple of locus_count")
         inferred_pool_factor = self.barcode_candidates_generated // self.locus_count
