@@ -27,6 +27,7 @@ class CapturedSource:
     sha256: str
     size: int
     fingerprint: tuple[int, int, int, int, int]
+    max_bytes: int | None
 
     @classmethod
     def capture(cls, path: str | Path, *, max_bytes: int | None = None) -> CapturedSource:
@@ -59,6 +60,7 @@ class CapturedSource:
                 sha256=hashlib.sha256(content).hexdigest(),
                 size=after.st_size,
                 fingerprint=after_fingerprint,
+                max_bytes=max_bytes,
             )
         finally:
             os.close(descriptor)
@@ -68,7 +70,7 @@ class CapturedSource:
 
     def verify_unchanged(self) -> None:
         try:
-            current = type(self).capture(self.path)
+            current = type(self).capture(self.path, max_bytes=self.max_bytes)
         except ValueError as exc:
             raise ValueError(f"Render source changed during execution: {self.path}") from exc
         if current.sha256 != self.sha256 or current.fingerprint != self.fingerprint:
@@ -81,6 +83,7 @@ class CapturedSource:
             sha256=self.sha256,
             size=self.size,
             fingerprint=self.fingerprint,
+            max_bytes=self.max_bytes,
         )
 
 
