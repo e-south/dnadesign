@@ -18,8 +18,13 @@ from typing import Iterable, Mapping
 import numpy as np
 
 from ..config import ImagesOutputCfg, Style
+from ..config.adapter_contracts import (
+    adapter_grid_record_limit,
+    validate_records_output_policy,
+)
 from ..core import Record, SchemaError
-from ..render import Palette, render_record
+from ..render import Palette, render_record, validate_records_for_rendering
+from ..render.renderer import get_renderer_descriptor
 from .names import _safe_stem, _unique_stem
 
 
@@ -71,6 +76,19 @@ def _render_record_grid_figure_local(
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
 
+    limits = tuple(
+        limit
+        for limit in (
+            get_renderer_descriptor(renderer_name).max_grid_records,
+            adapter_grid_record_limit(records),
+        )
+        if limit is not None
+    )
+    grid_limit = min(limits) if limits else None
+    if grid_limit is not None and len(records) > grid_limit:
+        raise SchemaError(
+            f"renderer {renderer_name!r} supports at most {grid_limit} record per grid; render records individually"
+        )
     panel_images: list[object] = []
     for record in records:
         panel = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
@@ -137,6 +155,19 @@ def write_images(
     materialized = list(records)
     if not materialized:
         raise SchemaError("No records to render after adapter, transforms, and selection")
+    materialized = list(
+        validate_records_for_rendering(
+            materialized,
+            renderer_name=renderer_name,
+            style=style,
+            palette=palette,
+        )
+    )
+    validate_records_output_policy(
+        materialized,
+        output_kind="images",
+        image_output_mode="single_file" if output.path is not None else "directory",
+    )
 
     if output.path is not None:
         out_path = output.path.resolve()

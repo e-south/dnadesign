@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from .scar_nick_visual_v1 import ScarNickVisualV1  # noqa: F401
     from .sequence_evidence_map_v1 import SequenceEvidenceMapV1  # noqa: F401
     from .snapback_visual_v1 import SnapbackVisualV1  # noqa: F401
+    from .three_way_junction_review_v1 import ThreeWayJunctionReviewV1  # noqa: F401
     from .viennarna_secondary_structure_svg_v1 import ViennaRNAStructureSvgV1  # noqa: F401
     from .yiu_hairpin_topology_v1 import YiuHairpinTopologyV1  # noqa: F401
     from .yiu_linear_state_v1 import YiuLinearStateV1  # noqa: F401
@@ -36,6 +37,7 @@ _LAZY_EXPORTS = {
     "ScarNickVisualV1": (".scar_nick_visual_v1", "ScarNickVisualV1"),
     "SequenceEvidenceMapV1": (".sequence_evidence_map_v1", "SequenceEvidenceMapV1"),
     "SnapbackVisualV1": (".snapback_visual_v1", "SnapbackVisualV1"),
+    "ThreeWayJunctionReviewV1": (".three_way_junction_review_v1", "ThreeWayJunctionReviewV1"),
     "ViennaRNAStructureSvgV1": (".viennarna_secondary_structure_svg_v1", "ViennaRNAStructureSvgV1"),
     "YiuHairpinTopologyV1": (".yiu_hairpin_topology_v1", "YiuHairpinTopologyV1"),
     "YiuLinearStateV1": (".yiu_linear_state_v1", "YiuLinearStateV1"),
@@ -50,6 +52,7 @@ __all__ = [
     "CompositionReviewSvgV1",
     "ScarNickVisualV1",
     "SnapbackVisualV1",
+    "ThreeWayJunctionReviewV1",
     "SequenceEvidenceMapV1",
     "ViennaRNAStructureSvgV1",
     "YiuLinearStateV1",

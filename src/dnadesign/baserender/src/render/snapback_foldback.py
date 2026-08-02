@@ -71,6 +71,8 @@ def _build_layout(contract: SnapbackVisualV1, style: Style) -> FoldbackCornerLay
     complement_indices = list(range(loop.display_complement_span.end - 1, loop.display_complement_span.start - 1, -1))
     if len(primary_indices) != len(complement_indices):
         raise RenderingError("foldback corner renderer requires equal retained/foldback display spans")
+    if not primary_indices:
+        raise RenderingError("foldback corner renderer requires non-empty retained/foldback display spans")
 
     top_y = 1.55
     bottom_y = 0.55
@@ -118,6 +120,18 @@ def _build_layout(contract: SnapbackVisualV1, style: Style) -> FoldbackCornerLay
         left_terminal_x=left_terminal_x,
         right_terminal_x=right_terminal_x,
     )
+
+
+def preflight_foldback_corner_triloop(contract: SnapbackVisualV1, style: Style) -> FoldbackCornerLayout:
+    """Validate foldback geometry and return its allocation-free layout."""
+
+    layout = _build_layout(contract, style)
+    primary_indices = set(layout.primary_indices)
+    complement_indices = set(layout.complement_indices)
+    for pair in contract.pairings:
+        if pair.left_index not in primary_indices or pair.right_index not in complement_indices:
+            raise RenderingError("foldback corner renderer received out-of-display pairing indices")
+    return layout
 
 
 def _draw_boundary(
@@ -353,7 +367,7 @@ def _draw_cap_partition_rails(
 
 
 def render_foldback_corner_triloop(contract: SnapbackVisualV1, style: Style, *, colors: Mapping[str, str]):
-    layout = _build_layout(contract, style)
+    layout = preflight_foldback_corner_triloop(contract, style)
     primary_x_by_index = dict(zip(layout.primary_indices, layout.stem_x_positions, strict=True))
     complement_x_by_index = dict(zip(layout.complement_indices, layout.stem_x_positions, strict=True))
 

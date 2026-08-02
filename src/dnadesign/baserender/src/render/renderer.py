@@ -15,11 +15,14 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from ..config import Style
-from ..core import ContractError, Record, RenderingError, validate_record_kinds
+from ..config.adapter_contracts import validate_record_renderer_compatibility
+from ..core import ContractError, Record, RenderingError, SchemaError, validate_record_kinds
 from .palette import Palette
 
 
 class Renderer(Protocol):
+    def preflight(self, record: Record, style: Style, palette: Palette) -> None: ...
+
     def render(self, record: Record, style: Style, palette: Palette): ...
 
 
@@ -34,6 +37,7 @@ class RendererDescriptor:
     required_record_features: tuple[str, ...]
     optional_record_features: tuple[str, ...]
     docs_slug: str
+    max_grid_records: int | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,12 @@ def _build_snapback_map_renderer() -> Renderer:
     from .snapback_map import SnapbackMapRenderer
 
     return SnapbackMapRenderer()
+
+
+def _build_three_way_junction_review_renderer() -> Renderer:
+    from .three_way_junction_review import ThreeWayJunctionReviewRenderer
+
+    return ThreeWayJunctionReviewRenderer()
 
 
 @dataclass(frozen=True)
@@ -153,6 +163,18 @@ _REGISTRY = _RendererRegistry(
             ),
             factory=_build_snapback_map_renderer,
         ),
+        "three_way_junction_review": _RegisteredRenderer(
+            descriptor=RendererDescriptor(
+                name="three_way_junction_review",
+                topology_kinds=("fragment_pool",),
+                accepted_alphabets=("DNA",),
+                required_record_features=(),
+                optional_record_features=(),
+                docs_slug="three-way-junction-review",
+                max_grid_records=1,
+            ),
+            factory=_build_three_way_junction_review_renderer,
+        ),
     }
 )
 
@@ -169,12 +191,39 @@ def get_renderer_descriptor(name: str) -> RendererDescriptor:
     return _REGISTRY.descriptor(name)
 
 
-def render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+def validate_records_for_rendering(
+    records: tuple[Record, ...] | list[Record],
+    *,
+    renderer_name: str,
+    style: Style,
+    palette: Palette,
+) -> tuple[Record, ...]:
+    """Validate one complete render batch before any renderer or figure is allocated."""
+
     try:
-        validated = record.validate()
-        validate_record_kinds(validated)
-    except ContractError as exc:
+        get_renderer_descriptor(renderer_name)
+        validated_records: list[Record] = []
+        for record in records:
+            validated = record.validate()
+            validate_record_kinds(validated)
+            validate_record_renderer_compatibility(validated, renderer_name=renderer_name)
+            validated_records.append(validated)
+    except (ContractError, SchemaError) as exc:
         raise RenderingError(str(exc)) from exc
+
+    renderer = get_renderer(renderer_name)
+    for validated in validated_records:
+        renderer.preflight(validated, style, palette)
+    return tuple(validated_records)
+
+
+def render_record(record: Record, *, renderer_name: str, style: Style, palette: Palette):
+    validated = validate_records_for_rendering(
+        (record,),
+        renderer_name=renderer_name,
+        style=style,
+        palette=palette,
+    )[0]
 
     renderer = get_renderer(renderer_name)
     return renderer.render(validated, style, palette)

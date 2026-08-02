@@ -74,6 +74,7 @@ latentdna  = "dnadesign.latentdna.src:main"
 permuter   = "dnadesign.permuter:main"
 baserender = "dnadesign.baserender:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
+junction = "dnadesign.junction.cli:main"
 ops        = "dnadesign.ops.cli:main"
 
 [project.optional-dependencies]

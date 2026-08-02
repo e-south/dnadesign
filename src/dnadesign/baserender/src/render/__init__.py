@@ -19,6 +19,7 @@ __all__ = [
     "legend_entries_for_record",
     "get_renderer",
     "render_record",
+    "validate_records_for_rendering",
 ]
 
 
@@ -27,10 +28,15 @@ def __getattr__(name: str):
         from .palette import Palette
 
         return Palette
-    if name in {"Renderer", "get_renderer", "render_record"}:
-        from .renderer import Renderer, get_renderer, render_record
+    if name in {"Renderer", "get_renderer", "render_record", "validate_records_for_rendering"}:
+        from .renderer import Renderer, get_renderer, render_record, validate_records_for_rendering
 
-        return {"Renderer": Renderer, "get_renderer": get_renderer, "render_record": render_record}[name]
+        return {
+            "Renderer": Renderer,
+            "get_renderer": get_renderer,
+            "render_record": render_record,
+            "validate_records_for_rendering": validate_records_for_rendering,
+        }[name]
     if name in {"LayoutContext", "compute_layout"}:
         from .layout import LayoutContext, compute_layout
 

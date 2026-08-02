@@ -30,6 +30,14 @@ _CIRCULAR_TOPOLOGY_KINDS = {"circular_duplex", "circular_dsdna_candidate"}
 _SUPPORTED_TOPOLOGY_KINDS = _CIRCULAR_TOPOLOGY_KINDS | {"branched_y", "fragment_pool"}
 
 
+@dataclass(frozen=True)
+class _TopologyCartoonInput:
+    payload: Mapping[str, Any]
+    topology_kind: str
+    evidence_mode: str
+    segments: tuple[Mapping[str, Any], ...]
+
+
 def _mapping_list(value: object) -> list[Mapping[str, Any]]:
     if not isinstance(value, list):
         return []
@@ -90,6 +98,50 @@ def _renderable_segments(payload: Mapping[str, Any], *, topology_kind: str) -> l
             "topology_cartoon requires exactly three positive-length segments for topology_kind 'branched_y'"
         )
     return renderable_segments
+
+
+def _preflight_topology_cartoon(
+    record: Record,
+    palette: Palette,
+) -> _TopologyCartoonInput:
+    payload = record.meta.get("topology_cartoon") if isinstance(record.meta, Mapping) else None
+    if not isinstance(payload, Mapping):
+        raise RenderingError("topology_cartoon requires record.meta.topology_cartoon")
+
+    topology_kind = str(payload.get("topology_kind") or "")
+    if topology_kind not in _SUPPORTED_TOPOLOGY_KINDS:
+        raise RenderingError(
+            "topology_cartoon does not support topology_kind "
+            f"{topology_kind!r}; expected one of {sorted(_SUPPORTED_TOPOLOGY_KINDS)}"
+        )
+
+    try:
+        segments = tuple(_renderable_segments(payload, topology_kind=topology_kind))
+        total_length = _sequence_length(payload)
+        if total_length <= 0:
+            raise RenderingError("topology_cartoon requires a positive sequence length")
+        for segment in segments:
+            _segment_span(segment)
+            _segment_color(segment, palette)
+        for junction in _mapping_list(payload.get("junctions")):
+            int(junction.get("join_index", 0))
+        for cut in _mapping_list(payload.get("cuts")):
+            for key in ("top_boundary", "bottom_boundary"):
+                if key in cut:
+                    int(cut[key])
+    except RenderingError:
+        raise
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RenderingError("topology_cartoon contains invalid numeric or palette evidence") from exc
+
+    meta = payload.get("meta")
+    evidence_mode = str(meta.get("evidence_mode") or "") if isinstance(meta, Mapping) else ""
+    return _TopologyCartoonInput(
+        payload=payload,
+        topology_kind=topology_kind,
+        evidence_mode=evidence_mode,
+        segments=segments,
+    )
 
 
 def _index_to_angle(index: int, total_length: int) -> float:
@@ -283,21 +335,16 @@ def _draw_linear_topology(
 
 @dataclass(frozen=True)
 class TopologyCartoonRenderer:
-    def render(self, record: Record, style: Style, palette: Palette):
-        record = record.validate()
-        payload = record.meta.get("topology_cartoon") if isinstance(record.meta, Mapping) else None
-        if not isinstance(payload, Mapping):
-            raise RenderingError("topology_cartoon requires record.meta.topology_cartoon")
+    def preflight(self, record: Record, style: Style, palette: Palette) -> None:
+        _ = style
+        _preflight_topology_cartoon(record, palette)
 
-        topology_kind = str(payload.get("topology_kind") or "")
-        meta = payload.get("meta")
-        evidence_mode = str(meta.get("evidence_mode") or "") if isinstance(meta, Mapping) else ""
-        if topology_kind not in _SUPPORTED_TOPOLOGY_KINDS:
-            raise RenderingError(
-                "topology_cartoon does not support topology_kind "
-                f"{topology_kind!r}; expected one of {sorted(_SUPPORTED_TOPOLOGY_KINDS)}"
-            )
-        segments = _renderable_segments(payload, topology_kind=topology_kind)
+    def render(self, record: Record, style: Style, palette: Palette):
+        validated = _preflight_topology_cartoon(record.validate(), palette)
+        payload = validated.payload
+        topology_kind = validated.topology_kind
+        evidence_mode = validated.evidence_mode
+        segments = validated.segments
         fig, ax = plt.subplots(figsize=(8.4, 5.0), dpi=style.dpi)
         ax.set_axis_off()
 

@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from .registry import (  # noqa: F401
         Adapter,
         build_adapter,
+        finalize_adapter,
         get_adapter_descriptor,
         list_adapter_descriptors,
         required_source_columns,
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
     from .sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter  # noqa: F401
     from .sequence_windows_v1 import SequenceWindowsV1Adapter  # noqa: F401
     from .snapback_visual_v1 import SnapbackVisualV1Adapter  # noqa: F401
+    from .three_way_junction_review_v1 import ThreeWayJunctionReviewV1Adapter  # noqa: F401
     from .usr_genbank_annotations_v1 import UsrGenbankAnnotationsV1Adapter  # noqa: F401
     from .yiu_hairpin_topology_v1 import YiuHairpinTopologyV1Adapter  # noqa: F401
     from .yiu_linear_state_v1 import YiuLinearStateV1Adapter  # noqa: F401
@@ -39,6 +41,7 @@ if TYPE_CHECKING:
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Adapter": (".registry", "Adapter"),
     "build_adapter": (".registry", "build_adapter"),
+    "finalize_adapter": (".registry", "finalize_adapter"),
     "get_adapter_descriptor": (".registry", "get_adapter_descriptor"),
     "list_adapter_descriptors": (".registry", "list_adapter_descriptors"),
     "required_source_columns": (".registry", "required_source_columns"),
@@ -50,6 +53,10 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "SequenceEvidenceMapV1Adapter": (".sequence_evidence_map_v1", "SequenceEvidenceMapV1Adapter"),
     "SequenceWindowsV1Adapter": (".sequence_windows_v1", "SequenceWindowsV1Adapter"),
     "SnapbackVisualV1Adapter": (".snapback_visual_v1", "SnapbackVisualV1Adapter"),
+    "ThreeWayJunctionReviewV1Adapter": (
+        ".three_way_junction_review_v1",
+        "ThreeWayJunctionReviewV1Adapter",
+    ),
     "UsrGenbankAnnotationsV1Adapter": (".usr_genbank_annotations_v1", "UsrGenbankAnnotationsV1Adapter"),
     "YiuHairpinTopologyV1Adapter": (".yiu_hairpin_topology_v1", "YiuHairpinTopologyV1Adapter"),
     "YiuLinearStateV1Adapter": (".yiu_linear_state_v1", "YiuLinearStateV1Adapter"),

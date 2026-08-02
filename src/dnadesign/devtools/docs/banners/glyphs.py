@@ -92,6 +92,9 @@ def glyph(name: str) -> str:
         "thread": _line("M0 16C20 16 20 44 40 44S60 16 80 16S100 44 120 44", INK, 4)
         + _rect(37, 39, 7, 10, ACCENT)
         + _rect(77, 11, 7, 10, MUTED),
+        "junction": _line("M0 24H40M40 24L76 2M40 24L76 46", INK, 4)
+        + _line("M0 36H44M44 36L80 14M44 36L80 58", MUTED, 3)
+        + _rect(37, 21, 10, 10, ACCENT),
         "records": _line("M0 8H88V22H0ZM0 27H104V41H0ZM0 46H76V60H0Z", MUTED, 3) + _rect(92, 10, 8, 8, ACCENT),
     }
     try:

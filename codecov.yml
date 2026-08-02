@@ -123,6 +123,10 @@ component_management:
       name: permuter
       paths:
         - src/dnadesign/permuter/**
+    - component_id: junction
+      name: junction
+      paths:
+        - src/dnadesign/junction/**
 
 comment:
   require_changes: true

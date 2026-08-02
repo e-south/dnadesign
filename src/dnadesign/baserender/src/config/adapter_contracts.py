@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/config/adapter_contracts.py
 
-Canonical adapter descriptor registry used by job parsing, public inspection,.
+Canonical adapter descriptor registry used by job parsing and public inspection.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,21 +11,23 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from dnadesign.contracts.visual import (
     ScarNickVisualV1,
     SequenceEvidenceMapV1,
     SnapbackVisualV1,
+    ThreeWayJunctionReviewV1,
     YiuHairpinTopologyV1,
     YiuLinearStateV1,
     YiuPayloadVisualV1,
     YiuTopologyCartoonV1,
 )
 
-from ..core import ContractError, SchemaError, ensure, reject_unknown_keys, require_one_of
+from ..core import ContractError, Record, SchemaError, ensure, reject_unknown_keys, require_one_of
+from .job_contracts import THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE, InputEnvelope
 
 PolicyNormalizer = Callable[[Mapping[str, Any], str], dict[str, Any]]
 AdapterFactory = Callable[[Any, str], Any]
@@ -188,6 +190,12 @@ def _build_snapback_visual(cfg: Any, alphabet: str) -> Any:
     return SnapbackVisualV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
+def _build_three_way_junction_review(cfg: Any, alphabet: str) -> Any:
+    from ..adapters.three_way_junction_review_v1 import ThreeWayJunctionReviewV1Adapter
+
+    return ThreeWayJunctionReviewV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
 def _build_duplex_sequence(cfg: Any, alphabet: str) -> Any:
     from ..adapters.duplex_sequence_v1 import DuplexSequenceV1Adapter
 
@@ -241,6 +249,15 @@ class AdapterDescriptor:
     allowed_policy_keys: tuple[str, ...] = ()
     resolved_path_columns: tuple[str, ...] = ()
     normalize_policies: PolicyNormalizer = _normalize_policies_passthrough
+    sensitivity: Literal["public", "private"] = "public"
+    input_envelope: InputEnvelope | None = None
+    output_kinds: tuple[Literal["images", "video"], ...] = ("images", "video")
+    image_output_modes: tuple[Literal["directory", "single_file"], ...] = (
+        "directory",
+        "single_file",
+    )
+    max_grid_records: int | None = None
+    validation_scope: Literal["row", "document"] = "row"
 
 
 AdapterContract = AdapterDescriptor
@@ -404,6 +421,25 @@ ADAPTER_DESCRIPTORS: dict[str, AdapterDescriptor] = {
         required_config_columns=(),
         required_source_columns=(),
     ),
+    "three_way_junction_review_v1": AdapterDescriptor(
+        kind="three_way_junction_review_v1",
+        owner_tool="junction",
+        contract_kind="three_way_junction_review_v1",
+        schema_model=ThreeWayJunctionReviewV1,
+        supported_renderers=("three_way_junction_review",),
+        supported_alphabets=("DNA",),
+        factory=_build_three_way_junction_review,
+        docs_slug="three-way-junction-review-v1",
+        allowed_config_columns=(),
+        required_config_columns=(),
+        required_source_columns=(),
+        sensitivity="private",
+        input_envelope=THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE,
+        output_kinds=("images",),
+        image_output_modes=("directory",),
+        max_grid_records=1,
+        validation_scope="document",
+    ),
     "duplex_sequence_v1": AdapterDescriptor(
         kind="duplex_sequence_v1",
         owner_tool="cassette",
@@ -502,6 +538,94 @@ def adapter_descriptor(kind: str) -> AdapterDescriptor:
 
 def adapter_contract(kind: str) -> AdapterContract:
     return adapter_descriptor(kind)
+
+
+def validate_adapter_output_policy(
+    adapter_kind: str,
+    *,
+    output_kind: Literal["images", "video"],
+    image_output_mode: Literal["directory", "single_file"] | None = None,
+) -> None:
+    """Enforce one adapter's publication policy without depending on job types."""
+
+    descriptor = adapter_contract(adapter_kind)
+    if output_kind not in descriptor.output_kinds:
+        allowed = ", ".join(descriptor.output_kinds)
+        raise SchemaError(f"adapter {adapter_kind!r} only supports output kinds: {allowed}")
+    if output_kind != "images":
+        return
+    if image_output_mode is None:
+        raise SchemaError("image_output_mode is required for images output")
+    if image_output_mode not in descriptor.image_output_modes:
+        if descriptor.image_output_modes == ("directory",):
+            raise SchemaError(
+                f"adapter {adapter_kind!r} requires a directory for images output; single-file images are not supported"
+            )
+        allowed = ", ".join(descriptor.image_output_modes)
+        raise SchemaError(
+            f"adapter {adapter_kind!r} does not support images output mode {image_output_mode!r}; "
+            f"supported modes: {allowed}"
+        )
+
+
+def _record_adapter_kind(record: Record, *, record_index: int) -> str | None:
+    if not isinstance(record.meta, Mapping):
+        raise SchemaError(f"records[{record_index}].meta must be a mapping/dict")
+    raw_kind = record.meta.get("adapter")
+    if raw_kind is None:
+        return None
+    if not isinstance(raw_kind, str) or not raw_kind.strip():
+        raise SchemaError(f"records[{record_index}].meta.adapter must be a non-empty string")
+    kind = raw_kind.strip()
+    adapter_contract(kind)
+    return kind
+
+
+def adapter_grid_record_limit(records: Iterable[Record]) -> int | None:
+    """Return the strictest contact-sheet limit declared by record origins."""
+
+    limit: int | None = None
+    for record_index, record in enumerate(records):
+        adapter_kind = _record_adapter_kind(record, record_index=record_index)
+        if adapter_kind is None:
+            continue
+        adapter_limit = adapter_contract(adapter_kind).max_grid_records
+        if adapter_limit is not None:
+            limit = adapter_limit if limit is None else min(limit, adapter_limit)
+    return limit
+
+
+def validate_records_output_policy(
+    records: Iterable[Record],
+    *,
+    output_kind: Literal["images", "video"],
+    image_output_mode: Literal["directory", "single_file"] | None = None,
+) -> None:
+    """Preserve adapter publication constraints on direct writer surfaces."""
+
+    for record_index, record in enumerate(records):
+        adapter_kind = _record_adapter_kind(record, record_index=record_index)
+        if adapter_kind is not None:
+            validate_adapter_output_policy(
+                adapter_kind,
+                output_kind=output_kind,
+                image_output_mode=image_output_mode,
+            )
+
+
+def validate_record_renderer_compatibility(record: Record, *, renderer_name: str) -> None:
+    """Enforce the renderer policy declared by an adapted record's origin."""
+
+    adapter_kind = _record_adapter_kind(record, record_index=0)
+    if adapter_kind is None:
+        return
+    supported_renderers = adapter_contract(adapter_kind).supported_renderers
+    if renderer_name not in supported_renderers:
+        allowed = ", ".join(sorted(supported_renderers))
+        raise SchemaError(
+            f"record.meta.adapter {adapter_kind!r} is not compatible with renderer {renderer_name!r}; "
+            f"supported renderer values: {allowed}"
+        )
 
 
 def normalize_adapter_config(

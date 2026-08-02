@@ -28,6 +28,7 @@ from dnadesign.baserender.src.outputs import (
     write_video,
 )
 from dnadesign.baserender.src.render import Palette
+from dnadesign.baserender.src.runtime import initialize_runtime
 
 
 class _FakeFFMpegWriter:
@@ -223,7 +224,7 @@ def test_write_video_draws_updated_canvas_for_each_record(monkeypatch, tmp_path:
             Record(id="blue", alphabet="DNA", sequence="TGCA"),
         ],
         output=output,
-        renderer_name="hairpin_cartoon",
+        renderer_name="sequence_rows",
         style=Style(dpi=100),
         palette=Palette(),
     )
@@ -584,8 +585,15 @@ def test_write_video_footer_legend_font_is_stable_for_variable_sequence_lengths(
     monkeypatch.setattr(animation.writers, "is_available", lambda name: True)
     monkeypatch.setattr(animation, "FFMpegWriter", _writer_factory)
     monkeypatch.setattr("dnadesign.baserender.src.outputs.video.render_record", _fake_render_record)
+    initialize_runtime()
 
-    feature = Feature(id="tfbs", kind="kmer", span=Span(start=0, end=4), label="ACGT", tags=("tf:LexA",))
+    feature = Feature(
+        id="tfbs",
+        kind="kmer",
+        span=Span(start=0, end=4, strand="fwd"),
+        label="ACGT",
+        tags=("tf:LexA",),
+    )
     records = [
         Record(
             id="short",

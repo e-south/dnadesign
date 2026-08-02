@@ -34,7 +34,11 @@ def read_selection_rows(
     key_col: str,
     overlay_col: str | None,
     content: bytes | None = None,
+    max_rows: int | None = None,
 ) -> SelectionRows:
+    if max_rows is not None and max_rows < 1:
+        raise SchemaError("selection max_rows must be >= 1 when set")
+
     keys: list[str] = []
     overlays: list[str | None] = []
     overlay_by_key: dict[str, str] = {}
@@ -54,7 +58,9 @@ def read_selection_rows(
         if overlay_col is not None and overlay_col not in reader.fieldnames:
             raise SchemaError(f"Selection CSV is missing required overlay column '{overlay_col}'")
 
-        for row in reader:
+        for row_number, row in enumerate(reader, start=1):
+            if max_rows is not None and row_number > max_rows:
+                raise SchemaError(f"Selection CSV exceeds the maximum of {max_rows} selection rows: {path}")
             raw_key = row.get(key_col)
             if raw_key is None:
                 continue
@@ -152,12 +158,14 @@ def apply_selection(
     selection: SelectionCfg,
     *,
     source_content: bytes | None = None,
+    max_rows: int | None = None,
 ) -> tuple[list[Record], list[str]]:
     rows = read_selection_rows(
         selection.path,
         key_col=selection.column,
         overlay_col=selection.overlay_column,
         content=source_content,
+        max_rows=max_rows,
     )
     mapping = _record_key_map(records, match_on=selection.match_on)
 

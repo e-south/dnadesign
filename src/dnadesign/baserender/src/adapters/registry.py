@@ -52,6 +52,14 @@ def build_adapter(adapter_cfg: AdapterCfg, *, alphabet: str) -> Adapter:
     return descriptor.factory(adapter_cfg, alphabet)
 
 
+def finalize_adapter(adapter: Adapter) -> None:
+    """Run optional validation that requires the complete source document."""
+
+    finalizer = getattr(adapter, "finalize", None)
+    if finalizer is not None:
+        finalizer()
+
+
 def list_adapter_descriptors() -> tuple[AdapterDescriptor, ...]:
     return adapter_descriptors()
 

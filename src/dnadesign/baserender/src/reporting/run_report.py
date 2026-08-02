@@ -72,11 +72,15 @@ class RunReport:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.to_json())
 
-    def capture_source_evidence(self) -> None:
+    def capture_source_evidence(self, *, max_bytes: int | None = None) -> None:
+        """Capture each declared source within the same per-file byte bound."""
+
         sources = {"input": self.input_path}
         if self.selection_path is not None:
             sources["selection"] = self.selection_path
-        self._source_evidence = {label: CapturedSource.capture(source) for label, source in sources.items()}
+        self._source_evidence = {
+            label: CapturedSource.capture(source, max_bytes=max_bytes) for label, source in sources.items()
+        }
 
     def source_content(self, label: str) -> bytes:
         evidence = self._source_evidence.get(label)

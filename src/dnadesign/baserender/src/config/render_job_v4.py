@@ -30,10 +30,15 @@ from ..core import (
     require_one_of,
 )
 from ..workspaces import WORKSPACE_MARKER_FILENAME
-from .adapter_contracts import adapter_contract, normalize_adapter_config
+from .adapter_contracts import (
+    adapter_contract,
+    normalize_adapter_config,
+    validate_adapter_output_policy,
+)
 from .job_contracts import (
     DEFAULT_RENDER_CONTRACT_KIND,
     render_contract_descriptor,
+    render_contract_renderer_kinds,
     validate_render_contract_renderer,
 )
 
@@ -525,7 +530,9 @@ def _parse_adapter(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...])
     return AdapterCfg(kind=kind, columns=parsed_columns, policies=parsed_policies)
 
 
-def _validate_adapter_compatibility(input_cfg: InputCfg, render_cfg: RenderCfg) -> None:
+def validate_adapter_renderer_compatibility(input_cfg: InputCfg, render_cfg: RenderCfg) -> None:
+    """Enforce adapter-owned renderer and alphabet constraints for any job form."""
+
     contract = adapter_contract(input_cfg.adapter.kind)
     if render_cfg.renderer not in contract.supported_renderers:
         allowed = ", ".join(sorted(contract.supported_renderers))
@@ -625,7 +632,7 @@ def _parse_render(raw: Any) -> RenderCfg:
     renderer = str(data.get("renderer", "")).strip()
     require_one_of(
         renderer,
-        {"sequence_rows", "nucleotide_evidence_map", "hairpin_cartoon", "topology_cartoon", "snapback_map"},
+        set(render_contract_renderer_kinds()),
         "render.renderer",
     )
 
@@ -871,15 +878,83 @@ def _parse_outputs(
             )
         )
 
-    destinations = [_output_destination_for_validation(output) for output in outputs]
-    destination_identities = [portable_path_identity(path.relative_to(bundle_root)) for path in destinations]
+    parsed_outputs = tuple(outputs)
+    validate_output_configuration(bundle_root, parsed_outputs)
+    return parsed_outputs
+
+
+def _output_destination_for_validation(output: OutputCfg) -> Path:
+    if isinstance(output, ImagesOutputCfg):
+        if output.path is not None:
+            return output.path
+        if output.dir is None:
+            raise SchemaError("images output must define exactly one of dir or path")
+        return output.dir
+    return output.path
+
+
+def validate_output_configuration(bundle_root: Path, outputs: tuple[OutputCfg, ...]) -> None:
+    """Revalidate parsed or already-typed output structure before any job I/O."""
+
+    ensure(isinstance(bundle_root, Path), "bundle.path must be a filesystem path", SchemaError)
+    ensure(bundle_root.is_absolute(), "bundle.path must be absolute for execution", SchemaError)
+    _reject_symlinked_path_components(bundle_root, field="bundle.path")
+    ensure(isinstance(outputs, tuple), "outputs must be a tuple in a typed job", SchemaError)
+    ensure(outputs, "outputs must contain at least one output entry", SchemaError)
+
+    seen_kinds: set[str] = set()
+    destinations: list[Path] = []
+    resolved_bundle_root = bundle_root.resolve()
+    ensure(
+        resolved_bundle_root != resolved_bundle_root.parent,
+        "bundle.path must name an owned directory",
+        SchemaError,
+    )
+    for index, output in enumerate(outputs):
+        if isinstance(output, ImagesOutputCfg):
+            ensure(output.kind == "images", f"outputs[{index}].kind must be 'images'", SchemaError)
+            ensure(output.fmt in {"png", "svg", "pdf"}, f"outputs[{index}].fmt is unsupported", SchemaError)
+            ensure(
+                (output.dir is None) != (output.path is None),
+                f"outputs[{index}] must define exactly one of dir or path for images output",
+                SchemaError,
+            )
+        elif isinstance(output, VideoOutputCfg):
+            ensure(output.kind == "video", f"outputs[{index}].kind must be 'video'", SchemaError)
+            ensure(output.fmt == "mp4", f"outputs[{index}].fmt must be 'mp4'", SchemaError)
+        else:
+            raise SchemaError(f"outputs[{index}] must be an images or video output configuration")
+
+        ensure(output.kind not in seen_kinds, f"outputs contains duplicate kind '{output.kind}'", SchemaError)
+        seen_kinds.add(output.kind)
+        destination = _output_destination_for_validation(output)
+        ensure(isinstance(destination, Path), f"outputs[{index}] destination must be a filesystem path", SchemaError)
+        _reject_symlinked_path_components(destination, field=f"outputs[{index}]")
+        resolved_destination = destination.resolve()
+        try:
+            resolved_destination.relative_to(resolved_bundle_root)
+        except ValueError as exc:
+            raise SchemaError(f"outputs[{index}] must stay inside bundle.path: {destination}") from exc
+        if isinstance(output, VideoOutputCfg) or output.path is not None:
+            ensure(
+                resolved_destination != resolved_bundle_root,
+                f"outputs[{index}].path must name a file inside bundle.path",
+                SchemaError,
+            )
+        destinations.append(resolved_destination)
+
+    destination_identities = [portable_path_identity(path.relative_to(resolved_bundle_root)) for path in destinations]
     ensure(
         len(destination_identities) == len(set(destination_identities)),
         "outputs must resolve to distinct bundle paths under the portable filesystem identity",
         SchemaError,
     )
     for index, destination in enumerate(destinations):
-        _ensure_not_reserved_bundle_metadata(destination, bundle_root=bundle_root, field=f"outputs[{index}]")
+        _ensure_not_reserved_bundle_metadata(
+            destination,
+            bundle_root=resolved_bundle_root,
+            field=f"outputs[{index}]",
+        )
     for left_index, left in enumerate(destinations):
         for right_index, right in enumerate(destinations[left_index + 1 :], start=left_index + 1):
             left_identity = destination_identities[left_index]
@@ -892,16 +967,23 @@ def _parse_outputs(
                     f"outputs[{left_index}] and outputs[{right_index}] have an impossible "
                     "file/directory prefix collision"
                 )
-    return tuple(outputs)
 
 
-def _output_destination_for_validation(output: OutputCfg) -> Path:
-    if isinstance(output, ImagesOutputCfg):
-        if output.path is not None:
-            return output.path
-        assert output.dir is not None
-        return output.dir
-    return output.path
+def validate_adapter_output_compatibility(
+    adapter_kind: str,
+    outputs: tuple[OutputCfg, ...],
+) -> None:
+    """Enforce adapter-owned publication modes for parsed or typed jobs."""
+
+    for output in outputs:
+        mode = None
+        if isinstance(output, ImagesOutputCfg):
+            mode = "single_file" if output.path is not None else "directory"
+        validate_adapter_output_policy(
+            adapter_kind,
+            output_kind=output.kind,
+            image_output_mode=mode,
+        )
 
 
 def _parse_run(raw: Any) -> RunCfg:
@@ -956,8 +1038,9 @@ def _parse_sequence_rows_job_mapping(
 
     render_cfg = _parse_render(data.get("render"))
     validate_render_contract_renderer(contract_cfg.kind, render_cfg.renderer, field="contract.kind")
-    _validate_adapter_compatibility(input_cfg, render_cfg)
+    validate_adapter_renderer_compatibility(input_cfg, render_cfg)
     outputs_cfg = _parse_outputs(job_path, bundle_cfg.path, data.get("outputs"))
+    validate_adapter_output_compatibility(input_cfg.adapter.kind, outputs_cfg)
     run_cfg = _parse_run(data.get("run"))
 
     return RenderJobV4(

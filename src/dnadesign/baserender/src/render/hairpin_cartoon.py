@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -34,19 +35,62 @@ def _feature_color(feature, palette: Palette):
     return palette.color_for(feature.kind)
 
 
+def _preflight_hairpin_cartoon(record: Record, style: Style, palette: Palette) -> Mapping[str, object]:
+    topology = record.meta.get("hairpin_topology") if isinstance(record.meta, Mapping) else None
+    if not isinstance(topology, Mapping):
+        raise RenderingError("hairpin_cartoon requires record.meta.hairpin_topology")
+
+    for key in ("stem5p_span", "loop_span", "stem3p_span"):
+        span = topology.get(key)
+        if not isinstance(span, Mapping):
+            raise RenderingError("hairpin_cartoon topology spans must be mappings")
+        start = span.get("start")
+        end = span.get("end")
+        if isinstance(start, bool) or not isinstance(start, int) or isinstance(end, bool) or not isinstance(end, int):
+            raise RenderingError("hairpin_cartoon topology span bounds must be integers")
+        if not 0 <= start < end <= len(record.sequence):
+            raise RenderingError("hairpin_cartoon topology spans must fit within the record sequence")
+
+    try:
+        for feature in record.features:
+            if feature.kind == "interval_annotation":
+                _feature_color(feature, palette)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RenderingError("hairpin_cartoon received invalid palette evidence") from exc
+
+    if bool(style.show_pair_rungs):
+        pair_effect = next((effect for effect in record.effects if effect.kind == "pair_map"), None)
+        if pair_effect is None:
+            raise RenderingError("hairpin_cartoon requires a pair_map effect")
+        pairs = pair_effect.target.get("pairs")
+        if not isinstance(pairs, list):
+            raise RenderingError("pair_map effect requires target.pairs list")
+        for pair in pairs:
+            if not isinstance(pair, Mapping):
+                raise RenderingError("pair_map pairs must be mappings")
+            try:
+                left_index = float(pair["left_index"])
+                right_index = float(pair["right_index"])
+            except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                raise RenderingError("pair_map pairs require numeric left_index and right_index") from exc
+            if not math.isfinite(left_index) or not math.isfinite(right_index):
+                raise RenderingError("pair_map pair indices must be finite")
+
+    return topology
+
+
 @dataclass(frozen=True)
 class HairpinCartoonRenderer:
+    def preflight(self, record: Record, style: Style, palette: Palette) -> None:
+        _preflight_hairpin_cartoon(record, style, palette)
+
     def render(self, record: Record, style: Style, palette: Palette):
         record = record.validate()
-        topology = record.meta.get("hairpin_topology") if isinstance(record.meta, Mapping) else None
-        if not isinstance(topology, Mapping):
-            raise RenderingError("hairpin_cartoon requires record.meta.hairpin_topology")
+        topology = _preflight_hairpin_cartoon(record, style, palette)
 
         stem5p = topology.get("stem5p_span")
         loop = topology.get("loop_span")
         stem3p = topology.get("stem3p_span")
-        if not all(isinstance(item, Mapping) for item in (stem5p, loop, stem3p)):
-            raise RenderingError("hairpin_cartoon topology spans must be mappings")
 
         fig, ax = plt.subplots(figsize=(max(6.0, len(record.sequence) * 0.22), 3.2), dpi=style.dpi)
         ax.set_axis_off()

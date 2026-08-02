@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-15
+**Last verified:** 2026-08-02
 
 For command-first routing, start with `uv run ops catalog list --simple`, then
 open the linked runbook or tool doc once you know the route.
@@ -74,9 +74,10 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `notify` | [Notify Operations](../notify/README.md) | Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows. |
 | `cruncher` | [Cruncher docs](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned design-family docs for optimization, cassettes, YIU, Snapback, scar-nick, studies, and portfolios. |
 | `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Ops commands, packaged presets, and runbook lifecycle docs. |
-| `baserender` | [baserender docs](../../src/dnadesign/baserender/docs/README.md) | Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces. |
+| `baserender` | [BaseRender documentation](../../src/dnadesign/baserender/docs/README.md) | Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces. |
 | `folding` | [Folding Docs](../../src/dnadesign/folding/docs/README.md) | Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts. |
 | `permuter` | [Permuter Docs](../../src/dnadesign/permuter/docs/README.md) | Tool-owned variant generation, workspace execution, plotting, and handoff contracts for USR, Construct, Infer, and study-owned promotion. |
+| `junction` | [`junction` documentation](../../src/dnadesign/junction/docs/README.md) | Plans three-way-junction oligos from exact DNA targets and verifies each saved bundle. |
 
 ### Status views
 

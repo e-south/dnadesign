@@ -30,9 +30,10 @@ from matplotlib.transforms import Affine2D
 from ..config import Style
 from ..core import Record, RenderingError
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
-from .effects.registry import draw_effect
+from .effects.registry import draw_effect, validate_effect
 from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
 from .palette import Palette
+from .sequence_rows_metadata import validate_sequence_rows_metadata
 
 
 def _add_fixed_layout_patch(ax, patch):
@@ -61,77 +62,113 @@ def _uses_near_feature_annotation_label(feature) -> bool:
 
 
 @dataclass(frozen=True)
-class SequenceRowsRenderer:
-    def render(self, record: Record, style: Style, palette: Palette):
-        record = record.validate()
-        show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
-        fixed_content_top_extent_px: float | None = None
-        fixed_content_bottom_extent_px: float | None = None
-        fixed_content_radius_px: float | None = None
+class _SequenceRowsInput:
+    layout: LayoutContext
+    motif_geometries: tuple[MotifLogoGeometry, ...]
+    tone_fwd: tuple[float, ...] | None
+    tone_rev: tuple[float, ...] | None
+    explicit_complement_sequence: str | None
+
+
+def _optional_meta_float(record: Record, key: str) -> float | None:
+    if not isinstance(record.meta, Mapping):
+        return None
+    raw = record.meta.get(key)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RenderingError(f"record.meta.{key} must be numeric when set") from exc
+
+
+def _preflight_sequence_rows(record: Record, style: Style, palette: Palette) -> _SequenceRowsInput:
+    validate_sequence_rows_metadata(record, style)
+    fixed_content_top_extent_px = _optional_meta_float(record, "fixed_content_top_extent_px")
+    fixed_content_bottom_extent_px = _optional_meta_float(record, "fixed_content_bottom_extent_px")
+    fixed_content_radius_px = _optional_meta_float(record, "fixed_content_radius_px")
+    cell_width_scale = _optional_meta_float(record, "cell_width_scale")
+    if cell_width_scale is None:
         cell_width_scale = 1.0
-        extra_bottom_padding_px: float = 0.0
-        if isinstance(record.meta, Mapping):
-            raw_top_extent = record.meta.get("fixed_content_top_extent_px")
-            if raw_top_extent is not None:
-                try:
-                    fixed_content_top_extent_px = float(raw_top_extent)
-                except Exception as exc:
-                    raise RenderingError("record.meta.fixed_content_top_extent_px must be numeric when set") from exc
-            raw_bottom_extent = record.meta.get("fixed_content_bottom_extent_px")
-            if raw_bottom_extent is not None:
-                try:
-                    fixed_content_bottom_extent_px = float(raw_bottom_extent)
-                except Exception as exc:
-                    raise RenderingError("record.meta.fixed_content_bottom_extent_px must be numeric when set") from exc
-            raw_radius = record.meta.get("fixed_content_radius_px")
-            if raw_radius is not None:
-                try:
-                    fixed_content_radius_px = float(raw_radius)
-                except Exception as exc:
-                    raise RenderingError("record.meta.fixed_content_radius_px must be numeric when set") from exc
-            raw_cell_width_scale = record.meta.get("cell_width_scale")
-            if raw_cell_width_scale is not None:
-                try:
-                    cell_width_scale = float(raw_cell_width_scale)
-                except Exception as exc:
-                    raise RenderingError("record.meta.cell_width_scale must be numeric when set") from exc
-                if not math.isfinite(cell_width_scale) or cell_width_scale <= 0.0:
-                    raise RenderingError("record.meta.cell_width_scale must be finite and > 0")
-            raw_extra_bottom_padding = record.meta.get("video_extra_bottom_padding_px")
-            if raw_extra_bottom_padding is not None:
-                try:
-                    extra_bottom_padding_px = float(raw_extra_bottom_padding)
-                except Exception as exc:
-                    raise RenderingError("record.meta.video_extra_bottom_padding_px must be numeric when set") from exc
-                if not math.isfinite(extra_bottom_padding_px) or extra_bottom_padding_px < 0.0:
-                    raise RenderingError("record.meta.video_extra_bottom_padding_px must be finite and >= 0")
-        layout = compute_layout(
+    if not math.isfinite(cell_width_scale) or cell_width_scale <= 0.0:
+        raise RenderingError("record.meta.cell_width_scale must be finite and > 0")
+    extra_bottom_padding_px = _optional_meta_float(record, "video_extra_bottom_padding_px")
+    if extra_bottom_padding_px is None:
+        extra_bottom_padding_px = 0.0
+    if not math.isfinite(extra_bottom_padding_px) or extra_bottom_padding_px < 0.0:
+        raise RenderingError("record.meta.video_extra_bottom_padding_px must be finite and >= 0")
+
+    layout = compute_layout(
+        record,
+        style,
+        cell_width_scale=cell_width_scale,
+        fixed_content_top_extent_px=fixed_content_top_extent_px,
+        fixed_content_bottom_extent_px=fixed_content_bottom_extent_px,
+        fixed_content_radius_px=fixed_content_radius_px,
+        extra_bottom_padding_px=extra_bottom_padding_px,
+    )
+    motif_geometries = tuple(
+        compute_motif_logo_geometry(
+            record=record,
+            effect_index=effect_index,
+            layout=layout,
+            style=style,
+            feature_boxes={},
+        )
+        for effect_index, effect in enumerate(record.effects)
+        if effect.kind == "motif_logo"
+    )
+
+    explicit_complement_sequence: str | None = None
+    if isinstance(record.meta, Mapping):
+        raw_complement = record.meta.get("complement_sequence")
+        if isinstance(raw_complement, str) and len(raw_complement) == len(record.sequence):
+            explicit_complement_sequence = raw_complement
+
+    tone_fwd: tuple[float, ...] | None = None
+    tone_rev: tuple[float, ...] | None = None
+    if bool(style.sequence.bold_consensus_bases) and motif_geometries:
+        tone_fwd, tone_rev = _sequence_tone_strengths(
             record,
-            style,
-            cell_width_scale=cell_width_scale,
-            fixed_content_top_extent_px=fixed_content_top_extent_px,
-            fixed_content_bottom_extent_px=fixed_content_bottom_extent_px,
-            fixed_content_radius_px=fixed_content_radius_px,
-            extra_bottom_padding_px=extra_bottom_padding_px,
+            motif_geometries,
+            q_low=float(style.sequence.tone_quantile_low),
+            q_high=float(style.sequence.tone_quantile_high),
+            complement_sequence=explicit_complement_sequence,
         )
 
-        motif_geometries: list[MotifLogoGeometry] = []
-        for effect_index, effect in enumerate(record.effects):
-            if effect.kind != "motif_logo":
-                continue
-            motif_geometries.append(
-                compute_motif_logo_geometry(
-                    record=record,
-                    effect_index=effect_index,
-                    layout=layout,
-                    style=style,
-                    feature_boxes={},
-                )
-            )
+    try:
+        for feature in record.features:
+            tag = str(feature.attrs.get("style_token", "")) or (feature.tags[0] if feature.tags else feature.kind)
+            palette.color_for(tag)
+        feature_boxes = dict(layout.feature_boxes)
+        for effect in record.effects:
+            validate_effect(effect, record, layout, style, palette, feature_boxes)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RenderingError("sequence_rows received invalid palette evidence") from exc
 
-        tone_fwd: Sequence[float] | None = None
-        tone_rev: Sequence[float] | None = None
-        explicit_complement_sequence: str | None = None
+    return _SequenceRowsInput(
+        layout=layout,
+        motif_geometries=motif_geometries,
+        tone_fwd=tone_fwd,
+        tone_rev=tone_rev,
+        explicit_complement_sequence=explicit_complement_sequence,
+    )
+
+
+@dataclass(frozen=True)
+class SequenceRowsRenderer:
+    def preflight(self, record: Record, style: Style, palette: Palette) -> None:
+        _preflight_sequence_rows(record, style, palette)
+
+    def render(self, record: Record, style: Style, palette: Palette):
+        record = record.validate()
+        prepared = _preflight_sequence_rows(record, style, palette)
+        show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
+        layout = prepared.layout
+        motif_geometries = list(prepared.motif_geometries)
+        tone_fwd = prepared.tone_fwd
+        tone_rev = prepared.tone_rev
+        explicit_complement_sequence = prepared.explicit_complement_sequence
         base_highlights: Mapping[str, Sequence[int]] = {}
         base_highlight_color: Mapping[str, str] = {}
         base_highlight_colors: Mapping[str, Mapping[int, str]] = {}
@@ -144,9 +181,6 @@ class SequenceRowsRenderer:
         span_brackets: Sequence[Mapping[str, object]] = ()
         panel_transition_arrows: Sequence[Mapping[str, object]] = ()
         if isinstance(record.meta, Mapping):
-            raw_complement = record.meta.get("complement_sequence")
-            if isinstance(raw_complement, str) and len(raw_complement) == len(record.sequence):
-                explicit_complement_sequence = raw_complement
             raw_highlights = record.meta.get("base_highlights")
             if isinstance(raw_highlights, Mapping):
                 base_highlights = raw_highlights
@@ -182,15 +216,6 @@ class SequenceRowsRenderer:
                 raw_panel_transition_arrows, (str, bytes)
             ):
                 panel_transition_arrows = raw_panel_transition_arrows
-        if bool(style.sequence.bold_consensus_bases) and motif_geometries:
-            tone_fwd, tone_rev = _sequence_tone_strengths(
-                record,
-                motif_geometries,
-                q_low=float(style.sequence.tone_quantile_low),
-                q_high=float(style.sequence.tone_quantile_high),
-                complement_sequence=explicit_complement_sequence,
-            )
-
         fig_scale = float(style.figure_scale)
         has_trajectory_panel = record.display.trajectory_panel is not None
         sequence_width_px = float(layout.width) * fig_scale

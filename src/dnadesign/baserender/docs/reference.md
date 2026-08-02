@@ -3,14 +3,13 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 ---
 
-# baserender Reference
+# BaseRender reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
-
+**Last verified:** 2026-08-02
 
 Single technical reference for operators and integrators.
 
@@ -95,6 +94,7 @@ Render-contract descriptors:
 - `hairpin_cartoon_render_v3`: hairpin topology cartoon visualization; accepts `hairpin_cartoon`
 - `topology_cartoon_render_v3`: explicit segment-topology cartoon visualization; accepts `topology_cartoon`
 - `snapback_map_render_v3`: snapback visual-map rendering; accepts `snapback_map`
+- `three_way_junction_review_render_v1`: private four-panel quality review; accepts `three_way_junction_review` and limits input to 64 MiB, 2,000 records, and 10,000,000 target bases
 
 Adapters:
 - `densegen_tfbs`
@@ -108,6 +108,7 @@ Adapters:
 - `yiu_payload_visual_v1`
 - `yiu_hairpin_topology_v1`
 - `yiu_topology_cartoon_v1`
+- `three_way_junction_review_v1`
 
 ### USR GenBank Annotations
 
@@ -154,6 +155,9 @@ Renderer families:
 - `topology_cartoon`
   - topology cartoons require explicit segment geometry; zero-length separator spans are ignored, and visible bands must be positive-length
 - `snapback_map`
+- `three_way_junction_review`
+  - consumes exact target geometry, junction assignments, strand roles, primer declarations, and search receipts
+  - reports thermodynamic screening as `not_run`; it does not infer or simulate missing evidence
 
 Shared cross-tool contract models live under `dnadesign.contracts.visual`. Cruncher and other producers publish those contracts; BaseRender parses them and adapts them to `Record`.
 
@@ -209,6 +213,7 @@ Publication:
 - publication copies that complete tree to same-filesystem adjacent staging, then performs one atomic create-only directory rename
 - existing bundle paths fail; reruns must choose a new versioned `bundle.path`
 - failed rendering or publication never exposes a partial final bundle
+- render-contract descriptors may declare `private` sensitivity; those bundles retain recursive owner-only modes (`0700` directories and `0600` files) instead of restoring staged public modes
 
 ## Public API Boundary
 
@@ -226,7 +231,7 @@ Stable API surface:
 - `SequencePanelConfig`, `SequencePanelDiagnostics`, `SequencePanelImage`
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
 - `Style`, `resolve_style`, `resolve_preset_path`, `list_style_presets`
-- `SchemaError`, `ContractError`, `LayoutError`
+- `SchemaError`, `ContractError`, `LayoutError`, `RenderingError`
 
 Sequence-panel contract:
 - contract id: `dnadesign.baserender.sequence_panel.v1`
@@ -246,15 +251,18 @@ Sequence-panel layout:
 - record list input defaults to a single-row layout (`ncols = len(records)`).
 - callers can override with `grid.ncols`.
 - invalid/unknown `grid` keys fail fast (`SchemaError`).
+- invalid records and record-to-renderer mismatches fail before any panel or
+  output is created (`RenderingError`), for both single-record and grid input.
 
 Boundary rule:
 - supported imports: `dnadesign.baserender`
 - unsupported/private imports: `dnadesign.baserender.src.*`
 
 Tool-specific wiring examples live in:
-- `docs/integrations/densegen.md`
-- `docs/integrations/cruncher.md`
-- `docs/integrations/yiu.md`
+- [DenseGen](integrations/densegen.md)
+- [Cruncher](integrations/cruncher.md)
+- [YIU](integrations/yiu.md)
+- [junction](integrations/junction.md)
 
 ## Runtime Flow
 
