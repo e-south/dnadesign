@@ -27,6 +27,11 @@ def _workflow(filename: str = "ci.yaml") -> dict:
     return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
 
 
+def _workflow_paths() -> list[Path]:
+    workflow_dir = _repo_root() / ".github" / "workflows"
+    return sorted((*workflow_dir.glob("*.yaml"), *workflow_dir.glob("*.yml")))
+
+
 def test_ci_workflow_uses_core_and_external_integration_lane_ids() -> None:
     workflow = _workflow()
     jobs = workflow["jobs"]
@@ -148,12 +153,8 @@ def test_fresh_ci_lanes_recreate_changed_file_list_before_resolving_test_targets
 
 
 def test_third_party_workflow_actions_are_pinned_to_full_commit_shas() -> None:
-    current = Path(__file__).resolve()
-    repo_root = next(parent for parent in current.parents if (parent / "pyproject.toml").exists())
-    workflow_paths = sorted((repo_root / ".github" / "workflows").glob("*.yaml"))
-
     unpinned: list[str] = []
-    for workflow_path in workflow_paths:
+    for workflow_path in _workflow_paths():
         workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
         for job_id, job in workflow.get("jobs", {}).items():
             for step in job.get("steps", ()):
@@ -178,6 +179,27 @@ def test_dependency_review_workflow_is_pr_only_and_least_privilege() -> None:
     assert "permissions" not in job
     review_step = next(step for step in job["steps"] if step["uses"].startswith("actions/dependency-review-action@"))
     assert review_step["with"]["fail-on-severity"] == "moderate"
+
+
+def test_checkout_and_artifact_actions_use_current_node24_releases() -> None:
+    expected_refs = {
+        "actions/checkout": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "actions/upload-artifact": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "actions/download-artifact": "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+    }
+    observed_refs: dict[str, list[str]] = {action: [] for action in expected_refs}
+    for workflow_path in _workflow_paths():
+        workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+        for job in workflow.get("jobs", {}).values():
+            for step in job.get("steps", ()):
+                action_ref = str(step.get("uses", ""))
+                action = action_ref.partition("@")[0]
+                if action in observed_refs:
+                    observed_refs[action].append(action_ref)
+
+    for action, expected_ref in expected_refs.items():
+        assert observed_refs[action], f"expected at least one {action} use"
+        assert set(observed_refs[action]) == {expected_ref}
 
 
 def test_codecov_uploads_use_node24_compatible_action() -> None:
