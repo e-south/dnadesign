@@ -186,6 +186,25 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
             "thermodynamic_screening check status",
         ),
         (
+            lambda payload: payload["checks"].pop(),
+            "exactly one pool-scoped thermodynamic_screening check",
+        ),
+        (
+            lambda payload: payload["checks"][1]["subject"].update({"kind": "target", "id": "target-01"}),
+            "exactly one pool-scoped thermodynamic_screening check",
+        ),
+        (
+            lambda payload: payload["checks"].append(
+                {
+                    "subject": {"kind": "target", "id": "target-01"},
+                    "check": "thermodynamic_screening",
+                    "status": "not_run",
+                    "detail": "duplicate scope",
+                }
+            ),
+            "exactly one pool-scoped thermodynamic_screening check",
+        ),
+        (
             lambda payload: payload["recovery"].update({"mode": "construct_specific"}),
             "recovery.mode",
         ),

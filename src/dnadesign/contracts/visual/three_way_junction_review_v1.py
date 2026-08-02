@@ -341,6 +341,15 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
         check_keys = [(check.subject.kind, check.subject.id, check.check) for check in self.checks]
         if len(check_keys) != len(set(check_keys)):
             raise ValueError("check subject and name tuples must be unique")
+        thermodynamic_checks = [check for check in self.checks if check.check == "thermodynamic_screening"]
+        if (
+            len(thermodynamic_checks) != 1
+            or thermodynamic_checks[0].subject.kind != "pool"
+            or thermodynamic_checks[0].subject.id != self.target.pool_id
+        ):
+            raise ValueError(
+                "checks must contain exactly one pool-scoped thermodynamic_screening check for target.pool_id"
+            )
         for check in self.checks:
             if check.subject.kind == "target" and check.subject.id != self.target.target_id:
                 raise ValueError("target check subject id must match target.target_id")
