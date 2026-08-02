@@ -344,6 +344,8 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
                 raise ValueError("target check subject id must match target.target_id")
             if check.subject.kind == "pool" and check.subject.id != self.target.pool_id:
                 raise ValueError("pool check subject id must match target.pool_id")
+            if check.check == "thermodynamic_screening" and check.status != "not_run":
+                raise ValueError("thermodynamic_screening check status must be not_run")
         return self
 
 

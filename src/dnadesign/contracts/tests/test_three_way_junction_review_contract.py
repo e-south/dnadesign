@@ -159,6 +159,10 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
         review.recovery.forward.five_prime_extension_5to3 + review.recovery.forward.binding_sequence_5to3
     )
     assert review.search.thermodynamic_screening == "not_run"
+    assert {(check.check, check.status) for check in review.checks} == {
+        ("target_reconstruction", "passed"),
+        ("thermodynamic_screening", "not_run"),
+    }
 
 
 @pytest.mark.parametrize(
@@ -176,6 +180,10 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
         (
             lambda payload: payload["search"].update({"thermodynamic_screening": "passed"}),
             "thermodynamic_screening",
+        ),
+        (
+            lambda payload: payload["checks"][1].update({"status": "passed"}),
+            "thermodynamic_screening check status",
         ),
         (
             lambda payload: payload["recovery"].update({"mode": "construct_specific"}),

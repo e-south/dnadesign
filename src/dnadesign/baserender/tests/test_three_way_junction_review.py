@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import hashlib
 import json
 import stat
 from pathlib import Path
@@ -24,136 +23,7 @@ import dnadesign.trijunction as trijunction
 from dnadesign.baserender.src.core import RenderingError
 from dnadesign.baserender.src.outputs.names import _unique_stem
 
-
-def _reverse_complement(sequence: str) -> str:
-    return sequence.translate(str.maketrans("ACGT", "TGCA"))[::-1]
-
-
-def _payload() -> dict[str, object]:
-    target = "AAAACCCCGGGGTTTTAAAACCCC"
-    toehold = target[10:14]
-    reverse_binding = _reverse_complement(target[-4:])
-    return {
-        "contract_kind": "three_way_junction_review_v1",
-        "source": {
-            "plan_schema": "dnadesign.trijunction.plan.v1",
-            "plan_id": f"sha256:{'a' * 64}",
-            "request_sha256": f"sha256:{'b' * 64}",
-            "algorithm": "trijunction.v1",
-        },
-        "target": {
-            "target_id": "target-01",
-            "pool_id": "pool-01",
-            "sequence_5to3": target,
-            "sequence_sha256": f"sha256:{hashlib.sha256(target.encode()).hexdigest()}",
-        },
-        "geometry": {
-            "fragments": [
-                {
-                    "fragment_id": "fragment-01",
-                    "index": 0,
-                    "role": "first",
-                    "domain_span": {"start": 0, "end": 10},
-                },
-                {
-                    "fragment_id": "fragment-02",
-                    "index": 1,
-                    "role": "last",
-                    "domain_span": {"start": 14, "end": len(target)},
-                },
-            ],
-            "junctions": [
-                {
-                    "junction_id": "junction-01",
-                    "toehold_span": {"start": 10, "end": 14},
-                    "left_fragment_id": "fragment-01",
-                    "right_fragment_id": "fragment-02",
-                    "toehold": toehold,
-                    "toehold_complement": _reverse_complement(toehold),
-                    "barcode": "AACCGGTT",
-                    "barcode_complement": "AACCGGTT",
-                    "complement_nick_geometry_valid": True,
-                    "complement_end_preparation": "vendor_5_prime_phosphate",
-                }
-            ],
-        },
-        "strands": [
-            {
-                "fragment_id": "fragment-01",
-                "role": "first",
-                "incoming_junction_id": None,
-                "outgoing_junction_id": "junction-01",
-                "barcode_bearing_sequence_5to3": target[:14] + "AACCGGTT",
-                "complement_sequence_5to3": _reverse_complement(target[:10]),
-            },
-            {
-                "fragment_id": "fragment-02",
-                "role": "last",
-                "incoming_junction_id": "junction-01",
-                "outgoing_junction_id": None,
-                "barcode_bearing_sequence_5to3": _reverse_complement("AACCGGTT") + target[14:],
-                "complement_sequence_5to3": _reverse_complement(target[14:]) + _reverse_complement(toehold),
-            },
-        ],
-        "recovery": {
-            "mode": "universal",
-            "forward": {
-                "direction": "forward",
-                "binding_sequence_5to3": target[:4],
-                "five_prime_extension_5to3": "",
-                "order_sequence_5to3": target[:4],
-                "target_binding_span": {"start": 0, "end": 4},
-            },
-            "reverse": {
-                "direction": "reverse",
-                "binding_sequence_5to3": reverse_binding,
-                "five_prime_extension_5to3": "",
-                "order_sequence_5to3": reverse_binding,
-                "target_binding_span": {"start": 20, "end": 24},
-            },
-            "first_fragment_id": "fragment-01",
-            "last_fragment_id": "fragment-02",
-            "expected_product_sequence_5to3": target,
-            "extended_top_sequence_5to3": target,
-            "extended_bottom_sequence_5to3": _reverse_complement(target),
-        },
-        "search": {
-            "pool_id": "pool-01",
-            "toehold_seed": 11,
-            "barcode_generation_seed": 12,
-            "barcode_subset_seed": 13,
-            "matching_seed": 14,
-            "locus_count": 1,
-            "toehold_paths_evaluated": 20,
-            "toehold_min_distance": 4.0,
-            "toehold_mean_distance": 4.0,
-            "toehold_rank_score": 1.0,
-            "barcode_candidates_generated": 25,
-            "barcode_forbidden_toehold_k": 3,
-            "barcode_forbidden_barcode_k": 4,
-            "barcode_subsets_evaluated": 20,
-            "barcode_min_distance": 6.0,
-            "barcode_mean_distance": 6.0,
-            "barcode_rank_score": 1.0,
-            "matchings_evaluated": 1,
-            "matching_max_pairwise_lcs": 2,
-            "thermodynamic_screening": "not_run",
-        },
-        "checks": [
-            {
-                "subject": {"kind": "target", "id": "target-01"},
-                "check": "exact_target_reconstruction",
-                "status": "passed",
-                "detail": "exact",
-            },
-            {
-                "subject": {"kind": "pool", "id": "pool-01"},
-                "check": "thermodynamic_screening",
-                "status": "not_run",
-                "detail": "not performed",
-            },
-        ],
-    }
+from .three_way_junction_review.fixtures import _payload, _reverse_complement
 
 
 def _trijunction_request() -> dict[str, object]:
@@ -238,6 +108,11 @@ def test_review_renderer_emits_one_semantic_four_panel_figure() -> None:
         assert "universal" in text
         assert "THERMODYNAMIC SCREENING NOT RUN" in text
         assert "1 junction" in text
+        assert "FWD bind · 4 nt" in text
+        assert "FWD 5′ ext · 0 nt" in text
+        assert "Primer sequence previews · digest = SHA-256[:12]" in text
+        assert "AAAA" not in text
+        assert "AA…A" in text
     finally:
         plt.close(figure)
 
@@ -347,6 +222,22 @@ def test_adapter_rejects_unvalidated_review_payloads() -> None:
 
     with pytest.raises(baserender.SchemaError, match="thermodynamic_screening"):
         baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+
+def test_adapter_rejects_contradictory_thermodynamic_check_status() -> None:
+    payload = _payload()
+    payload["checks"][1]["status"] = "passed"
+
+    with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
+        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+
+def test_review_renderer_rejects_contradictory_thermodynamic_check_status() -> None:
+    record = baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1")
+    record.meta["three_way_junction_review"]["checks"][1]["status"] = "passed"
+
+    with pytest.raises(RenderingError, match="invalid review evidence"):
+        baserender.render(record, renderer="three_way_junction_review")
 
 
 def test_review_validation_errors_redact_raw_input_values() -> None:

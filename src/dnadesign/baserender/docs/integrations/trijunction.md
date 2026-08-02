@@ -8,6 +8,11 @@ last_verified: 2026-08-02
 
 # TriJunction review integration
 
+**Type:** runbook
+**Plane:** downstream-tool
+**Owner-boundary:** TriJunction owns the verified design bundle; BaseRender owns the separate review bundle
+**Entry artifact:** verified `views/three_way_junction_review.v1.json` from a TriJunction bundle
+**Exit artifact:** create-only private BaseRender bundle with one optional QA image per selected target
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-08-02
 
@@ -29,6 +34,12 @@ The four panels have stable meanings:
 2. explicit toehold-to-barcode assignments;
 3. strand roles and declared recovery primers;
 4. search receipts, checks, and the unresolved thermodynamic boundary.
+
+The fixed-width junction and recovery panels display bounded sequence previews
+with total nucleotide length and a 12-hex-character SHA-256 prefix. The
+ellipsis is explicit: rendered labels are review aids, not exact ordering
+evidence. Complete toehold, barcode, primer-binding, extension, and order
+sequences remain in the typed review record and TriJunction order evidence.
 
 The contract keeps primer mechanics separate:
 

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -27,6 +28,7 @@ from ..config import Style
 from ..core import Record, RenderingError
 from ..core.pydantic_validation import format_validation_error
 from .palette import Palette
+from .sequence_preview import bounded_sequence_preview, bounded_text_preview
 
 _INK = "#172033"
 _MUTED = "#667085"
@@ -44,6 +46,32 @@ _AXIS_GIDS = (
     "three-way-junction-review:strands-and-recovery",
     "three-way-junction-review:search-and-checks",
 )
+
+_MAX_DISPLAYED_LOCI = 6
+
+
+def _display_indices(length: int) -> tuple[int, ...]:
+    if length <= _MAX_DISPLAYED_LOCI:
+        return tuple(range(length))
+    side = _MAX_DISPLAYED_LOCI // 2
+    return (*range(side), *range(length - side, length))
+
+
+def _integer_preview(value: int) -> tuple[str, bool]:
+    if abs(value) < 10**18:
+        return str(value), False
+    magnitude = abs(value)
+    digit_count = max(1, (magnitude.bit_length() * 30_103) // 100_000 + 1)
+    while magnitude < 10 ** (digit_count - 1):
+        digit_count -= 1
+    while magnitude >= 10**digit_count:
+        digit_count += 1
+    leading = magnitude // (10 ** (digit_count - 4))
+    trailing = magnitude % 10**4
+    byte_length = max(1, (magnitude.bit_length() + 7) // 8)
+    digest = hashlib.sha256(magnitude.to_bytes(byte_length, "big")).hexdigest()[:12]
+    sign = "-" if value < 0 else ""
+    return f"{digit_count} digits · {digest} · {sign}{leading:04d}…{trailing:04d}", True
 
 
 def _review_from_record(record: Record) -> ThreeWayJunctionReviewV1:
@@ -73,10 +101,25 @@ def _setup_axis(axis, *, title: str, gid: str) -> None:
 
 def _panel_geometry(axis, review: ThreeWayJunctionReviewV1) -> None:
     target_length = len(review.target.sequence_5to3)
-    axis.text(0.02, 0.92, review.target.target_id, fontsize=10, fontweight="semibold", color=_INK, va="top")
+    target_id = bounded_text_preview(review.target.target_id)
+    if target_id.abbreviated:
+        axis.text(
+            0.02,
+            0.92,
+            f"Target ID · {target_id.length_chars} chars · SHA-256[:12] {target_id.sha256_prefix}",
+            fontsize=6.5,
+            fontweight="semibold",
+            color=_INK,
+            va="top",
+        )
+        axis.text(0.02, 0.86, f"preview {target_id.preview}", fontsize=6.5, family="monospace", color=_INK, va="top")
+        summary_y = 0.78
+    else:
+        axis.text(0.02, 0.92, target_id.preview, fontsize=10, fontweight="semibold", color=_INK, va="top")
+        summary_y = 0.83
     axis.text(
         0.02,
-        0.83,
+        summary_y,
         f"{target_length} nt  ·  {len(review.geometry.fragments)} fragments  ·  {len(review.geometry.junctions)} "
         f"junction{'s' if len(review.geometry.junctions) != 1 else ''}",
         fontsize=8.2,
@@ -85,20 +128,36 @@ def _panel_geometry(axis, review: ThreeWayJunctionReviewV1) -> None:
     )
     y = 0.55
     axis.plot([0.05, 0.95], [y, y], color=_INK, linewidth=1.2, zorder=1)
-    for fragment in review.geometry.fragments:
+    fragment_indices = set(_display_indices(len(review.geometry.fragments)))
+    junction_indices = set(_display_indices(len(review.geometry.junctions)))
+    for index, fragment in enumerate(review.geometry.fragments):
+        if index not in fragment_indices:
+            continue
         x = 0.05 + 0.90 * fragment.domain_span.start / target_length
         width = 0.90 * (fragment.domain_span.end - fragment.domain_span.start) / target_length
         axis.add_patch(Rectangle((x, y - 0.08), width, 0.16, facecolor=_FRAGMENT, edgecolor="white", linewidth=1.0))
         axis.text(x + width / 2, y, f"F{fragment.index + 1}", ha="center", va="center", fontsize=8, color=_INK)
-    for junction in review.geometry.junctions:
+    for index, junction in enumerate(review.geometry.junctions):
+        if index not in junction_indices:
+            continue
         x = 0.05 + 0.90 * junction.toehold_span.start / target_length
         width = 0.90 * (junction.toehold_span.end - junction.toehold_span.start) / target_length
         axis.add_patch(Rectangle((x, y - 0.08), width, 0.16, facecolor=_TOEHOLD, edgecolor="white", linewidth=0.8))
         axis.plot([x + width / 2, x + width / 2], [y - 0.16, y + 0.16], color=_INK, linewidth=0.7)
     axis.text(0.05, 0.32, "0", fontsize=7.5, color=_MUTED, ha="center")
     axis.text(0.95, 0.32, str(target_length), fontsize=7.5, color=_MUTED, ha="center")
-    axis.text(0.02, 0.13, "Gray: target domains", fontsize=7.6, color=_MUTED)
-    axis.text(0.54, 0.13, "Blue: selected toeholds", fontsize=7.6, color=_MUTED)
+    if len(fragment_indices) < len(review.geometry.fragments):
+        axis.text(
+            0.02,
+            0.13,
+            f"Geometry preview · {len(fragment_indices)}/{len(review.geometry.fragments)} fragments · "
+            f"{len(junction_indices)}/{len(review.geometry.junctions)} junctions",
+            fontsize=6.8,
+            color=_MUTED,
+        )
+    else:
+        axis.text(0.02, 0.13, "Gray: target domains", fontsize=7.6, color=_MUTED)
+        axis.text(0.54, 0.13, "Blue: selected toeholds", fontsize=7.6, color=_MUTED)
 
 
 def _panel_junctions(axis, review: ThreeWayJunctionReviewV1) -> None:
@@ -106,32 +165,68 @@ def _panel_junctions(axis, review: ThreeWayJunctionReviewV1) -> None:
     axis.text(
         0.02,
         0.92,
-        f"{len(junctions)} junction{'s' if len(junctions) != 1 else ''} · every locus shown",
+        f"{len(junctions)} junction{'s' if len(junctions) != 1 else ''} · "
+        f"{'every locus shown' if len(junctions) <= 5 else 'bounded locus preview'}",
         fontsize=8.5,
         color=_MUTED,
         va="top",
     )
-    y = 0.74
-    row_gap = min(0.14, 0.55 / max(1, len(junctions)))
-    for index, junction in enumerate(junctions):
-        row_y = y - index * row_gap
-        axis.scatter([0.09], [row_y], s=28, color=_TOEHOLD, edgecolors="white", linewidths=0.6, zorder=3)
-        axis.scatter([0.54], [row_y], s=28, color=_BARCODE, edgecolors="white", linewidths=0.6, zorder=3)
-        axis.plot([0.11, 0.52], [row_y, row_y], color=_GRID, linewidth=1.0, zorder=1)
-        if len(junctions) <= 5 or index in {0, len(junctions) - 1}:
-            axis.text(0.14, row_y, junction.toehold, fontsize=7.6, family="monospace", color=_INK, va="center")
-            axis.text(0.59, row_y, junction.barcode, fontsize=7.6, family="monospace", color=_INK, va="center")
-        else:
+    if len(junctions) <= 5:
+        axis.text(
+            0.02,
+            0.83,
+            "Sequence previews · digest = SHA-256[:12]",
+            fontsize=6.5,
+            color=_MUTED,
+            va="top",
+        )
+        axis.text(0.02, 0.77, "T = toehold · B = matched barcode", fontsize=6.5, color=_MUTED, va="top")
+        row_gap = min(0.125, 0.58 / max(1, len(junctions)))
+        for index, junction in enumerate(junctions):
+            row_y = 0.68 - index * row_gap
+            toehold_preview = bounded_sequence_preview(junction.toehold)
+            barcode_preview = bounded_sequence_preview(junction.barcode)
+            axis.scatter([0.04], [row_y + 0.028], s=22, color=_TOEHOLD, edgecolors="white", linewidths=0.5)
+            axis.scatter([0.04], [row_y - 0.028], s=22, color=_BARCODE, edgecolors="white", linewidths=0.5)
+            axis.text(
+                0.07,
+                row_y + 0.028,
+                toehold_preview.label(f"J{index + 1} T"),
+                fontsize=6.2,
+                family="monospace",
+                color=_INK,
+                va="center",
+            )
+            axis.text(
+                0.07,
+                row_y - 0.028,
+                barcode_preview.label(f"J{index + 1} B"),
+                fontsize=6.2,
+                family="monospace",
+                color=_INK,
+                va="center",
+            )
+    else:
+        y = 0.74
+        displayed_indices = _display_indices(len(junctions))
+        row_gap = min(0.11, 0.55 / len(displayed_indices))
+        for display_index, index in enumerate(displayed_indices):
+            row_y = y - display_index * row_gap
+            axis.scatter([0.09], [row_y], s=28, color=_TOEHOLD, edgecolors="white", linewidths=0.6, zorder=3)
+            axis.scatter([0.54], [row_y], s=28, color=_BARCODE, edgecolors="white", linewidths=0.6, zorder=3)
+            axis.plot([0.11, 0.52], [row_y, row_y], color=_GRID, linewidth=1.0, zorder=1)
             axis.text(0.14, row_y, f"J{index + 1}", fontsize=7.6, color=_INK, va="center")
             axis.text(0.59, row_y, f"J{index + 1}", fontsize=7.6, color=_INK, va="center")
-    axis.text(0.03, 0.18, "toehold", fontsize=7.8, color=_TOEHOLD, fontweight="semibold")
-    axis.text(0.54, 0.18, "matched barcode", fontsize=7.8, color=_BARCODE, fontweight="semibold")
-    if len(junctions) > 5:
-        axis.text(0.03, 0.08, "Interior sequences remain explicit in the review contract.", fontsize=7.0, color=_MUTED)
-
-
-def _extension_label(sequence: str) -> str:
-    return sequence if sequence else "none"
+        axis.text(0.03, 0.18, "toehold", fontsize=7.8, color=_TOEHOLD, fontweight="semibold")
+        axis.text(0.54, 0.18, "matched barcode", fontsize=7.8, color=_BARCODE, fontweight="semibold")
+        omitted = len(junctions) - len(displayed_indices)
+        axis.text(
+            0.03,
+            0.08,
+            f"{omitted} loci omitted from preview; exact assignments remain in the typed contract.",
+            fontsize=6.5,
+            color=_MUTED,
+        )
 
 
 def _panel_strands_and_recovery(axis, review: ThreeWayJunctionReviewV1) -> None:
@@ -163,42 +258,69 @@ def _panel_strands_and_recovery(axis, review: ThreeWayJunctionReviewV1) -> None:
         axis.text(x + 0.135, 0.715, f"{role} · {role_counts[role]}", ha="center", va="center", fontsize=7.5, color=_INK)
     recovery = review.recovery
     axis.text(0.03, 0.53, f"Recovery · {recovery.mode}", fontsize=8.5, fontweight="semibold", color=_RECOVERY)
-    axis.text(
-        0.03,
-        0.42,
-        f"Forward  bind {recovery.forward.binding_sequence_5to3}  ·  5′ extension "
-        f"{_extension_label(recovery.forward.five_prime_extension_5to3)}",
-        fontsize=7.3,
-        family="monospace",
-        color=_INK,
+    axis.text(0.03, 0.46, "Primer sequence previews · digest = SHA-256[:12]", fontsize=6.8, color=_MUTED)
+    primer_rows = (
+        ("FWD bind", recovery.forward.binding_sequence_5to3),
+        ("FWD 5′ ext", recovery.forward.five_prime_extension_5to3),
+        ("REV bind", recovery.reverse.binding_sequence_5to3),
+        ("REV 5′ ext", recovery.reverse.five_prime_extension_5to3),
     )
-    axis.text(
-        0.03,
-        0.31,
-        f"Reverse  bind {recovery.reverse.binding_sequence_5to3}  ·  5′ extension "
-        f"{_extension_label(recovery.reverse.five_prime_extension_5to3)}",
-        fontsize=7.3,
-        family="monospace",
-        color=_INK,
-    )
-    axis.text(0.03, 0.15, "Order sequence = declared extension + binding sequence", fontsize=7.2, color=_MUTED)
-    axis.text(0.03, 0.07, "No cloning meaning is inferred from an extension.", fontsize=7.2, color=_MUTED)
+    for index, (label, sequence) in enumerate(primer_rows):
+        preview = bounded_sequence_preview(sequence)
+        axis.text(
+            0.03,
+            0.39 - index * 0.065,
+            preview.label(label),
+            fontsize=6.5,
+            family="monospace",
+            color=_INK,
+        )
+    axis.text(0.03, 0.10, "Order = declared 5′ extension + binding sequence", fontsize=6.8, color=_MUTED)
+    axis.text(0.03, 0.03, "Exact sequences remain in the typed review contract.", fontsize=6.8, color=_MUTED)
 
 
 def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
     search = review.search
-    axis.text(0.02, 0.92, f"Pool {search.pool_id}", fontsize=9.0, fontweight="semibold", color=_INK, va="top")
+    pool_id = bounded_text_preview(search.pool_id)
+    if pool_id.abbreviated:
+        axis.text(
+            0.02,
+            0.92,
+            f"Pool ID · {pool_id.length_chars} chars · SHA-256[:12] {pool_id.sha256_prefix}",
+            fontsize=6.5,
+            fontweight="semibold",
+            color=_INK,
+            va="top",
+        )
+        axis.text(0.02, 0.86, f"preview {pool_id.preview}", fontsize=6.5, family="monospace", color=_INK, va="top")
+        metrics_y = 0.70
+    else:
+        axis.text(0.02, 0.92, f"Pool {pool_id.preview}", fontsize=9.0, fontweight="semibold", color=_INK, va="top")
+        metrics_y = 0.81
+    locus_count, locus_abbreviated = _integer_preview(search.locus_count)
+    toehold_paths, paths_abbreviated = _integer_preview(search.toehold_paths_evaluated)
+    barcode_candidates, candidates_abbreviated = _integer_preview(search.barcode_candidates_generated)
+    barcode_subsets, subsets_abbreviated = _integer_preview(search.barcode_subsets_evaluated)
+    matchings, matchings_abbreviated = _integer_preview(search.matchings_evaluated)
     metrics = (
-        f"loci  {search.locus_count}",
-        f"toehold paths  {search.toehold_paths_evaluated}",
+        f"loci  {locus_count}",
+        f"toehold paths  {toehold_paths}",
         f"toehold min / mean  {search.toehold_min_distance:g} / {search.toehold_mean_distance:g}",
-        f"barcode candidates  {search.barcode_candidates_generated}",
-        f"barcode subsets  {search.barcode_subsets_evaluated}",
+        f"barcode candidates  {barcode_candidates}",
+        f"barcode subsets  {barcode_subsets}",
         f"barcode min / mean  {search.barcode_min_distance:g} / {search.barcode_mean_distance:g}",
-        f"matchings  {search.matchings_evaluated}",
+        f"matchings  {matchings}",
     )
+    if any((locus_abbreviated, paths_abbreviated, candidates_abbreviated, subsets_abbreviated, matchings_abbreviated)):
+        axis.text(
+            0.02,
+            0.78,
+            "Large integers · digest = SHA-256(unsigned big-endian)[:12]",
+            fontsize=5.8,
+            color=_MUTED,
+        )
     for index, line in enumerate(metrics):
-        axis.text(0.03, 0.81 - index * 0.075, line, fontsize=7.5, color=_INK, family="monospace")
+        axis.text(0.03, metrics_y - index * 0.075, line, fontsize=6.5, color=_INK, family="monospace")
     passed = sum(check.status == "passed" for check in review.checks)
     not_run = sum(check.status == "not_run" for check in review.checks)
     axis.text(0.03, 0.25, f"Checks  {passed} passed  ·  {not_run} not run", fontsize=7.8, color=_MUTED)
