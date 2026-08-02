@@ -28,7 +28,7 @@ PyWinder procedure and not an official Sidewinder product.
 
 TriJunction owns strict request parsing, bounded deterministic search, fragment
 and strand composition, method-specific checks, recovery geometry, neutral order
-rows, and immutable local bundle publication. It uses sibling public contracts
+rows, and create-only local bundle publication. It uses sibling public contracts
 only. Its executable schemas, algorithms, tests, and operator guide live with
 the feature code in a separate reviewed PR; this ADR does not repeat them.
 
@@ -171,9 +171,12 @@ the boundary even when an exact primer extension contains such a site.
 - Input sizes and search budgets are explicit and fail closed.
 - Preflight and planning perform no durable writes.
 - Final publication uses DNA Design's create-only staged directory primitive
-  and installs a new immutable destination only after bundle validation.
-- The manifest binds the canonical request, plan, checks, and order rows by
-  digest; verification replays the plan and rejects tampering.
+  and installs a new destination only when that path is absent and the staged
+  bundle has passed validation.
+- The manifest binds the canonical request, plan, checks, order rows, and
+  study-neutral review records by digest. Verification reads a stable
+  descriptor-held snapshot, replays the plan, and rejects tampering or a
+  concurrent filesystem change.
 - TriJunction does not copy study records into its bundle or transmit target
   sequences. An operator must explicitly move or submit order data.
 
