@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -166,6 +167,38 @@ def test_cli_json_failure_is_machine_readable_and_non_retryable(tmp_path: Path) 
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "bundle_error"
     assert payload["error"]["retryable"] is False
+
+
+@pytest.mark.parametrize(
+    ("suffix", "content", "message_kind"),
+    [
+        (".json", lambda value: f'{{"seed":{value}}}', "JSON"),
+        (".yaml", lambda value: f"seed: {value}", "YAML"),
+    ],
+)
+def test_cli_failure_wraps_parser_integer_limit_as_config_error(
+    tmp_path: Path,
+    suffix: str,
+    content: Callable[[str], str],
+    message_kind: str,
+) -> None:
+    request = tmp_path / f"request{suffix}"
+    oversized_integer = "9" * 5_000
+    request.write_text(content(oversized_integer), encoding="utf-8")
+
+    result = runner.invoke(app, ["preflight", str(request), "--format", "json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stderr)
+    assert payload == {
+        "error": {
+            "code": "config_error",
+            "message": f"Invalid {message_kind} in TriJunction request: {request}",
+            "retryable": False,
+        },
+        "status": "error",
+    }
+    assert oversized_integer not in result.stderr
 
 
 def test_cli_rejects_output_format_before_publication(tmp_path: Path) -> None:

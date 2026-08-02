@@ -226,6 +226,43 @@ def test_load_request_rejects_descriptor_growth_after_bounded_read(
         load_request(request_path)
 
 
+def test_load_request_rejects_same_length_in_place_rewrite_during_partial_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request_path = tmp_path / "request.json"
+    original = json.dumps(_request_mapping()).encode("utf-8")
+    request_path.write_bytes(original)
+    opened = request_path.stat()
+    real_read = os.read
+    split = len(original) // 2
+    first_read = True
+
+    def rewriting_read(fd: int, size: int) -> bytes:
+        nonlocal first_read
+        content = real_read(fd, min(size, split) if first_read else size)
+        if first_read:
+            first_read = False
+            with request_path.open("r+b") as mutable:
+                mutable.seek(split)
+                mutable.write(b" " * (len(original) - split))
+                mutable.flush()
+                os.fsync(mutable.fileno())
+            os.utime(
+                request_path,
+                ns=(opened.st_atime_ns, opened.st_mtime_ns + 1_000_000_000),
+            )
+        return content
+
+    monkeypatch.setattr(request_files.os, "read", rewriting_read)
+
+    with pytest.raises(TriJunctionConfigError, match="changed while it was being read"):
+        load_request(request_path)
+    rewritten = request_path.stat()
+    assert rewritten.st_ino == opened.st_ino
+    assert rewritten.st_size == opened.st_size
+
+
 def test_load_request_rejects_invalid_utf8_as_config_error(tmp_path: Path) -> None:
     request_path = tmp_path / "request.json"
     request_path.write_bytes(b"\xff")
@@ -416,6 +453,41 @@ def test_load_request_wraps_malformed_yaml(tmp_path: Path) -> None:
 
     with pytest.raises(TriJunctionConfigError, match="Invalid YAML"):
         load_request(request_path)
+
+
+def test_load_request_wraps_json_integer_limit_as_config_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.json"
+    request_path.write_text('{"seed":' + "9" * 10_000 + "}", encoding="utf-8")
+
+    with pytest.raises(TriJunctionConfigError, match="Invalid JSON"):
+        load_request(request_path)
+
+
+def test_load_request_wraps_yaml_integer_limit_as_config_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.yaml"
+    request_path.write_text("seed: " + "9" * 10_000, encoding="utf-8")
+
+    with pytest.raises(TriJunctionConfigError, match="Invalid YAML"):
+        load_request(request_path)
+
+
+def test_load_request_preserves_unsupported_extension_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.toml"
+    request_path.write_text("{}", encoding="utf-8")
+
+    expected = f"TriJunction request must use a .json, .yaml, or .yml extension: {request_path}"
+    with pytest.raises(TriJunctionConfigError) as caught:
+        load_request(request_path)
+    assert str(caught.value) == expected
+
+
+def test_load_request_preserves_yaml_anchor_policy_error(tmp_path: Path) -> None:
+    request_path = tmp_path / "request.yaml"
+    request_path.write_text("base: &base {}\ncopy: *base\n", encoding="utf-8")
+
+    with pytest.raises(TriJunctionConfigError) as caught:
+        load_request(request_path)
+    assert str(caught.value) == "TriJunction YAML requests must not use anchors or aliases"
 
 
 @pytest.mark.parametrize(

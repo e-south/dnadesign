@@ -19,6 +19,7 @@ import pytest
 
 from dnadesign.trijunction import build, verify
 from dnadesign.trijunction.contracts import parse_request
+from dnadesign.trijunction.contracts.identity import canonical_json_bytes, sha256_bytes
 from dnadesign.trijunction.design.planner import design_trijunction
 from dnadesign.trijunction.errors import TriJunctionBundleError
 from dnadesign.trijunction.publication import writer as writer_module
@@ -69,6 +70,47 @@ def test_tampered_artifact_fails_offline_verification(tmp_path: Path) -> None:
 
     with pytest.raises(TriJunctionBundleError, match="content identity does not match"):
         verify(destination)
+
+
+def test_oversized_integer_in_manifest_is_reported_as_a_sanitized_bundle_error(tmp_path: Path) -> None:
+    request = parse_request(_request_mapping())
+    destination = tmp_path / "design-v1"
+    build(request, destination=destination)
+    oversized_integer = "9" * 5_000
+    (destination / "manifest.json").write_text(
+        f'{{"oversized":{oversized_integer}}}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(TriJunctionBundleError) as raised:
+        verify(destination)
+
+    assert str(raised.value) == f"TriJunction manifest is not valid UTF-8 JSON: {destination / 'manifest.json'}"
+    assert oversized_integer not in str(raised.value)
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
+
+
+def test_oversized_integer_in_embedded_request_is_reported_as_a_sanitized_bundle_error(tmp_path: Path) -> None:
+    request = parse_request(_request_mapping())
+    destination = tmp_path / "design-v1"
+    build(request, destination=destination)
+    oversized_integer = "9" * 5_000
+    request_content = f'{{"seed":{oversized_integer}}}\n'.encode()
+    (destination / "request.json").write_bytes(request_content)
+    manifest_path = destination / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["artifacts"]["request"]["bytes"] = len(request_content)
+    manifest["artifacts"]["request"]["sha256"] = sha256_bytes(request_content)
+    manifest_path.write_bytes(canonical_json_bytes(manifest))
+
+    with pytest.raises(TriJunctionBundleError) as raised:
+        verify(destination)
+
+    assert str(raised.value) == "Bundle request cannot reproduce a valid TriJunction plan."
+    assert oversized_integer not in str(raised.value)
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
 
 
 def test_request_plan_mismatch_fails_before_payload_work_or_filesystem_mutation(

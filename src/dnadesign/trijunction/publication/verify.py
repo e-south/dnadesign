@@ -57,8 +57,8 @@ class BundleVerification:
 def _load_json(content: bytes, *, path: Path, context: str) -> dict[str, Any]:
     try:
         value = json.loads(content.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise TriJunctionBundleError(f"{context} is not valid UTF-8 JSON: {path}") from exc
+    except (UnicodeDecodeError, ValueError):
+        raise TriJunctionBundleError(f"{context} is not valid UTF-8 JSON: {path}") from None
     if not isinstance(value, dict):
         raise TriJunctionBundleError(f"{context} must contain one JSON object: {path}")
     return value
@@ -134,9 +134,12 @@ def _verify_bundle(bundle: str | Path, *, reject_undeclared_entries: bool) -> Bu
         assert request_content is not None
         try:
             request_payload = json.loads(request_content.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            raise TriJunctionBundleError("Bundle request cannot reproduce a valid TriJunction plan.") from None
+        try:
             request = parse_request(request_payload)
             recomputed_plan = design_trijunction(request)
-        except (UnicodeDecodeError, json.JSONDecodeError, TriJunctionError) as exc:
+        except TriJunctionError as exc:
             raise TriJunctionBundleError("Bundle request cannot reproduce a valid TriJunction plan.") from exc
         expected_payloads = bundle_payloads(request, recomputed_plan)
         for key, expected in expected_payloads.items():

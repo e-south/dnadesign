@@ -37,6 +37,20 @@ class _DuplicateYamlKeyError(ConstructorError):
     pass
 
 
+def _descriptor_identity(metadata: os.stat_result) -> tuple[int, int, int, int, int, int, int]:
+    """Return metadata that must remain stable across one descriptor read."""
+
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
 def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
@@ -44,6 +58,19 @@ def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
             raise _DuplicateJsonKeyError(f"duplicate JSON key: {key!r}")
         result[key] = value
     return result
+
+
+def _load_json_document(source: str, request_path: Path) -> object:
+    """Parse JSON while preserving the typed request-file error boundary."""
+
+    try:
+        return json.loads(source, object_pairs_hook=_unique_json_object)
+    except json.JSONDecodeError as exc:
+        raise TriJunctionConfigError(f"Invalid JSON in TriJunction request: {request_path}") from exc
+    except _DuplicateJsonKeyError as exc:
+        raise TriJunctionConfigError(f"Duplicate key in TriJunction request: {request_path}: {exc}") from exc
+    except ValueError as exc:
+        raise TriJunctionConfigError(f"Invalid JSON in TriJunction request: {request_path}") from exc
 
 
 class _UniqueKeySafeLoader(yaml.SafeLoader):
@@ -120,6 +147,8 @@ def load_request(path: str | Path) -> TriJunctionRequest:
             raise TriJunctionConfigError(
                 f"TriJunction request exceeds the {_MAX_REQUEST_BYTES}-byte input limit: {request_path}"
             )
+        if _descriptor_identity(opened) != _descriptor_identity(observed):
+            raise TriJunctionConfigError(f"TriJunction request changed while it was being read: {request_path}")
     except OSError as exc:
         raise TriJunctionConfigError(f"Unable to read TriJunction request: {request_path}") from exc
     finally:
@@ -133,25 +162,23 @@ def load_request(path: str | Path) -> TriJunctionRequest:
     except UnicodeDecodeError as exc:
         raise TriJunctionConfigError(f"TriJunction request is not valid UTF-8: {request_path}") from exc
 
-    try:
-        if suffix == ".json":
-            payload = json.loads(source, object_pairs_hook=_unique_json_object)
-        elif suffix in {".yaml", ".yml"}:
+    if suffix == ".json":
+        payload = _load_json_document(source, request_path)
+    elif suffix in {".yaml", ".yml"}:
+        try:
             if any(isinstance(token, (AliasToken, AnchorToken)) for token in yaml.scan(source)):
                 raise TriJunctionConfigError("TriJunction YAML requests must not use anchors or aliases")
             payload = yaml.load(source, Loader=_UniqueKeySafeLoader)
-        else:
-            raise TriJunctionConfigError(
-                f"TriJunction request must use a .json, .yaml, or .yml extension: {request_path}"
-            )
-    except json.JSONDecodeError as exc:
-        raise TriJunctionConfigError(f"Invalid JSON in TriJunction request: {request_path}") from exc
-    except _DuplicateJsonKeyError as exc:
-        raise TriJunctionConfigError(f"Duplicate key in TriJunction request: {request_path}: {exc}") from exc
-    except _DuplicateYamlKeyError as exc:
-        raise TriJunctionConfigError(f"Duplicate key in TriJunction request: {request_path}: {exc}") from exc
-    except yaml.YAMLError as exc:
-        raise TriJunctionConfigError(f"Invalid YAML in TriJunction request: {request_path}") from exc
+        except TriJunctionConfigError:
+            raise
+        except _DuplicateYamlKeyError as exc:
+            raise TriJunctionConfigError(f"Duplicate key in TriJunction request: {request_path}: {exc}") from exc
+        except yaml.YAMLError as exc:
+            raise TriJunctionConfigError(f"Invalid YAML in TriJunction request: {request_path}") from exc
+        except ValueError as exc:
+            raise TriJunctionConfigError(f"Invalid YAML in TriJunction request: {request_path}") from exc
+    else:
+        raise TriJunctionConfigError(f"TriJunction request must use a .json, .yaml, or .yml extension: {request_path}")
 
     if not isinstance(payload, dict):
         raise TriJunctionConfigError("TriJunction request document must contain one object")
