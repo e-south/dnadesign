@@ -30,6 +30,7 @@ from dnadesign.trijunction.design import toeholds as toehold_module
 from dnadesign.trijunction.design.barcodes import generate_barcode_candidates
 from dnadesign.trijunction.design.loci import ToeholdCandidate, ToeholdLocus, enumerate_loci
 from dnadesign.trijunction.design.resources import (
+    MAX_BARCODE_DISTANCE_SEQUENCE_LENGTH,
     MAX_REQUEST_BARCODE_GENERATION_BASE_VISITS,
     estimated_toehold_distance_lookups,
     guard_barcode_generation,
@@ -211,6 +212,26 @@ def test_barcode_generation_and_subset_shapes_fail_before_allocation() -> None:
             selected_count=1,
             sequence_length=22,
             iterations=20_000_000,
+        )
+
+
+def test_barcode_distance_representation_limit_is_explicit() -> None:
+    guard_barcode_subset_search(
+        candidate_count=1,
+        selected_count=1,
+        sequence_length=MAX_BARCODE_DISTANCE_SEQUENCE_LENGTH,
+        iterations=0,
+    )
+
+    with pytest.raises(
+        TriJunctionDesignError,
+        match=rf"distance-cache representation: requested .*, limit {MAX_BARCODE_DISTANCE_SEQUENCE_LENGTH}",
+    ):
+        guard_barcode_subset_search(
+            candidate_count=1,
+            selected_count=1,
+            sequence_length=MAX_BARCODE_DISTANCE_SEQUENCE_LENGTH + 1,
+            iterations=0,
         )
 
 

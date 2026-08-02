@@ -27,6 +27,7 @@ from .estimates import (
 )
 from .limits import (
     MAX_BARCODE_DISTANCE_CACHE_BYTES,
+    MAX_BARCODE_DISTANCE_SEQUENCE_LENGTH,
     MAX_BARCODE_DP_CELLS,
     MAX_BARCODE_GENERATION_BASE_VISITS,
     MAX_BARCODE_GENERATION_STATE_BYTES,
@@ -237,11 +238,17 @@ def guard_barcode_subset_search(
             f"{candidate_count} candidates require {cache_bytes} bytes, "
             f"limit {MAX_BARCODE_DISTANCE_CACHE_BYTES}. Reduce barcode_pool_factor."
         )
+    if sequence_length > MAX_BARCODE_DISTANCE_SEQUENCE_LENGTH:
+        raise TriJunctionDesignError(
+            "Barcode length exceeds the v1 distance-cache representation: "
+            f"requested {sequence_length}, limit {MAX_BARCODE_DISTANCE_SEQUENCE_LENGTH}. Reduce barcode_length."
+        )
     encoded_bases = candidate_count * sequence_length
-    if encoded_bases > MAX_BARCODE_DISTANCE_CACHE_BYTES or sequence_length >= 65_535:
+    if encoded_bases > MAX_BARCODE_DISTANCE_CACHE_BYTES:
         raise TriJunctionDesignError(
             "Barcode encoding exceeds the explicit sequence-state envelope: "
-            f"{candidate_count} candidates at length {sequence_length} require {encoded_bases} bases. "
+            f"{candidate_count} candidates at length {sequence_length} require {encoded_bases} bases, "
+            f"limit {MAX_BARCODE_DISTANCE_CACHE_BYTES}. "
             "Reduce barcode_length or barcode_pool_factor."
         )
     subset_pairs = selected_count * (selected_count - 1) // 2
