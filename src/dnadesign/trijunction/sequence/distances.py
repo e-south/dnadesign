@@ -20,6 +20,9 @@ from .alphabet import validate_dna
 
 POSITION_WEIGHT_SCALE = 1_000_000_000
 _MAX_SIGNED_64 = (1 << 63) - 1
+_MAX_POSITION_WEIGHTED_SCRATCH_BYTES = 64 * 1024 * 1024
+# Covers the retained compact forward scores plus per-cell NumPy temporaries.
+_POSITION_WEIGHTED_TEMPORARY_VECTORS = 10
 
 
 def levenshtein_distance(left: str, right: str) -> int:
@@ -165,7 +168,28 @@ def _directional_units_many(source: np.ndarray, target: np.ndarray, weights: np.
             )
             current[:, target_index] = np.minimum(np.minimum(deletion, insertion), substitution)
         previous = current
-    return previous[:, -1]
+    return previous[:, -1].copy()
+
+
+def _position_weighted_scratch_bytes(pair_count: int, sequence_length: int) -> int:
+    """Conservatively estimate transient bytes for one directional batch."""
+
+    int64_bytes = np.dtype(np.int64).itemsize
+    row_matrix_values = 2 * (sequence_length + 1)
+    per_pair_values = row_matrix_values + _POSITION_WEIGHTED_TEMPORARY_VECTORS
+    cumulative_values = sequence_length + 1
+    return int64_bytes * (pair_count * per_pair_values + cumulative_values)
+
+
+def _position_weighted_chunk_size(sequence_length: int) -> int:
+    """Return the largest deterministic pair chunk inside the scratch budget."""
+
+    one_pair_bytes = _position_weighted_scratch_bytes(1, sequence_length)
+    fixed_bytes = np.dtype(np.int64).itemsize * (sequence_length + 1)
+    if one_pair_bytes > _MAX_POSITION_WEIGHTED_SCRATCH_BYTES:
+        raise ValueError("sequence length exceeds the weighted-distance scratch envelope")
+    per_pair_bytes = one_pair_bytes - fixed_bytes
+    return (_MAX_POSITION_WEIGHTED_SCRATCH_BYTES - fixed_bytes) // per_pair_bytes
 
 
 def position_weighted_levenshtein_units_many(
@@ -200,11 +224,17 @@ def _position_weighted_levenshtein_units_encoded_many(
 
     if encoded_left.shape != encoded_right.shape or encoded_left.ndim != 2:
         raise ValueError("encoded pair matrices must have one equal two-dimensional shape")
-    sequence_length = encoded_left.shape[1]
+    pair_count, sequence_length = encoded_left.shape
     weights = np.asarray(position_weight_units(sequence_length), dtype=np.int64)
-    forward = _directional_units_many(encoded_left, encoded_right, weights)
-    reverse = _directional_units_many(encoded_right, encoded_left, weights)
-    return np.minimum(forward, reverse).astype(np.uint64, copy=False)
+    chunk_size = _position_weighted_chunk_size(sequence_length)
+    result = np.empty(pair_count, dtype=np.uint64)
+    for start in range(0, pair_count, chunk_size):
+        stop = min(start + chunk_size, pair_count)
+        forward = _directional_units_many(encoded_left[start:stop], encoded_right[start:stop], weights)
+        reverse = _directional_units_many(encoded_right[start:stop], encoded_left[start:stop], weights)
+        np.minimum(forward, reverse, out=forward)
+        result[start:stop] = forward
+    return result
 
 
 def position_weighted_levenshtein(left: str, right: str) -> float:

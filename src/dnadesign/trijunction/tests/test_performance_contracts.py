@@ -53,6 +53,7 @@ from dnadesign.trijunction.design.resources import (
 )
 from dnadesign.trijunction.design.scoring import RankAggregate
 from dnadesign.trijunction.errors import TriJunctionDesignError
+from dnadesign.trijunction.sequence import distances as distance_module
 from dnadesign.trijunction.sequence import (
     longest_common_substring_length,
     position_weighted_levenshtein_units,
@@ -106,6 +107,67 @@ def test_stable_prng_has_a_golden_cross_runtime_stream() -> None:
 def test_vectorized_weighted_distances_equal_the_scalar_fixed_point_contract() -> None:
     left = ("ACGATTCGGT", "GATTACAGAT", "ACGTACGTAC", "TTTTTTTTTT")
     right = ("CGCTTAGACT", "TACTAGATTA", "TACGTACGTA", "TTTTTATTTT")
+
+    observed = tuple(int(value) for value in position_weighted_levenshtein_units_many(left, right))
+    expected = tuple(position_weighted_levenshtein_units(a, b) for a, b in zip(left, right, strict=True))
+
+    assert observed == expected
+
+
+def test_wide_weighted_distance_batches_bound_every_directional_scratch_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    search_batch_size = 64
+    search_range = 4_096
+    toehold_length = 61
+    pair_count = search_batch_size * search_range
+    encoded = np.broadcast_to(
+        np.zeros((1, toehold_length), dtype=np.uint8),
+        (pair_count, toehold_length),
+    )
+    directional_shapes: list[tuple[int, int]] = []
+
+    def record_directional_call(
+        source: np.ndarray,
+        target: np.ndarray,
+        weights: np.ndarray,
+    ) -> np.ndarray:
+        assert source.shape == target.shape
+        assert weights.shape == (toehold_length,)
+        directional_shapes.append(source.shape)
+        return np.zeros(source.shape[0], dtype=np.int64)
+
+    monkeypatch.setattr(distance_module, "_directional_units_many", record_directional_call)
+
+    observed = distance_module._position_weighted_levenshtein_units_encoded_many(encoded, encoded)
+
+    assert observed.shape == (pair_count,)
+    assert len(directional_shapes) > 2
+    assert all(
+        distance_module._position_weighted_scratch_bytes(call_pair_count, sequence_length)
+        <= distance_module._MAX_POSITION_WEIGHTED_SCRATCH_BYTES
+        for call_pair_count, sequence_length in directional_shapes
+    )
+
+
+def test_directional_weighted_distance_returns_a_compact_owned_score_vector() -> None:
+    encoded = np.asarray([[ord(base) for base in sequence] for sequence in ("ACGT", "TGCA")], dtype=np.uint8)
+    weights = np.asarray(distance_module.position_weight_units(4), dtype=np.int64)
+
+    observed = distance_module._directional_units_many(encoded, encoded, weights)
+
+    assert observed.base is None
+    assert observed.nbytes == encoded.shape[0] * np.dtype(np.int64).itemsize
+
+
+def test_chunked_weighted_distances_preserve_exact_pair_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    left = ("ACGATTCGGT", "GATTACAGAT", "ACGTACGTAC", "TTTTTTTTTT", "CGATCGATCG")
+    right = ("CGCTTAGACT", "TACTAGATTA", "TACGTACGTA", "TTTTTATTTT", "GCTAGCTAGC")
+    monkeypatch.setattr(
+        distance_module,
+        "_MAX_POSITION_WEIGHTED_SCRATCH_BYTES",
+        distance_module._position_weighted_scratch_bytes(2, len(left[0])),
+    )
 
     observed = tuple(int(value) for value in position_weighted_levenshtein_units_many(left, right))
     expected = tuple(position_weighted_levenshtein_units(a, b) for a, b in zip(left, right, strict=True))
