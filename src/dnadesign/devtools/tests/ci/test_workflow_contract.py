@@ -17,10 +17,13 @@ from pathlib import Path
 import yaml
 
 
-def _workflow(filename: str = "ci.yaml") -> dict:
+def _repo_root() -> Path:
     current = Path(__file__).resolve()
-    repo_root = next(parent for parent in current.parents if (parent / "pyproject.toml").exists())
-    workflow_path = repo_root / ".github" / "workflows" / filename
+    return next(parent for parent in current.parents if (parent / "pyproject.toml").exists())
+
+
+def _workflow(filename: str = "ci.yaml") -> dict:
+    workflow_path = _repo_root() / ".github" / "workflows" / filename
     return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
 
 
@@ -238,12 +241,36 @@ def test_scheduled_entropy_is_isolated_from_full_ci() -> None:
     assert entropy_workflow["concurrency"]["group"].startswith("quality-entropy-")
 
 
-def test_no_tool_smoke_targets_include_workflow_contracts() -> None:
+def test_scoped_core_lanes_run_workflow_contract_before_target_resolution() -> None:
     workflow = _workflow()
     steps = workflow["jobs"]["core-lint-test-build"]["steps"]
     test_step = next(step for step in steps if step.get("name") == "Tests (core lane) + coverage report")
+    run_script = str(test_step["run"])
+    match = re.search(r"invariant_targets=\(\n(?P<targets>.*?)\n\s*\)", run_script, flags=re.DOTALL)
 
-    assert "src/dnadesign/devtools/tests/ci/test_workflow_contract.py" in test_step["run"]
+    assert match is not None, "core lane must declare invariant_targets as a shell array"
+    invariant_targets = [line.strip().strip("\"'") for line in match.group("targets").splitlines() if line.strip()]
+    assert invariant_targets == ["src/dnadesign/devtools/tests/ci/test_workflow_contract.py"]
+    invariant_run = 'uv run pytest -q --durations=25 "${invariant_targets[@]}"'
+    assert invariant_run in run_script
+    assert run_script.index(invariant_run) < run_script.index('affected_csv="')
+
+
+def test_core_lane_declared_test_targets_exist() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["core-lint-test-build"]["steps"]
+    test_step = next(step for step in steps if step.get("name") == "Tests (core lane) + coverage report")
+    run_script = str(test_step["run"])
+
+    targets: list[str] = []
+    for array_name in ("invariant_targets", "smoke_targets"):
+        match = re.search(rf"{array_name}=\(\n(?P<targets>.*?)\n\s*\)", run_script, flags=re.DOTALL)
+        assert match is not None, f"core lane must declare {array_name} as a shell array"
+        targets.extend(line.strip().strip("\"'") for line in match.group("targets").splitlines() if line.strip())
+
+    assert targets, "core lane declared test targets must not be empty"
+    missing = [target for target in targets if not (_repo_root() / target).is_file()]
+    assert missing == [], f"core lane declared test targets do not exist: {missing}"
 
 
 def test_core_pytest_collects_the_complete_failure_set() -> None:
