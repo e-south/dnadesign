@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import replace
 
 import pytest
@@ -72,6 +73,12 @@ def test_review_projection_serializes_as_one_canonical_json_array() -> None:
     payload = json.loads(first)
     assert isinstance(payload, list)
     assert [row["target"]["target_id"] for row in payload] == [target.target_id for target in plan.targets]
+    for row in payload:
+        search = row["search"]
+        assert search["barcode_subsets_evaluated"] <= math.comb(
+            search["barcode_candidates_generated"],
+            search["locus_count"],
+        )
     assert first.endswith(b"\n")
     assert b"NaN" not in first
 

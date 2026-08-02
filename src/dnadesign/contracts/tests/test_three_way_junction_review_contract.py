@@ -342,6 +342,25 @@ def test_multi_locus_pool_search_respects_sequence_derived_bounds(
         search._validate_sequence_bounds(toehold_length=4, barcode_length=8)
 
 
+def test_barcode_subset_evaluations_do_not_exceed_combination_capacity() -> None:
+    search_payload = three_way_junction_review_payload()["search"]
+    search_payload.update(
+        {
+            "locus_count": 2,
+            "barcode_candidates_generated": 10,
+            "barcode_subsets_evaluated": 45,
+        }
+    )
+    accepted = PoolSearchReview.model_validate(search_payload)
+
+    accepted._validate_sequence_bounds(toehold_length=4, barcode_length=8)
+
+    search_payload["barcode_subsets_evaluated"] = 46
+    rejected = PoolSearchReview.model_validate(search_payload)
+    with pytest.raises(ValueError, match="barcode_subsets_evaluated must not exceed the distinct combination count"):
+        rejected._validate_sequence_bounds(toehold_length=4, barcode_length=8)
+
+
 @pytest.mark.parametrize(
     ("second_toehold", "second_barcode", "message"),
     [

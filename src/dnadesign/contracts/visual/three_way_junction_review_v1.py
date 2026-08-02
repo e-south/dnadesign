@@ -41,6 +41,22 @@ def _permutation_capacity_covers(*, locus_count: int, evaluated: int) -> bool:
     return False
 
 
+def _combination_capacity_covers(*, item_count: int, selection_count: int, evaluated: int) -> bool:
+    """Compare against ``C(item_count, selection_count)`` with bounded growth."""
+
+    if selection_count < 0 or item_count < selection_count:
+        return False
+    if evaluated <= 1:
+        return True
+    selection_count = min(selection_count, item_count - selection_count)
+    capacity = 1
+    for selected in range(1, selection_count + 1):
+        capacity = capacity * (item_count - selection_count + selected) // selected
+        if capacity >= evaluated:
+            return True
+    return False
+
+
 def _require_dna(value: str, *, field: str, optional: bool = False) -> str:
     if optional and value == "":
         return value
@@ -278,6 +294,12 @@ class PoolSearchReview(VisualContractModel):
         inferred_pool_factor = self.barcode_candidates_generated // self.locus_count
         if inferred_pool_factor < _MIN_BARCODE_POOL_FACTOR_V1:
             raise ValueError("inferred barcode pool factor must be at least 5")
+        if not _combination_capacity_covers(
+            item_count=self.barcode_candidates_generated,
+            selection_count=self.locus_count,
+            evaluated=self.barcode_subsets_evaluated,
+        ):
+            raise ValueError("barcode_subsets_evaluated must not exceed the distinct combination count")
         if self.barcode_forbidden_toehold_k > min(toehold_length, barcode_length):
             raise ValueError("barcode_forbidden_toehold_k must not exceed toehold or barcode length")
         if self.barcode_forbidden_barcode_k > barcode_length:
