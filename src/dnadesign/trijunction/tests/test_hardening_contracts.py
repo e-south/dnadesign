@@ -234,7 +234,7 @@ def test_verification_rejects_artifact_replaced_by_symlink_before_open(
     def racing_os_open(
         path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:
@@ -300,7 +300,7 @@ def test_verification_rejects_undeclared_file_added_after_initial_inventory(
     def racing_os_open(
         path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:
@@ -332,7 +332,7 @@ def test_verification_rejects_artifact_mutated_during_late_path_revalidation(
     def racing_os_open(
         path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:
