@@ -40,6 +40,12 @@ class ThreeWayJunctionReviewV1Adapter:
         repr=False,
         compare=False,
     )
+    _target_identities: set[tuple[str, str]] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def apply(self, row: dict, *, row_index: int) -> Record:
         try:
@@ -47,6 +53,10 @@ class ThreeWayJunctionReviewV1Adapter:
         except ValidationError as exc:
             detail = format_validation_error(exc)
             raise SchemaError(f"Invalid three_way_junction_review_v1 contract at row {row_index}: {detail}") from None
+
+        target_identity = (review.source.plan_id, review.target.target_id)
+        if target_identity in self._target_identities:
+            raise SchemaError(f"three_way_junction_review_v1 document has duplicate target identity at row {row_index}")
 
         source_receipt = review.source.model_dump(mode="json")
         previous_source = self._source_receipts.get(review.source.plan_id)
@@ -64,6 +74,7 @@ class ThreeWayJunctionReviewV1Adapter:
                 f"three_way_junction_review_v1 document has a contradictory pool-wide search receipt at row {row_index}"
             )
         self._search_receipts[plan_and_pool] = search_receipt
+        self._target_identities.add(target_identity)
 
         record = Record(
             id=review.target.target_id,

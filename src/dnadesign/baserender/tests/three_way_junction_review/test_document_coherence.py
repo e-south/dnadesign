@@ -18,7 +18,7 @@ import pytest
 
 import dnadesign.baserender as baserender
 
-from .fixtures import _payload, _review_job
+from .fixtures import _payload, _payload_with_long_recovery_primers, _review_job
 
 
 def _second_target() -> tuple[dict[str, object], dict[str, object]]:
@@ -65,6 +65,36 @@ def test_adapter_rejects_inconsistent_metadata_for_one_plan_id(
 
     with pytest.raises(baserender.SchemaError, match="contradictory source metadata at row 1"):
         baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+
+
+@pytest.mark.parametrize("contradictory_payload", [False, True])
+def test_adapter_rejects_duplicate_target_identity_within_one_plan(
+    contradictory_payload: bool,
+) -> None:
+    first = _payload()
+    second = _payload_with_long_recovery_primers() if contradictory_payload else _payload()
+    private_target_id = "PRIVATE-TARGET-SENTINEL"
+    for payload in (first, second):
+        payload["target"]["target_id"] = private_target_id  # type: ignore[index]
+        payload["checks"][0]["subject"]["id"] = private_target_id  # type: ignore[index]
+
+    with pytest.raises(
+        baserender.SchemaError,
+        match="duplicate target identity at row 1",
+    ) as exc_info:
+        baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+    assert private_target_id not in str(exc_info.value)
+    assert exc_info.value.__cause__ is None
+
+
+def test_adapter_allows_target_id_reuse_across_distinct_plans() -> None:
+    first = _payload()
+    second = _payload()
+    second["source"]["plan_id"] = f"sha256:{'c' * 64}"  # type: ignore[index]
+
+    records = baserender.adapt_records([first, second], adapter_kind="three_way_junction_review_v1")
+
+    assert [record.id for record in records] == ["target-01", "target-01"]
 
 
 @pytest.mark.parametrize("distinct_group", ["plan", "pool"])
