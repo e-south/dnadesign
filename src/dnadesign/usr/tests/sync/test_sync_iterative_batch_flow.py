@@ -25,8 +25,13 @@ from dnadesign.devtools.tests.support.usr import ensure_registry, register_test_
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.contracts import TransferError
+from dnadesign.usr.src.events.append import event_log_lock
 from dnadesign.usr.src.sync.remote.config import SSHRemoteConfig
 from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
+from dnadesign.usr.src.sync.remote.transfer import (
+    capture_event_log_revision,
+    capture_locked_event_log_content_revision,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -65,6 +70,23 @@ class _FilesystemRemote:
             yield
 
         return _ctx()
+
+    def event_log_transfer_lock(self, dataset: str):
+        event_path = self._dataset_dir(dataset) / ".events.log"
+
+        @contextmanager
+        def _ctx():
+            with event_log_lock(event_path):
+                yield object()
+
+        return _ctx()
+
+    def event_log_revision(self, dataset: str, *, event_lease: object):
+        assert event_lease is not None
+        return capture_locked_event_log_content_revision(self._dataset_dir(dataset) / ".events.log")
+
+    def observe_event_log_revision(self, dataset: str):
+        return capture_event_log_revision(self._dataset_dir(dataset) / ".events.log").content_revision()
 
     def _primary_stat(self, records_path: Path, *, verify: str) -> RemotePrimaryStat:
         if not records_path.exists():
@@ -107,7 +129,16 @@ class _FilesystemRemote:
                     continue
                 rel = item.relative_to(dataset_dir)
                 rel_text = rel.as_posix()
-                if rel_text in {"records.parquet", "meta.md", ".events.log", ".events.lock", ".usr.lock"}:
+                if rel_text in {
+                    "records.parquet",
+                    "meta.md",
+                    ".events.log",
+                    ".events.lock",
+                    ".usr.lock",
+                    ".usr.transfer.lock",
+                }:
+                    continue
+                if rel.parts and rel.parts[0].startswith(".usr.lease."):
                     continue
                 if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
                     continue
@@ -140,7 +171,9 @@ class _FilesystemRemote:
         dst_dir.mkdir(parents=True, exist_ok=True)
         for item in src_dir.rglob("*"):
             rel = item.relative_to(src_dir)
-            if rel.as_posix() in {".events.lock", ".usr.lock"}:
+            if rel.as_posix() in {".events.lock", ".usr.lock", ".usr.transfer.lock"}:
+                continue
+            if rel.parts and rel.parts[0].startswith(".usr.lease."):
                 continue
             if skip_snapshots and rel.parts and rel.parts[0] == "_snapshots":
                 continue
@@ -183,9 +216,12 @@ class _FilesystemRemote:
         primary_only: bool = False,
         skip_snapshots: bool = False,
         dry_run: bool = False,
+        event_lease: object | None = None,
     ) -> None:
         if dry_run:
             return
+        if not primary_only:
+            assert event_lease is not None
         _FilesystemRemote.push_transfer_calls += 1
         if _FilesystemRemote.fail_next_push:
             _FilesystemRemote.fail_next_push = False
@@ -209,7 +245,9 @@ def _dataset_file_fingerprints(dataset_dir: Path, *, include_events: bool = True
         if not path.is_file():
             continue
         rel = path.relative_to(dataset_dir).as_posix()
-        if rel in {".events.lock", ".usr.lock"}:
+        if rel in {".events.lock", ".usr.lock", ".usr.transfer.lock"}:
+            continue
+        if rel.startswith(".usr.lease."):
             continue
         if not include_events and rel == ".events.log":
             continue
@@ -301,7 +339,9 @@ def test_iterative_sync_flow_skips_transfer_calls_when_already_up_to_date(
 
     sync_module.execute_push(local_root, dataset_id, "bu-scc", opts)
     assert _FilesystemRemote.push_transfer_calls == 0
-    assert _FilesystemRemote.remote_lock_calls == 1
+    # The full-push no-op decision is definitive only under the remote dataset
+    # and event leases, so it intentionally takes one additional remote lock.
+    assert _FilesystemRemote.remote_lock_calls == 2
 
 
 def test_iterative_sync_flow_recovers_after_interrupted_push(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -401,9 +441,7 @@ def test_iterative_cross_location_sidecar_fidelity_for_densegen_infer_updates(
     assert _dataset_file_fingerprints(local_dataset_dir, include_events=False) == _dataset_file_fingerprints(
         remote_dataset_dir, include_events=False
     )
-    local_events_lines = sum(1 for _ in (local_dataset_dir / ".events.log").open("rb"))
-    remote_events_lines = sum(1 for _ in (remote_dataset_dir / ".events.log").open("rb"))
-    assert local_events_lines == remote_events_lines + 1
+    assert (local_dataset_dir / ".events.log").read_bytes() == (remote_dataset_dir / ".events.log").read_bytes()
 
     local_dataset = Dataset(local_root, dataset_id)
     local_dataset.write_overlay_part(
@@ -419,9 +457,7 @@ def test_iterative_cross_location_sidecar_fidelity_for_densegen_infer_updates(
     assert _dataset_file_fingerprints(local_dataset_dir, include_events=False) == _dataset_file_fingerprints(
         remote_dataset_dir, include_events=False
     )
-    local_events_lines = sum(1 for _ in (local_dataset_dir / ".events.log").open("rb"))
-    remote_events_lines = sum(1 for _ in (remote_dataset_dir / ".events.log").open("rb"))
-    assert local_events_lines == remote_events_lines + 1
+    assert (local_dataset_dir / ".events.log").read_bytes() == (remote_dataset_dir / ".events.log").read_bytes()
 
     remote_dataset.import_rows([_row("GGGG", "densegen-batch-2")], source="densegen-batch-2")
     remote_dataset.write_overlay_part(
@@ -438,10 +474,13 @@ def test_iterative_cross_location_sidecar_fidelity_for_densegen_infer_updates(
     assert _dataset_file_fingerprints(local_dataset_dir, include_events=False) == _dataset_file_fingerprints(
         remote_dataset_dir, include_events=False
     )
-    local_events_lines = sum(1 for _ in (local_dataset_dir / ".events.log").open("rb"))
-    remote_events_lines = sum(1 for _ in (remote_dataset_dir / ".events.log").open("rb"))
-    assert local_events_lines == remote_events_lines + 1
+    assert (local_dataset_dir / ".events.log").read_bytes() == (remote_dataset_dir / ".events.log").read_bytes()
     assert pq.read_table(local_dataset_dir / "records.parquet").num_rows == 3
+
+    pushes_before_noop = _FilesystemRemote.push_transfer_calls
+    sync_module.execute_push(local_root, dataset_id, "bu-scc", opts)
+    assert _FilesystemRemote.push_transfer_calls == pushes_before_noop
+    assert (local_dataset_dir / ".events.log").read_bytes() == (remote_dataset_dir / ".events.log").read_bytes()
 
 
 def test_pull_detects_overlay_drift_when_event_sidecar_delta_is_missing(

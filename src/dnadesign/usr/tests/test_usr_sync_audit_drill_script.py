@@ -15,6 +15,10 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
+from dnadesign.usr.ops.sync_audit_drill import _final_sync_state_is_current
+
 
 def _repo_root() -> Path:
     current = Path(__file__).resolve()
@@ -81,9 +85,25 @@ def test_usr_sync_audit_drill_script_runs_and_emits_audit_report(tmp_path: Path)
     assert diff_after_push["action"] == "diff"
     assert diff_after_push["transfer_state"] == "DIFF-ONLY"
     assert diff_after_push["primary"]["changed"] is False
+    assert diff_after_push["meta"]["changed"] is False
+    assert diff_after_push[".events.log"]["changed"] is False
+    assert diff_after_push["_snapshots"]["changed"] is False
     assert diff_after_push["_derived"]["changed"] is False
     assert diff_after_push["_auxiliary"]["changed"] is False
     assert diff_after_push["_derived"]["local_only"] == []
     assert diff_after_push["_derived"]["remote_only"] == []
     assert diff_after_push["_auxiliary"]["local_only"] == []
     assert diff_after_push["_auxiliary"]["remote_only"] == []
+
+
+@pytest.mark.parametrize(
+    "section",
+    ["primary", "meta", ".events.log", "_snapshots", "_derived", "_auxiliary"],
+)
+def test_final_sync_state_requires_every_reported_section_to_match(section: str) -> None:
+    data = {
+        name: {"changed": name == section}
+        for name in ("primary", "meta", ".events.log", "_snapshots", "_derived", "_auxiliary")
+    }
+
+    assert _final_sync_state_is_current(data) is False

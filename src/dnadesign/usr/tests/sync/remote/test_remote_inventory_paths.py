@@ -84,3 +84,6 @@ def test_remote_aux_inventory_excludes_runtime_locks(monkeypatch: pytest.MonkeyP
     assert len(commands) == 1
     assert "! -path './.events.lock'" in commands[0]
     assert "! -path './.usr.lock'" in commands[0]
+    assert "! -path './.usr.transfer.lock'" in commands[0]
+    assert "! -path './.usr.lease.*'" in commands[0]
+    assert "! -path './.usr.lease.*/*'" in commands[0]

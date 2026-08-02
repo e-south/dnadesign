@@ -24,6 +24,14 @@ except ImportError as exc:  # pragma: no cover
     raise RuntimeError("fcntl is required for event-log append locking") from exc
 
 EVENT_LOCK_FILENAME = ".events.lock"
+MAX_EVENT_RECORD_BYTES = 1 << 20
+
+
+def _require_bounded_event_payload(payload: bytes) -> None:
+    if len(payload) > MAX_EVENT_RECORD_BYTES:
+        raise ValueError(
+            f"Encoded event records must not exceed {MAX_EVENT_RECORD_BYTES} bytes, including the newline."
+        )
 
 
 class EventAppendState(str, Enum):
@@ -186,7 +194,9 @@ def encode_event_line(encoded: str) -> bytes:
 
     if not encoded or "\n" in encoded or "\r" in encoded:
         raise ValueError("Event log records must be one non-empty JSONL line.")
-    return f"{encoded}\n".encode("utf-8")
+    payload = f"{encoded}\n".encode("utf-8")
+    _require_bounded_event_payload(payload)
+    return payload
 
 
 def append_event_payload(
@@ -203,6 +213,7 @@ def append_event_payload(
     """
 
     path = Path(event_path)
+    _require_bounded_event_payload(payload)
     append_started = False
     append_completed = False
 
@@ -243,6 +254,7 @@ __all__ = [
     "EventAppendFailure",
     "EventAppendState",
     "EVENT_LOCK_FILENAME",
+    "MAX_EVENT_RECORD_BYTES",
     "append_event_line",
     "append_event_payload",
     "encode_event_line",

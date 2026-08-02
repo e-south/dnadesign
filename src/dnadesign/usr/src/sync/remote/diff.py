@@ -21,6 +21,7 @@ import pyarrow.parquet as pq
 
 from ...contracts import VerificationError
 from .remote import RemoteDatasetStat
+from .transfer import EventLogContentRevision
 
 if TYPE_CHECKING:  # for static checkers only; avoids runtime coupling
     from .remote import RemotePrimaryStat  # noqa: F401
@@ -301,6 +302,15 @@ def events_tail_count(path: Path) -> int:
         raise VerificationError(f"Failed to read local events log: {p}") from exc
 
 
+def event_content_changed(
+    local: EventLogContentRevision,
+    remote: EventLogContentRevision,
+) -> bool:
+    """Compare complete event-log content, including absence and digest."""
+
+    return local != remote
+
+
 def _snap_ts_from_name(name: str) -> Optional[str]:
     m = _PAT_TS.search(name)
     return m.group(1) if m else None
@@ -363,7 +373,16 @@ def _aux_file_inventory(dataset_dir: Path) -> List[str]:
             continue
         rel = item.relative_to(dataset_dir)
         rel_text = rel.as_posix()
-        if rel_text in {"records.parquet", "meta.md", ".events.log", ".events.lock", ".usr.lock"}:
+        if rel_text in {
+            "records.parquet",
+            "meta.md",
+            ".events.log",
+            ".events.lock",
+            ".usr.lock",
+            ".usr.transfer.lock",
+        }:
+            continue
+        if rel.parts and rel.parts[0].startswith(".usr.lease."):
             continue
         if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
             continue

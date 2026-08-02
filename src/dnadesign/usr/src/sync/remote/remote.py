@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import shlex
 import subprocess
 import sys
@@ -23,6 +24,15 @@ from typing import Dict, Iterator, List, Optional, Tuple
 
 from ...contracts import RemoteUnavailableError, TransferError
 from .config import SSHRemoteConfig
+from .locks import (
+    _RemoteDatasetLease,
+    _RemoteEventLogLease,
+    dataset_lock_script,
+    event_log_lock_script,
+    leased_rsync_program,
+    remote_lock_session,
+)
+from .transfer import EventLogContentRevision
 
 
 @dataclass
@@ -70,6 +80,8 @@ class SSHRemote:
     def __init__(self, cfg: SSHRemoteConfig):
         self.cfg = cfg
         self._effective_ssh_config_cache: Dict[str, str] | None = None
+        self._active_dataset_leases: dict[str, _RemoteDatasetLease] = {}
+        self._active_event_log_leases: dict[str, _RemoteEventLogLease] = {}
 
     # ---- subprocess helpers ----
 
@@ -255,95 +267,138 @@ class SSHRemote:
             )
         return refreshed
 
-    def _dataset_lock_script(self, dataset: str, *, timeout_seconds: int) -> str:
-        dataset_dir = shlex.quote(self.cfg.dataset_path(dataset))
-        lock_path = shlex.quote(str(Path(self.cfg.dataset_path(dataset)) / ".usr.lock"))
-        timeout = max(1, int(timeout_seconds))
-        return (
-            "set -eu; "
-            f"mkdir -p {dataset_dir}; "
-            f"exec 9>>{lock_path}; "
-            f"if ! flock -x -w {timeout} 9; then echo USR_REMOTE_LOCK_TIMEOUT; exit 73; fi; "
-            "echo USR_REMOTE_LOCK_ACQUIRED; "
-            "IFS= read -r _usr_sync_unlock || true"
+    @contextmanager
+    def dataset_transfer_lock(
+        self,
+        dataset: str,
+        *,
+        timeout_seconds: int = 300,
+    ) -> Iterator[_RemoteDatasetLease]:
+        lease_token = secrets.token_hex(16)
+        script = dataset_lock_script(
+            self.cfg.dataset_path(dataset),
+            timeout_seconds=timeout_seconds,
+            lease_token=lease_token,
         )
+        with remote_lock_session(
+            self._ssh_cmd(),
+            script,
+            acquired_marker="USR_REMOTE_LOCK_ACQUIRED",
+            timeout_marker="USR_REMOTE_LOCK_TIMEOUT",
+            handshake_token=lease_token,
+            timeout_seconds=timeout_seconds,
+            failure_label=f"dataset lock for '{dataset}'",
+            ssh_target=self.cfg.ssh_target,
+        ) as session:
+            lease = _RemoteDatasetLease(
+                owner=self,
+                dataset=dataset,
+                token=lease_token,
+                session=session,
+            )
+            self._active_dataset_leases[dataset] = lease
+            try:
+                lease.session.require_alive(
+                    failure_label=f"dataset lease for '{dataset}'",
+                    ssh_target=self.cfg.ssh_target,
+                )
+                yield lease
+                lease.session.require_alive(
+                    failure_label=f"dataset lease for '{dataset}'",
+                    ssh_target=self.cfg.ssh_target,
+                )
+            finally:
+                if self._active_dataset_leases.get(dataset) is lease:
+                    self._active_dataset_leases.pop(dataset, None)
 
-    def _remote_event_locked_rsync_program(self, dataset: str, *, timeout_seconds: int = 300) -> str:
-        lock_path = PurePosixPath(self.cfg.dataset_path(dataset)) / ".events.lock"
-        timeout = max(1, int(timeout_seconds))
-        return f"flock -x -w {timeout} {shlex.quote(str(lock_path))} rsync"
+    def _require_dataset_lease(self, dataset: str) -> _RemoteDatasetLease:
+        lease = self._active_dataset_leases.get(dataset)
+        if lease is None or lease.owner is not self or lease.dataset != dataset:
+            raise TransferError(f"Dataset transfer for '{dataset}' requires its active remote dataset lease")
+        lease.session.require_alive(
+            failure_label=f"dataset lease for '{dataset}'",
+            ssh_target=self.cfg.ssh_target,
+        )
+        return lease
 
     @contextmanager
-    def dataset_transfer_lock(self, dataset: str, *, timeout_seconds: int = 300) -> Iterator[None]:
-        script = self._dataset_lock_script(dataset, timeout_seconds=timeout_seconds)
-        proc = subprocess.Popen(
-            self._ssh_cmd() + ["sh", "-lc", script],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        marker = ""
-        noise_lines: list[str] = []
-        if proc.stdout is not None:
-            while True:
-                line = proc.stdout.readline()
-                if line == "":
-                    break
-                marker = line.strip()
-                if marker in {"USR_REMOTE_LOCK_ACQUIRED", "USR_REMOTE_LOCK_TIMEOUT"}:
-                    break
-                if marker:
-                    noise_lines.append(marker)
-        if marker != "USR_REMOTE_LOCK_ACQUIRED":
-            stderr_text = ""
-            if proc.stderr is not None:
-                stderr_text = proc.stderr.read().strip()
-            if proc.poll() is None:
-                proc.kill()
-                proc.wait(timeout=2)
-            if marker == "USR_REMOTE_LOCK_TIMEOUT":
-                raise TransferError(
-                    f"Remote dataset lock timeout for '{dataset}' on {self.cfg.ssh_target} "
-                    f"after {max(1, int(timeout_seconds))} seconds."
-                )
-            detail = stderr_text or marker or "missing lock handshake marker"
-            if noise_lines:
-                detail = f"{detail}; stdout_before_marker={noise_lines[-1]}"
-            raise TransferError(
-                f"Failed to acquire remote dataset lock for '{dataset}' on {self.cfg.ssh_target}: {detail}"
-            )
+    def event_log_transfer_lock(
+        self,
+        dataset: str,
+        *,
+        timeout_seconds: int = 300,
+    ) -> Iterator[_RemoteEventLogLease]:
+        """Hold the remote event lock across planning, transfer, and verification."""
 
-        release_error: str | None = None
-        body_raised = False
-        try:
-            yield
-        except Exception:
-            body_raised = True
-            raise
-        finally:
-            if proc.poll() is None:
-                try:
-                    if proc.stdin is not None:
-                        proc.stdin.write("release\n")
-                        proc.stdin.flush()
-                        proc.stdin.close()
-                except (BrokenPipeError, OSError):
-                    pass
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait(timeout=2)
-            if proc.returncode not in (0, None):
-                stderr_text = ""
-                if proc.stderr is not None:
-                    stderr_text = proc.stderr.read().strip()
-                release_error = stderr_text or f"remote lock session exited with code {proc.returncode}"
-            if release_error is not None and not body_raised:
-                raise TransferError(
-                    f"Remote dataset lock release failed for '{dataset}' on {self.cfg.ssh_target}: {release_error}"
-                )
+        lease_token = secrets.token_hex(16)
+        script = event_log_lock_script(
+            self.cfg.dataset_path(dataset),
+            timeout_seconds=timeout_seconds,
+            lease_token=lease_token,
+        )
+        with remote_lock_session(
+            self._ssh_cmd(),
+            script,
+            acquired_marker="USR_REMOTE_EVENT_LOCK_ACQUIRED",
+            timeout_marker="USR_REMOTE_EVENT_LOCK_TIMEOUT",
+            handshake_token=lease_token,
+            timeout_seconds=timeout_seconds,
+            failure_label=f"event-log lock for '{dataset}'",
+            ssh_target=self.cfg.ssh_target,
+        ) as session:
+            lease = _RemoteEventLogLease(
+                owner=self,
+                dataset=dataset,
+                token=lease_token,
+                session=session,
+            )
+            self._active_event_log_leases[dataset] = lease
+            try:
+                yield lease
+            finally:
+                if self._active_event_log_leases.get(dataset) is lease:
+                    self._active_event_log_leases.pop(dataset, None)
+
+    def _validate_event_log_lease(self, dataset: str, event_lease: _RemoteEventLogLease | None) -> None:
+        if (
+            event_lease is None
+            or self._active_event_log_leases.get(dataset) is not event_lease
+            or event_lease.owner is not self
+            or event_lease.dataset != dataset
+        ):
+            raise TransferError(f"Full push for '{dataset}' requires its active remote event-log lease")
+        event_lease.session.require_alive(
+            failure_label=f"event-log lease for '{dataset}'",
+            ssh_target=self.cfg.ssh_target,
+        )
+
+    def event_log_revision(
+        self,
+        dataset: str,
+        *,
+        event_lease: _RemoteEventLogLease,
+    ) -> EventLogContentRevision:
+        """Read one remote event-log identity under its active lease."""
+
+        self._validate_event_log_lease(dataset, event_lease)
+        return self._read_event_log_revision(dataset)
+
+    def observe_event_log_revision(self, dataset: str) -> EventLogContentRevision:
+        """Observe event content for a non-mutating dry-run preflight."""
+
+        return self._read_event_log_revision(dataset)
+
+    def _read_event_log_revision(self, dataset: str) -> EventLogContentRevision:
+        event_path = str(PurePosixPath(self.cfg.dataset_path(dataset)) / ".events.log")
+        exists, size_bytes, _ = self._remote_stat_file(event_path)
+        if not exists:
+            return EventLogContentRevision(exists=False, size_bytes=0, sha256=None)
+        if size_bytes is None:
+            raise RemoteUnavailableError(f"Remote event-log size is unavailable for '{dataset}'")
+        digest = self._remote_sha256(event_path)
+        if digest is None:
+            raise RemoteUnavailableError(f"Remote event-log SHA-256 is unavailable for '{dataset}'")
+        return EventLogContentRevision(exists=True, size_bytes=size_bytes, sha256=digest)
 
     # ---- STAT helpers on remote ----
 
@@ -432,6 +487,9 @@ class SSHRemote:
             + "! -path './.events.log' "
             + "! -path './.events.lock' "
             + "! -path './.usr.lock' "
+            + "! -path './.usr.transfer.lock' "
+            + "! -path './.usr.lease.*' "
+            + "! -path './.usr.lease.*/*' "
             + "! -path './_snapshots/*' "
             + "! -path './_derived/*' "
             + "-print"
@@ -541,7 +599,8 @@ class SSHRemote:
 
     def pull_file(self, remote_src: str, local_dst: Path, *, dry_run: bool = False) -> None:
         local_dst = Path(local_dst)
-        local_dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dry_run:
+            local_dst.parent.mkdir(parents=True, exist_ok=True)
         rsync = self._rsync_cmd()
         cmd = rsync + (["--dry-run"] if dry_run else []) + [f"{self.cfg.ssh_target}:{remote_src}", str(local_dst)]
         proc = subprocess.run(cmd)
@@ -550,11 +609,9 @@ class SSHRemote:
 
     def push_file(self, local_src: Path, remote_dst: str, *, dry_run: bool = False) -> None:
         local_src = Path(local_src)
-        # ensure remote parent exists
-        import shlex
-
-        parent = Path(remote_dst).parent.as_posix()
-        self._ssh_run(f"mkdir -p {shlex.quote(parent)}", check=True)
+        if not dry_run:
+            parent = Path(remote_dst).parent.as_posix()
+            self._ssh_run(f"mkdir -p {shlex.quote(parent)}", check=True)
         rsync = self._rsync_cmd()
         cmd = rsync + (["--dry-run"] if dry_run else []) + [str(local_src), f"{self.cfg.ssh_target}:{remote_dst}"]
         proc = subprocess.run(cmd)
@@ -570,15 +627,35 @@ class SSHRemote:
         skip_snapshots: bool = False,
         dry_run: bool = False,
     ) -> None:
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        dataset_lease = None if dry_run else self._require_dataset_lease(dataset)
+        if not dry_run:
+            dest_dir.mkdir(parents=True, exist_ok=True)
         src = self.cfg.rsync_url(dataset)
         rsync = self._rsync_cmd()
 
-        include_args: List[str] = ["--exclude", ".events.lock", "--exclude", ".usr.lock"]
+        include_args: List[str] = [
+            "--exclude",
+            ".events.lock",
+            "--exclude",
+            ".usr.lock",
+            "--exclude",
+            ".usr.transfer.lock",
+            "--exclude",
+            ".usr.lease.*",
+        ]
+        if not dry_run:
+            include_args += [
+                "--rsync-path",
+                leased_rsync_program(
+                    self.cfg.dataset_path(dataset),
+                    dataset_lease_token=dataset_lease.token,
+                    timeout_seconds=300,
+                    event_mode=None if primary_only else "exclusive",
+                ),
+            ]
         if primary_only:
             include_args += ["--include", "records.parquet", "--exclude", "*"]
         else:
-            include_args += ["--rsync-path", self._remote_event_locked_rsync_program(dataset)]
             if skip_snapshots:
                 include_args += ["--exclude", "_snapshots/**"]
 
@@ -586,6 +663,8 @@ class SSHRemote:
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync pull failed with code {proc.returncode}")
+        if not dry_run:
+            self._require_dataset_lease(dataset)
 
     def push_from_local(
         self,
@@ -595,23 +674,55 @@ class SSHRemote:
         primary_only: bool = False,
         skip_snapshots: bool = False,
         dry_run: bool = False,
+        event_lease: _RemoteEventLogLease | None = None,
     ) -> None:
         src = str(src_dir)
         dst = self.cfg.rsync_url(dataset)
         rsync = self._rsync_cmd()
 
-        include_args: List[str] = ["--exclude", ".events.lock", "--exclude", ".usr.lock"]
+        include_args: List[str] = [
+            "--exclude",
+            ".events.lock",
+            "--exclude",
+            ".usr.lock",
+            "--exclude",
+            ".usr.transfer.lock",
+            "--exclude",
+            ".usr.lease.*",
+        ]
+        dataset_lease = None if dry_run else self._require_dataset_lease(dataset)
         if primary_only:
+            if event_lease is not None:
+                raise TransferError("Primary-only push must not receive a remote event-log lease")
+            if not dry_run:
+                include_args += [
+                    "--rsync-path",
+                    leased_rsync_program(
+                        self.cfg.dataset_path(dataset),
+                        dataset_lease_token=dataset_lease.token,
+                        timeout_seconds=300,
+                    ),
+                ]
             include_args += ["--include", "records.parquet", "--exclude", "*"]
         else:
-            include_args += ["--rsync-path", self._remote_event_locked_rsync_program(dataset)]
+            if not dry_run:
+                self._validate_event_log_lease(dataset, event_lease)
+                include_args += [
+                    "--rsync-path",
+                    leased_rsync_program(
+                        self.cfg.dataset_path(dataset),
+                        dataset_lease_token=dataset_lease.token,
+                        timeout_seconds=300,
+                        event_mode="shared",
+                        event_lease_token=event_lease.token,
+                    ),
+                ]
             if skip_snapshots:
                 include_args += ["--exclude", "_snapshots/**"]
-
-        # Ensure remote dataset directory exists
-        self._ssh_run(f"mkdir -p {shlex.quote(self.cfg.dataset_path(dataset))}", check=True)
 
         cmd = rsync + include_args + (["--dry-run"] if dry_run else []) + [src + "/", dst]
         proc = subprocess.run(cmd)
         if proc.returncode != 0:
             raise TransferError(f"rsync push failed with code {proc.returncode}")
+        if not dry_run:
+            self._require_dataset_lease(dataset)

@@ -69,6 +69,7 @@ TEST_FAMILY_FILES = {
     },
     "sync": {
         "__init__.py",
+        "test_sync_event_transactions.py",
         "test_sync_iterative_batch_flow.py",
         "test_sync_locking.py",
         "test_sync_module_layout.py",

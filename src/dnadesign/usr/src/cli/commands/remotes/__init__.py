@@ -21,6 +21,7 @@ from ....sync.remote.remote import SSHControlSessionStatus, SSHRemote
 _BU_SCC_PRESET = "bu-scc"
 _BU_SCC_LOGIN_HOST = "scc1.bu.edu"
 _BU_SCC_TRANSFER_HOST = "scc-globus.bu.edu"
+_REMOTE_PROCESS_START_PROBE = 'test -n "$(LC_ALL=C TZ=UTC0 ps -o lstart= -p "$$" 2>/dev/null | tr -d \'[:space:]\')"'
 
 
 def _render_ssh_config_snippet(*, alias: str, host: str, user: str) -> str:
@@ -190,6 +191,13 @@ def cmd_remotes_doctor(args) -> None:
     if rc != 0:
         raise SystemExit(f"Remote flock is unavailable on {cfg.ssh_target}.")
 
+    rc, _out, _err = remote._ssh_run(_REMOTE_PROCESS_START_PROBE, check=False)
+    if rc != 0:
+        raise SystemExit(
+            f"Remote process-start identity is unavailable on {cfg.ssh_target}; "
+            "USR requires `LC_ALL=C TZ=UTC0 ps -o lstart= -p $$` to return a value."
+        )
+
     if bool(getattr(args, "check_base_dir", True)):
         base_dir = shlex.quote(cfg.base_dir)
         rc, _out, _err = remote._ssh_run(f"test -d {base_dir}", check=False)
@@ -200,6 +208,7 @@ def cmd_remotes_doctor(args) -> None:
     print(f"SSH: {cfg.ssh_target} (ok)")
     print("Remote rsync: ok")
     print("Remote flock: ok")
+    print("Remote process identity: ok")
     if bool(getattr(args, "check_base_dir", True)):
         print(f"base_dir: {cfg.base_dir} (ok)")
     print("Doctor checks passed.")

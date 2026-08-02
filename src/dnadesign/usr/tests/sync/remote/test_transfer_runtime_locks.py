@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -22,12 +23,59 @@ import pytest
 from dnadesign.usr.src.contracts import VerificationError
 from dnadesign.usr.src.events import append as event_append_module
 from dnadesign.usr.src.events import append_event_line
+from dnadesign.usr.src.events.append import MAX_EVENT_RECORD_BYTES
 from dnadesign.usr.src.sync.remote import transfer as transfer_module
 from dnadesign.usr.src.sync.remote.transfer import (
     capture_event_log_revision,
+    capture_validated_event_log_content_revision,
     collect_staged_entries,
     promote_staged_pull,
 )
+
+
+def _event_payload_with_size(size_bytes: int) -> bytes:
+    prefix = b'{"action":"'
+    suffix = b'"}\n'
+    return prefix + (b"x" * (size_bytes - len(prefix) - len(suffix))) + suffix
+
+
+def test_streaming_event_validator_accepts_a_complete_multibyte_jsonl_record(tmp_path: Path) -> None:
+    event_path = tmp_path / ".events.log"
+    payload = ('{"action":"scientific","value":"' + ("x" * 65_535) + "µ" + '"}\n').encode()
+    event_path.write_bytes(payload)
+
+    revision = capture_validated_event_log_content_revision(event_path)
+
+    assert revision.exists is True
+    assert revision.size_bytes == len(payload)
+    assert revision.sha256 == hashlib.sha256(payload).hexdigest()
+
+
+def test_streaming_event_validator_accepts_a_record_at_the_encoded_size_limit(tmp_path: Path) -> None:
+    event_path = tmp_path / ".events.log"
+    payload = _event_payload_with_size(MAX_EVENT_RECORD_BYTES)
+    event_path.write_bytes(payload)
+
+    revision = capture_validated_event_log_content_revision(event_path)
+
+    assert revision.size_bytes == MAX_EVENT_RECORD_BYTES
+    assert revision.sha256 == hashlib.sha256(payload).hexdigest()
+
+
+def test_streaming_event_validator_rejects_a_complete_record_over_the_encoded_size_limit(tmp_path: Path) -> None:
+    event_path = tmp_path / ".events.log"
+    event_path.write_bytes(_event_payload_with_size(MAX_EVENT_RECORD_BYTES + 1))
+
+    with pytest.raises(VerificationError, match="exceeds the .* encoded-record limit"):
+        capture_validated_event_log_content_revision(event_path)
+
+
+def test_streaming_event_validator_rejects_an_oversized_unterminated_record(tmp_path: Path) -> None:
+    event_path = tmp_path / ".events.log"
+    event_path.write_bytes(b'{"action":"' + (b"x" * MAX_EVENT_RECORD_BYTES))
+
+    with pytest.raises(VerificationError, match="exceeds the .* encoded-record limit"):
+        capture_validated_event_log_content_revision(event_path)
 
 
 def test_staged_entries_exclude_runtime_locks(tmp_path: Path) -> None:
@@ -38,6 +86,9 @@ def test_staged_entries_exclude_runtime_locks(tmp_path: Path) -> None:
     (staged / ".events.log").write_text('{"event":"remote"}\n', encoding="utf-8")
     (staged / ".events.lock").write_text("remote-event-lock\n", encoding="utf-8")
     (staged / ".usr.lock").write_text("remote-dataset-lock\n", encoding="utf-8")
+    (staged / ".usr.transfer.lock").write_text("remote-transfer-lock\n", encoding="utf-8")
+    staged_lease = staged / ".usr.lease.dataset.RemoteLease123"
+    staged_lease.write_text("remote-lease\n", encoding="utf-8")
 
     entries = collect_staged_entries(staged, skip_snapshots=False)
 
@@ -53,6 +104,9 @@ def test_pull_promotion_preserves_local_runtime_locks(tmp_path: Path) -> None:
     destination.mkdir()
     (destination / ".events.lock").write_text("local-event-lock\n", encoding="utf-8")
     (destination / ".usr.lock").write_text("local-dataset-lock\n", encoding="utf-8")
+    (destination / ".usr.transfer.lock").write_text("local-transfer-lock\n", encoding="utf-8")
+    local_lease = destination / ".usr.lease.dataset.LocalLease123"
+    local_lease.write_text("local-lease\n", encoding="utf-8")
     (destination / ".events.log").write_text('{"event":"local"}\n', encoding="utf-8")
 
     expected_event_revision = capture_event_log_revision(destination / ".events.log")
@@ -68,6 +122,8 @@ def test_pull_promotion_preserves_local_runtime_locks(tmp_path: Path) -> None:
     assert (destination / "meta.md").read_text(encoding="utf-8") == "remote metadata\n"
     assert (destination / ".events.lock").read_text(encoding="utf-8") == "local-event-lock\n"
     assert (destination / ".usr.lock").read_text(encoding="utf-8") == "local-dataset-lock\n"
+    assert (destination / ".usr.transfer.lock").read_text(encoding="utf-8") == "local-transfer-lock\n"
+    assert local_lease.read_text(encoding="utf-8") == "local-lease\n"
     assert not (destination / ".events.log").exists()
 
 

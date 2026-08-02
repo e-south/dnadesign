@@ -220,7 +220,9 @@ def render_diff_rich(s: DiffSummary) -> None:
     console.print(
         f"meta.md mtime: {s.meta_local_mtime or '-'} → {s.meta_remote_mtime or '-'}\n"
         f"verify: {s.verify_mode}\n"
-        f".events.log: local={s.events_local_lines} remote={s.events_remote_lines} (+{max(0, s.events_remote_lines - s.events_local_lines)})\n"  # noqa
+        f".events.log ({'changed' if s.changes.get('events_content_diff') else 'unchanged'}): "
+        f"local={s.events_local_lines} remote={s.events_remote_lines} "
+        f"(+{max(0, s.events_remote_lines - s.events_local_lines)})\n"
         f"_snapshots: remote_count={s.snapshots.count} newer_than_local={s.snapshots.newer_than_local}\n"
         f"_derived: {'changed' if derived_changed else 'unchanged'} "
         f"local_files={len(s.derived_local_files)} remote_files={len(s.derived_remote_files)}"

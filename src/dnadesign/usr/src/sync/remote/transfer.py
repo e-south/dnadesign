@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import stat
@@ -20,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ...contracts import VerificationError
-from ...events.append import event_log_lock
+from ...events.append import MAX_EVENT_RECORD_BYTES, event_log_lock
 
 EVENT_LOG_FILENAME = ".events.log"
 
@@ -34,6 +35,24 @@ class EventLogRevision:
     inode: int | None = None
     size_bytes: int | None = None
     sha256: str | None = None
+
+    def content_revision(self) -> EventLogContentRevision:
+        """Project descriptor identity into transport-comparable content."""
+
+        return EventLogContentRevision(
+            exists=self.exists,
+            size_bytes=int(self.size_bytes or 0),
+            sha256=self.sha256,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EventLogContentRevision:
+    """One event-log content identity shared by local and remote transports."""
+
+    exists: bool
+    size_bytes: int
+    sha256: str | None
 
 
 def _event_log_revision_locked(event_path: Path) -> EventLogRevision:
@@ -90,6 +109,153 @@ def capture_event_log_revision(event_path: Path) -> EventLogRevision:
         return _event_log_revision_locked(event_path)
 
 
+def capture_locked_event_log_content_revision(event_path: Path) -> EventLogContentRevision:
+    """Capture event content while the caller holds its stable sidecar lock."""
+
+    return _event_log_revision_locked(Path(event_path)).content_revision()
+
+
+def capture_validated_event_log_revision(event_path: Path) -> EventLogRevision:
+    """Capture one stable, complete UTF-8 JSONL revision without mutation."""
+
+    event_path = Path(event_path)
+    flags = os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(event_path, flags)
+    except FileNotFoundError:
+        return EventLogRevision(exists=False)
+    except OSError as exc:
+        raise VerificationError(f"Event log is unavailable for validation: {event_path}") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise VerificationError(f"Event log must be one regular file: {event_path}")
+        digest = hashlib.sha256()
+        pending = bytearray()
+        line_number = 0
+        while chunk := os.read(descriptor, 1 << 16):
+            digest.update(chunk)
+            pending.extend(chunk)
+            while True:
+                newline = pending.find(b"\n")
+                if newline < 0:
+                    if len(pending) >= MAX_EVENT_RECORD_BYTES:
+                        raise VerificationError(
+                            f"Event log record {line_number + 1} exceeds the "
+                            f"{MAX_EVENT_RECORD_BYTES}-byte encoded-record limit: {event_path}"
+                        )
+                    break
+                if newline + 1 > MAX_EVENT_RECORD_BYTES:
+                    raise VerificationError(
+                        f"Event log record {line_number + 1} exceeds the "
+                        f"{MAX_EVENT_RECORD_BYTES}-byte encoded-record limit: {event_path}"
+                    )
+                line_number += 1
+                raw_line = bytes(pending[:newline])
+                del pending[: newline + 1]
+                if not raw_line:
+                    raise VerificationError(
+                        f"Event log contains a blank JSONL record at line {line_number}: {event_path}"
+                    )
+                try:
+                    record = json.loads(raw_line.decode("utf-8"))
+                except UnicodeDecodeError as exc:
+                    raise VerificationError(
+                        f"Event log is not valid UTF-8 at line {line_number}: {event_path}"
+                    ) from exc
+                except json.JSONDecodeError as exc:
+                    raise VerificationError(
+                        f"Event log contains malformed JSON at line {line_number}: {event_path}"
+                    ) from exc
+                if not isinstance(record, dict):
+                    raise VerificationError(f"Event log record {line_number} is not a JSON object: {event_path}")
+        if pending:
+            raise VerificationError(f"Event log ends with a partial JSONL record: {event_path}")
+        completed = os.fstat(descriptor)
+        try:
+            current = event_path.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise VerificationError(f"Event log changed during validation: {event_path}") from exc
+        identity = (opened.st_dev, opened.st_ino)
+        if (
+            not stat.S_ISREG(completed.st_mode)
+            or identity != (completed.st_dev, completed.st_ino)
+            or opened.st_size != completed.st_size
+            or identity != (current.st_dev, current.st_ino)
+        ):
+            raise VerificationError(f"Event log changed during validation: {event_path}")
+        return EventLogRevision(
+            exists=True,
+            device=completed.st_dev,
+            inode=completed.st_ino,
+            size_bytes=completed.st_size,
+            sha256=digest.hexdigest(),
+        )
+    finally:
+        os.close(descriptor)
+
+
+def capture_validated_event_log_content_revision(event_path: Path) -> EventLogContentRevision:
+    """Project one validated local event-log revision into transport identity."""
+
+    return capture_validated_event_log_revision(event_path).content_revision()
+
+
+def digest_event_log_prefix(event_path: Path, size_bytes: int) -> str:
+    """Hash one exact complete-line prefix from a stable regular event log."""
+
+    event_path = Path(event_path)
+    if size_bytes < 0:
+        raise VerificationError("Event-log prefix size must be non-negative")
+    flags = os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(event_path, flags)
+    except FileNotFoundError as exc:
+        raise VerificationError(f"Local event log is missing during prefix verification: {event_path}") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise VerificationError(f"Local event log must be one regular file: {event_path}")
+        if opened.st_size < size_bytes:
+            raise VerificationError("Remote event log is not a prefix of the locked local event log")
+        digest = hashlib.sha256()
+        remaining = size_bytes
+        final_byte = b""
+        while remaining:
+            chunk = os.read(descriptor, min(remaining, 1 << 16))
+            if not chunk:
+                raise VerificationError("Remote event log is not a prefix of the locked local event log")
+            digest.update(chunk)
+            final_byte = chunk[-1:]
+            remaining -= len(chunk)
+        if size_bytes and final_byte != b"\n":
+            raise VerificationError("Remote event log is not a prefix of the locked local event log: partial line")
+        completed = os.fstat(descriptor)
+        try:
+            current = event_path.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise VerificationError(f"Local event log changed during prefix verification: {event_path}") from exc
+        opened_identity = (opened.st_dev, opened.st_ino)
+        if (
+            not stat.S_ISREG(completed.st_mode)
+            or opened_identity != (completed.st_dev, completed.st_ino)
+            or opened.st_size != completed.st_size
+            or opened_identity != (current.st_dev, current.st_ino)
+        ):
+            raise VerificationError(f"Local event log changed during prefix verification: {event_path}")
+        return digest.hexdigest()
+    finally:
+        os.close(descriptor)
+
+
 def make_pull_staging_dir(root: Path, dataset: str) -> Path:
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
@@ -121,7 +287,15 @@ def collect_staged_entries(staged: Path, *, skip_snapshots: bool) -> list[tuple[
         if not rel.parts:
             continue
         rel_text = rel.as_posix()
-        if rel_text in {"records.parquet", EVENT_LOG_FILENAME, ".events.lock", ".usr.lock"}:
+        if rel_text in {
+            "records.parquet",
+            EVENT_LOG_FILENAME,
+            ".events.lock",
+            ".usr.lock",
+            ".usr.transfer.lock",
+        }:
+            continue
+        if rel.parts[0].startswith(".usr.lease."):
             continue
         if skip_snapshots and rel.parts[0] == "_snapshots":
             continue
@@ -221,7 +395,12 @@ def promote_staged_pull(
                 continue
             copy_file_atomic(src_path, dst_path)
 
-        keep_with_parents: set[str] = {EVENT_LOG_FILENAME, ".events.lock", ".usr.lock"}
+        keep_with_parents: set[str] = {
+            EVENT_LOG_FILENAME,
+            ".events.lock",
+            ".usr.lock",
+            ".usr.transfer.lock",
+        }
         for rel_text in kept_paths:
             keep_with_parents.add(rel_text)
             parent = Path(rel_text).parent
@@ -233,6 +412,8 @@ def promote_staged_pull(
             rel = local_path.relative_to(dest)
             rel_text = rel.as_posix()
             if rel_text in keep_with_parents:
+                continue
+            if rel.parts and rel.parts[0].startswith(".usr.lease."):
                 continue
             if skip_snapshots and rel.parts and rel.parts[0] == "_snapshots":
                 continue

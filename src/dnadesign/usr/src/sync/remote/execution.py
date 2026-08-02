@@ -21,6 +21,7 @@ from ...contracts import VerificationError
 from .diff import (
     DiffSummary,
     compute_file_diff,
+    event_content_changed,
     file_stats,
     resolve_verify_mode,
     verify_primary_match,
@@ -28,7 +29,10 @@ from .diff import (
 from .remote import SSHRemote
 from .sidecars import local_sidecar_state, remote_sidecar_state, verify_sidecar_state_match
 from .transfer import (
-    capture_event_log_revision,
+    EventLogContentRevision,
+    capture_validated_event_log_content_revision,
+    capture_validated_event_log_revision,
+    digest_event_log_prefix,
     make_pull_staging_dir,
     promote_staged_pull,
 )
@@ -43,15 +47,73 @@ class SyncRuntime:
     plan_diff_with_remote: Callable[..., tuple[DiffSummary, object]]
     verify_after_pull: Callable[[Path, DiffSummary], None]
     verify_after_push: Callable[..., object]
-    event_delta_requires_push: Callable[[Path, int], bool]
     dataset_write_lock: Callable[[Path], object]
     event_log_lock: Callable[[Path], object]
-    record_event: Callable[..., None]
+    remote_event_log_lock: Callable[[SSHRemote, str], object]
+    remote_event_log_revision: Callable[[SSHRemote, str, object], EventLogContentRevision]
+    remote_event_log_observation: Callable[[SSHRemote, str], EventLogContentRevision]
 
 
 def _remote_for_name(runtime: SyncRuntime, remote_name: str) -> SSHRemote:
     cfg = runtime.get_remote(remote_name)
     return runtime.remote_cls(cfg)
+
+
+def _verify_remote_event_prefix(
+    local_event_path: Path,
+    local_revision: EventLogContentRevision,
+    remote_revision: EventLogContentRevision,
+) -> None:
+    if not remote_revision.exists:
+        return
+    if (
+        not local_revision.exists
+        or remote_revision.size_bytes > local_revision.size_bytes
+        or not remote_revision.sha256
+    ):
+        raise VerificationError("Remote event log is not a prefix of the locked local event log")
+    prefix_digest = digest_event_log_prefix(local_event_path, remote_revision.size_bytes)
+    if prefix_digest != remote_revision.sha256:
+        raise VerificationError("Remote event log is not a prefix of the locked local event log")
+
+
+def _verify_remote_event_match(
+    local_revision: EventLogContentRevision,
+    remote_revision: EventLogContentRevision,
+) -> None:
+    if remote_revision != local_revision:
+        raise VerificationError("Remote event log does not match the transferred local event revision")
+
+
+def _apply_event_content_plan(
+    summary: DiffSummary,
+    local_revision: EventLogContentRevision,
+    remote_revision: EventLogContentRevision,
+) -> bool:
+    changed = event_content_changed(local_revision, remote_revision)
+    summary.changes["events_content_diff"] = changed
+    summary.has_change = bool(summary.has_change or changed)
+    return changed
+
+
+def _verify_staged_pull_event_history(
+    staged_event_path: Path,
+    local_revision: EventLogContentRevision,
+) -> None:
+    """Require a full pull to preserve the complete local append-only prefix."""
+
+    remote_revision = capture_validated_event_log_content_revision(staged_event_path)
+    if not local_revision.exists:
+        return
+    if (
+        not remote_revision.exists
+        or remote_revision.size_bytes < local_revision.size_bytes
+        or not local_revision.sha256
+    ):
+        raise VerificationError("Remote event log does not extend the local event history")
+    prefix_digest = digest_event_log_prefix(staged_event_path, local_revision.size_bytes)
+    if prefix_digest != local_revision.sha256:
+        raise VerificationError("Remote event log does not extend the local event history")
 
 
 def plan_diff(root: Path, dataset: str, remote_name: str, *, verify: str, runtime: SyncRuntime) -> DiffSummary:
@@ -90,9 +152,16 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
         dataset,
         verify=opts.verify,
         include_derived_hashes=opts.verify_derived_hashes,
+        include_event_content=False,
     )
     if not summary.primary_remote.exists:
         raise VerificationError(f"Refusing pull for dataset '{dataset}': remote records.parquet is missing.")
+    if not opts.primary_only:
+        _apply_event_content_plan(
+            summary,
+            capture_validated_event_log_content_revision(Path(root) / dataset / ".events.log"),
+            runtime.remote_event_log_observation(remote, dataset),
+        )
     if not summary.has_change and summary.primary_remote.exists:
         return summary
 
@@ -115,13 +184,25 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
                 dataset,
                 verify=opts.verify,
                 include_derived_hashes=opts.verify_derived_hashes,
+                include_event_content=False,
             )
+            local_event_revision = EventLogContentRevision(exists=False, size_bytes=0, sha256=None)
+            expected_event_revision = None
+            if not opts.primary_only:
+                with runtime.event_log_lock(dest / ".events.log"):
+                    expected_event_revision = capture_validated_event_log_revision(dest / ".events.log")
+                    local_event_revision = expected_event_revision.content_revision()
             if not summary.primary_remote.exists:
                 raise VerificationError(f"Refusing pull for dataset '{dataset}': remote records.parquet is missing.")
+            if not opts.primary_only:
+                _apply_event_content_plan(
+                    summary,
+                    local_event_revision,
+                    runtime.remote_event_log_observation(remote, dataset),
+                )
             if not summary.has_change and summary.primary_remote.exists:
                 return summary
 
-            expected_event_revision = None if opts.primary_only else capture_event_log_revision(dest / ".events.log")
             staged_dir = make_pull_staging_dir(root, dataset)
             try:
                 remote.pull_to_local(
@@ -138,6 +219,8 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
                         remote_sidecar_state(remote_before, include_derived_hashes=opts.verify_derived_hashes),
                         context="post-pull-sidecars",
                     )
+                if not opts.primary_only:
+                    _verify_staged_pull_event_history(staged_dir / ".events.log", local_event_revision)
                 promote_staged_pull(
                     staged_dir,
                     dest,
@@ -147,21 +230,6 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
                 )
             finally:
                 shutil.rmtree(staged_dir, ignore_errors=True)
-            runtime.record_event(
-                dest / ".events.log",
-                "pull",
-                dataset=dataset,
-                args={
-                    "from": remote_name,
-                    "verify": summary.verify_mode,
-                    "verify_sidecars": bool(opts.verify_sidecars),
-                    "verify_derived_hashes": bool(opts.verify_derived_hashes),
-                    "rows": summary.primary_remote.rows,
-                    "cols": summary.primary_remote.cols,
-                },
-                target_path=dest / "records.parquet",
-                dataset_root=root,
-            )
     return summary
 
 
@@ -187,14 +255,6 @@ def execute_pull_file(
             include_parquet=before.verify_mode == "parquet",
         )
         verify_primary_match(local_now, before.primary_remote, before.verify_mode, context="post-pull-file")
-        runtime.record_event(
-            local_file.parent / ".events.log",
-            "pull_file",
-            dataset=str(local_file.parent),
-            args={"from": remote_name, "path": str(local_file), "verify": before.verify_mode},
-            target_path=local_file,
-            dataset_root=local_file.parent,
-        )
     return before
 
 
@@ -209,17 +269,36 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
         dataset,
         verify=opts.verify,
         include_derived_hashes=opts.verify_derived_hashes,
+        include_event_content=False,
     )
     if not summary.primary_local.exists:
         raise VerificationError(f"Refusing push for dataset '{dataset}': local records.parquet is missing.")
-    if not summary.has_change and summary.primary_remote.exists:
-        if opts.primary_only:
-            return summary
-        with runtime.event_log_lock(src / ".events.log"):
-            if not runtime.event_delta_requires_push(src / ".events.log", summary.events_remote_lines):
-                return summary
+    observed_local_event_revision = None
+    observed_remote_event_revision = None
+    if not opts.primary_only:
+        observed_local_event_revision = capture_validated_event_log_content_revision(src / ".events.log")
+        observed_remote_event_revision = runtime.remote_event_log_observation(remote, dataset)
+        _apply_event_content_plan(
+            summary,
+            observed_local_event_revision,
+            observed_remote_event_revision,
+        )
+    if not summary.has_change and summary.primary_remote.exists and opts.primary_only:
+        return summary
 
     if opts.dry_run:
+        if not opts.primary_only:
+            assert observed_local_event_revision is not None
+            assert observed_remote_event_revision is not None
+            _verify_remote_event_prefix(
+                src / ".events.log",
+                observed_local_event_revision,
+                observed_remote_event_revision,
+            )
+            summary.verify_notes.append(
+                "Dry-run observed a valid remote event-log prefix without mutation; an actual push rechecks it "
+                "under transaction locks."
+            )
         remote.push_from_local(
             dataset,
             src,
@@ -232,66 +311,81 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts, *, runtime: S
     with runtime.dataset_write_lock(src):
         with runtime.remote_dataset_lock(remote, dataset):
             # Full-transfer lock order is local dataset, remote dataset, local
-            # event log, then the remote event log acquired inside rsync. All
-            # sync paths use this direction so direct event writers cannot form
-            # a local/remote lock cycle.
+            # event log, then remote event log. The remote lease spans the
+            # definitive plan, prefix proof, copy, and post-copy verification.
             local_event_lock = nullcontext() if opts.primary_only else runtime.event_log_lock(src / ".events.log")
             with local_event_lock:
-                summary, _ = runtime.plan_diff_with_remote(
-                    remote,
-                    root,
-                    dataset,
-                    verify=opts.verify,
-                    include_derived_hashes=opts.verify_derived_hashes,
+                remote_event_lock = (
+                    nullcontext(None) if opts.primary_only else runtime.remote_event_log_lock(remote, dataset)
                 )
-                if not summary.primary_local.exists:
-                    raise VerificationError(f"Refusing push for dataset '{dataset}': local records.parquet is missing.")
-                if not summary.has_change and summary.primary_remote.exists:
-                    if opts.primary_only or not runtime.event_delta_requires_push(
-                        src / ".events.log", summary.events_remote_lines
-                    ):
+                with remote_event_lock as event_lease:
+                    summary, _ = runtime.plan_diff_with_remote(
+                        remote,
+                        root,
+                        dataset,
+                        verify=opts.verify,
+                        include_derived_hashes=opts.verify_derived_hashes,
+                        include_event_content=False,
+                    )
+                    if not summary.primary_local.exists:
+                        raise VerificationError(
+                            f"Refusing push for dataset '{dataset}': local records.parquet is missing."
+                        )
+
+                    local_event_revision = None
+                    if not opts.primary_only:
+                        local_event_revision = capture_validated_event_log_content_revision(src / ".events.log")
+                        remote_event_revision = runtime.remote_event_log_revision(remote, dataset, event_lease)
+                        _verify_remote_event_prefix(
+                            src / ".events.log",
+                            local_event_revision,
+                            remote_event_revision,
+                        )
+                        _apply_event_content_plan(summary, local_event_revision, remote_event_revision)
+
+                    if not summary.has_change and summary.primary_remote.exists:
                         return summary
 
-                local_sidecars = (
-                    local_sidecar_state(src, include_derived_hashes=opts.verify_derived_hashes)
-                    if opts.verify_sidecars
-                    else None
-                )
-                remote.push_from_local(
-                    dataset,
-                    src,
-                    primary_only=opts.primary_only,
-                    skip_snapshots=opts.skip_snapshots,
-                    dry_run=False,
-                )
-                remote_after = runtime.verify_after_push(
-                    remote,
-                    dataset,
-                    summary,
-                    include_derived_hashes=opts.verify_derived_hashes,
-                )
-                if opts.verify_sidecars and local_sidecars is not None:
-                    verify_sidecar_state_match(
-                        local_sidecars,
-                        remote_sidecar_state(remote_after, include_derived_hashes=opts.verify_derived_hashes),
-                        context="post-push-sidecars",
+                    local_sidecars = (
+                        local_sidecar_state(src, include_derived_hashes=opts.verify_derived_hashes)
+                        if opts.verify_sidecars
+                        else None
                     )
+                    if opts.primary_only:
+                        remote.push_from_local(
+                            dataset,
+                            src,
+                            primary_only=True,
+                            skip_snapshots=opts.skip_snapshots,
+                            dry_run=False,
+                        )
+                    else:
+                        remote.push_from_local(
+                            dataset,
+                            src,
+                            primary_only=False,
+                            skip_snapshots=opts.skip_snapshots,
+                            dry_run=False,
+                            event_lease=event_lease,
+                        )
+                    remote_after = runtime.verify_after_push(
+                        remote,
+                        dataset,
+                        summary,
+                        include_derived_hashes=opts.verify_derived_hashes,
+                    )
+                    if not opts.primary_only and local_event_revision is not None:
+                        _verify_remote_event_match(
+                            local_event_revision,
+                            runtime.remote_event_log_revision(remote, dataset, event_lease),
+                        )
+                    if opts.verify_sidecars and local_sidecars is not None:
+                        verify_sidecar_state_match(
+                            local_sidecars,
+                            remote_sidecar_state(remote_after, include_derived_hashes=opts.verify_derived_hashes),
+                            context="post-push-sidecars",
+                        )
 
-            # The audit event belongs to the next local revision and therefore
-            # must be recorded only after the transferred revision is unlocked.
-            runtime.record_event(
-                src / ".events.log",
-                "push",
-                dataset=dataset,
-                args={
-                    "to": remote_name,
-                    "verify": summary.verify_mode,
-                    "verify_sidecars": bool(opts.verify_sidecars),
-                    "verify_derived_hashes": bool(opts.verify_derived_hashes),
-                },
-                target_path=src / "records.parquet",
-                dataset_root=root,
-            )
     return summary
 
 
@@ -315,14 +409,6 @@ def execute_push_file(
             local_file, remote_name, remote_path=remote_path, verify=before.verify_mode, runtime=runtime
         )
         verify_primary_match(after.primary_local, after.primary_remote, before.verify_mode, context="post-push-file")
-        runtime.record_event(
-            local_file.parent / ".events.log",
-            "push_file",
-            dataset=str(local_file.parent),
-            args={"to": remote_name, "path": str(local_file), "verify": before.verify_mode},
-            target_path=local_file,
-            dataset_root=local_file.parent,
-        )
     return before
 
 

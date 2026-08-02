@@ -28,9 +28,15 @@ from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.cli.commands import sync as sync_commands
 from dnadesign.usr.src.contracts import TransferError
+from dnadesign.usr.src.events.append import event_log_lock
 from dnadesign.usr.src.registry import parse_columns_spec, register_namespace
 from dnadesign.usr.src.sync.remote.config import SSHRemoteConfig
 from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
+from dnadesign.usr.src.sync.remote.transfer import (
+    EventLogContentRevision,
+    capture_event_log_revision,
+    capture_locked_event_log_content_revision,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -52,6 +58,7 @@ def _row(sequence: str, source: str) -> dict[str, str]:
 class _FilesystemRemote:
     def __init__(self, cfg: SSHRemoteConfig) -> None:
         self.cfg = cfg
+        self._event_leases: dict[str, object] = {}
 
     def _dataset_dir(self, dataset: str) -> Path:
         return Path(self.cfg.base_dir) / dataset
@@ -62,6 +69,29 @@ class _FilesystemRemote:
             yield
 
         return _ctx()
+
+    def event_log_transfer_lock(self, dataset: str):
+        @contextmanager
+        def _ctx():
+            dataset_dir = self._dataset_dir(dataset)
+            dataset_dir.mkdir(parents=True, exist_ok=True)
+            with event_log_lock(dataset_dir / ".events.log"):
+                lease = object()
+                self._event_leases[dataset] = lease
+                try:
+                    yield lease
+                finally:
+                    self._event_leases.pop(dataset, None)
+
+        return _ctx()
+
+    def event_log_revision(self, dataset: str, *, event_lease: object) -> EventLogContentRevision:
+        if self._event_leases.get(dataset) is not event_lease:
+            raise TransferError(f"active event-log lease required for filesystem remote: {dataset}")
+        return capture_locked_event_log_content_revision(self._dataset_dir(dataset) / ".events.log")
+
+    def observe_event_log_revision(self, dataset: str) -> EventLogContentRevision:
+        return capture_event_log_revision(self._dataset_dir(dataset) / ".events.log").content_revision()
 
     def _primary_stat(self, records_path: Path, *, verify: str) -> RemotePrimaryStat:
         if not records_path.exists():
@@ -104,7 +134,16 @@ class _FilesystemRemote:
                     continue
                 rel = item.relative_to(dataset_dir)
                 rel_text = rel.as_posix()
-                if rel_text in {"records.parquet", "meta.md", ".events.log", ".events.lock", ".usr.lock"}:
+                if rel_text in {
+                    "records.parquet",
+                    "meta.md",
+                    ".events.log",
+                    ".events.lock",
+                    ".usr.lock",
+                    ".usr.transfer.lock",
+                }:
+                    continue
+                if rel.parts and rel.parts[0].startswith(".usr.lease."):
                     continue
                 if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
                     continue
@@ -142,7 +181,9 @@ class _FilesystemRemote:
         dst_dir.mkdir(parents=True, exist_ok=True)
         for item in src_dir.rglob("*"):
             rel = item.relative_to(src_dir)
-            if rel.as_posix() in {".events.lock", ".usr.lock"}:
+            if rel.as_posix() in {".events.lock", ".usr.lock", ".usr.transfer.lock"}:
+                continue
+            if rel.parts and rel.parts[0].startswith(".usr.lease."):
                 continue
             if skip_snapshots and rel.parts and rel.parts[0] == "_snapshots":
                 continue
@@ -176,9 +217,15 @@ class _FilesystemRemote:
         primary_only: bool = False,
         skip_snapshots: bool = False,
         dry_run: bool = False,
+        event_lease: object | None = None,
     ) -> None:
         if dry_run:
             return
+        if primary_only:
+            if event_lease is not None:
+                raise TransferError("primary-only filesystem push must not receive an event-log lease")
+        elif self._event_leases.get(dataset) is not event_lease:
+            raise TransferError(f"active event-log lease required for filesystem push: {dataset}")
         self._copy_dataset(
             Path(src_dir), self._dataset_dir(dataset), primary_only=primary_only, skip_snapshots=skip_snapshots
         )
@@ -236,6 +283,13 @@ def _sync_args(
 
 def _read_audit(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _final_sync_state_is_current(data: dict) -> bool:
+    """Require parity across every section reported by the sync audit."""
+
+    sections = ("primary", "meta", ".events.log", "_snapshots", "_derived", "_auxiliary")
+    return all(not bool(data[section]["changed"]) for section in sections)
 
 
 def run_sync_audit_drill(*, work_dir: Path, dataset_id: str, report_json: Path) -> dict:
@@ -357,11 +411,7 @@ def run_sync_audit_drill(*, work_dir: Path, dataset_id: str, report_json: Path) 
         "diff_after_push": _read_audit(diff_after_push_path),
     }
     final_data = audits["diff_after_push"]["data"]
-    final_up_to_date = (
-        not bool(final_data["primary"]["changed"])
-        and not bool(final_data["_derived"]["changed"])
-        and not bool(final_data["_auxiliary"]["changed"])
-    )
+    final_up_to_date = _final_sync_state_is_current(final_data)
     payload = {
         "dataset_id": dataset_id,
         "local_root": str(local_root),

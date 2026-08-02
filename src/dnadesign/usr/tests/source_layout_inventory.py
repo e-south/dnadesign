@@ -148,6 +148,7 @@ PACKAGE_FILES = {
         "config.py",
         "diff.py",
         "execution.py",
+        "locks.py",
         "remote.py",
         "sidecars.py",
         "transfer.py",

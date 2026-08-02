@@ -45,8 +45,9 @@ def print_diff(summary, *, use_rich: bool | None = None) -> None:
     print(f"Primary sha: {pl.sha256 or '?'} {eq} {pr.sha256 or '?'}")
     print(f"meta.md     mtime: {summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}")
     delta_evt = max(0, summary.events_remote_lines - summary.events_local_lines)
+    event_content_state = "changed" if changes.get("events_content_diff") else "unchanged"
     print(
-        ".events.log lines: "
+        f".events.log ({event_content_state}) lines: "
         f"local={summary.events_local_lines}  "
         f"remote={summary.events_remote_lines}  "
         f"(+{delta_evt} on remote)"
@@ -114,7 +115,11 @@ def build_sync_audit_payload(
         },
         "primary": {"changed": bool(changes.get("primary_sha_diff"))},
         "meta": {"changed": bool(changes.get("meta_mtime_diff"))},
-        ".events.log": {"local": events_local, "remote": events_remote},
+        ".events.log": {
+            "changed": bool(changes.get("events_content_diff")),
+            "local": events_local,
+            "remote": events_remote,
+        },
         "_snapshots": {
             "changed": snapshots_changed,
             "remote_count": snapshot_count,

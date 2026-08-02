@@ -10,6 +10,7 @@ Module Author(s): Eric J. South
 """
 
 import fcntl
+import hashlib
 import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor
@@ -27,8 +28,10 @@ from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.contracts import REQUIRED_COLUMNS, VerificationError
 from dnadesign.usr.src.events import append_event_line
 from dnadesign.usr.src.events.append import append_event_payload, encode_event_line
+from dnadesign.usr.src.sync.remote import execution as sync_execution
 from dnadesign.usr.src.sync.remote.remote import RemoteDatasetStat, RemotePrimaryStat
 from dnadesign.usr.src.sync.remote.sidecars import local_sidecar_state
+from dnadesign.usr.src.sync.remote.transfer import EventLogContentRevision
 
 
 def _write_min_parquet(path: Path) -> None:
@@ -44,6 +47,8 @@ class DummyRemote:
         self.remote_template = remote_template
         self.pushed_file: Path | None = None
         self.remote_lock_calls = 0
+        self.event_revision_calls = 0
+        self._event_revision = EventLogContentRevision(exists=False, size_bytes=0, sha256=None)
 
     def _stat_from_file(self, path: Path) -> RemoteDatasetStat:
         size = int(path.stat().st_size)
@@ -80,6 +85,7 @@ class DummyRemote:
 
     def push_from_local(self, _dataset: str, src: Path, **_kwargs) -> None:
         self.pushed_file = Path(src) / "records.parquet"
+        self._event_revision = self._event_revision_for(Path(src) / ".events.log")
 
     def dataset_transfer_lock(self, _dataset: str):
         @contextmanager
@@ -88,6 +94,32 @@ class DummyRemote:
             yield
 
         return _ctx()
+
+    def event_log_transfer_lock(self, _dataset: str):
+        @contextmanager
+        def _ctx():
+            yield object()
+
+        return _ctx()
+
+    def event_log_revision(self, _dataset: str, *, event_lease: object) -> EventLogContentRevision:
+        assert event_lease is not None
+        self.event_revision_calls += 1
+        return self._event_revision
+
+    def observe_event_log_revision(self, _dataset: str) -> EventLogContentRevision:
+        return self._event_revision
+
+    @staticmethod
+    def _event_revision_for(path: Path) -> EventLogContentRevision:
+        if not path.exists():
+            return EventLogContentRevision(exists=False, size_bytes=0, sha256=None)
+        payload = path.read_bytes()
+        return EventLogContentRevision(
+            exists=True,
+            size_bytes=len(payload),
+            sha256=hashlib.sha256(payload).hexdigest(),
+        )
 
 
 def _event_lock_is_held(event_path: Path) -> bool:
@@ -102,6 +134,11 @@ def _event_lock_is_held(event_path: Path) -> bool:
         return False
     finally:
         os.close(descriptor)
+
+
+def test_remote_transport_without_a_dataset_lease_contract_fails_closed() -> None:
+    with pytest.raises(VerificationError, match="cannot lease the dataset"):
+        sync_module._remote_dataset_lock(object(), "demo")
 
 
 def test_execute_pull_uses_lock(tmp_path: Path, monkeypatch) -> None:
@@ -156,10 +193,12 @@ def test_full_pull_rejects_local_event_append_during_download(tmp_path: Path, mo
     class BlockingRemote(DummyRemote):
         def pull_to_local(self, dataset_name: str, dest: Path, **kwargs) -> None:
             super().pull_to_local(dataset_name, dest, **kwargs)
+            shutil.copy2(dataset.events_path, Path(dest) / ".events.log")
             staged_pull_ready.set()
             assert release_pull.wait(timeout=5)
 
     remote = BlockingRemote(remote_file)
+    remote._event_revision = remote._event_revision_for(dataset.events_path)
     monkeypatch.setattr(sync_module, "SSHRemote", lambda _cfg: remote)
     monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
 
@@ -184,6 +223,77 @@ def test_full_pull_rejects_local_event_append_during_download(tmp_path: Path, mo
     assert events_after.startswith(events_before)
     assert events_after.endswith(b'{"event":"local-concurrent"}\n')
     assert not list(root.glob(".usr-pull-demo-*"))
+
+
+def test_full_pull_uses_one_local_event_revision_for_prefix_and_promotion(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root = tmp_path / "datasets"
+    ensure_registry(root)
+    dataset = Dataset(root, "demo")
+    dataset.init(source="unit-test")
+    dataset.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit-test"},
+            {"sequence": "TGCA", "bio_type": "dna", "alphabet": "dna_4", "source": "unit-test"},
+        ],
+        source="unit-test",
+    )
+    records_before = dataset.records_path.read_bytes()
+    events_before = dataset.events_path.read_bytes()
+    remote_file = tmp_path / "remote" / "records.parquet"
+    _write_min_parquet(remote_file)
+
+    definitive_revision_captured = Event()
+    append_started = Event()
+    append_completed = Event()
+    original_capture = sync_execution.capture_validated_event_log_revision
+
+    def capture_and_pause(path: Path):
+        revision = original_capture(path)
+        definitive_revision_captured.set()
+        assert append_started.wait(timeout=5)
+        return revision
+
+    class AppendAwareRemote(DummyRemote):
+        def pull_to_local(self, dataset_name: str, dest: Path, **kwargs) -> None:
+            super().pull_to_local(dataset_name, dest, **kwargs)
+            shutil.copy2(dataset.events_path, Path(dest) / ".events.log")
+            assert append_completed.wait(timeout=5)
+
+    remote = AppendAwareRemote(remote_file)
+    remote._event_revision = remote._event_revision_for(dataset.events_path)
+    monkeypatch.setattr(sync_module, "SSHRemote", lambda _cfg: remote)
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
+    monkeypatch.setattr(sync_execution, "capture_validated_event_log_revision", capture_and_pause)
+
+    def append_local_event() -> None:
+        append_event_payload(
+            dataset.events_path,
+            encode_event_line('{"action":"local-between-revisions"}'),
+            on_start=append_started.set,
+        )
+        append_completed.set()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        pull = executor.submit(
+            sync_module.execute_pull,
+            root,
+            "demo",
+            "remote",
+            sync_module.SyncOptions(verify="size"),
+        )
+        assert definitive_revision_captured.wait(timeout=5)
+        append = executor.submit(append_local_event)
+        with pytest.raises(VerificationError, match="event log changed while the full pull was staged"):
+            pull.result(timeout=5)
+        append.result(timeout=5)
+
+    assert dataset.records_path.read_bytes() == records_before
+    events_after = dataset.events_path.read_bytes()
+    assert events_after.startswith(events_before)
+    assert events_after.endswith(b'{"action":"local-between-revisions"}\n')
 
 
 def test_execute_push_uses_lock(tmp_path: Path, monkeypatch) -> None:
@@ -229,12 +339,12 @@ def test_execute_push_uses_lock(tmp_path: Path, monkeypatch) -> None:
     assert remote.remote_lock_calls == 1
 
 
-@pytest.mark.parametrize(("primary_only", "expected_event_scans"), [(False, [True]), (True, [])])
-def test_noop_push_scans_events_only_for_a_locked_full_transfer(
+@pytest.mark.parametrize(("primary_only", "expected_revision_calls"), [(False, 1), (True, 0)])
+def test_noop_push_compares_event_content_only_for_a_full_transfer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     primary_only: bool,
-    expected_event_scans: list[bool],
+    expected_revision_calls: int,
 ) -> None:
     root = tmp_path / "datasets"
     ensure_registry(root)
@@ -281,17 +391,9 @@ def test_noop_push_scans_events_only_for_a_locked_full_transfer(
             self.push_calls += 1
 
     remote = MirrorRemote()
+    remote._event_revision = remote._event_revision_for(dataset.events_path)
     monkeypatch.setattr(sync_module, "SSHRemote", lambda _cfg: remote)
     monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
-
-    event_scans: list[bool] = []
-    original_event_delta = sync_module._event_delta_requires_push
-
-    def checked_event_delta(events_path: Path, *, remote_lines: int) -> bool:
-        event_scans.append(_event_lock_is_held(events_path))
-        return original_event_delta(events_path, remote_lines=remote_lines)
-
-    monkeypatch.setattr(sync_module, "_event_delta_requires_push", checked_event_delta)
 
     sync_module.execute_push(
         root,
@@ -300,7 +402,7 @@ def test_noop_push_scans_events_only_for_a_locked_full_transfer(
         sync_module.SyncOptions(verify="size", primary_only=primary_only),
     )
 
-    assert event_scans == expected_event_scans
+    assert remote.event_revision_calls == expected_revision_calls
     assert remote.push_calls == 0
 
 
@@ -330,7 +432,6 @@ def test_full_push_holds_local_event_snapshot_through_remote_verification(
     verification_started = Event()
     release_verification = Event()
     snapshot_unlocked = Event()
-    push_event_recorded = Event()
 
     class SnapshotBlockingRemote(DummyRemote):
         def __init__(self) -> None:
@@ -367,9 +468,15 @@ def test_full_push_holds_local_event_snapshot_through_remote_verification(
                 src,
                 remote_dir,
                 dirs_exist_ok=True,
-                ignore=shutil.ignore_patterns(".events.lock", ".usr.lock"),
+                ignore=shutil.ignore_patterns(
+                    ".events.lock",
+                    ".usr.lock",
+                    ".usr.transfer.lock",
+                    ".usr.lease.*",
+                ),
             )
             self.snapshot_events = (remote_dir / ".events.log").read_bytes()
+            self._event_revision = self._event_revision_for(remote_dir / ".events.log")
             self.pushed = True
             snapshot_captured.set()
             assert release_transfer.wait(timeout=5)
@@ -388,12 +495,7 @@ def test_full_push_holds_local_event_snapshot_through_remote_verification(
         finally:
             snapshot_unlocked.set()
 
-    def record_push_event(*_args, **_kwargs) -> None:
-        assert snapshot_unlocked.is_set()
-        push_event_recorded.set()
-
     monkeypatch.setattr(sync_module, "event_log_lock", tracked_event_log_lock)
-    monkeypatch.setattr(sync_module, "record_event", record_push_event)
 
     append_started = Event()
     append_completed = Event()
@@ -440,4 +542,4 @@ def test_full_push_holds_local_event_snapshot_through_remote_verification(
 
     assert b'"action":"local-concurrent"' not in remote.snapshot_events
     assert b'"action":"local-concurrent"' in dataset.events_path.read_bytes()
-    assert push_event_recorded.is_set()
+    assert b'"action":"push"' not in dataset.events_path.read_bytes()
