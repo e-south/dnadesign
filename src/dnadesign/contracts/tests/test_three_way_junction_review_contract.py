@@ -324,6 +324,10 @@ def test_singleton_pool_requires_exact_v1_pairwise_search_evidence(
             {"matching_max_pairwise_lcs": 13},
             "matching_max_pairwise_lcs exceeds the combined junction length",
         ),
+        (
+            {"matchings_evaluated": 3},
+            "matchings_evaluated must not exceed the distinct permutation count",
+        ),
     ],
 )
 def test_multi_locus_pool_search_respects_sequence_derived_bounds(

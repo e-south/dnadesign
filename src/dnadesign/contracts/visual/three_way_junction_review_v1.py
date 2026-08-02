@@ -28,6 +28,19 @@ def _reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGT", "TGCA"))[::-1]
 
 
+def _permutation_capacity_covers(*, locus_count: int, evaluated: int) -> bool:
+    """Compare against ``locus_count!`` without constructing an oversized integer."""
+
+    capacity = 1
+    if capacity >= evaluated:
+        return True
+    for factor in range(2, locus_count + 1):
+        capacity *= factor
+        if capacity >= evaluated:
+            return True
+    return False
+
+
 def _require_dna(value: str, *, field: str, optional: bool = False) -> str:
     if optional and value == "":
         return value
@@ -255,6 +268,11 @@ class PoolSearchReview(VisualContractModel):
                 raise ValueError("singleton pools require v1 rank scores of 1.5")
             if self.matchings_evaluated != 1:
                 raise ValueError("singleton pools require exactly one matching evaluation")
+        if not _permutation_capacity_covers(
+            locus_count=self.locus_count,
+            evaluated=self.matchings_evaluated,
+        ):
+            raise ValueError("matchings_evaluated must not exceed the distinct permutation count")
         if self.barcode_candidates_generated % self.locus_count != 0:
             raise ValueError("barcode_candidates_generated must be a multiple of locus_count")
         inferred_pool_factor = self.barcode_candidates_generated // self.locus_count

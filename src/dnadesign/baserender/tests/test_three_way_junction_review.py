@@ -427,6 +427,14 @@ def test_adapter_rejects_nonuniform_junction_sequence_lengths() -> None:
         baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
 
 
+def test_adapter_rejects_matching_count_above_multi_locus_permutation_space() -> None:
+    payload = _payload_with_many_junctions(junction_count=2)
+    payload["search"]["matchings_evaluated"] = 3
+
+    with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
+        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+
 @pytest.mark.parametrize(
     "updates",
     [
