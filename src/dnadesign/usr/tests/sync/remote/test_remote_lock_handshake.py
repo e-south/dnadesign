@@ -25,6 +25,10 @@ from dnadesign.usr.src.sync.remote import locks as locks_module
 from dnadesign.usr.src.sync.remote.config import SSHRemoteConfig
 from dnadesign.usr.src.sync.remote.remote import SSHRemote
 
+_PORTABLE_TEST_SHELLS = tuple(
+    dict.fromkeys(path for name in ("sh", "dash", "bash") if (path := shutil.which(name)) is not None)
+)
+
 
 class _FakeStdout:
     def __init__(self, lines: list[str]):
@@ -360,8 +364,9 @@ def test_remote_lease_scripts_use_stable_process_start_identity() -> None:
         assert script.count("ps -o lstart=") == script.count("LC_ALL=C TZ=UTC0 ps -o lstart=")
 
 
+@pytest.mark.parametrize("shell", _PORTABLE_TEST_SHELLS)
 @pytest.mark.parametrize("kind", ["dataset", "event"])
-def test_lease_owner_script_rejects_a_preexisting_symlink(tmp_path, kind: str) -> None:
+def test_lease_owner_script_rejects_a_preexisting_symlink(tmp_path, shell: str, kind: str) -> None:
     dataset_path = tmp_path / "dataset"
     redirect_target = tmp_path / "redirect-target"
     dataset_path.mkdir()
@@ -375,7 +380,7 @@ def test_lease_owner_script_rejects_a_preexisting_symlink(tmp_path, kind: str) -
     script = locks_module._lease_owner_script(str(dataset_path), kind, token)
 
     completed = subprocess.run(
-        ["sh", "-c", f"set -eu; {script}"],
+        [shell, "-c", f"set -eu; {script}"],
         check=False,
         capture_output=True,
         text=True,
@@ -515,6 +520,25 @@ def test_lease_cleanup_does_not_remove_a_post_creation_replacement(tmp_path) -> 
     assert "rmdir " not in script
     assert 'path_identity" = "$fd_identity' in script
     assert "excluded runtime marker for offline cleanup" in (locks_module._lease_owner_script.__doc__ or "")
+
+
+@pytest.mark.parametrize("shell", _PORTABLE_TEST_SHELLS)
+def test_lease_validation_normalizes_a_missing_marker_to_contract_exit_code(tmp_path, shell: str) -> None:
+    dataset_path = tmp_path / "dataset"
+    dataset_path.mkdir()
+
+    completed = subprocess.run(
+        [
+            shell,
+            "-c",
+            f"set -eu; {locks_module._lease_validation_script(str(dataset_path), 'dataset', 'SafeLease123')}",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 74
 
 
 def test_lease_validation_rejects_a_non_numeric_process_id(tmp_path) -> None:

@@ -1,4 +1,13 @@
-"""Persistent SSH lock sessions for remote dataset transactions."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/src/sync/remote/locks.py
+
+Persistent SSH lock sessions for remote dataset transactions.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -60,7 +69,11 @@ def _lease_owner_script(dataset_path: str, kind: str, token: str) -> str:
     return (
         f"lease_path={lease_path}; "
         "set -C; "
-        'if ! exec 6>"$lease_path"; then exit 75; fi; '
+        '_usr_open_lease_owner() { exec 6>"$lease_path"; }; '
+        'if [ -n "${BASH_VERSION-}" ]; then '
+        "if ! _usr_open_lease_owner; then exit 75; fi; "
+        'elif ! command exec 6>"$lease_path"; then exit 75; '
+        "fi; "
         "set +C; "
         "cleanup() { "
         "path_identity=$(stat -L -c '%d:%i' -- \"$lease_path\" 2>/dev/null || true); "
@@ -85,7 +98,11 @@ def _lease_validation_script(dataset_path: str, kind: str, token: str) -> str:
     quoted_token = shlex.quote(token)
     return (
         f"lease_path={lease_path}; "
-        'if ! exec 6<"$lease_path"; then exit 74; fi; '
+        '_usr_open_lease_reader() { exec 6<"$lease_path"; }; '
+        'if [ -n "${BASH_VERSION-}" ]; then '
+        "if ! _usr_open_lease_reader; then exit 74; fi; "
+        'elif ! command exec 6<"$lease_path"; then exit 74; '
+        "fi; "
         # A swapped pathname opens a different inode and therefore cannot carry
         # the holder's exclusive lock.  From this point on, fd 6 is the lease
         # capability; metadata is never read through the pathname.

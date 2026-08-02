@@ -1,4 +1,13 @@
-"""Full-push event-log transaction contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/usr/tests/sync/test_sync_event_transactions.py
+
+Full-push event-log transaction contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
