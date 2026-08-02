@@ -23,9 +23,9 @@ _DNA = re.compile(r"^[ACGT]+$")
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MIN_BARCODE_POOL_FACTOR_V1 = 5
 _TRIJUNCTION_STRING_V1_ALGORITHM = "dnadesign.trijunction.string.v1"
-# TriJunction request v1 permits 100,000 search iterations; this producer's
-# selector also evaluates one baseline path before its iteration budget.
-_TRIJUNCTION_STRING_V1_MAX_TOEHOLD_PATHS_EVALUATED = 100_001
+# TriJunction request v1 permits 100,000 iterations in each randomized search
+# stage; every v1 selector also evaluates one baseline before that budget.
+_TRIJUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS = 100_001
 
 
 def _reverse_complement(sequence: str) -> str:
@@ -428,14 +428,17 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
             raise ValueError("recovery extended top and bottom sequences must be reverse complements")
         if self.search.pool_id != self.target.pool_id:
             raise ValueError("search.pool_id must match target.pool_id")
-        if (
-            self.source.algorithm == _TRIJUNCTION_STRING_V1_ALGORITHM
-            and self.search.toehold_paths_evaluated > _TRIJUNCTION_STRING_V1_MAX_TOEHOLD_PATHS_EVALUATED
-        ):
-            raise ValueError(
-                "toehold_paths_evaluated must not exceed "
-                f"{_TRIJUNCTION_STRING_V1_MAX_TOEHOLD_PATHS_EVALUATED} for {_TRIJUNCTION_STRING_V1_ALGORITHM}"
-            )
+        if self.source.algorithm == _TRIJUNCTION_STRING_V1_ALGORITHM:
+            for field, evaluated in (
+                ("toehold_paths_evaluated", self.search.toehold_paths_evaluated),
+                ("barcode_subsets_evaluated", self.search.barcode_subsets_evaluated),
+                ("matchings_evaluated", self.search.matchings_evaluated),
+            ):
+                if evaluated > _TRIJUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS:
+                    raise ValueError(
+                        f"{field} must not exceed {_TRIJUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS} "
+                        f"for {_TRIJUNCTION_STRING_V1_ALGORITHM}"
+                    )
         if self.search.locus_count < len(junctions):
             raise ValueError("search.locus_count must cover every target geometry junction")
         self.search._validate_sequence_bounds(

@@ -44,6 +44,8 @@ def test_review_projection_is_exact_valid_and_structurally_scoped() -> None:
     assert review.recovery.reverse.order_sequence_5to3 == plan.targets[0].recovery.reverse_order_sequence
     assert review.search.thermodynamic_screening == "not_run"
     assert review.search.toehold_paths_evaluated <= 100_001
+    assert review.search.barcode_subsets_evaluated <= 100_001
+    assert review.search.matchings_evaluated <= 100_001
     assert {(check.subject.kind, check.subject.id) for check in review.checks} == {
         ("pool", plan.targets[0].pool_id),
         ("target", plan.targets[0].target_id),

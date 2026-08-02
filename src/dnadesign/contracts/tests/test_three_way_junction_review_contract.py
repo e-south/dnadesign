@@ -166,22 +166,28 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
     }
 
 
-def test_trijunction_string_v1_toehold_path_evaluations_respect_producer_budget() -> None:
+@pytest.mark.parametrize(
+    "field",
+    ["toehold_paths_evaluated", "barcode_subsets_evaluated", "matchings_evaluated"],
+)
+def test_trijunction_string_v1_search_evaluations_respect_producer_budget(field: str) -> None:
     payload = three_way_junction_review_payload()
     payload["source"]["algorithm"] = "dnadesign.trijunction.string.v1"
-    payload["search"]["toehold_paths_evaluated"] = 100_001
+    payload["search"]["locus_count"] = 10
+    payload["search"]["barcode_candidates_generated"] = 50
+    payload["search"][field] = 100_001
 
     accepted = ThreeWayJunctionReviewV1.model_validate(payload)
 
-    assert accepted.search.toehold_paths_evaluated == 100_001
+    assert getattr(accepted.search, field) == 100_001
 
-    payload["search"]["toehold_paths_evaluated"] = 100_002
-    with pytest.raises(ValidationError, match="toehold_paths_evaluated must not exceed 100001"):
+    payload["search"][field] = 100_002
+    with pytest.raises(ValidationError, match=rf"{field} must not exceed 100001"):
         ThreeWayJunctionReviewV1.model_validate(payload)
 
     payload["source"]["algorithm"] = "other.producer.algorithm.v2"
     extensible = ThreeWayJunctionReviewV1.model_validate(payload)
-    assert extensible.search.toehold_paths_evaluated == 100_002
+    assert getattr(extensible.search, field) == 100_002
 
 
 @pytest.mark.parametrize(
