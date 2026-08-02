@@ -1,4 +1,13 @@
-"""Resource and layout bounds for TriJunction review rendering."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/tests/three_way_junction_review/test_render_bounds.py
+
+Resource and layout bounds for TriJunction review rendering.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -166,6 +175,22 @@ def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
         plt.close(figure)
 
 
+def test_review_renderer_distinguishes_target_junctions_from_pool_loci() -> None:
+    payload = _payload()
+    payload["search"]["locus_count"] = 2
+    record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+    figure = baserender.render(record, renderer="three_way_junction_review")
+    try:
+        junction_text = "\n".join(item.get_text() for item in figure.axes[1].texts)
+        search_text = "\n".join(item.get_text() for item in figure.axes[3].texts)
+
+        assert "1 target junction · every target junction shown" in junction_text
+        assert "pool loci  2" in search_text
+    finally:
+        plt.close(figure)
+
+
 def test_review_renderer_escapes_control_characters_in_public_adapter_identifiers() -> None:
     payload = _payload()
     identifier = "pool\n\t" * 100
@@ -201,9 +226,9 @@ def test_review_renderer_bounds_geometry_artist_counts() -> None:
 
         assert "6/21 fragments" in geometry_text
         assert "6/20 junctions" in geometry_text
-        assert "bounded locus preview" in junction_text
-        assert "every locus shown" not in junction_text
-        assert "14 loci omitted" in junction_text
+        assert "bounded target-junction preview" in junction_text
+        assert "every target junction shown" not in junction_text
+        assert "14 target junctions omitted from preview" in junction_text
         assert len(geometry_axis.patches) <= 12
         assert len(geometry_axis.texts) <= 12
         assert len(junction_axis.lines) <= 6

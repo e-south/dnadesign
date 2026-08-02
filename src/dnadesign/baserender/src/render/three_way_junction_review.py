@@ -165,8 +165,8 @@ def _panel_junctions(axis, review: ThreeWayJunctionReviewV1) -> None:
     axis.text(
         0.02,
         0.92,
-        f"{len(junctions)} junction{'s' if len(junctions) != 1 else ''} · "
-        f"{'every locus shown' if len(junctions) <= 5 else 'bounded locus preview'}",
+        f"{len(junctions)} target junction{'s' if len(junctions) != 1 else ''} · "
+        f"{'every target junction shown' if len(junctions) <= 5 else 'bounded target-junction preview'}",
         fontsize=8.5,
         color=_MUTED,
         va="top",
@@ -223,7 +223,7 @@ def _panel_junctions(axis, review: ThreeWayJunctionReviewV1) -> None:
         axis.text(
             0.03,
             0.08,
-            f"{omitted} loci omitted from preview; exact assignments remain in the typed contract.",
+            f"{omitted} target junctions omitted from preview; exact assignments remain in the typed contract.",
             fontsize=6.5,
             color=_MUTED,
         )
@@ -303,7 +303,7 @@ def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
     barcode_subsets, subsets_abbreviated = _integer_preview(search.barcode_subsets_evaluated)
     matchings, matchings_abbreviated = _integer_preview(search.matchings_evaluated)
     metrics = (
-        f"loci  {locus_count}",
+        f"pool loci  {locus_count}",
         f"toehold paths  {toehold_paths}",
         f"toehold min / mean  {search.toehold_min_distance:g} / {search.toehold_mean_distance:g}",
         f"barcode candidates  {barcode_candidates}",

@@ -1,4 +1,13 @@
-"""Tests for bounded, descriptor-captured render sources."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/tests/test_captured_source.py
+
+Tests for bounded, descriptor-captured render sources.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from pathlib import Path
 

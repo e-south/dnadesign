@@ -1,4 +1,13 @@
-"""Neutral review-contract fixtures for BaseRender TriJunction tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/tests/three_way_junction_review/fixtures.py
+
+Neutral review-contract fixtures for BaseRender TriJunction tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

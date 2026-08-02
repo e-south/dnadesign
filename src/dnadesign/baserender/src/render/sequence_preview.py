@@ -1,4 +1,13 @@
-"""Bounded, explicit sequence previews for compact render surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/src/render/sequence_preview.py
+
+Bounded, explicit sequence previews for compact render surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
