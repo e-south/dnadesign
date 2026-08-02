@@ -65,7 +65,10 @@ meaning.
 Let `L` be `oligo_length`, `b` `barcode_length`, `t` `toehold_length`, and `R`
 `search_range`.
 
-- All integer budgets are positive except `seed`, which is nonnegative.
+- All request integers are at most `2^64 - 1`; integer budgets are positive
+  except `seed`, which is nonnegative. This preserves the complete unsigned
+  64-bit seed domain used by the stable PRNG while keeping every request scalar
+  within one explicit, portable representation bound.
 - `t >= 2`.
 - `barcode_pool_factor >= 5`.
 - `barcode_toehold_k <= min(b, t)`.

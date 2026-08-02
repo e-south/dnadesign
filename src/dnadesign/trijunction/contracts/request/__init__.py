@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from ...errors import TriJunctionConfigError
 from .codec import canonical_request_bytes, parse_request, request_to_mapping
 from .files import load_request
-from .limits import MAX_REQUEST_BYTES, MAX_REQUEST_IDENTIFIER_BYTES, MAX_REQUEST_PLAIN_TEXT_BYTES
+from .limits import MAX_REQUEST_BYTES, MAX_REQUEST_IDENTIFIER_BYTES, MAX_REQUEST_INTEGER, MAX_REQUEST_PLAIN_TEXT_BYTES
 from .model import (
     MAX_BARCODE_GENERATION_ATTEMPTS,
     MAX_BARCODE_SUBSET_ITERATIONS,
@@ -35,6 +35,7 @@ __all__ = [
     "MAX_MATCHING_ITERATIONS",
     "MAX_REQUEST_BYTES",
     "MAX_REQUEST_IDENTIFIER_BYTES",
+    "MAX_REQUEST_INTEGER",
     "MAX_REQUEST_PLAIN_TEXT_BYTES",
     "MAX_TOEHOLD_SEARCH_ITERATIONS",
     "REQUEST_SCHEMA",

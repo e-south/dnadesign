@@ -16,7 +16,7 @@ from collections.abc import Mapping
 
 from ...errors import TriJunctionConfigError
 from ...sequence import DNA_ALPHABET
-from .limits import MAX_REQUEST_IDENTIFIER_BYTES, MAX_REQUEST_PLAIN_TEXT_BYTES
+from .limits import MAX_REQUEST_IDENTIFIER_BYTES, MAX_REQUEST_INTEGER, MAX_REQUEST_PLAIN_TEXT_BYTES
 
 COMPLEMENT_END_PREPARATIONS = frozenset(
     {
@@ -89,11 +89,13 @@ def require_plain_text(value: object, *, context: str) -> str:
 
 
 def require_int(value: object, *, context: str, minimum: int) -> int:
-    """Return a bounded integer while rejecting booleans."""
+    """Return an unsigned-64-bit-compatible integer while rejecting booleans."""
 
     if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
         qualifier = "nonnegative" if minimum == 0 else "positive"
         raise TriJunctionConfigError(f"{context} must be a {qualifier} integer")
+    if value > MAX_REQUEST_INTEGER:
+        raise TriJunctionConfigError(f"{context} must not exceed {MAX_REQUEST_INTEGER}")
     return value
 
 

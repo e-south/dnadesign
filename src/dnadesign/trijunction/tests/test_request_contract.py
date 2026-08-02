@@ -473,6 +473,77 @@ def test_parse_request_rejects_fraction_integer_too_large_for_float() -> None:
         parse_request(raw)
 
 
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "oligo_length",
+        "barcode_length",
+        "toehold_length",
+        "search_range",
+        "toehold_search_iterations",
+        "barcode_pool_factor",
+        "barcode_generation_attempts",
+        "barcode_toehold_k",
+        "barcode_pair_k",
+        "barcode_subset_iterations",
+        "matching_iterations",
+        "barcode_max_homopolymer",
+    ],
+)
+def test_parse_request_rejects_planning_integer_above_unsigned_64_bit_domain(field_name: str) -> None:
+    raw = _request_mapping()
+    planning = raw["planning"]
+    assert isinstance(planning, dict)
+    planning[field_name] = 1 << 64
+
+    with pytest.raises(
+        TriJunctionConfigError,
+        match=rf"^planning\.{field_name} must not exceed 18446744073709551615$",
+    ):
+        parse_request(raw)
+
+
+@pytest.mark.parametrize("field_name", ["seed", "order_policy.max_oligo_length"])
+def test_parse_request_rejects_request_integer_above_unsigned_64_bit_domain(field_name: str) -> None:
+    raw = _request_mapping()
+    if field_name == "seed":
+        raw["seed"] = 10**5000
+    else:
+        order_policy = raw["order_policy"]
+        assert isinstance(order_policy, dict)
+        order_policy["max_oligo_length"] = 1 << 64
+
+    with pytest.raises(
+        TriJunctionConfigError,
+        match=rf"^{field_name} must not exceed 18446744073709551615$",
+    ):
+        parse_request(raw)
+
+
+def test_public_dataclasses_reject_integer_above_unsigned_64_bit_domain() -> None:
+    request = parse_request(_request_mapping())
+
+    with pytest.raises(TriJunctionConfigError, match=r"^seed must not exceed 18446744073709551615$"):
+        replace(request, seed=10**5000)
+    with pytest.raises(
+        TriJunctionConfigError,
+        match=r"^planning\.oligo_length must not exceed 18446744073709551615$",
+    ):
+        replace(request.planning, oligo_length=1 << 64)
+    with pytest.raises(
+        TriJunctionConfigError,
+        match=r"^order_policy\.max_oligo_length must not exceed 18446744073709551615$",
+    ):
+        replace(request.order_policy, max_oligo_length=1 << 64)
+
+
+def test_parse_request_accepts_maximum_unsigned_64_bit_seed() -> None:
+    raw = _request_mapping()
+    raw["seed"] = (1 << 64) - 1
+
+    assert parse_request(raw).seed == (1 << 64) - 1
+
+
 def test_parse_request_rejects_canonical_payload_above_file_limit() -> None:
     raw = _request_mapping()
     target = raw["targets"][0]  # type: ignore[index]
