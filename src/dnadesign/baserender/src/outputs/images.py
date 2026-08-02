@@ -21,10 +21,9 @@ from ..config import ImagesOutputCfg, Style
 from ..config.adapter_contracts import (
     adapter_grid_record_limit,
     validate_records_output_policy,
-    validate_records_renderer_compatibility,
 )
 from ..core import Record, SchemaError
-from ..render import Palette, render_record
+from ..render import Palette, render_record, validate_records_for_rendering
 from ..render.renderer import get_renderer_descriptor
 from .names import _safe_stem, _unique_stem
 
@@ -156,12 +155,19 @@ def write_images(
     materialized = list(records)
     if not materialized:
         raise SchemaError("No records to render after adapter, transforms, and selection")
+    materialized = list(
+        validate_records_for_rendering(
+            materialized,
+            renderer_name=renderer_name,
+            style=style,
+            palette=palette,
+        )
+    )
     validate_records_output_policy(
         materialized,
         output_kind="images",
         image_output_mode="single_file" if output.path is not None else "directory",
     )
-    validate_records_renderer_compatibility(materialized, renderer_name=renderer_name)
 
     if output.path is not None:
         out_path = output.path.resolve()

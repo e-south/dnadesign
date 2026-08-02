@@ -33,7 +33,6 @@ from ..config.adapter_contracts import (
     adapter_contract,
     adapter_grid_record_limit,
     normalize_adapter_config,
-    validate_records_renderer_compatibility,
 )
 from ..core import Record, SchemaError, ensure
 from ..execution import run_render_job as _run_render_job
@@ -402,6 +401,20 @@ def render_record_grid_figure(
     records_list = list(records)
     ensure(len(records_list) > 0, "render_record_grid_figure requires at least one record", SchemaError)
     ensure(isinstance(ncols, int) and ncols >= 1, "ncols must be >= 1", SchemaError)
+    style = resolve_style(
+        preset=style_preset,
+        overrides={} if style_overrides is None else dict(style_overrides),
+    )
+    from ..render import Palette, validate_records_for_rendering
+
+    records_list = list(
+        validate_records_for_rendering(
+            records_list,
+            renderer_name=renderer_name,
+            style=style,
+            palette=Palette(style.palette),
+        )
+    )
     limits = tuple(
         limit
         for limit in (
@@ -415,7 +428,6 @@ def render_record_grid_figure(
         raise SchemaError(
             f"renderer {renderer_name!r} supports at most {grid_limit} record per grid; render records individually"
         )
-    validate_records_renderer_compatibility(records_list, renderer_name=renderer_name)
 
     panel_images: list[object] = []
     for record in records_list:

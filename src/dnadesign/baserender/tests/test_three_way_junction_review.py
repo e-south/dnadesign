@@ -263,7 +263,7 @@ def test_review_renderer_rejects_multi_record_grids_on_public_and_writer_surface
 
     with pytest.raises(baserender.SchemaError, match="at most 1 record per grid"):
         baserender.render(records, renderer="three_way_junction_review")
-    with pytest.raises(baserender.SchemaError, match="at most 1 record per grid"):
+    with pytest.raises(baserender.RenderingError, match="not compatible with renderer 'sequence_rows'"):
         baserender.render(records, renderer="sequence_rows")
 
     style = baserender.resolve_style(preset=None, overrides=None)
@@ -277,7 +277,7 @@ def test_review_renderer_rejects_multi_record_grids_on_public_and_writer_surface
             style=style,
             palette=baserender.Palette(style.palette),
         )
-    with pytest.raises(baserender.SchemaError, match="requires a directory for images output"):
+    with pytest.raises(baserender.RenderingError, match="not compatible with renderer 'sequence_rows'"):
         write_images(
             records,
             output=output,

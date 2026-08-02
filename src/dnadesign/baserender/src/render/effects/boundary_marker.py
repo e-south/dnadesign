@@ -14,8 +14,8 @@ from __future__ import annotations
 from ...core import Effect, RenderingError
 
 
-def draw_boundary_marker(ax, effect: Effect, record, layout, style, palette, feature_boxes) -> None:
-    _ = (record, palette, feature_boxes)
+def validate_boundary_marker(effect: Effect, record, layout, style, palette, feature_boxes) -> None:
+    _ = (layout, style, palette, feature_boxes)
     boundary = effect.target.get("boundary")
     lane = str(effect.target.get("lane", "")).strip().lower()
     if not isinstance(boundary, int):
@@ -26,6 +26,12 @@ def draw_boundary_marker(ax, effect: Effect, record, layout, style, palette, fea
         raise RenderingError("boundary_marker.target.boundary must be within sequence boundaries")
     if lane not in {"primary", "complement"}:
         raise RenderingError("boundary_marker.target.lane must be primary|complement")
+
+
+def draw_boundary_marker(ax, effect: Effect, record, layout, style, palette, feature_boxes) -> None:
+    validate_boundary_marker(effect, record, layout, style, palette, feature_boxes)
+    boundary = int(effect.target["boundary"])
+    lane = str(effect.target["lane"]).strip().lower()
     x = layout.x_left + boundary * layout.cw
     y = layout.y_forward if lane == "primary" else layout.y_reverse
     semantic = str(effect.params.get("semantic", "")).strip().lower()

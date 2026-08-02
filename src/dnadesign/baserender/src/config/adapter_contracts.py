@@ -569,6 +569,8 @@ def validate_adapter_output_policy(
 
 
 def _record_adapter_kind(record: Record, *, record_index: int) -> str | None:
+    if not isinstance(record.meta, Mapping):
+        raise SchemaError(f"records[{record_index}].meta must be a mapping/dict")
     raw_kind = record.meta.get("adapter")
     if raw_kind is None:
         return None
@@ -624,13 +626,6 @@ def validate_record_renderer_compatibility(record: Record, *, renderer_name: str
             f"record.meta.adapter {adapter_kind!r} is not compatible with renderer {renderer_name!r}; "
             f"supported renderer values: {allowed}"
         )
-
-
-def validate_records_renderer_compatibility(records: Iterable[Record], *, renderer_name: str) -> None:
-    """Reject an incompatible direct-render batch before output mutation."""
-
-    for record in records:
-        validate_record_renderer_compatibility(record, renderer_name=renderer_name)
 
 
 def normalize_adapter_config(

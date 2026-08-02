@@ -385,6 +385,11 @@ def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
 
 @dataclass(frozen=True)
 class ThreeWayJunctionReviewRenderer:
+    def preflight(self, record: Record, style: Style, palette: Palette) -> None:
+        _ = palette
+        _review_figure_size(style)
+        _review_from_record(record)
+
     def render(self, record: Record, style: Style, palette: Palette):
         _ = palette
         figure_size = _review_figure_size(style)

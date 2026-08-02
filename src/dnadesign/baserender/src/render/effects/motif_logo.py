@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Mapping, Sequence
 
+import matplotlib.colors as mcolors
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import PathPatch, Rectangle
 from matplotlib.textpath import TextPath
@@ -393,3 +394,40 @@ def draw_motif_logo(
                 clip_on=False,
             )
         )
+
+
+def validate_motif_logo(
+    effect: Effect,
+    record: Record,
+    layout: LayoutContext,
+    style,
+    palette: Palette,
+    feature_boxes: dict[str, tuple[float, float, float, float]],
+) -> None:
+    """Validate motif geometry and style-dependent evidence before artist allocation."""
+
+    effect_index = _effect_index(record, effect)
+    geometry = compute_motif_logo_geometry(
+        record=record,
+        effect_index=effect_index,
+        layout=layout,
+        style=style,
+        feature_boxes=feature_boxes,
+    )
+    base_colors = _style_base_colors(style)
+    target_feature = _resolve_feature(record, geometry.feature_id)
+    palette.color_for(_feature_color_token(target_feature))
+    letter_coloring_mode = str(style.motif_logo.letter_coloring.mode).lower()
+    if letter_coloring_mode not in {"classic", "match_window_seq"}:
+        raise RenderingError(f"Unknown motif_logo letter coloring mode: {letter_coloring_mode!r}")
+    observed_color_source = str(style.motif_logo.letter_coloring.observed_color_source).lower()
+    if observed_color_source not in {"nucleotide_palette", "feature_fill"}:
+        raise RenderingError(
+            f"Unknown motif_logo observed color source: {style.motif_logo.letter_coloring.observed_color_source!r}"
+        )
+    display_mode = str(style.motif_logo.display_mode).lower()
+    if display_mode not in {"information", "probability"}:
+        raise RenderingError(f"Unknown motif_logo display mode: {display_mode!r}")
+    for color in (*base_colors.values(), str(style.motif_logo.letter_coloring.other_color)):
+        if not mcolors.is_color_like(color):
+            raise RenderingError("motif_logo colors must be valid Matplotlib colors")

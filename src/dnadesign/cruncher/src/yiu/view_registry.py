@@ -41,7 +41,7 @@ _CANONICAL_PAYLOAD_VIEW_DEFINITIONS: tuple[PayloadViewDefinition, ...] = (
         contract_kind="sequence_evidence_map_v1",
         adapter_kind="sequence_evidence_map_v1",
         input_kind="jsonl",
-        renderer_kind="sequence_rows",
+        renderer_kind="nucleotide_evidence_map",
     ),
     PayloadViewDefinition(
         view_id="assembled_payload",

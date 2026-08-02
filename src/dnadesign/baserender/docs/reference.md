@@ -231,7 +231,7 @@ Stable API surface:
 - `SequencePanelConfig`, `SequencePanelDiagnostics`, `SequencePanelImage`
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
 - `Style`, `resolve_style`, `resolve_preset_path`, `list_style_presets`
-- `SchemaError`, `ContractError`, `LayoutError`
+- `SchemaError`, `ContractError`, `LayoutError`, `RenderingError`
 
 Sequence-panel contract:
 - contract id: `dnadesign.baserender.sequence_panel.v1`
@@ -251,6 +251,8 @@ Sequence-panel layout:
 - record list input defaults to a single-row layout (`ncols = len(records)`).
 - callers can override with `grid.ncols`.
 - invalid/unknown `grid` keys fail fast (`SchemaError`).
+- invalid records and record-to-renderer mismatches fail before any panel or
+  output is created (`RenderingError`), for both single-record and grid input.
 
 Boundary rule:
 - supported imports: `dnadesign.baserender`

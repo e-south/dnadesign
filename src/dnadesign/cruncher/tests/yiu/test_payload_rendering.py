@@ -2672,7 +2672,7 @@ def test_bundle_path_contract_rejects_divergent_view_render_targets(tmp_path: Pa
                 input_kind="jsonl",
                 view_contract_path="split_payload_view.jsonl",
                 render_artifact_path="split_payload.pdf",
-                renderer_kind="sequence_rows",
+                renderer_kind="nucleotide_evidence_map",
             ),
         ],
         composite_render_artifact_path="payload_views.pdf",

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         Feature,
         LayoutError,
         Record,
+        RenderingError,
         SchemaError,
         Span,
     )
@@ -72,6 +73,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "SchemaError": ("dnadesign.baserender.src.core", "SchemaError"),
     "ContractError": ("dnadesign.baserender.src.core", "ContractError"),
     "LayoutError": ("dnadesign.baserender.src.core", "LayoutError"),
+    "RenderingError": ("dnadesign.baserender.src.core", "RenderingError"),
     "load_records_from_parquet": ("dnadesign.baserender.src.public", "load_records_from_parquet"),
     "load_record_from_parquet": ("dnadesign.baserender.src.public", "load_record_from_parquet"),
     "render_record_figure": ("dnadesign.baserender.src.public", "render_record_figure"),

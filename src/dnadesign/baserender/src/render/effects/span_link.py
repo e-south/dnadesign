@@ -11,6 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
+
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
 
@@ -59,15 +62,22 @@ def _resolve_endpoints(
     raise RenderingError("span_link target must provide from/to feature ids or from/to spans")
 
 
-def draw_span_link(
-    ax,
+@dataclass(frozen=True)
+class SpanLinkGeometry:
+    x1: float
+    x2: float
+    y: float
+    label: str
+
+
+def compute_span_link_geometry(
     effect: Effect,
-    record: Record,
     layout: LayoutContext,
     style,
-    palette: Palette,
     feature_boxes: dict[str, tuple[float, float, float, float]],
-) -> None:
+) -> SpanLinkGeometry:
+    """Resolve and validate span-link geometry without allocating artists."""
+
     x1, x2 = _resolve_endpoints(effect, layout, feature_boxes)
 
     lane = str(effect.params.get("lane", "top")).lower()
@@ -81,27 +91,62 @@ def draw_span_link(
         raise RenderingError("span_link render.track must be int") from exc
 
     if lane == "top":
-        center = layout.y_forward + layout.feature_track_base_offset_up + track * layout.feature_track_step
-        y = center
+        y = layout.y_forward + layout.feature_track_base_offset_up + track * layout.feature_track_step
     else:
-        center = layout.y_reverse - layout.feature_track_base_offset_down - track * layout.feature_track_step
-        y = center
+        y = layout.y_reverse - layout.feature_track_base_offset_down - track * layout.feature_track_step
 
     inner_margin_bp = effect.params.get("inner_margin_bp", style.span_link_inner_margin_bp)
     try:
         inner_margin_bp = float(inner_margin_bp)
     except Exception as exc:
         raise RenderingError("span_link params.inner_margin_bp must be numeric") from exc
-    if inner_margin_bp < 0:
-        raise RenderingError("span_link params.inner_margin_bp must be >= 0")
-    inner_margin_px = inner_margin_bp * layout.cw
+    if not math.isfinite(inner_margin_bp) or inner_margin_bp < 0:
+        raise RenderingError("span_link params.inner_margin_bp must be finite and >= 0")
 
-    x1 = x1 + inner_margin_px
-    x2 = x2 - inner_margin_px
+    inner_margin_px = inner_margin_bp * layout.cw
+    x1 += inner_margin_px
+    x2 -= inner_margin_px
     if x2 <= x1:
         raise RenderingError("span_link collapsed geometry after applying inner_margin_bp")
 
-    label = str(effect.params.get("label", "")).strip()
+    return SpanLinkGeometry(
+        x1=x1,
+        x2=x2,
+        y=y,
+        label=str(effect.params.get("label", "")).strip(),
+    )
+
+
+def validate_span_link(
+    effect: Effect,
+    record: Record,
+    layout: LayoutContext,
+    style,
+    palette: Palette,
+    feature_boxes: dict[str, tuple[float, float, float, float]],
+) -> None:
+    _ = (record, palette)
+    geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
+    if geometry.label:
+        base_fs = (
+            max(6, int(round(style.display_font_size())))
+            if bool(style.uniform_display_font_size)
+            else int(style.font_size_span_link_label or max(6, style.font_size_label - 2))
+        )
+        _text_px_width(geometry.label, style.font_label, base_fs, style.dpi)
+
+
+def draw_span_link(
+    ax,
+    effect: Effect,
+    record: Record,
+    layout: LayoutContext,
+    style,
+    palette: Palette,
+    feature_boxes: dict[str, tuple[float, float, float, float]],
+) -> None:
+    geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
+    x1, x2, y, label = geometry.x1, geometry.x2, geometry.y, geometry.label
     color = "#9CA3AF"
     line_width = max(0.8, float(getattr(style, "span_link_line_width", 1.1)))
     tick_line_width = max(0.8, float(getattr(style, "span_link_tick_line_width", line_width)))

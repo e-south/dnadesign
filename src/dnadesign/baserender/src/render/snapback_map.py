@@ -24,7 +24,7 @@ from dnadesign.contracts.visual import SnapbackVisualV1
 from ..config import Style
 from ..core import Record, RenderingError
 from .palette import Palette
-from .snapback_foldback import render_foldback_corner_triloop
+from .snapback_foldback import preflight_foldback_corner_triloop, render_foldback_corner_triloop
 
 _TITLE_COLOR = "#475569"
 _TEXT_COLOR = "#334155"
@@ -382,6 +382,12 @@ def _draw_sequence_row(
 
 @dataclass(frozen=True)
 class SnapbackMapRenderer:
+    def preflight(self, record: Record, style: Style, palette: Palette) -> None:
+        _ = palette
+        contract = _contract_from_record(record)
+        if contract.state_kind == "post_nick_foldback" and contract.loop_geometry is not None:
+            preflight_foldback_corner_triloop(contract, style)
+
     def render(self, record: Record, style: Style, palette: Palette):
         _ = palette
         record = record.validate()

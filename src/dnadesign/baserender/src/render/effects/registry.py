@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable
 
 from ...config import Style
@@ -21,23 +22,47 @@ from ..palette import Palette
 EffectDrawer = Callable[
     [object, Effect, Record, LayoutContext, Style, Palette, dict[str, tuple[float, float, float, float]]], None
 ]
+EffectValidator = Callable[
+    [Effect, Record, LayoutContext, Style, Palette, dict[str, tuple[float, float, float, float]]], None
+]
 
-_EFFECT_DRAWERS: dict[str, EffectDrawer] = {}
+
+@dataclass(frozen=True)
+class _RegisteredEffect:
+    drawer: EffectDrawer
+    validator: EffectValidator
+
+
+_EFFECTS: dict[str, _RegisteredEffect] = {}
 
 
 def clear_effect_drawers() -> None:
-    _EFFECT_DRAWERS.clear()
+    _EFFECTS.clear()
 
 
-def register_effect_drawer(kind: str, drawer: EffectDrawer) -> None:
-    _EFFECT_DRAWERS[kind] = drawer
+def register_effect_drawer(kind: str, drawer: EffectDrawer, *, validator: EffectValidator) -> None:
+    _EFFECTS[kind] = _RegisteredEffect(drawer=drawer, validator=validator)
 
 
 def get_effect_drawer(kind: str) -> EffectDrawer:
-    drawer = _EFFECT_DRAWERS.get(kind)
-    if drawer is None:
+    registered = _EFFECTS.get(kind)
+    if registered is None:
         raise RenderingError(f"Unknown effect kind: {kind}")
-    return drawer
+    return registered.drawer
+
+
+def validate_effect(
+    effect: Effect,
+    record: Record,
+    layout: LayoutContext,
+    style: Style,
+    palette: Palette,
+    feature_boxes: dict[str, tuple[float, float, float, float]],
+) -> None:
+    registered = _EFFECTS.get(effect.kind)
+    if registered is None:
+        raise RenderingError(f"Unknown effect kind: {effect.kind}")
+    registered.validator(effect, record, layout, style, palette, feature_boxes)
 
 
 def draw_effect(
