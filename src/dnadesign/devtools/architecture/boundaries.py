@@ -37,6 +37,7 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "studies",
     "thread",
     "tfkdanalysis",
+    "trijunction",
     "usr",
 }
 TOP_LEVEL_SHARED_INFRA_PACKAGES = {"artifacts", "contracts", "devtools"}
@@ -149,6 +150,8 @@ _FORBIDDEN_LEGACY_SURFACE_PATHS = (
     Path("src/dnadesign/ops/promoter_preflight_upstream.py"),
     Path("src/dnadesign/ops/promoter_preflight_infer.py"),
     Path("src/dnadesign/ops/promoter_preflight_coordinator.py"),
+    Path("src/dnadesign/trijunction/canonical.py"),
+    Path("src/dnadesign/trijunction/exports.py"),
     Path("src/dnadesign/ops/tests/test_promoter_study_infer_runtime.py"),
     Path("src/dnadesign/ops/tests/test_promoter_study_status_coordinator.py"),
     Path("src/dnadesign/ops/tests/test_promoter_preflight_scope.py"),

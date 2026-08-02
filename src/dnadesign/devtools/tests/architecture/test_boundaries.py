@@ -931,6 +931,21 @@ def test_find_legacy_surface_violations_ignores_cache_only_legacy_directory(tmp_
     assert violations == []
 
 
+def test_find_legacy_surface_violations_flags_removed_trijunction_root_modules(tmp_path: Path) -> None:
+    canonical = tmp_path / "src" / "dnadesign" / "trijunction" / "canonical.py"
+    exports = tmp_path / "src" / "dnadesign" / "trijunction" / "exports.py"
+    canonical.parent.mkdir(parents=True, exist_ok=True)
+    canonical.write_text("# removed identity module\n", encoding="utf-8")
+    exports.write_text("# removed publication module\n", encoding="utf-8")
+
+    violations = find_legacy_surface_violations(repo_root=tmp_path)
+
+    assert [item.path.relative_to(tmp_path).as_posix() for item in violations] == [
+        "src/dnadesign/trijunction/canonical.py",
+        "src/dnadesign/trijunction/exports.py",
+    ]
+
+
 def test_find_legacy_surface_violations_flags_removed_ops_study_paths(tmp_path: Path) -> None:
     legacy_path = tmp_path / "src" / "dnadesign" / "ops" / "promoter_preflight_coordinator.py"
     legacy_path.parent.mkdir(parents=True, exist_ok=True)
