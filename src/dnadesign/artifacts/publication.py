@@ -47,6 +47,7 @@ from .recovery import (
 _PRIVATE_DIRECTORY_MODE = 0o700
 _PRIVATE_FILE_MODE = 0o600
 _DEFAULT_PUBLISHED_ROOT_MODE = 0o755
+_PUBLICATION_SENSITIVITIES = frozenset({"public", "private"})
 
 
 def _validate_published_root_mode(mode: int) -> int:
@@ -57,6 +58,13 @@ def _validate_published_root_mode(mode: int) -> int:
     if mode & 0o700 != 0o700:
         raise PublicationError("Artifact bundle published root mode must grant its owner read, write, and execute")
     return mode
+
+
+def _validate_sensitivity(sensitivity: str) -> str:
+    if sensitivity not in _PUBLICATION_SENSITIVITIES:
+        allowed = ", ".join(sorted(_PUBLICATION_SENSITIVITIES))
+        raise PublicationError(f"Artifact bundle sensitivity must be one of: {allowed}")
+    return sensitivity
 
 
 def _lexical_absolute_path(path: Path) -> Path:
@@ -79,6 +87,27 @@ def _preflight_existing_path_components(path: Path) -> None:
             raise PublicationError(f"Publication output contains a symlinked path component: {current}")
         if not stat.S_ISDIR(entry_stat.st_mode):
             raise PublicationError(f"Publication output parent component is not a directory: {current}")
+
+
+def preflight_create_only_directory_publication(bundle_root: str | Path) -> Path:
+    """Validate a create-only destination without changing the filesystem.
+
+    This is an early advisory check. Callers must still use
+    :meth:`CreateOnlyDirectoryPublication.prepare`, whose descriptor-anchored
+    checks remain authoritative for races and recovery.
+    """
+
+    final = _lexical_absolute_path(Path(bundle_root))
+    try:
+        _preflight_existing_path_components(final.parent)
+        final.lstat()
+    except FileNotFoundError:
+        return final
+    except PublicationError:
+        raise
+    except OSError as exc:
+        raise PublicationError(f"Publication output could not be inspected safely: {final}") from exc
+    raise PublicationExistsError(f"Artifact bundle already exists and is immutable: {final}")
 
 
 def _open_or_create_directory(path: Path) -> int:
@@ -303,6 +332,7 @@ class CreateOnlyDirectoryPublication:
     parent_descriptor: int
     _owner: dict[str, object]
     published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE
+    sensitivity: str = "public"
     _closed: bool = False
     _published_descriptor: int | None = field(default=None, init=False, repr=False)
     _rollback_name: str | None = field(default=None, init=False, repr=False)
@@ -313,10 +343,14 @@ class CreateOnlyDirectoryPublication:
         bundle_root: str | Path,
         *,
         published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE,
+        sensitivity: str = "public",
     ) -> CreateOnlyDirectoryPublication:
         """Prepare private staging after validating the publication policy."""
 
         validated_published_root_mode = _validate_published_root_mode(published_root_mode)
+        validated_sensitivity = _validate_sensitivity(sensitivity)
+        if validated_sensitivity == "private":
+            validated_published_root_mode = _PRIVATE_DIRECTORY_MODE
         final = _lexical_absolute_path(Path(bundle_root))
         owner = _owner_payload(final)
         _preflight_existing_path_components(final.parent)
@@ -383,6 +417,7 @@ class CreateOnlyDirectoryPublication:
                 parent_descriptor=parent_descriptor,
                 _owner=owner,
                 published_root_mode=validated_published_root_mode,
+                sensitivity=validated_sensitivity,
             )
         except BaseException:
             os.close(parent_descriptor)
@@ -458,7 +493,8 @@ class CreateOnlyDirectoryPublication:
             renamed = True
             if not descriptor_matches_entry(self.parent_descriptor, self.final.name, published_descriptor):
                 raise PublicationError("Published artifact bundle identity changed after atomic rename")
-            _restore_published_modes(self.stage, published_descriptor)
+            if self.sensitivity == "public":
+                _restore_published_modes(self.stage, published_descriptor)
             os.fchmod(published_descriptor, validated_published_root_mode)
             os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
             self._published_descriptor = published_descriptor

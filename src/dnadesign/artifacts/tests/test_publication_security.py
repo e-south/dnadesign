@@ -19,10 +19,36 @@ import pytest
 from dnadesign.artifacts import (
     CreateOnlyDirectoryPublication,
     PublicationError,
+    preflight_create_only_directory_publication,
 )
 from dnadesign.artifacts import owned_directory as owned_directory_module
 from dnadesign.artifacts import publication as publication_module
 from dnadesign.artifacts import recovery as recovery_module
+
+
+def test_destination_preflight_rejects_symlinked_parent_without_mutation(tmp_path: Path) -> None:
+    physical = tmp_path / "physical"
+    physical.mkdir()
+    redirected = tmp_path / "redirected"
+    redirected.symlink_to(physical, target_is_directory=True)
+    bundle = redirected / "render-v1"
+
+    with pytest.raises(PublicationError, match="symlinked path component"):
+        preflight_create_only_directory_publication(bundle)
+
+    assert not bundle.exists()
+    assert list(physical.iterdir()) == []
+
+
+def test_destination_preflight_rejects_non_directory_parent_without_mutation(tmp_path: Path) -> None:
+    blocked = tmp_path / "blocked"
+    blocked.write_text("keep\n", encoding="utf-8")
+    bundle = blocked / "render-v1"
+
+    with pytest.raises(PublicationError, match="parent component is not a directory"):
+        preflight_create_only_directory_publication(bundle)
+
+    assert blocked.read_text(encoding="utf-8") == "keep\n"
 
 
 @pytest.mark.parametrize(
