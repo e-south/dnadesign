@@ -237,10 +237,46 @@ def test_universal_recovery_emits_one_shared_order_pair() -> None:
 
     assert len(recovery_orders) == 2
     assert {order.order_id for order in recovery_orders} == {
-        "pool-a:recovery-forward",
-        "pool-a:recovery-reverse",
+        "pool-a:universal-recovery-forward",
+        "pool-a:universal-recovery-reverse",
     }
     assert {order.target_ids for order in recovery_orders} == {("target-a", "target-b")}
+
+
+def test_universal_recovery_order_ids_cannot_alias_target_specific_orders() -> None:
+    universal_prefix = "ACGTACGT"
+    universal_suffix = "GATTACAA"
+    universal_sequence = universal_prefix + _target_sequence(offset=3)[:56] + universal_suffix
+    target_specific_sequence = _target_sequence(offset=0)
+    targets = [
+        {
+            "id": "pool-a",
+            "pool_id": "target-specific-pool",
+            "sequence": target_specific_sequence,
+            "recovery_primers": {
+                "mode": "target_specific",
+                "forward": _primer(target_specific_sequence[:8]),
+                "reverse": _primer(reverse_complement(target_specific_sequence[-8:])),
+            },
+        },
+        {
+            "id": "universal-target",
+            "pool_id": "pool-a",
+            "sequence": universal_sequence,
+            "recovery_primers": {
+                "mode": "universal",
+                "forward": _primer(universal_prefix),
+                "reverse": _primer(reverse_complement(universal_suffix)),
+            },
+        },
+    ]
+
+    result = design_trijunction(parse_request(_request_mapping(targets=targets)))
+    order_ids = [order.order_id for order in result.orders]
+
+    assert len(order_ids) == len(set(order_ids))
+    assert "pool-a:universal-recovery-forward" in order_ids
+    assert "pool-a:universal-recovery-reverse" in order_ids
 
 
 def test_target_specific_ambiguity_uses_binding_sequences_not_extensions() -> None:

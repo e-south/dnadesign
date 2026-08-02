@@ -98,7 +98,7 @@ def merge_universal_recovery_orders(
         retained.append(
             replace(
                 template,
-                order_id=f"{pool_id}:recovery-{direction}",
+                order_id=f"{pool_id}:universal-recovery-{direction}",
                 target_ids=target_ids,
             )
         )
