@@ -23,7 +23,7 @@ import dnadesign.trijunction as trijunction
 from dnadesign.baserender.src.core import RenderingError
 from dnadesign.baserender.src.outputs.names import _unique_stem
 
-from .three_way_junction_review.fixtures import _payload, _reverse_complement
+from .three_way_junction_review.fixtures import _payload, _payload_with_many_junctions, _reverse_complement
 
 
 def _trijunction_request() -> dict[str, object]:
@@ -227,6 +227,14 @@ def test_adapter_rejects_unvalidated_review_payloads() -> None:
 def test_adapter_rejects_contradictory_thermodynamic_check_status() -> None:
     payload = _payload()
     payload["checks"][1]["status"] = "passed"
+
+    with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
+        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+
+def test_adapter_rejects_pool_receipt_smaller_than_target_geometry() -> None:
+    payload = _payload_with_many_junctions(junction_count=2)
+    payload["search"]["locus_count"] = 1
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
         baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")

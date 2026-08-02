@@ -336,6 +336,8 @@ class ThreeWayJunctionReviewV1(VisualContractModel):
             raise ValueError("recovery extended top and bottom sequences must be reverse complements")
         if self.search.pool_id != self.target.pool_id:
             raise ValueError("search.pool_id must match target.pool_id")
+        if self.search.locus_count < len(junctions):
+            raise ValueError("search.locus_count must cover every target geometry junction")
         check_keys = [(check.subject.kind, check.subject.id, check.check) for check in self.checks]
         if len(check_keys) != len(set(check_keys)):
             raise ValueError("check subject and name tuples must be unique")
