@@ -180,10 +180,12 @@ jobs:
         run: |
           marker_expr="not fimo and not integration"
           run_coverage_gate="${{ needs.detect-ci-scope.outputs.run-coverage-gate }}"
-          smoke_targets=(
+          invariant_targets=(
             src/dnadesign/devtools/tests/ci/test_workflow_contract.py
+          )
+          smoke_targets=(
             src/dnadesign/devtools/tests/docs/test_checks.py
-            src/dnadesign/usr/tests/test_cli_command_surface.py
+            src/dnadesign/usr/tests/cli/test_cli_command_surface.py
           )
 
           if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" = "true" ]; then
@@ -193,6 +195,8 @@ jobs:
               --cov-report=xml:coverage-core.xml
             exit 0
           fi
+
+          uv run pytest -q --durations=25 "${invariant_targets[@]}"
 
           affected_csv="${{ needs.detect-ci-scope.outputs.affected-tools-csv }}"
           if [ -z "$affected_csv" ]; then
