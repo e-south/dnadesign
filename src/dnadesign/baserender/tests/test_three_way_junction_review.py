@@ -288,3 +288,73 @@ def test_review_job_rejects_oversized_input_before_capture_even_with_input_limit
         baserender.run_job(job, caller_root=tmp_path)
 
     assert not (tmp_path / "review-render").exists()
+
+
+def test_review_job_rejects_oversized_selection_before_rendering(tmp_path: Path) -> None:
+    descriptor = baserender.get_render_contract_descriptor("three_way_junction_review_render_v1")
+    assert descriptor.input_envelope is not None
+    source = tmp_path / "target-01.review.json"
+    source.write_text(json.dumps(_payload()), encoding="utf-8")
+    selection = tmp_path / "oversized-selection.csv"
+    with selection.open("wb") as handle:
+        handle.write(b"id\n")
+        handle.truncate(descriptor.input_envelope.max_bytes + 1)
+    job = {
+        "version": 4,
+        "contract": {"kind": "three_way_junction_review_render_v1"},
+        "bundle": {"path": "review-render"},
+        "input": {
+            "kind": "json",
+            "path": source.name,
+            "adapter": {"kind": "three_way_junction_review_v1"},
+            "alphabet": "DNA",
+        },
+        "selection": {"path": selection.name},
+        "render": {
+            "renderer": "three_way_junction_review",
+            "style": {"preset": None, "overrides": {}},
+        },
+        "outputs": [{"kind": "images", "dir": "images", "fmt": "svg"}],
+        "run": {"strict": True, "fail_on_skips": True},
+    }
+
+    with pytest.raises(baserender.SchemaError, match="maximum.*bytes") as error:
+        baserender.run_job(job, caller_root=tmp_path)
+
+    assert str(selection) in str(error.value)
+    assert not (tmp_path / "review-render").exists()
+
+
+def test_review_job_rejects_selection_row_amplification_before_rendering(tmp_path: Path) -> None:
+    descriptor = baserender.get_render_contract_descriptor("three_way_junction_review_render_v1")
+    assert descriptor.input_envelope is not None
+    source = tmp_path / "target-01.review.json"
+    source.write_text(json.dumps(_payload()), encoding="utf-8")
+    selection = tmp_path / "too-many-selection-rows.csv"
+    selection.write_text(
+        "id\n" + ("missing-target\n" * (descriptor.input_envelope.max_records + 1)),
+        encoding="utf-8",
+    )
+    job = {
+        "version": 4,
+        "contract": {"kind": "three_way_junction_review_render_v1"},
+        "bundle": {"path": "review-render"},
+        "input": {
+            "kind": "json",
+            "path": source.name,
+            "adapter": {"kind": "three_way_junction_review_v1"},
+            "alphabet": "DNA",
+        },
+        "selection": {"path": selection.name},
+        "render": {
+            "renderer": "three_way_junction_review",
+            "style": {"preset": None, "overrides": {}},
+        },
+        "outputs": [{"kind": "images", "dir": "images", "fmt": "svg"}],
+        "run": {"strict": True, "fail_on_skips": True},
+    }
+
+    with pytest.raises(baserender.SchemaError, match="maximum.*selection rows"):
+        baserender.run_job(job, caller_root=tmp_path)
+
+    assert not (tmp_path / "review-render").exists()

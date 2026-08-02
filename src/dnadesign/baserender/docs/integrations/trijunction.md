@@ -132,11 +132,11 @@ permissions.
 The JSON file is an array with one row per target. `dir: images` therefore
 writes one stable target-named image per row. Sanitized or case-insensitive
 filename collisions receive deterministic numeric suffixes. Before full source
-capture, BaseRender rejects review JSON larger than 64 MiB. Before record
-materialization, it also enforces at most 2,000 review rows and 10,000,000 total
-target bases. `input.limit` and selection only control which records are
-rendered; neither is a source-capture guard. Do not edit or split the verified
-source file in place.
+capture, BaseRender rejects review JSON or an optional selection CSV larger
+than 64 MiB. Before record materialization, it also enforces at most 2,000
+review rows, 2,000 selection rows, and 10,000,000 total target bases.
+`input.limit` and selection narrow which records are rendered; neither bypasses
+these bounds. Do not edit or split the verified source file in place.
 
 ## Literature and visual boundary
 

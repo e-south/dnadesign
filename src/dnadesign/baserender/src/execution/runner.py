@@ -194,7 +194,7 @@ def run_render_job(
         if envelope is None:
             report.capture_source_evidence()
         else:
-            report.capture_source_evidence(input_max_bytes=envelope.max_bytes)
+            report.capture_source_evidence(max_bytes=envelope.max_bytes)
     except ValueError as exc:
         raise SchemaError(str(exc)) from exc
     _validate_input_envelope(job, source_content=report.source_content("input"), envelope=envelope)
@@ -215,6 +215,7 @@ def run_render_job(
             list(records),
             job.selection,
             source_content=report.source_content("selection"),
+            max_rows=envelope.max_records if envelope is not None else None,
         )
         report.missing_selection_keys = missing
         enforce_selection_policy(job.selection, missing)
