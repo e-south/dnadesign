@@ -41,11 +41,12 @@ are repository-owned contracts.
 The implementation deliberately reports thermodynamic screening as `not_run`.
 It does not reproduce the papers' experimental validation, guarantee assembly
 fidelity, prescribe a laboratory protocol, select a supplier, or submit an
-order. Optional BaseRender quality-assurance views must use an original visual
-composition rather than reproducing paper figures, and remain separate from
-the create-only bundle and its verification result. A generated bundle or view
-is a review input, not evidence that an assembly is safe, feasible, licensed,
-or experimentally validated.
+order. The neutral review records are a digest-bound part of the verified
+TriJunction bundle. Optional BaseRender-rendered images use an original visual
+composition rather than reproducing paper figures and remain in a separate
+create-only render bundle. A generated bundle or image is a review input, not
+evidence that an assembly is safe, feasible, licensed, or experimentally
+validated.
 
 Citation provides attribution, not license, patent, regulatory, or freedom-to-
 operate clearance. Review the publications, applicable software licenses,

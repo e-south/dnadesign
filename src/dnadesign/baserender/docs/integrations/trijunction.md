@@ -54,18 +54,32 @@ receipts are not thermodynamic or experimental validation.
 
 ## Create a separate review bundle
 
-Point the job at the canonical review array in a published bundle, then choose
-a new output directory outside that verified TriJunction bundle:
+Keep the job file, verified source bundle, and review destinations under one
+explicit review root. Save the job as `review-root/target-01.review.job.yaml`
+and run BaseRender from `review-root/`:
+
+```text
+review-root/
+├── target-01.review.job.yaml
+├── verified-design/
+│   └── views/
+│       └── three_way_junction_review.v1.json
+└── reviews/
+```
+
+Paths in the job are resolved relative to the job file. Point the input at the
+canonical review array in the published TriJunction bundle, and choose a new
+output directory beside—not inside—that verified source bundle:
 
 ```yaml
 version: 4
 contract:
   kind: three_way_junction_review_render_v1
 bundle:
-  path: ../reviews/target-01-v1
+  path: reviews/target-01-v1
 input:
   kind: json
-  path: ../verified-design/views/three_way_junction_review.v1.json
+  path: verified-design/views/three_way_junction_review.v1.json
   adapter:
     kind: three_way_junction_review_v1
   alphabet: DNA
@@ -97,17 +111,17 @@ uv run baserender job validate target-01.review.job.yaml
 uv run baserender job run target-01.review.job.yaml
 ```
 
-BaseRender publishes this sensitivity-declared contract into private staging and
-atomically creates `bundle.path`. The complete published tree remains owner-only:
-directories use mode `0700` and files use mode `0600`. Other BaseRender contract
-descriptors retain their existing publication modes. If the destination already
-exists, the run fails. The input JSON and its owning verified bundle remain
-unchanged.
+The review records contain complete DNA sequences, so BaseRender creates this
+review bundle with owner-only access: directories use mode `0700` and files use
+mode `0600`. It creates `bundle.path` atomically and fails when that destination
+already exists. The input JSON and its verified TriJunction bundle remain
+unchanged. Other BaseRender contract kinds keep their declared publication
+permissions.
 
 The JSON file is an array with one row per target. `dir: images` therefore
 writes one stable target-named image per row. Sanitized or case-insensitive
-filename collisions receive deterministic numeric suffixes. Before full source capture,
-BaseRender rejects review JSON larger than 64 MiB. Before record
+filename collisions receive deterministic numeric suffixes. Before full source
+capture, BaseRender rejects review JSON larger than 64 MiB. Before record
 materialization, it also enforces at most 2,000 review rows and 10,000,000 total
 target bases. `input.limit` and selection only control which records are
 rendered; neither is a source-capture guard. Do not edit or split the verified
@@ -124,7 +138,8 @@ papers' assembly stages but does not reproduce their figures or claim their
 experimental results.
 
 For the method mapping and implementation limits, use TriJunction's
-`docs/reference/method.md` and `docs/reference/sources.md`.
+[method reference](../../../trijunction/docs/reference/method.md) and
+[source boundary](../../../trijunction/docs/reference/sources.md).
 
 ## Ownership rules
 

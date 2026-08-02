@@ -6,11 +6,10 @@ status: active
 last_verified: 2026-08-02
 ---
 
-# baserender Reference
+# BaseRender reference
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-08-02
-
 
 Single technical reference for operators and integrators.
 

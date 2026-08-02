@@ -5,10 +5,10 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-08-02
 
-TriJunction has no target-count promise detached from sequence lengths,
-physical-pool topology, and search budgets. A request that parses can still be
-too expensive or too constrained to design. `preflight` is the canonical,
-non-writing way to resolve that question for the exact request.
+There is no single supported target count. Capacity depends on target length,
+physical-pool grouping, and search budgets. A request that parses can still be
+too expensive or too constrained to design, so run `preflight` on the exact
+request before publication.
 
 ## Preserve the Physical-Pool Boundary
 
@@ -16,8 +16,8 @@ non-writing way to resolve that question for the exact request.
 | --- | --- | --- |
 | One roughly 1 kb target | One target in one pool | The exact geometry, search policy, and order ceiling fit. |
 | One roughly 10 kb target | One target in one pool | The larger locus set remains inside the declared and implementation resource envelopes. |
-| 100 roughly 1 kb targets in one physical pool | All targets share one `pool_id` | The bounded acceptance scenario jointly plans 600 junctions and 1,600 order rows. The exact request still controls search depth. |
-| 1,000 roughly 1 kb targets in one physical pool | All targets share one `pool_id` | The schema represents the intended topology, but the v1 acceptance scenario rejects its search state before allocation. This shape is not currently a successful pooled design. |
+| 100 roughly 1 kb targets in one physical pool | All targets share one `pool_id` | The tested example jointly plans 600 junctions and 1,600 order rows. The exact request still controls search depth. |
+| 1,000 roughly 1 kb targets in one physical pool | All targets share one `pool_id` | The schema represents the intended topology, but the v1 test rejects its search state before allocation. This shape is not currently a successful pooled design. |
 | 100 or 1,000 targets in independent physical pools | Distinct `pool_id` values | Each pool is designed independently while request-wide aggregate work is still bounded. |
 
 The executable scale scenarios use exact 1,000-base and 10,000-base targets,
@@ -101,7 +101,9 @@ contains `views/three_way_junction_review.v1.json`, a canonical array with one
 strict review record per target. BaseRender may consume that file to create an
 original literature-inspired four-panel QA image covering target tiling,
 selected junctions, strand and recovery geometry, string-search evidence, and
-unresolved checks.
+unresolved checks. Follow the runnable
+[TriJunction review integration](../../../baserender/docs/integrations/trijunction.md)
+to keep the source bundle and render output separate.
 
 The JSON projection is part of the verified TriJunction bundle. Rendered
 images are not: keep them in a new create-only BaseRender bundle beside the
