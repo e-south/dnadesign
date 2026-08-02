@@ -69,6 +69,8 @@ def _load_json_document(source: str, request_path: Path) -> object:
         raise TriJunctionConfigError(f"Invalid JSON in TriJunction request: {request_path}") from exc
     except _DuplicateJsonKeyError as exc:
         raise TriJunctionConfigError(f"Duplicate key in TriJunction request: {request_path}: {exc}") from exc
+    except RecursionError as exc:
+        raise TriJunctionConfigError(f"Invalid JSON in TriJunction request: {request_path}") from exc
     except ValueError as exc:
         raise TriJunctionConfigError(f"Invalid JSON in TriJunction request: {request_path}") from exc
 
@@ -174,6 +176,8 @@ def load_request(path: str | Path) -> TriJunctionRequest:
         except _DuplicateYamlKeyError as exc:
             raise TriJunctionConfigError(f"Duplicate key in TriJunction request: {request_path}: {exc}") from exc
         except yaml.YAMLError as exc:
+            raise TriJunctionConfigError(f"Invalid YAML in TriJunction request: {request_path}") from exc
+        except RecursionError as exc:
             raise TriJunctionConfigError(f"Invalid YAML in TriJunction request: {request_path}") from exc
         except ValueError as exc:
             raise TriJunctionConfigError(f"Invalid YAML in TriJunction request: {request_path}") from exc
