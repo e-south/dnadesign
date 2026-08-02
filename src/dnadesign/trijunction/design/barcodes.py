@@ -98,6 +98,27 @@ def _random_dna(rng: StablePrng, length: int) -> str:
     return "".join(bases)
 
 
+def _sample_candidate_indices(
+    rng: StablePrng,
+    *,
+    population_size: int,
+    selected_count: int,
+) -> tuple[int, ...]:
+    """Reproduce partial Fisher-Yates sampling with selected-count state."""
+
+    swaps: dict[int, int] = {}
+    selected: list[int] = []
+    for index in range(selected_count):
+        swap_index = index + rng.randbelow(population_size - index)
+        index_value = swaps.pop(index, index)
+        if swap_index == index:
+            selected.append(index_value)
+            continue
+        selected.append(swaps.pop(swap_index, swap_index))
+        swaps[swap_index] = index_value
+    return tuple(selected)
+
+
 def generate_barcode_candidates(
     toeholds: tuple[str, ...],
     *,
@@ -278,7 +299,17 @@ def select_barcodes(
     rng = StablePrng(seed)
     sampled: set[tuple[int, ...]] = {tuple(range(count))}
     for _ in range(iterations):
-        sampled.add(tuple(sorted(rng.sample(range(len(candidates)), count))))
+        sampled.add(
+            tuple(
+                sorted(
+                    _sample_candidate_indices(
+                        rng,
+                        population_size=len(candidates),
+                        selected_count=count,
+                    )
+                )
+            )
+        )
 
     cache = _BarcodeDistanceCache(candidates)
     scores = {subset: _subset_score_indices(subset, cache) for subset in sampled}
