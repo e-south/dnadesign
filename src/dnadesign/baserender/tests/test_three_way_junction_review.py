@@ -240,6 +240,21 @@ def test_adapter_rejects_missing_thermodynamic_check() -> None:
         baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
 
 
+@pytest.mark.parametrize(
+    "updates",
+    [
+        {"toehold_min_distance": 10.0, "toehold_mean_distance": 1.0},
+        {"barcode_rank_score": float("inf")},
+    ],
+)
+def test_adapter_rejects_contradictory_or_nonfinite_search_metrics(updates: dict[str, float]) -> None:
+    payload = _payload()
+    payload["search"].update(updates)
+
+    with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
+        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+
+
 def test_adapter_rejects_pool_receipt_smaller_than_target_geometry() -> None:
     payload = _payload_with_many_junctions(junction_count=2)
     payload["search"]["locus_count"] = 1

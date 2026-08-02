@@ -182,6 +182,18 @@ def test_review_contract_accepts_complete_neutral_evidence() -> None:
             "thermodynamic_screening",
         ),
         (
+            lambda payload: payload["search"].update({"toehold_min_distance": 10.0, "toehold_mean_distance": 1.0}),
+            "toehold_min_distance must be <= toehold_mean_distance",
+        ),
+        (
+            lambda payload: payload["search"].update({"barcode_min_distance": 10.0, "barcode_mean_distance": 1.0}),
+            "barcode_min_distance must be <= barcode_mean_distance",
+        ),
+        (
+            lambda payload: payload["search"].update({"toehold_rank_score": 1.5000001}),
+            "less than or equal to 1.5",
+        ),
+        (
             lambda payload: payload["checks"][1].update({"status": "passed"}),
             "thermodynamic_screening check status",
         ),
@@ -231,4 +243,24 @@ def test_review_contract_fails_closed_on_semantic_drift(mutate, message: str) ->
     mutate(payload)
 
     with pytest.raises(ValidationError, match=message):
+        ThreeWayJunctionReviewV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "toehold_min_distance",
+        "toehold_mean_distance",
+        "toehold_rank_score",
+        "barcode_min_distance",
+        "barcode_mean_distance",
+        "barcode_rank_score",
+    ],
+)
+@pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan")])
+def test_review_contract_rejects_nonfinite_search_metrics(field: str, value: float) -> None:
+    payload = three_way_junction_review_payload()
+    payload["search"][field] = value
+
+    with pytest.raises(ValidationError, match="finite number"):
         ThreeWayJunctionReviewV1.model_validate(payload)

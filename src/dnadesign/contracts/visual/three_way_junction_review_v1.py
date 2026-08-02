@@ -211,19 +211,27 @@ class PoolSearchReview(VisualContractModel):
     matching_seed: int
     locus_count: int = Field(ge=1)
     toehold_paths_evaluated: int = Field(ge=1)
-    toehold_min_distance: float = Field(ge=0)
-    toehold_mean_distance: float = Field(ge=0)
-    toehold_rank_score: float = Field(ge=0)
+    toehold_min_distance: float = Field(ge=0, allow_inf_nan=False)
+    toehold_mean_distance: float = Field(ge=0, allow_inf_nan=False)
+    toehold_rank_score: float = Field(ge=0, le=1.5, allow_inf_nan=False)
     barcode_candidates_generated: int = Field(ge=1)
     barcode_forbidden_toehold_k: int = Field(ge=1)
     barcode_forbidden_barcode_k: int = Field(ge=1)
     barcode_subsets_evaluated: int = Field(ge=1)
-    barcode_min_distance: float = Field(ge=0)
-    barcode_mean_distance: float = Field(ge=0)
-    barcode_rank_score: float = Field(ge=0)
+    barcode_min_distance: float = Field(ge=0, allow_inf_nan=False)
+    barcode_mean_distance: float = Field(ge=0, allow_inf_nan=False)
+    barcode_rank_score: float = Field(ge=0, le=1.5, allow_inf_nan=False)
     matchings_evaluated: int = Field(ge=1)
     matching_max_pairwise_lcs: int = Field(ge=0)
     thermodynamic_screening: Literal["not_run"]
+
+    @model_validator(mode="after")
+    def _validate_distance_summaries(self) -> "PoolSearchReview":
+        if self.toehold_min_distance > self.toehold_mean_distance:
+            raise ValueError("toehold_min_distance must be <= toehold_mean_distance")
+        if self.barcode_min_distance > self.barcode_mean_distance:
+            raise ValueError("barcode_min_distance must be <= barcode_mean_distance")
+        return self
 
 
 class CheckSubject(VisualContractModel):
