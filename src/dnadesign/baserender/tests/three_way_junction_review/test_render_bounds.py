@@ -17,7 +17,9 @@ import matplotlib.pyplot as plt
 import pytest
 
 import dnadesign.baserender as baserender
+from dnadesign.baserender.src.config import Style
 from dnadesign.baserender.src.outputs.names import _safe_stem
+from dnadesign.baserender.src.render import three_way_junction_review as review_renderer_module
 from dnadesign.baserender.src.render.sequence_preview import bounded_sequence_preview
 
 from .fixtures import (
@@ -236,3 +238,48 @@ def test_review_renderer_bounds_geometry_artist_counts() -> None:
         assert len(junction_axis.texts) <= 18
     finally:
         plt.close(figure)
+
+
+@pytest.mark.parametrize(
+    ("style_overrides", "message"),
+    [
+        ({"dpi": 10**12}, "three_way_junction_review style.dpi exceeds the renderer limit"),
+        ({"figure_scale": 10**12}, "three_way_junction_review style.figure_scale exceeds the renderer limit"),
+        (
+            {"dpi": 300, "figure_scale": 2.0},
+            "three_way_junction_review canvas exceeds the 64 MiB RGBA allocation limit",
+        ),
+    ],
+)
+def test_review_renderer_rejects_unsafe_canvas_styles_before_figure_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+    style_overrides: dict[str, object],
+    message: str,
+) -> None:
+    record = baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1")
+
+    def fail_if_allocated(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("unsafe review styles must reject before figure allocation")
+
+    monkeypatch.setattr(review_renderer_module.plt, "subplots", fail_if_allocated)
+
+    with pytest.raises(baserender.SchemaError, match=f"^{message}$"):
+        baserender.render(
+            record,
+            renderer="three_way_junction_review",
+            style={"overrides": style_overrides},
+        )
+
+
+@pytest.mark.parametrize(
+    ("style", "expected"),
+    [
+        (Style(), (15.2, 4.2)),
+        (Style(dpi=300, figure_scale=1.6), (24.32, 6.72)),
+    ],
+)
+def test_review_renderer_accepts_normal_documented_canvas_styles(
+    style: Style,
+    expected: tuple[float, float],
+) -> None:
+    assert review_renderer_module._review_figure_size(style) == pytest.approx(expected)

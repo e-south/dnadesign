@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import math
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -25,7 +26,7 @@ from pydantic import ValidationError
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from ..config import Style
-from ..core import Record, RenderingError
+from ..core import Record, RenderingError, SchemaError
 from ..core.pydantic_validation import format_validation_error
 from .palette import Palette
 from .sequence_preview import bounded_sequence_preview, bounded_text_preview
@@ -48,6 +49,41 @@ _AXIS_GIDS = (
 )
 
 _MAX_DISPLAYED_LOCI = 6
+_FIGURE_WIDTH_INCHES = 15.2
+_FIGURE_HEIGHT_INCHES = 4.2
+_MAX_REVIEW_DPI = 600
+_MAX_REVIEW_FIGURE_SCALE = 4.0
+_MAX_REVIEW_CANVAS_DIMENSION_PX = 16_384
+_MAX_REVIEW_CANVAS_RGBA_BYTES = 64 * 1024 * 1024
+_RGBA_BYTES_PER_PIXEL = 4
+
+
+def _review_figure_size(style: Style) -> tuple[float, float]:
+    """Validate and return the renderer-owned figure size in inches."""
+
+    try:
+        dpi = float(style.dpi)
+        figure_scale = float(style.figure_scale)
+    except (TypeError, ValueError, OverflowError):
+        raise SchemaError("three_way_junction_review style dimensions must be finite numbers") from None
+    if not math.isfinite(dpi):
+        raise SchemaError("three_way_junction_review style.dpi must be finite")
+    if not math.isfinite(figure_scale):
+        raise SchemaError("three_way_junction_review style.figure_scale must be finite")
+    if dpi > _MAX_REVIEW_DPI:
+        raise SchemaError("three_way_junction_review style.dpi exceeds the renderer limit")
+    if figure_scale > _MAX_REVIEW_FIGURE_SCALE:
+        raise SchemaError("three_way_junction_review style.figure_scale exceeds the renderer limit")
+
+    figure_width = _FIGURE_WIDTH_INCHES * figure_scale
+    figure_height = _FIGURE_HEIGHT_INCHES * figure_scale
+    width_px = math.ceil(figure_width * dpi)
+    height_px = math.ceil(figure_height * dpi)
+    if max(width_px, height_px) > _MAX_REVIEW_CANVAS_DIMENSION_PX:
+        raise SchemaError("three_way_junction_review canvas dimension exceeds the renderer limit")
+    if width_px * height_px * _RGBA_BYTES_PER_PIXEL > _MAX_REVIEW_CANVAS_RGBA_BYTES:
+        raise SchemaError("three_way_junction_review canvas exceeds the 64 MiB RGBA allocation limit")
+    return figure_width, figure_height
 
 
 def _display_indices(length: int) -> tuple[int, ...]:
@@ -351,11 +387,12 @@ def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
 class ThreeWayJunctionReviewRenderer:
     def render(self, record: Record, style: Style, palette: Palette):
         _ = palette
+        figure_size = _review_figure_size(style)
         review = _review_from_record(record)
         figure, axes = plt.subplots(
             1,
             4,
-            figsize=(15.2 * float(style.figure_scale), 4.2 * float(style.figure_scale)),
+            figsize=figure_size,
             dpi=style.dpi,
         )
         titles = ("Target geometry", "Junction assignments", "Strands and recovery", "Search and checks")
