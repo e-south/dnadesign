@@ -611,6 +611,28 @@ def validate_records_output_policy(
             )
 
 
+def validate_record_renderer_compatibility(record: Record, *, renderer_name: str) -> None:
+    """Enforce the renderer policy declared by an adapted record's origin."""
+
+    adapter_kind = _record_adapter_kind(record, record_index=0)
+    if adapter_kind is None:
+        return
+    supported_renderers = adapter_contract(adapter_kind).supported_renderers
+    if renderer_name not in supported_renderers:
+        allowed = ", ".join(sorted(supported_renderers))
+        raise SchemaError(
+            f"record.meta.adapter {adapter_kind!r} is not compatible with renderer {renderer_name!r}; "
+            f"supported renderer values: {allowed}"
+        )
+
+
+def validate_records_renderer_compatibility(records: Iterable[Record], *, renderer_name: str) -> None:
+    """Reject an incompatible direct-render batch before output mutation."""
+
+    for record in records:
+        validate_record_renderer_compatibility(record, renderer_name=renderer_name)
+
+
 def normalize_adapter_config(
     *,
     kind: Any,

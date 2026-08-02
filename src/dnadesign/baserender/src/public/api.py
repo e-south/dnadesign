@@ -16,7 +16,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from ..adapters import build_adapter, required_source_columns
+from ..adapters import build_adapter, finalize_adapter, required_source_columns
 from ..config import (
     AdapterCfg,
     RenderJobV4,
@@ -29,7 +29,12 @@ from ..config import (
 from ..config import (
     validate_render_job as _validate_render_job,
 )
-from ..config.adapter_contracts import adapter_grid_record_limit, normalize_adapter_config
+from ..config.adapter_contracts import (
+    adapter_contract,
+    adapter_grid_record_limit,
+    normalize_adapter_config,
+    validate_records_renderer_compatibility,
+)
 from ..core import Record, SchemaError, ensure
 from ..execution import run_render_job as _run_render_job
 from ..io import iter_parquet_rows
@@ -187,6 +192,14 @@ def _apply_public_adapter_row(
     return adapter.apply(dict(row), row_index=row_index)
 
 
+def _reject_partial_document_adapter(*, adapter_kind: str, surface: str) -> None:
+    if adapter_contract(adapter_kind).validation_scope == "document":
+        raise SchemaError(
+            f"{surface} cannot use document-scoped adapter {adapter_kind!r}; "
+            "use adapt_records with the complete document"
+        )
+
+
 def adapt_record(
     row: Mapping[str, object],
     *,
@@ -197,12 +210,13 @@ def adapt_record(
     row_index: int = 0,
 ) -> Record:
     initialize_runtime()
-    _cfg, adapter = _build_public_adapter(
+    cfg, adapter = _build_public_adapter(
         adapter_kind=adapter_kind,
         adapter_columns=adapter_columns,
         adapter_policies=adapter_policies,
         alphabet=alphabet,
     )
+    _reject_partial_document_adapter(adapter_kind=cfg.kind, surface="adapt_record")
     return _apply_public_adapter_row(adapter=adapter, row=row, row_index=row_index)
 
 
@@ -221,9 +235,11 @@ def adapt_records(
         adapter_policies=adapter_policies,
         alphabet=alphabet,
     )
-    return [
+    records = [
         _apply_public_adapter_row(adapter=adapter, row=row, row_index=row_index) for row_index, row in enumerate(rows)
     ]
+    finalize_adapter(adapter)
+    return records
 
 
 def load_record_from_parquet(
@@ -244,6 +260,7 @@ def load_record_from_parquet(
         adapter_policies=adapter_policies,
         alphabet=alphabet,
     )
+    _reject_partial_document_adapter(adapter_kind=cfg.kind, surface="load_record_from_parquet")
     source_columns = required_source_columns(cfg)
 
     if match_column is None:
@@ -295,6 +312,7 @@ def load_records_from_parquet(
         adapter_policies=adapter_policies,
         alphabet=alphabet,
     )
+    _reject_partial_document_adapter(adapter_kind=cfg.kind, surface="load_records_from_parquet")
     source_columns = required_source_columns(cfg)
 
     if match_column is None:
@@ -397,6 +415,7 @@ def render_record_grid_figure(
         raise SchemaError(
             f"renderer {renderer_name!r} supports at most {grid_limit} record per grid; render records individually"
         )
+    validate_records_renderer_compatibility(records_list, renderer_name=renderer_name)
 
     panel_images: list[object] = []
     for record in records_list:

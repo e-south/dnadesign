@@ -18,7 +18,11 @@ from typing import Iterable, Mapping
 import numpy as np
 
 from ..config import ImagesOutputCfg, Style
-from ..config.adapter_contracts import adapter_grid_record_limit, validate_records_output_policy
+from ..config.adapter_contracts import (
+    adapter_grid_record_limit,
+    validate_records_output_policy,
+    validate_records_renderer_compatibility,
+)
 from ..core import Record, SchemaError
 from ..render import Palette, render_record
 from ..render.renderer import get_renderer_descriptor
@@ -157,6 +161,7 @@ def write_images(
         output_kind="images",
         image_output_mode="single_file" if output.path is not None else "directory",
     )
+    validate_records_renderer_compatibility(materialized, renderer_name=renderer_name)
 
     if output.path is not None:
         out_path = output.path.resolve()

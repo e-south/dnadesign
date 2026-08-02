@@ -18,7 +18,7 @@ from typing import Iterable, Iterator
 
 from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 
-from ..adapters import build_adapter, required_source_columns
+from ..adapters import build_adapter, finalize_adapter, required_source_columns
 from ..config import (
     ImagesOutputCfg,
     InputEnvelope,
@@ -106,6 +106,7 @@ def _iter_records(job: RenderJobV4, report: RunReport, *, source_content: bytes)
             yield record
         except SkipRecord as skip:
             report.note_skip_row(str(skip) or "skip_record")
+    finalize_adapter(adapter)
 
 
 def _validate_input_envelope(

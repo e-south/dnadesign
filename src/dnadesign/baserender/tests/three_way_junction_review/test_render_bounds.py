@@ -23,6 +23,7 @@ from dnadesign.baserender.src.render import three_way_junction_review as review_
 from dnadesign.baserender.src.render.sequence_preview import bounded_sequence_preview
 
 from .fixtures import (
+    _adapt_payload,
     _payload,
     _payload_with_large_display_scalars,
     _payload_with_long_junction_sequences,
@@ -78,7 +79,7 @@ def test_bounded_sequence_preview_has_a_fixed_sequence_text_budget() -> None:
 
 def test_review_renderer_bounds_long_primer_sequences_with_explicit_preview_metadata() -> None:
     payload = _payload_with_long_recovery_primers()
-    record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(payload)
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -103,7 +104,7 @@ def test_review_renderer_bounds_long_primer_sequences_with_explicit_preview_meta
 
 def test_review_renderer_bounds_long_junction_sequences_with_explicit_preview_metadata() -> None:
     payload = _payload_with_long_junction_sequences()
-    record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(payload)
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -129,7 +130,7 @@ def test_review_renderer_bounds_long_junction_sequences_with_explicit_preview_me
 
 def test_review_renderer_bounds_long_ids_and_integer_metrics() -> None:
     payload = _payload_with_large_display_scalars()
-    record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(payload)
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -161,7 +162,7 @@ def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
     payload["search"]["pool_id"] = identifier
     payload["checks"][0]["subject"]["id"] = identifier
     payload["checks"][1]["subject"]["id"] = identifier
-    record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(payload)
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -178,10 +179,18 @@ def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
 
 
 def test_review_renderer_distinguishes_target_junctions_from_pool_loci() -> None:
-    payload = _payload()
-    payload["search"]["locus_count"] = 2
-    payload["search"]["barcode_candidates_generated"] = 10
-    record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+    first = _payload()
+    second = _payload_with_long_recovery_primers()
+    second["target"]["target_id"] = "target-02"
+    second["checks"][0]["subject"]["id"] = "target-02"
+    for payload in (first, second):
+        payload["recovery"]["mode"] = "target_specific"
+        payload["search"]["locus_count"] = 2
+        payload["search"]["barcode_candidates_generated"] = 10
+    record = baserender.adapt_records(
+        [first, second],
+        adapter_kind="three_way_junction_review_v1",
+    )[0]
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -202,7 +211,7 @@ def test_review_renderer_escapes_control_characters_in_public_adapter_identifier
     payload["search"]["pool_id"] = identifier
     payload["checks"][0]["subject"]["id"] = identifier
     payload["checks"][1]["subject"]["id"] = identifier
-    record = baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(payload)
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -219,7 +228,7 @@ def test_review_renderer_escapes_control_characters_in_public_adapter_identifier
 
 
 def test_review_renderer_bounds_geometry_artist_counts() -> None:
-    record = baserender.adapt_record(_payload_with_many_junctions(), adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(_payload_with_many_junctions())
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -256,7 +265,7 @@ def test_review_renderer_rejects_unsafe_canvas_styles_before_figure_allocation(
     style_overrides: dict[str, object],
     message: str,
 ) -> None:
-    record = baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(_payload())
 
     def fail_if_allocated(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("unsafe review styles must reject before figure allocation")

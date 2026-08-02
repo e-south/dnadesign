@@ -27,7 +27,12 @@ from dnadesign.baserender.src.outputs.images import write_images
 from dnadesign.baserender.src.outputs.names import _unique_stem
 from dnadesign.baserender.src.outputs.video import write_video
 
-from .three_way_junction_review.fixtures import _payload, _payload_with_many_junctions, _reverse_complement
+from .three_way_junction_review.fixtures import (
+    _adapt_payload,
+    _payload,
+    _payload_with_many_junctions,
+    _reverse_complement,
+)
 
 
 def _trijunction_request() -> dict[str, object]:
@@ -80,7 +85,7 @@ def _trijunction_request() -> dict[str, object]:
 def test_public_catalog_and_adapter_expose_the_review_contract() -> None:
     descriptor = baserender.get_adapter_descriptor("three_way_junction_review_v1")
 
-    record = baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(_payload())
 
     assert descriptor.owner_tool == "trijunction"
     assert descriptor.supported_renderers == ("three_way_junction_review",)
@@ -102,7 +107,7 @@ def test_review_image_stems_are_collision_safe_on_case_insensitive_filesystems()
 
 
 def test_review_renderer_emits_one_semantic_four_panel_figure() -> None:
-    record = baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(_payload())
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
@@ -252,8 +257,8 @@ def test_review_job_rejects_video_before_rendering(tmp_path: Path) -> None:
 
 def test_review_renderer_rejects_multi_record_grids_on_public_and_writer_surfaces(tmp_path: Path) -> None:
     records = [
-        baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1"),
-        baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1"),
+        _adapt_payload(_payload()),
+        _adapt_payload(_payload()),
     ]
 
     with pytest.raises(baserender.SchemaError, match="at most 1 record per grid"):
@@ -376,7 +381,7 @@ def test_adapter_rejects_unvalidated_review_payloads() -> None:
     payload["search"]["thermodynamic_screening"] = "passed"
 
     with pytest.raises(baserender.SchemaError, match="thermodynamic_screening"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 def test_adapter_rejects_contradictory_thermodynamic_check_status() -> None:
@@ -384,7 +389,7 @@ def test_adapter_rejects_contradictory_thermodynamic_check_status() -> None:
     payload["checks"][1]["status"] = "passed"
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 def test_adapter_rejects_missing_thermodynamic_check() -> None:
@@ -392,7 +397,7 @@ def test_adapter_rejects_missing_thermodynamic_check() -> None:
     payload["checks"].pop()
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 @pytest.mark.parametrize(
@@ -407,7 +412,7 @@ def test_adapter_rejects_contradictory_or_nonfinite_search_metrics(updates: dict
     payload["search"].update(updates)
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 def test_adapter_rejects_pool_receipt_smaller_than_target_geometry() -> None:
@@ -415,7 +420,7 @@ def test_adapter_rejects_pool_receipt_smaller_than_target_geometry() -> None:
     payload["search"]["locus_count"] = 1
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 def test_adapter_rejects_nonuniform_junction_sequence_lengths() -> None:
@@ -425,7 +430,7 @@ def test_adapter_rejects_nonuniform_junction_sequence_lengths() -> None:
     )
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 def test_adapter_rejects_matching_count_above_multi_locus_permutation_space() -> None:
@@ -433,7 +438,7 @@ def test_adapter_rejects_matching_count_above_multi_locus_permutation_space() ->
     payload["search"]["matchings_evaluated"] = 3
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 @pytest.mark.parametrize(
@@ -450,11 +455,11 @@ def test_adapter_rejects_impossible_search_evidence(updates: dict[str, float | i
     payload["search"].update(updates)
 
     with pytest.raises(baserender.SchemaError, match="Invalid three_way_junction_review_v1 contract"):
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
 
 def test_review_renderer_rejects_contradictory_thermodynamic_check_status() -> None:
-    record = baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(_payload())
     record.meta["three_way_junction_review"]["checks"][1]["status"] = "passed"
 
     with pytest.raises(RenderingError, match="invalid review evidence"):
@@ -467,11 +472,11 @@ def test_review_validation_errors_redact_raw_input_values() -> None:
     payload["target"]["sequence_5to3"] = sentinel
 
     with pytest.raises(baserender.SchemaError) as adapter_error:
-        baserender.adapt_record(payload, adapter_kind="three_way_junction_review_v1")
+        _adapt_payload(payload)
 
     assert sentinel not in str(adapter_error.value)
     assert adapter_error.value.__cause__ is None
-    record = baserender.adapt_record(_payload(), adapter_kind="three_way_junction_review_v1")
+    record = _adapt_payload(_payload())
     record.meta["three_way_junction_review"]["target"]["sequence_5to3"] = sentinel
     with pytest.raises(RenderingError) as renderer_error:
         baserender.render(record, renderer="three_way_junction_review")

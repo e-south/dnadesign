@@ -15,7 +15,8 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from ..config import Style
-from ..core import ContractError, Record, RenderingError, validate_record_kinds
+from ..config.adapter_contracts import validate_record_renderer_compatibility
+from ..core import ContractError, Record, RenderingError, SchemaError, validate_record_kinds
 from .palette import Palette
 
 
@@ -192,7 +193,8 @@ def render_record(record: Record, *, renderer_name: str, style: Style, palette: 
     try:
         validated = record.validate()
         validate_record_kinds(validated)
-    except ContractError as exc:
+        validate_record_renderer_compatibility(validated, renderer_name=renderer_name)
+    except (ContractError, SchemaError) as exc:
         raise RenderingError(str(exc)) from exc
 
     renderer = get_renderer(renderer_name)

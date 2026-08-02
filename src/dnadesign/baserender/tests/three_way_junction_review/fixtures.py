@@ -14,6 +14,13 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+import dnadesign.baserender as baserender
+from dnadesign.baserender.src.core import Record
+
+
+def _adapt_payload(payload: dict[str, object]) -> Record:
+    return baserender.adapt_records([payload], adapter_kind="three_way_junction_review_v1")[0]
+
 
 def _reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGT", "TGCA"))[::-1]

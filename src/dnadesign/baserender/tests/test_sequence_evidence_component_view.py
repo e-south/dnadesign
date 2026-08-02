@@ -154,7 +154,7 @@ def test_sequence_evidence_component_view_renders_pairing_dashes_and_duplex_back
     assert layout.y_forward - layout.y_reverse < 40.0
 
     initialize_runtime()
-    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=Palette(style.palette))
+    fig = render_record(record, renderer_name="nucleotide_evidence_map", style=style, palette=Palette(style.palette))
     try:
         axis = fig.axes[0]
         connector_lines = [

@@ -485,7 +485,7 @@ def test_scar_nick_annealed_adapter_backdrop_renders_thin_edge() -> None:
     style = resolve_style(preset=None, overrides={"connectors": True})
     palette = Palette(style.palette)
     initialize_runtime()
-    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+    fig = render_record(record, renderer_name="nucleotide_evidence_map", style=style, palette=palette)
     try:
         patch_by_gid = {patch.get_gid(): patch for patch in fig.axes[0].patches if patch.get_gid()}
         backdrop = patch_by_gid[f"sequence_backdrop:{annealed_index}"]
@@ -537,7 +537,7 @@ def test_scar_nick_top_strand_y_adaptor_label_does_not_collide_with_title() -> N
     )
     palette = Palette(style.palette)
     initialize_runtime()
-    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+    fig = render_record(record, renderer_name="nucleotide_evidence_map", style=style, palette=palette)
     try:
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()

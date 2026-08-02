@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from .registry import (  # noqa: F401
         Adapter,
         build_adapter,
+        finalize_adapter,
         get_adapter_descriptor,
         list_adapter_descriptors,
         required_source_columns,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Adapter": (".registry", "Adapter"),
     "build_adapter": (".registry", "build_adapter"),
+    "finalize_adapter": (".registry", "finalize_adapter"),
     "get_adapter_descriptor": (".registry", "get_adapter_descriptor"),
     "list_adapter_descriptors": (".registry", "list_adapter_descriptors"),
     "required_source_columns": (".registry", "required_source_columns"),
