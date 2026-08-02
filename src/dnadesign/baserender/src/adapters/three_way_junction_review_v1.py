@@ -52,6 +52,24 @@ class ThreeWayJunctionReviewV1Adapter:
         repr=False,
         compare=False,
     )
+    _fragment_identities: set[tuple[str, str]] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _junction_identities: set[tuple[str, str]] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _barcode_identities: set[tuple[str, str, str]] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+        compare=False,
+    )
     _junction_counts: dict[tuple[str, str], int] = field(
         default_factory=dict,
         init=False,
@@ -65,6 +83,12 @@ class ThreeWayJunctionReviewV1Adapter:
         compare=False,
     )
     _universal_primer_evidence: dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _target_specific_recovery: dict[tuple[str, str], list[tuple[str, str, str]]] = field(
         default_factory=dict,
         init=False,
         repr=False,
@@ -103,6 +127,23 @@ class ThreeWayJunctionReviewV1Adapter:
         if physical_sequence_identity in self._physical_sequence_identities:
             raise SchemaError("three_way_junction_review_v1 document has duplicate physical target sequence")
 
+        fragment_identities = {(review.source.plan_id, fragment.fragment_id) for fragment in review.geometry.fragments}
+        if fragment_identities & self._fragment_identities:
+            raise SchemaError("three_way_junction_review_v1 document has duplicate plan-scoped fragment identity")
+
+        junction_identities = {(review.source.plan_id, junction.junction_id) for junction in review.geometry.junctions}
+        if junction_identities & self._junction_identities:
+            raise SchemaError("three_way_junction_review_v1 document has duplicate plan-scoped junction identity")
+
+        barcode_identities = {
+            (*plan_and_pool, min(junction.barcode, junction.barcode_complement))
+            for junction in review.geometry.junctions
+        }
+        if len(barcode_identities) != len(review.geometry.junctions):
+            raise SchemaError("three_way_junction_review_v1 document has duplicate physical barcode identity")
+        if barcode_identities & self._barcode_identities:
+            raise SchemaError("three_way_junction_review_v1 document has duplicate physical barcode identity")
+
         previous_mode = self._recovery_modes.get(plan_and_pool)
         if previous_mode is not None and previous_mode != review.recovery.mode:
             raise SchemaError("three_way_junction_review_v1 document mixes recovery modes within one physical pool")
@@ -118,6 +159,16 @@ class ThreeWayJunctionReviewV1Adapter:
                     "three_way_junction_review_v1 document has contradictory universal recovery primer evidence"
                 )
             self._universal_primer_evidence[plan_and_pool] = primer_evidence
+        else:
+            reverse_span = review.recovery.reverse.target_binding_span
+            reverse_target_suffix = review.target.sequence_5to3[reverse_span.start : reverse_span.end]
+            self._target_specific_recovery.setdefault(plan_and_pool, []).append(
+                (
+                    review.target.sequence_5to3,
+                    review.recovery.forward.binding_sequence_5to3,
+                    reverse_target_suffix,
+                )
+            )
 
         self._target_identities.add(target_identity)
         next_junction_count = self._junction_counts.get(plan_and_pool, 0) + len(review.geometry.junctions)
@@ -125,6 +176,9 @@ class ThreeWayJunctionReviewV1Adapter:
             raise SchemaError("three_way_junction_review_v1 document junction total exceeds declared locus_count")
 
         self._physical_sequence_identities.add(physical_sequence_identity)
+        self._fragment_identities.update(fragment_identities)
+        self._junction_identities.update(junction_identities)
+        self._barcode_identities.update(barcode_identities)
         self._recovery_modes[plan_and_pool] = review.recovery.mode
         self._junction_counts[plan_and_pool] = next_junction_count
 
@@ -149,6 +203,18 @@ class ThreeWayJunctionReviewV1Adapter:
     def finalize(self) -> None:
         if not self._junction_counts:
             raise SchemaError("three_way_junction_review_v1 document must contain at least one target")
+        for recovery_rows in self._target_specific_recovery.values():
+            for target_index, (_, forward_binding, reverse_target_suffix) in enumerate(recovery_rows):
+                if any(
+                    other_index != target_index
+                    and other_sequence.startswith(forward_binding)
+                    and other_sequence.endswith(reverse_target_suffix)
+                    for other_index, (other_sequence, _, _) in enumerate(recovery_rows)
+                ):
+                    raise SchemaError(
+                        "three_way_junction_review_v1 document has ambiguous target-specific recovery "
+                        "within one physical pool"
+                    )
         for plan_and_pool, junction_count in self._junction_counts.items():
             declared_locus_count = self._search_receipts[plan_and_pool]["locus_count"]
             if junction_count != declared_locus_count:

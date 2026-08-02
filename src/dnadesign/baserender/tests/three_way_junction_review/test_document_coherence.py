@@ -18,14 +18,13 @@ import pytest
 
 import dnadesign.baserender as baserender
 
-from .fixtures import _payload, _payload_with_long_recovery_primers, _review_job
+from .fixtures import _payload, _payload_with_long_recovery_primers, _rename_target_geometry, _review_job
 
 
 def _second_target() -> tuple[dict[str, object], dict[str, object]]:
     first = _payload()
     second = _payload()
-    second["target"]["target_id"] = "target-02"  # type: ignore[index]
-    second["checks"][0]["subject"]["id"] = "target-02"  # type: ignore[index]
+    _rename_target_geometry(second, target_id="target-02")
     return first, second
 
 

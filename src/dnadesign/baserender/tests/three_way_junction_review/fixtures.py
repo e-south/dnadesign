@@ -26,6 +26,37 @@ def _reverse_complement(sequence: str) -> str:
     return sequence.translate(str.maketrans("ACGT", "TGCA"))[::-1]
 
 
+def _rename_target_geometry(payload: dict[str, object], *, target_id: str) -> None:
+    """Give one synthetic review row producer-shaped plan-scoped identities."""
+
+    payload["target"]["target_id"] = target_id  # type: ignore[index]
+    fragment_id_map = {
+        fragment["fragment_id"]: f"{target_id}:fragment-{index + 1:04d}"
+        for index, fragment in enumerate(payload["geometry"]["fragments"])  # type: ignore[index]
+    }
+    junction_id_map = {
+        junction["junction_id"]: f"{target_id}:junction-{index + 1:04d}"
+        for index, junction in enumerate(payload["geometry"]["junctions"])  # type: ignore[index]
+    }
+    for fragment in payload["geometry"]["fragments"]:  # type: ignore[index]
+        fragment["fragment_id"] = fragment_id_map[fragment["fragment_id"]]
+    for junction in payload["geometry"]["junctions"]:  # type: ignore[index]
+        junction["junction_id"] = junction_id_map[junction["junction_id"]]
+        junction["left_fragment_id"] = fragment_id_map[junction["left_fragment_id"]]
+        junction["right_fragment_id"] = fragment_id_map[junction["right_fragment_id"]]
+    for strand in payload["strands"]:  # type: ignore[index]
+        strand["fragment_id"] = fragment_id_map[strand["fragment_id"]]
+        if strand["incoming_junction_id"] is not None:
+            strand["incoming_junction_id"] = junction_id_map[strand["incoming_junction_id"]]
+        if strand["outgoing_junction_id"] is not None:
+            strand["outgoing_junction_id"] = junction_id_map[strand["outgoing_junction_id"]]
+    payload["recovery"]["first_fragment_id"] = fragment_id_map[payload["recovery"]["first_fragment_id"]]  # type: ignore[index]
+    payload["recovery"]["last_fragment_id"] = fragment_id_map[payload["recovery"]["last_fragment_id"]]  # type: ignore[index]
+    for check in payload["checks"]:  # type: ignore[index]
+        if check["subject"]["kind"] == "target":
+            check["subject"]["id"] = target_id
+
+
 def _payload() -> dict[str, object]:
     target = "AAAACCCCGGGGTTTTAAAACCCC"
     toehold = target[10:14]
@@ -191,6 +222,7 @@ def _payload_with_long_recovery_primers() -> dict[str, object]:
     reverse_binding = _reverse_complement(target[-96:])
     forward_extension = ("GATTACA" * 15)[:100]
     reverse_extension = ("CCGTTA" * 17)[:100]
+    barcode = "AGTCCTGA"
 
     payload["target"] = {
         "target_id": "target-01",
@@ -217,6 +249,8 @@ def _payload_with_long_recovery_primers() -> dict[str, object]:
             "toehold_span": {"start": toehold_start, "end": toehold_end},
             "toehold": toehold,
             "toehold_complement": _reverse_complement(toehold),
+            "barcode": barcode,
+            "barcode_complement": _reverse_complement(barcode),
         }
     )
     payload["strands"] = [
@@ -225,7 +259,7 @@ def _payload_with_long_recovery_primers() -> dict[str, object]:
             "role": "first",
             "incoming_junction_id": None,
             "outgoing_junction_id": "junction-01",
-            "barcode_bearing_sequence_5to3": target[:toehold_start] + toehold + "AACCGGTT",
+            "barcode_bearing_sequence_5to3": target[:toehold_start] + toehold + barcode,
             "complement_sequence_5to3": _reverse_complement(target[:toehold_start]),
         },
         {
@@ -233,7 +267,7 @@ def _payload_with_long_recovery_primers() -> dict[str, object]:
             "role": "last",
             "incoming_junction_id": "junction-01",
             "outgoing_junction_id": None,
-            "barcode_bearing_sequence_5to3": _reverse_complement("AACCGGTT") + target[toehold_end:],
+            "barcode_bearing_sequence_5to3": _reverse_complement(barcode) + target[toehold_end:],
             "complement_sequence_5to3": _reverse_complement(target[toehold_end:]) + _reverse_complement(toehold),
         },
     ]
@@ -331,7 +365,15 @@ def _payload_with_large_display_scalars() -> dict[str, object]:
 def _payload_with_many_junctions(junction_count: int = 20) -> dict[str, object]:
     payload = _payload()
     target = ("ACGT" * (junction_count + 1))[: (2 * junction_count) + 1]
-    barcode = "AACCGGTT"
+
+    def _indexed_barcode(index: int) -> str:
+        value = index
+        encoded: list[str] = []
+        for _ in range(4):
+            value, digit = divmod(value, 4)
+            encoded.append("ACGT"[digit])
+        return "AA" + "".join(reversed(encoded)) + "AA"
+
     fragments = []
     junctions = []
     strands = []
@@ -349,17 +391,20 @@ def _payload_with_many_junctions(junction_count: int = 20) -> dict[str, object]:
         )
         previous = None if index == 0 else junctions[index - 1]
         following_id = None if index == junction_count else f"junction-{index + 1:02d}"
+        following_barcode = None if following_id is None else _indexed_barcode(index)
         domain = target[domain_start:domain_end]
         if previous is None:
+            assert following_barcode is not None
             following_toehold = target[domain_end : domain_end + 1]
-            barcode_bearing = domain + following_toehold + barcode
+            barcode_bearing = domain + following_toehold + following_barcode
             complement = _reverse_complement(domain)
         elif following_id is None:
             barcode_bearing = _reverse_complement(previous["barcode"]) + domain
             complement = _reverse_complement(domain) + previous["toehold_complement"]
         else:
+            assert following_barcode is not None
             following_toehold = target[domain_end : domain_end + 1]
-            barcode_bearing = _reverse_complement(previous["barcode"]) + domain + following_toehold + barcode
+            barcode_bearing = _reverse_complement(previous["barcode"]) + domain + following_toehold + following_barcode
             complement = _reverse_complement(domain) + previous["toehold_complement"]
         strands.append(
             {
@@ -372,6 +417,7 @@ def _payload_with_many_junctions(junction_count: int = 20) -> dict[str, object]:
             }
         )
         if following_id is not None:
+            assert following_barcode is not None
             toehold = target[domain_end : domain_end + 1]
             junctions.append(
                 {
@@ -381,8 +427,8 @@ def _payload_with_many_junctions(junction_count: int = 20) -> dict[str, object]:
                     "right_fragment_id": f"fragment-{index + 2:02d}",
                     "toehold": toehold,
                     "toehold_complement": _reverse_complement(toehold),
-                    "barcode": barcode,
-                    "barcode_complement": _reverse_complement(barcode),
+                    "barcode": following_barcode,
+                    "barcode_complement": _reverse_complement(following_barcode),
                     "complement_nick_geometry_valid": True,
                     "complement_end_preparation": "vendor_5_prime_phosphate",
                 }

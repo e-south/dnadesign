@@ -29,6 +29,7 @@ from .fixtures import (
     _payload_with_long_junction_sequences,
     _payload_with_long_recovery_primers,
     _payload_with_many_junctions,
+    _rename_target_geometry,
 )
 
 
@@ -181,8 +182,7 @@ def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
 def test_review_renderer_distinguishes_target_junctions_from_pool_loci() -> None:
     first = _payload()
     second = _payload_with_long_recovery_primers()
-    second["target"]["target_id"] = "target-02"
-    second["checks"][0]["subject"]["id"] = "target-02"
+    _rename_target_geometry(second, target_id="target-02")
     for payload in (first, second):
         payload["recovery"]["mode"] = "target_specific"
         payload["search"]["locus_count"] = 2
