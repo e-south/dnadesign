@@ -38,7 +38,10 @@ from .jobs.base_render_v4 import (
     load_render_job_from_mapping,
     output_kind,
     resolve_job_path,
+    validate_adapter_output_compatibility,
+    validate_adapter_renderer_compatibility,
     validate_job,
+    validate_output_configuration,
     validate_render_job,
 )
 from .style_v1 import (
@@ -87,6 +90,9 @@ __all__ = [
     "validate_render_job",
     "validate_job",
     "resolve_job_path",
+    "validate_adapter_output_compatibility",
+    "validate_adapter_renderer_compatibility",
+    "validate_output_configuration",
     "output_kind",
     "render_contract_descriptor",
     "render_contract_descriptors",

@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 
 def _reverse_complement(sequence: str) -> str:
@@ -142,6 +143,34 @@ def _payload() -> dict[str, object]:
                 "detail": "not performed",
             },
         ],
+    }
+
+
+def _review_job(
+    source: Path,
+    *,
+    contract_kind: str = "three_way_junction_review_render_v1",
+    input_narrowing: dict[str, object] | None = None,
+) -> dict[str, object]:
+    input_config: dict[str, object] = {
+        "kind": "json",
+        "path": source.name,
+        "adapter": {"kind": "three_way_junction_review_v1"},
+        "alphabet": "DNA",
+    }
+    if input_narrowing is not None:
+        input_config.update(input_narrowing)
+    return {
+        "version": 4,
+        "contract": {"kind": contract_kind},
+        "bundle": {"path": "review-render"},
+        "input": input_config,
+        "render": {
+            "renderer": "three_way_junction_review",
+            "style": {"preset": None, "overrides": {}},
+        },
+        "outputs": [{"kind": "images", "dir": "images", "fmt": "svg"}],
+        "run": {"strict": True, "fail_on_skips": True},
     }
 
 

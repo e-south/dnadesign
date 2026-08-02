@@ -29,7 +29,10 @@ from ..render_job_v4 import (
     load_render_job_from_mapping,
     output_kind,
     resolve_job_path,
+    validate_adapter_output_compatibility,
+    validate_adapter_renderer_compatibility,
     validate_job,
+    validate_output_configuration,
     validate_render_job,
 )
 
@@ -53,6 +56,9 @@ __all__ = [
     "load_render_job_from_mapping",
     "output_kind",
     "resolve_job_path",
+    "validate_adapter_output_compatibility",
+    "validate_adapter_renderer_compatibility",
     "validate_job",
+    "validate_output_configuration",
     "validate_render_job",
 ]

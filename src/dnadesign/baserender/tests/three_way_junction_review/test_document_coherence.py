@@ -18,7 +18,7 @@ import pytest
 
 import dnadesign.baserender as baserender
 
-from .fixtures import _payload
+from .fixtures import _payload, _review_job
 
 
 def _second_target() -> tuple[dict[str, object], dict[str, object]]:
@@ -27,29 +27,6 @@ def _second_target() -> tuple[dict[str, object], dict[str, object]]:
     second["target"]["target_id"] = "target-02"  # type: ignore[index]
     second["checks"][0]["subject"]["id"] = "target-02"  # type: ignore[index]
     return first, second
-
-
-def _job(source: Path, *, input_narrowing: dict[str, object] | None = None) -> dict[str, object]:
-    input_config: dict[str, object] = {
-        "kind": "json",
-        "path": source.name,
-        "adapter": {"kind": "three_way_junction_review_v1"},
-        "alphabet": "DNA",
-    }
-    if input_narrowing is not None:
-        input_config.update(input_narrowing)
-    return {
-        "version": 4,
-        "contract": {"kind": "three_way_junction_review_render_v1"},
-        "bundle": {"path": "review-render"},
-        "input": input_config,
-        "render": {
-            "renderer": "three_way_junction_review",
-            "style": {"preset": None, "overrides": {}},
-        },
-        "outputs": [{"kind": "images", "dir": "images", "fmt": "svg"}],
-        "run": {"strict": True, "fail_on_skips": True},
-    }
 
 
 @pytest.mark.parametrize(
@@ -66,7 +43,7 @@ def test_job_validates_the_complete_review_document_before_narrowing(
     source.write_text(json.dumps([first, second]), encoding="utf-8")
 
     with pytest.raises(baserender.SchemaError, match="contradictory pool-wide search receipt at row 1"):
-        baserender.run_job(_job(source, input_narrowing=input_narrowing), caller_root=tmp_path)
+        baserender.run_job(_review_job(source, input_narrowing=input_narrowing), caller_root=tmp_path)
 
     assert not (tmp_path / "review-render").exists()
 

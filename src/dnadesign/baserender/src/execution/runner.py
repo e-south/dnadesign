@@ -28,9 +28,12 @@ from ..config import (
     output_kind,
     render_contract_descriptor,
     resolve_style,
+    validate_adapter_output_compatibility,
+    validate_adapter_renderer_compatibility,
+    validate_output_configuration,
+    validate_render_contract_renderer,
 )
 from ..config.adapter_contracts import adapter_contract
-from ..config.render_job_v4 import validate_adapter_output_compatibility
 from ..core import Record, SchemaError, SkipRecord
 from ..io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
 from ..pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
@@ -183,14 +186,17 @@ def run_render_job(
         )
     )
 
+    validate_adapter_renderer_compatibility(job.input, job.render)
+    validate_render_contract_renderer(job.contract.kind, job.render.renderer, field="contract.kind")
+    validate_output_configuration(job.bundle.path, job.outputs)
+    validate_adapter_output_compatibility(job.input.adapter.kind, job.outputs)
+    descriptor = render_contract_descriptor(job.contract.kind)
+    adapter_descriptor = adapter_contract(job.input.adapter.kind)
     report = RunReport(
         job_name=job.name,
         input_path=str(job.input.path),
         selection_path=str(job.selection.path) if job.selection else None,
     )
-    descriptor = render_contract_descriptor(job.contract.kind)
-    adapter_descriptor = adapter_contract(job.input.adapter.kind)
-    validate_adapter_output_compatibility(job.input.adapter.kind, job.outputs)
     envelope = adapter_descriptor.input_envelope or descriptor.input_envelope
     try:
         if envelope is None:
