@@ -66,7 +66,7 @@ The exact binding is recorded in
 ```text
 OD600, YFP, and CFP well trajectories
   -> event-relative 4-8 h reduction for each well
-  -> within-experiment replicate medians
+  -> within-experiment observation medians
   -> same-state pDual-10 signal subtraction
   -> one Reader experiment-level response-window phenotype
   -> identity-verified Reader alias-to-candidate binding
@@ -111,7 +111,7 @@ constructs.
 
 Each well is reduced before wells are combined. Pooling raw time points across
 wells would give densely sampled wells more influence and would erase the
-replicate structure.
+well-level structure.
 
 In the assay-development plates, the 4–8-hour window retained much of the SpyP
 and sulAp separation seen at 6–12 hours while reducing late-plate OD
@@ -123,12 +123,12 @@ metastudy](response-metastudy.md) records the equal-footing window comparison.
 Alternative windows, event bounds, area-under-the-curve summaries, and delta
 summaries remain sensitivity evidence. They do not replace the primary
 reduction. Reader owns the full contract in
-`reader/docs/lib/plate_reader/response_window.md` in the sibling Reader
+`reader/docs/lib/plate_reader/four_state_event_window.md` in the sibling Reader
 repository.
 
 ### 2. Reader summarizes wells within an experiment
 
-For state $i$, Reader combines replicate wells from the same experiment with
+For state $i$, Reader combines wells from the same experiment with
 medians:
 
 $$
@@ -503,9 +503,8 @@ run remains comparator evidence rather than a second executable selector.
 (SFXI)](../../../../../src/dnadesign/opal/docs/plugins/objectives/sfxi.md) uses a
 distinct Reader vec8 and does not directly score target-OFF signal. Vector
 target similarity requires absolute setpoints and penalizes overshoot. A
-single vector channel omits two behavior families. Scalar identity and
-[SPOP](../../../../../src/dnadesign/opal/docs/plugins/objectives/spop.md) belong
-to different Y contracts.
+single vector channel omits two behavior families. Scalar identity and the
+retired RT-lnRNA endpoint score belong to different Y contracts.
 
 SpyP ranks near the top of observed ethanol-associated examples but retains an
 OFF-suppression failure. SulAp ranks near the top of observed
@@ -553,7 +552,7 @@ variation and is handled by study review rather than hidden in MSRB.
 
 The campaign needs five evidence surfaces:
 
-1. Reader evidence for the selected time window, trajectories, replicate
+1. Reader evidence for the selected time window, trajectories, well-level
    support, censoring, and growth context.
 2. The three family scores, hard bottleneck, limiting coordinate, and
    direction-met status for every selected candidate.
@@ -666,7 +665,7 @@ resolve candidate authority.
 Source map:
 
 - Reader response-window contract:
-  `reader/docs/lib/plate_reader/response_window.md`
+  `reader/docs/lib/plate_reader/four_state_event_window.md`
 - Study observation and repeat policy:
   `src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/README.md`
 - Study label promotion:

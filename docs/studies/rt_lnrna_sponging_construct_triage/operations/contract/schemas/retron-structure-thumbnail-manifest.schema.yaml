@@ -1,9 +1,9 @@
 schema_id: retron_structure_thumbnail_manifest_v1
 study_id: rt_lnrna_sponging_construct_triage
-status: materialized
+status: immutable_historical_evidence_contract
 owner: dnadesign.studies.units.rt_lnrna_sponging_construct_triage
 source_owner: retron_hairpin_design
-materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_composite.structure_manifest
+materializer: retired_unavailable
 row_grain: one row per assay_subject_key in the plotted condition matrix
 required_fields:
   assay_subject_key: string
@@ -16,16 +16,26 @@ required_fields:
   folding_status: string
   structure_status: string
   structure_png_path: string
+  structure_svg_path: string
+  structure_annotation_manifest_path: string
   composition_png_path: string
   source_bundle_path: string
   review_manifest_path: string
+  left_base_sequence: string
+  stem_length_bp: integer_or_null
+  foldback_sequence: string
+  right_base_sequence: string
+  primitive_source_path: string
+  primitive_warning: string
+  stem_extension_pairing_status: string
+  payload_pairing_status: string
+  foldback_pairing_status: string
+  pairing_summary: string
 structure_status_values:
   - available
   - missing_hairpin_materialization
   - missing_thumbnail_path
 validation_rules:
   - Structure paths must point to retron_hairpin_design materialized outputs.
-  - Missing structures must not drop SPOP rows from the plot.
-  - Route to retron_hairpin_design only to materialize missing structure assets, not to regenerate Reader SPOP evidence.
-  - Malformed retron_hairpin_design source tables must fail with an explicit manifest error.
-  - Rows marked available must have an existing PNG path before rendering.
+  - This schema interprets frozen thumbnail rows; it does not authorize regeneration.
+  - Primitive and pairing fields came from hairpin-owned materialized features and MSD-region records, never image parsing.

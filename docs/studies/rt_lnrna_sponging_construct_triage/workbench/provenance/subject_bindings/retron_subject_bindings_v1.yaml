@@ -1,0 +1,135 @@
+schema_id: rt_lnrna_subject_binding_registry_v1
+study_id: rt_lnrna_sponging_construct_triage
+binding_set_id: retron_subject_bindings_v1
+source_sets:
+  - source_set_id: genbank_catalog_projection_v1
+    projection_kind: rt_lnrna_variant_genbank_catalog
+    owner_study_id: rt_lnrna_sponging_construct_triage
+    source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+    projection_sha256: sha256:d0b2bb8704a4169cb04669b86673f934393d60e8167c00045336cc57cbbdbe4c
+    msd_source_manifest_path: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/manifest.yaml
+    exclude_record_ids:
+      - retron26
+      - retron180
+    default_payload_program_id: tetO_sponging_v1
+    payload_program_overrides:
+      msrmsdwt_bl21: native_retron_v1
+subjects:
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron26_lnrna__tetO
+    study_variant_id: retron26
+    payload_program_id: tetO_sponging_v1
+    rt_part:
+      owner_study_id: rt_lnrna_sponging_construct_triage
+      part_id: genbank:pes-retron-26.gb#ECD_00831
+      authority_kind: rt_lnrna_variant_genbank_catalog
+      source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+      record_id: retron26
+      sequence_sha256: sha256:ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
+    lnrna_part:
+      owner_study_id: rt_lnrna_sponging_construct_triage
+      part_id: retron26
+      authority_kind: rt_lnrna_variant_genbank_catalog
+      source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+      record_id: retron26
+      sequence_sha256: sha256:03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23
+    msd_structure: &retron26_msd_structure
+      owner_study_id: retron_hairpin_design
+      source_manifest_path: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/manifest.yaml
+      variant_id: retron26
+      sequence_sha256: sha256:df954857b3515ca0b15eecd75a4877d6e76164f067f81bba26cddcd249c21bdf
+      orientation_in_lnrna: reverse_complement
+      lnrna_span_0: [78, 152]
+      structure_materialization_id: retron_msd_structure_panel_v1
+      structure_subject_id: pES-retron-26
+    aliases:
+      - namespace: reader.design_id
+        value: pES-retron-26; pBbS2c-rfp
+      - namespace: reader.assay_subject_id
+        value: retron-26__fresh-transformation
+      - namespace: reader.assay_subject_id
+        value: retron-26__prior-glycerol-stock
+    construct_projection_status: representable
+
+  - subject_id: rt_lnrna_pair__eco1rt_g3_d01__retron26_lnrna__tetO
+    study_variant_id: eco1rt_g3_d01__retron26
+    payload_program_id: tetO_sponging_v1
+    rt_part: &d01_rt
+      owner_study_id: eco1_rt_repack
+      part_id: Eco1RT-G3-D01
+      authority_kind: rt_part_publication_v1
+      source_path: docs/studies/eco1_rt_repack/record/rt-parts/eco1-g3-distal-pair-v1.yaml
+      record_id: Eco1RT-G3-D01
+      sequence_sha256: sha256:0b0d9de3d19f7f22b09befa93365a45e3e01ffe9ff328a867333a578f1fe1191
+    lnrna_part: &retron26_lnrna
+      owner_study_id: rt_lnrna_sponging_construct_triage
+      part_id: retron26
+      authority_kind: rt_lnrna_variant_genbank_catalog
+      source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+      record_id: retron26
+      sequence_sha256: sha256:03b32f6a59093bc386ba1b40e916c9194dd5c3cdacbee8ad4d0fd40cc15f7a23
+    msd_structure: *retron26_msd_structure
+    aliases:
+      - namespace: reader.design_id
+        value: pES-retron-205-Eco1RT-G3-D01; pBbS2c-rfp
+      - namespace: reader.assay_subject_id
+        value: retron-205-Eco1RT-G3-D01
+    construct_projection_status: representable
+
+  - subject_id: rt_lnrna_pair__eco1rt_g3_d02__retron26_lnrna__tetO
+    study_variant_id: eco1rt_g3_d02__retron26
+    payload_program_id: tetO_sponging_v1
+    rt_part:
+      owner_study_id: eco1_rt_repack
+      part_id: Eco1RT-G3-D02
+      authority_kind: rt_part_publication_v1
+      source_path: docs/studies/eco1_rt_repack/record/rt-parts/eco1-g3-distal-pair-v1.yaml
+      record_id: Eco1RT-G3-D02
+      sequence_sha256: sha256:3e6e97cc4365f8bdba5bf27810169c2d12deb213fe4be48c6fe476e8e5f42f01
+    lnrna_part: *retron26_lnrna
+    msd_structure: *retron26_msd_structure
+    aliases:
+      - namespace: reader.design_id
+        value: pES-retron-206-Eco1RT-G3-D02; pBbS2c-rfp
+      - namespace: reader.assay_subject_id
+        value: retron-206-Eco1RT-G3-D02
+    construct_projection_status: representable
+
+  - subject_id: rt_lnrna_pair__eco1_wt_rt__retron180_lnrna__tetO
+    study_variant_id: retron180
+    payload_program_id: tetO_sponging_v1
+    rt_part:
+      owner_study_id: rt_lnrna_sponging_construct_triage
+      part_id: genbank:pes-retron-180-msdtetr-c172-lagtg-rcatg-xwmm.gb#ECD_00831
+      authority_kind: rt_lnrna_variant_genbank_catalog
+      source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+      record_id: retron180
+      sequence_sha256: sha256:ac4f45fd2687525e5f28de23d267af29d3b960421d9a2f95274cf47bbaacdb1d
+    lnrna_part: &retron180_lnrna
+      owner_study_id: rt_lnrna_sponging_construct_triage
+      part_id: retron180
+      authority_kind: rt_lnrna_variant_genbank_catalog
+      source_path: docs/studies/rt_lnrna_sponging_construct_triage/workbench/provenance/retron-variant-genbank-catalog.yaml
+      record_id: retron180
+      sequence_sha256: sha256:3e858e80ddb5b5a1c3b6616245e9953628deedee6f871b086871df90cb7c415c
+    msd_structure: &retron180_msd_structure
+      owner_study_id: retron_hairpin_design
+      source_manifest_path: docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/retron_msd_structure_panel_v1/manifest.yaml
+      variant_id: retron180
+      sequence_sha256: sha256:c286ec719e5e5de2256f335959f0ed5e286ba3111d0f8830ee6d844eab5aed19
+      orientation_in_lnrna: reverse_complement
+      lnrna_span_0: [78, 157]
+      structure_materialization_id: retron_msd_structure_panel_v1
+      structure_subject_id: pES-retron-180
+    aliases:
+      - namespace: reader.design_id
+        value: pES-retron-180; pBbS2c-rfp
+    construct_projection_status: representable
+
+  - subject_id: rt_lnrna_pair__eco1rt_g3_d01__retron180_lnrna__tetO
+    study_variant_id: eco1rt_g3_d01__retron180
+    payload_program_id: tetO_sponging_v1
+    rt_part: *d01_rt
+    lnrna_part: *retron180_lnrna
+    msd_structure: *retron180_msd_structure
+    aliases: []
+    construct_projection_status: representable

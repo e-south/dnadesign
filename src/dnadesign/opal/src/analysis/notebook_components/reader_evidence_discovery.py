@@ -105,6 +105,9 @@ def discover_reader_evidence_artifacts(workdir: str | Path) -> list[dict[str, An
                     "bytes": artifact_item.get("bytes"),
                     "sha256": str(artifact_item.get("sha256") or ""),
                     "source_manifest_sha256": str(artifact_item.get("source_manifest_sha256") or ""),
+                    "source_record_revision_digest": str(artifact_item.get("source_record_revision_digest") or ""),
+                    "source_file_path": str(artifact_item.get("source_file_path") or ""),
+                    "source_receipt_sha256": str(artifact_item.get("source_receipt_sha256") or ""),
                     "manifest_path": str(manifest_path.resolve()),
                     "manifest_path_label": compact_path(manifest_path, base=root),
                 }

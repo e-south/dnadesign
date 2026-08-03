@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import subprocess
-from datetime import date
 from pathlib import Path
 
 from dnadesign.devtools.security.tracked_text_privacy import find_privacy_issues, main
@@ -114,59 +113,17 @@ def test_find_privacy_issues_allows_examples_and_skips_binary_files(tmp_path: Pa
     assert find_privacy_issues(tmp_path) == ()
 
 
-def test_find_privacy_issues_limits_legacy_provenance_allowance_to_exact_paths(tmp_path: Path) -> None:
+def test_find_privacy_issues_rejects_personal_paths_in_structure_provenance(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     token = "/Users/" + "Shockwing"
-    allowed_path = (
+    provenance_path = (
         "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/manifest.yaml"
+        "retron_msd_structure_panel_v1/manifest.yaml"
     )
-    future_path = (
-        "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/reports/future.yaml"
-    )
-    _track(tmp_path, allowed_path, f"path: {token}\n".encode())
-    _track(tmp_path, future_path, f"path: {token}\n".encode())
-    _track(tmp_path, "docs/studies/demo/outputs/status.yaml", f"path: {token}\n".encode())
-    _track(tmp_path, "src/dnadesign/infer/docs/dev/journal.md", f"path: {token}\n".encode())
+    _track(tmp_path, provenance_path, f"path: {token}\n".encode())
+    issues = find_privacy_issues(tmp_path)
 
-    issues = find_privacy_issues(tmp_path, today=date(2026, 7, 30))
-
-    assert [(issue.path.as_posix(), issue.token_name) for issue in issues] == [(future_path, "personal_macos_home")]
-
-
-def test_find_privacy_issues_does_not_allow_other_tokens_at_legacy_path(tmp_path: Path) -> None:
-    _init_repo(tmp_path)
-    allowed_path = (
-        "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/manifest.yaml"
-    )
-    content = "".join(
-        (
-            "path=/Users/" + "Shockwing/project\n",
-            "email=ericjohn" + "south@gmail.com\n",
-        )
-    )
-    _track(tmp_path, allowed_path, content.encode())
-
-    issues = find_privacy_issues(tmp_path, today=date(2026, 7, 30))
-
-    assert [(issue.path.as_posix(), issue.token_name) for issue in issues] == [(allowed_path, "personal_gmail")]
-
-
-def test_find_privacy_issues_expires_legacy_provenance_allowance(tmp_path: Path) -> None:
-    _init_repo(tmp_path)
-    allowed_path = (
-        "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/reports/discrepancies.yaml"
-    )
-    _track(tmp_path, allowed_path, b"status: regenerated_without_private_paths\n")
-
-    issues = find_privacy_issues(tmp_path, today=date(2026, 10, 1))
-
-    assert [(issue.path.as_posix(), issue.token_name) for issue in issues] == [
-        (allowed_path, "expired_legacy_path_allowance")
-    ]
+    assert [(issue.path.as_posix(), issue.token_name) for issue in issues] == [(provenance_path, "personal_macos_home")]
 
 
 def test_main_fails_closed_when_a_tracked_token_is_present(tmp_path: Path, capsys) -> None:

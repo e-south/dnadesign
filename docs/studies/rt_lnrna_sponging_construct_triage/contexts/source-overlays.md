@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-source-overlays
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-26
+last_verified: 2026-08-02
 ---
 
 ## Source Overlay Contract
@@ -14,7 +14,7 @@ The study keeps three result layers separate:
 | --- | --- | --- |
 | `AbundancePriorOverlay` | Literature/source msDNA or RT-DNA abundance. | No |
 | `InferFeatureAlias` | Model-derived `X` for a declared construct view. | Yes, as `X` only |
-| `SpongingAssayObservation` | Actual lab TF-sponging assay label. | Yes, after labels exist |
+| `rt_lnrna_reporter_measurement_profile.v2` or `rt_lnrna_reporter_response_profile.v4` | One alternative descriptive lab profile: raw when normalization is unavailable, otherwise reference-normalized with raw measurements retained. | No |
 
 ### Khan
 
@@ -36,7 +36,7 @@ abundance, `40` exceed the current lane, and `2` lack RT CDS authority.
 
 Use Khan `raw_value` and `normalized_value` as source-scoped RT-DNA production
 fields. Use `ordinal_bin` only as secondary review metadata. These values must
-not be put on one numeric scale with Crawford abundance or Reader SPOP.
+not be put on one numeric scale with Crawford abundance or reporter-response evidence.
 
 ### Crawford
 
@@ -135,32 +135,27 @@ offset checks, but they do not create OPAL `Y` values. All representable
 GenBank catalog rows use the same source-authority and Construct projection
 path.
 
-### Reader SPOP
+### Reader-derived reporter response
 
-Reader retron reporter experiments are the planned source for
-`SpongingAssayObservation` labels. They are not Khan/Crawford overlays and do
-not replace Construct sequence authority.
+Reader retron reporter experiments are the measurement source for one
+descriptive profile variant: `rt_lnrna_reporter_measurement_profile.v2` when
+normalization is unavailable, otherwise
+`rt_lnrna_reporter_response_profile.v4`. Profiles are not
+Khan/Crawford overlays, optimization labels, or Construct sequence authority.
 
-Reader owns the SPOP metric definition in the sibling source-of-truth document
-`reader/docs/lib/spop_endpoint_in_reader.md` and public scoring API
-`reader.domains.plate_reader.analysis.spop.score_spop_endpoint`. The RT-lnRNA
-study owns only the Construct bridge. The study bridge emits
-`reader_spop_endpoint_dose_mean_v1` rows from
-`pES-retron-*; pBbS2c-rfp` assay subjects. A Reader row can exist before a
-Construct subject row exists, but it must keep these identities separate:
-`assay_subject_key`, `reader_design_id`, `proposed_construct_subject_id`,
-`construct_subject_id`, and `construct_subject_bridge_status`.
+Reader owns generic measurement records and recorded time. The RT-lnRNA study
+owns explicit control pairing, endpoint or window selection, comparability,
+biological-replicate uncertainty, and later objective design. A Reader row can
+exist before a study subject row exists, but measurement evidence and identity
+authority remain separate.
 
 Only rows with resolved RT plus lnRNA sequence authority can join the
 consolidated Construct output that feeds Infer. Unresolved Reader retron rows
-remain label evidence and review overlays until their GenBank or sequence
-authority is supplied.
+remain descriptive evidence until their sequence authority is supplied.
 
-Reader SPOP is the materialized lab TF-sponging scalar for LatentDNA GenBank
-overlays. Its numeric scope is
-`reader_experiment_normalized_tf_sponging`, separate from Khan RT-DNA abundance
-and Crawford Eco1 msDNA abundance. Numeric scoring is delegated to Reader's
-public `score_spop_endpoint` API. It may be used as a categorical hue, an
-ordinal audit axis, or OPAL `Y` only after the row has a resolved Construct
-subject bridge and the materialized `SpongingAssayObservation` contract is
-written.
+Both variants preserve declared RFP, OD600, and RFP/OD600 summaries plus exact
+Reader provenance. Only the reference-normalized variant adds dose-wise
+normalized reporter response, uncapped relative OD, and supported uncertainty.
+Endpoint `relative_od` is an OD ratio, not viability or growth; biomass
+interpretation requires meta-study validation. Profiles cannot be used as
+LatentDNA labels or OPAL `Y`.

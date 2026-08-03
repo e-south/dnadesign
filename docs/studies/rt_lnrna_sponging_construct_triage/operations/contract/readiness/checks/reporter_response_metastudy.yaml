@@ -1,0 +1,8 @@
+checks:
+  phase_5_analysis:
+    - kind: command
+      check_id: rt_lnrna.reporter_response_metastudy.semantic_status
+      check_group: reporter_response_metastudy
+      summary: Meta-study live route and source decision must report semantic readiness.
+      required: true
+      surface: reporter_response_metastudy_status

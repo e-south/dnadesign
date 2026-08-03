@@ -2,8 +2,8 @@
 
 **Owner:** dnadesign-maintainers
 **Status:** implemented generic runtime contract
-**Last verified:** 2026-07-14
-**Last edited:** 2026-07-14
+**Last verified:** 2026-08-02
+**Last edited:** 2026-08-02
 **First dogfood workspace:** `rt_lnrna_sponging_construct_triage`
 
 This note defines a generic LatentDNA fitted-geometry primitive,
@@ -15,8 +15,13 @@ geometry, but the primitive is not RT-specific.
 This dev spec is the durable LatentDNA maintainer contract for the implemented
 primitive. LatentDNA owns fitted-geometry mechanics and compact provenance only
 when LatentDNA fits geometry; the RT-lnRNA study owns biological meaning,
-source labels, abundance overlays, GenBank/compiler/DMS categories, and future
-SPOP interpretation.
+source labels, abundance overlays, GenBank/compiler/DMS categories, and any
+future reporter-response interpretation.
+
+Reader owns generic measurement records, treatment metadata, and replicate
+metadata. The RT-lnRNA study owns the scientific policy for descriptive
+reporter-response profiles and any future objective. Those profiles are not
+LatentDNA labels.
 
 Earlier design notes proposed broader population ledgers, duplicate collapse,
 composition baselines, and UMAP-heavy interpretation. Those are not the first
@@ -33,8 +38,8 @@ docs/studies/rt_lnrna_sponging_construct_triage/contexts/latentdna/trait-axis-pr
 ```
 
 That companion should explain Crawford/Khan source scope, GenBank/compiler
-overlay interpretation, DMS held-out status, and future Reader SPOP alignment
-in RT study terms.
+overlay interpretation, DMS held-out status, and the future reporter-response
+meta-study boundary in RT study terms.
 
 Audience:
 
@@ -64,14 +69,13 @@ The RT-lnRNA study needs a focused analysis path for one biological question:
 
 > Does Evo2 / LatentDNA geometry encode a source-scoped multi-copy ssDNA /
 > RT-DNA abundance direction, and can that direction help audit or triage
-> unlabeled RT-lnRNA candidates before SPOP labels are complete?
+> unlabeled RT-lnRNA candidates before an assay-response objective exists?
 
 The correct LatentDNA contribution is a generic fitted-geometry primitive. The
 primitive fits a signed trait axis from declared high/low endpoint cohorts in a
 representation view, then projects configured populations onto that axis. The
-same machinery must support Crawford abundance, Khan abundance, future Reader
-SPOP, and non-RT trait layers without adding study-specific LatentDNA runtime
-code.
+same machinery must support Crawford abundance, Khan abundance, and other
+declared scalar traits without adding study-specific LatentDNA runtime code.
 
 The first dogfood path is RT-lnRNA:
 
@@ -79,7 +83,7 @@ The first dogfood path is RT-lnRNA:
 - Khan is a sparse parallel source-scoped RT-DNA abundance audit.
 - GenBank and compiler MSD rows are unlabeled reference overlays.
 - RT-CDS DMS rows are sensitivity or perturbation overlays, not fit rows.
-- Reader SPOP remains future label evidence and must not be invented.
+- Reporter-response profiles are descriptive study evidence, not fit labels.
 
 The notebook and docs should present this as a staged decision funnel:
 
@@ -88,7 +92,8 @@ The notebook and docs should present this as a staged decision funnel:
    values;
 3. rank representation views by trait-axis preservation;
 4. project GenBank and compiler candidates;
-5. later compare against Reader SPOP when materialized;
+5. later audit against comparable reporter-response profiles without treating
+   them as fit labels;
 6. analyze DMS parent-relative movement only when parent mapping is reliable.
 
 ## Question
@@ -97,7 +102,7 @@ The RT-lnRNA study needs to ask:
 
 > Does Evo2 / LatentDNA geometry encode a source-scoped multi-copy ssDNA /
 > RT-DNA abundance direction, and can that direction help audit or triage
-> unlabeled RT-lnRNA candidates before SPOP labels are complete?
+> unlabeled RT-lnRNA candidates before an assay-response objective exists?
 
 The reusable LatentDNA question is narrower:
 
@@ -131,8 +136,8 @@ Study or workspace config owns:
 - visible labels and biological interpretation.
 
 For RT-lnRNA, this means LatentDNA must not hard-code Crawford, Khan, Eco1,
-MSD, RT, lnRNA, GenBank, DMS, or SPOP. Those nouns belong in the RT workspace
-config and study docs.
+MSD, RT, lnRNA, GenBank, DMS, or reporter-response policy. Those nouns belong
+in the RT workspace config and study docs.
 
 ## Design Principles and Scope Tags
 
@@ -177,14 +182,15 @@ The implemented first pass supports:
   10 percent, and top/bottom 20 percent;
 - compact summary metrics suitable for scorecards, notebooks, and future
   plot-semantic surfaces;
-- a clean future path for Reader-owned SPOP labels as another trait layer.
+- a clean future path for a separately versioned, study-approved scalar
+  objective after the RT-lnRNA meta-study defines one.
 
 ## Non-Goals
 
 - Do not add an RT-specific LatentDNA runtime module.
 - Do not pool Crawford and Khan abundance into one numeric target.
 - Do not treat abundance overlays as OPAL `Y`.
-- Do not infer or invent SPOP labels.
+- Do not infer or invent reporter-response labels or objectives.
 - Do not use UMAP as primary evidence for abundance geometry.
 - Do not let perturbation/sensitivity rows define an axis by default.
 - Do not collapse meaningful near-duplicates or single-nucleotide variants.
@@ -242,11 +248,12 @@ Current source semantics:
 - GenBank rows are sequence-authority/reference rows, not abundance fit rows by
   default.
 - Compiler MSD rows are study-owned design references and unlabeled for
-  abundance/SPOP in the first pass.
+  abundance or assay response in the first pass.
 - RT-CDS DMS rows are in silico RT CDS point-mutation variants and unlabeled
   sensitivity rows by default.
-- Reader SPOP is future Reader-owned sponging-function label evidence, not
-  currently materialized as a LatentDNA trait.
+- Reporter-response profiles are descriptive evidence owned by the RT-lnRNA
+  study and derived from Reader measurement records. They are not currently
+  materialized and are not a LatentDNA trait or OPAL label.
 
 The implementation should re-run workspace validation before relying on these
 counts or column names in a commit message or generated artifact. The counts are
@@ -501,7 +508,8 @@ express finite numeric source values, parent mapping, or endpoint membership.
 ## Endpoint Selection Contract
 
 Endpoint selection is a generic operation over metadata and optional numeric
-source values. It must not know about Crawford, Khan, SPOP, or RT categories.
+source values. It must not know about Crawford, Khan, reporter-response policy,
+or RT categories.
 
 Supported first-pass endpoint methods should include:
 
@@ -1095,7 +1103,7 @@ The RT configuration slice should produce or enable these review artifacts:
 - a DMS held-out score distribution, plus parent-relative deltas only if parent
   mapping is complete;
 - plot semantics that make the claim boundary visible: audit/triage evidence,
-  not SPOP or OPAL `Y`.
+  not assay response or OPAL `Y`.
 
 If any deliverable cannot be implemented in the first pass, record it in the RT
 study-facing companion doc and in the implementation notes as deferred, with the
@@ -1272,47 +1280,40 @@ Failure mode:
   do not use the axis for candidate triage.
 - If row-identifiable anchors are absent, do not invent anchor labels.
 
-### Gate 5: Future SPOP Alignment
+### Gate 5: Future reporter-response audit
 
 Question answered:
 
-When Reader-owned SPOP labels exist, does abundance-like geometry align with
-sponging function?
+When comparable descriptive profiles owned by the RT-lnRNA study exist, does
+abundance-like geometry warrant a prospective assay-response hypothesis?
 
 Required inputs:
 
 - a frozen or explicitly versioned abundance-axis protocol;
-- Reader-owned SPOP metric and label-coverage metadata;
-- source/category annotations for labeled and unlabeled rows;
+- matching profile comparability keys and biological-unit uncertainty;
+- source/category annotations for observed and unobserved rows;
 - row-level abundance-axis scores from the selected view or predeclared view
   ranking rule.
 
 Outputs and plots:
 
-- abundance-axis score vs SPOP numeric metric;
-- SPOP coverage ledger or compact coverage summary;
-- quadrant interpretation:
-  - high abundance / high SPOP;
-  - high abundance / low SPOP;
-  - low abundance / high SPOP;
-  - low abundance / low SPOP;
-- optional SPOP trait axis fitted by the same generic primitive.
+- abundance-axis score against dose-wise reporter response and relative OD;
+- profile coverage and uncertainty summary;
+- explicit comparison strata by dose and matching reduction policy.
 
 Decision rule:
 
-- High abundance and high SPOP supports abundance-like geometry as a possible
-  in silico triage proxy.
-- High abundance and low SPOP means abundance is not sufficient for sponging.
-- Low abundance and high SPOP marks potentially efficient or mechanistically
-  distinct candidates.
-- No relationship means abundance geometry should not be used as a SPOP proxy.
+- Any observed relationship is hypothesis-generating until a prospective
+  meta-study defines the endpoint/window and constrained objective.
+- No relationship means abundance geometry should not be used as an assay
+  response proxy.
 
 Failure mode:
 
-- No SPOP labels means no SPOP claims.
-- Sparse or non-random SPOP coverage must be explicit.
-- Do not tune the abundance-axis protocol post hoc against SPOP labels unless
-  that decision is documented as a new analysis phase.
+- No comparable profiles means no assay-response claims.
+- Sparse or non-random profile coverage must be explicit.
+- Descriptive profiles must not be promoted into fit labels or an OPAL
+  objective.
 
 ### Gate 6: DMS Parent-Relative Movement
 
@@ -1351,8 +1352,8 @@ Failure mode:
 
 - If parent mapping is missing, incomplete, or ambiguous, DMS remains a
   held-out score distribution only.
-- Do not present DMS axis movement as a predicted sponging effect without SPOP
-  or another functional label.
+- Do not present DMS axis movement as a predicted assay effect without a
+  prospectively defined functional objective.
 
 ## Plot and Notebook Surfaces
 
@@ -1381,7 +1382,6 @@ Recommended RT-facing plot or deliverable IDs:
 - `rt_lnrna_trait_axis_view_scorecard`;
 - `rt_lnrna_reference_compiler_axis_projection`;
 - `rt_lnrna_dms_parent_delta_on_trait_axis`;
-- `rt_lnrna_abundance_spop_alignment` when Reader SPOP exists.
 
 The exact IDs may follow existing workspace naming conventions, but each
 surface should map cleanly to one gate in the decision funnel. Avoid reusing
@@ -1421,7 +1421,7 @@ Notebook order:
 4. View selection.
 5. Reference/compiler projection.
 6. DMS sensitivity and parent-relative analysis.
-7. Future SPOP readiness or alignment.
+7. Future reporter-response meta-study and profile readiness.
 8. UMAP appendix.
 
 If the configured review path starts with dataset overview or trait-axis
@@ -1442,8 +1442,7 @@ Minimum sections:
 - GenBank and compiler MSD as unlabeled reference/candidate overlays;
 - DMS as held-out sensitivity rows, with parent-relative interpretation only
   when mapping exists;
-- future Reader SPOP alignment and the no-SPOP-claims rule before labels
-  materialize;
+- the reporter-response meta-study boundary and the no-objective-claims rule;
 - visible terminology and label rules for plots;
 - current first-pass limitations and deferred extensions.
 
@@ -1538,8 +1537,8 @@ itself:
   an explicit tested override?
 - Can a notebook reader distinguish unsupported, insufficient, source-confounded,
   and view-fragile outcomes?
-- Can a future SPOP implementer add a SPOP trait layer by config without
-  changing trait-axis projection mechanics?
+- Can a future study-approved scalar objective be configured without changing
+  trait-axis projection mechanics?
 - Can plot/browser controls work from scalar/catalog sidecars without opening
   raw matrices?
 
@@ -1550,8 +1549,9 @@ Hostile-but-competent objections the implementation should already address:
   separation as a positive objective.
 - "The axis is a duplicate-density artifact." The implementation should state
   row weighting, exact-duplicate policy, and no near-duplicate collapse.
-- "The SPOP conclusion is post hoc." The RT docs should require a frozen or
-  versioned abundance-axis protocol before SPOP alignment claims.
+- "The assay conclusion is post hoc." The RT docs should require a frozen or
+  versioned abundance-axis protocol and prospective response meta-study before
+  any alignment claim.
 - "The notebook proves biology from UMAP." UMAP should be appendix-level and
   never substitute for Gate 1 axis-existence evidence.
 
@@ -1580,7 +1580,8 @@ The first pass is not ready if:
 - Crawford and Khan are numerically pooled into one target;
 - source-family separation is treated as a positive objective for selecting
   the trait view;
-- SPOP claims appear before Reader-owned SPOP labels are materialized;
+- assay-response claims appear before a prospective objective and comparable
+  profiles exist;
 - DMS perturbation conclusions are made without parent mapping;
 - notebook or plot controls read raw matrices interactively;
 - generated outputs are hand-edited.
@@ -1608,7 +1609,7 @@ May defer, but document:
 - DMS parent-relative plots if parent mapping is incomplete;
 - composition or sequence-similarity baselines;
 - domain/residue enrichment for DMS;
-- SPOP alignment until Reader-owned labels exist.
+- reporter-response comparison until comparable profiles exist.
 
 ## Future Extensions
 
@@ -1643,19 +1644,18 @@ Potential overlays:
 Use these as confound/reference overlays when stable upstream fields exist. Do
 not add unstable ad hoc extraction in the first trait-axis implementation.
 
-### Reader SPOP Trait Layer
+### Study-owned reporter-response objective
 
-When Reader SPOP labels exist:
+Only after the RT-lnRNA meta-study defines and versions a scalar objective:
 
-- configure SPOP as a separate trait layer;
-- preserve label coverage provenance;
-- compare SPOP metric to selected abundance-axis score;
-- optionally fit a SPOP trait axis with the same primitive;
-- report abundance/SPOP alignment outcomes explicitly.
+- configure that objective as a separate trait layer;
+- preserve eligibility, uncertainty, and coverage provenance;
+- compare the objective to the selected abundance-axis score;
+- report alignment outcomes explicitly.
 
-Do not invent SPOP labels, do not treat abundance as a SPOP proxy without
-evidence, and do not use SPOP to retroactively tune the abundance-axis protocol
-without documenting that decision.
+Do not invent labels, do not treat abundance as an assay-response proxy, and do
+not use future response evidence to retroactively tune the abundance-axis
+protocol without documenting a new analysis phase.
 
 ## Claim Ladder
 

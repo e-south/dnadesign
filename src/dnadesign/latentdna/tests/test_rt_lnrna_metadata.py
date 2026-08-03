@@ -106,3 +106,24 @@ def test_crawford_abundance_edges_match_workspace_order_contract() -> None:
     payload = yaml.safe_load((RT_WORKSPACE_DIR / "study_inputs/crawford_abundance_order.yaml").read_text())
 
     assert tuple(payload["binning"]["edges"]) == CRAWFORD_ABUNDANCE_QUANTILE_EDGES_V1
+
+
+def test_retired_reader_spop_snapshots_are_absent_and_not_active_sources() -> None:
+    payload = yaml.safe_load((RT_WORKSPACE_DIR / "config.yaml").read_text(encoding="utf-8"))
+
+    assert tuple((RT_WORKSPACE_DIR / "study_inputs").glob("reader_spop_*.parquet")) == ()
+    assert "rt_lnrna_reader_spop_candidate_summary" not in payload["sources"]
+    assert not {
+        "reader_spop_overlay_status",
+        "reader_spop_metric_id",
+        "reader_spop_experiment_ids",
+        "reader_spop_normalized_value",
+        "reader_spop_score_median",
+        "reader_spop_observation_count",
+        "reader_spop_qc_flags",
+    }.intersection(payload["metadata"]["include"])
+    assert payload["metadata"]["derivations"]["label_readiness_status"] == {
+        "kind": "constant",
+        "value": "reporter_response_profiles_absent_pending_meta_study",
+        "value_type": "string",
+    }

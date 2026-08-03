@@ -3,8 +3,8 @@ id: stress-ethanol-cipro-growth-response-window-observations
 title: Response-window observations
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-18
-first_hop: config/observation_policy.yaml
+last_verified: 2026-08-02
+first_hop: config/reader_response_projection.yaml
 ---
 
 # Response-window observations
@@ -16,7 +16,7 @@ SFXI, RMF, OPAL models, or campaign selection.
 The handoff is:
 
 ```text
-Reader experiment reductions
+Reader catalog-v4 / record-v6 reductions
   -> exact study candidate bindings
   -> explicit study label-source decisions
   -> candidate response-window observations
@@ -30,13 +30,24 @@ label publication. It does not choose among Reader experiments.
 
 ## Open next
 
-- `config/reader_response_window.yaml`: Reader request, 4-8-hour primary
-  reduction, sensitivity reductions, display vocabulary, and assay checks.
+- `config/reader_response_projection.yaml`: the exact canonical Reader
+  experiment, source set, analysis settings, record contracts, primary
+  reduction, and study display vocabulary consumed by this package.
 - `config/observation_policy.yaml`: source-manifest pins, exact label-source
-  decisions, censoring policy, and study approval.
+  decisions, censoring policy, and study approval. The historical Reader-bundle
+  digest supports replay only. Current authoring requires an approved exact
+  Reader record receipt; that pin is presently unset.
 - `config/evidence/repeat_adjudication_4_8h_v1.json`: typed comparison evidence
   for every repeated candidate.
-- `reader_bundle.py`: strict Reader bundle adapter with no Reader imports.
+- `reader_records.py`: thin study projection over the shared public Reader
+  record resolver in `dnadesign.studies.core.reader_records`.
+- `reader_config_attestation.py`: exact comparison of Reader's public authoring
+  payload with the study projection, bracketed by Reader verification.
+- `reader_record_structure.py` and `reader_record_relations.py`: dataframe
+  shape, identity, coverage, and cross-record checks.
+- `historical/reader_bundle_v5.py`: explicit decoder used only to verify the
+  frozen pre-RecordStore evidence path. Active source loading and publication
+  cannot import it.
 - `sources.py`: exact Reader alias resolution through the study candidate
   binding public API.
 - `label_sources.py`: one explicit label source per eligible candidate while
@@ -87,15 +98,16 @@ overflow-bounded component remains visible but receives no candidate label.
 The package never imputes a bounded value and never falls back to a different
 experiment automatically.
 
-The typed repeat-evidence file binds the Reader manifest digest, primary
+The typed repeat-evidence file binds the historical Reader manifest digest, primary
 reduction, candidate ID, exact experiment set, selected source or exclusion,
 status, classification, and all eight component ranges. It validates evidence
 identity but does not encode a universal disagreement cutoff.
 
-The current approved policy selects the newest reviewed source for eight
-repeated candidates. ES22, ES25, ES28, and ES30 are excluded because unresolved
-source disagreement prevents one defensible label. ES26 selects its newest
-source, but exact-only censoring excludes that bounded source from labels.
+The frozen repeat adjudications select a reviewed source for eight repeated
+candidates. ES22, ES25, ES28, and ES30 are excluded because unresolved source
+disagreement prevents one defensible label. ES26 selects a reviewed source, but
+exact-only censoring excludes that bounded source from labels. These decisions
+remain evidence; they do not approve the current Reader record set.
 “Unresolved source disagreement” does not claim biological heterogeneity,
 technical failure, or assay-context drift; the present bulk data do not
 distinguish those causes.
@@ -105,8 +117,12 @@ distinguish those causes.
 Publication fails on any unresolved repeat, missing or ambiguous alias, source
 digest drift, candidate or sequence mismatch, undeclared experiment, malformed
 repeat evidence, incomplete bootstrap coverage, non-finite vector, or missing
-study approval. Artifact verification recomputes selected-source values,
-one-source contribution flags, uncertainty, sensitivities, and record digests.
+study approval. It also fails if Reader's public channel mapping, state mapping,
+random seed, reduction window, or pre-window differs from the projection. The
+in-memory evidence is sealed at preview time, so coordinated dataframe changes
+cannot be published under unchanged source receipts. Artifact verification
+rechecks selected-source values, contribution flags, uncertainty, sensitivities,
+and record digests.
 
 Candidate bindings remain the study source of truth for Reader aliases,
 candidate IDs, sequence identity, and BaseRender metadata. This package carries
@@ -125,37 +141,55 @@ uv run python -m \
   --allowed-root src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations
 ```
 
-Preview a candidate authoring input without writing:
+For new data, first complete Reader's one lifecycle in `reader/`:
 
 ```bash
-READER_BUNDLE=<reader-bundle-root-matching-observation-policy-digest>
+READER_EXPERIMENT=experiments/2026/20260717_stress_response_window_aggregate
+uv run reader inspect "$READER_EXPERIMENT" --section plan --format json
+uv run reader validate "$READER_EXPERIMENT" --format json
+uv run reader run "$READER_EXPERIMENT" --dry-run --format json
+uv run reader run "$READER_EXPERIMENT"
+uv run reader records "$READER_EXPERIMENT" --format json
+uv run reader verify "$READER_EXPERIMENT" --format json
+uv run reader notebook "$READER_EXPERIMENT" --mode none
+```
+
+Then preview the study projection from `dnadesign/` without writing:
+
+```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
   preview \
-  --reader-bundle "$READER_BUNDLE" \
+  --reader-root ../reader \
+  --reader-experiment ../reader/experiments/2026/20260717_stress_response_window_aggregate \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
 ```
 
-The Reader input must match `source_manifests.reader_bundle_sha256` in
-`config/observation_policy.yaml`. A moving `latest` path is intentionally not
-shown: a newly regenerated Reader bundle requires an explicit study-policy
-advance before it can author a different observation publication.
+The adapter accepts only `plate_reader/four_state_event_window`, catalog schema
+v4, record schema v6, the five exact dataframe contracts in the projection,
+and digest-verified bytes. It also reads Reader's public `authoring` inspection
+and compares the complete analysis block with the projection. Read-only
+comparison of the stored neutral records found the same scientific values as
+the earlier bundle, but current `reader verify` reports
+`build.identity_mismatch`. That comparison is not approval. Reader must rerun
+and verify the aggregate before the study can pin its receipt. No fallback to
+the historical bundle exists on the active path.
 
 Publish an approved immutable bundle:
 
 ```bash
-READER_BUNDLE=<reader-bundle-root-matching-observation-policy-digest>
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations \
   materialize \
-  --reader-bundle "$READER_BUNDLE" \
+  --reader-root ../reader \
+  --reader-experiment ../reader/experiments/2026/20260717_stress_response_window_aggregate \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
-  --out-dir src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations/4_8h_v1 \
+  --out-dir src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations/<new-version> \
   --allowed-output-root src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/response_window_observations
 ```
 
-An approved `stress_ethanol_cipro_growth.response_window_observations.v2`
-bundle contains:
+A new `stress_ethanol_cipro_growth.response_window_observations.v3` bundle
+contains:
 
 - `manifest.json`
 - `observations.parquet`
@@ -166,6 +200,9 @@ bundle contains:
 - `reduction_sensitivity.parquet`
 - `event_time_sensitivity.parquet`
 
-The manifest pins the policy, Reader bundle, candidate bindings, value order,
-primary reduction, and every record digest. Publication is create-only; a new
-scientific decision receives a new named bundle.
+The manifest pins the policy, Reader config and authoring digests, catalog and
+provenance epoch, exact record revisions and content digests, study projection,
+candidate bindings, value order, primary reduction, and every output digest.
+Publication is create-only; a new scientific decision receives a new named
+bundle. The accepted v2 bundle remains frozen campaign evidence, but is not an
+authoring input for future observations.

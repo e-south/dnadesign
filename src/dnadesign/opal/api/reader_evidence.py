@@ -13,10 +13,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from importlib import metadata
+from pathlib import Path
+from threading import Lock
+from typing import Any, Callable
 
 READER_EVIDENCE_API_VERSION = "1"
 READER_EVIDENCE_MANIFEST_ADAPTER = "opal.reader_evidence_manifest.v1"
+READER_EVIDENCE_ARTIFACT_ENTRY_POINT = "dnadesign.opal.reader_evidence_artifacts"
 _SUMMARY_FIELDS = {
     "rows",
     "distinct_ids",
@@ -40,6 +44,22 @@ class ReaderEvidenceManifestAdapterError(ValueError):
 
 
 @dataclass(frozen=True)
+class ReaderEvidenceArtifactAdapter:
+    """Producer-owned validator and optional detail renderer for one artifact kind."""
+
+    semantic_kind: str
+    verify_artifact: Callable[[Mapping[str, Any]], Path]
+    render_details: Callable[..., Any] | None = None
+    verification_label: str = "Reader evidence"
+    display_label: str | None = None
+
+
+_ARTIFACT_ADAPTERS: dict[str, ReaderEvidenceArtifactAdapter] = {}
+_ARTIFACT_PLUGINS_LOADED = False
+_ARTIFACT_PLUGIN_LOCK = Lock()
+
+
+@dataclass(frozen=True)
 class ReaderEvidenceManifestProjection:
     """Validated producer-neutral fields used by OPAL Reader evidence views."""
 
@@ -47,6 +67,70 @@ class ReaderEvidenceManifestProjection:
     round_label: str
     summary: Mapping[str, int]
     rows: tuple[Mapping[str, Any], ...]
+
+
+def register_reader_evidence_artifact_adapter(adapter: ReaderEvidenceArtifactAdapter) -> None:
+    """Register one producer-owned artifact adapter at OPAL's public boundary."""
+
+    semantic_kind = _text(adapter.semantic_kind, field="artifact adapter semantic_kind")
+    if not callable(adapter.verify_artifact):
+        raise ReaderEvidenceManifestAdapterError("Reader evidence artifact verify_artifact must be callable.")
+    if adapter.render_details is not None and not callable(adapter.render_details):
+        raise ReaderEvidenceManifestAdapterError("Reader evidence artifact render_details must be callable or None.")
+    if adapter.display_label is not None:
+        _text(adapter.display_label, field="artifact adapter display_label")
+    if semantic_kind in _ARTIFACT_ADAPTERS:
+        raise ReaderEvidenceManifestAdapterError(
+            f"Reader evidence semantic kind {semantic_kind!r} is already registered."
+        )
+    _ARTIFACT_ADAPTERS[semantic_kind] = adapter
+
+
+def reader_evidence_artifact_adapter(semantic_kind: str) -> ReaderEvidenceArtifactAdapter:
+    """Return a registered producer adapter, loading installed plugins first."""
+
+    _ensure_artifact_plugins_loaded()
+
+    try:
+        return _ARTIFACT_ADAPTERS[semantic_kind]
+    except KeyError as exc:
+        raise ReaderEvidenceManifestAdapterError(
+            f"Reader evidence semantic kind {semantic_kind!r} has no registered OPAL artifact adapter."
+        ) from exc
+
+
+def optional_reader_evidence_artifact_adapter(semantic_kind: str) -> ReaderEvidenceArtifactAdapter | None:
+    """Return a producer adapter when registered; generic media needs none."""
+
+    _ensure_artifact_plugins_loaded()
+    return _ARTIFACT_ADAPTERS.get(semantic_kind)
+
+
+def _ensure_artifact_plugins_loaded() -> None:
+    global _ARTIFACT_PLUGINS_LOADED
+    if _ARTIFACT_PLUGINS_LOADED:
+        return
+    with _ARTIFACT_PLUGIN_LOCK:
+        if _ARTIFACT_PLUGINS_LOADED:
+            return
+        try:
+            entry_points = metadata.entry_points()
+            plugins = list(entry_points.select(group=READER_EVIDENCE_ARTIFACT_ENTRY_POINT))
+        except Exception as exc:
+            raise ReaderEvidenceManifestAdapterError(
+                f"Could not discover Reader evidence artifact adapters: {exc}"
+            ) from exc
+        for entry_point in plugins:
+            try:
+                register = entry_point.load()
+                if not callable(register):
+                    raise TypeError("entry point must resolve to a registration callable")
+                register()
+            except Exception as exc:
+                raise ReaderEvidenceManifestAdapterError(
+                    f"Could not load Reader evidence artifact adapter {entry_point.name!r}: {exc}"
+                ) from exc
+        _ARTIFACT_PLUGINS_LOADED = True
 
 
 def parse_reader_evidence_manifest_adapter(payload: object) -> ReaderEvidenceManifestProjection:
@@ -170,8 +254,13 @@ def _text(value: object, *, field: str) -> str:
 
 __all__ = [
     "READER_EVIDENCE_API_VERSION",
+    "READER_EVIDENCE_ARTIFACT_ENTRY_POINT",
     "READER_EVIDENCE_MANIFEST_ADAPTER",
     "ReaderEvidenceManifestAdapterError",
+    "ReaderEvidenceArtifactAdapter",
     "ReaderEvidenceManifestProjection",
+    "optional_reader_evidence_artifact_adapter",
     "parse_reader_evidence_manifest_adapter",
+    "reader_evidence_artifact_adapter",
+    "register_reader_evidence_artifact_adapter",
 ]

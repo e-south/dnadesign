@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/multistate_behavior_cli.py
 
-Operate the study-owned Multistate Response Behavior shadow bundle.
+Reproduce or verify the immutable pre-RecordStore behavior shadow.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ DEFAULT_OUT_DIR = Path(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Preview, publish, or verify the digest-bound shadow evidence."""
+    """Reproduce or verify explicitly historical, digest-bound evidence."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -114,7 +114,7 @@ def _preview_summary(preview: VerifiedMultistateBehaviorShadow) -> dict[str, obj
         "source_equivalence": {
             "reader_manifest_sha256": preview.source["reader_bundle_manifest_sha256"],
             "central_label_equivalence_sha256": (preview.completion.validation_labels.central_label_equivalence_sha256),
-            "reference_bootstrap_row_count": preview.reference_identity.bootstrap_row_count,
+            "reference_descriptive_resampling_row_count": (preview.reference_identity.descriptive_resampling_row_count),
         },
         "promotion_decision": "no_go",
         "claim_boundary": "shadow_evidence_only_no_campaign_activation_or_synthesis_authorization",

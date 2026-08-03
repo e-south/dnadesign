@@ -16,15 +16,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
-from ._support import display_name, mapping, sequence
+from dnadesign.opal.api.reader_evidence import optional_reader_evidence_artifact_adapter
 
-_SEMANTIC_KIND_LABELS = {
-    "intensity_overview": "Time series + snapshot",
-    "promoter_response_evidence": "Promoter response evidence",
-    "raw_kinetics": "Plate-reader time series",
-    "sfxi_vec8_heatmap": "SFXI vec8 heatmap",
-    "vec8_heatmap": "SFXI vec8 heatmap",
-}
+from ._support import display_name, mapping, sequence
 
 
 def is_reader_media_artifact(row: Mapping[str, Any]) -> bool:
@@ -183,8 +177,9 @@ def semantic_kind_label(value: Any) -> str:
     """Return the notebook label for a Reader artifact semantic kind."""
 
     semantic_kind = str(value or "artifact").strip()
-    if semantic_kind in _SEMANTIC_KIND_LABELS:
-        return _SEMANTIC_KIND_LABELS[semantic_kind]
+    adapter = optional_reader_evidence_artifact_adapter(semantic_kind)
+    if adapter is not None and adapter.display_label is not None:
+        return adapter.display_label
     return semantic_kind.replace("_", " ").strip().title() or "Reader artifact"
 
 

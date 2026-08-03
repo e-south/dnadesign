@@ -31,6 +31,7 @@ from ..evaluation.multistate_behavior_normalization import MultistateBehaviorNor
 from ..evaluation.multistate_behavior_protocol import MultistateBehaviorShadowProtocol
 from ..evaluation.multistate_behavior_shadow import MultistateBehaviorShadowEvidence
 from .calibration_preview import build_calibration_cohort
+from .historical import load_historical_source_files
 from .loading import assert_campaign_response_reduction, load_stress_campaign_contract
 from .multistate_behavior_censor import build_behavior_censor_exclusions
 from .multistate_behavior_completion import MultistateBehaviorCompletionEvidence
@@ -63,11 +64,13 @@ def load_verified_multistate_behavior_shadow(
     """Load exhaustive verified Reader evidence and one digest-bound prediction run."""
 
     root = Path(repo_root).resolve()
+    historical_bundle_root = Path(reader_bundle_root).resolve()
     if not prediction_run_id.strip() or prediction_run_id != prediction_run_id.strip():
         raise ValueError("prediction_run_id must be one explicit nonempty run identity.")
     paths = MetastudyPaths(
         repo_root=root,
-        reader_bundle_root=Path(reader_bundle_root).resolve(),
+        reader_root=historical_bundle_root,
+        reader_experiment_root=historical_bundle_root,
         out_dir=root / ".unused-behavior-shadow",
         campaign_root=response_window_round0_source_evidence_root(root).resolve(),
     )
@@ -75,21 +78,19 @@ def load_verified_multistate_behavior_shadow(
     protocol_path = (
         root
         / "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config"
-        / "multistate_response_behavior_shadow_v1.yaml"
+        / "multistate_response_behavior_shadow_v2.yaml"
     )
     protocol = load_multistate_behavior_protocol(protocol_path)
     protocol.assert_target_views(campaign.target_views)
-    request_path = (
-        root
-        / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "response_window_observations/config/reader_response_window.yaml"
+    historical_sources = load_historical_source_files(
+        root,
+        protocol=protocol.source_equivalence,
     )
-    policy_path = request_path.with_name("observation_policy.yaml")
     sources = load_verified_behavior_sources(
-        reader_bundle_root=paths.reader_bundle_root,
-        reader_request_path=request_path,
+        reader_bundle_root=historical_bundle_root,
+        reader_request_path=historical_sources.reader_request,
         candidate_bindings_root=Path(candidate_bindings_root).resolve(),
-        prior_observation_policy_path=policy_path,
+        prior_observation_policy_path=historical_sources.observation_policy,
         protocol=protocol,
     )
     primary_reduction_id = sources.prior_observation_policy.aggregation.primary_reduction_id
@@ -103,7 +104,7 @@ def load_verified_multistate_behavior_shadow(
     )
     source_digests = {
         "reader_bundle_manifest_sha256": sources.reader_manifest_sha256,
-        "reader_request_sha256": sha256_file(request_path),
+        "reader_request_sha256": sha256_file(historical_sources.reader_request),
         "candidate_bindings_manifest_sha256": sources.candidate_bindings_manifest_sha256,
         "observation_policy_sha256": sources.prior_observation_policy.config_sha256,
     }
@@ -182,7 +183,7 @@ def load_verified_multistate_behavior_shadow(
             "prediction": prediction_run.source,
             "reader_bundle_manifest_sha256": _canonical_digest(sources.reader_manifest_sha256),
             "candidate_bindings_manifest_sha256": _canonical_digest(sources.candidate_bindings_manifest_sha256),
-            "reader_request_sha256": _canonical_digest(sha256_file(request_path)),
+            "reader_request_sha256": _canonical_digest(sha256_file(historical_sources.reader_request)),
             "observation_policy_sha256": _canonical_digest(sources.prior_observation_policy.config_sha256),
         },
     )

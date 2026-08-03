@@ -16,7 +16,6 @@ import hashlib
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 from typing import Sequence
 
@@ -47,33 +46,6 @@ _PUBLIC_DOC_ROOT = Path("docs")
 _OPS_RUNBOOK_ROOT = Path("src/dnadesign/ops/runbooks")
 _USR_ROOT = Path("src/dnadesign/usr")
 _PUBLIC_TEXT_SUFFIXES = {".md", ".qsub", ".sh", ".toml", ".yaml", ".yml"}
-
-
-@dataclass(frozen=True)
-class LegacyPathAllowance:
-    expires_on: date
-    producer: str
-    allowed_token_names: frozenset[str]
-
-
-_LEGACY_PATH_ALLOWANCES = {
-    Path(
-        "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/manifest.yaml"
-    ): LegacyPathAllowance(
-        expires_on=date(2026, 9, 30),
-        producer="retron_hairpin_design.msd_region_ingest",
-        allowed_token_names=frozenset({"personal_macos_home"}),
-    ),
-    Path(
-        "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "reader_spop_msd_structure_panel_v1/reports/discrepancies.yaml"
-    ): LegacyPathAllowance(
-        expires_on=date(2026, 9, 30),
-        producer="retron_hairpin_design.msd_region_ingest",
-        allowed_token_names=frozenset({"personal_macos_home"}),
-    ),
-}
 
 
 @dataclass(frozen=True, order=True)
@@ -136,17 +108,12 @@ def _line_has_signature(line: str, *, length: int, digest: str) -> bool:
     )
 
 
-def find_privacy_issues(repo_root: Path, *, today: date | None = None) -> tuple[PrivacyIssue, ...]:
+def find_privacy_issues(repo_root: Path) -> tuple[PrivacyIssue, ...]:
     root = repo_root.resolve()
-    check_date = today or date.today()
     issues: list[PrivacyIssue] = []
     for relative_path in _tracked_paths(root):
         if relative_path == _ACTIVE_REMOTES_CONFIG:
             issues.append(PrivacyIssue(relative_path, 1, "tracked_active_remotes_config"))
-
-        allowance = _LEGACY_PATH_ALLOWANCES.get(relative_path)
-        if allowance is not None and check_date > allowance.expires_on:
-            issues.append(PrivacyIssue(relative_path, 1, "expired_legacy_path_allowance"))
 
         if not _is_operator_surface(relative_path):
             continue
@@ -160,12 +127,6 @@ def find_privacy_issues(repo_root: Path, *, today: date | None = None) -> tuple[
         for line_number, line in enumerate(text.splitlines(), start=1):
             for token_name, (length, digest) in _PERSONAL_TOKEN_SIGNATURES.items():
                 if _line_has_signature(line, length=length, digest=digest):
-                    if (
-                        allowance is not None
-                        and check_date <= allowance.expires_on
-                        and token_name in allowance.allowed_token_names
-                    ):
-                        continue
                     issues.append(PrivacyIssue(relative_path, line_number, token_name))
     return tuple(sorted(issues))
 

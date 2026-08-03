@@ -1,8 +1,0 @@
-checks:
-  phase_6_wet_lab_handoff:
-    - kind: path_exists
-      check_id: rt_lnrna.reader_spop.label_contract
-      check_group: reader_spop_label_materialization
-      summary: Reader SPOP label-materialization contract is present.
-      required: true
-      artifact: reader_spop_label_contract

@@ -35,7 +35,17 @@ def test_teto_retained_span_trim_tetr_pwm_elite_design_set_is_study_owned_and_co
     assert design_set["compiler_spec_ref"] == (
         "docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_tetr_pwm_elite_v1.spec.yaml"
     )
-    assert design_set["non_goals"]["rt_fusions"] == "excluded_viability_confounded"
+    assert design_set["non_goals"]["rt_fusions"] == "outside_msd_design_scope"
+    assert "decision_logic" not in design_set
+    assert "outcome_bins" not in design_set
+    assert design_set["assay_handoff"] == {
+        "contract": "retron_msd_assay_handoff_ref_v1",
+        "owner_study_id": "rt_lnrna_sponging_construct_triage",
+        "route_ref": ("docs/studies/rt_lnrna_sponging_construct_triage/routes/reporter-response-evidence.md"),
+        "subject_set_id": "teto_retained_span_trim_tetr_pwm_elite_v1",
+        "subject_identity_field": "construct_id",
+        "handoff_role": "subject_identity_only",
+    }
     assert set(design_set["payload_trims"]) == {"TetR_w00_19", "TetR_w02_17", "TetR_w03_16"}
     assert {trim["payload_trim_id"] for trim in design_set["payload_trims"].values()} == set(spec["payload_sequences"])
     assert {trim["exact_sequence_5to3"] for trim in design_set["payload_trims"].values()} == {
@@ -54,14 +64,7 @@ def test_teto_retained_span_trim_tetr_pwm_elite_design_set_is_study_owned_and_co
         "source_design_set_ref": (
             "docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml"
         ),
-        "reader_spop_summary_ref": (
-            "src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/"
-            "reader_spop_candidate_summary.parquet"
-        ),
-        "selection_basis": (
-            "Highest available S0-compatible C172 bottom-nick prior in the 177-186 Reader SPOP summary; "
-            "still near-zero and not a validated positive control."
-        ),
+        "selection_basis": "Retain the existing pES-retron-180 MSD precedent as one bounded scaffold context.",
         "cap_id": "C172",
         "left_base": "AGTG",
         "right_base": "CATG",

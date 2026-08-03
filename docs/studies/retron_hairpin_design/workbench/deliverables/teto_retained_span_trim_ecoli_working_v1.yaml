@@ -22,7 +22,7 @@ output_policy:
     - compiled catalogs
 reader_boundary:
   status: experiment_time_only
-  note: Reader owns SPOP and viability evidence after these constructs are assayed; this plan only prepares pre-assay review and Benchling handoff outputs.
+  note: Reader owns generic measurement records, treatment metadata, and replicate metadata after these constructs are assayed. The RT-lnRNA study owns descriptive reporter-response profiles and the future meta-study that may define an uncertainty-bearing objective. This plan only prepares pre-assay review and Benchling handoff outputs.
 source_refs:
   design_set: docs/studies/retron_hairpin_design/workbench/design_sets/teto_retained_span_trim_ecoli_working_v1.yaml
   compiler_spec: docs/studies/retron_hairpin_design/compiler/inputs/teto_retained_span_trim_ecoli_working_v1.spec.yaml

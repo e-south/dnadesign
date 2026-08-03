@@ -21,13 +21,15 @@ next-build policy.
 - OPAL owns objective primitives, campaign training, candidate scoring,
   selection, and ledgers after observed-Y promotion.
 
-The runtime consumes a verified `reader.response_window.bundle.v5` produced
-from `reader.response_window.request.v3`. Both carry the stress `study_id`. The
-runtime does not import Reader, inspect raw PlateReader workbooks, or duplicate
-Reader reduction math.
+The active runtime consumes the canonical `plate_reader/four_state_event_window`
+experiment through Reader's public `records --format json` contract. It
+requires catalog schema v4, record schema v6, and the exact record contracts
+declared by the study projection. The runtime does not import Reader, inspect
+raw plate-reader workbooks, or duplicate Reader reduction math.
 
 The window comparison may read Reader-published well and trajectory records for
-pDual-10 replicate spread, growth/OD context, and measurement observability.
+pDual-10 within-experiment observation spread, growth/OD context, and
+measurement observability.
 Those records are diagnostic only: the study never recomputes or substitutes
 Reader-owned response-window Y.
 
@@ -37,7 +39,7 @@ Reader-owned response-window Y.
 - `evaluation/`: independent SFXI source-evidence review, RMF components,
   uncertainty, fixed model comparisons, repeated measurements, and
   greedy-support evidence.
-- `runtime/`: OPAL loading, Reader-bundle verification, orchestration,
+- `runtime/`: OPAL loading, canonical Reader-record verification, orchestration,
   publication, and manifest construction.
 - `model_evidence/`: frozen evaluation protocols plus immutable scientific
   checkpoints for the model-evidence trajectory. OPAL run progress is outside
@@ -48,9 +50,17 @@ Reader-owned response-window Y.
   pairs used only by the retrospective response model screen. It contains no
   candidate IDs, accounts explicitly for Reader designs that have no study
   candidate binding, and has no label-truth role.
-- `config/multistate_response_behavior_shadow_v1.yaml`: persisted, shadow-only
-  binding for target masks, the shared soft-min scale recipe, evidence roles,
-  and activation gates. It does not configure a campaign.
+- `config/multistate_response_behavior_shadow_v1.yaml`: immutable protocol
+  bytes referenced by the historical activation receipt. Runtime replay does
+  not amend or select this file.
+- `config/multistate_response_behavior_shadow_v2.yaml`: current shadow-only
+  replay binding for target masks, source snapshots, the shared soft-min scale
+  recipe, evidence roles, and activation gates. It cannot configure a campaign.
+- `config/historical_response_window_observation_policy_v2.yaml`: immutable
+  policy snapshot used only to replay the frozen shadow. Its request, approval,
+  source identities, and digest are pinned by the shadow protocol.
+- `runtime/historical/`: verifies that snapshot and projects only the fields
+  needed by replay. The active response-window policy is not a replay input.
 
 The shadow behavior modules expose a bounded builder for observed rows, Reader
 joint-bootstrap draws, and fixed prediction matrices. They use OPAL's public
@@ -70,9 +80,10 @@ RMF replay scales, fixed raw prediction vectors, sequence-unique allocation
 previews, a digest-bound split decision, an independent adversarial audit,
 `report.md`, and three minimal review plots.
 
-To reproduce the current shadow bundle without changing its prediction source,
-read the pinned run ID from the existing manifest and pass it back to the
-publisher:
+The multistate-behavior shadow is a frozen pre-RecordStore reproduction lane,
+not the authoring path for new observations. To reproduce that historical
+bundle without changing its prediction source, read the pinned run ID from the
+existing manifest and pass it back to the publisher:
 
 ```bash
 BUNDLE=src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/multistate_response_behavior_shadow/latest
@@ -102,31 +113,33 @@ is hand-edited.
 
 ## Run
 
-First materialize the Reader bundle from `reader/`:
+First use the canonical Reader experiment lifecycle from `reader/`:
 
 ```bash
-uv run reader init \
-  experiments/2026/20260717_stress_response_window_aggregate \
-  --protocol workbench/generic \
-  --title "Stress response-window cross-experiment aggregate"
-
-uv run reader response-window build \
-  ../dnadesign/src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/config/reader_response_window.yaml \
-  --reader-root . \
-  --output-experiment experiments/2026/20260717_stress_response_window_aggregate \
-  --overwrite \
-  --format json
+READER_EXPERIMENT=experiments/2026/20260717_stress_response_window_aggregate
+uv run reader inspect "$READER_EXPERIMENT" --section plan --format json
+uv run reader validate "$READER_EXPERIMENT" --format json
+uv run reader run "$READER_EXPERIMENT" --dry-run --format json
+uv run reader run "$READER_EXPERIMENT"
+uv run reader records "$READER_EXPERIMENT" --format json
+uv run reader verify "$READER_EXPERIMENT" --format json
+uv run reader notebook "$READER_EXPERIMENT" --mode none
 ```
 
-The `init` command is a one-time step. On later runs, reuse the existing output
-experiment and rebuild its generated `outputs/`.
+The aggregate must be a verified `plate_reader/four_state_event_window`
+RecordStore experiment under catalog v4 and record v6. The current stored
+aggregate still fails Reader verification because its producing build differs
+from the current build. Rerun and verify it before treating the preview as
+campaign-ready. The study commands consume exact records and do not fall back
+to the historical bundle.
 
 Then run the metastudy from `dnadesign/`:
 
 ```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
-  --reader-bundle ../reader/experiments/2026/20260717_stress_response_window_aggregate/outputs \
+  --reader-root ../reader \
+  --reader-experiment ../reader/experiments/2026/20260717_stress_response_window_aggregate \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --calibration-preview \
   --json
@@ -137,14 +150,18 @@ non-reference primary Reader candidate-experiment row. This declared cohort is
 independent of the retrospective model-screen selection and repeated-candidate
 label decisions. The output records the cohort rule, Reader and candidate-binding
 digests, counts, target masks, exact derived values, and six-decimal campaign
-parity.
+parity. It reports mathematical parity separately from source readiness. An
+unapproved policy, unpinned Reader receipt, or other source blocker always sets
+`ready_for_campaign=false`, even when the derived values match the configured
+campaign values.
 
 Publish the complete review bundle:
 
 ```bash
 uv run python -m \
   dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy \
-  --reader-bundle ../reader/experiments/2026/20260717_stress_response_window_aggregate/outputs \
+  --reader-root ../reader \
+  --reader-experiment ../reader/experiments/2026/20260717_stress_response_window_aggregate \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
   --overwrite \
   --json
@@ -179,7 +196,9 @@ the campaign scale contract.
 - The response model screen does not read SFXI source CSVs. Its explicit source
   choice for repeated designs is screen-only and has no label-source or
   calibration-cohort authority.
-- Publication uses `stress_ethanol_cipro_growth.response_metastudy.v12`.
+- New publication uses `stress_ethanol_cipro_growth.response_metastudy.v13` and
+  pins Reader catalog, provenance epoch, record revisions, and content digests.
+  The verifier still recognizes v12 only as frozen historical evidence.
 
 Reader emits `[r00, r10, r01, r11, b00, b10, b01, b11]`. The `r` values are
 reduced `log2(YFP/CFP)` response, while the `b` values are same-state

@@ -3,13 +3,13 @@ id: opal-objective-plugins
 title: OPAL objective plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-20
+last_verified: 2026-08-02
 ---
 
 ## OPAL Objective Plugins
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-20
+**Last verified:** 2026-08-02
 
 Objective plugins convert shared model predictions into named score and
 uncertainty channels. Objective-specific pages define the equations.
@@ -48,7 +48,12 @@ of the same objective plugin cannot collide.
 | `vector_target_similarity_v1` | Generic vector in one declared coordinate system | `negative_mse` | None | Unweighted distance to an absolute target |
 | `vector_channel_v1` | Generic vector | Configured channel | None | One selected channel only |
 | `scalar_identity_v1` | One scalar that already is the objective | `scalar` | None | Passthrough |
-| [`spop_v1`](spop.md) | Reader SPOP endpoint scalar | `spop` | None | Passthrough with SPOP identity |
+
+Do not register a study-named alias for `scalar_identity_v1` merely to rename
+its channel. Preserve the scalar's scientific identity in the study-owned label
+publication, `y_space`, content digests, and a meaningful selection-view id.
+Add a new objective only when OPAL must enforce different input semantics,
+compute different scores, or encode a distinct selection preference.
 
 No row in this table is preference-free. Target vectors, selected channels,
 thresholds, scales, family priors, and setpoints all express different design

@@ -52,6 +52,7 @@ _SELECTION_READINESS_ROOT_FILES = {
     "models.py",
     "mutation_distance.py",
     "mutation_distance_plot.py",
+    "n_terminal_pair_plot.py",
     "panel.py",
     "panel_contract.py",
     "panel_ranking.py",

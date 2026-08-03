@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..runtime.publication import METASTUDY_SCHEMA_VERSION
+from ..runtime.publication import HISTORICAL_METASTUDY_SCHEMA_VERSION, METASTUDY_SCHEMA_VERSION
 from .contracts import ModelEvidenceError, content_digest
 from .fields import (
     enum_string,
@@ -66,7 +66,8 @@ def project_verified_manifest(
 ) -> ModelEvidenceProjection:
     """Build comparable scientific evidence without OPAL operational state."""
 
-    if manifest.get("schema_version") != METASTUDY_SCHEMA_VERSION:
+    source_manifest_schema = manifest.get("schema_version")
+    if source_manifest_schema not in {METASTUDY_SCHEMA_VERSION, HISTORICAL_METASTUDY_SCHEMA_VERSION}:
         raise ModelEvidenceError(f"unsupported metastudy manifest schema: {manifest.get('schema_version')!r}.")
     source = required_mapping(manifest, "source")
     screen = required_mapping(manifest, "response_metric_screen")
@@ -109,6 +110,7 @@ def project_verified_manifest(
         label_truth=label_truth,
         campaign_model=campaign_model,
         views=views,
+        source_manifest_schema=str(source_manifest_schema),
     )
     snapshot = _snapshot(
         source=source,
@@ -122,6 +124,7 @@ def project_verified_manifest(
         campaign_support=campaign_support,
         challenger_support=challenger_support,
         metastudy_manifest_sha256=metastudy_manifest_sha256,
+        source_manifest_schema=str(source_manifest_schema),
     )
     return ModelEvidenceProjection(protocol=protocol, protocol_digest=content_digest(protocol), snapshot=snapshot)
 
@@ -139,13 +142,14 @@ def _snapshot(
     campaign_support: dict[str, dict[str, object]],
     challenger_support: dict[str, dict[str, object]],
     metastudy_manifest_sha256: str,
+    source_manifest_schema: str,
 ) -> dict[str, object]:
     view_ids = tuple(sorted(views))
     return {
         "study_id": "stress_ethanol_cipro_growth",
         "evidence_timing": enum_string(screen, "evidence_timing", {"retrospective", "prospective"}),
         "source_metastudy": {
-            "schema_version": METASTUDY_SCHEMA_VERSION,
+            "schema_version": source_manifest_schema,
             "manifest_sha256": sha256_digest(metastudy_manifest_sha256, "metastudy manifest"),
             "status": required_string(screen, "status"),
         },

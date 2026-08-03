@@ -44,7 +44,7 @@ def build_source_equivalence_receipt(preview: VerifiedMultistateBehaviorShadow) 
         "candidate_records_sha256": labels.source["candidate_records_sha256"],
         "promoted_candidate_count": labels.promoted_candidate_count,
         "reference_unit_count": preview.reference_identity.reference_unit_count,
-        "reference_bootstrap_row_count": preview.reference_identity.bootstrap_row_count,
+        "reference_descriptive_resampling_row_count": (preview.reference_identity.descriptive_resampling_row_count),
         "normalization_reference_unit_count": 0,
         "central_vectors_exactly_equal": True,
         "new_observation_version_required_for_point_labels": False,
@@ -78,7 +78,7 @@ def verify_source_equivalence_receipt(
         "candidate_records_sha256",
         "promoted_candidate_count",
         "reference_unit_count",
-        "reference_bootstrap_row_count",
+        "reference_descriptive_resampling_row_count",
         "normalization_reference_unit_count",
         "central_vectors_exactly_equal",
         "new_observation_version_required_for_point_labels",
@@ -128,7 +128,11 @@ def verify_source_equivalence_receipt(
         value = receipt.get(field)
         if not isinstance(value, str) or len(value) != 71 or not value.startswith("sha256:"):
             raise ValueError(f"source-equivalence field {field!r} is not a canonical digest.")
-    for field in ("promoted_candidate_count", "reference_unit_count", "reference_bootstrap_row_count"):
+    for field in (
+        "promoted_candidate_count",
+        "reference_unit_count",
+        "reference_descriptive_resampling_row_count",
+    ):
         value = receipt.get(field)
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ValueError(f"source-equivalence field {field!r} must be positive integer evidence.")
@@ -139,7 +143,7 @@ def verify_source_equivalence_receipt(
         "label_artifact_sha256",
         "promotion_manifest_sha256",
         "reference_unit_count",
-        "reference_bootstrap_row_count",
+        "reference_descriptive_resampling_row_count",
         "normalization_reference_unit_count",
     }
     if any(decision_source.get(field) != receipt.get(field) for field in shared):

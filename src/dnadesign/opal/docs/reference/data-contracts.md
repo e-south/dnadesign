@@ -1,7 +1,7 @@
 ## OPAL Data and Artifact Contracts v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-18
+**Last verified:** 2026-08-02
 
 ### Candidate records
 
@@ -171,6 +171,14 @@ and count drift reject the adapter before notebook discovery. Producer-specific
 assay semantics, candidate identity, artifact digests, and scientific claims
 remain in their owning contracts; the adapter only defines the common evidence
 shape OPAL is allowed to display.
+
+Artifacts that need stronger render-time verification register a
+producer-owned `ReaderEvidenceArtifactAdapter` through the
+`dnadesign.opal.reader_evidence_artifacts` entry-point group. The descriptor
+provides the semantic-kind key, authoritative validator, and optional detail
+renderer. OPAL's registry is empty by default and rejects strict lookup of an
+unregistered kind; ordinary generic media can still use the projection-only
+path without inventing producer semantics.
 
 ### Validation
 

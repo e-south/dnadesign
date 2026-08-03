@@ -1,77 +1,74 @@
 ---
-id: stress-ethanol-cipro-growth-reader-promoter-evidence
-title: Reader promoter evidence
+id: stress-reader-promoter-evidence
+title: Reader promoter-response display
 owner: stress_ethanol_cipro_growth
+surface: study-display-adapter
 status: active
-last_verified: 2026-07-18
+last_verified: 2026-08-01
+entry_artifact: reader_catalog_v4_record_v6
+exit_artifact: stress_ethanol_cipro_growth.reader_promoter_evidence.v3
 ---
 
-# Reader promoter evidence
+# Reader promoter-response display
 
-The study-owned adapter validates published Reader
-`reader.response_window.promoter_evidence_bundle.v5` directories against an
-explicit `dnadesign.study.promoter_candidate_bindings.v1` bundle. It stages
-their static PNG/PDF artifacts for OPAL display. It writes the
-`stress_ethanol_cipro_growth.reader_promoter_evidence.v2` schema with semantic
-kind `promoter_response_evidence`; the default filename is
-`reader_evidence_promoter_response.json`.
+This adapter stages one canonical Reader response-window diagnostic for the
+OPAL notebook. It does not run Reader, recompute a plot, produce labels, or
+score an objective.
 
-The v2 display row preserves the verified v5 selection, non-claim boundary,
-selected binding, response-window source, candidate-binding source,
-BaseRender diagnostics, and typed or null objective overlay. OPAL presents
-these fields in one disclosure below the assay figure. They are evidence, not
-inputs to objective scoring.
+The live path is:
 
-The manifest also declares the public
-`opal.reader_evidence_manifest.v1` adapter. The study schema remains the
-authority for candidate and experiment provenance; the adapter identifies only
-the generic fields OPAL may render. OPAL therefore does not import or recognize
-the stress-study schema name.
+`Reader records → study display pin → promoter binding → portable media → OPAL viewport`
 
-The handoff is display-only. Reader owns trajectories, reductions, figures,
-and source manifests. The stress study validates candidate, sequence-authority,
-exact-binding, and adapter-specific provenance. OPAL verifies and displays the
-static media. Model-feature readiness uses a separate candidate-keyed contract.
-The adapter does not calculate MSRB or any other OPAL objective, create
-observed labels, or mutate campaign/model state.
+Reader owns the `plate_reader/four_state_event_window` experiment, its catalog-v4
+provenance, schema-v6 records, and `plot:four_state_event_window_diagnostic`. The study
+owns the selected source experiment and design, the exact promoter binding,
+and the statement that this media belongs in the stress-study review surface.
+OPAL verifies and renders the portable projection.
 
-The adapter resolves each exact `reader.design_id` alias through the study
-binding artifact and checks candidate, sequence, source, and BaseRender adapter
-provenance before publication. Published media live under the round-local
-`reader_evidence_media/<Reader-manifest-digest>/` directory. Manifest paths are
-relative and digest-verified, so OPAL does not need access to Reader's output
-directory after publication.
+This package also owns the notebook artifact descriptor registered through the
+`dnadesign.opal.reader_evidence_artifacts` entry-point group. The descriptor
+routes notebook verification back through this package's authoritative v3
+manifest verifier and supplies the study-specific evidence details. Generic
+OPAL code contains no promoter, response-window, or stress-study semantics.
 
-Run from the `dnadesign` repository root:
+The display pin records the source experiment, design, plot-config digest, and
+exact output path. The adapter then verifies:
+
+- `four_state_event_window/designs` and `four_state_event_window/traces`, including revisions,
+  revision digests, content digests, and sizes;
+- the diagnostic file-bundle revision and its exact input revisions;
+- every diagnostic file digest and the selected PNG or PDF signature; and
+- one exact `reader.design_id` candidate binding.
+
+Media is staged under
+`reader_evidence_media/<diagnostic-revision-digest>/`. The v3 manifest remains
+display-only and objective-neutral. MSRB labels, promotion, campaign state,
+and the completed round-0 artifacts use separate contracts.
+
+The projection pins the verified catalog-v4 / record-v6 diagnostic for the
+reviewed SpyP source. Existing `secg_msrb_greedy` campaign files remain
+immutable historical evidence; activating this display surface does not alter
+labels, objectives, selections, or synthesis handoffs.
+
+Run from the repository root after the Reader evidence is ready:
 
 ```bash
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence \
-  preview --bindings-bundle <promoter-candidate-bindings-bundle> \
-  <promoter-evidence-bundle> [<promoter-evidence-bundle> ...]
+  preview \
+  --reader-root ../reader \
+  --experiment-root ../reader/experiments/2026/20260717_stress_response_window_aggregate \
+  --projection src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/config/reader_response_projection.yaml \
+  --bindings-bundle src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
 
 uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence \
-  materialize --bindings-bundle <promoter-candidate-bindings-bundle> \
-  --out-dir src/dnadesign/opal/campaigns/secg_msrb_greedy/inputs/r0 \
-  <promoter-evidence-bundle> [<promoter-evidence-bundle> ...]
-
-uv run python -m dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence \
-  verify src/dnadesign/opal/campaigns/secg_msrb_greedy/inputs/r0/reader_evidence_promoter_response.json
+  materialize \
+  --reader-root ../reader \
+  --experiment-root ../reader/experiments/2026/20260717_stress_response_window_aggregate \
+  --projection src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/config/reader_response_projection.yaml \
+  --bindings-bundle src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest \
+  --out-dir <new-review-input-directory>
 ```
 
-`preview` and `verify` do not write. `materialize` atomically installs each
-content-addressed media directory, then publishes the manifest as the final
-commit point. It refuses to replace an existing manifest unless `--overwrite`
-is explicit. None of the commands ingest or apply labels.
-
-The published row set is exactly the set of bundle directories passed to
-`preview` or `materialize`. The adapter does not infer candidates from old
-media directories, the OPAL label table, or the candidate universe. When the
-notebook is meant to review every observed candidate, assemble the inputs from
-the study's accepted label-source contributions and confirm that the manifest
-row count and candidate IDs match that accepted label set. Supplying a subset
-publishes a subset; content-addressed media left by an earlier publication are
-not notebook records.
-
-The adapter always emits `campaign_slug: secg_msrb_greedy`, the only
-executable campaign destination for this evidence. Other campaign slugs occur
-only as digest-pinned synthesis-source provenance.
+`preview` is read-only. `materialize` verifies all source bytes before creating
+the destination and publishes the manifest only after staged media verifies.
+It never writes labels or campaign state.

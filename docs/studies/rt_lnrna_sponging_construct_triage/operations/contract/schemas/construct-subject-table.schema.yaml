@@ -22,7 +22,6 @@ required_columns:
   construct_id: string_or_null
   construct_context_view_ids: list_or_empty
   abundance_prior_overlay_ids: list_or_empty
-  sponging_assay_observation_ids: list_or_empty
   construct_subject_role: controlled_string_or_null
   construct_subject_note: string_or_null
 usr_construct_subject_envelope_overlay_required_columns:
@@ -42,7 +41,7 @@ controlled_values:
     - tetO_sponging_v1
   source_basis:
     - lab_anchor
-    - genbank_variant_catalog
+    - rt_lnrna_subject_binding
     - crawford_eco1_lnrna_fixed_wt_rt
     - khan_abundance_affiliated_rt_lnrna_reference
     - compiler_generated_msd_lnrna_variant
@@ -75,6 +74,7 @@ validation_notes:
   - Keep study metadata namespaced or in companion sidecars for OPAL export.
   - "USR construct-subject-envelope overlays must include construct_subject__record_kind, construct_subject__sequence_authority, and construct_subject__biological_sequence_fields before consumers read records.parquet.sequence as biological authority."
   - "source_basis: lab_anchor is a source-history label, not a Construct part role."
+  - "source_basis: rt_lnrna_subject_binding marks a logical paired subject resolved through the study-owned binding set; GenBank and provider publications remain component sequence and placement provenance."
   - "source_basis: in_silico_rt_cds_dms marks RT-CDS variants generated through the public dnadesign.permuter API."
   - "source_basis: crawford_eco1_lnrna_fixed_wt_rt promotes abundance-affiliated Crawford lnRNA sequences with fixed Eco1 WT RT when the lnRNA sequence passes Eco1 forward k-mer orientation QC; design-reference-only sequences remain source provenance and issue records."
   - "source_basis: khan_abundance_affiliated_rt_lnrna_reference promotes Khan terminal-keyed rows only with source ncRNA sequence, source RT CDS DNA sequence, translation-exact RT CDS validation, affiliated RT-DNA abundance prior, and current Construct lane fit."

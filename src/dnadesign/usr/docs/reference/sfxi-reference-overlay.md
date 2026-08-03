@@ -1,7 +1,7 @@
 # SFXI Reference Overlay Contract
 
 **Owner:** USR maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-02
 
 The `sfxi_ref` namespace stores provenance-aware SFXI reference metrics for downstream annotation overlays. It is an additive USR overlay keyed by canonical `id`; it must not mutate base `records.parquet` rows or existing Infer overlays.
 
@@ -43,7 +43,7 @@ Study recipes must fail before asking USR to write when any of these are true:
 - metric provenance is empty;
 - Reader score rows do not map to the target USR dataset by sequence.
 
-## Command
+## Publication
 
 Dry run:
 

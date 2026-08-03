@@ -94,7 +94,7 @@ def test_retron_hairpin_skill_frontmatter_is_yaml_safe_and_discovery_scoped() ->
     assert "generic Cruncher/snapback" in description
     assert "Snapback/scar-nick/YIU" not in description
     assert isinstance(metadata, dict)
-    assert metadata["version"] == "0.7.29"
+    assert metadata["version"] == "0.7.30"
 
 
 def test_retron_hairpin_skill_naive_agent_discovery_and_prompt_surface_contract() -> None:
@@ -335,7 +335,11 @@ def test_retron_hairpin_study_record_and_skill_keep_boundary_language_explicit()
     assert "teto_retained_span_trim_tetr_pwm_elite_v1.sequence_montage.mp4" in workbench_deliverable_plan
     assert "reviews/review_manifest.json" in workbench_deliverable_plan
     assert "sequence_handoff" in workbench_deliverable_plan
-    assert "Reader owns SPOP math" in workbench_deliverable_plan
+    assert "retron_msd_assay_handoff_ref_v1" in workbench_deliverable_plan
+    assert "subject_identity_only" in workbench_deliverable_plan
+    assert "outcome_bins" not in workbench_deliverable_plan
+    assert "owner_study_id: rt_lnrna_sponging_construct_triage" in workbench_deliverable_plan
+    assert "routes/reporter-response-evidence.md" in workbench_deliverable_plan
     assert "Run records cite design sets" in workbench_provenance_readme
     assert "tests/compiler/" in study_surfaces
     assert "test_cli_lint.py" in study_surfaces

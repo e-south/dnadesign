@@ -28,16 +28,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Stage verified Reader promoter evidence for static OPAL display.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    preview = subparsers.add_parser("preview", help="Validate Reader bundles and preview the display manifest.")
-    _add_bundle_inputs(preview)
+    preview = subparsers.add_parser(
+        "preview",
+        help="Validate canonical Reader records and preview the display manifest.",
+    )
+    _add_source_inputs(preview)
 
     materialize = subparsers.add_parser("materialize", help="Atomically write the display manifest.")
-    _add_bundle_inputs(materialize)
+    _add_source_inputs(materialize)
     materialize.add_argument("--out-dir", type=Path, required=True)
     materialize.add_argument("--filename", default=READER_PROMOTER_EVIDENCE_FILENAME)
     materialize.add_argument("--overwrite", action="store_true")
 
-    verify = subparsers.add_parser("verify", help="Verify a materialized display manifest and its Reader sources.")
+    verify = subparsers.add_parser(
+        "verify",
+        help="Verify a materialized display manifest, embedded receipts, and staged media.",
+    )
     verify.add_argument("manifest", type=Path)
     return parser
 
@@ -46,13 +52,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "preview":
         payload = preview_reader_promoter_evidence_manifest(
-            args.bundle_dirs,
+            reader_root=args.reader_root,
+            experiment_root=args.experiment_root,
+            projection_path=args.projection,
             bindings_bundle=args.bindings_bundle,
             round_label=args.round_label,
         )
     elif args.command == "materialize":
         result = materialize_reader_promoter_evidence_manifest(
-            args.bundle_dirs,
+            reader_root=args.reader_root,
+            experiment_root=args.experiment_root,
+            projection_path=args.projection,
             bindings_bundle=args.bindings_bundle,
             out_dir=args.out_dir,
             round_label=args.round_label,
@@ -77,15 +87,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-def _add_bundle_inputs(parser: argparse.ArgumentParser) -> None:
+def _add_source_inputs(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--round", dest="round_label", default="r0")
+    parser.add_argument("--reader-root", type=Path, required=True)
+    parser.add_argument("--experiment-root", type=Path, required=True)
+    parser.add_argument("--projection", type=Path, required=True)
     parser.add_argument(
         "--bindings-bundle",
         type=Path,
         required=True,
         help="Verified study-owned promoter-candidate binding bundle.",
     )
-    parser.add_argument("bundle_dirs", type=Path, nargs="+")
 
 
 __all__ = ["build_parser", "main"]

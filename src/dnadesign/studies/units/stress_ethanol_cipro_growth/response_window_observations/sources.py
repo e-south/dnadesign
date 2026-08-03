@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -24,8 +24,9 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
 )
 
 from .aggregation import VALUE_COLUMNS, ResponseWindowObservationPreview, aggregate_response_window_observations
+from .evidence_integrity import evidence_integrity_sha256
 from .policy import ResponseWindowObservationPolicy, load_response_window_observation_policy
-from .reader_bundle import ReaderResponseBundle, load_reader_response_bundle
+from .reader_records import ReaderResponseRecords, load_reader_response_records
 
 _BINDING_IDENTITY_COLUMNS = ("alias_namespace", "alias", "candidate_id", "sequence_sha256")
 _BINDING_PROVENANCE_COLUMNS = (
@@ -59,34 +60,51 @@ class ResponseWindowObservationEvidence:
     policy: ResponseWindowObservationPolicy
     resolved: ResolvedReaderCandidateEvidence
     preview: ResponseWindowObservationPreview
-    reader_manifest_path: Path
-    reader_manifest_sha256: str
+    reader_records: ReaderResponseRecords
+    reader_catalog_path: Path
+    reader_catalog_sha256: str
+    reader_projection_path: Path
+    reader_projection_sha256: str
+    reader_record_receipt_sha256: str
     candidate_bindings_manifest_path: Path
     candidate_bindings_manifest_sha256: str
     candidate_bindings_path: Path
+    _integrity_sha256: str = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_integrity_sha256", _evidence_integrity_sha256(self))
+
+    def integrity_matches(self) -> bool:
+        """Whether mutable dataframe members still match the verified preview."""
+
+        return self._integrity_sha256 == _evidence_integrity_sha256(self)
 
 
 def preview_response_window_observation_evidence(
     *,
-    reader_bundle_root: Path,
-    reader_request_path: Path,
+    reader_root: Path,
+    reader_experiment_root: Path,
+    reader_projection_path: Path,
     candidate_bindings_root: Path,
     policy_path: Path,
 ) -> ResponseWindowObservationEvidence:
-    """Verify the two source bundles and preview candidate observations without publication."""
+    """Verify canonical Reader records and preview candidate observations."""
 
     policy = load_response_window_observation_policy(policy_path)
-    reader = load_reader_response_bundle(reader_bundle_root, expected_request_path=reader_request_path)
+    reader = load_reader_response_records(
+        reader_root=reader_root,
+        experiment_root=reader_experiment_root,
+        projection_path=reader_projection_path,
+    )
     if reader.primary_reduction_id != policy.aggregation.primary_reduction_id:
         raise ResponseWindowObservationSourceError(
             "Reader primary reduction disagrees with the response-window observation policy."
         )
-    reader_digest = _sha256(reader.manifest_path)
-    if reader_digest != policy.reader_bundle_sha256:
+    reader_receipt_sha256 = reader.source_receipt_sha256()
+    if policy.reader_record_receipt_sha256 is not None and reader_receipt_sha256 != policy.reader_record_receipt_sha256:
         raise ResponseWindowObservationSourceError(
-            "Reader bundle manifest digest disagrees with the response-window observation policy."
+            "Reader record receipt digest disagrees with the response-window observation policy."
         )
-
     binding_root = Path(candidate_bindings_root).expanduser().resolve()
     verification = verify_promoter_candidate_bindings(binding_root, allowed_root=binding_root)
     binding_digest = _sha256(verification.manifest_json)
@@ -107,6 +125,8 @@ def preview_response_window_observation_evidence(
         repeat_decisions=policy.repeat_decisions,
     )
     blockers = list(preview.blockers)
+    if policy.reader_record_receipt_sha256 is None:
+        blockers.append("canonical Reader record receipt requires study review and approval")
     if policy.approval_status != "approved":
         blockers.append("response-window observation policy requires study approval")
     preview = ResponseWindowObservationPreview(
@@ -123,8 +143,12 @@ def preview_response_window_observation_evidence(
         policy=policy,
         resolved=resolved,
         preview=preview,
-        reader_manifest_path=reader.manifest_path,
-        reader_manifest_sha256=reader_digest,
+        reader_records=reader,
+        reader_catalog_path=reader.catalog_path,
+        reader_catalog_sha256=reader.catalog_sha256,
+        reader_projection_path=reader.projection_path,
+        reader_projection_sha256=reader.projection_sha256,
+        reader_record_receipt_sha256=reader_receipt_sha256,
         candidate_bindings_manifest_path=verification.manifest_json,
         candidate_bindings_manifest_sha256=binding_digest,
         candidate_bindings_path=verification.bindings_parquet,
@@ -132,7 +156,7 @@ def preview_response_window_observation_evidence(
 
 
 def resolve_reader_candidate_evidence(
-    bundle: ReaderResponseBundle,
+    records: ReaderResponseRecords,
     *,
     binding_rows: pd.DataFrame,
     unbound_reader_designs: pd.DataFrame,
@@ -141,7 +165,7 @@ def resolve_reader_candidate_evidence(
 
     bindings = _reader_bindings(binding_rows)
     exclusions = _validated_exclusions(unbound_reader_designs)
-    designs = bundle.designs.loc[~bundle.designs["is_reference"].astype(bool)].copy()
+    designs = records.designs.loc[~records.designs["is_reference"].astype(bool)].copy()
     observed_designs = set(designs["design_id"].astype(str))
     bound_designs = set(bindings["design_id"].astype(str))
     observed_unbound = observed_designs - bound_designs
@@ -157,11 +181,12 @@ def resolve_reader_candidate_evidence(
         bindings=bindings,
         evidence_label="measurements",
     ).rename(columns={"experiment_id": "reader_experiment_id"})
-    draws = bundle.bootstrap_draws.loc[~bundle.bootstrap_draws["is_reference"].astype(bool)].copy()
+    reader_draws = records.descriptive_resampling_draws
+    draws = reader_draws.loc[~reader_draws["is_reference"].astype(bool)].copy()
     resolved_draws = _merge_evidence(
         draws.loc[~draws["design_id"].astype(str).isin(declared_unbound)],
         bindings=bindings,
-        evidence_label="bootstrap draws",
+        evidence_label="descriptive resampling draws",
     ).rename(columns={"experiment_id": "reader_experiment_id"})
     return ResolvedReaderCandidateEvidence(
         measurements=resolved_designs.reset_index(drop=True),
@@ -220,6 +245,31 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _evidence_integrity_sha256(evidence: ResponseWindowObservationEvidence) -> str:
+    scalar_identity = {
+        "policy_config_sha256": evidence.policy.config_sha256,
+        "reader_record_receipt_sha256": evidence.reader_record_receipt_sha256,
+        "reader_projection_sha256": evidence.reader_projection_sha256,
+        "candidate_bindings_manifest_sha256": evidence.candidate_bindings_manifest_sha256,
+        "blockers": list(evidence.preview.blockers),
+    }
+    frames = (
+        ("policy.repeat_decisions", evidence.policy.repeat_decisions),
+        ("policy.unbound_reader_designs", evidence.policy.unbound_reader_designs),
+        ("resolved.measurements", evidence.resolved.measurements),
+        ("resolved.bootstrap_draws", evidence.resolved.bootstrap_draws),
+        ("resolved.excluded_reader_designs", evidence.resolved.excluded_reader_designs),
+        ("preview.observations", evidence.preview.observations),
+        ("preview.contributions", evidence.preview.contributions),
+        ("preview.bootstrap_draws", evidence.preview.bootstrap_draws),
+        ("preview.uncertainty", evidence.preview.uncertainty),
+        ("preview.repeat_diagnostics", evidence.preview.repeat_diagnostics),
+        ("preview.reduction_sensitivity", evidence.preview.reduction_sensitivity),
+        ("preview.event_time_sensitivity", evidence.preview.event_time_sensitivity),
+    )
+    return evidence_integrity_sha256(scalar_identity=scalar_identity, frames=frames)
 
 
 __all__ = [

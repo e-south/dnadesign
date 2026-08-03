@@ -1,7 +1,7 @@
 ## OPAL Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-17
+**Last verified:** 2026-08-02
 
 Start with a workflow for command order. Use the plugin, concept, and reference
 pages for mathematical and interface contracts.
@@ -35,7 +35,6 @@ pages for mathematical and interface contracts.
 - [SFXI behavior and math](./plugins/objectives/sfxi.md): SFXI objective mechanics and output interpretation.
 - [Response-Magnitude Feasibility (RMF) behavior and math](./plugins/objectives/response-magnitude-feasibility.md): non-compensatory response separation and reference-relative magnitude constraints.
 - [Multistate Response Behavior math and contract](./plugins/objectives/multistate-response-behavior.md): threshold-free, strictly monotone response ordering, ON expression, and OFF suppression.
-- [SPOP scalar objective](./plugins/objectives/spop.md): objective channel for predicted Reader SPOP endpoint scalars.
 - [X transforms](./plugins/transforms/x.md): input transform contracts for feature generation.
 - [Y transforms and Y-ops](./plugins/transforms/y.md): target transform contracts and label operations.
 

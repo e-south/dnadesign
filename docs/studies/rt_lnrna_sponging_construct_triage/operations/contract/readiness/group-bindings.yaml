@@ -3,5 +3,5 @@ group_phase_bindings:
   construct_subject_contract: phase_1_construct_subject_table
   representation_readiness: phase_3_infer_handoff
   overlay_linkage: phase_4_overlay_linkage
-  reader_spop_label_materialization: phase_6_wet_lab_handoff
+  reporter_response_metastudy: phase_5_analysis
   opal_precondition: phase_7_opal_readiness

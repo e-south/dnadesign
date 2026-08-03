@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from ..runtime.publication import METASTUDY_SCHEMA_VERSION
 from .contracts import PROTOCOL_ID, PROTOCOL_SCHEMA_VERSION
 from .evaluator_protocol import evaluator_sources
 from .fields import (
@@ -31,6 +30,7 @@ def build_protocol(
     label_truth: dict[str, object],
     campaign_model: dict[str, object],
     views: dict[str, list[int]],
+    source_manifest_schema: str,
 ) -> dict[str, object]:
     screen_protocol = required_mapping(screen, "response_screen_protocol")
     return {
@@ -39,7 +39,7 @@ def build_protocol(
         "study_id": "stress_ethanol_cipro_growth",
         "evidence_name": "model-evidence trajectory",
         "status": "frozen",
-        "source_manifest_schema": METASTUDY_SCHEMA_VERSION,
+        "source_manifest_schema": source_manifest_schema,
         "target_views": views,
         "label_truth_contract": {
             "state": enum_string(label_truth, "state", {"not_ready", "promoted"}),

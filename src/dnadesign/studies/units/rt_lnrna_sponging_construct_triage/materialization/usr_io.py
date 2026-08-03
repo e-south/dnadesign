@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import math
 from pathlib import Path
 from typing import Mapping
@@ -37,9 +38,8 @@ def _write_construct_subject_dataset(*, usr_root: Path, rows: list[dict[str, obj
     _ensure_construct_subject_overlay_namespace(usr_root, field_names=field_names)
     dataset = Dataset(usr_root, _INPUT_DATASET)
     dataset.init(source=_MATERIALIZATION_SOURCE, notes="Temp RT-lnRNA Construct materialization inputs.")
-    carrier_sequences = [
-        _construct_subject_envelope_carrier_sequence(index) for index, _row in enumerate(rows, start=1)
-    ]
+    subject_ids = [str(row["id"]) for row in rows]
+    carrier_sequences = [_construct_subject_envelope_carrier_sequence(subject_id) for subject_id in subject_ids]
     add_result = dataset.add_sequences(
         carrier_sequences,
         bio_type="dna",
@@ -70,20 +70,16 @@ def _write_construct_subject_dataset(*, usr_root: Path, rows: list[dict[str, obj
     return input_ids_by_subject_id
 
 
-def _construct_subject_envelope_carrier_sequence(index: int) -> str:
-    if index < 1:
-        raise MaterializationContractError("Construct-subject envelope carrier index must be positive.")
+def _construct_subject_envelope_carrier_sequence(subject_id: str) -> str:
+    """Encode a subject-id digest as a non-biological DNA4 identity carrier."""
+
+    if not isinstance(subject_id, str) or not subject_id.strip():
+        raise MaterializationContractError("Construct-subject envelope subject id must be non-empty.")
+    if subject_id != subject_id.strip():
+        raise MaterializationContractError("Construct-subject envelope subject id must not have outer whitespace.")
     alphabet = "ACGT"
-    n = index - 1
-    encoded: list[str] = []
-    for _digit in range(10):
-        n, remainder = divmod(n, len(alphabet))
-        encoded.append(alphabet[remainder])
-    if n:
-        raise MaterializationContractError(
-            "Construct-subject envelope carrier index exceeds synthetic policy capacity."
-        )
-    return "ACGT" + "".join(reversed(encoded))
+    digest = hashlib.sha256(subject_id.encode("utf-8")).digest()
+    return "".join(alphabet[(byte >> shift) & 0b11] for byte in digest for shift in (6, 4, 2, 0))
 
 
 def _write_construct_output_subject_bridge(

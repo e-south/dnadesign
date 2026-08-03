@@ -87,7 +87,7 @@ def _write_records_vec8(records_path: Path, *, slug: str = "demo") -> None:
             "random_forest",
             {"n_estimators": 8, "random_state": 7, "oob_score": False},
             "top_n",
-            {"top_k": 1, "score_ref": "sfxi_v1/sfxi", "objective_mode": "maximize"},
+            {"top_k": 1, "score_ref": "sfxi", "objective_mode": "maximize"},
         ),
         (
             "gp_sfxi_topn",
@@ -98,7 +98,7 @@ def _write_records_vec8(records_path: Path, *, slug: str = "demo") -> None:
                 "kernel": {"name": "matern", "length_scale": 0.5, "nu": 1.5, "with_white_noise": True},
             },
             "top_n",
-            {"top_k": 1, "score_ref": "sfxi_v1/sfxi", "objective_mode": "maximize"},
+            {"top_k": 1, "score_ref": "sfxi", "objective_mode": "maximize"},
         ),
         (
             "gp_sfxi_ei",
@@ -111,8 +111,8 @@ def _write_records_vec8(records_path: Path, *, slug: str = "demo") -> None:
             "expected_improvement",
             {
                 "top_k": 1,
-                "score_ref": "sfxi_v1/sfxi",
-                "uncertainty_ref": "sfxi_v1/sfxi",
+                "score_ref": "sfxi",
+                "uncertainty_ref": "sfxi",
                 "objective_mode": "maximize",
                 "alpha": 1.0,
                 "beta": 1.0,
@@ -224,7 +224,7 @@ def test_cli_response_magnitude_feasibility_topn_happy_path(tmp_path: Path) -> N
         selection_name="top_n",
         selection_params={
             "top_k": 1,
-            "score_ref": "response_magnitude_feasibility_v1/feasibility_margin",
+            "score_ref": "feasibility_margin",
             "objective_mode": "maximize",
         },
     )

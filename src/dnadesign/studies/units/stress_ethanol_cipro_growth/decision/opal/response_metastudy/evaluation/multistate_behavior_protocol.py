@@ -52,11 +52,15 @@ from .multistate_behavior_protocol_fields import (
 )
 from .multistate_behavior_source_protocol import (
     BehaviorSourceEquivalenceProtocol,
+    FrozenBehaviorSourceEquivalenceProtocolV1,
     parse_behavior_source_equivalence,
+    parse_frozen_behavior_source_equivalence_v1,
 )
 
-SCHEMA_ID = "stress_ethanol_cipro_growth.multistate_response_behavior_shadow.v1"
-SCHEMA_VERSION = "1"
+SCHEMA_ID = "stress_ethanol_cipro_growth.multistate_response_behavior_shadow.v2"
+SCHEMA_VERSION = "2"
+FROZEN_SCHEMA_ID_V1 = "stress_ethanol_cipro_growth.multistate_response_behavior_shadow.v1"
+FROZEN_SCHEMA_VERSION_V1 = "1"
 
 
 class _UniqueKeyLoader(yaml.SafeLoader):
@@ -96,7 +100,7 @@ class MultistateBehaviorShadowProtocol:
     protocol_id: str
     study_id: str
     status: Literal["shadow_only"]
-    source_equivalence: BehaviorSourceEquivalenceProtocol
+    source_equivalence: BehaviorSourceEquivalenceProtocol | FrozenBehaviorSourceEquivalenceProtocolV1
     objective_name: str
     family_weighting: Literal["equal_one_third"]
     selector_output: Literal["behavior_score"]
@@ -170,14 +174,20 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
         },
         context="protocol",
     )
-    _require_literal(payload, "schema_id", SCHEMA_ID, context="protocol")
-    _require_literal(payload, "schema_version", SCHEMA_VERSION, context="protocol")
     _require_literal(payload, "study_id", "stress_ethanol_cipro_growth", context="protocol")
     _require_literal(payload, "status", "shadow_only", context="protocol")
-    source_equivalence = parse_behavior_source_equivalence(payload["source_equivalence"])
+    schema_identity = (payload["schema_id"], str(payload["schema_version"]))
+    if schema_identity == (SCHEMA_ID, SCHEMA_VERSION):
+        source_equivalence = parse_behavior_source_equivalence(payload["source_equivalence"])
+        expected_protocol_id = "secg_multistate_response_behavior_shadow_v2"
+    elif schema_identity == (FROZEN_SCHEMA_ID_V1, FROZEN_SCHEMA_VERSION_V1):
+        source_equivalence = parse_frozen_behavior_source_equivalence_v1(payload["source_equivalence"])
+        expected_protocol_id = "secg_multistate_response_behavior_shadow_v1"
+    else:
+        raise BehaviorProtocolError("multistate behavior shadow protocol schema identity disagrees.")
     protocol_id = _nonempty_string(payload["protocol_id"], field="protocol.protocol_id")
-    if protocol_id != "secg_multistate_response_behavior_shadow_v1":
-        raise BehaviorProtocolError("protocol.protocol_id must be 'secg_multistate_response_behavior_shadow_v1'.")
+    if protocol_id != expected_protocol_id:
+        raise BehaviorProtocolError(f"protocol.protocol_id must be {expected_protocol_id!r}.")
 
     objective = _mapping(payload["objective"], context="objective")
     _require_exact_fields(
@@ -285,8 +295,8 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
 
     completion_gate = parse_behavior_completion_gate(payload["completion_gate"])
     return MultistateBehaviorShadowProtocol(
-        schema_id=SCHEMA_ID,
-        schema_version=SCHEMA_VERSION,
+        schema_id=str(payload["schema_id"]),
+        schema_version=str(payload["schema_version"]),
         protocol_id=protocol_id,
         study_id="stress_ethanol_cipro_growth",
         status="shadow_only",
@@ -322,6 +332,8 @@ def load_multistate_behavior_protocol(path: Path) -> MultistateBehaviorShadowPro
 __all__ = [
     "SCHEMA_ID",
     "SCHEMA_VERSION",
+    "FROZEN_SCHEMA_ID_V1",
+    "FROZEN_SCHEMA_VERSION_V1",
     "BehaviorNormalizationProtocol",
     "BehaviorProtocolError",
     "BehaviorTargetView",

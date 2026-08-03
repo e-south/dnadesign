@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/multistate_behavior_sources.py
 
-Corrected Reader and immutable label-policy sources for behavior evaluation.
+Historical Reader and immutable label-policy sources for frozen behavior replay.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,13 +18,9 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
     load_promoter_candidate_bindings,
     verify_promoter_candidate_bindings,
 )
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.policy import (
-    ResponseWindowObservationPolicy,
-    load_response_window_observation_policy,
-)
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
-    ReaderResponseBundle,
-    load_reader_response_bundle,
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.historical import (
+    HistoricalReaderResponseBundleV5,
+    load_historical_reader_response_bundle_v5,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.sources import (
     ResolvedReaderCandidateEvidence,
@@ -32,18 +28,19 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
 )
 
 from ..evaluation.multistate_behavior_protocol import MultistateBehaviorShadowProtocol
+from .historical import HistoricalObservationPolicyV2, load_historical_observation_policy_v2
 from .multistate_behavior_reference import (
     ReferenceSignalIdentityReceipt,
-    verify_reference_relative_bootstrap_identity,
+    verify_reference_relative_descriptive_resampling_identity,
 )
 from .publication import sha256_file
 
 
 @dataclass(frozen=True)
 class VerifiedBehaviorSources:
-    reader: ReaderResponseBundle
+    reader: HistoricalReaderResponseBundleV5
     resolved: ResolvedReaderCandidateEvidence
-    prior_observation_policy: ResponseWindowObservationPolicy
+    prior_observation_policy: HistoricalObservationPolicyV2
     reference_identity: ReferenceSignalIdentityReceipt
     reader_manifest_sha256: str
     candidate_bindings_manifest_sha256: str
@@ -59,20 +56,26 @@ def load_verified_behavior_sources(
 ) -> VerifiedBehaviorSources:
     """Bind corrected bootstrap evidence to independently verifiable prior label policy."""
 
-    policy = load_response_window_observation_policy(prior_observation_policy_path)
-    if policy.reader_bundle_sha256 != protocol.source_equivalence.prior_observation_reader_bundle_sha256:
-        raise ValueError("prior observation policy does not match the declared source-equivalence version.")
-    reader = load_reader_response_bundle(
+    source_protocol = protocol.source_equivalence
+    policy = load_historical_observation_policy_v2(
+        prior_observation_policy_path,
+        expected_sha256=source_protocol.prior_observation_policy_sha256,
+        expected_reader_bundle_sha256=source_protocol.prior_observation_reader_bundle_sha256,
+        expected_candidate_bindings_sha256=source_protocol.prior_candidate_bindings_manifest_sha256,
+        expected_approval_sha256=source_protocol.prior_observation_approval_sha256,
+        expected_primary_reduction_id=protocol.primary_reduction_id,
+    )
+    reader = load_historical_reader_response_bundle_v5(
         reader_bundle_root,
         expected_request_path=reader_request_path,
     )
     reader_sha = sha256_file(reader.manifest_path)
-    if reader_sha != protocol.source_equivalence.current_reader_bundle_sha256:
+    if reader_sha != source_protocol.current_reader_bundle_sha256:
         raise ValueError("Reader bundle does not match the corrected source-equivalence version.")
     binding_root = Path(candidate_bindings_root).resolve()
     binding_verification = verify_promoter_candidate_bindings(binding_root, allowed_root=binding_root)
     binding_sha = sha256_file(binding_verification.manifest_json)
-    if binding_sha != policy.candidate_bindings_sha256:
+    if binding_sha != source_protocol.prior_candidate_bindings_manifest_sha256:
         raise ValueError("corrected Reader evaluation changed the approved candidate-binding universe.")
     bindings = load_promoter_candidate_bindings(binding_root, allowed_root=binding_root)
     resolved = resolve_reader_candidate_evidence(
@@ -84,9 +87,9 @@ def load_verified_behavior_sources(
         raise ValueError("resolved Reader candidate evidence lacks the reference-exclusion field.")
     if resolved.measurements["is_reference"].astype(bool).any():
         raise ValueError("pDual-10 reference rows must not enter the candidate normalization cohort.")
-    reference = verify_reference_relative_bootstrap_identity(
+    reference = verify_reference_relative_descriptive_resampling_identity(
         reader.designs,
-        reader.bootstrap_draws,
+        reader.descriptive_resampling_draws,
         primary_reduction_id=protocol.primary_reduction_id,
         state_ids=protocol.state_ids,
     )

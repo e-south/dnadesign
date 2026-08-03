@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_records import (
     build_all_primary_measurements,
 )
 
@@ -52,7 +52,7 @@ from .label_truth import resolve_configured_label_truth
 from .loading import (
     assert_candidate_alignment,
     assert_shared_observed_labels,
-    load_campaign_reader_bundle,
+    load_campaign_reader_records,
     load_candidate_matrix,
     load_label_source_frame,
     load_observed_label_frame,
@@ -68,13 +68,14 @@ from .response_screen import build_response_metric_screen
 from .response_screen_publication import response_screen_manifest
 from .review_bundle import ReviewBundleEvidence, materialize_review_bundle
 from .run_contracts import assert_shared_label_sources, predictor_parity
-from .selected_reader_rows import build_selected_bootstrap_draws, build_selected_response_labels
+from .selected_reader_rows import build_selected_descriptive_resampling_draws, build_selected_response_labels
 
 
 def run_metastudy(
     *,
     repo_root: Path,
-    reader_bundle_root: Path,
+    reader_root: Path,
+    reader_experiment_root: Path,
     candidate_binding_bundle_root: Path,
     out_dir: Path,
     overwrite: bool,
@@ -85,7 +86,8 @@ def run_metastudy(
     try:
         manifest = _materialize_metastudy(
             repo_root=repo_root,
-            reader_bundle_root=reader_bundle_root,
+            reader_root=reader_root,
+            reader_experiment_root=reader_experiment_root,
             candidate_binding_bundle_root=candidate_binding_bundle_root,
             out_dir=stage,
             top_k=top_k,
@@ -101,14 +103,16 @@ def run_metastudy(
 def _materialize_metastudy(
     *,
     repo_root: Path,
-    reader_bundle_root: Path,
+    reader_root: Path,
+    reader_experiment_root: Path,
     candidate_binding_bundle_root: Path,
     out_dir: Path,
     top_k: int,
 ) -> dict[str, object]:
     paths = MetastudyPaths(
         repo_root=repo_root.resolve(),
-        reader_bundle_root=reader_bundle_root.resolve(),
+        reader_root=reader_root.resolve(),
+        reader_experiment_root=reader_experiment_root.resolve(),
         out_dir=out_dir.resolve(),
         campaign_root=response_window_round0_source_evidence_root(repo_root).resolve(),
     )
@@ -137,11 +141,11 @@ def _materialize_metastudy(
     )
     assert_shared_label_sources(label_source_frames)
     label_sources = label_source_frames[0]
-    reader_bundle = load_campaign_reader_bundle(paths, stress_campaign)
+    reader_records = load_campaign_reader_records(paths, stress_campaign)
     measurement_selection = load_response_measurement_selection(
         Path(__file__).resolve().parents[1] / "config/response_model_screen_selection.yaml",
-        reader_designs=reader_bundle.designs,
-        primary_reduction_id=reader_bundle.primary_reduction_id,
+        reader_designs=reader_records.designs,
+        primary_reduction_id=reader_records.primary_reduction_id,
     )
     candidate_identity_bindings = load_response_candidate_identity_bindings(
         measurement_selection=measurement_selection.rows,
@@ -156,14 +160,14 @@ def _materialize_metastudy(
         candidate_bindings=candidate_identity_bindings,
     )
     response_labels = build_selected_response_labels(
-        reader_bundle,
+        reader_records,
         candidate_identity_bindings=candidate_identity_bindings.rows,
     )
-    response_draws = build_selected_bootstrap_draws(
-        reader_bundle,
+    response_draws = build_selected_descriptive_resampling_draws(
+        reader_records,
         candidate_identity_bindings=candidate_identity_bindings.rows,
     )
-    all_primary_measurements = build_all_primary_measurements(reader_bundle)
+    all_primary_measurements = build_all_primary_measurements(reader_records)
     for evidence in sfxi_evidence:
         if evidence.stats_n_train != len(observed_labels):
             raise ValueError(
@@ -193,12 +197,12 @@ def _materialize_metastudy(
         response_labels,
         response_draws,
         all_primary_measurements,
-        reader_bundle.events,
-        reader_designs=reader_bundle.designs,
-        reader_wells=reader_bundle.wells,
-        reader_traces=reader_bundle.traces,
-        reference_design_id=reader_bundle.reference_design_id,
-        primary_reduction_id=reader_bundle.primary_reduction_id,
+        reader_records.events,
+        reader_designs=reader_records.designs,
+        reader_wells=reader_records.wells,
+        reader_traces=reader_records.traces,
+        reference_design_id=reader_records.reference_design_id,
+        primary_reduction_id=reader_records.primary_reduction_id,
         label_ids=response_ids,
         x_train=response_x_train,
         groups=candidate_identity_bindings.rows["reader_experiment_id"].astype(str).to_numpy(),
@@ -210,7 +214,7 @@ def _materialize_metastudy(
     )
     response_examples = build_response_example_rows(
         response_screen.uncertainty,
-        examples=reader_bundle.response_examples,
+        examples=reader_records.response_examples,
         selection_view_ids=tuple(target_view.id for target_view in target_views),
     )
     shuffled_validation = cross_validate_random_forest(
@@ -335,7 +339,7 @@ def _materialize_metastudy(
             thresholds=thresholds,
             recommendation=recommendation,
             canonical_sfxi_validation=canonical_sfxi_validation,
-            primary_reduction_id=reader_bundle.primary_reduction_id,
+            primary_reduction_id=reader_records.primary_reduction_id,
             label_truth_state=label_truth_state,
         ),
     )
@@ -343,7 +347,7 @@ def _materialize_metastudy(
         paths=paths,
         sfxi_evidence=sfxi_evidence,
         stress_campaign=stress_campaign,
-        reader_bundle=reader_bundle,
+        reader_records=reader_records,
         measurement_selection=measurement_selection,
         label_truth_state=label_truth_state,
         candidate_identity_bindings=candidate_identity_bindings,
@@ -359,7 +363,7 @@ def _materialize_metastudy(
         shuffled_model_validation_summary=shuffled_model_validation_summary,
         response_metric_screen=response_screen_manifest(
             response_screen,
-            primary_reduction_id=reader_bundle.primary_reduction_id,
+            primary_reduction_id=reader_records.primary_reduction_id,
             campaign_to_screen_calibration=campaign_to_screen_calibration,
             campaign_model_params=stress_campaign.model_params,
         ),

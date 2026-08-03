@@ -3,7 +3,7 @@ doc_id: study-eco1-rt-repack-routes
 surface: study-route-map
 study_id: eco1_rt_repack
 owner: dnadesign-maintainers
-last_verified: 2026-07-15
+last_verified: 2026-07-29
 entrypoint: self
 status_surface: record-only
 preflight_surface: runtime-and-contract-checks
@@ -20,6 +20,7 @@ study.
 | --- | --- |
 | Current state | `../record/status.md` |
 | Dataset and artifact posture | `../record/datasets.yaml` |
+| Downstream RT part publications | `../record/rt-parts/README.md` |
 | Campaign/procedure set | `../record/campaign.yaml` |
 | Fixed-backbone method | `../contexts/fixed-backbone-method.md` |
 | MSA/conservation method | `../contexts/msa-method.md` |
@@ -34,6 +35,7 @@ study.
 | Eco1 profile schema | `../operations/contract/schemas/eco1-rt-profile.schema.yaml` |
 | Artifact-chain schema | `../operations/contract/schemas/thread-artifact-chain.schema.yaml` |
 | Candidate handoff schema | `../operations/contract/schemas/thread-candidate-handoff.schema.yaml` |
+| Shared RT part publication contract | `../../../../src/dnadesign/contracts/sequence/rt_part_publication_v1.py` |
 | RT-lnRNA acceptance schema | `../operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml` |
 | Phase contract validator CLI | `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contract_validation.py` |
 | Contract validator package | `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/contracts/` |
@@ -97,13 +99,14 @@ study.
 | Communication visuals | `../../../../src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/communication_visuals/` | source-derived residue map, py3Dmol structure story, protected-evidence movie, centered cycle of all 738 local-geometry-retained ColabFold models, selected-panel qualitative Coulombic movie, structural screen, and selected-mutation map; present artifacts are exposed through the notebook communication evidence set |
 | Interactive browser structure review | `../../../../src/dnadesign/thread/structure_views/` and `../../../../src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/structure_browser/` | materialized interactive inspection for the Ec86 reference and fitted fold models; uses py3Dmol through the generic `dnadesign.thread.structure_views` contract. The constraint-evidence section highlights one selected mask-evidence category at a time on the ec86kit/7V9U reference using a single high-contrast highlight color. The design/fold triage section reuses baseline foldcheck_review PDBs for audit. The panel-selection section uses the active selection root and shows WT plus all eight selected sequences, with pLDDT, RMSD, mutation count, MSA support, mutation count near retained DNA/RNA or thumb-track positions, charge change, and chemistry warnings beside the viewer. Structure group labels are section-specific, and molecule-visibility controls stay stable while moving between visuals. Raw local PDB files remain unchanged, and the browser view does not replace ColabFold fold validation |
 | ChimeraX movie and pose review | `../../../../src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/review_deliverables/communication_visuals/` and `.agents/skills/chimerax-structure-review/` | reproducible scripts plus separate opt-in targets for protected evidence, the local-geometry-retained proposal pool, and selected electrostatics; ChimeraX provides publication output while py3Dmol provides interactive inspection |
-| Panel-selection visuals | v3 `selection/plots/` under the generation-policy root | materialized; the notebook exposes only files declared present by the v3 selection manifest |
+| Panel-selection visuals | v3 `selection/plots/` under the generation-policy root | materialized; the notebook exposes only files declared present by the v3 selection manifest, with the WT/D01/D02 N-terminal sequence and charge-proxy comparison routed to review-only context |
 | Optional model checks | `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/atlas_semantic_profile/`, `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_sae_profile/`, and `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/biohub_esmc_wt_mutation_scoring/` | supplementary ESMC, SAE, and Atlas context only; none filters v3 candidates or validates function |
 | Selection readiness | `../../../../src/dnadesign/studies/units/eco1_rt_repack/operations/materialization/selection_readiness/` and the v3 `selection/selection_readiness_manifest.yaml` | materialized flow: 1007 complete sequences, 978 strong-class models, 732 also passing local geometry, design groups of 335 distal, 220 peripheral, and 177 combined rows, then eight selected sequences; exact F10/R13 states are reported, while RT-msDNA oligomeric state is not established |
 | Candidate triage table | v3 `selection/candidate_triage_table.parquet` | materialized policy provenance, fold/local geometry, mutation geography, charge events, and MSA support without a composite activity score |
 | Candidate selection panel | v3 `selection/candidate_selection_panel.parquet` | eight selected sequences: two distal, three peripheral, and three combined; within each group, mutated-position distance precedes exact-substitution distance |
 | Selected protein sequence export | v3 `selection/candidate_handoff_sequences.csv` | materialized canonical 320-aa RT protein export with mapped-sequence provenance; it is not a DNA or construct design |
 | Twist full-CDS handoff | v3 `twist_handoff/` | all eight selected 963-bp CDS designs with CSV, FASTA, annotated GenBank files, hashes, and sequence QC; assembly flanks remain pending |
+| Tracked RT part publication | `../record/rt-parts/eco1-g3-distal-pair-v1.yaml` | D01 and D02 exact CDS/protein authorities conforming to the provider-neutral shared contract; no claim over RTs from other providers |
 | Downstream RT-lnRNA collaboration | `../../rt_lnrna_sponging_construct_triage/routes/README.md` | explicit handoff needed |
 | RT-only downstream acceptance | `../operations/contract/schemas/rt-lnrna-candidate-acceptance.schema.yaml` | scaffolded |
 

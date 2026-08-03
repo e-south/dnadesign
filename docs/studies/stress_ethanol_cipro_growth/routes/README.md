@@ -11,9 +11,8 @@ preflight_surface: studies.stress-ethanol-cipro-growth.preflight
 
 ## stress_ethanol_cipro_growth Routes
 
-Use this page to choose one owner and one next artifact. Current facts belong in
-the [checked-in status](../record/status.md); detailed scientific interpretation
-belongs in `contexts/`; executable declarations belong in `operations/`.
+Use this page to choose one owner and one next artifact. Current facts belong in the
+[checked-in status](../record/status.md), interpretation in `contexts/`, and declarations in `operations/`.
 
 ### First checks
 
@@ -31,13 +30,17 @@ Each step verifies its input before publishing the next artifact.
 
 | Step | Owner | Input and output | Open next |
 | --- | --- | --- | --- |
-| Measured records | Reader | Raw assay sources become verified measurement, event-window, and plot records. Reader does not assign study candidates or objectives. | [Study observation adapter](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/README.md) |
+| Measured records | Reader | Raw assay sources become verified measurement, event-window, and plot records. Reader does not assign study candidates, labels, or objectives. | [Candidate bindings](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/promoter_candidate_bindings/README.md) |
 | Candidate identity | Stress study | Reader aliases resolve to exact promoter candidates and sequence digests. | [Candidate bindings](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/promoter_candidate_bindings/README.md) |
 | Candidate observations | Stress study | Verified Reader reductions plus explicit repeat decisions become objective-neutral candidate observations. | [Response-window observations](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/README.md) |
 | Candidate features | Stress study and LatentDNA | The candidate table binds each candidate to the selected fixed-length model input. | [Candidate-table contract](../contexts/opal/candidate-table.md) |
 | Observed labels | Stress study | An approved observation bundle becomes an immutable OPAL label publication; this step does not score an objective. | [Label promotion](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_window_label_promotion/README.md) |
 | Objective interpretation | OPAL mathematics plus stress-study policy | SFXI, RMF, and MSRB interpret declared vectors under separate contracts. The active campaign uses MSRB; SFXI and RMF remain comparison evidence. | [OPAL context](../contexts/opal/README.md) |
 | Campaign state | OPAL plus checked-in study record | Validated features and labels feed model fitting, scoring, selection, ledgers, and the recorded physical handoff. | [OPAL route and commands](decision/opal/README.md) |
+
+After candidate binding, the [Reader evidence display](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/reader_promoter_evidence/README.md)
+verifies the exact plot record and promoter binding for read-only OPAL notebook review.
+It does not produce observations, labels, or objectives.
 
 Stop when the next contract is absent or fails validation. Do not infer a study
 candidate from a Reader `design_id`, synthesize response-window labels from an
@@ -54,7 +57,3 @@ SFXI score, or treat an accepted physical handoff as evidence of model support.
 | Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
 | OPAL campaigns and synthesis handoff | `opal` plus stress study | `opal_assay_b1_order_ready` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
 | Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | MSRB active learning probe; SFXI and RMF comparison evidence | [MSRB symbol walkthrough](../contexts/opal/multistate-response-behavior-walkthrough.html), [MSRB study binding](../contexts/opal/multistate-response-behavior.md), [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), and [RMF](../contexts/opal/response-magnitude-feasibility.md) |
-
-### Guardrails
-
-Use [Promoter design intent](../contexts/promoter-design-intent.md) for terminology and state boundaries; do not redefine them on this route map.

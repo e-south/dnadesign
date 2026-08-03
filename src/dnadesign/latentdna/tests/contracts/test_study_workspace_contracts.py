@@ -447,7 +447,7 @@ def test_rt_lnrna_workspace_exposes_intermediate_and_output_layer_gallery_views(
     assert "rt_lnrna_slot_context_robustness_summary_metrics" in notebook.context_audit_scalar_ids
     assert notebook.preferred_hue_kinds["khan_abundance_ordinal_bin"] == "ordinal"
     assert notebook.preferred_hue_kinds["crawford_abundance_ordinal_bin"] == "ordinal"
-    assert notebook.preferred_hue_kinds["reader_spop_score_median"] == "continuous"
+    assert "reader_spop_score_median" not in notebook.preferred_hue_kinds
     assert "crawford_abundance_normalized_value" not in notebook.preferred_hue_kinds
 
     for view_id in _RT_LNRNA_OUTPUT_LAYER_GALLERY_VIEWS:
@@ -489,8 +489,6 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
         "rt_variant_class",
         "rt_dms_mutation_class",
         "template_name",
-        "reader_spop_score_median",
-        "reader_spop_overlay_status",
         "khan_abundance_normalized_value",
         "khan_abundance_ordinal_bin",
         "crawford_abundance_raw_value",
@@ -505,7 +503,6 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
         "reference_genbank_catalog_rows",
         "reference_khan_abundance_rows",
         "reference_msd_compiler_landmarks",
-        "reference_reader_spop_assayed_genbank_rows",
         "reference_source_family_anchors",
     ]
     assert context.config.study_binding is not None
@@ -517,11 +514,10 @@ def test_rt_lnrna_workspace_ports_umap_and_ordinal_overlay_plot_contracts() -> N
     assert list(umap_gallery.projections) == [f"umap_{view_id}" for view_id in _RT_LNRNA_GALLERY_VIEWS]
     assert [option.column for option in umap_gallery.hue_options] == expected_overlay_hues
     assert umap_gallery.hue_options[9].type == "continuous"
-    assert umap_gallery.hue_options[10].type == "categorical"
+    assert umap_gallery.hue_options[10].type == "ordinal"
     assert umap_gallery.hue_options[11].type == "continuous"
     assert umap_gallery.hue_options[12].type == "ordinal"
-    assert umap_gallery.hue_options[13].type == "continuous"
-    assert umap_gallery.hue_options[14].type == "ordinal"
+    assert umap_gallery.hue_options[13].type == "categorical"
 
     assert dataset_overview.kind == "categorical_count"
     assert dataset_overview.scalar == "rt_lnrna_dataset_overview_counts"

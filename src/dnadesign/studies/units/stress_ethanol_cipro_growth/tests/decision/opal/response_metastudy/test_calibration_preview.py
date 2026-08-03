@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy import cli
 from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_metastudy.core.contracts import (
     StressCampaignContract,
     StressTargetView,
@@ -76,10 +77,14 @@ def test_calibration_preview_binds_reader_identity_masks_and_campaign_parity() -
     payload = calibration_preview.build_calibration_preview_payload(
         calibration=pd.DataFrame(rows),
         campaign=campaign,
-        reader_manifest_sha256="a" * 64,
-        reader_request_sha256="sha256:" + "b" * 64,
+        reader_catalog_sha256="a" * 64,
+        reader_projection_sha256="sha256:" + "b" * 64,
         candidate_bindings_manifest_sha256="c" * 64,
         observation_policy_sha256="d" * 64,
+        reader_record_receipt_sha256="e" * 64,
+        approved_reader_record_receipt_sha256="e" * 64,
+        approval_status="approved",
+        source_blockers=(),
         primary_reduction_id="event_logmean_4_8h_post",
         calibration_unit_count=35,
         calibration_candidate_count=31,
@@ -91,6 +96,10 @@ def test_calibration_preview_binds_reader_identity_masks_and_campaign_parity() -
     assert payload["schema_id"] == calibration_preview.SCHEMA_ID
     assert payload["mutation_posture"] == "preview_only"
     assert payload["campaign_matches_reader_calibration"] is True
+    assert payload["source_ready"] is True
+    assert payload["ready_for_campaign"] is True
+    assert payload["reader_record_receipt_sha256"] == "e" * 64
+    assert payload["blockers"] == []
     assert payload["campaign_matches_calibration_cohort"] is True
     assert payload["calibration_cohort"] == {
         "cohort_id": "exact_primary_reader_candidate_experiments_v1",
@@ -156,10 +165,14 @@ def test_calibration_preview_reports_drift_without_mutating_or_failing() -> None
     payload = calibration_preview.build_calibration_preview_payload(
         calibration=calibration,
         campaign=campaign,
-        reader_manifest_sha256="a" * 64,
-        reader_request_sha256="sha256:" + "b" * 64,
+        reader_catalog_sha256="a" * 64,
+        reader_projection_sha256="sha256:" + "b" * 64,
         candidate_bindings_manifest_sha256="c" * 64,
         observation_policy_sha256="d" * 64,
+        reader_record_receipt_sha256="e" * 64,
+        approved_reader_record_receipt_sha256="e" * 64,
+        approval_status="approved",
+        source_blockers=(),
         primary_reduction_id="primary",
         calibration_unit_count=1,
         calibration_candidate_count=1,
@@ -169,7 +182,126 @@ def test_calibration_preview_reports_drift_without_mutating_or_failing() -> None
     )
 
     assert payload["campaign_matches_reader_calibration"] is False
+    assert payload["source_ready"] is True
+    assert payload["ready_for_campaign"] is False
     assert payload["selection_views"][0]["matches_campaign_six_decimal_contract"] is False
+
+
+def test_matching_calibration_stays_closed_when_policy_is_unapproved_and_unpinned() -> None:
+    fields = {
+        "response_separation_min": 0.0,
+        "on_magnitude_min": 0.0,
+        "off_magnitude_max": 0.0,
+        "response_separation_scale": 0.4,
+        "on_magnitude_scale": 0.3,
+        "off_magnitude_scale": 0.2,
+    }
+    campaign = StressCampaignContract(
+        slug="secg_rmf_greedy",
+        config_path=Path("campaign.yaml"),
+        target_views=(StressTargetView(id="and", label="AND", target_mask=(0.0, 0.0, 0.0, 1.0)),),
+        candidate_records_path=Path("records.parquet"),
+        x_column_name="x",
+        response_reduction_id="primary",
+        rmf_calibration_by_view={"and": fields},
+        rmf_calibration_cohort={
+            "cohort_id": "exact_primary_reader_candidate_experiments_v1",
+            "unit": "reader_candidate_experiment",
+            "scale_quantile": 0.9,
+            "reader_bundle_manifest_sha256": "a" * 64,
+            "candidate_bindings_manifest_sha256": "c" * 64,
+            "unit_count": 1,
+            "excluded_nonexact_unit_count": 0,
+        },
+    )
+    calibration = pd.DataFrame(
+        [
+            {
+                "selection_view_id": "and",
+                "component": component,
+                "threshold": 0.0,
+                "scale": scale,
+                "scale_quantile": 0.9,
+                "scale_basis": "reader_joint_bootstrap_plus_conservative_event_bound",
+            }
+            for component, scale in (
+                ("response_separation", 0.4),
+                ("on_magnitude_floor", 0.3),
+                ("off_magnitude_ceiling", 0.2),
+            )
+        ]
+    )
+
+    payload = calibration_preview.build_calibration_preview_payload(
+        calibration=calibration,
+        campaign=campaign,
+        reader_catalog_sha256="a" * 64,
+        reader_projection_sha256="b" * 64,
+        candidate_bindings_manifest_sha256="c" * 64,
+        observation_policy_sha256="d" * 64,
+        reader_record_receipt_sha256="e" * 64,
+        approved_reader_record_receipt_sha256=None,
+        approval_status="review_required",
+        source_blockers=(
+            "canonical Reader record receipt requires study review and approval",
+            "response-window observation policy requires study approval",
+        ),
+        primary_reduction_id="primary",
+        calibration_unit_count=1,
+        calibration_candidate_count=1,
+        calibration_experiment_count=1,
+        excluded_nonexact_unit_count=0,
+        bootstrap_samples=500,
+    )
+
+    assert payload["campaign_matches_reader_calibration"] is True
+    assert payload["source_ready"] is False
+    assert payload["ready_for_campaign"] is False
+    assert payload["approval_status"] == "review_required"
+    assert payload["approved_reader_record_receipt_sha256"] is None
+    assert payload["reader_record_receipt_sha256"] == "e" * 64
+    assert payload["blocker_count"] == 2
+
+
+def test_plain_calibration_preview_prints_readiness_receipt_and_blockers(
+    monkeypatch,
+    capsys,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "preview_response_calibration",
+        lambda **_kwargs: {
+            "primary_reduction_id": "primary",
+            "ready_for_campaign": False,
+            "source_ready": False,
+            "reader_record_receipt_sha256": "e" * 64,
+            "campaign_matches_reader_calibration": True,
+            "blockers": ["policy requires study approval"],
+            "selection_views": [],
+        },
+    )
+
+    result = cli.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--reader-root",
+            str(tmp_path),
+            "--reader-experiment",
+            str(tmp_path),
+            "--candidate-bindings",
+            str(tmp_path),
+            "--calibration-preview",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "ready_for_campaign=False" in output
+    assert "source_ready=False" in output
+    assert f"reader_record_receipt_sha256={'e' * 64}" in output
+    assert "blocker=policy requires study approval" in output
 
 
 def test_calibration_cohort_uses_every_exact_candidate_experiment_without_repeat_selection() -> None:

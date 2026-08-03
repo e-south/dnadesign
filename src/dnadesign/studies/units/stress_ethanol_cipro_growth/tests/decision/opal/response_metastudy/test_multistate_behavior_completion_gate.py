@@ -40,7 +40,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 
 PACKAGE = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy")
 PROTOCOL = behavior_protocol.load_multistate_behavior_protocol(
-    PACKAGE / "config/multistate_response_behavior_shadow_v1.yaml"
+    PACKAGE / "config/multistate_response_behavior_shadow_v2.yaml"
 )
 
 
@@ -218,7 +218,7 @@ def test_grouped_validation_excludes_repeated_candidates_from_fold_scales() -> N
                 assert float(value) < 10.0
 
 
-def test_reference_relative_signal_bootstrap_must_be_definitionally_zero() -> None:
+def test_reference_relative_signal_resampling_must_be_definitionally_zero() -> None:
     designs = pd.DataFrame(
         {
             "experiment_id": ["experiment-a"],
@@ -226,7 +226,7 @@ def test_reference_relative_signal_bootstrap_must_be_definitionally_zero() -> No
             "reduction_id": ["event_logmean_4_8h_post"],
             "is_reference": [True],
             **{f"b{state}": [0.0] for state in PROTOCOL.state_ids},
-            **{f"b{state}_bootstrap_sd": [0.0] for state in PROTOCOL.state_ids},
+            **{f"b{state}_descriptive_resampling_sd": [0.0] for state in PROTOCOL.state_ids},
         }
     )
     draws = pd.DataFrame(
@@ -240,19 +240,19 @@ def test_reference_relative_signal_bootstrap_must_be_definitionally_zero() -> No
         }
     )
 
-    receipt = behavior_reference.verify_reference_relative_bootstrap_identity(
+    receipt = behavior_reference.verify_reference_relative_descriptive_resampling_identity(
         designs,
         draws,
         primary_reduction_id=PROTOCOL.primary_reduction_id,
         state_ids=PROTOCOL.state_ids,
     )
     assert receipt.reference_unit_count == 1
-    assert receipt.bootstrap_row_count == 3
+    assert receipt.descriptive_resampling_row_count == 3
 
     drifted = draws.copy()
     drifted.loc[1, "b10"] = 0.1
     with pytest.raises(ValueError, match="definitionally zero"):
-        behavior_reference.verify_reference_relative_bootstrap_identity(
+        behavior_reference.verify_reference_relative_descriptive_resampling_identity(
             designs,
             drifted,
             primary_reduction_id=PROTOCOL.primary_reduction_id,

@@ -7,8 +7,10 @@ These YAML fragments are loaded by `../ops.study.yaml`.
 - `status/`: record-only snapshot scope.
 - `readiness/`: providerless readiness scope, group bindings, next-scope rules,
   GenBank source-authority checks, and phase-named checks.
-- `schemas/`: study-owned contract fixtures, including the Construct
-  projection manifest schema and the representation-table handoff schema.
+- `schemas/`: study-owned contract fixtures, including raw reporter measurement
+  and stricter reference-normalized profile schemas, the Construct projection
+  manifest schema, the representation-table handoff schema, and the
+  compositional RT-lnRNA subject-binding schema.
 - `fixtures/`: minimal planned candidate, overlay, Permuter, Construct
   projection, and Infer feature-bundle examples. Candidate fixtures use
   `candidate_role` for working/failed study roles; GenBank/source-authority
@@ -24,3 +26,7 @@ public Permuter API. The representation helper validates the fixed six-view
 Infer handoff and rejects RT-lnRNA feature bundles that select by `product_kind`
 plus orientation without explicit `view_name`. Do not register OPS
 status/preflight providers until a concrete study provider exists.
+
+Provider-owned RT parts enter the subject-binding contract through the shared
+`dnadesign.contracts.sequence.RtPartPublicationV1` model. The study owns the
+composition, not the provider publication or a global RT registry.

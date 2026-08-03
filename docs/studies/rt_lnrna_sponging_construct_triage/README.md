@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage
 surface: study-root
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-05-26
+last_verified: 2026-08-01
 first_hop: routes/README.md
 status_surface: record-only
 preflight_surface: planned-contract-checks
@@ -11,25 +11,32 @@ preflight_surface: planned-contract-checks
 
 ## RT-lnRNA Sponging Construct Triage Study
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-26
+Start with the [route map](routes/README.md). For reporter-response work, the
+plain path is bridge admission, study-owned subject binding, the
+[reporter-response meta-study](contexts/reporter-response-metastudy/README.md),
+then objective readiness. Each step has one owner and passes a typed artifact;
+an acquisition never becomes a biological replicate unless Reader declares a
+replicate identifier.
 
-This study is the checked-in Phase 0/1 record for synthetic RT-lnRNA expression
-construct triage. It owns study framing, candidate-row semantics, source overlay
-contracts, and OPAL training-dataset readiness rules. It does not own Construct assembly,
-Infer feature extraction, LatentDNA materialization, or OPAL learning.
-
-Use `contexts/construct-overview.md` for the study primer. Use
-`contexts/retron-tf-decoy-design-logic.md` for the cross-study manuscript
-semantics that connect RT-lnRNA construct triage to the retron hairpin study.
-Use `routes/README.md` for task routing, `record/status.md` for current state
-and blockers, `record/datasets.yaml` for source inventories, and
+This study owns its framing, candidate-row semantics, source overlays, and
+downstream readiness rules. It does not own Construct assembly, Infer feature
+extraction, LatentDNA materialization, or OPAL learning. The route map also
+sends sequence, structure, representation, and construct questions to their
+owners in one jump. Use
+`contexts/construct-overview.md` for the study primer and
+`contexts/retron-tf-decoy-design-logic.md` for cross-study manuscript semantics.
+Use `record/status.md` for current state and blockers,
+`record/datasets.yaml` for source inventories, and
 `operations/ops.study.yaml` for the machine-readable contract index.
 GenBank source authority lives in
 `workbench/provenance/genbank-source-authority.yaml` with parsed offsets in
 `workbench/provenance/genbank-feature-offset-audit.md`. The Phase 2a Construct
 projection contract is the multi-slot projection manifest at
 `operations/contract/fixtures/construct/construct-projection-manifest.yaml`.
+Exact RT-lnRNA component compositions and Reader aliases are resolved through
+`workbench/provenance/subject_bindings/README.md`. Verified Reader records join
+to those identities through the separate, measurement-free
+`workbench/provenance/reader_evidence_bindings/README.md` contract.
 
 ### Directory Ontology
 

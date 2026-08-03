@@ -22,7 +22,7 @@ from .sources import ResponseWindowObservationEvidence, preview_response_window_
 
 CONFIG_ROOT = Path(__file__).resolve().parent / "config"
 DEFAULT_POLICY_PATH = CONFIG_ROOT / "observation_policy.yaml"
-DEFAULT_READER_REQUEST_PATH = CONFIG_ROOT / "reader_response_window.yaml"
+DEFAULT_READER_PROJECTION_PATH = CONFIG_ROOT / "reader_response_projection.yaml"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,8 +62,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
     else:
         evidence = preview_response_window_observation_evidence(
-            reader_bundle_root=args.reader_bundle,
-            reader_request_path=args.reader_request,
+            reader_root=args.reader_root,
+            reader_experiment_root=args.reader_experiment,
+            reader_projection_path=args.reader_projection,
             candidate_bindings_root=args.candidate_bindings,
             policy_path=args.policy,
         )
@@ -86,9 +87,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _add_source_inputs(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--reader-bundle", type=Path, required=True)
+    parser.add_argument("--reader-root", type=Path, required=True)
+    parser.add_argument("--reader-experiment", type=Path, required=True)
     parser.add_argument("--candidate-bindings", type=Path, required=True)
-    parser.add_argument("--reader-request", type=Path, default=DEFAULT_READER_REQUEST_PATH)
+    parser.add_argument("--reader-projection", type=Path, default=DEFAULT_READER_PROJECTION_PATH)
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY_PATH)
 
 
@@ -110,7 +112,9 @@ def _preview_payload(evidence: ResponseWindowObservationEvidence) -> dict[str, o
         "study_id": "stress_ethanol_cipro_growth",
         "policy_id": evidence.policy.policy_id,
         "approval_status": evidence.policy.approval_status,
-        "reader_manifest_sha256": evidence.reader_manifest_sha256,
+        "reader_catalog_sha256": evidence.reader_catalog_sha256,
+        "reader_projection_sha256": evidence.reader_projection_sha256,
+        "reader_record_receipt_sha256": evidence.reader_record_receipt_sha256,
         "candidate_bindings_manifest_sha256": evidence.candidate_bindings_manifest_sha256,
         "candidate_count": int(primary["candidate_id"].nunique()),
         "candidate_observation_preview_count": len(publishable),
@@ -130,7 +134,7 @@ def _preview_payload(evidence: ResponseWindowObservationEvidence) -> dict[str, o
 
 __all__ = [
     "DEFAULT_POLICY_PATH",
-    "DEFAULT_READER_REQUEST_PATH",
+    "DEFAULT_READER_PROJECTION_PATH",
     "build_parser",
     "main",
 ]

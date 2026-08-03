@@ -57,8 +57,9 @@ def test_notebook_generate_smoke(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         notebook_cmd,
         "smoke_check_notebook",
-        lambda path, *, run_marimo_check=True: smoke_checked.append(Path(path))
-        or {"python_parse_ok": True, "marimo_check_ok": True},
+        lambda path, *, run_marimo_check=True: (
+            smoke_checked.append(Path(path)) or {"python_parse_ok": True, "marimo_check_ok": True}
+        ),
     )
 
     app = _build()
@@ -264,8 +265,9 @@ def test_notebook_generate_campaign_set_with_repeated_campaign(tmp_path: Path, m
     monkeypatch.setattr(
         notebook_cmd,
         "smoke_check_notebook",
-        lambda path, *, run_marimo_check=True: smoke_checked.append(Path(path))
-        or {"python_parse_ok": True, "marimo_check_ok": True},
+        lambda path, *, run_marimo_check=True: (
+            smoke_checked.append(Path(path)) or {"python_parse_ok": True, "marimo_check_ok": True}
+        ),
     )
 
     app = _build()
@@ -587,8 +589,9 @@ def test_notebook_generate_campaign_set_rejects_mismatched_collection_visual_ind
     monkeypatch.setattr(
         notebook_cmd,
         "smoke_check_notebook",
-        lambda path, *, run_marimo_check=True: smoke_checked.append(Path(path))
-        or {"python_parse_ok": True, "marimo_check_ok": True},
+        lambda path, *, run_marimo_check=True: (
+            smoke_checked.append(Path(path)) or {"python_parse_ok": True, "marimo_check_ok": True}
+        ),
     )
 
     app = _build()

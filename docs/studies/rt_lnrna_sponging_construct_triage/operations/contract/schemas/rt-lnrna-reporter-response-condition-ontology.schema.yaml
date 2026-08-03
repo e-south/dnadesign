@@ -1,0 +1,64 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: rt-lnrna-reporter-response-condition-ontology.schema.yaml
+title: RT-lnRNA reporter-response condition ontology
+type: object
+additionalProperties: false
+required:
+  - ontology_id
+  - conditions
+  - sample_type_value
+  - reporter_channel
+  - normalizer_channel
+  - ratio_channel
+  - contract_id
+  - digest
+properties:
+  ontology_id:
+    type: string
+    minLength: 1
+  conditions:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    allOf:
+      - contains:
+          type: object
+          required: [role]
+          properties:
+            role: {const: baseline}
+        minContains: 1
+        maxContains: 1
+      - contains:
+          type: object
+          required: [role]
+          properties:
+            role: {const: positive_control}
+        minContains: 0
+        maxContains: 1
+      - contains:
+          type: object
+          required: [role]
+          properties:
+            role: {const: dose}
+        minContains: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [condition_id, treatment_label, role, dose_uM]
+      properties:
+        condition_id: {type: string, minLength: 1}
+        treatment_label: {type: string, minLength: 1}
+        role: {enum: [baseline, positive_control, dose]}
+        dose_uM:
+          anyOf:
+            - {type: number, exclusiveMinimum: 0}
+            - {type: "null"}
+  sample_type_value: {type: string, minLength: 1}
+  reporter_channel: {type: string, minLength: 1}
+  normalizer_channel: {type: string, minLength: 1}
+  ratio_channel: {type: string, minLength: 1}
+  contract_id:
+    const: rt_lnrna_reporter_response_condition_ontology.v1
+  digest:
+    type: string
+    pattern: '^sha256:[0-9a-f]{64}$'

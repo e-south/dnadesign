@@ -53,5 +53,5 @@ Fit, eval, reference, compiler, and DMS population placement on the selected
 axis. Reference and DMS rows remain projection evidence, not fit labels.
 
 Current claim boundary: this deliverable supports abundance-geometry audit and
-candidate triage. It does not invent SPOP labels, pool Crawford and Khan
-abundance values, or treat DMS rows as fit evidence.
+candidate triage. It does not invent reporter-response labels, pool Crawford
+and Khan abundance values, or treat DMS rows as fit evidence.

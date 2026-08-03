@@ -17,14 +17,32 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .linear_ssdna_composition_v1 import LinearSsdnaCompositionV1  # noqa: F401
     from .msd_design_reference_v1 import MsdDesignCatalogV1, MsdDesignReferenceV1  # noqa: F401
+    from .rt_part_publication_v1 import (  # noqa: F401
+        RtPartPublicationProvenanceV1,
+        RtPartPublicationV1,
+        RtPartV1,
+    )
 
 _LAZY_EXPORTS = {
     "LinearSsdnaCompositionV1": (".linear_ssdna_composition_v1", "LinearSsdnaCompositionV1"),
     "MsdDesignCatalogV1": (".msd_design_reference_v1", "MsdDesignCatalogV1"),
     "MsdDesignReferenceV1": (".msd_design_reference_v1", "MsdDesignReferenceV1"),
+    "RtPartPublicationProvenanceV1": (
+        ".rt_part_publication_v1",
+        "RtPartPublicationProvenanceV1",
+    ),
+    "RtPartPublicationV1": (".rt_part_publication_v1", "RtPartPublicationV1"),
+    "RtPartV1": (".rt_part_publication_v1", "RtPartV1"),
 }
 
-__all__ = ["LinearSsdnaCompositionV1", "MsdDesignCatalogV1", "MsdDesignReferenceV1"]
+__all__ = [
+    "LinearSsdnaCompositionV1",
+    "MsdDesignCatalogV1",
+    "MsdDesignReferenceV1",
+    "RtPartPublicationProvenanceV1",
+    "RtPartPublicationV1",
+    "RtPartV1",
+]
 
 
 def __getattr__(name: str) -> Any:

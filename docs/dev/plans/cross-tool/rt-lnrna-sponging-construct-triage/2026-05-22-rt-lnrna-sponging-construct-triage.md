@@ -636,7 +636,6 @@ Required columns:
 | `construct_id` | string/null | Filled after Construct projection. |
 | `construct_context_view_ids` | list/string | Declared view ids once produced. |
 | `abundance_prior_overlay_ids` | list/string | Khan/Crawford overlay ids attached by declared rules. |
-| `sponging_assay_observation_ids` | list/string/null | Empty before lab labels. |
 | `candidate_note` | string/null | Short human rationale. |
 
 `source_basis` should be controlled, but it is not the removed
@@ -1281,7 +1280,6 @@ construct_projection_status: pending
 construct_id: null
 construct_context_view_ids: []
 abundance_prior_overlay_ids: []
-sponging_assay_observation_ids: []
 candidate_note: Working Eco1 WT RT plus Eco1-derived retron26 lnRNA control.
 ```
 
@@ -1307,7 +1305,6 @@ construct_projection_status: pending
 construct_id: null
 construct_context_view_ids: []
 abundance_prior_overlay_ids: []
-sponging_assay_observation_ids: []
 candidate_note: Failed Eco1 WT RT plus Eco1-derived retron43 P4/stem-extension control.
 ```
 
@@ -1527,7 +1524,7 @@ docs/studies/rt_lnrna_sponging_construct_triage/
         msd-design-spec.schema.yaml
         construct-context-view.schema.yaml
         abundance-prior-overlay.schema.yaml
-        sponging-assay-observation.schema.yaml
+        rt-lnrna-reporter-response-profile.schema.yaml
       fixtures/
         retron26-working-anchor.yaml
         retron43-failed-anchor.yaml

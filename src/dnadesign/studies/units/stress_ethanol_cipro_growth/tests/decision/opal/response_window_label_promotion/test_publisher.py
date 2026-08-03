@@ -98,7 +98,7 @@ def test_verified_observations_publish_exact_one_dimensional_opal_labels(tmp_pat
     assert verified.promotion.row_count == 1
     assert verified.promotion.candidate_path == (dataset / "records.parquet").resolve()
     provenance = json.loads(result.study_provenance_path.read_text(encoding="utf-8"))
-    assert provenance["observation_bundle"]["schema_id"].endswith("response_window_observations.v2")
+    assert provenance["observation_bundle"]["schema_id"].endswith("response_window_observations.v3")
     assert provenance["schema_id"].endswith("response_window_label_promotion.v5")
     assert provenance["prior_promotion"] is None
 

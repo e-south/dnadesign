@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/reader_promoter_evidence/binding_verification.py
 
-Verify study-owned candidate identity for one Reader promoter-evidence selection.
+Resolve one Reader design through the study-owned promoter binding artifact.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -26,46 +26,41 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
 from .contracts import ReaderPromoterEvidenceError
 
 
-def verify_reader_study_binding(payload: dict[str, object], *, bindings_bundle: Path) -> None:
-    """Match a Reader selection to one exact row in the explicit study artifact."""
+def resolve_reader_study_binding(
+    design_id: str,
+    *,
+    bindings_bundle: Path,
+) -> tuple[dict[str, object], dict[str, str]]:
+    """Return the exact selected binding and its immutable source receipt."""
 
     try:
         bindings = load_promoter_candidate_bindings(bindings_bundle)
     except PromoterCandidateBindingsError as exc:
         raise ReaderPromoterEvidenceError(f"Study promoter-candidate bindings did not verify: {exc}") from exc
-    selection = payload["selection"]
-    if not isinstance(selection, dict):  # pragma: no cover - verified by the caller
-        raise ReaderPromoterEvidenceError("Reader selection is malformed.")
     matches = bindings.loc[
         (bindings["alias_namespace"].astype(str) == READER_ALIAS_NAMESPACE)
-        & (bindings["alias"].astype(str) == str(selection["design_id"]))
+        & (bindings["alias"].astype(str) == design_id)
     ]
     if len(matches) != 1:
         raise ReaderPromoterEvidenceError(
-            "Reader design alias must resolve exactly once in the explicit study promoter-candidate bindings."
+            "Reader design alias must resolve exactly once in the study promoter-candidate bindings."
         )
     row = matches.iloc[0]
-    if str(selection["candidate_id"]) != str(row["candidate_id"]):
-        raise ReaderPromoterEvidenceError("Reader selection candidate identity disagrees with the study binding.")
-
     manifest_path = Path(bindings_bundle).expanduser().resolve() / "manifest.json"
-    binding_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    expected_source = {
-        "schema_id": str(binding_manifest["schema_id"]),
-        "schema_version": str(binding_manifest["schema_version"]),
-        "study_id": str(binding_manifest["study_id"]),
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ReaderPromoterEvidenceError(f"Could not read the promoter-binding manifest: {exc}") from exc
+    source = {
+        "schema_id": str(manifest["schema_id"]),
+        "schema_version": str(manifest["schema_version"]),
+        "study_id": str(manifest["study_id"]),
         "manifest_sha256": _sha256(manifest_path),
-        "records_sha256": "sha256:" + str(binding_manifest["record"]["sha256"]),
-        "candidate_table_id": str(binding_manifest["candidate_table"]["dataset_id"]),
-        "candidate_selection_sha256": "sha256:" + str(binding_manifest["candidate_table"]["selection_sha256"]),
+        "records_sha256": "sha256:" + str(manifest["record"]["sha256"]),
+        "candidate_table_id": str(manifest["candidate_table"]["dataset_id"]),
+        "candidate_selection_sha256": "sha256:" + str(manifest["candidate_table"]["selection_sha256"]),
     }
-    sources = payload["sources"]
-    if not isinstance(sources, dict) or sources["candidate_bindings"] != expected_source:
-        raise ReaderPromoterEvidenceError(
-            "Reader candidate-binding source claim disagrees with the explicit study binding artifact."
-        )
-
-    expected_binding = {
+    selected = {
         "reader_design_id": str(row["alias"]),
         "candidate_id": str(row["candidate_id"]),
         "sequence_sha256": "sha256:" + str(row["sequence_sha256"]),
@@ -80,13 +75,9 @@ def verify_reader_study_binding(payload: dict[str, object], *, bindings_bundle: 
         "densegen_run_id": _optional_text(row["densegen__run_id"]),
         "densegen_sampling_library_hash": _optional_text(row["densegen__sampling_library_hash"]),
     }
-    if payload["selected_binding"] != expected_binding:
-        raise ReaderPromoterEvidenceError(
-            "Reader selected sequence or binding provenance disagrees with the explicit study binding artifact."
-        )
-    baserender = sources["baserender"]
-    if not isinstance(baserender, dict) or baserender["adapter_kind"] != row["baserender_adapter_kind"]:
-        raise ReaderPromoterEvidenceError("Reader BaseRender adapter disagrees with the explicit study binding.")
+    if selected["binding_status"] != "resolved" or selected["binding_method"] != "exact_alias":
+        raise ReaderPromoterEvidenceError("Promoter display requires one resolved exact Reader alias binding.")
+    return selected, source
 
 
 def _optional_text(value: object) -> str | None:
@@ -101,11 +92,7 @@ def _optional_text(value: object) -> str | None:
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return "sha256:" + digest.hexdigest()
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-__all__ = ["verify_reader_study_binding"]
+__all__ = ["resolve_reader_study_binding"]

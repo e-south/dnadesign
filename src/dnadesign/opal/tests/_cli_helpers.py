@@ -127,9 +127,6 @@ def write_campaign_yaml(
         merged_selection_params.update(selection_params)
     if selection_name == "expected_improvement" and "uncertainty_ref" not in merged_selection_params:
         merged_selection_params["uncertainty_ref"] = str(merged_selection_params["score_ref"])
-    for ref_key in ("score_ref", "uncertainty_ref"):
-        if ref_key in merged_selection_params and "/" in str(merged_selection_params[ref_key]):
-            merged_selection_params[ref_key] = str(merged_selection_params[ref_key]).rsplit("/", 1)[-1]
     cfg: Dict[str, Any] = {
         "schema_version": "opal.campaign.v3",
         "ownership": {"owner_scope": "opal_demo", "portable": True},

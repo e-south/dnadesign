@@ -1,7 +1,7 @@
 ## RT-lnRNA Trait-Axis Projection
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-21
+**Last verified:** 2026-07-30
 
 This surface asks whether LatentDNA geometry contains a source-scoped
 abundance direction for the current RT-lnRNA construct population. Crawford and
@@ -43,9 +43,11 @@ the abundance axes unless a future config change makes that override explicit.
 Parent-relative `axis_delta` and `orthogonal_delta` interpretation is deferred
 until parent mapping is complete and reliable in the workspace metadata.
 
-Reader SPOP is now available as durable Reader-owned label evidence. This
-surface must still not claim SPOP predictive validity until a candidate-X
-vector is selected and evaluated against the joined labels.
+Current Reader-backed reporter-response profiles support a 6-10 h provisional
+descriptive comparison. They are not LatentDNA labels: biological-replicate
+uncertainty and a constrained objective remain unresolved. This surface must
+not claim assay-response predictive validity or use immutable historical
+snapshots as labels.
 
 ### First-Pass Limits
 

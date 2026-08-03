@@ -86,6 +86,24 @@ def test_write_bundle_emits_clean_per_variant_records_manifest_and_compiler_spec
     assert variant_payload["msd_sequence_5to3"] == display_sequence
     compiler_spec = yaml.safe_load(Path(written.compiler_spec_path).read_text(encoding="utf-8"))
     assert compiler_spec == compiler_spec_payload_from_records(bundle.records)
+    assert Path(written.compiler_spec_path).name == "retron_msd_structure_panel_v1.spec.yaml"
+
+
+def test_bundle_writer_does_not_discover_or_publish_study_selection_files(tmp_path: Path) -> None:
+    source = tmp_path / "msd-regions.gb"
+    display_sequence = "GTCAGAAAAAACGGGTCCCTATCAGTGATAGAGAAGGCTCTCTATCACTGATAGGGAACAGACAGTAACTCAGA"
+    _write_genbank(source, [_record("msd-retron-170", display_sequence)])
+    bundle = parse_msd_region_genbank(source)
+    output_dir = tmp_path / "bundle"
+    output_dir.mkdir()
+    (output_dir / "selected-lineage.yaml").write_text("not: a valid lineage\n", encoding="utf-8")
+
+    written = write_msd_region_record_bundle(bundle, output_dir=output_dir)
+
+    manifest = yaml.safe_load(Path(written.manifest_path).read_text(encoding="utf-8"))
+    assert "selected_lineage" not in manifest
+    assert "materialized_variant_lineage" not in manifest
+    assert "materialized_variant_provenance_index" not in manifest
 
 
 def test_replacement_genbanks_overlay_matching_base_records(tmp_path: Path) -> None:
@@ -136,7 +154,8 @@ def test_variant_genbank_source_dir_is_steady_state_authority(tmp_path: Path) ->
     assert bundle.skipped_records == ()
     manifest = yaml.safe_load(Path(written.manifest_path).read_text(encoding="utf-8"))
     assert manifest["source_policy"] == "per_variant_genbank_sources_are_authority"
-    assert manifest["source_path"].endswith("source_inputs/variants")
+    assert manifest["source_path"] == "variants"
+    assert tmp_path.as_posix() not in Path(written.manifest_path).read_text(encoding="utf-8")
     assert "msd-regions - all DNA RNA.gb" not in Path(written.manifest_path).read_text(encoding="utf-8")
 
 
@@ -154,6 +173,9 @@ def test_ingest_msd_regions_cli_uses_only_variant_source_dir_inputs(tmp_path: Pa
     assert "source_genbank" not in command_parameters
     assert "replacement_genbank" not in command_parameters
     assert "write_variant_source_inputs" not in command_parameters
+    default_output = command_parameters["out_dir"].default.default
+    assert Path(default_output).name == "retron_msd_structure_panel_v1"
+    assert "reader_spop" not in Path(default_output).as_posix()
 
     result = RUNNER.invoke(
         app,
@@ -176,6 +198,8 @@ def test_ingest_msd_regions_cli_uses_only_variant_source_dir_inputs(tmp_path: Pa
     assert payload["variant_source_input_count"] == 1
     assert payload["included_record_count"] == 1
     assert "migrated_variant_sources" not in payload
+    assert "workbench/outputs/retron_msd_structure_panel_v1/materialized" in payload["next_step"]
+    assert "reader_spop" not in payload["next_step"]
 
 
 def test_generated_compiler_spec_loads_through_existing_genetic_compiler_boundary(tmp_path: Path) -> None:

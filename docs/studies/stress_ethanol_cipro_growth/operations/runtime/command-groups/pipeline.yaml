@@ -297,7 +297,7 @@ study_pipeline:
       reduction_id: event_logmean_4_8h_post
       label_rows: 27
       manifest: src/dnadesign/usr/datasets/usr_prom_eth_cip_opal_candidates/_opal/response_window_labels_v5/promotion.manifest.json
-      manifest_sha256: 12a6ae8c1f3720f9f72dc00bf556787e1a73953058cd8ab8d8030d516f023ef3  # pragma: allowlist secret
+      manifest_sha256: 059acdd5f8487d91704e1b65556ddab0c22a41609914a4035c5253df15e4144a  # pragma: allowlist secret
       label_artifact_sha256: 746196094ae181d8bb18336545beac2cce644fa916b193731b66cabd2d742f92  # pragma: allowlist secret
     selection_views:
       ethanol: [0, 1, 0, 1]

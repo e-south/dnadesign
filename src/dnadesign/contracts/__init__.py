@@ -16,7 +16,14 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1  # noqa: F401
-    from .sequence import LinearSsdnaCompositionV1, MsdDesignCatalogV1, MsdDesignReferenceV1  # noqa: F401
+    from .sequence import (  # noqa: F401
+        LinearSsdnaCompositionV1,
+        MsdDesignCatalogV1,
+        MsdDesignReferenceV1,
+        RtPartPublicationProvenanceV1,
+        RtPartPublicationV1,
+        RtPartV1,
+    )
     from .visual import (  # noqa: F401
         CassetteViewsManifestV1,
         CompositionReviewSvgV1,
@@ -37,6 +44,9 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "LinearSsdnaCompositionV1": (".sequence", "LinearSsdnaCompositionV1"),
     "MsdDesignCatalogV1": (".sequence", "MsdDesignCatalogV1"),
     "MsdDesignReferenceV1": (".sequence", "MsdDesignReferenceV1"),
+    "RtPartPublicationProvenanceV1": (".sequence", "RtPartPublicationProvenanceV1"),
+    "RtPartPublicationV1": (".sequence", "RtPartPublicationV1"),
+    "RtPartV1": (".sequence", "RtPartV1"),
     "SecondaryStructurePredictionRequestV1": (".folding", "SecondaryStructurePredictionRequestV1"),
     "SecondaryStructurePredictionV1": (".folding", "SecondaryStructurePredictionV1"),
     "SequenceEvidenceMapV1": (".visual", "SequenceEvidenceMapV1"),
@@ -54,6 +64,9 @@ __all__ = [
     "LinearSsdnaCompositionV1",
     "MsdDesignCatalogV1",
     "MsdDesignReferenceV1",
+    "RtPartPublicationProvenanceV1",
+    "RtPartPublicationV1",
+    "RtPartV1",
     "SecondaryStructurePredictionRequestV1",
     "SecondaryStructurePredictionV1",
     "SequenceEvidenceMapV1",

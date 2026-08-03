@@ -10,5 +10,6 @@ to pES-retron-26 `[56,2056)`, with longer lnRNA controls using the centered
 flank-trim policy declared by the Construct projection manifest.
 
 The Infer sidecars under `_derived/infer/` are materialized for the six
-declared source views. Planned status now applies to future Reader SPOP labels
-and downstream OPAL handoff, not to the current LatentDNA sidecar surface.
+declared source views. Planned status now applies to future descriptive
+reporter-response evidence and downstream OPAL handoff, not to the current
+LatentDNA sidecar surface.

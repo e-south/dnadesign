@@ -107,35 +107,6 @@ def test_guide_json_includes_campaign_plugins_steps_and_doc_pointers(tmp_path: P
     assert "src/dnadesign/opal/src/runtime/round/stages/scoring.py" in out["learn_more"]["source"]
 
 
-def test_guide_json_includes_spop_objective_pointers_without_sfxi_warning(tmp_path: Path) -> None:
-    workdir, campaign = _setup_workspace(tmp_path)
-    records = workdir / "records.parquet"
-    write_campaign_yaml(
-        campaign,
-        workdir=workdir,
-        records_path=records,
-        transforms_y_name="scalar_from_table_v1",
-        objective_name="spop_v1",
-        objective_params={},
-        y_expected_length=1,
-        selection_params={
-            "score_ref": "spop_v1/spop",
-            "objective_mode": "maximize",
-        },
-    )
-    app = _build()
-    runner = CliRunner()
-
-    res = runner.invoke(app, ["--no-color", "guide", "-c", str(campaign), "--format", "json"])
-    assert res.exit_code == 0, res.stdout
-    out = json.loads(res.stdout)
-
-    assert "docs/plugins/objectives/spop.md" in out["learn_more"]["docs"]
-    assert "src/dnadesign/opal/src/objectives/spop_v1.py" in out["learn_more"]["source"]
-    assert any("SPOP campaigns require scalar Y" in item for item in out["common_errors"])
-    assert not any("SFXI min_n" in item for item in out["common_errors"])
-
-
 def test_guide_json_uses_usr_records_and_shared_label_source_sidecar(tmp_path: Path) -> None:
     campaign, records, sidecar = _setup_usr_sidecar_workspace(tmp_path)
     app = _build()

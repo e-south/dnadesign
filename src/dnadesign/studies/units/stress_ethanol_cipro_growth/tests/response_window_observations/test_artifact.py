@@ -16,6 +16,7 @@ import json
 from dataclasses import replace
 from inspect import signature
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -29,6 +30,9 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observa
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.policy import (
     load_response_window_observation_policy,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_record_receipt import (
+    READER_EVENT_WINDOW_RECORD_CONTRACTS,
 )
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.repeat_diagnostics import (
     REPEAT_DIAGNOSTIC_COLUMNS,
@@ -127,9 +131,9 @@ def test_observation_publication_is_create_only(tmp_path: Path) -> None:
 
 def test_source_manifest_drift_blocks_publication_before_staging(tmp_path: Path) -> None:
     evidence = _evidence(tmp_path)
-    evidence.reader_manifest_path.write_text("changed", encoding="utf-8")
+    evidence.reader_catalog_path.write_text("changed", encoding="utf-8")
 
-    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="Reader manifest drift"):
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="Reader catalog drift"):
         artifact.materialize_response_window_observations(
             evidence,
             out_dir=tmp_path / "published",
@@ -137,12 +141,42 @@ def test_source_manifest_drift_blocks_publication_before_staging(tmp_path: Path)
         )
 
 
+def test_materialization_requires_the_policy_pinned_current_reader_receipt(tmp_path: Path) -> None:
+    evidence = _evidence(tmp_path)
+    evidence = replace(evidence, policy=replace(evidence.policy, reader_record_receipt_sha256="f" * 64))
+
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="not pinned"):
+        artifact.materialize_response_window_observations(
+            evidence,
+            out_dir=tmp_path / "published",
+            allowed_output_root=tmp_path,
+        )
+
+    assert not (tmp_path / "published").exists()
+
+
+def test_materialization_rejects_coordinated_preview_mutation(tmp_path: Path) -> None:
+    evidence = _evidence(tmp_path)
+    evidence.preview.contributions.loc[0, "r00"] = 9.0
+    evidence.preview.observations.loc[0, "r00"] = 9.0
+    evidence.preview.uncertainty.loc[evidence.preview.uncertainty["component"].eq("r00"), "point_estimate"] = 9.0
+
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="changed after its verified preview"):
+        artifact.materialize_response_window_observations(
+            evidence,
+            out_dir=tmp_path / "published",
+            allowed_output_root=tmp_path,
+        )
+
+    assert not (tmp_path / "published").exists()
+
+
 @pytest.mark.parametrize("source", ["reader", "candidate_bindings"])
 def test_source_record_drift_blocks_publication_before_staging(tmp_path: Path, source: str) -> None:
     evidence = _evidence(tmp_path)
     if source == "reader":
-        record = evidence.reader_manifest_path.parent / "tables" / "designs.parquet"
-        message = "Reader artifact"
+        record = evidence.reader_records.record_refs["designs"].path
+        message = "Reader 'designs' source record"
     else:
         record = evidence.candidate_bindings_path
         message = "candidate-binding record"
@@ -163,7 +197,7 @@ def test_source_record_race_after_staging_blocks_atomic_publication(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     evidence = _evidence(tmp_path)
-    reader_record = evidence.reader_manifest_path.parent / "tables" / "designs.parquet"
+    reader_record = evidence.reader_records.record_refs["designs"].path
     verify_staged = artifact.verify_response_window_observations
 
     def verify_then_mutate(*args, **kwargs):
@@ -173,7 +207,7 @@ def test_source_record_race_after_staging_blocks_atomic_publication(
 
     monkeypatch.setattr(artifact, "verify_response_window_observations", verify_then_mutate)
 
-    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="Reader artifact"):
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="Reader 'designs' source record"):
         artifact.materialize_response_window_observations(
             evidence,
             out_dir=tmp_path / "published",
@@ -195,6 +229,73 @@ def test_verifier_rejects_duplicate_manifest_keys(tmp_path: Path) -> None:
     manifest.write_text(raw.replace("{\n", '{\n  "schema_id": "ambiguous",\n', 1), encoding="utf-8")
 
     with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="duplicate JSON key"):
+        artifact.verify_response_window_observations(output, allowed_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("missing", "exactly the five"),
+        ("extra", "exactly the five"),
+        ("fake_record_id", "identity disagrees"),
+        ("fake_contract_id", "identity disagrees"),
+        ("empty_experiment", "identity is malformed"),
+        ("empty_epoch", "identity is malformed"),
+        ("extra_top_level", "identity is malformed"),
+        ("extra_catalog", "identity is malformed"),
+        ("absolute_path", "path is invalid"),
+        ("traversal_path", "path is invalid"),
+        ("bad_config_digest", "malformed revisions"),
+        ("inconsistent_config_digest", "must share one experiment config digest"),
+        ("bad_producer", "provenance is malformed"),
+        ("bad_input_revision", "provenance is malformed"),
+    ],
+)
+def test_verifier_requires_exact_reader_projection_receipt(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    output = tmp_path / "published"
+    artifact.materialize_response_window_observations(
+        _evidence(tmp_path),
+        out_dir=output,
+        allowed_output_root=tmp_path,
+    )
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    records = manifest["source_manifests"]["reader_records"]["records"]
+    if mutation == "missing":
+        records.pop("wells")
+    elif mutation == "extra":
+        records["unexpected"] = dict(records["wells"])
+    elif mutation == "fake_record_id":
+        records["designs"]["record_id"] = "response_window/not-designs"
+    elif mutation == "fake_contract_id":
+        records["designs"]["contract_id"] = "plate_reader.four_state_event_window.not-designs.v1"
+    elif mutation == "empty_experiment":
+        manifest["source_manifests"]["reader_records"]["experiment_id"] = ""
+    elif mutation == "empty_epoch":
+        manifest["source_manifests"]["reader_records"]["catalog"]["provenance_epoch_id"] = ""
+    elif mutation == "extra_top_level":
+        manifest["source_manifests"]["reader_records"]["unexpected"] = "value"
+    elif mutation == "extra_catalog":
+        manifest["source_manifests"]["reader_records"]["catalog"]["unexpected"] = "value"
+    elif mutation == "absolute_path":
+        records["designs"]["path"] = "/tmp/designs.parquet"
+    elif mutation == "traversal_path":
+        records["designs"]["path"] = "tables/../designs.parquet"
+    elif mutation == "bad_config_digest":
+        records["designs"]["config_digest"] = "sha256:not-a-digest"
+    elif mutation == "inconsistent_config_digest":
+        records["designs"]["config_digest"] = "sha256:" + ("e" * 64)
+    elif mutation == "bad_producer":
+        records["designs"]["producer"]["kind"] = "study"
+    else:
+        records["designs"]["inputs"][0]["record_revision_digest"] = "sha256:not-a-digest"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match=message):
         artifact.verify_response_window_observations(output, allowed_root=tmp_path)
 
 
@@ -268,25 +369,18 @@ def _rewrite_record(output: Path, record_id: str, frame: pd.DataFrame) -> None:
 
 def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWindowObservationEvidence:
     tmp_path.mkdir(parents=True, exist_ok=True)
-    reader_root = tmp_path / "reader-bundle"
-    reader_record = reader_root / "tables" / "designs.parquet"
-    reader_record.parent.mkdir(parents=True, exist_ok=True)
-    reader_record.write_bytes(b"reader-record")
-    reader_manifest = reader_root / "manifest.json"
-    reader_manifest.write_text(
-        json.dumps(
-            {
-                "artifacts": {
-                    "tables/designs.parquet": {
-                        "path": "tables/designs.parquet",
-                        "bytes": reader_record.stat().st_size,
-                        "sha256": f"sha256:{hashlib.sha256(reader_record.read_bytes()).hexdigest()}",
-                    }
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
+    reader_root = tmp_path / "reader"
+    reader_table_root = reader_root / "tables"
+    reader_table_root.mkdir(parents=True, exist_ok=True)
+    reader_record_paths: dict[str, Path] = {}
+    for name in ("wells", "designs", "descriptive_resampling_draws", "traces", "events"):
+        path = reader_table_root / f"{name}.parquet"
+        path.write_bytes(f"reader-record:{name}".encode())
+        reader_record_paths[name] = path
+    reader_catalog = reader_root / "records.json"
+    reader_catalog.write_text("{}", encoding="utf-8")
+    reader_projection = reader_root / "reader_response_projection.yaml"
+    reader_projection.write_text("projection", encoding="utf-8")
     binding_root = tmp_path / "candidate-bindings"
     binding_root.mkdir(parents=True, exist_ok=True)
     binding_manifest = binding_root / "manifest.json"
@@ -303,7 +397,8 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
         ),
         encoding="utf-8",
     )
-    reader_sha = hashlib.sha256(reader_manifest.read_bytes()).hexdigest()
+    reader_sha = hashlib.sha256(reader_catalog.read_bytes()).hexdigest()
+    projection_sha = hashlib.sha256(reader_projection.read_bytes()).hexdigest()
     binding_sha = hashlib.sha256(binding_manifest.read_bytes()).hexdigest()
     loaded = load_response_window_observation_policy(CONFIG)
     policy = replace(
@@ -311,7 +406,6 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
         approval_status="approved",
         approved_by="study-reviewer",
         approved_at="2026-07-15T12:00:00+00:00",
-        reader_bundle_sha256=reader_sha,
         candidate_bindings_sha256=binding_sha,
         repeat_decisions=pd.DataFrame(columns=loaded.repeat_decisions.columns),
         aggregation=replace(loaded.aggregation, bootstrap_samples=100),
@@ -420,6 +514,72 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
         event_time_sensitivity=event,
         blockers=blockers,
     )
+    record_refs = {
+        name: SimpleNamespace(
+            path=path,
+            content_digest="sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(),
+            size_bytes=path.stat().st_size,
+        )
+        for name, path in reader_record_paths.items()
+    }
+    receipt_records = {
+        name: {
+            "record_id": READER_EVENT_WINDOW_RECORD_CONTRACTS[name][0],
+            "kind": "dataframe_artifact",
+            "schema_version": 6,
+            "revision": 1,
+            "revision_digest": "sha256:" + ("a" * 64),
+            "config_digest": "sha256:" + ("b" * 64),
+            "producer_config_digest": "sha256:" + ("c" * 64),
+            "producer": {
+                "kind": "pipeline",
+                "id": name,
+                "plugin": "transform/four_state_event_window",
+            },
+            "inputs": [
+                {
+                    "label": "source",
+                    "kind": "record",
+                    "record": "source/df",
+                    "discovery_policy": "record",
+                    "record_revision_digest": "sha256:" + ("d" * 64),
+                }
+            ],
+            "contract_id": READER_EVENT_WINDOW_RECORD_CONTRACTS[name][1],
+            "path": f"tables/{name}.parquet",
+            "size_bytes": record_refs[name].size_bytes,
+            "content_digest": record_refs[name].content_digest,
+        }
+        for name in record_refs
+    }
+    receipt = {
+        "schema_version": "stress_ethanol_cipro_growth.reader_response_projection.v5",
+        "experiment_id": "aggregate",
+        "protocol_id": "plate_reader/four_state_event_window",
+        "catalog": {
+            "schema_version": 4,
+            "provenance_epoch_id": "epoch-test",
+            "sha256": reader_sha,
+        },
+        "config": {
+            "schema_version": "stress_ethanol_cipro_growth.reader_config_attestation.v1",
+            "config_sha256": "c" * 64,
+            "authoring_sha256": "d" * 64,
+            "analysis": {},
+        },
+        "projection_sha256": projection_sha,
+        "records": receipt_records,
+    }
+    receipt_sha = hashlib.sha256(
+        json.dumps(receipt, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    reader_records = SimpleNamespace(
+        record_refs=record_refs,
+        source_receipt=lambda: receipt,
+        source_receipt_sha256=lambda: receipt_sha,
+        verify_config_attestation=lambda: None,
+    )
+    policy = replace(policy, reader_record_receipt_sha256=receipt_sha)
     return ResponseWindowObservationEvidence(
         policy=policy,
         resolved=ResolvedReaderCandidateEvidence(
@@ -428,8 +588,12 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
             excluded_reader_designs=pd.DataFrame(),
         ),
         preview=preview,
-        reader_manifest_path=reader_manifest,
-        reader_manifest_sha256=reader_sha,
+        reader_records=reader_records,  # type: ignore[arg-type]
+        reader_catalog_path=reader_catalog,
+        reader_catalog_sha256=reader_sha,
+        reader_projection_path=reader_projection,
+        reader_projection_sha256=projection_sha,
+        reader_record_receipt_sha256=receipt_sha,
         candidate_bindings_manifest_path=binding_manifest,
         candidate_bindings_manifest_sha256=binding_sha,
         candidate_bindings_path=binding_rows,

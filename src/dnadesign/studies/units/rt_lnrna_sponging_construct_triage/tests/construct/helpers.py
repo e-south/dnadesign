@@ -72,7 +72,7 @@ def _assert_construct_subject_envelope_inputs(report: ControlConstructMaterializ
 
     assert set(inputs["construct_subject__record_kind"]) == {"construct_subject_envelope"}
     assert set(inputs["construct_subject__sequence_authority"]) == {"overlay_only"}
-    assert set(inputs["construct_subject__envelope_carrier_policy"]) == {"synthetic_unique_dna4_v1"}
+    assert set(inputs["construct_subject__envelope_carrier_policy"]) == {"subject_id_sha256_digest_carrier_v1"}
     assert inputs["id"].is_unique
     assert {tuple(fields) for fields in inputs["construct_subject__biological_sequence_fields"]} == {
         _CONSTRUCT_SUBJECT_SEQUENCE_FIELDS

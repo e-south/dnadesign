@@ -27,12 +27,12 @@ CONFIG = Path(
 )
 
 
-def test_repository_policy_records_approved_explicit_repeat_sources() -> None:
+def test_repository_policy_retains_reviewed_repeats_but_requires_current_record_approval() -> None:
     result = policy.load_response_window_observation_policy(CONFIG)
 
-    assert result.approval_status == "approved"
-    assert result.approved_by == "Eric J. South"
-    assert result.approved_at == "2026-07-15T19:33:54-04:00"
+    assert result.approval_status == "review_required"
+    assert result.approved_by is None
+    assert result.approved_at is None
     expected_reader_sha256 = (
         "e0065183fe010fe40e88e75da998cff5ed1399e56ff1d2bc1268f9331b573a67"  # pragma: allowlist secret
     )
@@ -40,6 +40,7 @@ def test_repository_policy_records_approved_explicit_repeat_sources() -> None:
         "273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8"  # pragma: allowlist secret
     )
     assert result.reader_bundle_sha256 == expected_reader_sha256
+    assert result.reader_record_receipt_sha256 is None
     assert result.candidate_bindings_sha256 == expected_bindings_sha256
     assert len(result.repeat_decisions) == 12
     assert result.repeat_decisions["status"].value_counts().to_dict() == {
@@ -102,9 +103,30 @@ def test_policy_rejects_duplicate_repeat_candidates(tmp_path: Path) -> None:
 
 def test_policy_rejects_unpinned_source_manifests(tmp_path: Path) -> None:
     payload = _unreviewed_payload()
-    payload["source_manifests"]["reader_bundle_sha256"] = "latest"
+    payload["source_manifests"]["reader_record_receipt_sha256"] = "latest"
 
     with pytest.raises(policy.ResponseWindowObservationPolicyError, match="SHA-256 digest"):
+        policy.load_response_window_observation_policy(_write(tmp_path / "policy.yaml", payload))
+
+
+def test_approved_policy_requires_current_reader_record_receipt(tmp_path: Path) -> None:
+    payload = _unreviewed_payload()
+    payload["approval"] = {
+        "status": "approved",
+        "approved_by": "study-reviewer",
+        "approved_at": "2026-08-02T12:00:00+00:00",
+        "rationale": "The exact current Reader receipt was reviewed.",
+    }
+
+    with pytest.raises(policy.ResponseWindowObservationPolicyError, match="pinned Reader record receipt"):
+        policy.load_response_window_observation_policy(_write(tmp_path / "policy.yaml", payload))
+
+
+def test_policy_rejects_uppercase_record_receipt_digest(tmp_path: Path) -> None:
+    payload = _unreviewed_payload()
+    payload["source_manifests"]["reader_record_receipt_sha256"] = "A" * 64
+
+    with pytest.raises(policy.ResponseWindowObservationPolicyError, match="lowercase SHA-256"):
         policy.load_response_window_observation_policy(_write(tmp_path / "policy.yaml", payload))
 
 
@@ -164,10 +186,11 @@ def test_selected_repeat_requires_declared_label_source(tmp_path: Path) -> None:
         policy.load_response_window_observation_policy(_write(tmp_path / "policy.yaml", payload))
 
 
-def test_v1_policy_is_rejected_without_a_compatibility_shim(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", ["1", "2"])
+def test_retired_policy_versions_are_rejected_without_a_compatibility_shim(tmp_path: Path, version: str) -> None:
     payload = _unreviewed_payload()
-    payload["schema_id"] = "stress_ethanol_cipro_growth.response_window_observation_policy.v1"
-    payload["schema_version"] = "1"
+    payload["schema_id"] = f"stress_ethanol_cipro_growth.response_window_observation_policy.v{version}"
+    payload["schema_version"] = version
 
     with pytest.raises(policy.ResponseWindowObservationPolicyError, match="schema identity disagrees"):
         policy.load_response_window_observation_policy(_write(tmp_path / "policy.yaml", payload))

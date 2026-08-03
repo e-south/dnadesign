@@ -76,6 +76,10 @@ baserender = "dnadesign.baserender:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
 junction = "dnadesign.junction.cli:main"
 ops        = "dnadesign.ops.cli:main"
+rt-lnrna-reporter-metastudy = "dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator:main"
+
+[project.entry-points."dnadesign.opal.reader_evidence_artifacts"]
+stress-promoter-response = "dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.reader_promoter_evidence.notebook_adapter:register_notebook_adapter"
 
 [project.optional-dependencies]
 # GPU stack (Linux x86_64 only)
@@ -171,6 +175,7 @@ where = ["src"]
   "units/stress_ethanol_cipro_growth/response_window_observations/config/evidence/*.json",
   "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.yaml",
   "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.json",
+  "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/evidence/*.json",
   "units/stress_ethanol_cipro_growth/decision/opal/sfxi_reference_overlay/reader_records.json",
   "units/stress_ethanol_cipro_growth/decision/opal/synthesis_handoff/configs/*.yaml",
 ]

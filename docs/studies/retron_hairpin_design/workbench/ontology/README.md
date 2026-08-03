@@ -34,5 +34,5 @@ Use this directory for reusable vocabulary only. Cohort membership belongs in
 belongs in `../provenance/`.
 
 Payload families describe literal payload sources and motif-register semantics.
-They do not declare whether a construct worked in Reader; assay evidence stays
-in the RT-lnRNA/Reader SPOP records.
+They do not declare whether a construct worked in Reader; descriptive assay
+profiles and any later objective interpretation stay in the RT-lnRNA study.

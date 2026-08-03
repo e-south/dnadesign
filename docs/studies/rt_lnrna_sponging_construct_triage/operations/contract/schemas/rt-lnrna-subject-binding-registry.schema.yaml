@@ -1,0 +1,91 @@
+schema_id: rt_lnrna_subject_binding_registry_v1
+owner: rt_lnrna_sponging_construct_triage
+purpose: >-
+  Bind one RT sequence authority and one RNA-bearing-part authority into an
+  assay-resolvable study subject, with an optional hairpin-owned MSD source.
+  The RNA-bearing part may be a complete lnRNA cassette or a construct-ready
+  MSD handoff, as declared by its source record.
+strict: true
+required_root_fields:
+  - schema_id
+  - study_id
+  - binding_set_id
+  - source_sets
+  - subjects
+subject_required_fields:
+  - subject_id
+  - study_variant_id
+  - payload_program_id
+  - rt_part
+  - lnrna_part
+  - msd_structure
+  - aliases
+  - construct_projection_status
+source_set_required_fields:
+  - source_set_id
+  - projection_kind
+  - owner_study_id
+  - source_path
+  - projection_sha256
+  - msd_source_manifest_path
+  - exclude_record_ids
+  - default_payload_program_id
+  - payload_program_overrides
+part_authority_required_fields:
+  - owner_study_id
+  - part_id
+  - authority_kind
+  - source_path
+  - record_id
+  - sequence_sha256
+msd_structure_required_fields:
+  - owner_study_id
+  - source_manifest_path
+  - variant_id
+  - sequence_sha256
+  - orientation_in_lnrna
+  - lnrna_span_0
+  - structure_materialization_id
+  - structure_subject_id
+alias_required_fields:
+  - namespace
+  - value
+controlled_values:
+  part_authority_kind:
+    - rt_lnrna_variant_genbank_catalog
+    - rt_part_publication_v1
+  alias_namespace:
+    - reader.design_id
+    - reader.assay_subject_id
+  orientation_in_lnrna:
+    - forward
+    - reverse_complement
+  construct_projection_status:
+    - representable
+forbidden_subject_fields:
+  - measurement
+  - observation
+  - plot
+  - opal_state
+  - score
+validation:
+  - Unknown fields fail.
+  - Subject ids, study-variant ids, and component tuples are unique.
+  - A provider-composed Reader design id such as pES-retron-205-Eco1RT-G3-D01 cannot collapse to the bare study-variant id retron205; component-defined study identity is required.
+  - The one declared catalog source set promotes all non-excluded catalog rows into logical bindings without copying rows into this file.
+  - The declared projection digest pins the canonical projected identity tuples and rejects silent catalog membership, alias, source path/kind/digest, handoff marker, component-digest, payload, or projection-status drift.
+  - Source-set exclusions must be covered by explicit subjects with the same study-variant ids.
+  - Payload-program overrides must name included catalog records; the native msrmsdwt_bl21 subject cannot inherit the tetO default.
+  - Namespace-qualified aliases resolve to exactly one subject.
+  - RT and lnRNA digests must close against their named source artifacts.
+  - A catalog row marked local_retron_hairpin_handoff must resolve one exact hairpin source record whose normalized source-sequence digest equals the catalog lnRNA digest.
+  - A local_genbank_only catalog row may omit an MSD structure reference.
+  - Each part owner must match the named authority contract.
+  - Provider-published RT parts validate through rt_part_publication_v1, and the publication owner must equal the binding owner.
+  - Provider publications expose opaque provider references plus canonical CDS/protein digests and lengths; they do not expose CDS bytes or provider-internal generated candidate ids.
+  - Reference-only subject loading validates digest-pinned composition; general materialization reports byte-blocked subjects and continues with independently resolvable subjects.
+  - An exact projection request containing a byte-blocked subject fails before any materialization writes.
+  - Every published subject carries proven component authority; representable is binding eligibility, not a completed Construct projection.
+  - When an MSD source exists, its sequence must match one unique forward or reverse-complement lnRNA span and its display identity must match.
+  - The MSD materialization id must equal its hairpin-owned source-bundle directory; retired Reader- or objective-coupled identities are rejected.
+  - Absence of an MSD source does not invalidate RT-lnRNA identity.

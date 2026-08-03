@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,7 +30,7 @@ from ..core.response_contracts import RESPONSE_REVIEW_SPEC
 from ..evaluation.response_uncertainty import estimate_response_calibration_from_reader_draws
 from .loading import assert_campaign_response_reduction, load_stress_campaign_contract
 
-SCHEMA_ID = "stress_ethanol_cipro_growth.rmf_calibration_preview.v2"
+SCHEMA_ID = "stress_ethanol_cipro_growth.rmf_calibration_preview.v4"
 CALIBRATION_COHORT_ID = "exact_primary_reader_candidate_experiments_v1"
 _COMPONENT_FIELDS = {
     "response_separation": ("response_separation_min", "response_separation_scale"),
@@ -55,7 +54,8 @@ class ResponseCalibrationCohort:
 def preview_response_calibration(
     *,
     repo_root: Path,
-    reader_bundle_root: Path,
+    reader_root: Path,
+    reader_experiment_root: Path,
     candidate_binding_bundle_root: Path,
 ) -> dict[str, object]:
     """Return Reader-derived campaign calibration without writing artifacts."""
@@ -63,15 +63,16 @@ def preview_response_calibration(
     root = Path(repo_root).resolve()
     paths = MetastudyPaths(
         repo_root=root,
-        reader_bundle_root=Path(reader_bundle_root).resolve(),
+        reader_root=Path(reader_root).resolve(),
+        reader_experiment_root=Path(reader_experiment_root).resolve(),
         out_dir=root / ".unused-calibration-preview",
         campaign_root=response_window_round0_source_evidence_root(root).resolve(),
     )
     campaign = load_stress_campaign_contract(paths)
-    request_path = (
+    projection_path = (
         root
         / "src/dnadesign/studies/units/stress_ethanol_cipro_growth"
-        / "response_window_observations/config/reader_response_window.yaml"
+        / "response_window_observations/config/reader_response_projection.yaml"
     )
     policy_path = (
         root
@@ -79,8 +80,9 @@ def preview_response_calibration(
         / "response_window_observations/config/observation_policy.yaml"
     )
     evidence = preview_response_window_observation_evidence(
-        reader_bundle_root=paths.reader_bundle_root,
-        reader_request_path=request_path,
+        reader_root=paths.reader_root,
+        reader_experiment_root=paths.reader_experiment_root,
+        reader_projection_path=projection_path,
         candidate_bindings_root=candidate_binding_bundle_root,
         policy_path=policy_path,
     )
@@ -105,10 +107,14 @@ def preview_response_calibration(
     return build_calibration_preview_payload(
         calibration=result.calibration,
         campaign=campaign,
-        reader_manifest_sha256=evidence.reader_manifest_sha256,
-        reader_request_sha256="sha256:" + _file_sha256(request_path),
+        reader_catalog_sha256=evidence.reader_catalog_sha256,
+        reader_projection_sha256=evidence.reader_projection_sha256,
         candidate_bindings_manifest_sha256=evidence.candidate_bindings_manifest_sha256,
         observation_policy_sha256=evidence.policy.config_sha256,
+        reader_record_receipt_sha256=evidence.reader_record_receipt_sha256,
+        approved_reader_record_receipt_sha256=evidence.policy.reader_record_receipt_sha256,
+        approval_status=evidence.policy.approval_status,
+        source_blockers=evidence.preview.blockers,
         primary_reduction_id=primary_reduction_id,
         calibration_unit_count=cohort.unit_count,
         calibration_candidate_count=cohort.candidate_count,
@@ -179,10 +185,14 @@ def build_calibration_preview_payload(
     *,
     calibration: pd.DataFrame,
     campaign: StressCampaignContract,
-    reader_manifest_sha256: str,
-    reader_request_sha256: str,
+    reader_catalog_sha256: str,
+    reader_projection_sha256: str,
     candidate_bindings_manifest_sha256: str,
     observation_policy_sha256: str,
+    reader_record_receipt_sha256: str,
+    approved_reader_record_receipt_sha256: str | None,
+    approval_status: str,
+    source_blockers: tuple[str, ...],
     primary_reduction_id: str,
     calibration_unit_count: int,
     calibration_candidate_count: int,
@@ -239,38 +249,44 @@ def build_calibration_preview_payload(
         "cohort_id": calibration_cohort["cohort_id"],
         "unit": calibration_cohort["unit"],
         "scale_quantile": float(calibration["scale_quantile"].iloc[0]),
-        "reader_bundle_manifest_sha256": reader_manifest_sha256,
+        "reader_bundle_manifest_sha256": reader_catalog_sha256,
         "candidate_bindings_manifest_sha256": candidate_bindings_manifest_sha256,
         "unit_count": calibration_cohort["unit_count"],
         "excluded_nonexact_unit_count": calibration_cohort["excluded_nonexact_unit_count"],
     }
     cohort_matches = configured_cohort == campaign_cohort_projection
+    blockers = sorted(set(source_blockers))
+    source_ready = (
+        approval_status == "approved"
+        and approved_reader_record_receipt_sha256 == reader_record_receipt_sha256
+        and not blockers
+    )
+    calibration_matches = matches and cohort_matches
     return {
         "schema_id": SCHEMA_ID,
         "study_id": "stress_ethanol_cipro_growth",
         "mutation_posture": "preview_only",
         "primary_reduction_id": primary_reduction_id,
-        "reader_bundle_manifest_sha256": reader_manifest_sha256,
-        "reader_request_sha256": reader_request_sha256,
+        "reader_catalog_sha256": reader_catalog_sha256,
+        "reader_projection_sha256": reader_projection_sha256,
         "candidate_bindings_manifest_sha256": candidate_bindings_manifest_sha256,
         "observation_policy_sha256": observation_policy_sha256,
+        "reader_record_receipt_sha256": reader_record_receipt_sha256,
+        "approved_reader_record_receipt_sha256": approved_reader_record_receipt_sha256,
+        "approval_status": approval_status,
+        "source_ready": source_ready,
+        "ready_for_campaign": source_ready and calibration_matches,
+        "blocker_count": len(blockers),
+        "blockers": blockers,
         "calibration_cohort": calibration_cohort,
         "configured_campaign_calibration_cohort": configured_cohort,
         "campaign_matches_calibration_cohort": cohort_matches,
         "bootstrap_samples": int(bootstrap_samples),
         "scale_quantile": float(calibration["scale_quantile"].iloc[0]),
         "scale_basis": sorted(calibration["scale_basis"].astype(str).unique().tolist()),
-        "campaign_matches_reader_calibration": matches and cohort_matches,
+        "campaign_matches_reader_calibration": calibration_matches,
         "selection_views": view_rows,
     }
-
-
-def _file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 __all__ = [

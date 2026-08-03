@@ -57,7 +57,7 @@ stress_ethanol_cipro_growth/
     opal/
       batch0/               # pre-assay OPAL candidate-table handoff
       densegen_axis_probe/  # DenseGen-label OPAL probe and TFBS learnability
-      reader_promoter_evidence/ # OPAL discovery of Reader evidence bundles
+      reader_promoter_evidence/ # canonical Reader diagnostic -> OPAL display
       response_window_label_promotion/ # verified observations -> OPAL labels
       response_metastudy/   # SFXI/RMF evidence and promotion review
   operations/
@@ -79,8 +79,9 @@ stress_ethanol_cipro_growth/
 - `decision/opal/batch0/`: OPAL candidate-table sampling for this study only.
 - `decision/opal/densegen_axis_probe/`: study-local OPAL probes that consume
   DenseGen construction metadata through study-owned contracts.
-- `decision/opal/reader_promoter_evidence/`: verifies objective-neutral Reader
-  evidence bundles for OPAL discovery without owning candidate identity or RMF
+- `decision/opal/reader_promoter_evidence/`: verifies and stages one
+  objective-neutral diagnostic from canonical Reader catalog-v4/record-v6
+  evidence for OPAL discovery, without owning candidate identity or objective
   mathematics.
 - `decision/opal/response_metastudy/`: compares the declared SFXI source
   evidence with response-window and RMF requirements without merging their

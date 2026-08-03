@@ -13,20 +13,20 @@ from __future__ import annotations
 
 import pandas as pd
 
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
-    ReaderResponseBundle,
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_records import (
+    ReaderResponseRecords,
 )
 
 CANDIDATE_IDENTITY_COLUMNS = ("id", "design_id", "reader_experiment_id")
 
 
 def build_selected_response_labels(
-    bundle: ReaderResponseBundle,
+    records: ReaderResponseRecords,
     *,
     candidate_identity_bindings: pd.DataFrame,
 ) -> pd.DataFrame:
     labels = _validated_bindings(candidate_identity_bindings, require_unique_candidate=True)
-    designs = bundle.designs.loc[~bundle.designs["is_reference"].astype(bool)].copy()
+    designs = records.designs.loc[~records.designs["is_reference"].astype(bool)].copy()
     designs = designs.rename(
         columns={
             "experiment_id": "reader_experiment_id",
@@ -41,8 +41,8 @@ def build_selected_response_labels(
     )
     if selected["reduction_id"].isna().any():
         missing_rows = selected.loc[selected["reduction_id"].isna(), ["id", "reader_experiment_id", "design_id"]]
-        raise ValueError(f"Reader response-window bundle lacks selected labels: {missing_rows.to_dict('records')}")
-    expected_rows = len(labels) * bundle.designs["reduction_id"].nunique()
+        raise ValueError(f"Reader response-window records lack selected labels: {missing_rows.to_dict('records')}")
+    expected_rows = len(labels) * records.designs["reduction_id"].nunique()
     if len(selected) != expected_rows:
         raise ValueError(f"selected Reader label rows expected {expected_rows}; observed {len(selected)}.")
     if selected.duplicated(subset=["reduction_id", "id"]).any():
@@ -50,13 +50,14 @@ def build_selected_response_labels(
     return selected.sort_values(["reduction_id", "id"], kind="mergesort").reset_index(drop=True)
 
 
-def build_selected_bootstrap_draws(
-    bundle: ReaderResponseBundle,
+def build_selected_descriptive_resampling_draws(
+    records: ReaderResponseRecords,
     *,
     candidate_identity_bindings: pd.DataFrame,
 ) -> pd.DataFrame:
     labels = _validated_bindings(candidate_identity_bindings, require_unique_candidate=False)
-    draws = bundle.bootstrap_draws.loc[~bundle.bootstrap_draws["is_reference"].astype(bool)].rename(
+    reader_draws = records.descriptive_resampling_draws
+    draws = reader_draws.loc[~reader_draws["is_reference"].astype(bool)].rename(
         columns={"experiment_id": "reader_experiment_id"}
     )
     selected = labels.merge(
@@ -66,10 +67,10 @@ def build_selected_bootstrap_draws(
         validate="one_to_many",
     )
     if selected["draw_index"].isna().any():
-        raise ValueError("Reader bootstrap bundle lacks one or more selected labels.")
+        raise ValueError("Reader descriptive-resampling records lack one or more selected labels.")
     key = ["id", "reduction_id", "draw_index"]
     if selected.duplicated(subset=key).any():
-        raise ValueError("selected Reader bootstrap draws contain duplicate identities.")
+        raise ValueError("selected Reader descriptive-resampling draws contain duplicate identities.")
     return selected.sort_values(key, kind="mergesort").reset_index(drop=True)
 
 
@@ -84,4 +85,4 @@ def _validated_bindings(frame: pd.DataFrame, *, require_unique_candidate: bool) 
     return labels
 
 
-__all__ = ["build_selected_bootstrap_draws", "build_selected_response_labels"]
+__all__ = ["build_selected_descriptive_resampling_draws", "build_selected_response_labels"]

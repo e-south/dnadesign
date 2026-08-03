@@ -846,13 +846,15 @@ def test_notebook_baserender_panel_titles_candidate_by_selection_view_and_rank()
         mo=_FakeMo(),
         opal_table=lambda *_, **__: {"kind": "table"},
         pl=pl,
-        render_notebook_baserender_record=lambda *_, **kwargs: rendered.update(kwargs)
-        or {
-            "record_id": "candidate-record-alpha-with-long-id",
-            "image_bytes": b"png",
-            "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
-            "alt_text": "DenseGen TFBS annotation",
-        },
+        render_notebook_baserender_record=lambda *_, **kwargs: (
+            rendered.update(kwargs)
+            or {
+                "record_id": "candidate-record-alpha-with-long-id",
+                "image_bytes": b"png",
+                "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
+                "alt_text": "DenseGen TFBS annotation",
+            }
+        ),
         render_notebook_plot_choice_image=lambda *_, **__: None,
         selected_baserender_round=0,
         selected_baserender_status_rows=(),
@@ -1030,13 +1032,15 @@ def test_three_axis_panel_is_not_appended_with_baserender_evidence() -> None:
         opal_table=lambda *_, **__: {"kind": "table"},
         pl=pl,
         plot_view_state={"figure": "interactive_3d"},
-        render_notebook_baserender_record=lambda *_, **kwargs: rendered.update(kwargs)
-        or {
-            "record_id": "candidate-record-alpha-with-long-id",
-            "image_bytes": b"png",
-            "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
-            "alt_text": "DenseGen TFBS annotation",
-        },
+        render_notebook_baserender_record=lambda *_, **kwargs: (
+            rendered.update(kwargs)
+            or {
+                "record_id": "candidate-record-alpha-with-long-id",
+                "image_bytes": b"png",
+                "caption": "DenseGen TFBS annotation · 60 bp · 5 annotated elements",
+                "alt_text": "DenseGen TFBS annotation",
+            }
+        ),
         render_notebook_plot_choice_image=lambda *_, **__: {"kind": "three-axis-plot"},
         selected_campaign_baserender_contract={"available": True},
         selected_visual_choice={"surface_kind": "plot", "label": "MSRB family landscape"},
@@ -2185,7 +2189,7 @@ def test_reader_evidence_artifact_rows_preserve_zero_hour_snapshot() -> None:
                 {
                     "label": "baseline",
                     "time_selected_h": 0.0,
-                    "semantic_kind": "reader.sfxi_triptych",
+                    "semantic_kind": "promoter_response_evidence",
                     "path": "baseline.png",
                     "exists": True,
                 }

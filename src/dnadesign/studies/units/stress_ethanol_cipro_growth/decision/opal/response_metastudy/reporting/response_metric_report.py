@@ -80,7 +80,7 @@ def response_metric_report_sections(
         f"- Candidate reductions: {screen.labels['reduction_id'].nunique()} over "
         f"{screen.labels['id'].nunique()} labels.",
         f"- Primary Reader reduction: `{primary_reduction_id}`.",
-        "- Event-bound sensitivity is propagated separately from replicate resampling.",
+        "- Event-bound sensitivity is propagated separately from within-experiment observation resampling.",
         "- No Reader record, OPAL label, campaign config, or synthesis handoff is changed by this screen.",
         "",
         "### Equal-footing window evidence",
@@ -92,7 +92,7 @@ def response_metric_report_sections(
         "",
         _markdown_table(screen.window_evidence.loc[:, window_assay_columns]),
         "",
-        "The pDual-10 columns report within-experiment replicate ranges and the largest state-specific "
+        "The pDual-10 columns report within-experiment observation ranges and the largest state-specific "
         "cross-experiment range of experiment medians. SpyP and sulAp summarize every Reader occurrence, not the "
         "single source chosen for the retrospective label-model screen.",
         "",
@@ -191,7 +191,7 @@ def response_metric_report_sections(
         "",
         "All three semantic thresholds are zero: ON response must exceed OFF response, ON fluorescence must be at "
         "least the same-state pDual-10 reference, and OFF fluorescence must not exceed it. Target-view review "
-        "scales use the 90th percentile of replicate-bootstrap variation combined with event-bound sensitivity. "
+        "scales use the 90th percentile of well-resampling bootstrap variation combined with event-bound sensitivity. "
         "These values make the comparator screen interpretable but are not biological laws.",
         "",
         _markdown_table(screen.calibration),

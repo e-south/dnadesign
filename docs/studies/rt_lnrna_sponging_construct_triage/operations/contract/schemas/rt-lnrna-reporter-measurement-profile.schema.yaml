@@ -1,0 +1,109 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: rt_lnrna_reporter_measurement_profile.v2
+title: RT-lnRNA reporter measurement profile
+description: Raw condition summaries retained when reference normalization is unavailable.
+type: object
+additionalProperties: false
+required:
+  - contract_id
+  - study_id
+  - profile_id
+  - subject_id
+  - provenance
+  - observation_policy
+  - reduction
+  - dose_grid_uM
+  - measurements
+  - reference_normalization
+  - eligibility
+  - comparability_key
+properties:
+  contract_id: {const: rt_lnrna_reporter_measurement_profile.v2}
+  study_id: {const: rt_lnrna_sponging_construct_triage}
+  profile_id: {type: string, minLength: 1}
+  subject_id: {type: string, minLength: 1}
+  provenance:
+    $ref: 'rt_lnrna_reporter_response_profile.v4#/$defs/provenance'
+  observation_policy:
+    $ref: 'rt_lnrna_reporter_response_profile.v4#/$defs/observation_policy'
+  reduction:
+    oneOf:
+      - $ref: 'rt_lnrna_reporter_response_profile.v4#/$defs/endpoint_reduction'
+      - $ref: 'rt_lnrna_reporter_response_profile.v4#/$defs/time_window_reduction'
+  dose_grid_uM:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: {type: number, exclusiveMinimum: 0}
+  measurements:
+    type: array
+    minItems: 2
+    items:
+      $ref: 'rt_lnrna_reporter_response_profile.v4#/$defs/condition_measurement'
+  reference_normalization:
+    type: object
+    additionalProperties: false
+    required: [reason, positive_control_condition_id, status]
+    properties:
+      status: {const: unavailable}
+      reason:
+        enum:
+          - positive_control_not_declared
+          - positive_control_observations_missing
+          - positive_control_separation_not_positive
+      positive_control_condition_id:
+        anyOf:
+          - {type: string, minLength: 1}
+          - {type: "null"}
+  eligibility:
+    $ref: 'rt_lnrna_reporter_response_profile.v4#/$defs/eligibility'
+  comparability_key:
+    $ref: 'rt_lnrna_reporter_response_profile.v4#/$defs/sha256_digest'
+allOf:
+  - if:
+      properties:
+        reference_normalization:
+          properties:
+            reason: {const: positive_control_not_declared}
+    then:
+      properties:
+        reference_normalization:
+          properties:
+            positive_control_condition_id: {type: "null"}
+        measurements:
+          not:
+            contains:
+              properties:
+                role: {const: positive_control}
+              required: [role]
+  - if:
+      properties:
+        reference_normalization:
+          properties:
+            reason: {const: positive_control_observations_missing}
+    then:
+      properties:
+        reference_normalization:
+          properties:
+            positive_control_condition_id: {type: string, minLength: 1}
+        measurements:
+          not:
+            contains:
+              properties:
+                role: {const: positive_control}
+              required: [role]
+  - if:
+      properties:
+        reference_normalization:
+          properties:
+            reason: {const: positive_control_separation_not_positive}
+    then:
+      properties:
+        reference_normalization:
+          properties:
+            positive_control_condition_id: {type: string, minLength: 1}
+        measurements:
+          contains:
+            properties:
+              role: {const: positive_control}
+            required: [role]

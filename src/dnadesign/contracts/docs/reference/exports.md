@@ -1,13 +1,13 @@
 # Contract Exports
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-02
 
 `contracts` publishes shared cross-tool artifact schemas for `dnadesign`.
 
 ## Current exports
 
-Generic composition and folding:
+Generic sequence and folding contracts:
 
 - `LinearSsdnaCompositionV1`: ordered segment, annotation, repeat, and
   provenance contract for linear ssDNA products
@@ -15,6 +15,10 @@ Generic composition and folding:
   contract with explicit DNA/RNA backend policy
 - `SecondaryStructurePredictionV1`: backend-neutral folding result contract for
   canonical component-unit secondary-structure predictions
+- `RtPartPublicationV1` / `RtPartV1`: provider-neutral publication envelope
+  for opaque, digest-closed RT parts, with explicit producer ownership,
+  provider references, and declared CDS/protein lengths; it publishes no
+  sequence bytes or provider-internal candidate ids
 
 Visual contracts:
 
@@ -47,6 +51,12 @@ compatibility only; breaking changes require a new version or migration. Move a
 domain-qualified contract out of shared contracts if it loses its sibling
 consumer, becomes study-only, or starts accumulating behavior instead of record
 shape.
+
+`RtPartPublicationV1` is a neutral producer-consumer seam, not an RT registry.
+Each provider owns the publication file and only the parts it emits; consumers
+compose exact references without copying provider-owned sequence payloads.
+Consumers that require sequence bytes must resolve the opaque provider reference
+through a provider-owned authority or fail closed.
 
 ## Tests
 

@@ -1,6 +1,6 @@
 version: 1
 study_id: eco1_rt_repack
-last_verified: 2026-07-10
+last_verified: 2026-07-29
 datasets:
   - id: eco1_rt_v1_profile
     owner: eco1_rt_repack
@@ -709,6 +709,16 @@ datasets:
       Compact review visual showing where selected substitutions fall across
       Eco1 RT positions, with substitution chemistry and display-only RT region
       context. It is descriptive review context, not activity evidence.
+  - id: eco1_rt_selection_distal_pair_n_terminal_comparison
+    owner: eco1_rt_repack
+    kind: generated_artifact
+    path: src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/selection/plots/selection_distal_pair_n_terminal_comparison.svg
+    status: materialized
+    description: >-
+      Review-only WT, D01, and D02 comparison across canonical residues 1-32,
+      with alpha-1, F10/R13, and a simple residues 4-16 basic-minus-acidic
+      count. The sequence and charge-proxy differences are descriptive, not
+      causal or altered-scaffold evidence.
   - id: eco1_rt_selection_regional_mutation_burden
     owner: eco1_rt_repack
     kind: generated_artifact
@@ -856,6 +866,16 @@ datasets:
       the assay host and cites the exact Kazusa E. coli K-12 codon-frequency
       record used for changed residues. Assembly flanks and the live vendor
       complexity check remain pending.
+  - id: eco1_rt_g3_distal_pair_part_publication
+    owner: eco1_rt_repack
+    kind: tracked_provider_publication
+    path: docs/studies/eco1_rt_repack/record/rt-parts/eco1-g3-distal-pair-v1.yaml
+    status: present
+    description: >-
+      Exact D01 and D02 CDS/protein authorities published for downstream
+      composition through the shared rt_part_publication_v1 contract. The
+      repack study owns only the RTs it produced; WT, literature, point-mutant,
+      fusion, and future-provider RTs remain with their own authorities.
   - id: eco1_rt_candidate_handoff
     owner: thread
     kind: planned_artifact
@@ -865,5 +885,5 @@ datasets:
 downstream_collaboration:
   - study_id: rt_lnrna_sponging_construct_triage
     relationship: downstream_construct_promotion_candidate
-    required_contract: explicit RT-only candidate promotion handoff
-    status: planned
+    required_contract: exact RT provider publication plus compositional subject binding
+    status: d01_d02_publication_present

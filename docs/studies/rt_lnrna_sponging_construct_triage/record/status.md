@@ -1,11 +1,11 @@
 ## rt_lnrna_sponging_construct_triage
 
-- Last verified: 2026-07-21
+- Last verified: 2026-07-30
 - Owner: dnadesign-maintainers
 - Affiliated dataset registry: `datasets.yaml`
 - Route map: `../routes/README.md`
 - Study execution map: `../operations/runtime/command-groups/pipeline.yaml`
-- Lifecycle posture: record-only and paused; Reader SPOP labels and LatentDNA review artifacts are materialized, while OPAL remains blocked on candidate-X selection
+- Lifecycle posture: record-only and paused; LatentDNA geometry artifacts are materialized, the 6-10 h reporter-response reduction is selected for provisional descriptive comparison, and OPAL remains blocked
 - OPS provider: study execution surfaces include a six-view Infer batch runbook
 
 ### Current Phase
@@ -15,9 +15,10 @@ materialization path for GenBank-authorized retrons, Crawford source-sequence
 promotions, Khan source RT-lnRNA rows that fit the current 2,000 bp construct
 geometry, a bounded compiler-generated MSD lnRNA variant fixture pool, and
 RT-CDS in silico DMS variants, plus a fixed-size representation-table contract
-for the next LatentDNA and OPAL handoff. It is not ready for OPAL training
-because a fixed candidate-X vector has not yet been selected; durable
-`SpongingAssayObservation` labels are now materialized and schema-validated.
+for the next LatentDNA and eventual OPAL handoff. It is not ready for OPAL
+training: a fixed candidate-X vector has not been selected, the descriptive
+reporter-response profile is not a label, and no constrained objective has been
+defined.
 
 ### Current Evidence
 
@@ -95,25 +96,22 @@ because a fixed candidate-X vector has not yet been selected; durable
   template MSD plus 5-prime/3-prime flanks, and writes ordinary Construct
   subject rows with fixed Eco1 WT RT. It does not formalize or materialize a
   pre-Infer concat.
-- The live consolidated Construct input dogfood contains 10,425 construct
-  subjects: 46 GenBank-authorized subjects, 4,148 abundance-affiliated Crawford
-  source-sequence subjects paired with fixed WT Eco1 RT, 71 abundance-affiliated
-  Khan RT-lnRNA subjects, 80 compiler-generated MSD lnRNA variant subjects, and
-  6,080 RT-CDS DMS subjects generated through the public `dnadesign.permuter`
-  API.
-- The live Construct output dogfood validates strictly with 20,850 realized
-  context rows and 62,550 explicit sequence-view declarations. Each construct
-  subject has all six required view names.
+- The unified identity lane now resolves 49 study-owned RT-lnRNA subjects from
+  one binding contract. Forty-six have GenBank component and placement
+  provenance; three are additional RT-repack compositions. GenBank no longer
+  acts as a parallel subject selector.
+- Compiler-generated MSD promotion is explicit opt-in and remains separate
+  from registered biological subjects. The checked-in operational sequence
+  requires hairpin-owner primitive validation before enabling it.
 - The executable Infer-readiness gate at
   `../../../../src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/infer_readiness.py`
   now runs as a Construct materialization postcondition. It requires one
   forward context row, one reverse-complement context row, and exactly the six
   declared source sequence-view names per construct subject before the study can
-  hand the dataset to Infer. A full temp dogfood through public dnadesign-data
-  source IDs passed with 10,425 subjects, 20,850 Construct output rows, and
-  62,550 sequence-view rows; the source-promotion issues are explicit: 76
-  missing affiliated abundance observations, 2 missing RT CDS rows, and 40
-  over-window Khan rows.
+  hand the dataset to Infer. The prior full-universe dogfood predates the
+  subject-binding seam and is not a current publication artifact; regenerate
+  it before reporting aggregate row counts. Source-promotion issues remain
+  explicit rather than changing subject identity.
 - `../operations/contract/schemas/representation-table.schema.yaml` declares the
   fixed-size representation-table contract, including expected Evo2 7B vector
   dimensions and Khan/Crawford overlay integration boundaries.
@@ -123,28 +121,35 @@ because a fixed candidate-X vector has not yet been selected; durable
   Khan/Crawford ordinal audit, abundance margin galleries, slot/context
   robustness, candidate-X frontier/scorecard, appendix scree, and appendix
   UMAP views across intermediate and output-layer gallery views.
-- `../contexts/reader-spop-label-contract.md` and
-  `../operations/contract/readiness/checks/reader_spop_label_materialization.yaml`
-  declare the Reader-to-Construct SPOP bridge. Reader owns the SPOP
-  metric source-of-truth in `reader/docs/lib/spop_endpoint_in_reader.md`; this
-  study bridge resolves Reader ratio artifacts through `records.json`, keeps
-  assay subject identity separate from Construct subject identity, delegates
-  scoring to Reader's public `score_spop_endpoint` API, materializes LatentDNA
-  overlay tables, and routes OPAL SPOP campaigns as `spop_v1/spop` only after a
-  selected `X` exists.
-- Current Reader SPOP materialization evidence is label-planner clean with one explicit
-  no-call warning:
-  `uv run python -m dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_spop_plan`
-  reports 56 observations across 40 candidate summaries, including
-  `20260705_retron_Eco1_26_195_196_180_199_200_197_198_benchmark` and
-  `20260720_retron_Eco1_26_180_201_202_203_204_benchmark`. The
-  `20251105_retron_Eco1_RT_variants` Reader artifact is treated as a
-  single-point mid-log read at approximately 10 h after seeding, even though the
-  artifact stores row time as 0 h and the historical config reported 12 h.
-  Retron176 in
-  `20260507_retron_Eco1_26_43_172_173_174_175_176_benchmark` is intentionally
-  omitted because the plate map carried retron176 but no actual strain was
-  present in those wells.
+- `../contexts/reporter-response-evidence.md` and
+  `../operations/contract/schemas/rt-lnrna-reporter-response-profile.schema.yaml`
+  define the current Reader-evidence boundary. Reader owns generic measurement
+  records and recorded time; the RT-lnRNA study owns explicit control pairing,
+  endpoint or window selection, comparability, biological-replicate uncertainty,
+  and any later preference objective. The profile is descriptive and
+  optimization-ineligible.
+- The compositional subject registry resolves 49 logical subjects: 46
+  catalog-backed compositions projected by one declarative source set plus
+  D01×26, D02×26, and planned D01×180. It is the sole authority for exact
+  RT-lnRNA composition, study-local variant identity, Reader aliases, and
+  Construct subject identity. The GenBank catalog remains sequence and digest
+  provenance.
+- Forty-three bindings carry validated hairpin-owned MSD references. Six catalog
+  subjects have no structure reference; this does not invalidate their
+  RT-lnRNA identity.
+- The live reporter-response bridge route is record-ready for the eight-member
+  kinetic calibration cohort: three 2025 and five 2026 acquisitions. An
+  acquisition is provenance, not a biological-replicate identity; persisted
+  positions are observations. Biological-replicate identity remains unknown
+  unless Reader declares it explicitly. Source-closed public resolution and exact subject binding
+  succeed with no unbound identities, and all eight calibration experiments
+  contribute valid profiles. The 2026-05-07 and 2026-05-29
+  attempts are partial because some subject/window coordinates are omitted;
+  valid sibling coordinates remain admissible. The meta-study selects the
+  inclusive 6-10 h interval as `provisional_descriptive`. Within-acquisition
+  observation range,
+  incomplete reference coverage, one unstable leave-one-acquisition-out fold,
+  and subject/window omissions remain explicit limitations.
 - `retron-eco1-rt.gb` matches the RT CDS and CDS translation in both
   `pes-retron-26.gb` and `pes-retron-43.gb`.
 - `pes-retron-26-a1-a2.gb` is contained in `pes-retron-26.gb`.
@@ -160,9 +165,12 @@ because a fixed candidate-X vector has not yet been selected; durable
 
 ### Remaining Blockers
 
-- Reader SPOP labels and OPAL handoff. Durable Reader label tables, LatentDNA
-  sidecars, and review surfaces are materialized, but OPAL still needs a
-  selected fixed-size `X` and the final training-table join.
+- Reporter-response objective and OPAL handoff. Measurement, descriptive
+  visualization, and the 6-10 h reduction recommendation are ready. Objective
+  readiness remains blocked because no constrained objective is defined,
+  biological-replicate uncertainty is not estimable, and OD linearity
+  is not validated. OPAL also requires a selected fixed-size `X` and a
+  versioned label projection.
 - Khan source rows exceeding the current fixed 2,000 bp Construct window. The
   translation-validated Khan RT CDS path is present, but 40 cross-retron RTs are
   too long for the current lnRNA-centered 2,000 bp geometry when paired with
@@ -193,9 +201,8 @@ view ids.
 2. Decide whether to add a larger or alternate Construct context for
    over-capacity Khan source rows, or keep the current 2,000 bp lane as an
    Eco1-sized normalized context. The 2,000 bp lane is useful but not complete.
-3. Rerun the Reader SPOP label planner as new sibling Reader manifests arrive,
-   audit any endpoint drift, malformed treatments, or weak aTc positive
-   controls, and refresh the durable label sidecar only after that audit passes.
+3. Use the selected 6-10 h reduction for descriptive comparison and aggregate
+   plots. Keep its limitations visible; do not promote it to an objective.
 4. Run the schema/check fixtures before materializing larger construct subject tables.
-5. Keep abundance priors and Reader sponging labels separate through OPAL
-   handoff.
+5. Keep abundance priors and reporter-response evidence separate through any
+   later OPAL handoff.

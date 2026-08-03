@@ -19,7 +19,7 @@ source_refs:
 non_goals:
   final_plasmid_number_assignment: deliverable_plan_owned_not_design_set_owned
   reader_score_interpretation: excluded_until_wet_lab_data_exists
-  changing_reader_spop_math: excluded
+  defining_reporter_response_objective: excluded
 selection_basis:
   - Preserve the prior retained-span trim logic from the bidirectional TetR PWM elite trim pilot.
   - Change payload family from the Cruncher TetR PWM elite sequence to the Eco1 tetO sequence used by retron26 and retron43.
@@ -85,7 +85,7 @@ payload_trims:
     selection_basis: retained_span_from_teto_payload_prior
 decision_logic:
   - id: trim_logic_fails_in_working_payload_family
-    condition: retron26 trim controls lose SPOP despite acceptable viability.
+    condition: retron26 trim controls lose reporter response despite acceptable relative biomass.
     interpretation: Payload length/register may be limiting even when using the retron26/retron43 Eco1 tetO payload family.
   - id: ecoli_working_payload_improves_r180_trim
     condition: r180 Eco1 tetO retained-span trims rise above the 199/200 failure floor while retron26 controls remain active.

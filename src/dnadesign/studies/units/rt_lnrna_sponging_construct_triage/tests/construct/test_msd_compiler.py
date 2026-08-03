@@ -205,7 +205,7 @@ def test_rt_lnrna_unified_construct_subjects_reject_cross_pool_duplicate_msd_lnr
         materialize_unified_construct_subject_contexts(
             repo_root=_repo_root(),
             work_root=tmp_path,
-            include_genbank_catalog=False,
+            allow_partial_byte_resolution=True,
             include_source_promotions=False,
             include_msd_compiler_promotions=True,
             include_rt_cds_dms=False,
@@ -217,30 +217,33 @@ def test_rt_lnrna_unified_construct_subjects_include_msd_compiler_pool(tmp_path:
     report = materialize_unified_construct_subject_contexts(
         repo_root=_repo_root(),
         work_root=tmp_path,
-        include_genbank_catalog=False,
+        allow_partial_byte_resolution=True,
         include_source_promotions=False,
         include_msd_compiler_promotions=True,
         include_rt_cds_dms=False,
         msd_variant_pool_spec_paths=(_write_msd_compiler_pool_spec(tmp_path / "msd-pool.yaml"),),
     )
 
-    assert report.genbank_construct_subject_count == 0
+    assert report.subject_binding_resolved_subject_count == 46
+    assert len(report.blocked_subject_bindings) == 3
     assert report.crawford_construct_subject_count == 0
     assert report.khan_construct_subject_count == 0
     assert report.msd_compiler_construct_subject_count == 80
     assert report.rt_cds_dms_construct_subject_count == 0
-    assert len(report.input_ids_by_subject_id) == 80
+    assert len(report.input_ids_by_subject_id) == 126
     _assert_construct_subject_envelope_inputs(report)
     _assert_construct_output_subject_bridge(report)
     _assert_usr_contracts_strictly_validate(report)
 
-    inputs = Dataset(report.usr_root, report.input_dataset).head(n=5)
-    assert set(inputs["construct_subject__source_basis"]) == {"compiler_generated_msd_lnrna_variant"}
-    assert set(inputs["construct_subject__role"]) == {"compiler_lnrna_variant"}
-    assert set(inputs["construct_subject__msd_insert_orientation"]) == {"reverse_complement"}
+    inputs = Dataset(report.usr_root, report.input_dataset).head(n=140)
+    compiler_inputs = inputs[inputs["construct_subject__source_basis"] == "compiler_generated_msd_lnrna_variant"]
+    assert compiler_inputs.shape[0] == 80
+    assert set(compiler_inputs["construct_subject__role"]) == {"compiler_lnrna_variant"}
+    assert set(compiler_inputs["construct_subject__msd_insert_orientation"]) == {"reverse_complement"}
 
-    output = Dataset(report.usr_root, report.output_dataset).head(n=170)
-    assert output.shape[0] == 160
-    assert set(output["construct_subject__source_basis"]) == {"compiler_generated_msd_lnrna_variant"}
+    output = Dataset(report.usr_root, report.output_dataset).head(n=270)
+    assert output.shape[0] == 252
+    compiler_output = output[output["construct_subject__source_basis"] == "compiler_generated_msd_lnrna_variant"]
+    assert compiler_output.shape[0] == 160
     views = load_sequence_views(Dataset(report.usr_root, report.output_dataset))
-    assert len(views) == 480
+    assert len(views) == 756

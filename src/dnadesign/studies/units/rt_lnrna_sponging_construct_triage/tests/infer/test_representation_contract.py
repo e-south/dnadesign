@@ -92,7 +92,6 @@ def test_representation_table_contract_declares_fixed_size_gallery_and_overlay_i
         "khan_cross_retron_rt_dna_abundance_v1",
         "crawford_eco1_lnrna_msd_abundance_v1",
         "crawford_eco1_lnrna_msd_design_reference_v1",
-        "reader_spop_endpoint_dose_mean_v1",
     )
     assert audit.fixed_size_vectors[
         "intermediate_embedding_7b_lnrna_fixed_384bp_window_in_construct_anchor_mean_bidir_concat"

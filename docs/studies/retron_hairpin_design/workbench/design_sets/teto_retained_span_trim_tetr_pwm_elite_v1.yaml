@@ -20,13 +20,20 @@ source_refs:
   tetr_monotypic_elites: src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/outputs/optimize/tables/elites.parquet
   tetr_monotypic_occurrences: src/dnadesign/cruncher/workspaces/demo_monotypic_tetr/outputs/optimize/tables/elites_occurrences.parquet
 non_goals:
-  rt_fusions: excluded_viability_confounded
+  rt_fusions: outside_msd_design_scope
   payload_source_resolution_in_compiler: excluded_literal_payloads_only
   implicit_cap_stem_grid_expansion: excluded_bounded_matrix_only
   generated_outputs_as_truth: excluded_workbench_records_are_authoritative
+assay_handoff:
+  contract: retron_msd_assay_handoff_ref_v1
+  owner_study_id: rt_lnrna_sponging_construct_triage
+  route_ref: docs/studies/rt_lnrna_sponging_construct_triage/routes/reporter-response-evidence.md
+  subject_set_id: teto_retained_span_trim_tetr_pwm_elite_v1
+  subject_identity_field: construct_id
+  handoff_role: subject_identity_only
 selection_basis:
-  - Test whether shorter cargo changes SPOP before larger cap/stem-base exploration.
-  - Keep WT Eco1 RT fixed because RT fusions are viability-confounded.
+  - Test whether shorter cargo changes reporter response before larger cap/stem-base exploration.
+  - Keep WT Eco1 RT fixed so the bounded MSD design comparison changes one composition axis at a time.
   - Use retron26 only as a scaffold and binding control, not the optimization target.
   - Test retron43 and the pES-retron-180 C172/AGTG/CATG/XWMM context as the target scaffold space.
   - Encode dual-site PWM trims as exact literal payloads with source-backed span and information metadata.
@@ -55,8 +62,7 @@ retron180_context_selection:
   selected_precedent_construct_id: pES-retron-180
   selected_precedent_label: pES-retron-180-msd[TetR]; C172-LAGTG-RCATG-XWMM
   source_design_set_ref: docs/studies/retron_hairpin_design/workbench/design_sets/scar_nick_profile_panel_v1.yaml
-  reader_spop_summary_ref: src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/study_inputs/reader_spop_candidate_summary.parquet
-  selection_basis: Highest available S0-compatible C172 bottom-nick prior in the 177-186 Reader SPOP summary; still near-zero and not a validated positive control.
+  selection_basis: Retain the existing pES-retron-180 MSD precedent as one bounded scaffold context.
   cap_id: C172
   left_base: AGTG
   right_base: CATG
@@ -112,27 +118,6 @@ payload_trims:
     selection_basis: dual_site_tetR_pwm_information_content
     selection_rule: {algorithm: dual_site_sliding_window_max_ic, requested_length_nt: 13, tie_breaker: closest_to_parent_center}
     protected_positions_or_reason: Stronger dual-site trim; selector keeps the requested 13 nt subspan across both selected motif occurrences.
-decision_logic:
-  - id: trim_damages_binding_control
-    condition: retron26 trim controls lose SPOP despite acceptable viability.
-    interpretation: Treat the payload trim as binding/readout-limited before interpreting target-scaffold failures.
-  - id: cargo_shortening_not_sufficient
-    condition: retron26 trim controls retain SPOP, but retron43 and retron180-context trims remain near the failure floor.
-    interpretation: Cap/stem-base/processability dominates over cargo length in this panel.
-  - id: candidate_cargo_shortening_signal
-    condition: Any retron43 or retron180-context trim rises above the 43/177-186 failure floor with acceptable viability.
-    interpretation: Expand the winning trim length across a bounded cap/stem-base grid.
-  - id: viability_confounded_signal
-    condition: SPOP improves while viability drops below the acceptance gate.
-    interpretation: Do not classify as a win; demote before expansion.
-outcome_bins:
-  - no_call
-  - inactive_or_failed_sponging
-  - viability_confounded_signal
-  - product_abundance_limited
-  - binding_or_payload_limited
-  - candidate_cargo_shortening_signal
-  - confirmed_cargo_shortening_signal
 designs:
   - construct_id: pES-tetr-r26-w00-19
     label: pES-tetr-r26-w00-19-msd[TetR_w00_19]; C26-LCGGG-RACAG-MXMX
@@ -211,7 +196,7 @@ designs:
     rt_mode: wt_eco1
     direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
     effect_tags: [teto_pwm_elite_mild_retained_span_trim, retron43_target, cargo_length_test, wt_eco1_only]
-    rationale: Mild 15 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
+    rationale: Mild 15 nt dual-site TetR trim tests whether shorter cargo changes retron43 reporter response.
   - construct_id: pES-tetr-r43-w03-16
     label: pES-tetr-r43-w03-16-msd[TetR_w03_16]; C43-LCAAG-RCTCG-MXMM
     expected_msd_design_id: msd-tetr-w03-16-C43-LCAAG-RCTCG-MXMM
@@ -226,7 +211,7 @@ designs:
     rt_mode: wt_eco1
     direction_ids: [teto_retained_span_trim_tetr_pwm_elite]
     effect_tags: [teto_pwm_elite_stronger_retained_span_trim, retron43_target, cargo_length_test, wt_eco1_only]
-    rationale: Stronger 13 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
+    rationale: Stronger 13 nt dual-site TetR trim tests whether shorter cargo changes retron43 reporter response.
   - construct_id: pES-tetr-r180-w00-19
     label: pES-tetr-r180-w00-19-msd[TetR_w00_19]; C172-LAGTG-RCATG-XWMM
     expected_msd_design_id: msd-tetr-w00-19-C172-LAGTG-RCATG-XWMM

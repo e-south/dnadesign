@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/multistate_behavior_reference.py
 
-Fail-closed pDual-10 reference-relative bootstrap identity checks.
+Fail-closed pDual-10 reference-relative descriptive-resampling identity checks.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,13 +22,13 @@ class ReferenceSignalIdentityReceipt:
     """Counts proving that the same resample was used on both sides of b_i."""
 
     reference_unit_count: int
-    bootstrap_row_count: int
+    descriptive_resampling_row_count: int
     reader_experiment_count: int
 
 
-def verify_reference_relative_bootstrap_identity(
+def verify_reference_relative_descriptive_resampling_identity(
     designs: pd.DataFrame,
-    bootstrap_draws: pd.DataFrame,
+    descriptive_resampling_draws: pd.DataFrame,
     *,
     primary_reduction_id: str,
     state_ids: tuple[str, ...],
@@ -36,7 +36,7 @@ def verify_reference_relative_bootstrap_identity(
     """Require pDual-10 compared with itself to be exactly zero in every draw."""
 
     signal_columns = tuple(f"b{state_id}" for state_id in state_ids)
-    sd_columns = tuple(f"{column}_bootstrap_sd" for column in signal_columns)
+    sd_columns = tuple(f"{column}_descriptive_resampling_sd" for column in signal_columns)
     design_required = {"experiment_id", "design_id", "reduction_id", "is_reference", *signal_columns, *sd_columns}
     draw_required = {
         "experiment_id",
@@ -48,14 +48,14 @@ def verify_reference_relative_bootstrap_identity(
     }
     if missing := sorted(design_required - set(designs.columns)):
         raise ValueError(f"Reader reference identity designs lack fields: {missing}")
-    if missing := sorted(draw_required - set(bootstrap_draws.columns)):
+    if missing := sorted(draw_required - set(descriptive_resampling_draws.columns)):
         raise ValueError(f"Reader reference identity draws lack fields: {missing}")
     reference = designs.loc[
         designs["is_reference"].astype(bool) & designs["reduction_id"].astype(str).eq(primary_reduction_id)
     ].copy()
-    draws = bootstrap_draws.loc[
-        bootstrap_draws["is_reference"].astype(bool)
-        & bootstrap_draws["reduction_id"].astype(str).eq(primary_reduction_id)
+    draws = descriptive_resampling_draws.loc[
+        descriptive_resampling_draws["is_reference"].astype(bool)
+        & descriptive_resampling_draws["reduction_id"].astype(str).eq(primary_reduction_id)
     ].copy()
     if reference.empty or draws.empty:
         raise ValueError("Reader bundle lacks primary pDual-10 reference evidence.")
@@ -66,11 +66,11 @@ def verify_reference_relative_bootstrap_identity(
     reference_keys = set(reference[["experiment_id", "design_id"]].astype(str).itertuples(index=False, name=None))
     draw_keys = set(draws[["experiment_id", "design_id"]].astype(str).itertuples(index=False, name=None))
     if draw_keys != reference_keys:
-        raise ValueError("Reader reference bootstrap identities disagree with primary reference units.")
+        raise ValueError("Reader reference resampling identities disagree with primary reference units.")
     for frame, columns, context in (
         (reference, signal_columns, "central reference-relative signal"),
-        (reference, sd_columns, "reference bootstrap SD"),
-        (draws, signal_columns, "reference bootstrap draw"),
+        (reference, sd_columns, "reference descriptive-resampling SD"),
+        (draws, signal_columns, "reference descriptive-resampling draw"),
     ):
         values = frame.loc[:, list(columns)].to_numpy(dtype=float)
         if not np.isfinite(values).all() or not np.equal(values, 0.0).all():
@@ -84,12 +84,12 @@ def verify_reference_relative_bootstrap_identity(
             or not np.equal(indexes, np.floor(indexes)).all()
             or len(np.unique(indexes)) != len(indexes)
         ):
-            raise ValueError(f"Reader reference bootstrap draw indexes are invalid for {key!r}.")
+            raise ValueError(f"Reader reference descriptive-resampling draw indexes are invalid for {key!r}.")
     return ReferenceSignalIdentityReceipt(
         reference_unit_count=len(reference),
-        bootstrap_row_count=len(draws),
+        descriptive_resampling_row_count=len(draws),
         reader_experiment_count=int(reference["experiment_id"].astype(str).nunique()),
     )
 
 
-__all__ = ["ReferenceSignalIdentityReceipt", "verify_reference_relative_bootstrap_identity"]
+__all__ = ["ReferenceSignalIdentityReceipt", "verify_reference_relative_descriptive_resampling_identity"]

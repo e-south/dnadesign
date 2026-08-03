@@ -11,19 +11,16 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
 
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations import sources
-from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_bundle import (
-    ReaderResponseBundle,
-)
 
 
 def test_exact_reader_aliases_resolve_and_preserve_scientific_evidence() -> None:
-    bundle = _bundle()
+    bundle = _reader_records()
 
     result = sources.resolve_reader_candidate_evidence(
         bundle,
@@ -42,7 +39,7 @@ def test_exact_reader_aliases_resolve_and_preserve_scientific_evidence() -> None
 
 
 def test_resolution_rejects_missing_stale_or_bound_exclusion_declarations() -> None:
-    bundle = _bundle()
+    bundle = _reader_records()
 
     with pytest.raises(sources.ResponseWindowObservationSourceError, match="unbound design accounting"):
         sources.resolve_reader_candidate_evidence(
@@ -95,7 +92,7 @@ def test_resolution_rejects_non_exact_binding_rows() -> None:
 
     with pytest.raises(sources.ResponseWindowObservationSourceError, match="unbound design accounting"):
         sources.resolve_reader_candidate_evidence(
-            _bundle(),
+            _reader_records(),
             binding_rows=bindings,
             unbound_reader_designs=pd.DataFrame(
                 [{"design_id": "unbound", "reason": "absent_from_study_candidate_bindings"}]
@@ -103,7 +100,7 @@ def test_resolution_rejects_non_exact_binding_rows() -> None:
         )
 
 
-def _bundle() -> ReaderResponseBundle:
+def _reader_records() -> SimpleNamespace:
     design_rows: list[dict[str, object]] = []
     draw_rows: list[dict[str, object]] = []
     for experiment_id, support in (("experiment-a", 3), ("experiment-b", 4)):
@@ -132,15 +129,9 @@ def _bundle() -> ReaderResponseBundle:
                         **_values(1.0 + draw_index),
                     }
                 )
-    return ReaderResponseBundle(
-        root=Path("/reader"),
-        manifest_path=Path("/reader/manifest.json"),
-        manifest={"primary_reduction_id": "primary"},
+    return SimpleNamespace(
         designs=pd.DataFrame.from_records(design_rows),
-        bootstrap_draws=pd.DataFrame.from_records(draw_rows),
-        wells=pd.DataFrame(),
-        traces=pd.DataFrame(),
-        events=pd.DataFrame(),
+        descriptive_resampling_draws=pd.DataFrame.from_records(draw_rows),
     )
 
 

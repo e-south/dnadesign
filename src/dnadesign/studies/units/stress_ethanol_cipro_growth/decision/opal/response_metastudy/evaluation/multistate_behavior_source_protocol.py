@@ -25,16 +25,33 @@ from .multistate_behavior_protocol_fields import (
 
 
 @dataclass(frozen=True)
-class BehaviorSourceEquivalenceProtocol:
+class FrozenBehaviorSourceEquivalenceProtocolV1:
+    """Source identity retained only to verify receipt-pinned v1 evidence."""
+
     current_reader_bundle_sha256: str
     prior_observation_reader_bundle_sha256: str
     prior_observation_bundle_repo_path: str
     central_label_requirement: Literal["exact_candidate_source_experiment_vector_equality"]
-    reference_signal_requirement: Literal["central_b_bootstrap_sd_and_all_joint_draws_exactly_zero"]
+    reference_signal_requirement: Literal["central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero"]
 
 
-def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenceProtocol:
-    """Parse the source correction without rewriting immutable label artifacts."""
+@dataclass(frozen=True)
+class BehaviorSourceEquivalenceProtocol:
+    current_reader_bundle_sha256: str
+    prior_observation_reader_bundle_sha256: str
+    prior_candidate_bindings_manifest_sha256: str
+    prior_observation_bundle_repo_path: str
+    prior_observation_request_repo_path: str
+    prior_observation_request_sha256: str
+    prior_observation_policy_repo_path: str
+    prior_observation_policy_sha256: str
+    prior_observation_approval_sha256: str
+    central_label_requirement: Literal["exact_candidate_source_experiment_vector_equality"]
+    reference_signal_requirement: Literal["central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero"]
+
+
+def parse_frozen_behavior_source_equivalence_v1(value: object) -> FrozenBehaviorSourceEquivalenceProtocolV1:
+    """Parse only the source fields recorded by the immutable v1 protocol."""
 
     payload = require_mapping(value, context="source_equivalence")
     require_exact_fields(
@@ -48,6 +65,78 @@ def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenc
         },
         context="source_equivalence",
     )
+    common = _parse_common_source_equivalence(payload)
+    return FrozenBehaviorSourceEquivalenceProtocolV1(**common)
+
+
+def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenceProtocol:
+    """Parse the source correction without rewriting immutable label artifacts."""
+
+    payload = require_mapping(value, context="source_equivalence")
+    require_exact_fields(
+        payload,
+        {
+            "current_reader_bundle_sha256",
+            "prior_observation_reader_bundle_sha256",
+            "prior_candidate_bindings_manifest_sha256",
+            "prior_observation_bundle_repo_path",
+            "prior_observation_request_repo_path",
+            "prior_observation_request_sha256",
+            "prior_observation_policy_repo_path",
+            "prior_observation_policy_sha256",
+            "prior_observation_approval_sha256",
+            "central_label_requirement",
+            "reference_signal_requirement",
+        },
+        context="source_equivalence",
+    )
+    common = _parse_common_source_equivalence(payload)
+    current = str(common["current_reader_bundle_sha256"])
+    prior = str(common["prior_observation_reader_bundle_sha256"])
+    candidate_bindings = _digest(
+        payload["prior_candidate_bindings_manifest_sha256"],
+        field="prior_candidate_bindings_manifest_sha256",
+    )
+    config_prefix = PurePosixPath(
+        "src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config"
+    )
+    request_path = _config_path(
+        payload["prior_observation_request_repo_path"],
+        expected_parent=config_prefix,
+        expected_name="historical_reader_response_window_request_v3.yaml",
+        field="prior_observation_request_repo_path",
+    )
+    policy_path = _config_path(
+        payload["prior_observation_policy_repo_path"],
+        expected_parent=config_prefix,
+        expected_name="historical_response_window_observation_policy_v2.yaml",
+        field="prior_observation_policy_repo_path",
+    )
+    return BehaviorSourceEquivalenceProtocol(
+        current_reader_bundle_sha256=current,
+        prior_observation_reader_bundle_sha256=prior,
+        prior_candidate_bindings_manifest_sha256=candidate_bindings,
+        prior_observation_bundle_repo_path=str(common["prior_observation_bundle_repo_path"]),
+        prior_observation_request_repo_path=request_path.as_posix(),
+        prior_observation_request_sha256=_digest(
+            payload["prior_observation_request_sha256"],
+            field="prior_observation_request_sha256",
+        ),
+        prior_observation_policy_repo_path=policy_path.as_posix(),
+        prior_observation_policy_sha256=_digest(
+            payload["prior_observation_policy_sha256"],
+            field="prior_observation_policy_sha256",
+        ),
+        prior_observation_approval_sha256=_digest(
+            payload["prior_observation_approval_sha256"],
+            field="prior_observation_approval_sha256",
+        ),
+        central_label_requirement="exact_candidate_source_experiment_vector_equality",
+        reference_signal_requirement="central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero",
+    )
+
+
+def _parse_common_source_equivalence(payload: dict[str, object]) -> dict[str, object]:
     require_literal(
         payload,
         "central_label_requirement",
@@ -57,7 +146,7 @@ def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenc
     require_literal(
         payload,
         "reference_signal_requirement",
-        "central_b_bootstrap_sd_and_all_joint_draws_exactly_zero",
+        "central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero",
         context="source_equivalence",
     )
     current = _digest(payload["current_reader_bundle_sha256"], field="current_reader_bundle_sha256")
@@ -78,13 +167,28 @@ def parse_behavior_source_equivalence(value: object) -> BehaviorSourceEquivalenc
         raise BehaviorProtocolError(
             "source_equivalence.prior_observation_bundle_repo_path must name one study-owned observation bundle."
         )
-    return BehaviorSourceEquivalenceProtocol(
-        current_reader_bundle_sha256=current,
-        prior_observation_reader_bundle_sha256=prior,
-        prior_observation_bundle_repo_path=parsed_path.as_posix(),
-        central_label_requirement="exact_candidate_source_experiment_vector_equality",
-        reference_signal_requirement="central_b_bootstrap_sd_and_all_joint_draws_exactly_zero",
-    )
+    return {
+        "current_reader_bundle_sha256": current,
+        "prior_observation_reader_bundle_sha256": prior,
+        "prior_observation_bundle_repo_path": parsed_path.as_posix(),
+        "central_label_requirement": "exact_candidate_source_experiment_vector_equality",
+        "reference_signal_requirement": "central_b_descriptive_resampling_sd_and_all_joint_draws_exactly_zero",
+    }
+
+
+def _config_path(
+    value: object,
+    *,
+    expected_parent: PurePosixPath,
+    expected_name: str,
+    field: str,
+) -> PurePosixPath:
+    if not isinstance(value, str):
+        raise BehaviorProtocolError(f"source_equivalence.{field} must be a string.")
+    path = PurePosixPath(value)
+    if path.is_absolute() or ".." in path.parts or path.parent != expected_parent or path.name != expected_name:
+        raise BehaviorProtocolError(f"source_equivalence.{field} must name the response-metastudy historical snapshot.")
+    return path
 
 
 def _digest(value: object, *, field: str) -> str:
@@ -93,4 +197,9 @@ def _digest(value: object, *, field: str) -> str:
     return value
 
 
-__all__ = ["BehaviorSourceEquivalenceProtocol", "parse_behavior_source_equivalence"]
+__all__ = [
+    "BehaviorSourceEquivalenceProtocol",
+    "FrozenBehaviorSourceEquivalenceProtocolV1",
+    "parse_behavior_source_equivalence",
+    "parse_frozen_behavior_source_equivalence_v1",
+]

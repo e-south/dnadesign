@@ -52,8 +52,9 @@ Parsed offsets and SHA-256 values are pinned in
 - Exact pES retron-26 and pES retron-43 vector constants in source records.
 - Exact 2,000 bp target context:
   `genbank:2000bp-region.gb#record`, contained in pES retron-26 at `[56,2056)`.
-- 46 GenBank-authorized RT-lnRNA construct subjects resolve to explicit lnRNA
-  and RT CDS slot sequences.
+- The binding set resolves 49 logical RT-lnRNA subjects. Its 46 historical
+  catalog compositions use GenBank for explicit lnRNA and RT CDS bytes plus
+  placement geometry; the catalog does not independently mint subjects.
 - 4,148 abundance-affiliated Crawford Eco1-local source lnRNA sequences pass
   DNA4 validation, Eco1 forward k-mer orientation QC, and reverse-complement
   rejection, then project with fixed WT Eco1 RT. The 18 design-reference-only
@@ -65,7 +66,8 @@ Parsed offsets and SHA-256 values are pinned in
 - 71 Khan terminal-keyed RT-lnRNA rows pass explicit source ncRNA, explicit RT
   CDS DNA, translation-exact RT CDS validation, affiliated RT-DNA abundance
   prior, and the current 2,000 bp construct-window preflight.
-- 80 compiler-generated MSD lnRNA fixture rows compile from the YIU-compatible
+- When explicitly enabled after hairpin-owner preflight, 80 compiler-generated
+  MSD lnRNA fixture rows compile from the YIU-compatible
   5 x 16 Snapback cap and scar-nick stem-base primitive pool, insert the
   reverse complement of the 5-prime-to-3-prime MSD product into the retron26
   lnRNA template after exact flank checks, and pair with fixed Eco1 WT RT.
@@ -84,6 +86,6 @@ Parsed offsets and SHA-256 values are pinned in
 - OPAL-ready training table after selecting one fixed-size feature vector `X`;
   durable Reader sponging labels are materialized.
 
-The live consolidated Construct workspace now materializes 10,425 construct
-subjects into 20,850 realized 2,000 bp contexts with 62,550 sequence-view
-declarations.
+The prior consolidated workspace counts predate the subject-binding seam and
+must be regenerated before reuse. Each enabled lane reports its own count; no
+aggregate count serves as biological identity authority.

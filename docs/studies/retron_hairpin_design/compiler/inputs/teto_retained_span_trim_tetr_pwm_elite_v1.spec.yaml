@@ -75,7 +75,7 @@ designs:
     rt_mode: wt_eco1
     decision_group: retron43_payload_trim_test
     control_id: pES-tetr-r43-w00-19
-    rationale: Mild 15 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
+    rationale: Mild 15 nt dual-site TetR trim tests whether shorter cargo changes reporter response.
   - construct_id: pES-tetr-r43-w03-16
     payload_id: TetR_w03_16
     cap_id: C43
@@ -89,7 +89,7 @@ designs:
     rt_mode: wt_eco1
     decision_group: retron43_payload_trim_test
     control_id: pES-tetr-r43-w00-19
-    rationale: Stronger 13 nt dual-site TetR trim tests whether shorter cargo changes retron43 SPOP.
+    rationale: Stronger 13 nt dual-site TetR trim tests whether shorter cargo changes reporter response.
   - construct_id: pES-tetr-r180-w00-19
     payload_id: TetR_w00_19
     cap_id: C172
@@ -106,7 +106,7 @@ designs:
     rt_mode: wt_eco1
     decision_group: retron180_payload_trim_test
     control_id: pES-tetr-r26-w00-19
-    source_notes: Derived from pES-retron-180, the best available S0-compatible C172 bottom-nick prior by Reader SPOP summary; the prior still remains near-zero.
+    source_notes: Derived from pES-retron-180 using the immutable historical Reader score summary as selection provenance; the prior still remains near-zero and is not an active objective.
     rationale: Full bidirectional TetR baseline in the pES-retron-180 C172/AGTG/CATG/XWMM context.
   - construct_id: pES-tetr-r180-w02-17
     payload_id: TetR_w02_17
@@ -124,7 +124,7 @@ designs:
     rt_mode: wt_eco1
     decision_group: retron180_payload_trim_test
     control_id: pES-tetr-r180-w00-19
-    source_notes: Derived from pES-retron-180, the best available S0-compatible C172 bottom-nick prior by Reader SPOP summary; the prior still remains near-zero.
+    source_notes: Derived from pES-retron-180 using the immutable historical Reader score summary as selection provenance; the prior still remains near-zero and is not an active objective.
     rationale: Mild 15 nt dual-site TetR trim in the pES-retron-180 context.
   - construct_id: pES-tetr-r180-w03-16
     payload_id: TetR_w03_16
@@ -142,7 +142,7 @@ designs:
     rt_mode: wt_eco1
     decision_group: retron180_payload_trim_test
     control_id: pES-tetr-r180-w00-19
-    source_notes: Derived from pES-retron-180, the best available S0-compatible C172 bottom-nick prior by Reader SPOP summary; the prior still remains near-zero.
+    source_notes: Derived from pES-retron-180 using the immutable historical Reader score summary as selection provenance; the prior still remains near-zero and is not an active objective.
     rationale: Stronger 13 nt dual-site TetR trim in the pES-retron-180 context.
 
 payload_sequences:

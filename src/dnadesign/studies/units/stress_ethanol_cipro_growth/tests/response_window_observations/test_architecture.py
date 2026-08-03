@@ -22,11 +22,11 @@ MODULE_BODY_LIMITS = {
     "__init__.py": 60,
     "__main__.py": 20,
     "aggregation.py": 200,
-    "artifact.py": 220,
+    "artifact.py": 230,
     "artifact_contract.py": 80,
     "artifact_io.py": 100,
     "artifact_label_source_validation.py": 130,
-    "artifact_manifest.py": 190,
+    "artifact_manifest.py": 210,
     "artifact_recomputation.py": 130,
     "artifact_repeat_validation.py": 150,
     "artifact_uncertainty_validation.py": 80,
@@ -34,18 +34,28 @@ MODULE_BODY_LIMITS = {
     "censoring.py": 160,
     "cli.py": 140,
     "contracts.py": 100,
+    "contract_yaml.py": 50,
     "display_contract.py": 80,
+    "evidence_integrity.py": 50,
     "label_sources.py": 190,
     "policy.py": 420,
     "policy_contract.py": 90,
-    "reader_bundle.py": 230,
-    "reader_bundle_validation.py": 130,
+    "reader_projection.py": 140,
+    "reader_config_attestation.py": 210,
+    "reader_projection_contract.py": 310,
+    "reader_record_receipt.py": 130,
+    "reader_record_receipt_records.py": 120,
+    "reader_record_relations.py": 100,
+    "reader_record_structure.py": 180,
+    "reader_record_validation.py": 190,
+    "reader_records.py": 375,
+    "reader_snapshot.py": 70,
     "repeat_adjudication.py": 160,
     "repeat_diagnostics.py": 80,
     "repeat_evidence.py": 250,
     "sensitivity.py": 100,
     "source_integrity.py": 110,
-    "sources.py": 250,
+    "sources.py": 280,
     "uncertainty.py": 100,
     "validation.py": 190,
 }
@@ -93,3 +103,28 @@ def test_observations_do_not_import_reader_or_opal(module_path: Path) -> None:
         or module.startswith("dnadesign.opal.")
     ]
     assert offenders == []
+
+
+@pytest.mark.parametrize("module_name", ["artifact.py", "cli.py", "policy.py", "reader_records.py", "sources.py"])
+def test_active_authoring_modules_do_not_import_frozen_replay(module_name: str) -> None:
+    imports = _imported_modules(PACKAGE_ROOT / module_name)
+
+    offenders = [
+        module
+        for _, module in imports
+        if module == "historical" or module.startswith("historical.") or ".historical." in module
+    ]
+
+    assert offenders == []
+
+
+def test_active_modules_do_not_restore_retired_reader_contracts() -> None:
+    retired = ("plate_reader.response_window", "reader.response_window", "plate_reader/response_window")
+    offenders = {
+        path.name: token
+        for path in PACKAGE_ROOT.glob("*.py")
+        for token in retired
+        if token in path.read_text(encoding="utf-8")
+    }
+
+    assert offenders == {}

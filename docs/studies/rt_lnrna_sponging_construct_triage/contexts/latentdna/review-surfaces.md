@@ -55,6 +55,6 @@ Crawford high/low abundance examples. These overlays are provenance and review
 aids; they are not pseudo-records and they do not merge Khan and Crawford
 abundance scales.
 
-SPOP is materialized as a durable Reader-to-Construct label overlay. It remains
-separate from any OPAL training table until candidate-X selection and the
-explicit label join are complete.
+Reporter-response profiles are not LatentDNA label inputs. They remain
+descriptive study evidence until the study activates a constrained objective
+and current comparable profiles carry supported biological-replicate uncertainty.
