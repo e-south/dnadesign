@@ -2995,6 +2995,30 @@ def test_cross_tool_doc_metadata_check_flags_missing_semantic_fields(tmp_path: P
     assert any("missing '**Exit artifact:**'" in issue for issue in issues)
 
 
+def test_cross_tool_doc_metadata_check_covers_baserender_junction_route(tmp_path: Path) -> None:
+    route_path = tmp_path / "src" / "dnadesign" / "baserender" / "docs" / "integrations" / "junction.md"
+    _write(
+        route_path,
+        "\n".join(
+            [
+                "# junction review integration",
+                "",
+                "**Type:** route",
+                "",
+                "Missing the route ownership and artifact boundary.",
+            ]
+        )
+        + "\n",
+    )
+
+    issues = _find_cross_tool_doc_metadata_issues(tmp_path)
+
+    assert any(str(route_path) in issue and "missing '**Plane:**'" in issue for issue in issues)
+    assert any(str(route_path) in issue and "missing '**Owner-boundary:**'" in issue for issue in issues)
+    assert any(str(route_path) in issue and "missing '**Entry artifact:**'" in issue for issue in issues)
+    assert any(str(route_path) in issue and "missing '**Exit artifact:**'" in issue for issue in issues)
+
+
 def test_cross_tool_doc_metadata_check_flags_missing_registry_fields(tmp_path: Path) -> None:
     _write(
         tmp_path / "docs" / "operations" / "orchestration/runbooks.md",

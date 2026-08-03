@@ -38,7 +38,7 @@ def _real_universal_rows_with_unequal_target_lengths() -> list[dict[str, object]
         target_count=2,
         target_length=240,
         topology="shared",
-        oligo_length=96,
+        nominal_fragment_oligo_length=96,
         search_range=2,
         barcode_generation_attempts=250_000,
     )
@@ -271,7 +271,7 @@ def test_adapter_accepts_a_complete_multi_target_document_from_the_real_producer
             target_count=2,
             target_length=240,
             topology="shared",
-            oligo_length=96,
+            nominal_fragment_oligo_length=96,
             search_range=2,
             barcode_generation_attempts=250_000,
         )

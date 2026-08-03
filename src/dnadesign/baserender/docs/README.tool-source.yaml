@@ -8,3 +8,7 @@ keywords:
   - rendering
   - job files
   - optional workspaces
+routes:
+  - id: junction-review
+    path: integrations/junction.md
+    summary: Render optional per-target review images from a verified junction review contract without recomputing the design.

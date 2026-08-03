@@ -8,7 +8,11 @@ last_verified: 2026-08-02
 
 # junction review integration
 
-**Type:** runbook
+**Type:** route
+**Plane:** downstream-tool
+**Owner-boundary:** baserender
+**Entry artifact:** verified junction `views/three_way_junction_review.v1.json` plus an explicit BaseRender `RenderJobV4` job
+**Exit artifact:** create-only BaseRender review bundle containing per-target images and its render manifest
 **Use when:** you want one optional four-panel review image per selected target
 **Input:** `views/three_way_junction_review.v1.json` from a verified junction bundle
 **Output:** a separate private BaseRender bundle

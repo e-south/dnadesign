@@ -387,6 +387,11 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "downstream-tool",
         "owner_boundary": "opal",
     },
+    "src/dnadesign/baserender/docs/integrations/junction.md": {
+        "type": "route",
+        "plane": "downstream-tool",
+        "owner_boundary": "baserender",
+    },
 }
 _CROSS_TOOL_DOC_ALLOWED_TYPES = {"contract", "route", "runbook", "workflow"}
 _CROSS_TOOL_DOC_ALLOWED_PLANES = {"control-plane", "data-plane", "downstream-tool"}
