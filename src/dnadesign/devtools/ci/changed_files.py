@@ -32,44 +32,40 @@ def _run_git(*, repo_root: Path, args: list[str], context: str) -> str:
     return completed.stdout
 
 
-def _git_ref_exists(*, repo_root: Path, ref_name: str) -> bool:
-    completed = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", ref_name],
-        cwd=repo_root,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-    return completed.returncode == 0
+def _resolve_commit(*, repo_root: Path, commit: str, role: str) -> str:
+    try:
+        return _run_git(
+            repo_root=repo_root,
+            args=["rev-parse", "--verify", f"{commit}^{{commit}}"],
+            context=f"{role} commit is unavailable in the CI checkout",
+        ).strip()
+    except ValueError as exc:
+        raise ValueError(f"{role} commit is unavailable in the CI checkout: {commit}") from exc
 
 
-def collect_changed_files(
-    *, event_name: str, repo_root: Path, base_ref: str | None, head_sha: str | None, remote: str = "origin"
-) -> list[str]:
+def collect_changed_files(*, event_name: str, repo_root: Path, base_sha: str | None, head_sha: str | None) -> list[str]:
     if event_name != "pull_request":
         return []
 
-    if not base_ref or not head_sha:
-        raise ValueError("--base-ref and --head-sha are required for pull_request event.")
-    if not remote.strip():
-        raise ValueError("--remote must not be empty.")
+    if not base_sha or not head_sha:
+        raise ValueError("--base-sha and --head-sha are required for pull_request event.")
 
-    tracking_ref = f"{remote}/{base_ref}"
-    if not _git_ref_exists(repo_root=repo_root, ref_name=tracking_ref):
-        _run_git(
-            repo_root=repo_root,
-            args=[
-                "fetch",
-                "--no-tags",
-                "--depth=1",
-                remote,
-                f"refs/heads/{base_ref}:refs/remotes/{tracking_ref}",
-            ],
-            context="git fetch failed",
-        )
+    resolved_base = _resolve_commit(repo_root=repo_root, commit=base_sha, role="pull-request base")
+    resolved_head = _resolve_commit(repo_root=repo_root, commit=head_sha, role="pull-request merge")
+    parent_line = _run_git(
+        repo_root=repo_root,
+        args=["rev-list", "--parents", "-n", "1", resolved_head],
+        context="unable to inspect pull-request merge parents",
+    ).strip()
+    parent_tokens = parent_line.split()
+    if len(parent_tokens) != 3:
+        raise ValueError("--head-sha must resolve to GitHub's two-parent pull-request merge commit.")
+    if parent_tokens[1] != resolved_base:
+        raise ValueError("pull-request merge commit first parent does not match --base-sha.")
+
     diff_output = _run_git(
         repo_root=repo_root,
-        args=["diff", "--name-only", f"{tracking_ref}...{head_sha}"],
+        args=["diff", "--name-only", f"{resolved_base}...{resolved_head}"],
         context="git diff failed",
     )
     return [line.strip() for line in diff_output.splitlines() if line.strip()]
@@ -79,9 +75,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Collect changed files for CI scope detection.")
     parser.add_argument("--event-name", required=True)
     parser.add_argument("--repo-root", type=Path, default=Path("."))
-    parser.add_argument("--base-ref", default=None)
+    parser.add_argument("--base-sha", default=None)
     parser.add_argument("--head-sha", default=None)
-    parser.add_argument("--remote", default="origin")
     parser.add_argument("--output-file", type=Path, required=True)
     return parser
 
@@ -93,9 +88,8 @@ def main(argv: list[str] | None = None) -> int:
         changed_files = collect_changed_files(
             event_name=args.event_name,
             repo_root=args.repo_root,
-            base_ref=args.base_ref,
+            base_sha=args.base_sha,
             head_sha=args.head_sha,
-            remote=args.remote,
         )
     except ValueError as exc:
         print(str(exc))

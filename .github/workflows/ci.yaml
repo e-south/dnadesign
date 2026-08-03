@@ -40,7 +40,7 @@ jobs:
           PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
-            --base-ref "${{ github.base_ref }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
             --head-sha "${{ github.sha }}" \
             --output-file .ci_changed_files.txt
 
@@ -114,7 +114,7 @@ jobs:
           PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
-            --base-ref "${{ github.base_ref }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
             --head-sha "${{ github.sha }}" \
             --output-file .ci_changed_files.txt
 
@@ -147,8 +147,9 @@ jobs:
             exit 0
           fi
 
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          uv run pre-commit run --from-ref "origin/${{ github.base_ref }}" --to-ref "${{ github.sha }}"
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          git cat-file -e "${base_sha}^{commit}"
+          uv run pre-commit run --from-ref "${base_sha}" --to-ref "${{ github.sha }}"
 
       - name: Lint
         run: uv run ruff check .
@@ -304,7 +305,7 @@ jobs:
           PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
-            --base-ref "${{ github.base_ref }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
             --head-sha "${{ github.sha }}" \
             --output-file .ci_changed_files.txt
 

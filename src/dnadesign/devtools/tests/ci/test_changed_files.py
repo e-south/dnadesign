@@ -28,7 +28,7 @@ def _run_git(repo_root: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
-def _create_repo_with_feature_change(tmp_path: Path) -> tuple[Path, str]:
+def _create_repo_with_pr_merge(tmp_path: Path) -> tuple[Path, str, str, str]:
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
 
@@ -39,104 +39,96 @@ def _create_repo_with_feature_change(tmp_path: Path) -> tuple[Path, str]:
     (repo_root / "README.md").write_text("base\n", encoding="utf-8")
     _run_git(repo_root, "add", "README.md")
     _run_git(repo_root, "commit", "-m", "base commit")
+    base_sha = _run_git(repo_root, "rev-parse", "HEAD")
 
-    _run_git(repo_root, "remote", "add", "origin", str(repo_root))
     _run_git(repo_root, "switch", "-c", "feature")
     (repo_root / "README.md").write_text("base\nfeature\n", encoding="utf-8")
     _run_git(repo_root, "add", "README.md")
     _run_git(repo_root, "commit", "-m", "feature commit")
-    head_sha = _run_git(repo_root, "rev-parse", "HEAD")
+    feature_sha = _run_git(repo_root, "rev-parse", "HEAD")
 
-    return repo_root, head_sha
-
-
-def _create_single_branch_feature_clone(tmp_path: Path) -> tuple[Path, str]:
-    remote_root = tmp_path / "remote.git"
-    seed_root = tmp_path / "seed"
-    checkout_root = tmp_path / "checkout"
-
-    _run_git(tmp_path, "init", "--bare", str(remote_root))
-    seed_root.mkdir(parents=True, exist_ok=True)
-    _run_git(seed_root, "init", "-b", "main")
-    _run_git(seed_root, "config", "user.email", "test@example.com")
-    _run_git(seed_root, "config", "user.name", "Test User")
-
-    (seed_root / "README.md").write_text("base\n", encoding="utf-8")
-    _run_git(seed_root, "add", "README.md")
-    _run_git(seed_root, "commit", "-m", "base commit")
-    _run_git(seed_root, "remote", "add", "origin", str(remote_root))
-    _run_git(seed_root, "push", "-u", "origin", "main")
-
-    _run_git(seed_root, "switch", "-c", "feature")
-    (seed_root / "README.md").write_text("base\nfeature\n", encoding="utf-8")
-    _run_git(seed_root, "add", "README.md")
-    _run_git(seed_root, "commit", "-m", "feature commit")
-    _run_git(seed_root, "push", "-u", "origin", "feature")
-
-    _run_git(tmp_path, "clone", "--single-branch", "--branch", "feature", str(remote_root), str(checkout_root))
-    head_sha = _run_git(checkout_root, "rev-parse", "HEAD")
-    return checkout_root, head_sha
+    _run_git(repo_root, "switch", "main")
+    _run_git(repo_root, "merge", "--no-ff", "--no-edit", feature_sha)
+    merge_sha = _run_git(repo_root, "rev-parse", "HEAD")
+    return repo_root, base_sha, feature_sha, merge_sha
 
 
 def test_collect_changed_files_returns_empty_for_non_pr(tmp_path: Path) -> None:
-    repo_root, head_sha = _create_repo_with_feature_change(tmp_path)
+    repo_root, _, _, _ = _create_repo_with_pr_merge(tmp_path)
 
     files = collect_changed_files(
         event_name="push",
         repo_root=repo_root,
-        base_ref="main",
-        head_sha=head_sha,
+        base_sha=None,
+        head_sha=None,
     )
 
     assert files == []
 
 
 def test_collect_changed_files_returns_pr_diff(tmp_path: Path) -> None:
-    repo_root, head_sha = _create_repo_with_feature_change(tmp_path)
+    repo_root, base_sha, _, merge_sha = _create_repo_with_pr_merge(tmp_path)
 
     files = collect_changed_files(
         event_name="pull_request",
         repo_root=repo_root,
-        base_ref="main",
-        head_sha=head_sha,
+        base_sha=base_sha,
+        head_sha=merge_sha,
     )
 
     assert files == ["README.md"]
 
 
-def test_collect_changed_files_fetches_missing_base_into_tracking_ref(tmp_path: Path) -> None:
-    repo_root, head_sha = _create_single_branch_feature_clone(tmp_path)
-    assert "origin/main" not in _run_git(repo_root, "branch", "--remotes").splitlines()
+def test_collect_changed_files_rejects_non_merge_head(tmp_path: Path) -> None:
+    repo_root, base_sha, feature_sha, _ = _create_repo_with_pr_merge(tmp_path)
+
+    try:
+        collect_changed_files(
+            event_name="pull_request",
+            repo_root=repo_root,
+            base_sha=base_sha,
+            head_sha=feature_sha,
+        )
+    except ValueError as exc:
+        assert "two-parent pull-request merge commit" in str(exc)
+    else:
+        raise AssertionError("non-merge pull-request head was accepted")
+
+
+def test_collect_changed_files_rejects_base_snapshot_mismatch(tmp_path: Path) -> None:
+    repo_root, _, feature_sha, merge_sha = _create_repo_with_pr_merge(tmp_path)
+
+    try:
+        collect_changed_files(
+            event_name="pull_request",
+            repo_root=repo_root,
+            base_sha=feature_sha,
+            head_sha=merge_sha,
+        )
+    except ValueError as exc:
+        assert "first parent does not match --base-sha" in str(exc)
+    else:
+        raise AssertionError("mismatched pull-request base snapshot was accepted")
+
+
+def test_collect_changed_files_ignores_later_base_branch_movement(tmp_path: Path) -> None:
+    repo_root, base_sha, _, merge_sha = _create_repo_with_pr_merge(tmp_path)
+    (repo_root / "later.txt").write_text("later base movement\n", encoding="utf-8")
+    _run_git(repo_root, "add", "later.txt")
+    _run_git(repo_root, "commit", "-m", "later base movement")
 
     files = collect_changed_files(
         event_name="pull_request",
         repo_root=repo_root,
-        base_ref="main",
-        head_sha=head_sha,
-    )
-
-    assert files == ["README.md"]
-    assert _run_git(repo_root, "rev-parse", "--verify", "origin/main")
-
-
-def test_collect_changed_files_uses_existing_tracking_ref_without_fetch(tmp_path: Path) -> None:
-    repo_root, head_sha = _create_repo_with_feature_change(tmp_path)
-    main_sha = _run_git(repo_root, "rev-parse", "main")
-    _run_git(repo_root, "update-ref", "refs/remotes/broken/main", main_sha)
-
-    files = collect_changed_files(
-        event_name="pull_request",
-        repo_root=repo_root,
-        base_ref="main",
-        head_sha=head_sha,
-        remote="broken",
+        base_sha=base_sha,
+        head_sha=merge_sha,
     )
 
     assert files == ["README.md"]
 
 
 def test_main_fails_when_pr_args_missing(tmp_path: Path) -> None:
-    repo_root, _ = _create_repo_with_feature_change(tmp_path)
+    repo_root, _, _, _ = _create_repo_with_pr_merge(tmp_path)
     output_file = tmp_path / "changed.txt"
 
     rc = main(
@@ -153,17 +145,8 @@ def test_main_fails_when_pr_args_missing(tmp_path: Path) -> None:
     assert rc == 1
 
 
-def test_main_reports_git_fetch_failure_with_context(tmp_path: Path, capsys) -> None:
-    repo_root = tmp_path / "repo-no-remote"
-    repo_root.mkdir(parents=True, exist_ok=True)
-
-    _run_git(repo_root, "init", "-b", "main")
-    _run_git(repo_root, "config", "user.email", "test@example.com")
-    _run_git(repo_root, "config", "user.name", "Test User")
-    (repo_root / "README.md").write_text("base\n", encoding="utf-8")
-    _run_git(repo_root, "add", "README.md")
-    _run_git(repo_root, "commit", "-m", "base commit")
-    head_sha = _run_git(repo_root, "rev-parse", "HEAD")
+def test_main_reports_unavailable_base_snapshot(tmp_path: Path, capsys) -> None:
+    repo_root, _, _, merge_sha = _create_repo_with_pr_merge(tmp_path)
 
     output_file = tmp_path / "changed.txt"
     rc = main(
@@ -172,10 +155,10 @@ def test_main_reports_git_fetch_failure_with_context(tmp_path: Path, capsys) -> 
             "pull_request",
             "--repo-root",
             str(repo_root),
-            "--base-ref",
-            "main",
+            "--base-sha",
+            "0" * 40,
             "--head-sha",
-            head_sha,
+            merge_sha,
             "--output-file",
             str(output_file),
         ]
@@ -183,28 +166,4 @@ def test_main_reports_git_fetch_failure_with_context(tmp_path: Path, capsys) -> 
 
     captured = capsys.readouterr()
     assert rc == 1
-    assert "git fetch failed" in captured.out
-
-
-def test_main_fails_for_empty_remote_name(tmp_path: Path) -> None:
-    repo_root, head_sha = _create_repo_with_feature_change(tmp_path)
-    output_file = tmp_path / "changed.txt"
-
-    rc = main(
-        [
-            "--event-name",
-            "pull_request",
-            "--repo-root",
-            str(repo_root),
-            "--base-ref",
-            "main",
-            "--head-sha",
-            head_sha,
-            "--remote",
-            "",
-            "--output-file",
-            str(output_file),
-        ]
-    )
-
-    assert rc == 1
+    assert "pull-request base commit is unavailable" in captured.out
