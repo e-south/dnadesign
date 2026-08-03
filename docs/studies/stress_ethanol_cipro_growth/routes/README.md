@@ -11,9 +11,8 @@ preflight_surface: studies.stress-ethanol-cipro-growth.preflight
 
 ## stress_ethanol_cipro_growth Routes
 
-Use this page to choose one owner and one next artifact. Current facts belong in
-the [checked-in status](../record/status.md); detailed scientific interpretation
-belongs in `contexts/`; executable declarations belong in `operations/`.
+Use this page to choose one owner and one next artifact. Current facts belong in the
+[checked-in status](../record/status.md), interpretation in `contexts/`, and declarations in `operations/`.
 
 ### First checks
 
@@ -39,11 +38,9 @@ Each step verifies its input before publishing the next artifact.
 | Objective interpretation | OPAL mathematics plus stress-study policy | SFXI, RMF, and MSRB interpret declared vectors under separate contracts. The active campaign uses MSRB; SFXI and RMF remain comparison evidence. | [OPAL context](../contexts/opal/README.md) |
 | Campaign state | OPAL plus checked-in study record | Validated features and labels feed model fitting, scoring, selection, ledgers, and the recorded physical handoff. | [OPAL route and commands](decision/opal/README.md) |
 
-The pinned Reader plot has one read-only study display after candidate bindings
-exist: [Reader evidence display](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/reader_promoter_evidence/README.md).
-It verifies the exact plot record and promoter binding for review in the OPAL
-notebook; it is not another data-plane step and does not produce observations,
-labels, or objectives.
+After candidate binding, the [Reader evidence display](../../../../src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/reader_promoter_evidence/README.md)
+verifies the exact plot record and promoter binding for read-only OPAL notebook review.
+It does not produce observations, labels, or objectives.
 
 Stop when the next contract is absent or fails validation. Do not infer a study
 candidate from a Reader `design_id`, synthesize response-window labels from an
@@ -60,7 +57,3 @@ SFXI score, or treat an accepted physical handoff as evidence of model support.
 | Cluster exploration | `cluster` | `planned` | [Cluster](analysis/cluster.md) |
 | OPAL campaigns and synthesis handoff | `opal` plus stress study | `opal_assay_b1_order_ready` | [OPAL](decision/opal/) (`routes/decision/opal/README.md`) |
 | Objective semantics | `opal` mathematics plus `stress study` masks, scales, and decisions | MSRB active learning probe; SFXI and RMF comparison evidence | [MSRB symbol walkthrough](../contexts/opal/multistate-response-behavior-walkthrough.html), [MSRB study binding](../contexts/opal/multistate-response-behavior.md), [SFXI](../contexts/opal/sfxi-round0-source-evidence.md), and [RMF](../contexts/opal/response-magnitude-feasibility.md) |
-
-### Guardrails
-
-Use [Promoter design intent](../contexts/promoter-design-intent.md) for terminology and state boundaries; do not redefine them on this route map.
