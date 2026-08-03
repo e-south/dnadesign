@@ -267,14 +267,17 @@ jobs:
           name: quality-score-coverage-summary
           path: quality-score-coverage-summary.json
 
-      - name: Upload core-lane coverage to Codecov
+      # Local tests and coverage thresholds are authoritative; this upload is telemetry.
+      - name: Publish core-lane coverage to Codecov (non-blocking)
         if: needs.detect-ci-scope.outputs.run-coverage-gate == 'true'
+        continue-on-error: true
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: coverage-core.xml
           flags: core
           use_oidc: true
           fail_ci_if_error: true
+          version: v11.3.1
           verbose: true
 
       - name: Build (sdist + wheel)
@@ -381,13 +384,16 @@ jobs:
             --lane-name external-integration \
             --required-tools-csv "${{ needs.detect-ci-scope.outputs.external-integration-tools-csv }}"
 
-      - name: Upload external-integration coverage to Codecov
+      # The integration tests gate this job; Codecov availability does not.
+      - name: Publish external-integration coverage to Codecov (non-blocking)
+        continue-on-error: true
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           files: coverage-external-integration.xml
           flags: external_integration
           use_oidc: true
           fail_ci_if_error: true
+          version: v11.3.1
           verbose: true
 
   quality-score-inputs:

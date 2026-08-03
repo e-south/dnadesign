@@ -251,18 +251,23 @@ def test_checkout_and_artifact_actions_use_current_node24_releases() -> None:
         assert set(observed_refs[action]) == {expected_ref}
 
 
-def test_codecov_uploads_use_node24_compatible_action() -> None:
+def test_codecov_uploads_are_pinned_verified_and_non_gating() -> None:
     workflow = _workflow()
     expected_ref = "codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f"
 
-    upload_refs = [
-        str(step.get("uses", ""))
+    upload_steps = [
+        step
         for job in workflow["jobs"].values()
         for step in job.get("steps", ())
         if str(step.get("uses", "")).startswith("codecov/codecov-action@")
     ]
 
-    assert upload_refs == [expected_ref, expected_ref]
+    assert [str(step["uses"]) for step in upload_steps] == [expected_ref, expected_ref]
+    for step in upload_steps:
+        assert step["continue-on-error"] is True
+        assert step["with"]["fail_ci_if_error"] is True
+        assert step["with"]["use_oidc"] is True
+        assert step["with"]["version"] == "v11.3.1"
 
 
 def test_quality_entropy_job_uses_stdlib_only_runtime() -> None:
