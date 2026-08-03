@@ -1,4 +1,13 @@
-"""Path confinement and digest-stability contracts for Reader records."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/reader_records/test_path_confinement.py
+
+Path confinement and digest-stability contracts for Reader records.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from pathlib import Path
 

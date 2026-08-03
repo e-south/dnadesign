@@ -1,4 +1,13 @@
-"""Architecture boundaries for the reporter-response package."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/reporter_response/test_architecture.py
+
+Architecture boundaries for the reporter-response package.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

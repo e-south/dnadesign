@@ -1,4 +1,13 @@
-"""Keep Reader evidence-binding tests organized by contract."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/reader_evidence_bindings/test_layout.py
+
+Keep Reader evidence-binding tests organized by contract.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from pathlib import Path
 

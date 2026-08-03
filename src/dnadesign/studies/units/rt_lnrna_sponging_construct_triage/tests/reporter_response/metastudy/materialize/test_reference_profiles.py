@@ -1,4 +1,13 @@
-"""Tests optional reference normalization without dropping raw profiles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/reporter_response/metastudy/materialize/test_reference_profiles.py
+
+Tests optional reference normalization without dropping raw profiles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

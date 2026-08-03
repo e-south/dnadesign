@@ -1,4 +1,13 @@
-"""Canonical serialization for descriptive reporter profiles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/serialization.py
+
+Canonical serialization for descriptive reporter profiles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

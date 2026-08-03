@@ -1,4 +1,13 @@
-"""Construction and audit binding for one descriptive reporter profile."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/materialize/profile_building.py
+
+Construction and audit binding for one descriptive reporter profile.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

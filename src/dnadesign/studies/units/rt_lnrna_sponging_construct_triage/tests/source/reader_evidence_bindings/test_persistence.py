@@ -1,4 +1,13 @@
-"""Binding artifact projection, loading, and atomic publication."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/reader_evidence_bindings/test_persistence.py
+
+Binding artifact projection, loading, and atomic publication.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import hashlib
 import json

@@ -1,4 +1,13 @@
-"""CLI routing and fail-fast publication behavior."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/reader_evidence_bindings/test_cli.py
+
+CLI routing and fail-fast publication behavior.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import json
 from pathlib import Path

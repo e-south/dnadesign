@@ -1,4 +1,13 @@
-"""Scalar validation shared by acquisition-projection contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/acquisition_projection/_values.py
+
+Scalar validation shared by acquisition-projection contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Bounded pagination contracts for Reader records."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/reader_records/test_pagination.py
+
+Bounded pagination contracts for Reader records.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from copy import deepcopy
 from pathlib import Path

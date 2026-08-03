@@ -1,4 +1,13 @@
-"""Study-owned reporter measurements that do not require a positive control."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/measurement_profile.py
+
+Study-owned reporter measurements that do not require a positive control.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Strict JSON-shaped value decoding for offline profile projections."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/evidence_projection/_values.py
+
+Strict JSON-shaped value decoding for offline profile projections.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,8 +1,12 @@
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/historical/observation_policy_v2.py
+
 Project the immutable v2 observation policy used by the frozen behavior replay.
 
-This loader is intentionally local to the response metastudy. It does not make
-the retired policy schema part of the active response-window API.
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from __future__ import annotations

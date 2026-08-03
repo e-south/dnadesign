@@ -1,4 +1,13 @@
-"""Source-closed construction of descriptive reporter-response profiles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/building.py
+
+Source-closed construction of descriptive reporter-response profiles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

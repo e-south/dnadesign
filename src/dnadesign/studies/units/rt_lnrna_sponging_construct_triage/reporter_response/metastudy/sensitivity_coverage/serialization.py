@@ -1,4 +1,13 @@
-"""Canonical payload codecs for sensitivity-coverage ledgers and receipts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/sensitivity_coverage/serialization.py
+
+Canonical payload codecs for sensitivity-coverage ledgers and receipts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

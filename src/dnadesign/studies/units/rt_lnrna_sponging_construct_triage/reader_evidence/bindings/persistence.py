@@ -1,4 +1,13 @@
-"""Create-only publication and source-closed loading for binding artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_evidence/bindings/persistence.py
+
+Create-only publication and source-closed loading for binding artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

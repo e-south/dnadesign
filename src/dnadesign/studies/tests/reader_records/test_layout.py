@@ -1,4 +1,13 @@
-"""Keep Reader-record boundary tests organized by behavior."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/reader_records/test_layout.py
+
+Keep Reader-record boundary tests organized by behavior.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from pathlib import Path
 

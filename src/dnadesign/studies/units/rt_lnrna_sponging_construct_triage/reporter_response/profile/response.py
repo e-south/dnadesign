@@ -1,4 +1,13 @@
-"""Control pairing and derived dose-response contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/profile/response.py
+
+Control pairing and derived dose-response contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

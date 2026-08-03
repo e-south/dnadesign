@@ -1,4 +1,13 @@
-"""Exact JSON serialization and parsing for acquisition projections."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/acquisition_projection/serialization.py
+
+Exact JSON serialization and parsing for acquisition projections.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

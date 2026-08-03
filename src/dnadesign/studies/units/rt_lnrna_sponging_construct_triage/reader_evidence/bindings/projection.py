@@ -1,4 +1,13 @@
-"""Canonical JSON projection for Reader evidence-binding artifacts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_evidence/bindings/projection.py
+
+Canonical JSON projection for Reader evidence-binding artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Public verification and record-contract validation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/reader_records/test_verification.py
+
+Public verification and record-contract validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import subprocess
 from copy import deepcopy

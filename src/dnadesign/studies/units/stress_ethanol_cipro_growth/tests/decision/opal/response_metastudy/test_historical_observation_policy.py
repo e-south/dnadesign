@@ -1,4 +1,13 @@
-"""Fail-closed tests for the response metastudy's frozen policy snapshot."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/tests/decision/opal/response_metastudy/test_historical_observation_policy.py
+
+Fail-closed tests for the response metastudy's frozen policy snapshot.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Tests compact selection state and forgery resistance."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/reporter_response/metastudy/operator/test_state_selection.py
+
+Tests compact selection state and forgery resistance.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

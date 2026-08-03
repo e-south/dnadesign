@@ -1,4 +1,13 @@
-"""Primitive validation helpers for sensitivity-coverage contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/sensitivity_coverage/_values.py
+
+Primitive validation helpers for sensitivity-coverage contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

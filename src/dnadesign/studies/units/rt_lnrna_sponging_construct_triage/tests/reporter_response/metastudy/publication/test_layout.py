@@ -1,4 +1,13 @@
-"""Architecture guards for the study-owned publication package."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/reporter_response/metastudy/publication/test_layout.py
+
+Architecture guards for the study-owned publication package.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

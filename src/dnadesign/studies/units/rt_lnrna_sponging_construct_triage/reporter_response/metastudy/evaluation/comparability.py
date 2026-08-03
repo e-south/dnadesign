@@ -1,4 +1,13 @@
-"""Selection comparability across raw and reference-normalized profile variants."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/evaluation/comparability.py
+
+Selection comparability across raw and reference-normalized profile variants.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

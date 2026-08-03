@@ -1,4 +1,13 @@
-"""Strict codecs for the complete Reader identity used by materialization receipts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/contracts/_materialization/lineage.py
+
+Strict codecs for the complete Reader identity used by materialization receipts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Identity and replicate metadata contracts for Reader records."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/reader_records/test_identity.py
+
+Identity and replicate metadata contracts for Reader records.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from pathlib import Path
 

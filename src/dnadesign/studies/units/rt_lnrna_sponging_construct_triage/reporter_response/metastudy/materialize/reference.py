@@ -1,4 +1,13 @@
-"""Reference-normalization availability from explicitly declared controls."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/materialize/reference.py
+
+Reference-normalization availability from explicitly declared controls.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

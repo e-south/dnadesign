@@ -1,4 +1,13 @@
-"""Build selected-window projections from typed profile evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/acquisition_projection/building.py
+
+Build selected-window projections from typed profile evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Final normalized reporter-response profile contract."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/profile/normalized.py
+
+Final normalized reporter-response profile contract.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

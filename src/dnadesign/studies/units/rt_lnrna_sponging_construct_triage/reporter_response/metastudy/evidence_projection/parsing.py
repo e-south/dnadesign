@@ -1,4 +1,13 @@
-"""Strict parsing of offline profile content projections."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/evidence_projection/parsing.py
+
+Strict parsing of offline profile content projections.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Typed normalized and raw acquisition-projection contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/acquisition_projection/contracts.py
+
+Typed normalized and raw acquisition-projection contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

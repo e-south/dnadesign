@@ -1,4 +1,13 @@
-"""Immutable contracts for study-owned Reader evidence bindings."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_evidence/bindings/contracts.py
+
+Immutable contracts for study-owned Reader evidence bindings.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Non-authoritative profile content projections for offline evaluation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/evidence_projection/contracts.py
+
+Non-authoritative profile content projections for offline evaluation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

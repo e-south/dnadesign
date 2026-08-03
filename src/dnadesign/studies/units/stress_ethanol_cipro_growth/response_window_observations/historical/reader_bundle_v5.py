@@ -3,10 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/historical/reader_bundle_v5.py
 
-Verify immutable bundle-v5 evidence for frozen campaign replay only.
-
-This module is not an authoring source and must not be imported by the active
-preview or materialization path.
+Verify immutable bundle-v5 evidence for frozen campaign replay; exclude it from active authoring.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

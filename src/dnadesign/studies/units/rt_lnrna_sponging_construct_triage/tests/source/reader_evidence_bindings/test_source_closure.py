@@ -1,4 +1,13 @@
-"""Source-closure and digest-stability binding behavior."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/tests/source/reader_evidence_bindings/test_source_closure.py
+
+Source-closure and digest-stability binding behavior.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dataclasses import replace
 from pathlib import Path

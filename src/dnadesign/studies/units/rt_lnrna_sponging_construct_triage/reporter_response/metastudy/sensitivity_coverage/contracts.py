@@ -1,4 +1,13 @@
-"""Typed Cartesian coverage for sensitivity evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/sensitivity_coverage/contracts.py
+
+Typed Cartesian coverage for sensitivity evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

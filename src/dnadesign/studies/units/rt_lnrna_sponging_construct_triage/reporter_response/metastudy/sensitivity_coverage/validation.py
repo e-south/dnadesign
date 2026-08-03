@@ -1,4 +1,13 @@
-"""Evidence and attempt validation for sensitivity-coverage ledgers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/sensitivity_coverage/validation.py
+
+Evidence and attempt validation for sensitivity-coverage ledgers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

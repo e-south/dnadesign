@@ -1,4 +1,13 @@
-"""Strict parsing and source-closed revalidation of serialized reporter profiles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/parsing.py
+
+Strict parsing and source-closed revalidation of serialized reporter profiles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

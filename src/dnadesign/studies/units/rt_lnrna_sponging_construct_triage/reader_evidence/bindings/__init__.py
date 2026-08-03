@@ -1,4 +1,13 @@
-"""Public contract for study-owned Reader evidence bindings."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_evidence/bindings/__init__.py
+
+Public contract for study-owned Reader evidence bindings.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .building import build_reader_evidence_bindings
 from .contracts import (

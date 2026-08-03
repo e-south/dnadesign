@@ -1,4 +1,13 @@
-"""Uncertainty and descriptive-eligibility contracts for response profiles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/profile/uncertainty.py
+
+Uncertainty and descriptive-eligibility contracts for response profiles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

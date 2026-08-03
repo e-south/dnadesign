@@ -1,4 +1,13 @@
-"""Canonical sensitivity-coverage contracts, codecs, construction, and validation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/sensitivity_coverage/__init__.py
+
+Canonical sensitivity-coverage contracts, codecs, construction, and validation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .building import build_sensitivity_coverage
 from .contracts import (

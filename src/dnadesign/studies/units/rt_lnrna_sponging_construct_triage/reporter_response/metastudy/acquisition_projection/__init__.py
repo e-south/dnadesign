@@ -1,4 +1,13 @@
-"""Public acquisition-projection contract and operations."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/acquisition_projection/__init__.py
+
+Public acquisition-projection contract and operations.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .building import build_acquisition_projection
 from .contracts import (

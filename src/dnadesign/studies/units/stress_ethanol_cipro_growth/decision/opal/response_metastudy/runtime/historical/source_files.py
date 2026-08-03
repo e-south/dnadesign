@@ -1,4 +1,13 @@
-"""Resolve digest-bound files owned by the frozen response-metastudy replay."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/runtime/historical/source_files.py
+
+Resolve digest-bound files owned by the frozen response-metastudy replay.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

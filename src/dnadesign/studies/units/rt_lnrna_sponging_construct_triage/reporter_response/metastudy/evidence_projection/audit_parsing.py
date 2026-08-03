@@ -1,4 +1,13 @@
-"""Digest-closed parsing for serialized profile audit projections."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/evidence_projection/audit_parsing.py
+
+Digest-closed parsing for serialized profile audit projections.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

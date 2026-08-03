@@ -1,4 +1,13 @@
-"""Source-closed construction of sensitivity-coverage ledgers."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/sensitivity_coverage/building.py
+
+Source-closed construction of sensitivity-coverage ledgers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

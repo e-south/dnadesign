@@ -1,4 +1,13 @@
-"""Canonical rendering for reporter-response meta-study publications."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/publication/report.py
+
+Canonical rendering for reporter-response meta-study publications.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

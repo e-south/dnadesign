@@ -1,4 +1,13 @@
-"""Canonical identity payloads for profile-bound meta-study evidence."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/contracts/profile_identity.py
+
+Canonical identity payloads for profile-bound meta-study evidence.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

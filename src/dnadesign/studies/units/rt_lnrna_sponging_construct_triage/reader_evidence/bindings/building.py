@@ -1,4 +1,13 @@
-"""Build study subject bindings from one source-closed Reader record."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reader_evidence/bindings/building.py
+
+Build study subject bindings from one source-closed Reader record.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

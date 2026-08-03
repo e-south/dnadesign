@@ -1,4 +1,13 @@
-"""Source-closed Reader evidence provenance for reporter-response profiles."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/profile/provenance.py
+
+Source-closed Reader evidence provenance for reporter-response profiles.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

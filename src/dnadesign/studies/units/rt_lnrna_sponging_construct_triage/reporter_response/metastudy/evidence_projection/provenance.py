@@ -1,4 +1,13 @@
-"""Non-authoritative Reader lineage projection for offline profile evaluation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/evidence_projection/provenance.py
+
+Non-authoritative Reader lineage projection for offline profile evaluation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
