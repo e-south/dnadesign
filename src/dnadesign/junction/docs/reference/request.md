@@ -17,7 +17,7 @@ use `.json`, `.yaml`, or `.yml`, contain UTF-8 text, and fit within 16 MiB.
 | `seed` | integer | Deterministic request seed in `0..2^64-1`. |
 | `planning` | object | Exact geometry, search, and barcode policy. |
 | `targets` | non-empty list | Exact target, assembly-group, and recovery declarations. |
-| `order_policy` | object | Vendor-neutral labels, end preparation, and length ceiling. |
+| `order_policy` | object | Vendor-neutral labels, end preparation, and allowed order-length interval. |
 
 ## Planning fields
 
@@ -43,7 +43,7 @@ request requires:
 - `L > 2b + t + R - 1`;
 - GC fractions in `[0, 1]`, with minimum no greater than maximum;
 - `barcode_max_homopolymer <= b`; and
-- `order_policy.max_oligo_length >= max(L + R - 1, L - b + t)`; and
+- `order_policy.max_oligo_length >= max(L + R - 1, L - b + t)`;
 - `order_policy.minimum_fragment_oligo_length <=
   order_policy.max_oligo_length`.
 
@@ -104,7 +104,7 @@ The `order_policy` object contains exactly:
 - `barcode_bearing_purification`;
 - `complement_purification`;
 - `primer_purification`;
-- `complement_end_preparation`; and
+- `complement_end_preparation`;
 - `minimum_fragment_oligo_length`; and
 - `max_oligo_length`.
 
