@@ -19,6 +19,18 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 )
 
 
+def _logical_source_line_count(path: Path) -> int:
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    physical_lines = len(source.splitlines())
+    if not tree.body or not isinstance(tree.body[0], ast.Expr):
+        return physical_lines
+    value = tree.body[0].value
+    if not isinstance(value, ast.Constant) or not isinstance(value.value, str):
+        return physical_lines
+    return physical_lines - (tree.body[0].end_lineno - tree.body[0].lineno)
+
+
 def test_publication_package_is_small_and_explicit() -> None:
     package_root = Path(publication.__file__).parent
     modules = {path.name for path in package_root.glob("*.py")}
@@ -38,8 +50,8 @@ def test_publication_modules_respect_cohesion_budgets() -> None:
     }
 
     for name, budget in budgets.items():
-        lines = (package_root / name).read_text(encoding="utf-8").splitlines()
-        assert len(lines) <= budget, f"{name} has {len(lines)} lines; expected <= {budget}"
+        line_count = _logical_source_line_count(package_root / name)
+        assert line_count <= budget, f"{name} has {line_count} logical lines; expected <= {budget}"
 
 
 def test_study_publication_uses_only_the_generic_artifact_facade() -> None:

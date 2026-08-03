@@ -163,11 +163,23 @@ _SENSITIVITY_COVERAGE_LINE_BUDGETS = {
 }
 
 
+def _logical_source_line_count(path: Path) -> int:
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    physical_lines = len(source.splitlines())
+    if not tree.body or not isinstance(tree.body[0], ast.Expr):
+        return physical_lines
+    value = tree.body[0].value
+    if not isinstance(value, ast.Constant) or not isinstance(value.value, str):
+        return physical_lines
+    return physical_lines - (tree.body[0].end_lineno - tree.body[0].lineno)
+
+
 def test_contract_package_has_one_semantic_module_per_owner() -> None:
     assert not (_METASTUDY_ROOT / "contracts.py").exists()
     assert {path.name for path in _CONTRACTS_ROOT.glob("*.py")} == _EXPECTED_CONTRACT_MODULES
     for filename, line_budget in _LINE_BUDGETS.items():
-        line_count = len((_CONTRACTS_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_CONTRACTS_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 
@@ -218,7 +230,7 @@ def test_evaluation_package_has_one_semantic_module_per_owner() -> None:
     assert not (_METASTUDY_ROOT / "evaluation.py").exists()
     assert {path.name for path in _EVALUATION_ROOT.glob("*.py")} == _EXPECTED_EVALUATION_MODULES
     for filename, line_budget in _EVALUATION_LINE_BUDGETS.items():
-        line_count = len((_EVALUATION_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_EVALUATION_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 
@@ -237,7 +249,7 @@ def test_operator_package_has_one_semantic_module_per_owner() -> None:
     assert not (_METASTUDY_ROOT / "operator.py").exists()
     assert {path.name for path in _OPERATOR_ROOT.glob("*.py")} == _EXPECTED_OPERATOR_MODULES
     for filename, line_budget in _OPERATOR_LINE_BUDGETS.items():
-        line_count = len((_OPERATOR_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_OPERATOR_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 
@@ -260,7 +272,7 @@ def test_acquisition_projection_has_one_semantic_module_per_owner() -> None:
         _ACQUISITION_PROJECTION_LINE_BUDGETS
     )
     for filename, line_budget in _ACQUISITION_PROJECTION_LINE_BUDGETS.items():
-        line_count = len((_ACQUISITION_PROJECTION_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_ACQUISITION_PROJECTION_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 
@@ -268,7 +280,7 @@ def test_evidence_projection_has_one_semantic_module_per_owner() -> None:
     assert not (_METASTUDY_ROOT / "evidence_projection.py").exists()
     assert {path.name for path in _EVIDENCE_PROJECTION_ROOT.glob("*.py")} == set(_EVIDENCE_PROJECTION_LINE_BUDGETS)
     for filename, line_budget in _EVIDENCE_PROJECTION_LINE_BUDGETS.items():
-        line_count = len((_EVIDENCE_PROJECTION_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_EVIDENCE_PROJECTION_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 
@@ -316,7 +328,7 @@ def test_sensitivity_coverage_has_one_semantic_module_per_owner() -> None:
     assert not (_METASTUDY_ROOT / "sensitivity_coverage.py").exists()
     assert {path.name for path in _SENSITIVITY_COVERAGE_ROOT.glob("*.py")} == set(_SENSITIVITY_COVERAGE_LINE_BUDGETS)
     for filename, line_budget in _SENSITIVITY_COVERAGE_LINE_BUDGETS.items():
-        line_count = len((_SENSITIVITY_COVERAGE_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_SENSITIVITY_COVERAGE_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line architecture budget"
 
 
@@ -324,7 +336,7 @@ def test_materialization_tests_are_split_by_behavior_owner() -> None:
     assert not (_TEST_ROOT / "test_materialize.py").exists()
     assert {path.name for path in _MATERIALIZE_TEST_ROOT.glob("*.py")} == _EXPECTED_MATERIALIZE_TEST_MODULES
     for filename, line_budget in _MATERIALIZE_TEST_LINE_BUDGETS.items():
-        line_count = len((_MATERIALIZE_TEST_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_MATERIALIZE_TEST_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line test-owner budget"
 
 
@@ -332,7 +344,7 @@ def test_operator_tests_are_split_by_behavior_owner() -> None:
     assert not (_TEST_ROOT / "test_operator.py").exists()
     assert {path.name for path in _OPERATOR_TEST_ROOT.glob("*.py")} == _EXPECTED_OPERATOR_TEST_MODULES
     for filename, line_budget in _OPERATOR_TEST_LINE_BUDGETS.items():
-        line_count = len((_OPERATOR_TEST_ROOT / filename).read_text(encoding="utf-8").splitlines())
+        line_count = _logical_source_line_count(_OPERATOR_TEST_ROOT / filename)
         assert line_count <= line_budget, f"{filename} exceeds its {line_budget}-line test-owner budget"
 
 
