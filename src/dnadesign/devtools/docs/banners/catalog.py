@@ -17,6 +17,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True, slots=True)
 class BannerSpec:
     path: str
+    readme_path: str
     name: str
     capability: str
     description: str
@@ -29,6 +30,7 @@ REPOSITORY_BANNER_PATH = "assets/dnadesign-banner.svg"
 BANNERS = (
     BannerSpec(
         "src/dnadesign/aligner/assets/aligner-banner.svg",
+        "src/dnadesign/aligner/README.md",
         "aligner",
         "ALIGN SEQUENCES",
         "Align nucleotide pairs and protein sequence sets.",
@@ -36,6 +38,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/baserender/assets/baserender-banner.svg",
+        "src/dnadesign/baserender/README.md",
         "baserender",
         "DRAW SEQUENCE MAPS",
         "Draw annotated sequence diagrams from saved job files.",
@@ -43,6 +46,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/billboard/assets/billboard-banner.svg",
+        "src/dnadesign/billboard/README.md",
         "billboard",
         "MEASURE DIVERSITY",
         "Measure binding-site diversity in generated libraries.",
@@ -50,6 +54,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/cluster/assets/cluster-banner.svg",
+        "src/dnadesign/cluster/README.md",
         "cluster",
         "GROUP FEATURES",
         "Group and visualize rows in numerical feature tables.",
@@ -57,6 +62,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/construct/docs/assets/construct-banner.svg",
+        "src/dnadesign/construct/README.md",
         "construct",
         "ASSEMBLE CONSTRUCTS",
         "Place named DNA parts into declared sequence contexts.",
@@ -64,6 +70,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/contracts/assets/contracts-banner.svg",
+        "src/dnadesign/contracts/README.md",
         "contracts",
         "SHARE DATA FORMATS",
         "Define versioned data formats shared between tools.",
@@ -71,6 +78,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/cruncher/assets/cruncher-banner.svg",
+        "src/dnadesign/cruncher/README.md",
         "cruncher",
         "DESIGN TO CONSTRAINTS",
         "Find sequences and assembly plans that satisfy stated constraints.",
@@ -78,6 +86,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/densegen/assets/densegen-banner.svg",
+        "src/dnadesign/densegen/README.md",
         "densegen",
         "GENERATE LIBRARIES",
         "Generate reproducible DNA libraries from workspace inputs.",
@@ -85,6 +94,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/devtools/tests/support/assets/testsupport-banner.svg",
+        "src/dnadesign/devtools/tests/support/README.md",
         "testsupport",
         "SHARE TEST FIXTURES",
         "Share test-only fixtures across repository tools.",
@@ -92,6 +102,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/folding/assets/folding-banner.svg",
+        "src/dnadesign/folding/README.md",
         "folding",
         "DRAW RNA STRUCTURES",
         "Predict and draw RNA secondary structures from sequence records.",
@@ -99,6 +110,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/infer/assets/infer-banner.svg",
+        "src/dnadesign/infer/README.md",
         "infer",
         "ADD MODEL RESULTS",
         "Run sequence models and add their results to datasets.",
@@ -106,6 +118,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/latentdna/docs/assets/latentdna-banner.svg",
+        "src/dnadesign/latentdna/README.md",
         "latentdna",
         "COMPARE SEQUENCE DATA",
         "Compare numerical sequence features and save review-ready results.",
@@ -113,6 +126,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/libshuffle/assets/libshuffle-banner.svg",
+        "src/dnadesign/libshuffle/README.md",
         "libshuffle",
         "SELECT DIVERSE SETS",
         "Select representative subsets from dense sequence libraries.",
@@ -120,6 +134,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/nmf/assets/nmf-banner.svg",
+        "src/dnadesign/nmf/README.md",
         "nmf",
         "FIND MOTIF PATTERNS",
         "Find recurring combinations in motif tables.",
@@ -127,6 +142,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/notify/assets/notify-banner.svg",
+        "src/dnadesign/notify/README.md",
         "notify",
         "SEND RUN UPDATES",
         "Send notifications for local and scheduled jobs.",
@@ -134,6 +150,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/opal/assets/opal-banner.svg",
+        "src/dnadesign/opal/README.md",
         "opal",
         "SELECT NEXT DESIGNS",
         "Choose the next designs from measured sequence results.",
@@ -141,6 +158,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/ops/assets/ops-banner.svg",
+        "src/dnadesign/ops/README.md",
         "ops",
         "FIND AND RUN JOBS",
         "Find, run, and inspect jobs owned by repository tools.",
@@ -148,6 +166,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/permuter/assets/permuter-banner.svg",
+        "src/dnadesign/permuter/README.md",
         "permuter",
         "MAKE AND SCORE VARIANTS",
         "Generate sequence variants and score them with chosen tools.",
@@ -155,6 +174,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/studies/assets/studies-banner.svg",
+        "src/dnadesign/studies/README.md",
         "studies",
         "ORGANIZE STUDIES",
         "Keep study methods, records, and decisions together.",
@@ -162,6 +182,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/tfkdanalysis/assets/tfkdanalysis-banner.svg",
+        "src/dnadesign/tfkdanalysis/README.md",
         "tfkdanalysis",
         "SUMMARIZE KNOCKDOWNS",
         "Summarize transcription-factor knockdown responses.",
@@ -169,6 +190,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/thread/assets/thread-banner.svg",
+        "src/dnadesign/thread/README.md",
         "thread",
         "PREPARE PROTEIN DESIGNS",
         "Prepare fixed-backbone design requests and fold checks.",
@@ -176,6 +198,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/junction/assets/junction-banner.svg",
+        "src/dnadesign/junction/README.md",
         "junction",
         "TARGETS / OLIGOS / CHECKS",
         "Compile exact DNA targets into checked three-way-junction oligo plans.",
@@ -183,6 +206,7 @@ BANNERS = (
     ),
     BannerSpec(
         "src/dnadesign/usr/assets/usr-banner.svg",
+        "src/dnadesign/usr/README.md",
         "usr",
         "MANAGE SEQUENCE TABLES",
         "Store, check, and sync tables of sequence records.",

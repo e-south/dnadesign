@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 import yaml
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
+from dnadesign.devtools.docs.badges import find_markdown_badge_policy_issues, rendered_markdown_images
 from dnadesign.devtools.docs.banners.catalog import BANNERS
 from dnadesign.devtools.docs.banners.render import check_banners
 from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
@@ -44,7 +45,7 @@ from dnadesign.ops.status import list_status_kind_specs_for_repo
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
 README_TOOL_COMPONENT_COVERAGE_PATTERN = re.compile(r"codecov\.io/[^\s)]+[?&]component=", flags=re.IGNORECASE)
-TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
+TOOL_README_BANNER_LABEL_PATTERN = re.compile(r"\bbanner\b", flags=re.IGNORECASE)
 TOOL_README_BANNER_DIMENSION_PATTERN = re.compile(
     r"<svg[^>]*\bwidth=\"1200\"[^>]*\bheight=\"180\"[^>]*\bviewBox=\"0 0 1200 180\"",
     flags=re.IGNORECASE,
@@ -2094,18 +2095,27 @@ def _resolve_readme_banner_reference(*, repo_root: Path, readme_path: Path, targ
     return declared_relative, target_path
 
 
+def _top_rendered_readme_banner(text: str) -> tuple[int, str] | None:
+    for image in rendered_markdown_images(text):
+        if image.line_no > 25 or TOOL_README_BANNER_LABEL_PATTERN.search(image.label) is None:
+            continue
+        if len(image.sources) != 1:
+            return image.line_no, ""
+        return image.line_no, image.sources[0]
+    return None
+
+
 def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
     banner_source = repo_root / "src" / "dnadesign" / "devtools" / "docs" / "banners"
     if not banner_source.is_dir():
         return []
 
-    referenced_paths: set[str] = set()
+    referenced_paths_by_readme: dict[str, str] = {}
     for readme_path in sorted((repo_root / "src" / "dnadesign").rglob("README.md")):
-        top_block = "\n".join(readme_path.read_text(encoding="utf-8").splitlines()[:25])
-        banner_match = TOOL_README_BANNER_PATTERN.search(top_block)
-        if banner_match is None:
+        banner = _top_rendered_readme_banner(readme_path.read_text(encoding="utf-8"))
+        if banner is None:
             continue
-        link = banner_match.group("link").strip().split()[0]
+        _line_no, link = banner
         parsed = urlparse(link)
         if parsed.scheme or link.startswith("mailto:") or not link.lower().endswith(".svg"):
             continue
@@ -2120,9 +2130,11 @@ def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
             )
         except ValueError:
             continue
-        referenced_paths.add(declared_relative.as_posix())
+        readme_relative = readme_path.relative_to(repo_root).as_posix()
+        referenced_paths_by_readme[readme_relative] = declared_relative.as_posix()
 
     catalog_paths = {Path(spec.path).as_posix() for spec in BANNERS}
+    referenced_paths = set(referenced_paths_by_readme.values())
     issues = [
         f"{path}: tool README banner path is not declared in the banner catalog."
         for path in sorted(referenced_paths - catalog_paths)
@@ -2131,6 +2143,31 @@ def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
         f"{path}: banner catalog path is not referenced by a tool README."
         for path in sorted(catalog_paths - referenced_paths)
     )
+
+    catalog_paths_by_readme: dict[str, str] = {}
+    for spec in BANNERS:
+        readme_path = Path(spec.readme_path).as_posix()
+        banner_path = Path(spec.path).as_posix()
+        existing_path = catalog_paths_by_readme.get(readme_path)
+        if existing_path is not None:
+            issues.append(
+                f"{readme_path}: banner catalog declares more than one README binding ({existing_path}, {banner_path})."
+            )
+            continue
+        catalog_paths_by_readme[readme_path] = banner_path
+
+    for readme_path, referenced_path in sorted(referenced_paths_by_readme.items()):
+        expected_path = catalog_paths_by_readme.get(readme_path)
+        if expected_path is None:
+            issues.append(f"{readme_path}: tool README is not bound to a banner catalog entry.")
+            continue
+        if referenced_path != expected_path:
+            issues.append(
+                f"{readme_path}: banner path must match catalog entry {expected_path}; found {referenced_path}."
+            )
+
+    for readme_path in sorted(catalog_paths_by_readme.keys() - referenced_paths_by_readme.keys()):
+        issues.append(f"{readme_path}: banner catalog README is missing or does not reference a local .svg banner.")
     return issues
 
 
@@ -2147,12 +2184,12 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
 
         text = readme_path.read_text(encoding="utf-8")
         top_block = "\n".join(text.splitlines()[:25])
-        banner_match = TOOL_README_BANNER_PATTERN.search(top_block)
-        if banner_match is None:
+        banner = _top_rendered_readme_banner(text)
+        if banner is None:
             issues.append(f"{readme_path}: missing top banner image markdown line with '* banner' alt text.")
             continue
 
-        link = banner_match.group("link").strip().split()[0]
+        _line_no, link = banner
         parsed = urlparse(link)
         if parsed.scheme or link.startswith("mailto:") or not link.lower().endswith(".svg"):
             issues.append(f"{readme_path}: banner link must target a local .svg asset.")
@@ -2230,8 +2267,8 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
             continue
 
         first_index = non_empty_indices[0]
-        first_line = lines[first_index].strip()
-        if TOOL_README_BANNER_PATTERN.search(first_line) is None:
+        banner = _top_rendered_readme_banner(text)
+        if banner is None or banner[0] != first_index + 1:
             issues.append(f"{readme_path}: first non-empty line must be the banner image line.")
             continue
 
@@ -2908,6 +2945,13 @@ def main(argv: list[str] | None = None) -> int:
     if readme_tool_catalog_issues:
         print("README tool catalog check failed:")
         for issue in readme_tool_catalog_issues:
+            print(f" - {issue}")
+        return 1
+
+    markdown_badge_policy_issues = find_markdown_badge_policy_issues(repo_root, all_md_files)
+    if markdown_badge_policy_issues:
+        print("Markdown badge policy check failed:")
+        for issue in markdown_badge_policy_issues:
             print(f" - {issue}")
         return 1
 

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from .glyphs import ACCENT, DIM, INK, MUTED, glyph
 
 BACKGROUND = "#1E1D1A"
 FONT_STACK = "Menlo, Monaco, Consolas, monospace"
+BANNER_NAME_PATTERN = re.compile(r"[a-z0-9]+(?:[a-z0-9_-]*[a-z0-9])?")
 
 
 def _resolve_repo_root(repo_root: Path) -> Path:
@@ -36,28 +38,113 @@ def _resolve_repo_root(repo_root: Path) -> Path:
     return root
 
 
-def _resolve_output_path(root: Path, relative_path: str) -> Path:
-    declared_path = Path(relative_path)
-    if declared_path.is_absolute():
-        raise ValueError(f"Banner output path escapes repository root: {relative_path}")
+def _canonical_relative_path(value: str, *, label: str) -> Path:
+    if not value or value.startswith("/") or "\\" in value:
+        raise ValueError(f"{label} must be a canonical repository-relative POSIX path: {value!r}")
+    components = value.split("/")
+    if any(component in {"", ".", ".."} for component in components):
+        raise ValueError(f"{label} must be a canonical repository-relative POSIX path: {value!r}")
+    return Path(*components)
+
+
+def _resolve_repo_path(
+    root: Path,
+    relative_path: Path,
+    *,
+    label: str,
+    must_exist: bool,
+    reject_hardlinks: bool = False,
+) -> Path:
     candidate = root
-    components = declared_path.parts
+    components = relative_path.parts
     for index, component in enumerate(components):
         candidate /= component
         if candidate.is_symlink():
-            raise ValueError(f"Banner output path contains a symlink component: {relative_path}")
+            raise ValueError(f"{label} contains a symlink component: {relative_path.as_posix()}")
         if not candidate.exists():
             continue
         if index < len(components) - 1 and not candidate.is_dir():
-            raise ValueError(f"Banner output parent component is not a directory: {relative_path}")
+            raise ValueError(f"{label} parent component is not a directory: {relative_path.as_posix()}")
         if index == len(components) - 1 and not candidate.is_file():
-            raise ValueError(f"Banner output is not a regular file: {relative_path}")
-    output_path = (root / declared_path).resolve()
+            raise ValueError(f"{label} is not a regular file: {relative_path.as_posix()}")
+        if index == len(components) - 1 and reject_hardlinks and candidate.stat(follow_symlinks=False).st_nlink != 1:
+            raise ValueError(f"{label} has multiple hard links: {relative_path.as_posix()}")
+    resolved_path = (root / relative_path).resolve()
     try:
-        output_path.relative_to(root)
+        resolved_path.relative_to(root)
     except ValueError as error:
-        raise ValueError(f"Banner output path escapes repository root: {relative_path}") from error
-    return output_path
+        raise ValueError(f"{label} escapes repository root: {relative_path.as_posix()}") from error
+    if must_exist and not resolved_path.is_file():
+        raise ValueError(f"{label} does not exist as a regular file: {relative_path.as_posix()}")
+    return resolved_path
+
+
+def _preflight_banner_binding(
+    root: Path,
+    *,
+    name: str,
+    output_value: str,
+    readme_value: str,
+) -> tuple[Path, Path]:
+    if BANNER_NAME_PATTERN.fullmatch(name) is None:
+        raise ValueError(f"Banner name must be a lowercase slug: {name!r}")
+
+    output_relative = _canonical_relative_path(output_value, label="Banner output path")
+    readme_relative = _canonical_relative_path(readme_value, label="Banner README path")
+    expected_leaf = f"{name}-banner.svg"
+    if output_relative.name != expected_leaf:
+        raise ValueError(f"Banner output path for {name!r} must end with {expected_leaf!r}")
+    if readme_relative.name != "README.md":
+        raise ValueError(f"Banner README path for {name!r} must end with 'README.md'")
+
+    owner_root = readme_relative.parent
+    try:
+        owner_relative = output_relative.relative_to(owner_root)
+    except ValueError as error:
+        raise ValueError(
+            f"Banner output path for {name!r} must be under its owning README directory: {owner_root.as_posix()}"
+        ) from error
+    if "assets" not in owner_relative.parts[:-1]:
+        raise ValueError(f"Banner output path for {name!r} must be in an assets directory")
+
+    readme_path = _resolve_repo_path(root, readme_relative, label="Banner README path", must_exist=True)
+    output_path = _resolve_repo_path(
+        root,
+        output_relative,
+        label="Banner output",
+        must_exist=False,
+        reject_hardlinks=True,
+    )
+    return output_path, readme_path
+
+
+def _preflight_banner_catalog(root: Path) -> tuple[tuple[Path, BannerSpec | None], ...]:
+    declarations: list[tuple[Path, BannerSpec | None]] = []
+    seen_names: set[str] = set()
+    seen_outputs: set[Path] = set()
+    seen_readmes: set[Path] = set()
+
+    bindings = (("dnadesign", REPOSITORY_BANNER_PATH, "README.md", None),) + tuple(
+        (spec.name, spec.path, spec.readme_path, spec) for spec in BANNERS
+    )
+    for name, output_value, readme_value, spec in bindings:
+        output_path, readme_path = _preflight_banner_binding(
+            root,
+            name=name,
+            output_value=output_value,
+            readme_value=readme_value,
+        )
+        if name in seen_names:
+            raise ValueError(f"Duplicate banner name: {name}")
+        if output_path in seen_outputs:
+            raise ValueError(f"Duplicate banner output path: {output_value}")
+        if readme_path in seen_readmes:
+            raise ValueError(f"Duplicate banner README path: {readme_value}")
+        seen_names.add(name)
+        seen_outputs.add(output_path)
+        seen_readmes.add(readme_path)
+        declarations.append((output_path, spec))
+    return tuple(declarations)
 
 
 def repository_svg() -> str:
@@ -126,16 +213,8 @@ def tool_svg(spec: BannerSpec) -> str:
 
 def expected_banners(repo_root: Path) -> dict[Path, str]:
     root = _resolve_repo_root(repo_root)
-    declarations = ((REPOSITORY_BANNER_PATH, repository_svg()),) + tuple(
-        (spec.path, tool_svg(spec)) for spec in BANNERS
-    )
-    expected: dict[Path, str] = {}
-    for relative_path, content in declarations:
-        output_path = _resolve_output_path(root, relative_path)
-        if output_path in expected:
-            raise ValueError(f"Duplicate banner output path: {relative_path}")
-        expected[output_path] = content
-    return expected
+    declarations = _preflight_banner_catalog(root)
+    return {output_path: repository_svg() if spec is None else tool_svg(spec) for output_path, spec in declarations}
 
 
 def render_banners(repo_root: Path) -> tuple[Path, ...]:

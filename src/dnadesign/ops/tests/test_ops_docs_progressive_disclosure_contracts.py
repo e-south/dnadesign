@@ -357,7 +357,7 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
 
 def test_root_ops_row_is_tool_agnostic() -> None:
     text = _read(_repo_root() / "README.md")
-    expected_row = "| [**ops**](src/dnadesign/ops/README.md) | Find, run, and inspect jobs owned by repository tools. |"
+    expected_row = "| [**ops**](src/dnadesign/ops/README.md) | Find, run, and inspect jobs across dnadesign. |"
     assert expected_row in text
 
 

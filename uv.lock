@@ -412,11 +412,13 @@ dependencies = [
     { name = "dense-arrays", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "duckdb", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "fastparquet", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "html5lib", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "igraph", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "keyring", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "leidenalg", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "logomaker", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "marimo", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "markdown-it-py", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "matplotlib", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "netcdf4", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "numpy", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
@@ -445,6 +447,7 @@ dependencies = [
     { name = "tqdm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "typer", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "umap-learn", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "upa-url", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "vegafusion", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "viennarna", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "vl-convert-python", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
@@ -501,11 +504,13 @@ requires-dist = [
     { name = "evo2", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=0.5.3" },
     { name = "fastparquet", specifier = ">=2025.12.0" },
     { name = "flash-attn", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.8.0.post2,<3" },
+    { name = "html5lib", specifier = ">=1.1,<2" },
     { name = "igraph" },
     { name = "keyring", specifier = ">=25.6.0" },
     { name = "leidenalg" },
     { name = "logomaker" },
     { name = "marimo", specifier = ">=0.23.16" },
+    { name = "markdown-it-py", specifier = ">=4.0.0,<5" },
     { name = "matplotlib" },
     { name = "netcdf4", specifier = ">=1.7.3" },
     { name = "ninja", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
@@ -543,6 +548,7 @@ requires-dist = [
     { name = "transformers", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
     { name = "typer" },
     { name = "umap-learn", specifier = ">=0.5.11" },
+    { name = "upa-url", specifier = ">=1.1.0,<2" },
     { name = "vegafusion", specifier = ">=2.0.3" },
     { name = "viennarna", specifier = ">=2.7.2" },
     { name = "vl-convert-python", specifier = ">=1.9.0" },
@@ -765,6 +771,19 @@ sdist = { url = "https://files.pythonhosted.org/packages/8b/cb/9bb543bd987ffa1ee
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9d/ca/907890ce6ef5598b5920514f255ed0a65f558f820515b18db75a51b2f878/hf_xet-1.3.2-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:7c2a054a97c44e136b1f7f5a78f12b3efffdf2eed3abc6746fc5ea4b39511633", size = 4180750, upload-time = "2026-02-27T17:25:43.125Z" },
     { url = "https://files.pythonhosted.org/packages/00/b3/7bc1ff91d1ac18420b7ad1e169b618b27c00001b96310a89f8a9294fe509/hf_xet-1.3.2-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:06cdbde243c85f39a63b28e9034321399c507bcd5e7befdd17ed2ccc06dfe14e", size = 4398020, upload-time = "2026-02-27T17:26:03.977Z" },
+]
+
+[[package]]
+name = "html5lib"
+version = "1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+    { name = "webencodings", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ac/b6/b55c3f49042f1df3dcd422b7f224f939892ee94f22abcf503a9b7339eaf2/html5lib-1.1.tar.gz", hash = "sha256:b2e5b40261e20f354d198eae92afc10d750afb487ed5e50f9c4eaf07c184146f", size = 272215, upload-time = "2020-06-22T23:32:38.834Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/dd/a834df6482147d48e225a49515aabc28974ad5a4ca3215c18a882565b028/html5lib-1.1-py2.py3-none-any.whl", hash = "sha256:0d78f8fde1c230e99fe37986a60526d7049ed4bf8a9fadbad5f00e22e58e041d", size = 112173, upload-time = "2020-06-22T23:32:36.781Z" },
 ]
 
 [[package]]
@@ -2650,6 +2669,18 @@ wheels = [
 ]
 
 [[package]]
+name = "upa-url"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/52/f4/2686ce2c3f860be0ebe65cac6493d2a12c33ee4115f59ce2f03ecaeafaf4/upa_url-1.1.0.tar.gz", hash = "sha256:1919d265f70d3522745c1413f5530c5cae8369d2ae1daa79b4c3daa09ef96d5f", size = 129382, upload-time = "2025-11-22T17:39:26.05Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/da/501342a9d0e1a7544e755f644aa9a3d75f83e26ebafd2dedee28a77a4dcc/upa_url-1.1.0-cp312-abi3-macosx_10_15_x86_64.whl", hash = "sha256:15ef927f5d8f33081abcfd94ca0bdff16c3c4a52b1479f2089cf089d8f5505ed", size = 131079, upload-time = "2025-11-22T17:38:39.517Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/49/a93c25f0fccf504f2695dbc6b85a606521446d318de4c0bd4a4bd83674ee/upa_url-1.1.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:c35251fb76588aa78dbdca1153fb57575d34ceacb8e0deee08f6dda8d29e4664", size = 126151, upload-time = "2025-11-22T17:38:40.506Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/52/c55e3359ecfea3885c1ff7c9f2e6ba6122c25965db80826ef83959e93e56/upa_url-1.1.0-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:791e6d93e922b300bb804ca8f7481b2ebc32ab15c2df6c23dc46a69e5df0f270", size = 168143, upload-time = "2025-11-22T17:38:42.804Z" },
+    { url = "https://files.pythonhosted.org/packages/26/f2/775d1eafddc951bb840f5b364b1c713a830bc6f77d07e2ec42f6bac706b4/upa_url-1.1.0-cp312-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:0c2ca12107b94e3195064b9cb35f07c0c589a76891df6ea0d3d76cf657fdc600", size = 651733, upload-time = "2025-11-22T17:38:45.261Z" },
+]
+
+[[package]]
 name = "uvicorn"
 version = "0.40.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2729,6 +2760,15 @@ dependencies = [
     { name = "tqdm", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/91/20/4af95a064a75bf62fcc8128a06100a91928e473e649bd8d283f3e10b626d/vtx-1.0.8.tar.gz", hash = "sha256:cce1f595e391819702219c924e76c99c3facb661730cb5c33dea6dc1ffbffe16", size = 26363808, upload-time = "2026-03-03T22:43:41.658Z" }
+
+[[package]]
+name = "webencodings"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/02/ae6ceac1baeda530866a85075641cec12989bd8d31af6d5ab4a3e8c92f47/webencodings-0.5.1.tar.gz", hash = "sha256:b36a1c245f2d304965eb4e0a82848379241dc04b865afcc4aab16748587e1923", size = 9721, upload-time = "2017-04-05T20:21:34.189Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/24/2a3e3df732393fed8b3ebf2ec078f05546de641fe1b667ee316ec1dcf3b7/webencodings-0.5.1-py2.py3-none-any.whl", hash = "sha256:a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78", size = 11774, upload-time = "2017-04-05T20:21:32.581Z" },
+]
 
 [[package]]
 name = "websockets"

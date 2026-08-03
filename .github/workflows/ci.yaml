@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -40,7 +40,7 @@ jobs:
           PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
-            --base-ref "${{ github.base_ref }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
             --head-sha "${{ github.sha }}" \
             --output-file .ci_changed_files.txt
 
@@ -102,7 +102,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -114,7 +114,7 @@ jobs:
           PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
-            --base-ref "${{ github.base_ref }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
             --head-sha "${{ github.sha }}" \
             --output-file .ci_changed_files.txt
 
@@ -134,6 +134,9 @@ jobs:
       - name: Architecture boundary checks
         run: uv run python -m dnadesign.devtools.architecture.boundaries
 
+      - name: Package layout contracts
+        run: uv run pytest -q src/dnadesign/devtools/tests/package/test_layout.py
+
       - name: Pre-commit (non-Ruff hooks)
         env:
           SKIP: ruff-check,ruff-format,detect-secrets
@@ -144,8 +147,9 @@ jobs:
             exit 0
           fi
 
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
-          uv run pre-commit run --from-ref "origin/${{ github.base_ref }}" --to-ref "${{ github.sha }}"
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          git cat-file -e "${base_sha}^{commit}"
+          uv run pre-commit run --from-ref "${base_sha}" --to-ref "${{ github.sha }}"
 
       - name: Lint
         run: uv run ruff check .
@@ -289,7 +293,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -301,7 +305,7 @@ jobs:
           PYTHONPATH=src python3 -m dnadesign.devtools.ci.changed_files \
             --event-name "${{ github.event_name }}" \
             --repo-root . \
-            --base-ref "${{ github.base_ref }}" \
+            --base-sha "${{ github.event.pull_request.base.sha }}" \
             --head-sha "${{ github.sha }}" \
             --output-file .ci_changed_files.txt
 

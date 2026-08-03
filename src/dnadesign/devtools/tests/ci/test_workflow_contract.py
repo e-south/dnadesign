@@ -103,8 +103,13 @@ def test_core_precommit_defers_detect_secrets_to_dedicated_lane() -> None:
     workflow = _workflow()
     steps = workflow["jobs"]["core-lint-test-build"]["steps"]
     precommit_step = next(step for step in steps if step.get("name") == "Pre-commit (non-Ruff hooks)")
+    precommit_run = str(precommit_step.get("run", ""))
 
     assert set(precommit_step["env"]["SKIP"].split(",")) == {"ruff-check", "ruff-format", "detect-secrets"}
+    assert 'base_sha="${{ github.event.pull_request.base.sha }}"' in precommit_run
+    assert 'git cat-file -e "${base_sha}^{commit}"' in precommit_run
+    assert '--from-ref "${base_sha}" --to-ref "${{ github.sha }}"' in precommit_run
+    assert "git fetch" not in precommit_run
 
 
 def test_core_lane_always_runs_dependency_security_contract() -> None:
@@ -115,6 +120,16 @@ def test_core_lane_always_runs_dependency_security_contract() -> None:
     assert security_step["run"] == (
         "uv run pytest -q src/dnadesign/devtools/tests/security/test_dependency_security_contract.py"
     )
+
+
+def test_core_lane_fails_fast_on_package_layout_contracts() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["core-lint-test-build"]["steps"]
+    step_names = [str(step.get("name", "")) for step in steps]
+    layout_step = next(step for step in steps if step.get("name") == "Package layout contracts")
+
+    assert layout_step["run"] == "uv run pytest -q src/dnadesign/devtools/tests/package/test_layout.py"
+    assert step_names.index("Package layout contracts") < step_names.index("Tests (core lane) + coverage report")
 
 
 def test_scope_outputs_expose_core_external_integration_keys() -> None:
@@ -146,10 +161,29 @@ def test_fresh_ci_lanes_recreate_changed_file_list_before_resolving_test_targets
         checkout_step = next(
             step for step in steps[:collect_index] if str(step.get("uses", "")).startswith("actions/checkout@")
         )
-        assert checkout_step.get("with", {}).get("fetch-depth") == 0
+        assert checkout_step.get("with", {}).get("fetch-depth") == 2
         assert "dnadesign.devtools.ci.changed_files" in collect_run
+        assert '--base-sha "${{ github.event.pull_request.base.sha }}"' in collect_run
         assert "--output-file .ci_changed_files.txt" in collect_run
         assert collect_index < target_index
+
+
+def test_scope_detection_uses_two_commit_shallow_checkout() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["detect-ci-scope"]["steps"]
+    checkout_step = next(step for step in steps if str(step.get("uses", "")).startswith("actions/checkout@"))
+
+    assert checkout_step.get("with", {}).get("fetch-depth") == 2
+
+
+def test_scope_detection_pins_the_event_base_snapshot() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["detect-ci-scope"]["steps"]
+    collect_step = next(step for step in steps if step.get("name") == "Collect changed files for scope detection")
+    collect_run = str(collect_step.get("run", ""))
+
+    assert '--base-sha "${{ github.event.pull_request.base.sha }}"' in collect_run
+    assert '--head-sha "${{ github.sha }}"' in collect_run
 
 
 def test_third_party_workflow_actions_are_pinned_to_full_commit_shas() -> None:
