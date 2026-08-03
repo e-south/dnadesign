@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/sensitivity.py
 
-Typed non-selectable reporter-response sensitivity evaluation.
+Typed coverage-only reporter-response sensitivity evaluation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -33,13 +33,13 @@ from .sensitivity_coverage import (
     validate_sensitivity_coverage_set,
 )
 
-SENSITIVITY_EVIDENCE_CONTRACT_ID = "rt_lnrna_reporter_response_sensitivity_evidence.v3"
+SENSITIVITY_EVIDENCE_CONTRACT_ID = "rt_lnrna_reporter_response_sensitivity_evidence.v4"
 
 
 def evaluate_sensitivity(
     evidence: Iterable[ProfileEvidence | ProfileEvidenceProjection],
 ) -> tuple[SensitivityEvaluation, ...]:
-    """Summarize admissible non-selectable dose, endpoint, and alternate-window evidence."""
+    """Inventory admissible evidence without comparing effects or selecting a reduction."""
 
     grouped: dict[tuple[str, float], list[ProfileEvidence | ProfileEvidenceProjection]] = defaultdict(list)
     for row in evidence:

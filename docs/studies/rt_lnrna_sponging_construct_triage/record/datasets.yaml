@@ -325,27 +325,28 @@ datasets:
     source_catalog_schema_version: 4
     source_record_schema_version: 6
     source_record_contract: plate_reader.annotated.v1
-    source_record_identity: exact_positive_revision_plus_revision_digest
+    source_record_identity: exact_schema_v6_revision_and_provenance
     schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/reader-evidence-bindings.schema.yaml
     materializer: dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_evidence.materialize
     reader_experiment_route_registry: ../.agents/skills/retron-assay-study-bridge/references/reader-experiment-routes.json
     reader_experiment_route_id: rt_competence_subject_binding
     reader_readiness_gate: ../.agents/skills/retron-assay-study-bridge/scripts/check_reader_experiment_readiness.py
-    output_target: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_evidence_bindings_v4/20260727_retron_Eco1_26_D01_D02_P01_P03_DP01_DP03_benchmark/bindings.json
+    output_target: docs/studies/rt_lnrna_sponging_construct_triage/workbench/outputs/reader_evidence_bindings_v5/20260727_retron_Eco1_26_D01_D02_P01_P03_DP01_DP03_benchmark/bindings.json
     notes: >-
       The competence route is live-ready. On-demand materialization requires
       its exact selected membership and rechecks Reader before reading the
-      record or writing output. The join preserves the exact revision, revision
-      digest, and content digest; publication derives a canonical artifact id
-      and digest, is create-only, and strict loading restores source closure
-      only after complete contract validation. Generated outputs are
-      recipe-owned and ignored by Git. No measurements or scientific
-      interpretations enter this artifact.
+      record or writing output. The join preserves the exact revision; the
+      revision, configuration, producer-configuration, and content digests;
+      and the typed producer and input edges. Publication derives a canonical
+      artifact id and digest, is create-only, and strict loading restores
+      source closure only after complete contract validation. Generated
+      outputs are recipe-owned and ignored by Git. No measurements or
+      scientific interpretations enter this artifact.
   - role: rt_lnrna_reporter_response_profile_contract
     owner_tool: study
     lifecycle: descriptive_assay_evidence_contract
     status: present_not_materialized
-    contract_id: rt_lnrna_reporter_response_profile.v3
+    contract_id: rt_lnrna_reporter_response_profile.v4
     schema: docs/studies/rt_lnrna_sponging_construct_triage/operations/contract/schemas/rt-lnrna-reporter-response-profile.schema.yaml
     context: docs/studies/rt_lnrna_sponging_construct_triage/contexts/reporter-response-evidence.md
     route: docs/studies/rt_lnrna_sponging_construct_triage/routes/reporter-response-evidence.md

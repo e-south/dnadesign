@@ -22,7 +22,7 @@ from .profile.normalized import STUDY_ID, ReporterResponseProfile
 from .profile.provenance import ReaderEvidenceProvenance
 from .profile.uncertainty import ProfileEligibility
 
-MEASUREMENT_PROFILE_CONTRACT_ID = "rt_lnrna_reporter_measurement_profile.v1"
+MEASUREMENT_PROFILE_CONTRACT_ID = "rt_lnrna_reporter_measurement_profile.v2"
 ReferenceNormalizationAbsenceReason = Literal[
     "positive_control_not_declared",
     "positive_control_observations_missing",
@@ -63,7 +63,7 @@ class ReferenceNormalizationUnavailable:
 class ReporterMeasurementProfile:
     """Raw reporter, OD600, and reporter/OD summaries for declared conditions."""
 
-    contract_id: Literal["rt_lnrna_reporter_measurement_profile.v1"]
+    contract_id: Literal["rt_lnrna_reporter_measurement_profile.v2"]
     study_id: str
     profile_id: str
     subject_id: str

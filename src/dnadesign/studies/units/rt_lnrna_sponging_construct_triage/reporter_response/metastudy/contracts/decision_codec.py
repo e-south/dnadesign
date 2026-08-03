@@ -12,8 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, replace
+from dataclasses import replace
 
+from ..._contract_values import json_value
 from ._values import MetastudyContractError, _digest, _unique_text
 from .candidate import CandidateEvaluation
 from .decision import (
@@ -67,7 +68,8 @@ def decision_to_dict(decision: MetastudyDecision) -> dict[str, object]:
 
     if not isinstance(decision, MetastudyDecision):
         raise MetastudyContractError("decision must be MetastudyDecision")
-    payload = asdict(decision)
+    payload = json_value(decision)
+    assert isinstance(payload, dict)
     payload.pop("_selection_closure", None)
     readiness = payload.get("readiness")
     if isinstance(readiness, dict):

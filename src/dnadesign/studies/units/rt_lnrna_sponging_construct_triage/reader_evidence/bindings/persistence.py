@@ -7,7 +7,12 @@ import os
 import tempfile
 from pathlib import Path
 
-from dnadesign.studies.core.reader_records import ReaderDataframeRecordRef
+from dnadesign.studies.core.reader_records import (
+    ReaderDataframeRecordRef,
+    ReaderRecordError,
+    parse_record_inputs,
+    parse_record_producer,
+)
 
 from ...subject_bindings import SubjectBindingRegistry
 from .building import build_reader_evidence_bindings
@@ -39,6 +44,10 @@ _BINDING_FIELDS = {
     "reader_record_schema_version",
     "reader_record_revision",
     "reader_record_revision_digest",
+    "reader_record_config_digest",
+    "reader_record_producer_config_digest",
+    "reader_record_producer",
+    "reader_record_inputs",
     "reader_record_contract_id",
     "reader_record_content_digest",
     "reader_record_path",
@@ -123,6 +132,17 @@ def _binding_from_payload(value: object, *, index: int) -> ReaderEvidenceBinding
     if not isinstance(observation_values, list):
         raise ReaderEvidenceBindingError(f"{label}.observation_identity_values must be an array")
     row_payload["observation_identity_values"] = tuple(observation_values)
+    try:
+        row_payload["reader_record_producer"] = parse_record_producer(
+            row_payload["reader_record_producer"],
+            record_id=str(row_payload["reader_record_id"]),
+        )
+        row_payload["reader_record_inputs"] = parse_record_inputs(
+            row_payload["reader_record_inputs"],
+            record_id=str(row_payload["reader_record_id"]),
+        )
+    except ReaderRecordError as exc:
+        raise ReaderEvidenceBindingError(f"{label} Reader lineage is malformed: {exc}") from exc
     replicate_scopes = row_payload["biological_replicate_identity_scopes"]
     if not isinstance(replicate_scopes, list):
         raise ReaderEvidenceBindingError(f"{label}.biological_replicate_identity_scopes must be an array")

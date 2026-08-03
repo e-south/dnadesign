@@ -117,6 +117,7 @@ _EXPECTED_OPERATOR_TEST_MODULES = {
     "test_persistence.py",
     "test_regeneration.py",
     "test_state.py",
+    "test_state_lineage.py",
     "test_state_selection.py",
 }
 _OPERATOR_TEST_LINE_BUDGETS = {
@@ -127,6 +128,7 @@ _OPERATOR_TEST_LINE_BUDGETS = {
     "test_persistence.py": 120,
     "test_regeneration.py": 380,
     "test_state.py": 200,
+    "test_state_lineage.py": 140,
     "test_state_selection.py": 130,
 }
 _ACQUISITION_PROJECTION_LINE_BUDGETS = {
@@ -142,12 +144,14 @@ _EVIDENCE_PROJECTION_LINE_BUDGETS = {
     "audit_parsing.py": 60,
     "contracts.py": 130,
     "parsing.py": 330,
+    "provenance.py": 115,
 }
 _EVIDENCE_PROJECTION_ALLOWED_SIBLING_IMPORTS = {
     "_values.py": set(),
-    "audit_parsing.py": {"_values", "contracts"},
-    "contracts.py": {"_values"},
-    "parsing.py": {"_values", "audit_parsing", "contracts"},
+    "audit_parsing.py": {"_values", "contracts", "provenance"},
+    "contracts.py": {"provenance"},
+    "parsing.py": {"_values", "audit_parsing", "contracts", "provenance"},
+    "provenance.py": {"_values"},
 }
 _SENSITIVITY_COVERAGE_LINE_BUDGETS = {
     "__init__.py": 60,

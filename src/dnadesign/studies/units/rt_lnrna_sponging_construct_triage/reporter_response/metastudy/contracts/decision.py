@@ -24,7 +24,7 @@ from .candidate import (
 from .materialization import EvidenceReadiness, MaterializationAttemptReceipt
 from .protocol import DEFAULT_PROTOCOL, PROTOCOL_ID, Window, protocol_digest
 
-DECISION_CONTRACT_ID = "rt_lnrna_reporter_response_metastudy_decision.v4"
+DECISION_CONTRACT_ID = "rt_lnrna_reporter_response_metastudy_decision.v5"
 DecisionStatus = Literal["selected", "blocked"]
 _SELECTION_CLOSURE_TOKEN = object()
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from dnadesign.studies.core.reader_records import ReaderRecordProducer
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_evidence import (
     ReaderEvidenceBinding,
     ReaderEvidenceBindingSet,
@@ -75,6 +76,20 @@ def _attempts(evidence: tuple[ProfileEvidence, ...]) -> tuple[MaterializationAtt
             reader_record_schema_version=6,
             reader_record_revision=provenance.reader_record_revision if provenance else 1,
             reader_record_revision_digest=provenance.reader_record_revision_digest if provenance else _digest("e"),
+            reader_record_config_digest=provenance.reader_record_config_digest if provenance else _digest("0"),
+            reader_record_producer_config_digest=(
+                provenance.reader_record_producer_config_digest if provenance else _digest("1")
+            ),
+            reader_record_producer=(
+                provenance.reader_record_producer
+                if provenance
+                else ReaderRecordProducer(
+                    kind="pipeline",
+                    id="sample_measurements",
+                    plugin="transform/sample_measurements",
+                )
+            ),
+            reader_record_inputs=provenance.reader_record_inputs if provenance else (),
             reader_record_contract_id="plate_reader.annotated.v1",
             reader_record_content_digest=provenance.reader_record_content_digest if provenance else _digest("f"),
             reader_record_path=(
@@ -83,7 +98,7 @@ def _attempts(evidence: tuple[ProfileEvidence, ...]) -> tuple[MaterializationAtt
         )
         attempts.append(
             MaterializationAttemptReceipt(
-                contract_id="rt_lnrna_reporter_response_materialization_attempt.v4",
+                contract_id="rt_lnrna_reporter_response_materialization_attempt.v5",
                 experiment_id=experiment_id,
                 reader_record_identity=identity,
                 evidence_binding_artifact_id=(provenance.evidence_binding_artifact_id if provenance else None),
@@ -247,6 +262,14 @@ def _binding_set(
             reader_record_schema_version=6,
             reader_record_revision=4,
             reader_record_revision_digest=revision_digest,
+            reader_record_config_digest=_digest("d"),
+            reader_record_producer_config_digest=_digest("e"),
+            reader_record_producer=ReaderRecordProducer(
+                kind="pipeline",
+                id="sample_measurements",
+                plugin="transform/sample_measurements",
+            ),
+            reader_record_inputs=(),
             reader_record_contract_id="plate_reader.annotated.v1",
             reader_record_content_digest=_digest("c"),
             reader_record_path="outputs/records/sample_measurements/df__r4.parquet",
@@ -261,7 +284,7 @@ def _binding_set(
         for row_subject_id in subjects
     )
     return ReaderEvidenceBindingSet._from_source_closed_record(
-        schema_id="rt_lnrna_reader_evidence_bindings_v4",
+        schema_id="rt_lnrna_reader_evidence_bindings_v5",
         subject_binding_set_id="subject-bindings-v1",
         rows=rows,
     )

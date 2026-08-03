@@ -8,7 +8,7 @@ from typing import Literal
 from ..contracts._values import MetastudyContractError, canonical_digest
 from ._values import digest, finite, text, window
 
-ACQUISITION_PROJECTION_CONTRACT_ID = "rt_lnrna_reporter_response_acquisition_projection.v2"
+ACQUISITION_PROJECTION_CONTRACT_ID = "rt_lnrna_reporter_response_acquisition_projection.v3"
 MetricSpace = Literal["raw_measurement", "reference_normalized"]
 
 

@@ -230,6 +230,10 @@ def _source_closed_inputs(
         reader_record_schema_version=record.record_schema_version,
         reader_record_revision=record.revision,
         reader_record_revision_digest=record.revision_digest,
+        reader_record_config_digest=record.config_digest,
+        reader_record_producer_config_digest=record.producer_config_digest,
+        reader_record_producer=record.producer,
+        reader_record_inputs=record.inputs,
         reader_record_contract_id=record.contract_id,
         reader_record_content_digest=record.content_digest,
         reader_record_path=record.reader_path,
@@ -256,7 +260,7 @@ def _source_closed_inputs(
         binding_reason="exact_subject_alias_match",
     )
     bindings = ReaderEvidenceBindingSet._from_source_closed_record(
-        schema_id="rt_lnrna_reader_evidence_bindings_v4",
+        schema_id="rt_lnrna_reader_evidence_bindings_v5",
         subject_binding_set_id="rt_lnrna_subject_bindings_v1",
         rows=(binding,),
     )

@@ -52,7 +52,7 @@ def _live_readiness(*, ready_ids: tuple[str, ...], receipt_digest: str | None = 
 def _state(*, decision_status: str = "blocked") -> dict[str, object]:
     selected = decision_status == "selected"
     return {
-        "schema_id": "rt_lnrna_reporter_response_metastudy_state.v6",
+        "schema_id": "rt_lnrna_reporter_response_metastudy_state.v7",
         "generation_digest": "sha256:" + "b" * 64,
         "decision": {
             "status": decision_status,

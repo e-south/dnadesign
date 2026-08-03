@@ -177,7 +177,7 @@ def materialize_record_evidence(
     identity = _record_identity(record)
     status: Literal["complete", "partial"] = "partial" if candidate_omissions else "complete"
     attempt = MaterializationAttemptReceipt(
-        contract_id="rt_lnrna_reporter_response_materialization_attempt.v4",
+        contract_id="rt_lnrna_reporter_response_materialization_attempt.v5",
         experiment_id=record.experiment_id,
         reader_record_identity=identity,
         evidence_binding_artifact_id=bindings.artifact_id,
@@ -247,6 +247,10 @@ def _preflight(record, bindings, ontology, policy, protocol) -> str | None:
         record.record_schema_version,
         record.revision,
         record.revision_digest,
+        record.config_digest,
+        record.producer_config_digest,
+        record.producer,
+        record.inputs,
         record.contract_id,
         record.content_digest,
         record.reader_path,
@@ -263,6 +267,10 @@ def _preflight(record, bindings, ontology, policy, protocol) -> str | None:
             row.reader_record_schema_version,
             row.reader_record_revision,
             row.reader_record_revision_digest,
+            row.reader_record_config_digest,
+            row.reader_record_producer_config_digest,
+            row.reader_record_producer,
+            row.reader_record_inputs,
             row.reader_record_contract_id,
             row.reader_record_content_digest,
             row.reader_record_path,
@@ -284,6 +292,10 @@ def _record_identity(record: ReaderDataframeRecordRef) -> ReaderRecordIdentity:
         reader_record_schema_version=record.record_schema_version,
         reader_record_revision=record.revision,
         reader_record_revision_digest=record.revision_digest,
+        reader_record_config_digest=record.config_digest,
+        reader_record_producer_config_digest=record.producer_config_digest,
+        reader_record_producer=record.producer,
+        reader_record_inputs=record.inputs,
         reader_record_contract_id=record.contract_id,
         reader_record_content_digest=record.content_digest,
         reader_record_path=record.reader_path,
@@ -310,7 +322,7 @@ def _blocked(
     if not (blockers or typed_omissions):
         raise ValueError("blocked materialization requires a blocker or coordinate omissions")
     attempt = MaterializationAttemptReceipt(
-        contract_id="rt_lnrna_reporter_response_materialization_attempt.v4",
+        contract_id="rt_lnrna_reporter_response_materialization_attempt.v5",
         experiment_id=record.experiment_id,
         reader_record_identity=_record_identity(record),
         evidence_binding_artifact_id=bindings.artifact_id if bindings is not None else None,

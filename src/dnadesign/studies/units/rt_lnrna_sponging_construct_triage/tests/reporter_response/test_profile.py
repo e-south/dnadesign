@@ -18,6 +18,7 @@ import jsonschema
 import pytest
 import yaml
 
+from dnadesign.studies.core.reader_records import ReaderRecordProducer
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_evidence import (
     BiologicalReplicateIdentityScope,
     ReaderEvidenceBinding,
@@ -65,6 +66,14 @@ def _bindings(
         reader_record_schema_version=6,
         reader_record_revision=1,
         reader_record_revision_digest=_digest("a"),
+        reader_record_config_digest=_digest("c"),
+        reader_record_producer_config_digest=_digest("d"),
+        reader_record_producer=ReaderRecordProducer(
+            kind="pipeline",
+            id="sample_measurements",
+            plugin="transform/sample_measurements",
+        ),
+        reader_record_inputs=(),
         reader_record_contract_id="plate_reader.annotated.v1",
         reader_record_content_digest=_digest("b"),
         reader_record_path="artifacts/sample_measurements/df.parquet",
@@ -85,7 +94,7 @@ def _bindings(
         binding_reason="exact_subject_alias_match",
     )
     return ReaderEvidenceBindingSet._from_source_closed_record(
-        schema_id="rt_lnrna_reader_evidence_bindings_v4",
+        schema_id="rt_lnrna_reader_evidence_bindings_v5",
         subject_binding_set_id="subject-bindings-v1",
         rows=(row,),
     )
@@ -204,10 +213,10 @@ def test_profile_round_trip_has_no_second_replicate_tier_or_objective_ontology()
     assert not ({"score", "scalar", "objective"} & keys)
 
 
-def test_profile_v3_preserves_complete_reader_record_identity() -> None:
+def test_profile_v4_preserves_complete_reader_record_lineage() -> None:
     payload = profile_to_dict(_profile())
 
-    assert payload["contract_id"] == "rt_lnrna_reporter_response_profile.v3"
+    assert payload["contract_id"] == "rt_lnrna_reporter_response_profile.v4"
     assert payload["provenance"] == {
         "raw_design_id": "design-subject-a",
         "raw_assay_subject_id": None,
@@ -217,6 +226,14 @@ def test_profile_v3_preserves_complete_reader_record_identity() -> None:
         "reader_record_kind": "dataframe_artifact",
         "reader_record_revision": 1,
         "reader_record_revision_digest": _digest("a"),
+        "reader_record_config_digest": _digest("c"),
+        "reader_record_producer_config_digest": _digest("d"),
+        "reader_record_producer": {
+            "kind": "pipeline",
+            "id": "sample_measurements",
+            "plugin": "transform/sample_measurements",
+        },
+        "reader_record_inputs": [],
         "reader_record_content_digest": _digest("b"),
         "reader_record_schema_version": 6,
         "reader_record_contract_id": "plate_reader.annotated.v1",
@@ -272,6 +289,17 @@ def test_serialized_profile_matches_checked_in_schema() -> None:
     unconfined["provenance"]["reader_record_path"] = "../outside.parquet"
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.Draft202012Validator(schema).validate(unconfined)
+
+    for field_name, changed_value in (
+        ("reader_record_id", "another_record/df"),
+        ("reader_record_kind", "file_bundle"),
+        ("reader_record_schema_version", 5),
+        ("reader_record_contract_id", "plate_reader.other.v1"),
+    ):
+        tampered = profile_to_dict(_profile())
+        tampered["provenance"][field_name] = changed_value
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.Draft202012Validator(schema).validate(tampered)
 
 
 def test_position_is_only_observation_identity_not_replicate_identity() -> None:

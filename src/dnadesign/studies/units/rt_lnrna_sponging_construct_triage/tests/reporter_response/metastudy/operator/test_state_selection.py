@@ -65,7 +65,7 @@ def test_selected_source_state_is_compact_and_rejects_phase_ineligible_forgery()
         ),
     }
     payload = {
-        "schema_id": "rt_lnrna_reporter_response_metastudy_state.v6",
+        "schema_id": "rt_lnrna_reporter_response_metastudy_state.v7",
         "generation_digest": operator_state.canonical_digest(body),
         **body,
     }

@@ -54,6 +54,10 @@ def test_materialized_binding_rows_exclude_measurements_and_interpretations(tmp_
         "reader_record_schema_version",
         "reader_record_revision",
         "reader_record_revision_digest",
+        "reader_record_config_digest",
+        "reader_record_producer_config_digest",
+        "reader_record_producer",
+        "reader_record_inputs",
         "reader_record_contract_id",
         "reader_record_content_digest",
         "reader_record_path",
@@ -66,6 +70,12 @@ def test_materialized_binding_rows_exclude_measurements_and_interpretations(tmp_
         "binding_state",
         "binding_reason",
     }
+    assert row["reader_record_producer"] == {
+        "kind": "pipeline",
+        "id": "sample_measurements",
+        "plugin": "transform/sample_measurements",
+    }
+    assert row["reader_record_inputs"] == []
     assert not ({"OD600", "RFP", "RFP/OD600", "assay_score", "measurement"} & set(row))
     assert payload["unbound_count"] == 0
 

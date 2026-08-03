@@ -26,10 +26,8 @@ from ..contracts.materialization import (
 )
 from ..contracts.profile import ProfileEvidence
 from ..contracts.protocol import DEFAULT_PROTOCOL, MetastudyProtocol, Window
-from ..evidence_projection.contracts import (
-    ProfileEvidenceProjection,
-    profile_source_identity_projection,
-)
+from ..evidence_projection.contracts import ProfileEvidenceProjection
+from ..evidence_projection.provenance import profile_source_identity_projection
 
 
 def canonical_evidence_digest(
@@ -131,6 +129,10 @@ def _require_complete_attempt(
         expected_identity.reader_record_schema_version,
         expected_identity.reader_record_revision,
         expected_identity.reader_record_revision_digest,
+        expected_identity.reader_record_config_digest,
+        expected_identity.reader_record_producer_config_digest,
+        expected_identity.reader_record_producer,
+        expected_identity.reader_record_inputs,
         expected_identity.reader_record_contract_id,
         expected_identity.reader_record_content_digest,
         expected_identity.reader_record_path,
@@ -145,6 +147,10 @@ def _require_complete_attempt(
             provenance.reader_record_schema_version,
             provenance.reader_record_revision,
             provenance.reader_record_revision_digest,
+            provenance.reader_record_config_digest,
+            provenance.reader_record_producer_config_digest,
+            provenance.reader_record_producer,
+            provenance.reader_record_inputs,
             provenance.reader_record_contract_id,
             provenance.reader_record_content_digest,
             provenance.reader_record_path,

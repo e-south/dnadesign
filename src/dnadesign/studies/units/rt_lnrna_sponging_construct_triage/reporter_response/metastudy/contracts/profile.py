@@ -44,7 +44,7 @@ class GrowthPhaseStratum:
 class ProfileAuditArtifact:
     """One canonical audit artifact bound to an exact profile source identity."""
 
-    contract_id: Literal["rt_lnrna_reporter_response_profile_audit.v3"]
+    contract_id: Literal["rt_lnrna_reporter_response_profile_audit.v4"]
     method_id: Literal["synthetic_profile_audit_v1", "canonical_profile_observation_audit_v1"]
     profile_source_digest: str
     profile_digest: str
@@ -59,7 +59,7 @@ class ProfileAuditArtifact:
     _derivation_closure: object | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self.contract_id != "rt_lnrna_reporter_response_profile_audit.v3":
+        if self.contract_id != "rt_lnrna_reporter_response_profile_audit.v4":
             raise MetastudyContractError("profile audit contract_id changed")
         if self.method_id not in {"synthetic_profile_audit_v1", "canonical_profile_observation_audit_v1"}:
             raise MetastudyContractError("profile audit method_id is not enumerated")

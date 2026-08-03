@@ -150,6 +150,28 @@ def test_publication_projection_rejects_unconfined_reader_record_path(reader_rec
         parse_profile_evidence_projection(row, index=0)
 
 
+@pytest.mark.parametrize(
+    ("field_name", "changed_value"),
+    (
+        ("reader_record_id", "another_record/df"),
+        ("reader_record_kind", "file_bundle"),
+        ("reader_record_schema_version", 5),
+        ("reader_record_contract_id", "plate_reader.other.v1"),
+    ),
+)
+def test_publication_projection_rejects_tampered_reader_record_family(
+    field_name: str,
+    changed_value: object,
+) -> None:
+    evidence = _evidence()
+    selected = evaluate_metastudy(evidence, readiness=_ready())
+    row = decision_evidence_payload(evidence, decision=selected)["profiles"][0]
+    projection = parse_profile_evidence_projection(row, index=0).profile
+
+    with pytest.raises(ValueError, match=field_name):
+        replace(projection.provenance, **{field_name: changed_value})
+
+
 def test_publication_projection_rejects_forged_null_raw_identity_after_digest_recomputation() -> None:
     evidence = _evidence()
     selected = evaluate_metastudy(evidence, readiness=_ready())

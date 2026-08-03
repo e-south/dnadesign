@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import asdict
 
+from dnadesign.studies.core.reader_records import parse_record_inputs, parse_record_producer
+
 from ..._contract_values import json_value
 from ...canonical import comparability_key, derive_profile_rows
 from ...measurement_profile import (
@@ -28,8 +30,8 @@ from .audit_parsing import parse_profile_audit
 from .contracts import (
     ProfileContentProjection,
     ProfileEvidenceProjection,
-    ProfileProvenanceProjection,
 )
+from .provenance import ProfileProvenanceProjection
 
 
 def parse_profile_evidence_projection(value: object, *, index: int) -> ProfileEvidenceProjection:
@@ -59,13 +61,11 @@ def parse_profile_evidence_projection(value: object, *, index: int) -> ProfileEv
             "eligibility",
         },
     )
-    if profile_payload["contract_id"] != "rt_lnrna_reporter_response_profile.v3":
+    if profile_payload["contract_id"] != "rt_lnrna_reporter_response_profile.v4":
         raise ValueError(f"publication evidence profiles[{index}] profile contract_id changed")
     if profile_payload["study_id"] != "rt_lnrna_sponging_construct_triage":
         raise ValueError(f"publication evidence profiles[{index}] profile study_id changed")
-    provenance = ProfileProvenanceProjection(
-        **strict_dataclass(profile_payload["provenance"], ProfileProvenanceProjection)
-    )
+    provenance = _parse_provenance(profile_payload["provenance"])
     policy = _parse_observation_policy(profile_payload["observation_policy"])
     reduction = _parse_reduction(profile_payload["reduction"])
     measurements = tuple(
@@ -156,9 +156,7 @@ def _parse_measurement_profile_projection(
             "eligibility",
         },
     )
-    provenance = ProfileProvenanceProjection(
-        **strict_dataclass(profile_payload["provenance"], ProfileProvenanceProjection)
-    )
+    provenance = _parse_provenance(profile_payload["provenance"])
     policy = _parse_observation_policy(profile_payload["observation_policy"])
     reduction = _parse_reduction(profile_payload["reduction"])
     measurements = tuple(
@@ -233,6 +231,20 @@ def _parse_observation_policy(value: object) -> ReporterResponseObservationPolic
     if payload != json_value(asdict(policy)):
         raise ValueError("serialized observation policy differs from its canonical form")
     return policy
+
+
+def _parse_provenance(value: object) -> ProfileProvenanceProjection:
+    values = strict_dataclass(value, ProfileProvenanceProjection)
+    record_id = required_text(values["reader_record_id"], label="reader_record_id")
+    values["reader_record_producer"] = parse_record_producer(
+        values["reader_record_producer"],
+        record_id=record_id,
+    )
+    values["reader_record_inputs"] = parse_record_inputs(
+        values["reader_record_inputs"],
+        record_id=record_id,
+    )
+    return ProfileProvenanceProjection(**values)
 
 
 def _parse_reduction(value: object) -> EndpointReduction | TimeWindowReduction:

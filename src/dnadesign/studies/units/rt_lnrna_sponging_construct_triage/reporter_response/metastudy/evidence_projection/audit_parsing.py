@@ -8,7 +8,8 @@ from dataclasses import fields
 from ..contracts._values import canonical_digest
 from ..contracts.profile import GrowthPhaseStratum, ProfileAuditArtifact
 from ._values import object_list, strict_dataclass, strict_object
-from .contracts import ProfileContentProjection, profile_source_identity_projection
+from .contracts import ProfileContentProjection
+from .provenance import profile_source_identity_projection
 
 
 def parse_profile_audit(

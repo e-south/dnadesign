@@ -1,5 +1,5 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: rt_lnrna_reporter_response_profile.v3
+$id: rt_lnrna_reporter_response_profile.v4
 title: RT-lnRNA reporter-response profile
 description: >-
   Exact study-owned contract for descriptive, dose-wise reporter response and
@@ -25,7 +25,7 @@ required:
   - eligibility
 properties:
   contract_id:
-    const: rt_lnrna_reporter_response_profile.v3
+    const: rt_lnrna_reporter_response_profile.v4
   study_id:
     const: rt_lnrna_sponging_construct_triage
   profile_id:
@@ -108,6 +108,10 @@ $defs:
       - reader_record_kind
       - reader_record_revision
       - reader_record_revision_digest
+      - reader_record_config_digest
+      - reader_record_producer_config_digest
+      - reader_record_producer
+      - reader_record_inputs
       - reader_record_content_digest
       - reader_record_schema_version
       - reader_record_contract_id
@@ -128,25 +132,108 @@ $defs:
       reader_protocol_id:
         $ref: '#/$defs/non_empty_string'
       reader_record_id:
-        $ref: '#/$defs/non_empty_string'
+        const: sample_measurements/df
       reader_record_kind:
         const: dataframe_artifact
       reader_record_revision:
         $ref: '#/$defs/positive_integer'
       reader_record_revision_digest:
         $ref: '#/$defs/sha256_digest'
+      reader_record_config_digest:
+        $ref: '#/$defs/sha256_digest'
+      reader_record_producer_config_digest:
+        $ref: '#/$defs/sha256_digest'
+      reader_record_producer:
+        $ref: '#/$defs/reader_record_producer'
+      reader_record_inputs:
+        type: array
+        items:
+          $ref: '#/$defs/reader_record_input'
       reader_record_content_digest:
         $ref: '#/$defs/sha256_digest'
       reader_record_schema_version:
         const: 6
       reader_record_contract_id:
-        $ref: '#/$defs/non_empty_string'
+        const: plate_reader.annotated.v1
       reader_record_path:
         $ref: '#/$defs/outputs_relative_path'
       evidence_binding_artifact_id:
         $ref: '#/$defs/non_empty_string'
       evidence_binding_artifact_digest:
         $ref: '#/$defs/sha256_digest'
+  reader_record_producer:
+    type: object
+    additionalProperties: false
+    required: [kind, id, plugin]
+    properties:
+      kind:
+        enum: [pipeline, plot, export]
+      id:
+        $ref: '#/$defs/non_empty_string'
+      plugin:
+        $ref: '#/$defs/non_empty_string'
+      source_recipe:
+        type: object
+        additionalProperties: false
+        required: [recipe, with]
+        properties:
+          recipe:
+            $ref: '#/$defs/non_empty_string'
+          with:
+            type: object
+  reader_input_artifact:
+    type: object
+    additionalProperties: false
+    required: [path, size_bytes, content_digest]
+    properties:
+      path:
+        $ref: '#/$defs/outputs_relative_path'
+      size_bytes:
+        type: integer
+        minimum: 0
+      content_digest:
+        $ref: '#/$defs/sha256_digest'
+  reader_record_input:
+    oneOf:
+      - type: object
+        additionalProperties: false
+        required: [label, kind, record, discovery_policy, record_revision_digest]
+        properties:
+          label: {$ref: '#/$defs/non_empty_string'}
+          kind: {const: record}
+          record: {$ref: '#/$defs/non_empty_string'}
+          discovery_policy: {const: record}
+          record_revision_digest: {$ref: '#/$defs/sha256_digest'}
+      - type: object
+        additionalProperties: false
+        required: [label, kind, resource, experiment, record, discovery_policy, record_revision_digest]
+        properties:
+          label: {$ref: '#/$defs/non_empty_string'}
+          kind: {const: source_record}
+          resource: {$ref: '#/$defs/non_empty_string'}
+          experiment: {$ref: '#/$defs/non_empty_string'}
+          record: {$ref: '#/$defs/non_empty_string'}
+          discovery_policy: {const: source_record}
+          record_revision_digest: {$ref: '#/$defs/sha256_digest'}
+      - type: object
+        additionalProperties: false
+        required: [label, kind, discovery_policy, artifact]
+        properties:
+          label: {$ref: '#/$defs/non_empty_string'}
+          kind: {const: file}
+          discovery_policy:
+            enum: [declared_file, declared_resource, plugin_discovery]
+          artifact: {$ref: '#/$defs/reader_input_artifact'}
+      - type: object
+        additionalProperties: false
+        required: [label, kind, resource, discovery_policy, artifact]
+        properties:
+          label: {$ref: '#/$defs/non_empty_string'}
+          kind: {const: resource}
+          resource: {$ref: '#/$defs/non_empty_string'}
+          discovery_policy:
+            enum: [declared_file, declared_resource, plugin_discovery]
+          artifact: {$ref: '#/$defs/reader_input_artifact'}
   observation_policy:
     type: object
     additionalProperties: false

@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-reporter-response-metastudy
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 parent_route: ../../routes/reporter-response-evidence.md
 bridge_route: rt_lnrna_reporter_response_metastudy
 data_plane_role: retrospective-descriptive-reduction-selection
@@ -134,8 +134,18 @@ erase an otherwise useful descriptive recommendation.
 
 The primary reporter-response cohort uses 500 uM. The 5 uM and 50 uM cohorts,
 single endpoints, and alternate centered-window widths are typed sensitivity
-results and cannot select the primary reduction. There is no weighted score,
-clipping, capping, label, or objective in this meta-study.
+coverage evidence and cannot select the primary reduction. Each sensitivity
+summary reports only its kind, declared value, profile count, and evidence
+digest, with `selectable: false`; it does not report an effect size or rank-
+stability statistic. There is no weighted score, clipping, capping, label, or
+objective in this meta-study.
+
+Single endpoints and time windows are not a common selection estimand. Endpoint
+profiles use `reduce_channels_then_ratio`, while window profiles use
+`ratio_then_reduce`. Their coverage may be audited side by side, but their
+values or subject ranks must not be compared to select a reduction. A future
+rank-stability analysis would need a separately declared common estimand and a
+new contract.
 
 The later objective candidate is Reporter Response Feasibility (RRF), documented
 in the parent [reporter-response evidence context](../reporter-response-evidence.md).
@@ -147,15 +157,16 @@ validated OD linearity, and biological-replicate support.
 
 The operator accepts only source-closed Reader dataframe records, exact
 study-owned evidence bindings, the pinned condition ontology, and the typed
-descriptive profile union: `rt_lnrna_reporter_measurement_profile.v1` or
-`rt_lnrna_reporter_response_profile.v3`. Raw workbooks, notebook cells,
+descriptive profile union: `rt_lnrna_reporter_measurement_profile.v2` or
+`rt_lnrna_reporter_response_profile.v4`. Raw workbooks, notebook cells,
 screenshots, and caller-supplied digests are not evidence inputs.
 
 `metastudy-state.yaml` is generated state. Do not edit it by hand. Its decision,
-readiness, objective readiness, acquisition projection, sensitivity summaries,
-and compact coverage receipts are one atomic generation. Immutable publications
-contain `manifest.json`, `report.md`, `sensitivity.json`, and, for evaluated
-decisions, `evidence.json`. A selected decision also contains
+readiness, objective readiness, acquisition projection, coverage-only
+sensitivity summaries, and compact coverage receipts are one atomic generation.
+Immutable publications contain `manifest.json`, `report.md`,
+`sensitivity.json`, and, for evaluated decisions, `evidence.json`. A selected
+decision also contains
 `acquisition.json` for its selected reduction. Offline verification recomputes
 both the decision and any selected acquisition projection from the bundled typed
 evidence; live status additionally verifies the external Reader records and

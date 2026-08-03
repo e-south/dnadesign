@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-reporter-response-evidence
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 measurement_readiness: ready
 descriptive_visualization_readiness: ready
 reduction_recommendation_status: ready
@@ -20,15 +20,16 @@ and decides whether evidence is comparable enough to support a later
 preference objective.
 
 The handoff publishes exactly one descriptive profile variant. When reference
-normalization is unavailable, `rt_lnrna_reporter_measurement_profile.v1`
+normalization is unavailable, `rt_lnrna_reporter_measurement_profile.v2`
 retains raw time-reduced RFP, OD600, and RFP/OD600 summaries plus a typed reason.
-When normalization is available, `rt_lnrna_reporter_response_profile.v3`
+When normalization is available, `rt_lnrna_reporter_response_profile.v4`
 retains those same raw measurements and adds dose-wise reporter response,
-`relative_od`, and supported biological-replicate uncertainty. Both carry
-exact Reader record and evidence-binding provenance, declared condition roles,
-the ordered dose grid, and within-acquisition observation counts. Neither emits
-a score, scalar objective, rank, or OPAL label. There is no active scalar
-objective.
+`relative_od`, and supported biological-replicate uncertainty. Both carry the
+exact Reader revision and content evidence, configuration and producer-
+configuration digests, typed producer and input edges, and the binding artifact
+identity. They also retain declared condition roles, the ordered dose grid, and
+within-acquisition observation counts. Neither emits a score, scalar objective,
+rank, or OPAL label. There is no active scalar objective.
 
 The evidence-binding artifact is not a caller-authored metadata bag. Its
 builder accepts only a source-closed Reader record, publication derives a
@@ -84,8 +85,10 @@ consistent descriptive comparison of the current kinetic cohort. It owns:
 - endpoint-OD linearity checks before interpreting `relative_od` as relative
   biomass;
 - biological-replicate uncertainty over declared identities and minimum support;
-- rank-stability analysis across defensible endpoint/window, dose-grid,
-  control, and plate/block choices;
+- coverage checks across declared endpoint, centered-window, dose-grid,
+  control, and acquisition choices. These checks establish which evidence is
+  present; they do not estimate effect size or rank stability and cannot select
+  a reduction;
 - the distinction between a descriptive recommendation, its limitations, and
   any later objective claim.
 
@@ -95,6 +98,13 @@ there is no constrained objective, biological-replicate uncertainty is not
 estimable, and OD linearity is not validated. Reader evidence may therefore
 support descriptive review, assay QC, canonical Reader plots, and aggregate
 study plots without becoming an optimization target.
+
+Endpoint and time-window sensitivity profiles also have different estimands.
+An endpoint first reduces each channel and then forms their ratio
+(`reduce_channels_then_ratio`); a time window first forms ratios and then
+reduces them over time (`ratio_then_reduce`). Their coverage receipts may be
+reviewed together, but their values and ranks must not be compared to choose a
+reduction.
 
 ### Proposed objective, not an active contract
 

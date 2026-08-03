@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 import operator
 from collections.abc import Iterable, Mapping
-from dataclasses import asdict, is_dataclass
+from dataclasses import fields, is_dataclass
 
 
 class ReporterResponseContractError(ValueError):
@@ -90,10 +90,10 @@ def sha256_digest(value: object, *, field_name: str) -> str:
 
 
 def json_value(value: object) -> object:
-    if is_dataclass(value) and not isinstance(value, type):
-        return json_value(asdict(value))
     if isinstance(value, Mapping):
         return {str(key): json_value(child) for key, child in value.items()}
+    if is_dataclass(value) and not isinstance(value, type):
+        return {item.name: json_value(getattr(value, item.name)) for item in fields(value)}
     if isinstance(value, tuple | list):
         return [json_value(child) for child in value]
     return value

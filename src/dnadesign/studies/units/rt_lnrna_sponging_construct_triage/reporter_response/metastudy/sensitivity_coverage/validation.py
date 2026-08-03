@@ -40,6 +40,10 @@ def validate_sensitivity_coverage(
             identity.reader_record_kind,
             identity.reader_record_revision,
             identity.reader_record_revision_digest,
+            identity.reader_record_config_digest,
+            identity.reader_record_producer_config_digest,
+            identity.reader_record_producer,
+            identity.reader_record_inputs,
             identity.reader_record_content_digest,
             identity.reader_record_schema_version,
             identity.reader_record_contract_id,
@@ -54,6 +58,10 @@ def validate_sensitivity_coverage(
             provenance.reader_record_kind,
             provenance.reader_record_revision,
             provenance.reader_record_revision_digest,
+            provenance.reader_record_config_digest,
+            provenance.reader_record_producer_config_digest,
+            provenance.reader_record_producer,
+            provenance.reader_record_inputs,
             provenance.reader_record_content_digest,
             provenance.reader_record_schema_version,
             provenance.reader_record_contract_id,
@@ -130,6 +138,9 @@ def _validate_coverage_receipts(
         if (
             attempt.reader_record_identity != coverage.reader_record_identity
             or attempt.attempt_digest != coverage.materialization_attempt_digest
+            or attempt.evidence_binding_artifact_id != coverage.evidence_binding_artifact_id
+            or attempt.evidence_binding_artifact_digest != coverage.evidence_binding_artifact_digest
+            or attempt.expected_subject_ids != tuple(subject.subject_id for subject in coverage.expected_subjects)
         ):
             raise MetastudyContractError("sensitivity coverage differs from its exact materialization attempt")
 

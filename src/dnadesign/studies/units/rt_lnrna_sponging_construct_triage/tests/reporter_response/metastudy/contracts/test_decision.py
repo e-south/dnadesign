@@ -31,6 +31,9 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
     evaluate_metastudy as evaluate_metastudy_with_attempts,
 )
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.contracts import (
+    canonical_digest,
+)
 
 from .._builders import (
     KINETIC_IDS,
@@ -265,7 +268,7 @@ def test_seven_of_eight_decision_serializes_the_unavailable_reader_attempt() -> 
     unavailable = next(row for row in payload["materialization_attempts"] if row["experiment_id"] == blocked_id)
     assert decision.status == "selected"
     assert unavailable["reader_record_identity"] is None
-    assert unavailable["blockers"] == ({"code": "reader_records_not_ready"},)
+    assert unavailable["blockers"] == [{"code": "reader_records_not_ready"}]
 
 
 def test_decision_rejects_attempt_reader_identity_drift_from_primary_profiles() -> None:
@@ -282,3 +285,27 @@ def test_decision_rejects_attempt_reader_identity_drift_from_primary_profiles() 
             readiness=_ready(),
             attempts=(changed_attempt, *attempts[1:]),
         )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "changed_value"),
+    (
+        ("reader_record_id", "another_record/df"),
+        ("reader_record_kind", "file_bundle"),
+        ("reader_record_schema_version", 5),
+        ("reader_record_contract_id", "plate_reader.other.v1"),
+    ),
+)
+def test_decision_payload_rejects_tampered_reader_record_family(
+    field_name: str,
+    changed_value: object,
+) -> None:
+    payload = decision_to_dict(evaluate_metastudy(_evidence(), readiness=_ready()))
+    attempt = payload["materialization_attempts"][0]
+    attempt["reader_record_identity"][field_name] = changed_value
+    attempt["attempt_digest"] = canonical_digest(
+        {key: value for key, value in attempt.items() if key != "attempt_digest"}
+    )
+
+    with pytest.raises(MetastudyContractError, match="attempt Reader"):
+        validate_decision_payload(payload)

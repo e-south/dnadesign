@@ -15,7 +15,7 @@ from .uncertainty import DoseUncertainty, ProfileEligibility
 if TYPE_CHECKING:
     from ..policy import ReporterResponseObservationPolicy
 
-CONTRACT_ID = "rt_lnrna_reporter_response_profile.v3"
+CONTRACT_ID = "rt_lnrna_reporter_response_profile.v4"
 STUDY_ID = "rt_lnrna_sponging_construct_triage"
 
 

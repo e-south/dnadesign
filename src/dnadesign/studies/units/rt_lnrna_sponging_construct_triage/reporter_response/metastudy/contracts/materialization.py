@@ -13,9 +13,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
-from dataclasses import fields as dataclass_fields
 from typing import Literal
 
+from ._materialization.lineage import (
+    ReaderRecordIdentity,
+    reader_record_identity_from_payload,
+    reader_record_identity_payload,
+)
 from ._values import MetastudyContractError, _digest, _required_text, _unique_text, canonical_digest
 from .protocol import DEFAULT_PROTOCOL
 
@@ -77,39 +81,6 @@ class EvidenceReadiness:
 
 
 @dataclass(frozen=True, slots=True)
-class ReaderRecordIdentity:
-    """Exact public Reader record identity preserved by one materialization attempt."""
-
-    reader_experiment_id: str
-    reader_protocol_id: str
-    reader_record_id: str
-    reader_record_kind: str
-    reader_record_schema_version: int
-    reader_record_revision: int
-    reader_record_revision_digest: str
-    reader_record_contract_id: str
-    reader_record_content_digest: str
-    reader_record_path: str
-
-    def __post_init__(self) -> None:
-        for name in (
-            "reader_experiment_id",
-            "reader_protocol_id",
-            "reader_record_id",
-            "reader_record_kind",
-            "reader_record_contract_id",
-            "reader_record_path",
-        ):
-            _required_text(getattr(self, name), label=name)
-        if self.reader_record_schema_version != 6:
-            raise MetastudyContractError("attempt Reader record schema version must equal 6")
-        if type(self.reader_record_revision) is not int or self.reader_record_revision < 1:
-            raise MetastudyContractError("attempt Reader record revision must be positive")
-        _digest(self.reader_record_revision_digest, label="attempt Reader revision digest")
-        _digest(self.reader_record_content_digest, label="attempt Reader content digest")
-
-
-@dataclass(frozen=True, slots=True)
 class MaterializationBlocker:
     """One source- or experiment-level failure that prevents materialization."""
 
@@ -137,7 +108,7 @@ class MaterializationOmission:
 class MaterializationAttemptReceipt:
     """Digest-bound result of attempting one selected Reader experiment."""
 
-    contract_id: Literal["rt_lnrna_reporter_response_materialization_attempt.v4"]
+    contract_id: Literal["rt_lnrna_reporter_response_materialization_attempt.v5"]
     experiment_id: str
     reader_record_identity: ReaderRecordIdentity | None
     evidence_binding_artifact_id: str | None
@@ -151,7 +122,7 @@ class MaterializationAttemptReceipt:
     attempt_digest: str = field(default="", init=False)
 
     def __post_init__(self) -> None:
-        if self.contract_id != "rt_lnrna_reporter_response_materialization_attempt.v4":
+        if self.contract_id != "rt_lnrna_reporter_response_materialization_attempt.v5":
             raise MetastudyContractError("materialization attempt contract_id changed")
         _required_text(self.experiment_id, label="materialization attempt experiment_id")
         if self.reader_record_identity is not None and not isinstance(
@@ -279,9 +250,6 @@ def materialization_attempt_from_payload(value: object, *, index: int) -> Materi
             raise MetastudyContractError(
                 f"materialization_attempts[{index}].reader_record_identity must be an object or null"
             )
-        identity_fields = {item.name for item in dataclass_fields(ReaderRecordIdentity)}
-        if set(identity) != identity_fields:
-            raise MetastudyContractError(f"materialization_attempts[{index}] Reader identity fields changed")
     blockers = value["blockers"]
     omissions = value["candidate_omissions"]
     digests = value["candidate_profile_digests"]
@@ -290,10 +258,11 @@ def materialization_attempt_from_payload(value: object, *, index: int) -> Materi
         raise MetastudyContractError(f"materialization_attempts[{index}] array fields are malformed")
     parsed_blockers = _materialization_blockers_from_payload(blockers, index=index, field="blockers")
     parsed_omissions = _materialization_omissions_from_payload(omissions, index=index)
+    parsed_identity = reader_record_identity_from_payload(identity, index=index) if identity is not None else None
     attempt = MaterializationAttemptReceipt(
         contract_id=value["contract_id"],
         experiment_id=value["experiment_id"],
-        reader_record_identity=ReaderRecordIdentity(**identity) if identity is not None else None,
+        reader_record_identity=parsed_identity,
         evidence_binding_artifact_id=value["evidence_binding_artifact_id"],
         evidence_binding_artifact_digest=value["evidence_binding_artifact_digest"],
         expected_subject_ids=tuple(subjects),
@@ -347,7 +316,24 @@ def materialization_attempt_payload(
 
     if not isinstance(attempt, MaterializationAttemptReceipt):
         raise MetastudyContractError("attempt must be MaterializationAttemptReceipt")
-    payload = asdict(attempt)
+    payload = {
+        "contract_id": attempt.contract_id,
+        "experiment_id": attempt.experiment_id,
+        "reader_record_identity": (
+            reader_record_identity_payload(attempt.reader_record_identity)
+            if attempt.reader_record_identity is not None
+            else None
+        ),
+        "evidence_binding_artifact_id": attempt.evidence_binding_artifact_id,
+        "evidence_binding_artifact_digest": attempt.evidence_binding_artifact_digest,
+        "expected_subject_ids": list(attempt.expected_subject_ids),
+        "status": attempt.status,
+        "candidate_profile_count": attempt.candidate_profile_count,
+        "candidate_profile_digests": list(attempt.candidate_profile_digests),
+        "candidate_omissions": [asdict(item) for item in attempt.candidate_omissions],
+        "blockers": [asdict(item) for item in attempt.blockers],
+        "attempt_digest": attempt.attempt_digest,
+    }
     if not include_digest:
         payload.pop("attempt_digest", None)
     return payload

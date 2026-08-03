@@ -174,7 +174,7 @@ def regenerate_metastudy(
         if member.experiment_id not in ready_ids:
             attempts.append(
                 MaterializationAttemptReceipt(
-                    contract_id="rt_lnrna_reporter_response_materialization_attempt.v4",
+                    contract_id="rt_lnrna_reporter_response_materialization_attempt.v5",
                     experiment_id=member.experiment_id,
                     reader_record_identity=None,
                     evidence_binding_artifact_id=None,

@@ -26,7 +26,7 @@ from .report import _render_report
 _EVIDENCE_FREE_FILES = frozenset({"manifest.json", "report.md", "sensitivity.json"})
 _EVIDENCE_BEARING_FILES = frozenset({*_EVIDENCE_FREE_FILES, "evidence.json"})
 _SELECTED_FILES = frozenset({*_EVIDENCE_BEARING_FILES, "acquisition.json"})
-_PUBLICATION_SCHEMA_ID = "rt_lnrna_reporter_response_metastudy_publication.v6"
+_PUBLICATION_SCHEMA_ID = "rt_lnrna_reporter_response_metastudy_publication.v7"
 
 
 def _read_publication_bundle(root: Path) -> dict[str, bytes]:

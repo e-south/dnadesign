@@ -1,4 +1,4 @@
-schema_id: rt_lnrna_reader_evidence_bindings_v4
+schema_id: rt_lnrna_reader_evidence_bindings_v5
 study_id: rt_lnrna_sponging_construct_triage
 owner: rt_lnrna_sponging_construct_triage
 purpose: >-
@@ -8,7 +8,7 @@ purpose: >-
 artifact_fields:
   schema_id:
     type: string
-    const: rt_lnrna_reader_evidence_bindings_v4
+    const: rt_lnrna_reader_evidence_bindings_v5
   artifact_id:
     type: non_empty_string
     derivation: schema_id_plus_exact_reader_experiment_record_and_revision
@@ -41,6 +41,12 @@ binding_fields:
     const: 6
   reader_record_revision: positive_integer
   reader_record_revision_digest: sha256_digest
+  reader_record_config_digest: sha256_digest
+  reader_record_producer_config_digest: sha256_digest
+  reader_record_producer: reader_schema_v6_producer
+  reader_record_inputs:
+    type: list
+    items: reader_schema_v6_input_evidence
   reader_record_contract_id:
     type: string
     const: plate_reader.annotated.v1
@@ -73,7 +79,7 @@ validation_rules:
   - A populated replicate_identity_field declares biological-replicate identity within each source treatment condition. The same label may recur under different conditions without implying a shared identity or pairing.
   - A reporter-response profile must use exactly the condition-scoped biological-replicate identities preserved by its bound row. It cannot invent a value, move a value between conditions, omit a declared value, or replace an unknown declaration with an acquisition coordinate.
   - Reader record references and binding sets are source-closed; directly constructed lookalikes cannot be published as verified evidence.
-  - Every binding preserves the positive exact record revision, its canonical revision digest, and the content digest.
+  - Every binding preserves the positive exact record revision, its revision, configuration, producer-configuration, and content digests, the typed producer, and every typed input edge from the Reader schema-v6 record.
   - The selected catalog epoch and exact record identity must remain unchanged across public resolution; the parsed dataframe bytes must be the same bytes checked against the content digest.
   - At least one of raw_design_id or raw_assay_subject_id must be populated.
   - Reader identities resolve only through exact namespace-qualified aliases in the selected subject binding set.

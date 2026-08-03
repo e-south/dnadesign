@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-reporter-response-route
 surface: study-route
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 parent_route: README.md
 bridge_route: rt_lnrna_reporter_response_evidence
 data_plane_role: descriptive-evidence-binding
@@ -16,8 +16,8 @@ entry_artifacts:
   - source-closed-reader-record
   - source-closed-reader-evidence-bindings
 exit_artifacts:
-  - rt_lnrna_reporter_measurement_profile.v1
-  - rt_lnrna_reporter_response_profile.v3
+  - rt_lnrna_reporter_measurement_profile.v2
+  - rt_lnrna_reporter_response_profile.v4
   - reporter-response-metastudy-route
 ---
 
@@ -35,8 +35,8 @@ study-owned reduction recommendation.
 3. Publish exactly one descriptive profile variant. A positive control is
    optional and must be declared by role; its name is never inferred. When
    reference normalization is unavailable, use
-   `rt_lnrna_reporter_measurement_profile.v1` and record the typed reason.
-   Otherwise use the stricter `rt_lnrna_reporter_response_profile.v3`, which
+   `rt_lnrna_reporter_measurement_profile.v2` and record the typed reason.
+   Otherwise use the stricter `rt_lnrna_reporter_response_profile.v4`, which
    retains the recorded interval, dose grid, condition roles, raw reporter,
    OD600, and reporter/OD600 measurements and adds normalized response,
    relative OD, and supported biological-replicate uncertainty.

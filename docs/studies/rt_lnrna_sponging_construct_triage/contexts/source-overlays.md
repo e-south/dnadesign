@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-source-overlays
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-02
 ---
 
 ## Source Overlay Contract
@@ -14,7 +14,7 @@ The study keeps three result layers separate:
 | --- | --- | --- |
 | `AbundancePriorOverlay` | Literature/source msDNA or RT-DNA abundance. | No |
 | `InferFeatureAlias` | Model-derived `X` for a declared construct view. | Yes, as `X` only |
-| `rt_lnrna_reporter_measurement_profile.v1` or `rt_lnrna_reporter_response_profile.v3` | One alternative descriptive lab profile: raw when normalization is unavailable, otherwise reference-normalized with raw measurements retained. | No |
+| `rt_lnrna_reporter_measurement_profile.v2` or `rt_lnrna_reporter_response_profile.v4` | One alternative descriptive lab profile: raw when normalization is unavailable, otherwise reference-normalized with raw measurements retained. | No |
 
 ### Khan
 
@@ -138,9 +138,9 @@ path.
 ### Reader-derived reporter response
 
 Reader retron reporter experiments are the measurement source for one
-descriptive profile variant: `rt_lnrna_reporter_measurement_profile.v1` when
+descriptive profile variant: `rt_lnrna_reporter_measurement_profile.v2` when
 normalization is unavailable, otherwise
-`rt_lnrna_reporter_response_profile.v3`. Profiles are not
+`rt_lnrna_reporter_response_profile.v4`. Profiles are not
 Khan/Crawford overlays, optimization labels, or Construct sequence authority.
 
 Reader owns generic measurement records and recorded time. The RT-lnRNA study

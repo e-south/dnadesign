@@ -32,7 +32,7 @@ ROUTE_ID = "rt_lnrna_reporter_response_metastudy"
 ROUTE_REGISTRY_PATH = ".agents/skills/retron-assay-study-bridge/references/reader-experiment-routes.json"
 STATE_FILE = "metastudy-state.yaml"
 READINESS_SCHEMA_ID = "rt_lnrna_reporter_response_readiness_snapshot.v1"
-STATE_SCHEMA_ID = "rt_lnrna_reporter_response_metastudy_state.v6"
+STATE_SCHEMA_ID = "rt_lnrna_reporter_response_metastudy_state.v7"
 RECEIPT_NORMALIZATION = "omit environment-specific reader_command before canonical JSON hashing"
 _SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 

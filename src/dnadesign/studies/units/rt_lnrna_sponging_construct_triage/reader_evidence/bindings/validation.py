@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+
+from dnadesign.studies.core.reader_records import ReaderRecordInputEvidence, ReaderRecordProducer
 
 from .contracts import (
     READER_EVIDENCE_BINDING_SCHEMA_ID,
@@ -52,6 +55,14 @@ def validate_binding_set(binding_set: ReaderEvidenceBindingSet) -> None:
                 row.reader_record_schema_version,
                 row.reader_record_revision,
                 row.reader_record_revision_digest,
+                row.reader_record_config_digest,
+                row.reader_record_producer_config_digest,
+                json.dumps(row.reader_record_producer.to_dict(), sort_keys=True, separators=(",", ":")),
+                json.dumps(
+                    [item.to_dict() for item in row.reader_record_inputs],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
                 row.reader_record_contract_id,
                 row.reader_record_content_digest,
                 row.reader_record_path,
@@ -99,6 +110,17 @@ def _validate_binding(row: ReaderEvidenceBinding, *, label: str) -> None:
     if type(row.reader_record_revision) is not int or row.reader_record_revision < 1:
         raise ReaderEvidenceBindingError(f"{label}.reader_record_revision must be a positive integer")
     sha256_digest(row.reader_record_revision_digest, label=f"{label}.reader_record_revision_digest")
+    sha256_digest(row.reader_record_config_digest, label=f"{label}.reader_record_config_digest")
+    sha256_digest(
+        row.reader_record_producer_config_digest,
+        label=f"{label}.reader_record_producer_config_digest",
+    )
+    if not isinstance(row.reader_record_producer, ReaderRecordProducer):
+        raise ReaderEvidenceBindingError(f"{label}.reader_record_producer must be typed Reader provenance")
+    if not isinstance(row.reader_record_inputs, tuple) or not all(
+        isinstance(item, ReaderRecordInputEvidence) for item in row.reader_record_inputs
+    ):
+        raise ReaderEvidenceBindingError(f"{label}.reader_record_inputs must be typed Reader provenance")
     if row.reader_record_contract_id != "plate_reader.annotated.v1":
         raise ReaderEvidenceBindingError(f"{label}.reader_record_contract_id must equal 'plate_reader.annotated.v1'")
     sha256_digest(row.reader_record_content_digest, label=f"{label}.reader_record_content_digest")

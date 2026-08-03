@@ -2,7 +2,7 @@
 name: rt-lnrna-reporter-response
 description: Route admitted RT-lnRNA reporter-response profiles, interval recommendations, and objective readiness. Use for verified Reader-to-study evidence handoffs; not for generic Reader plots or MSD design.
 metadata:
-  version: 1.3.1
+  version: 1.3.2
   category: workflow-automation
   tags: [rt-lnrna, reader, reporter-response, evidence, study]
   owner: rt_lnrna_sponging_construct_triage
@@ -42,8 +42,8 @@ Reader intake, generic Reader plots, and MSD design remain outside this skill.
    canonically digested evidence-binding artifact. Never accept caller-supplied
    provenance lookalikes.
 5. Publish exactly one descriptive profile variant. Use
-   `rt_lnrna_reporter_measurement_profile.v1` when reference normalization is
-   unavailable; otherwise use `rt_lnrna_reporter_response_profile.v3`, which
+   `rt_lnrna_reporter_measurement_profile.v2` when reference normalization is
+   unavailable; otherwise use `rt_lnrna_reporter_response_profile.v4`, which
    retains the raw measurements and adds normalized response. Both derive
    exact provenance from one bound subject row and derive their typed
    observation-policy digest.
@@ -89,8 +89,10 @@ Reader intake, generic Reader plots, and MSD design remain outside this skill.
 - Do not name or publish an objective until its formula, constraint, uncertainty
   unit, and validation claim are explicit. The 6-10 h recommendation is a
   descriptive reduction only.
-- Sensitivity evaluations may diagnose endpoint, centered-window, or dose
-  behavior, but never enter `MetastudyDecision`, window selection, or OPAL.
+- Current sensitivity artifacts report coverage for declared endpoint,
+  centered-window, dose, control, and acquisition coordinates. They do not
+  estimate effect size or rank stability and never enter `MetastudyDecision`,
+  window selection, or OPAL.
 - A subject/window omission limits that coordinate. It does not invalidate
   other valid subjects from the same experiment.
 - Treat the selected acquisition projection as descriptive aggregation with

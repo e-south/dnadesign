@@ -3,7 +3,7 @@ doc_id: study-rt-lnrna-sponging-construct-triage-opal-training-dataset
 surface: study-context
 study_id: rt_lnrna_sponging_construct_triage
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-02
 ---
 
 ## OPAL training dataset
@@ -25,7 +25,7 @@ OPAL readiness requires:
 - canonical base columns: `id`, `bio_type`, `sequence`, `alphabet`, and
   `length`;
 - one explicit Arrow fixed-size-list vector `X` column selected by the study;
-- comparable `rt_lnrna_reporter_response_profile.v3` evidence with supported
+- comparable `rt_lnrna_reporter_response_profile.v4` evidence with supported
   biological-replicate uncertainty;
 - the selected 6-10 h descriptive reduction and its explicit limitations;
 - a separately versioned constrained objective with validated uncertainty and

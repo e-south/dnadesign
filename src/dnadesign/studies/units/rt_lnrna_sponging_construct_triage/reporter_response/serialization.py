@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
-
 from ._contract_values import ReporterResponseContractError
 from ._contract_values import json_value as _json_value
 from .measurement_profile import ReporterMeasurementProfile
@@ -15,7 +13,7 @@ def profile_to_dict(profile: ReporterResponseProfile | ReporterMeasurementProfil
 
     if not isinstance(profile, (ReporterResponseProfile, ReporterMeasurementProfile)):
         raise ReporterResponseContractError("profile must be a typed reporter profile")
-    payload = _json_value(asdict(profile))
+    payload = _json_value(profile)
     assert isinstance(payload, dict)
     provenance = payload["provenance"]
     assert isinstance(provenance, dict)

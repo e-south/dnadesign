@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dnadesign.studies.core.reader_records import ReaderRecordInputEvidence, ReaderRecordProducer
+
 from .._contract_values import ReporterResponseContractError
 from .._contract_values import positive_integer as _positive_integer
 from .._contract_values import required_text as _required_text
@@ -27,6 +29,10 @@ class ReaderEvidenceProvenance:
     reader_record_kind: str
     reader_record_revision: int
     reader_record_revision_digest: str
+    reader_record_config_digest: str
+    reader_record_producer_config_digest: str
+    reader_record_producer: ReaderRecordProducer
+    reader_record_inputs: tuple[ReaderRecordInputEvidence, ...]
     reader_record_content_digest: str
     reader_record_schema_version: int
     reader_record_contract_id: str
@@ -63,10 +69,18 @@ class ReaderEvidenceProvenance:
             raise ReporterResponseContractError("reader_record_kind must equal dataframe_artifact")
         for name in (
             "reader_record_revision_digest",
+            "reader_record_config_digest",
+            "reader_record_producer_config_digest",
             "reader_record_content_digest",
             "evidence_binding_artifact_digest",
         ):
             _sha256_digest(getattr(self, name), field_name=name)
+        if not isinstance(self.reader_record_producer, ReaderRecordProducer):
+            raise ReporterResponseContractError("reader_record_producer must be typed Reader provenance")
+        if not isinstance(self.reader_record_inputs, tuple) or not all(
+            isinstance(item, ReaderRecordInputEvidence) for item in self.reader_record_inputs
+        ):
+            raise ReporterResponseContractError("reader_record_inputs must be typed Reader provenance")
         record_path = Path(self.reader_record_path)
         if record_path.is_absolute() or ".." in record_path.parts:
             raise ReporterResponseContractError("reader_record_path must be outputs-relative")
@@ -110,6 +124,10 @@ class ReaderEvidenceProvenance:
             reader_record_kind=row.reader_record_kind,
             reader_record_revision=row.reader_record_revision,
             reader_record_revision_digest=row.reader_record_revision_digest,
+            reader_record_config_digest=row.reader_record_config_digest,
+            reader_record_producer_config_digest=row.reader_record_producer_config_digest,
+            reader_record_producer=row.reader_record_producer,
+            reader_record_inputs=row.reader_record_inputs,
             reader_record_content_digest=row.reader_record_content_digest,
             reader_record_schema_version=row.reader_record_schema_version,
             reader_record_contract_id=row.reader_record_contract_id,

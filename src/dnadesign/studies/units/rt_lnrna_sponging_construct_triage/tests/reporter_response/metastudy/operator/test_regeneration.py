@@ -35,6 +35,9 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
     state as operator_state,
 )
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.sensitivity import (
+    parse_sensitivity_evaluations,
+)
 
 from ._support import (
     _checked_state_path,
@@ -203,7 +206,7 @@ def test_live_state_validation_accepts_exact_canonical_regeneration(
         endpoint_sensitivity_evidence=(),
         centered_window_sensitivity_evidence=(),
         sensitivity_coverages=coverages,
-        sensitivity_evaluations=(),
+        sensitivity_evaluations=parse_sensitivity_evaluations(payload["sensitivity_evaluations"]),
         attempts=(),
         objective_readiness=DEFAULT_OBJECTIVE_READINESS,
         acquisition_projection=validate_acquisition_projection_payload(payload["acquisition_projection"]),

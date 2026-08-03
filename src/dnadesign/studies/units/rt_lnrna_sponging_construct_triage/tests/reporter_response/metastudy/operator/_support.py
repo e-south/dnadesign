@@ -12,9 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import json
+from dataclasses import asdict
 from pathlib import Path
-
-import yaml
 
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import (
     DEFAULT_OBJECTIVE_READINESS,
@@ -24,14 +24,20 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
     AcquisitionMetricProjection,
     AcquisitionProjection,
     acquisition_projection_payload,
-    protocol_digest,
-)
-from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.contracts import (
-    canonical_digest,
+    build_acquisition_projection,
+    decision_to_dict,
+    evaluate_sensitivity,
 )
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.operator import (
     state as operator_state,
 )
+from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.sensitivity import (
+    sensitivity_evaluations_to_payload,
+)
+
+from .....reporter_response.metastudy.sensitivity_coverage import sensitivity_coverage_receipt_payload
+from .._builders import _attempts, _evidence, _ready, evaluate_metastudy
+from ..evidence._builders import _complete_sensitivity_evidence, _sensitivity_coverages
 
 
 def _digest(character: str) -> str:
@@ -56,7 +62,7 @@ def _acquisition_projection_payload() -> dict[str, object]:
     )
     acquisition_id = DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[0]
     projection = AcquisitionProjection(
-        contract_id="rt_lnrna_reporter_response_acquisition_projection.v2",
+        contract_id="rt_lnrna_reporter_response_acquisition_projection.v3",
         selected_reduction=(6.0, 10.0),
         coordinates=(
             AcquisitionCoordinate(
@@ -96,31 +102,40 @@ def _state_for_external_registry(phd_root: Path) -> dict[str, object]:
     registry = phd_root / ".agents/skills/retron-assay-study-bridge/references/reader-experiment-routes.json"
     registry.parent.mkdir(parents=True)
     registry.write_text('{"routes": []}\n', encoding="utf-8")
-    payload = yaml.safe_load(_checked_state_path().read_text(encoding="utf-8"))
-    payload["schema_id"] = "rt_lnrna_reporter_response_metastudy_state.v6"
-    payload["decision"]["condition_ontology_digest"] = DEFAULT_PROTOCOL.condition_ontology_digest
-    payload["decision"]["policy_digest"] = protocol_digest()
-    attempt_digests: dict[str, str] = {}
-    for attempt in payload["decision"]["materialization_attempts"]:
-        attempt["attempt_digest"] = canonical_digest(
-            {key: value for key, value in attempt.items() if key != "attempt_digest"}
-        )
-        attempt_digests[attempt["experiment_id"]] = attempt["attempt_digest"]
-    payload["objective_readiness"] = {
-        "contract_id": DEFAULT_OBJECTIVE_READINESS.contract_id,
-        "status": DEFAULT_OBJECTIVE_READINESS.status,
-        "objective_id": DEFAULT_OBJECTIVE_READINESS.objective_id,
-        "blockers": list(DEFAULT_OBJECTIVE_READINESS.blockers),
+    primary = _evidence()
+    attempts = _attempts(primary)
+    decision = evaluate_metastudy(primary, readiness=_ready())
+    sensitivity = _complete_sensitivity_evidence(primary)
+    coverages = _sensitivity_coverages(sensitivity, attempts)
+    projection = build_acquisition_projection(primary, selected_reduction=decision.selected_reduction)
+    registry_digest = "sha256:" + hashlib.sha256(registry.read_bytes()).hexdigest()
+    readiness = decision.readiness
+    payload = {
+        "schema_id": "rt_lnrna_reporter_response_metastudy_state.v7",
+        "readiness": {
+            "schema_id": "rt_lnrna_reporter_response_readiness_snapshot.v1",
+            "source_identity": {
+                "route_id": operator_state.ROUTE_ID,
+                "route_registry_path": operator_state.ROUTE_REGISTRY_PATH,
+                "route_registry_digest": registry_digest,
+                "normalized_full_receipt_digest": readiness.receipt_digest,
+                "normalization": operator_state.RECEIPT_NORMALIZATION,
+            },
+            "last_verified": "2026-08-02",
+            "selected_experiment_count": readiness.selected_experiment_count,
+            "related_experiment_count": len(DEFAULT_PROTOCOL.excluded_snapshot_experiment_ids),
+            "related_experiment_ids": list(DEFAULT_PROTOCOL.excluded_snapshot_experiment_ids),
+            "ready_experiment_count": readiness.ready_experiment_count,
+            "ready_experiment_ids": list(readiness.ready_experiment_ids),
+            "blocked_experiment_ids": list(readiness.blocked_experiment_ids),
+        },
+        "decision": decision_to_dict(decision),
+        "objective_readiness": asdict(DEFAULT_OBJECTIVE_READINESS),
+        "sensitivity_evaluations": sensitivity_evaluations_to_payload(evaluate_sensitivity(sensitivity)),
+        "sensitivity_coverage_receipts": [sensitivity_coverage_receipt_payload(coverage) for coverage in coverages],
+        "acquisition_projection": acquisition_projection_payload(projection),
     }
-    payload["sensitivity_evaluations"] = []
-    payload.setdefault("sensitivity_coverage_receipts", [])
-    for receipt in payload["sensitivity_coverage_receipts"]:
-        receipt["materialization_attempt_digest"] = attempt_digests[receipt["experiment_id"]]
-    payload["acquisition_projection"] = _acquisition_projection_payload()
-    payload.pop("evidence", None)
-    payload["readiness"]["source_identity"]["route_registry_digest"] = (
-        "sha256:" + hashlib.sha256(registry.read_bytes()).hexdigest()
-    )
+    payload = json.loads(json.dumps(payload, allow_nan=False))
     payload["generation_digest"] = operator_state.canonical_digest(
         {
             key: payload[key]

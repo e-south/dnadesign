@@ -191,7 +191,6 @@ def test_cross_window_reader_provenance_drift_fails_closed() -> None:
     ("field_name", "changed_value"),
     [
         ("reader_protocol_id", "plate_reader/another_protocol"),
-        ("reader_record_kind", "another_kind"),
         ("reader_record_path", "artifacts/another.parquet"),
     ],
 )
@@ -216,7 +215,6 @@ def test_primary_profile_requires_complete_attempt_reader_identity(
     ("field_name", "changed_value"),
     [
         ("reader_protocol_id", "plate_reader/another_protocol"),
-        ("reader_record_kind", "another_kind"),
         ("reader_record_path", "artifacts/another.parquet"),
     ],
 )
@@ -246,7 +244,46 @@ def test_sensitivity_profile_requires_complete_coverage_reader_identity(
         )
 
 
-def test_sensitivity_evidence_is_typed_and_never_selectable() -> None:
+@pytest.mark.parametrize(
+    "drift_kind",
+    [
+        "binding_artifact_id",
+        "binding_artifact_digest",
+        "subject_roster",
+    ],
+)
+def test_sensitivity_coverage_requires_exact_materialization_attempt_lineage(
+    drift_kind: str,
+) -> None:
+    primary = _evidence()
+    attempts = _attempts(primary)
+    sensitivity = _complete_sensitivity_evidence(primary)
+    coverages = list(_sensitivity_coverages(sensitivity, attempts))
+    coverage = coverages[0]
+    if drift_kind == "binding_artifact_id":
+        coverages[0] = replace(coverage, evidence_binding_artifact_id="drifted-binding-artifact")
+    elif drift_kind == "binding_artifact_digest":
+        coverages[0] = replace(coverage, evidence_binding_artifact_digest=_digest("f"))
+    else:
+        drifted_subjects = tuple(
+            replace(subject, subject_id=f"drifted-{subject.subject_id}") for subject in coverage.expected_subjects
+        )
+        drifted_by_original = dict(zip(coverage.expected_subjects, drifted_subjects, strict=True))
+        coverages[0] = replace(
+            coverage,
+            expected_subjects=drifted_subjects,
+            entries=tuple(replace(entry, subject=drifted_by_original[entry.subject]) for entry in coverage.entries),
+        )
+
+    with pytest.raises(MetastudyContractError, match="exact materialization attempt"):
+        sensitivity_coverage_contracts.validate_sensitivity_coverage_set(
+            coverages,
+            evidence=sensitivity,
+            attempts=attempts,
+        )
+
+
+def test_sensitivity_evidence_is_coverage_only_and_never_selectable() -> None:
     primary = _profile(
         experiment_index=1,
         subject_id=LOW_ANCHOR,
@@ -292,6 +329,8 @@ def test_sensitivity_evidence_is_typed_and_never_selectable() -> None:
 
     assert {row.kind for row in results} == {"dose", "endpoint", "centered_window"}
     assert all(row.selectable is False for row in results)
+    assert endpoint.reduction.ratio_reduction_order == "reduce_channels_then_ratio"
+    assert centered.reduction.ratio_reduction_order == "ratio_then_reduce"
 
 
 def test_mismatched_profile_comparability_fails_closed() -> None:

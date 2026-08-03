@@ -109,7 +109,7 @@ def _build_profile_audit(
     source_closed: bool,
 ) -> ProfileAuditArtifact:
     values = {
-        "contract_id": "rt_lnrna_reporter_response_profile_audit.v3",
+        "contract_id": "rt_lnrna_reporter_response_profile_audit.v4",
         "method_id": method_id,
         "profile_source_digest": canonical_digest(profile_source_identity_payload(profile)),
         "profile_digest": profile_digest(profile),

@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from ..contracts._values import MetastudyContractError, canonical_digest
-from ..contracts.materialization import MaterializationOmission, ReaderRecordIdentity
+from ..contracts.materialization import (
+    MaterializationOmission,
+    ReaderRecordIdentity,
+    reader_record_identity_payload,
+)
 from ..contracts.protocol import DEFAULT_PROTOCOL
 from ._values import require_digest
 
-SENSITIVITY_COVERAGE_CONTRACT_ID = "rt_lnrna_reporter_response_sensitivity_coverage.v1"
+SENSITIVITY_COVERAGE_CONTRACT_ID = "rt_lnrna_reporter_response_sensitivity_coverage.v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +65,7 @@ class SensitivityCoverageEntry:
 class SensitivityCoverageLedger:
     """Canonical Cartesian coverage for one ready Reader materialization attempt."""
 
-    contract_id: Literal["rt_lnrna_reporter_response_sensitivity_coverage.v1"]
+    contract_id: Literal["rt_lnrna_reporter_response_sensitivity_coverage.v2"]
     experiment_id: str
     materialization_attempt_digest: str
     reader_record_identity: ReaderRecordIdentity
@@ -120,7 +123,18 @@ def declared_sensitivity_reduction_ids() -> tuple[str, ...]:
 
 
 def coverage_payload(coverage: SensitivityCoverageLedger, *, include_digest: bool) -> dict[str, object]:
-    payload = json.loads(json.dumps(asdict(coverage), allow_nan=False))
+    payload = {
+        "contract_id": coverage.contract_id,
+        "experiment_id": coverage.experiment_id,
+        "materialization_attempt_digest": coverage.materialization_attempt_digest,
+        "reader_record_identity": reader_record_identity_payload(coverage.reader_record_identity),
+        "evidence_binding_artifact_id": coverage.evidence_binding_artifact_id,
+        "evidence_binding_artifact_digest": coverage.evidence_binding_artifact_digest,
+        "expected_subjects": [asdict(item) for item in coverage.expected_subjects],
+        "expected_reduction_ids": list(coverage.expected_reduction_ids),
+        "entries": [asdict(item) for item in coverage.entries],
+        "coverage_digest": coverage.coverage_digest,
+    }
     if not include_digest:
         payload.pop("coverage_digest", None)
     return payload

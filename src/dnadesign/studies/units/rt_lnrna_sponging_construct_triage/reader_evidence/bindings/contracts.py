@@ -6,7 +6,9 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 
-READER_EVIDENCE_BINDING_SCHEMA_ID = "rt_lnrna_reader_evidence_bindings_v4"
+from dnadesign.studies.core.reader_records import ReaderRecordInputEvidence, ReaderRecordProducer
+
+READER_EVIDENCE_BINDING_SCHEMA_ID = "rt_lnrna_reader_evidence_bindings_v5"
 _SOURCE_CLOSURE_TOKEN = object()
 
 
@@ -35,6 +37,10 @@ class ReaderEvidenceBinding:
     reader_record_schema_version: int
     reader_record_revision: int
     reader_record_revision_digest: str
+    reader_record_config_digest: str
+    reader_record_producer_config_digest: str
+    reader_record_producer: ReaderRecordProducer
+    reader_record_inputs: tuple[ReaderRecordInputEvidence, ...]
     reader_record_contract_id: str
     reader_record_content_digest: str
     reader_record_path: str

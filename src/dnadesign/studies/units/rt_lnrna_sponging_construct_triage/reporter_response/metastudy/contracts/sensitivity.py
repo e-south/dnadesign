@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/rt_lnrna_sponging_construct_triage/reporter_response/metastudy/contracts/sensitivity.py
 
-Non-selectable sensitivity-evidence contract.
+Coverage-only, non-selectable sensitivity-evidence contract.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -19,7 +19,7 @@ from ._values import MetastudyContractError, _digest, _nonnegative
 
 @dataclass(frozen=True, slots=True)
 class SensitivityEvaluation:
-    """Digest-bound non-selectable sensitivity evidence summary."""
+    """Digest-bound coverage receipt, never an effect or rank comparison."""
 
     kind: Literal["dose", "endpoint", "centered_window"]
     value: float

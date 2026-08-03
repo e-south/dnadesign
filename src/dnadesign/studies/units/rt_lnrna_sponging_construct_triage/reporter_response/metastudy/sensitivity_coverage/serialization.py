@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict
 
-from ..contracts._values import MetastudyContractError
-from ..contracts.materialization import (
-    MaterializationAttemptReceipt,
-    MaterializationOmission,
-    ReaderRecordIdentity,
+from ..contracts._materialization.lineage import (
+    reader_record_identity_from_payload,
+    reader_record_identity_payload,
 )
+from ..contracts._values import MetastudyContractError
+from ..contracts.materialization import MaterializationAttemptReceipt, MaterializationOmission
 from ._values import require_digest
 from .contracts import (
     SENSITIVITY_COVERAGE_CONTRACT_ID,
@@ -37,7 +37,7 @@ def sensitivity_coverage_receipt_payload(coverage: SensitivityCoverageLedger) ->
         "contract_id": coverage.contract_id,
         "experiment_id": coverage.experiment_id,
         "materialization_attempt_digest": coverage.materialization_attempt_digest,
-        "reader_record_identity": asdict(coverage.reader_record_identity),
+        "reader_record_identity": reader_record_identity_payload(coverage.reader_record_identity),
         "evidence_binding_artifact_id": coverage.evidence_binding_artifact_id,
         "evidence_binding_artifact_digest": coverage.evidence_binding_artifact_digest,
         "expected_subjects": [asdict(row) for row in coverage.expected_subjects],
@@ -92,7 +92,7 @@ def validate_sensitivity_coverage_receipt_payloads(
         ):
             raise MetastudyContractError(f"sensitivity coverage receipts[{index}] structure changed")
         try:
-            identity = ReaderRecordIdentity(**identity_payload)
+            identity = reader_record_identity_from_payload(identity_payload, index=index)
             subjects = tuple(SensitivitySubjectCoordinate(**row) for row in subjects_payload)
         except (TypeError, KeyError) as exc:
             raise MetastudyContractError(f"sensitivity coverage receipts[{index}] is malformed") from exc
@@ -128,6 +128,9 @@ def validate_sensitivity_coverage_receipt_payloads(
             payload["experiment_id"] != attempt.experiment_id
             or identity != attempt.reader_record_identity
             or payload["materialization_attempt_digest"] != attempt.attempt_digest
+            or payload["evidence_binding_artifact_id"] != attempt.evidence_binding_artifact_id
+            or payload["evidence_binding_artifact_digest"] != attempt.evidence_binding_artifact_digest
+            or tuple(subject.subject_id for subject in subjects) != attempt.expected_subject_ids
         ):
             raise MetastudyContractError(
                 f"sensitivity coverage receipts[{index}] differs from its exact materialization attempt"
@@ -150,7 +153,10 @@ def parse_sensitivity_coverage(payload: object, *, index: int) -> SensitivityCov
     if not isinstance(payload, Mapping) or set(payload) != expected:
         raise MetastudyContractError(f"sensitivity coverages[{index}] fields do not match the exact contract")
     try:
-        identity = ReaderRecordIdentity(**payload["reader_record_identity"])
+        identity_payload = payload["reader_record_identity"]
+        if not isinstance(identity_payload, Mapping):
+            raise TypeError("reader_record_identity must be an object")
+        identity = reader_record_identity_from_payload(identity_payload, index=index)
         subjects = tuple(SensitivitySubjectCoordinate(**row) for row in payload["expected_subjects"])
         entries = tuple(
             SensitivityCoverageEntry(
