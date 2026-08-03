@@ -3,7 +3,7 @@ doc_id: study-stress-ethanol-cipro-growth-route-decision-opal
 surface: study-route-detail
 study_id: stress_ethanol_cipro_growth
 owner: dnadesign-maintainers
-last_verified: 2026-07-29
+last_verified: 2026-08-03
 parent_route: ../../README.md
 type: route
 plane: control-plane
@@ -15,7 +15,7 @@ exit_artifact: opal_campaign_records_and_ledgers
 assay_entry: reader_catalog_v4_record_v6
 identity_bridge: dnadesign.study.promoter_candidate_bindings.v1
 observation_bridge: stress_ethanol_cipro_growth.response_window_observations.v3
-label_bridge: opal.observed_y_publication.v2
+label_bridge: opal.observed_label_promotion.v1
 campaign: secg_msrb_greedy
 synthesis_handoff: stress-opal-assay-b1-r0-msrb-v1
 canonical_flow:
@@ -97,5 +97,4 @@ support or prospective enrichment; `model_support_ready` remains false.
   per-record provenance remain study-owned and read-only.
 - Prune shared USR data only by campaign scope. A selection view owns one
   target; a selection batch owns their logical union.
-- DenseGen probes exercise mechanics in silico and never create campaign or
-  synthesis authority.
+- DenseGen probes exercise mechanics in silico and never create campaign or synthesis authority.

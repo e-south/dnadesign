@@ -1975,8 +1975,10 @@ def test_study_routes_expose_opal_notebook_generate_as_campaign_viewer() -> None
     )
     opal_pipeline = pipeline["study_pipeline"]["opal"]
     opal_notebook = opal_pipeline["notebook"]
+    _, route_frontmatter, _ = opal_route.split("---", 2)
 
     assert "routes/decision/opal/README.md" in routes
+    assert yaml.safe_load(route_frontmatter)["label_bridge"] == "opal.observed_label_promotion.v1"
     assert "Campaign configs and commands" in opal_route
     assert "Read-only campaign verification" in opal_commands
     assert "Notebook review" in opal_commands
