@@ -208,6 +208,8 @@ def _valid_promoter_surface(tmp_path: Path) -> tuple[dict[str, object], str]:
 
 
 def _response_source(*, media_path: Path, revision_digest: str, source_file_path: str) -> dict[str, object]:
+    config_digest = "sha256:" + "0" * 64
+
     def dataframe_record(record_id: str, contract_id: str, character: str) -> dict[str, object]:
         return {
             "record_id": record_id,
@@ -215,11 +217,30 @@ def _response_source(*, media_path: Path, revision_digest: str, source_file_path
             "schema_version": 6,
             "revision": 2,
             "revision_digest": "sha256:" + character * 64,
+            "config_digest": config_digest,
+            "producer_config_digest": "sha256:" + "9" * 64,
+            "producer": {
+                "kind": "pipeline",
+                "id": "four_state_event_window",
+                "plugin": "protocol/plate_reader_four_state_event_window",
+            },
+            "inputs": [],
             "contract_id": contract_id,
             "path": f"artifacts/{Path(record_id).name}.parquet",
             "size_bytes": 10,
             "content_digest": "sha256:" + character * 64,
         }
+
+    designs = dataframe_record(
+        "four_state_event_window/designs",
+        "plate_reader.four_state_event_window.designs.v4",
+        "1",
+    )
+    traces = dataframe_record(
+        "four_state_event_window/traces",
+        "plate_reader.four_state_event_window.traces.v3",
+        "2",
+    )
 
     return {
         "schema_version": "stress_ethanol_cipro_growth.reader_response_record_source.v1",
@@ -235,23 +256,31 @@ def _response_source(*, media_path: Path, revision_digest: str, source_file_path
             "sha256": "sha256:" + "5" * 64,
         },
         "records": {
-            "designs": dataframe_record(
-                "four_state_event_window/designs",
-                "plate_reader.four_state_event_window.designs.v4",
-                "1",
-            ),
-            "traces": dataframe_record(
-                "four_state_event_window/traces",
-                "plate_reader.four_state_event_window.traces.v3",
-                "2",
-            ),
+            "designs": designs,
+            "traces": traces,
             "diagnostic": {
                 "record_id": "plot:four_state_event_window_diagnostic",
                 "kind": "file_bundle",
                 "schema_version": 6,
                 "revision": 3,
                 "revision_digest": revision_digest,
+                "config_digest": config_digest,
                 "producer_config_digest": "sha256:" + "3" * 64,
+                "producer": {
+                    "kind": "plot",
+                    "id": "four_state_event_window_diagnostic",
+                    "plugin": "plot/four_state_event_window_diagnostic",
+                },
+                "inputs": [
+                    {
+                        "label": label,
+                        "kind": "record",
+                        "record": record["record_id"],
+                        "discovery_policy": "record",
+                        "record_revision_digest": record["revision_digest"],
+                    }
+                    for label, record in (("designs", designs), ("traces", traces))
+                ],
                 "file_evidence": [
                     {
                         "path": source_file_path,
