@@ -321,7 +321,10 @@ def test_scoped_core_lanes_run_workflow_contract_before_target_resolution() -> N
 
     assert match is not None, "core lane must declare invariant_targets as a shell array"
     invariant_targets = [line.strip().strip("\"'") for line in match.group("targets").splitlines() if line.strip()]
-    assert invariant_targets == ["src/dnadesign/devtools/tests/ci/test_workflow_contract.py"]
+    assert invariant_targets == [
+        "src/dnadesign/devtools/tests/ci/test_precommit_contract.py",
+        "src/dnadesign/devtools/tests/ci/test_workflow_contract.py",
+    ]
     invariant_run = 'uv run pytest -q --durations=25 "${invariant_targets[@]}"'
     assert invariant_run in run_script
     assert run_script.index(invariant_run) < run_script.index('affected_csv="')

@@ -187,6 +187,7 @@ jobs:
           marker_expr="not fimo and not integration"
           run_coverage_gate="${{ needs.detect-ci-scope.outputs.run-coverage-gate }}"
           invariant_targets=(
+            src/dnadesign/devtools/tests/ci/test_precommit_contract.py
             src/dnadesign/devtools/tests/ci/test_workflow_contract.py
           )
           smoke_targets=(
