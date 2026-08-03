@@ -65,7 +65,12 @@ def test_toehold_lookup_guard_counts_the_cache_only_weight_pass() -> None:
 
 
 def test_toehold_workload_includes_two_pass_construction_and_final_scoring() -> None:
-    profile = replace(_profile(), oligo_length=64, search_range=10, toehold_search_iterations=2)
+    profile = replace(
+        _profile(),
+        nominal_fragment_oligo_length=64,
+        search_range=10,
+        toehold_search_iterations=2,
+    )
 
     estimate = estimate_request_workload(
         input_bases=72,

@@ -28,7 +28,7 @@ def candidate(index: int, sequence: str) -> ToeholdCandidate:
 
 def planning_profile() -> PlanningProfile:
     return PlanningProfile(
-        oligo_length=46,
+        nominal_fragment_oligo_length=46,
         barcode_length=16,
         toehold_length=8,
         search_range=2,

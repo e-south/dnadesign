@@ -63,7 +63,7 @@ def test_review_projection_serializes_as_one_canonical_json_array() -> None:
             target_count=2,
             target_length=1_000,
             topology="independent",
-            oligo_length=96,
+            nominal_fragment_oligo_length=96,
             search_range=2,
             barcode_generation_attempts=250_000,
         )

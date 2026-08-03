@@ -55,7 +55,7 @@ def scale_request_mapping(
     target_count: int,
     target_length: int,
     topology: Literal["shared", "independent"],
-    oligo_length: int,
+    nominal_fragment_oligo_length: int,
     search_range: int,
     barcode_generation_attempts: int,
 ) -> dict[str, Any]:
@@ -102,10 +102,10 @@ def scale_request_mapping(
             }
         )
     return {
-        "schema": "dnadesign.junction.request.v1",
+        "schema": "dnadesign.junction.request.v2",
         "seed": 20_260_801,
         "planning": {
-            "oligo_length": oligo_length,
+            "nominal_fragment_oligo_length": nominal_fragment_oligo_length,
             "barcode_length": 22,
             "toehold_length": 10,
             "search_range": search_range,
@@ -127,6 +127,7 @@ def scale_request_mapping(
             "complement_purification": "declared-test-purification",
             "primer_purification": "declared-test-purification",
             "complement_end_preparation": "vendor_5_prime_phosphate",
-            "max_oligo_length": oligo_length + search_range - 1,
+            "minimum_fragment_oligo_length": 1,
+            "max_oligo_length": nominal_fragment_oligo_length + search_range - 1,
         },
     }

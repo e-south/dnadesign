@@ -16,7 +16,10 @@ from copy import deepcopy
 import pytest
 
 from dnadesign.junction.contracts import parse_request
+from dnadesign.junction.design.loci import ToeholdCandidate
+from dnadesign.junction.design.matching import JunctionAssignment
 from dnadesign.junction.design.planner import design_junction
+from dnadesign.junction.design.strands import compose_target
 from dnadesign.junction.errors import JunctionDesignError
 from dnadesign.junction.sequence import reverse_complement
 
@@ -50,10 +53,10 @@ def _request_mapping(*, targets: list[dict] | None = None) -> dict:
             }
         ]
     return {
-        "schema": "dnadesign.junction.request.v1",
+        "schema": "dnadesign.junction.request.v2",
         "seed": 17,
         "planning": {
-            "oligo_length": 46,
+            "nominal_fragment_oligo_length": 46,
             "barcode_length": 16,
             "toehold_length": 8,
             "search_range": 2,
@@ -75,9 +78,120 @@ def _request_mapping(*, targets: list[dict] | None = None) -> dict:
             "complement_purification": "declared-test-purification",
             "primer_purification": "declared-test-purification",
             "complement_end_preparation": "vendor_5_prime_phosphate",
+            "minimum_fragment_oligo_length": 1,
             "max_oligo_length": 64,
         },
     }
+
+
+def _target_with_sequence(sequence: str) -> dict:
+    return {
+        "id": "target-a",
+        "assembly_group_id": "assembly-a",
+        "sequence": sequence,
+        "recovery_primers": {
+            "mode": "target_specific",
+            "forward": _primer(sequence[:8]),
+            "reverse": _primer(reverse_complement(sequence[-8:])),
+        },
+    }
+
+
+def test_exact_boundary_rejects_an_empty_terminal_domain() -> None:
+    sequence = _target_sequence()[:30]
+    mapping = _request_mapping(targets=[_target_with_sequence(sequence)])
+    mapping["planning"]["search_range"] = 1
+
+    with pytest.raises(JunctionDesignError, match="nonempty terminal domain"):
+        design_junction(parse_request(mapping))
+
+
+def test_one_base_beyond_exact_boundary_has_a_nonempty_terminal_domain() -> None:
+    sequence = _target_sequence()[:31]
+    mapping = _request_mapping(targets=[_target_with_sequence(sequence)])
+    mapping["planning"]["search_range"] = 1
+
+    result = design_junction(parse_request(mapping))
+
+    assert result.targets[0].fragments[-1].domain_end - result.targets[0].fragments[-1].domain_start == 1
+
+
+def test_fragment_minimum_length_rejects_only_fragment_orders() -> None:
+    mapping = _request_mapping()
+    mapping["order_policy"]["minimum_fragment_oligo_length"] = 40
+
+    with pytest.raises(JunctionDesignError, match="no candidate path.*fragment synthesis minimum of 40 nt"):
+        design_junction(parse_request(mapping))
+
+
+def test_fragment_minimum_filters_infeasible_candidate_before_ranking() -> None:
+    sequence = _target_sequence()[:60]
+    mapping = _request_mapping(targets=[_target_with_sequence(sequence)])
+    mapping["order_policy"]["minimum_fragment_oligo_length"] = 23
+
+    result = design_junction(parse_request(mapping))
+
+    selected = result.assembly_groups[0].junctions
+    assert len(selected) == 1
+    assert selected[0].candidate_offset == 1
+    assert min(order.length for order in result.orders if order.fragment_id is not None) >= 23
+
+
+def test_fragment_minimum_filters_coupled_multi_locus_paths() -> None:
+    mapping = _request_mapping()
+    mapping["order_policy"]["minimum_fragment_oligo_length"] = 14
+
+    result = design_junction(parse_request(mapping))
+
+    selected = sorted(result.assembly_groups[0].junctions, key=lambda junction: junction.locus_index)
+    assert len(selected) > 1
+    assert all(
+        right.start - left.start >= mapping["order_policy"]["minimum_fragment_oligo_length"]
+        for left, right in zip(selected, selected[1:], strict=False)
+    )
+    assert min(order.length for order in result.orders if order.fragment_id is not None) >= 14
+
+
+def test_fragment_minimum_does_not_apply_to_recovery_primers() -> None:
+    mapping = _request_mapping()
+    mapping["order_policy"]["minimum_fragment_oligo_length"] = 14
+
+    result = design_junction(parse_request(mapping))
+
+    fragment_orders = [order for order in result.orders if order.fragment_id is not None]
+    recovery_orders = [order for order in result.orders if order.role.startswith("recovery_")]
+    assert min(order.length for order in fragment_orders) == 14
+    assert max(order.length for order in recovery_orders) == 8
+
+
+def test_plan_reports_fragment_floor_and_all_order_ceiling_separately() -> None:
+    result = design_junction(parse_request(_request_mapping()))
+    target_checks = {
+        check.check for check in result.checks if check.subject.kind == "target" and check.subject.id == "target-a"
+    }
+
+    assert "fragment_synthesis_length_floor" in target_checks
+    assert "synthesis_length_ceiling" in target_checks
+
+
+def test_compose_target_defensively_rejects_a_nonpositive_domain() -> None:
+    request = parse_request(_request_mapping())
+    target = request.targets[0]
+    assignment = JunctionAssignment(
+        candidate=ToeholdCandidate(
+            target_id=target.id,
+            assembly_group_id=target.assembly_group_id,
+            locus_index=0,
+            candidate_offset=0,
+            start=len(target.sequence) - request.planning.toehold_length,
+            sequence=target.sequence[-request.planning.toehold_length :],
+        ),
+        barcode_id="barcode-0001",
+        barcode="ACGTACGTACGTACGT",
+    )
+
+    with pytest.raises(JunctionDesignError, match="nonpositive domain span"):
+        compose_target(target, (assignment,), order_policy=request.order_policy)
 
 
 def test_design_is_deterministic_and_reconstructs_the_exact_target() -> None:

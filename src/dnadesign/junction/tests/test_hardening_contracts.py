@@ -72,10 +72,10 @@ def _request_mapping(*, targets: list[dict[str, object]] | None = None) -> dict[
             )
         ]
     return {
-        "schema": "dnadesign.junction.request.v1",
+        "schema": "dnadesign.junction.request.v2",
         "seed": 17,
         "planning": {
-            "oligo_length": 46,
+            "nominal_fragment_oligo_length": 46,
             "barcode_length": 16,
             "toehold_length": 8,
             "search_range": 2,
@@ -97,6 +97,7 @@ def _request_mapping(*, targets: list[dict[str, object]] | None = None) -> dict[
             "complement_purification": "declared test purification",
             "primer_purification": "declared test purification",
             "complement_end_preparation": "vendor_5_prime_phosphate",
+            "minimum_fragment_oligo_length": 1,
             "max_oligo_length": 64,
         },
     }

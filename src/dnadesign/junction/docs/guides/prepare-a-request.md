@@ -8,7 +8,7 @@
 `junction` does not infer a complete design from a sequence alone. Before
 planning, supply five things:
 
-1. the v1 schema identifier and one deterministic seed;
+1. the v2 request-schema identifier and one deterministic seed;
 2. a planning profile;
 3. exact linear DNA targets;
 4. caller-chosen recovery primers; and
@@ -65,9 +65,9 @@ twice in one group.
 ## Supply exact targets
 
 Each `sequence` is the complete linear 5′→3′ uppercase `ACGT` string that the
-planner must reconstruct before any later cleavage or cloning step. V1 does
-not accept circular topology, RNA, ambiguity codes, degenerate positions, or
-lowercase normalization.
+planner must reconstruct before any later cleavage or cloning step. The
+request contract does not accept circular topology, RNA, ambiguity codes,
+degenerate positions, or lowercase normalization.
 
 If a target contains universal priming regions, buffers, Type IIS sites, or
 adapters, `junction` treats them as part of the submitted target. It has no
@@ -92,7 +92,7 @@ The forward binding string must match the target prefix. The reverse binding
 string must match the reverse complement of the target suffix. The order row
 is `five_prime_extension + binding_sequence`.
 
-V1 requires one recovery mode per assembly group:
+The request requires one recovery mode per assembly group:
 
 - `target_specific` rejects a binding pair that also exactly resolves another
   declared target in the same group.
@@ -116,7 +116,7 @@ profile.
 
 Review at least:
 
-- the intended oligo, barcode, and toehold lengths;
+- the nominal fragment-oligo geometry, barcode length, and toehold length;
 - how many candidate offsets each locus should expose;
 - the amount of seeded search work;
 - barcode GC and homopolymer bounds; and
@@ -125,13 +125,29 @@ Review at least:
 The tool never relaxes these values automatically. Candidate exhaustion fails
 with the original request preserved.
 
+`nominal_fragment_oligo_length` is a coordinate parameter, not a physical
+length guarantee. The current method can emit fragment orders as long as
+`nominal_fragment_oligo_length + search_range - 1`; terminal fragment orders
+can be shorter than the nominal value. This differs from the Nature paper's
+use of `L` for the physical input-oligo length. Inspect the planned order
+lengths instead of treating the field name as a purchasing specification.
+
 ## Declare order metadata
 
 The order policy records the caller's labels for synthesis scale,
-purification, complement-strand end preparation, and maximum sequence length.
-These values are copied and checked; they are not recommendations. Supported
-end-preparation declarations are `vendor_5_prime_phosphate` and
+purification, complement-strand end preparation, a minimum fragment-oligo
+length, and a maximum length for every order row. These values are copied and
+checked; they are not recommendations. The minimum applies to barcode-bearing
+and complement strands, not recovery primers. It is required because short
+terminal fragments can be valid under the coordinate model while still being
+unsuitable for a caller's synthesis route. Supported end-preparation
+declarations are `vendor_5_prime_phosphate` and
 `downstream_phosphorylation`.
+
+No default minimum is inferred from either paper. Declare the boundary that
+your downstream process has reviewed. Passing it proves only that the emitted
+fragment strings lie inside the caller's length interval; it does not validate
+synthesis, folding, annealing, ligation, or amplification.
 
 An arbitrary 5′ primer extension may contain a caller-supplied adapter or Type
 IIS sequence. `junction` does not identify enzymes, design spacers, model

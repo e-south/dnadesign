@@ -20,13 +20,16 @@ import dnadesign.junction as junction
 from dnadesign.junction import publication as publication_module
 from dnadesign.junction.contracts import parse_request
 from dnadesign.junction.design import search_pipeline as search_pipeline_module
+from dnadesign.junction.design import toeholds as toehold_module
 from dnadesign.junction.design.barcodes import BarcodeSelection
+from dnadesign.junction.design.fragment_constraints import FragmentPathConstraint
 from dnadesign.junction.design.loci import ToeholdCandidate, ToeholdLocus
 from dnadesign.junction.design.matching import MatchingSelection
 from dnadesign.junction.design.planner import _compile_junction, design_junction
 from dnadesign.junction.design.randomness import derive_seed
 from dnadesign.junction.design.search_pipeline import _STRING_SEARCH_V1, _SearchPipeline
 from dnadesign.junction.design.toeholds import ToeholdSelection
+from dnadesign.junction.errors import JunctionDesignError
 from dnadesign.junction.tests.scenarios.factories import scale_request_mapping
 from dnadesign.junction.tests.test_planner import _request_mapping
 
@@ -39,9 +42,15 @@ def test_internal_compile_uses_each_search_stage_and_pipeline_identity() -> None
         *,
         iterations: int,
         seed: int,
+        path_constraint: FragmentPathConstraint | None = None,
     ) -> ToeholdSelection:
         calls.append(("select_toeholds", seed))
-        return _STRING_SEARCH_V1.select_toeholds(loci, iterations=iterations, seed=seed)
+        return _STRING_SEARCH_V1.select_toeholds(
+            loci,
+            iterations=iterations,
+            seed=seed,
+            path_constraint=path_constraint,
+        )
 
     def generate_barcode_candidates(
         toeholds: tuple[str, ...],
@@ -145,8 +154,8 @@ def test_string_v1_has_a_fixed_conformance_vector() -> None:
     result = design_junction(parse_request(_request_mapping()))
 
     assert result.algorithm == "dnadesign.junction.string.v1"
-    assert result.request_sha256 == "sha256:3bef4866d8088dd2b546503757b1cfca1ccd6c1d0621c9328c1d30a44c28b724"
-    assert result.plan_id == "sha256:dba5411822eec8559a9be5c85e67554253b3b9da3065336e4e2e5331151be4a0"
+    assert result.request_sha256 == "sha256:6d6be8bb57e4bdddea7d7cd680a70f63e5dc8796cdc7e498625da25847d1cbfa"
+    assert result.plan_id == "sha256:6b82d9b63adefc0eff1a79d62e2e92ec55592d90ca88c7be885a96c11d27a253"
 
 
 def test_publication_package_does_not_export_an_alternate_lifecycle() -> None:
@@ -164,9 +173,15 @@ def test_v1_toehold_selection_jointly_receives_every_target_in_an_assembly_group
         *,
         iterations: int,
         seed: int,
+        path_constraint: FragmentPathConstraint | None = None,
     ) -> ToeholdSelection:
         observed_target_sets.append({locus.target_id for locus in loci})
-        return _STRING_SEARCH_V1.select_toeholds(loci, iterations=iterations, seed=seed)
+        return _STRING_SEARCH_V1.select_toeholds(
+            loci,
+            iterations=iterations,
+            seed=seed,
+            path_constraint=path_constraint,
+        )
 
     pipeline = replace(_STRING_SEARCH_V1, select_toeholds=select_toeholds)
     request = parse_request(
@@ -174,7 +189,7 @@ def test_v1_toehold_selection_jointly_receives_every_target_in_an_assembly_group
             target_count=2,
             target_length=1_000,
             topology="shared",
-            oligo_length=96,
+            nominal_fragment_oligo_length=96,
             search_range=2,
             barcode_generation_attempts=250_000,
         )
@@ -190,3 +205,46 @@ def test_search_pipeline_contract_fails_fast_for_invalid_composition() -> None:
         replace(_STRING_SEARCH_V1, algorithm_id=" invalid id ")
     with pytest.raises(TypeError, match="match_barcodes"):
         replace(_STRING_SEARCH_V1, match_barcodes=None)  # type: ignore[arg-type]
+
+
+def test_infeasible_fragment_path_fails_before_pairwise_search(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loci = (
+        ToeholdLocus(
+            target_id="target-a",
+            assembly_group_id="assembly-a",
+            index=index,
+            candidates=tuple(
+                ToeholdCandidate(
+                    target_id="target-a",
+                    assembly_group_id="assembly-a",
+                    locus_index=index,
+                    candidate_offset=offset,
+                    start=start,
+                    sequence="ACGTACGT",
+                )
+                for offset, start in enumerate(starts)
+            ),
+        )
+        for index, starts in enumerate(((22, 23), (44, 45)))
+    )
+    constraint = FragmentPathConstraint(
+        target_lengths=(("target-a", 60),),
+        barcode_length=16,
+        toehold_length=8,
+        minimum_fragment_oligo_length=24,
+    )
+
+    def fail_if_searched(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("pairwise search ran before fragment feasibility was proved")
+
+    monkeypatch.setattr(toehold_module, "_selection_weights_streamed", fail_if_searched)
+
+    with pytest.raises(JunctionDesignError, match="no candidate path.*minimum of 24 nt"):
+        toehold_module.select_toeholds(
+            loci,
+            iterations=2,
+            seed=1,
+            path_constraint=constraint,
+        )

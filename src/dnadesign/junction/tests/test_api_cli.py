@@ -26,6 +26,7 @@ from dnadesign.junction import preflight
 from dnadesign.junction.cli import app
 from dnadesign.junction.contracts.request import MAX_REQUEST_BYTES, MAX_REQUEST_IDENTIFIER_BYTES, parse_request
 from dnadesign.junction.errors import JunctionBundleError, JunctionConfigError, JunctionDesignError
+from dnadesign.junction.sequence import reverse_complement
 from dnadesign.junction.tests.test_planner import _request_mapping
 
 runner = CliRunner()
@@ -60,6 +61,46 @@ def test_preflight_api_creates_no_durable_artifacts(tmp_path: Path) -> None:
     assert result.validation_scope == "string_only"
     assert result.to_mapping()["validation_scope"] == "string_only"
     assert before == after == [Path("request.json")]
+
+
+def _boundary_request_file(tmp_path: Path, *, target_length: int) -> Path:
+    raw = _request_mapping()
+    raw["planning"]["search_range"] = 1  # type: ignore[index]
+    target = raw["targets"][0]  # type: ignore[index]
+    sequence = target["sequence"][:target_length]
+    target["sequence"] = sequence
+    target["recovery_primers"]["forward"]["binding_sequence"] = sequence[:8]
+    target["recovery_primers"]["reverse"]["binding_sequence"] = reverse_complement(sequence[-8:])
+    path = tmp_path / f"boundary-{target_length}.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    return path
+
+
+def test_empty_terminal_domain_fails_every_prepublication_surface_without_mutation(tmp_path: Path) -> None:
+    request = _boundary_request_file(tmp_path, target_length=30)
+    destination = tmp_path / "missing-parent" / "must-not-exist"
+
+    with pytest.raises(JunctionDesignError, match="nonempty terminal domain"):
+        api_module.plan(request)
+    with pytest.raises(JunctionDesignError, match="nonempty terminal domain"):
+        api_module.preflight(request)
+    with pytest.raises(JunctionDesignError, match="nonempty terminal domain"):
+        api_module.build(request, destination=destination)
+
+    assert not destination.parent.exists()
+
+
+def test_one_base_terminal_domain_builds_renders_and_verifies(tmp_path: Path) -> None:
+    request = _boundary_request_file(tmp_path, target_length=31)
+    destination = tmp_path / "design-v2"
+
+    plan = api_module.plan(request)
+    published = api_module.build(request, destination=destination)
+    verified = api_module.verify(destination)
+
+    assert plan.targets[0].fragments[-1].domain_end - plan.targets[0].fragments[-1].domain_start == 1
+    assert published.plan_id == plan.plan_id
+    assert verified.plan_id == plan.plan_id
 
 
 def test_preflight_fails_closed_when_internal_thermodynamic_status_drifts(

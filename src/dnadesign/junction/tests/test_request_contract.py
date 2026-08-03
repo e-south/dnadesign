@@ -47,10 +47,10 @@ def _reverse_complement(sequence: str) -> str:
 def _request_mapping() -> dict[str, object]:
     sequence = "ACGTTGCA" * 10
     return {
-        "schema": "dnadesign.junction.request.v1",
+        "schema": "dnadesign.junction.request.v2",
         "seed": 17,
         "planning": {
-            "oligo_length": 60,
+            "nominal_fragment_oligo_length": 60,
             "barcode_length": 12,
             "toehold_length": 10,
             "search_range": 20,
@@ -105,9 +105,62 @@ def _request_mapping() -> dict[str, object]:
             "complement_purification": "PAGE",
             "primer_purification": "HPLC",
             "complement_end_preparation": "vendor_5_prime_phosphate",
+            "minimum_fragment_oligo_length": 1,
             "max_oligo_length": 200,
         },
     }
+
+
+def test_request_v2_uses_explicit_nominal_and_fragment_length_fields() -> None:
+    request = parse_request(_request_mapping())
+
+    assert request.schema == "dnadesign.junction.request.v2"
+    assert request.planning.nominal_fragment_oligo_length == 60
+    assert request.order_policy.minimum_fragment_oligo_length == 1
+    serialized = request_to_mapping(request)
+    assert "oligo_length" not in serialized["planning"]  # type: ignore[operator]
+    assert parse_request(serialized) == request
+
+
+def test_request_v1_is_rejected_without_a_compatibility_shim() -> None:
+    raw = _request_mapping()
+    raw["schema"] = "dnadesign.junction.request.v1"
+
+    with pytest.raises(JunctionConfigError, match="schema must equal 'dnadesign.junction.request.v2'"):
+        parse_request(raw)
+
+
+def test_legacy_oligo_length_field_is_rejected_without_an_alias() -> None:
+    raw = _request_mapping()
+    planning = raw["planning"]
+    assert isinstance(planning, dict)
+    planning["oligo_length"] = planning.pop("nominal_fragment_oligo_length")
+
+    with pytest.raises(JunctionConfigError, match="unknown field.*oligo_length"):
+        parse_request(raw)
+
+
+def test_order_policy_requires_a_valid_fragment_length_interval() -> None:
+    raw = _request_mapping()
+    order_policy = raw["order_policy"]
+    assert isinstance(order_policy, dict)
+    order_policy["minimum_fragment_oligo_length"] = order_policy["max_oligo_length"] + 1
+
+    with pytest.raises(
+        JunctionConfigError,
+        match="minimum_fragment_oligo_length must not exceed max_oligo_length",
+    ):
+        parse_request(raw)
+
+
+def test_order_policy_requires_a_positive_fragment_length_minimum() -> None:
+    raw = _request_mapping()
+    order_policy = raw["order_policy"]
+    assert isinstance(order_policy, dict)
+    order_policy["minimum_fragment_oligo_length"] = 0
+
+    with pytest.raises(JunctionConfigError, match="minimum_fragment_oligo_length must be a positive integer"):
+        parse_request(raw)
 
 
 def test_request_contract_exports_are_anchored_at_the_canonical_package() -> None:
@@ -213,7 +266,7 @@ def test_load_request_supports_yaml_and_json(tmp_path: Path, suffix: str) -> Non
 
     loaded = load_request(request_path)
 
-    assert loaded.schema == "dnadesign.junction.request.v1"
+    assert loaded.schema == "dnadesign.junction.request.v2"
     assert request_to_mapping(loaded)["targets"][0]["id"] == "target-a"  # type: ignore[index]
     assert sorted(tmp_path.iterdir()) == [request_path]
 
@@ -344,8 +397,8 @@ def test_load_request_rejects_symlink(tmp_path: Path) -> None:
             "planning.*unknown field.*extra",
         ),
         (
-            lambda raw: raw["planning"].update(oligo_length=53),  # type: ignore[union-attr]
-            "oligo_length.*2.*barcode_length.*toehold_length.*search_range",
+            lambda raw: raw["planning"].update(nominal_fragment_oligo_length=53),  # type: ignore[union-attr]
+            "nominal_fragment_oligo_length.*2.*barcode_length.*toehold_length.*search_range",
         ),
         (
             lambda raw: raw["planning"].update(barcode_gc_min=0.8, barcode_gc_max=0.2),  # type: ignore[union-attr]
@@ -416,25 +469,25 @@ def test_load_request_rejects_symlink(tmp_path: Path) -> None:
             lambda raw: raw["planning"].update(  # type: ignore[union-attr]
                 toehold_search_iterations=MAX_TOEHOLD_SEARCH_ITERATIONS + 1
             ),
-            "toehold_search_iterations.*100000.*request.v1",
+            "toehold_search_iterations.*100000.*request.v2",
         ),
         (
             lambda raw: raw["planning"].update(  # type: ignore[union-attr]
                 barcode_generation_attempts=MAX_BARCODE_GENERATION_ATTEMPTS + 1
             ),
-            "barcode_generation_attempts.*10000000.*request.v1",
+            "barcode_generation_attempts.*10000000.*request.v2",
         ),
         (
             lambda raw: raw["planning"].update(  # type: ignore[union-attr]
                 barcode_subset_iterations=MAX_BARCODE_SUBSET_ITERATIONS + 1
             ),
-            "barcode_subset_iterations.*100000.*request.v1",
+            "barcode_subset_iterations.*100000.*request.v2",
         ),
         (
             lambda raw: raw["planning"].update(  # type: ignore[union-attr]
                 matching_iterations=MAX_MATCHING_ITERATIONS + 1
             ),
-            "matching_iterations.*100000.*request.v1",
+            "matching_iterations.*100000.*request.v2",
         ),
         (
             lambda raw: raw["planning"].update(barcode_toehold_k=13),  # type: ignore[union-attr]
@@ -450,7 +503,7 @@ def test_load_request_rejects_symlink(tmp_path: Path) -> None:
         ),
         (
             lambda raw: raw["order_policy"].update(max_oligo_length=50),  # type: ignore[union-attr]
-            "max_oligo_length.*oligo_length",
+            "max_oligo_length.*maximum.*fragment order length",
         ),
     ],
 )
@@ -459,6 +512,22 @@ def test_parse_request_rejects_invalid_input(mutation: object, match: str) -> No
     mutation(raw)  # type: ignore[operator]
 
     with pytest.raises(JunctionConfigError, match=match):
+        parse_request(raw)
+
+
+def test_maximum_order_length_accounts_for_terminal_complement_geometry() -> None:
+    raw = _request_mapping()
+    raw["planning"].update(  # type: ignore[union-attr]
+        nominal_fragment_oligo_length=60,
+        barcode_length=16,
+        toehold_length=20,
+        search_range=2,
+        barcode_toehold_k=4,
+        barcode_pair_k=5,
+    )
+    raw["order_policy"]["max_oligo_length"] = 63  # type: ignore[index]
+
+    with pytest.raises(JunctionConfigError, match="maximum possible fragment order length.*64"):
         parse_request(raw)
 
 
@@ -476,7 +545,7 @@ def test_parse_request_rejects_fraction_integer_too_large_for_float() -> None:
 @pytest.mark.parametrize(
     "field_name",
     [
-        "oligo_length",
+        "nominal_fragment_oligo_length",
         "barcode_length",
         "toehold_length",
         "search_range",
@@ -503,7 +572,10 @@ def test_parse_request_rejects_planning_integer_above_unsigned_64_bit_domain(fie
         parse_request(raw)
 
 
-@pytest.mark.parametrize("field_name", ["seed", "order_policy.max_oligo_length"])
+@pytest.mark.parametrize(
+    "field_name",
+    ["seed", "order_policy.minimum_fragment_oligo_length", "order_policy.max_oligo_length"],
+)
 def test_parse_request_rejects_request_integer_above_unsigned_64_bit_domain(field_name: str) -> None:
     raw = _request_mapping()
     if field_name == "seed":
@@ -511,7 +583,7 @@ def test_parse_request_rejects_request_integer_above_unsigned_64_bit_domain(fiel
     else:
         order_policy = raw["order_policy"]
         assert isinstance(order_policy, dict)
-        order_policy["max_oligo_length"] = 1 << 64
+        order_policy[field_name.removeprefix("order_policy.")] = 1 << 64
 
     with pytest.raises(
         JunctionConfigError,
@@ -527,9 +599,14 @@ def test_public_dataclasses_reject_integer_above_unsigned_64_bit_domain() -> Non
         replace(request, seed=10**5000)
     with pytest.raises(
         JunctionConfigError,
-        match=r"^planning\.oligo_length must not exceed 18446744073709551615$",
+        match=r"^planning\.nominal_fragment_oligo_length must not exceed 18446744073709551615$",
     ):
-        replace(request.planning, oligo_length=1 << 64)
+        replace(request.planning, nominal_fragment_oligo_length=1 << 64)
+    with pytest.raises(
+        JunctionConfigError,
+        match=r"^order_policy\.minimum_fragment_oligo_length must not exceed 18446744073709551615$",
+    ):
+        replace(request.order_policy, minimum_fragment_oligo_length=1 << 64)
     with pytest.raises(
         JunctionConfigError,
         match=r"^order_policy\.max_oligo_length must not exceed 18446744073709551615$",

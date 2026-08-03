@@ -27,6 +27,7 @@ from dnadesign.junction.sequence.distances import (
     _position_weighted_scratch_bytes,
 )
 
+from .fragment_constraints import FragmentPathConstraint
 from .loci import ToeholdCandidate, ToeholdLocus
 from .randomness import StablePrng
 from .resources import (
@@ -331,8 +332,9 @@ def select_toeholds(
     *,
     iterations: int,
     seed: int,
+    path_constraint: FragmentPathConstraint | None = None,
 ) -> ToeholdSelection:
-    """Choose one candidate per locus with a seeded bounded maximin search."""
+    """Choose one feasible candidate path with a seeded bounded maximin search."""
 
     ordered_loci = tuple(sorted(loci, key=lambda locus: locus.identity))
     if not ordered_loci:
@@ -346,6 +348,7 @@ def select_toeholds(
         sequence_length=len(ordered_loci[0].candidates[0].sequence),
         iterations=iterations,
     )
+    feasible_baseline = path_constraint.first_feasible_path(ordered_loci) if path_constraint is not None else None
     selection_pair_chunk_size: int | None = None
     if len(ordered_loci) > 1:
         selection_pair_chunk_size = _toehold_selection_pair_chunk_size(
@@ -403,11 +406,20 @@ def select_toeholds(
     canonical_paths = np.empty_like(selected)
     for trial_index in range(iterations):
         canonical_paths[trial_index, visit_orders[trial_index]] = selected[trial_index]
-    baseline = locus_matrix[:, 0].astype(np.int32, copy=False)
+    if feasible_baseline is None:
+        baseline = locus_matrix[:, 0].astype(np.int32, copy=False)
+    else:
+        baseline = np.asarray(
+            [index_by_identity[candidate.identity] for candidate in feasible_baseline],
+            dtype=np.int32,
+        )
     unique_paths = np.unique(np.vstack((baseline[None, :], canonical_paths)), axis=0)
     paths_by_identity: dict[tuple[tuple[str, int, int], ...], tuple[int, ...]] = {}
     for path_array in unique_paths:
         path = tuple(int(index) for index in path_array)
+        candidates = tuple(all_candidates[index] for index in path)
+        if path_constraint is not None and not path_constraint.allows(candidates):
+            continue
         identity = tuple(all_candidates[index].identity for index in path)
         paths_by_identity[identity] = path
 

@@ -59,7 +59,7 @@ or experimental performance for those target counts or lengths.
 
 ## Limits and failure behavior
 
-V1 has independent ceilings for:
+Method v1 has independent ceilings for:
 
 - request bytes and integer declarations;
 - assembly groups, targets, input bases, loci, and candidates;
@@ -84,7 +84,7 @@ candidates under its declared GC, homopolymer, and substring constraints.
 `junction` does not weaken those constraints automatically.
 
 The pooled paper describes a different procedure that adjusts its substring
-thresholds when candidate generation is insufficient. V1 keeps
+thresholds when candidate generation is insufficient. Method v1 keeps
 `barcode_toehold_k` and `barcode_pair_k` fixed. A reviewed follow-up request may
 change them, but it is a new input and normally a new plan identity.
 

@@ -23,7 +23,7 @@ def _paper_starting_request(*, target_length: int) -> dict[str, object]:
         target_count=1,
         target_length=target_length,
         topology="shared",
-        oligo_length=96,
+        nominal_fragment_oligo_length=96,
         search_range=15,
         barcode_generation_attempts=500_000,
     )
@@ -55,10 +55,10 @@ def test_v1_terminal_locus_policy_keeps_orders_inside_the_declared_ceiling() -> 
 
 @pytest.mark.parametrize(
     ("target_length", "expected_loci"),
-    [(87, 0), (88, 1), (148, 1), (149, 2), (190, 2), (200, 2), (201, 3)],
+    [(88, 0), (89, 1), (148, 1), (149, 2), (190, 2), (200, 2), (201, 3)],
 )
 def test_v1_terminal_locus_transition_boundaries(target_length: int, expected_loci: int) -> None:
-    request = parse_request(_paper_starting_request(target_length=max(target_length, 88)))
+    request = parse_request(_paper_starting_request(target_length=max(target_length, 89)))
 
     assert predict_locus_count(target_length, request.planning) == expected_loci
 
