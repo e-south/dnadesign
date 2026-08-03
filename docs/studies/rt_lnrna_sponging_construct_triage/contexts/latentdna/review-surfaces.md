@@ -56,5 +56,5 @@ aids; they are not pseudo-records and they do not merge Khan and Crawford
 abundance scales.
 
 Reporter-response profiles are not LatentDNA label inputs. They remain
-descriptive study evidence until the meta-study defines a constrained objective
+descriptive study evidence until the study activates a constrained objective
 and current comparable profiles carry supported biological-replicate uncertainty.

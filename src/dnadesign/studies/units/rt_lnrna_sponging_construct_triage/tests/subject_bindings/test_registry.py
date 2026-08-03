@@ -399,7 +399,7 @@ def test_binding_loader_binds_structure_materialization_id_to_source_bundle(tmp_
 
 def test_binding_loader_rejects_retired_structure_materialization_identity(tmp_path: Path) -> None:
     payload = _registry_payload()
-    payload["subjects"][0]["msd_structure"]["structure_materialization_id"] = "reader_" + "spop_msd_structure_panel_v1"
+    payload["subjects"][0]["msd_structure"]["structure_materialization_id"] = "reader_spop_msd_structure_panel_v1"
 
     with pytest.raises(SubjectBindingContractError, match="retired structure_materialization_id"):
         load_subject_bindings(repo_root=_repo_root(), registry_path=_write_registry(tmp_path, payload))
