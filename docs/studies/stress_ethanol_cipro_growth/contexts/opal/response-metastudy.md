@@ -296,9 +296,10 @@ uv run python -m \
 Before this command, run Reader's canonical `inspect --section plan`,
 `validate`, dry-run, `run`, `records`, and `verify` sequence on the aggregate
 experiment. The command stages output atomically and replaces the destination
-only after the complete run succeeds. The aggregate is regenerated and verified
-under catalog v4 / record v6. The active path consumes those current records and
-fails closed if their identities, digests, or contracts change.
+only after the complete run succeeds. The aggregate must verify under catalog
+v4 / record v6. The active path consumes those current records and fails closed
+if their identities, digests, or contracts change; the checked-in historical
+bundle is not a fallback.
 
 ### Promotion Boundary
 

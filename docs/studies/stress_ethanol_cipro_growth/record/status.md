@@ -128,9 +128,12 @@ unsupported lanes. It plans no runnable GPU jobs for the declared row quota.
   Reader aggregate contains 8 experiments, 7 reductions, 413 design/reduction
   rows, 206500 descriptive-resampling draw rows, and 12 repeated design IDs.
   The active study adapter accepts only the canonical
-  `plate_reader/four_state_event_window` catalog-v4/record-v6 lifecycle. The aggregate
-  is regenerated and verified under that contract; future publication fails
-  closed if its record identities, digests, or contracts change.
+  `plate_reader/four_state_event_window` catalog-v4/record-v6 lifecycle. The
+  frozen aggregate was generated and verified when its receipt was published.
+  The current Reader build reports `build.identity_mismatch`, so the adapter
+  blocks a new publication until Reader reruns the aggregate and the study pins
+  the new receipt. The stored aggregate remains historical evidence, not a
+  fallback for the active path.
   The primary reduction is the 4-8 hour post-event log mean; the other
   declared windows, normalized linear AUC, and delta remain response sensitivity
   analyses. The strongest descriptive fixed challenger is PLS4 over the primary
