@@ -19,6 +19,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 def _repo_root() -> Path:
@@ -47,6 +48,20 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     assert any(requirement.startswith("setuptools>=83.0.0;") for requirement in evo2_dependencies)
     assert "setuptools>=83.0.0" in build_dependencies
     assert all("email" not in author for author in project["authors"])
+
+
+def test_dependabot_covers_each_tracked_dependency_surface() -> None:
+    config = yaml.safe_load((_repo_root() / ".github" / "dependabot.yml").read_text(encoding="utf-8"))
+
+    assert config["version"] == 2
+    updates = {entry["package-ecosystem"]: entry for entry in config["updates"]}
+    assert set(updates) == {"uv", "github-actions", "pre-commit"}
+    for entry in updates.values():
+        assert entry["directory"] == "/"
+        assert entry["schedule"] == {"interval": "weekly"}
+        assert entry["cooldown"] == {"default-days": 7}
+        assert entry["open-pull-requests-limit"] == 5
+        assert tuple(entry["groups"].values())[0]["patterns"] == ["*"]
 
 
 def test_bounded_dependency_exception_does_not_enter_supported_code() -> None:
