@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 import pytest
 
-from dnadesign.devtools.docs.badges import _source_has_badge_hint
+from dnadesign.devtools.docs.badges.detection import source_has_badge_hint
 
 
 @pytest.mark.parametrize(
@@ -36,7 +36,7 @@ from dnadesign.devtools.docs.badges import _source_has_badge_hint
     ],
 )
 def test_browser_valid_badge_sources_are_detected(source: str) -> None:
-    assert _source_has_badge_hint(source)
+    assert source_has_badge_hint(source)
 
 
 @pytest.mark.parametrize(
@@ -58,7 +58,7 @@ def test_browser_valid_badge_sources_are_detected(source: str) -> None:
     ],
 )
 def test_browser_valid_non_badge_sources_are_ignored(source: str) -> None:
-    assert not _source_has_badge_hint(source)
+    assert not source_has_badge_hint(source)
 
 
 @pytest.mark.parametrize(
@@ -85,19 +85,19 @@ def test_browser_valid_non_badge_sources_are_ignored(source: str) -> None:
     ],
 )
 def test_browser_invalid_sources_are_ignored(source: str) -> None:
-    assert not _source_has_badge_hint(source)
+    assert not source_has_badge_hint(source)
 
 
 @pytest.mark.parametrize("authority", ["//ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ", "https://img.shields.io"])
 @pytest.mark.parametrize("port", ["", "0", "1", "80", "443", "65535"])
 def test_browser_valid_provider_ports_are_detected(authority: str, port: str) -> None:
-    assert _source_has_badge_hint(f"{authority}:{port}/status.svg")
+    assert source_has_badge_hint(f"{authority}:{port}/status.svg")
 
 
 @pytest.mark.parametrize("authority", ["//ｉｍｇ．ｓｈｉｅｌｄｓ．ｉｏ", "https://img.shields.io"])
 @pytest.mark.parametrize("port", ["bogus", "65536", "99999", "%34%34%33", "%38%30", "%2F", "%3F", "%23", "%40"])
 def test_browser_invalid_ports_are_ignored(authority: str, port: str) -> None:
-    assert not _source_has_badge_hint(f"{authority}:{port}/badge.svg")
+    assert not source_has_badge_hint(f"{authority}:{port}/badge.svg")
 
 
 @pytest.mark.parametrize("authority_prefix", ["//", "https://"])
@@ -107,4 +107,4 @@ def test_browser_invalid_encoded_host_delimiters_are_ignored(
     encoded_delimiter: str,
 ) -> None:
     source = f"{authority_prefix}img.shields.io{encoded_delimiter}/badge.svg"
-    assert not _source_has_badge_hint(source)
+    assert not source_has_badge_hint(source)
