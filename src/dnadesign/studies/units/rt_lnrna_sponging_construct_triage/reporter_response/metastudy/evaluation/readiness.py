@@ -187,7 +187,11 @@ def readiness_from_receipt(payload: Mapping[str, object]) -> EvidenceReadiness:
     )
 
 
-def readiness_from_live_bridge(*, phd_root: Path) -> EvidenceReadiness:
+def readiness_from_live_bridge(
+    *,
+    phd_root: Path,
+    reader_executable: Path | None = None,
+) -> EvidenceReadiness:
     """Run the exact bridge-owned route checker and authorize its typed receipt."""
 
     root = Path(phd_root).expanduser().resolve()
@@ -206,6 +210,8 @@ def readiness_from_live_bridge(*, phd_root: Path) -> EvidenceReadiness:
         "--route-id",
         METASTUDY_ROUTE_ID,
     ]
+    if reader_executable is not None:
+        command.extend(("--reader-executable", str(Path(reader_executable).expanduser().resolve())))
     completed = subprocess.run(command, cwd=root, check=False, capture_output=True, text=True)
     if completed.returncode != 0:
         diagnostics = "; ".join(

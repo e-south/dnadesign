@@ -43,6 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Active Dnadesign source checkout. Defaults to the checkout running this command.",
     )
+    regenerate.add_argument(
+        "--reader-executable",
+        type=Path,
+        help="Exact Reader CLI executable used for readiness and record verification.",
+    )
     regenerate.add_argument("--publication", type=Path)
     regenerate.add_argument("--state-dir", type=Path)
     status = subparsers.add_parser("status", help="Validate and summarize one source-controlled state generation")
@@ -51,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--dnadesign-root",
         type=Path,
         help="Active Dnadesign source checkout. Defaults to the checkout running this command.",
+    )
+    status.add_argument(
+        "--reader-executable",
+        type=Path,
+        help="Exact Reader CLI executable used for live source verification.",
     )
     status.add_argument("--state-dir", type=Path, required=True)
     verify = subparsers.add_parser("verify", help="Verify one create-only meta-study publication")
@@ -72,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             args.state_dir / STATE_FILE,
             phd_root=args.phd_root,
             dnadesign_root=dnadesign_root,
+            reader_executable=args.reader_executable,
         )
         state = validation.state
         decision = state["decision"]
@@ -95,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
     result = regenerate_metastudy(
         phd_root=args.phd_root,
         dnadesign_root=dnadesign_root,
+        reader_executable=args.reader_executable,
     )
     state_paths = None
     if args.state_dir is not None:

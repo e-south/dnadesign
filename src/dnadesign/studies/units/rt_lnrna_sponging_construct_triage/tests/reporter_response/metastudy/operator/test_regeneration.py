@@ -73,9 +73,11 @@ def test_operator_preserves_complete_partial_and_blocked_materialization_states(
 
     monkeypatch.setattr(operator_regeneration, "load_registered_subject_bindings", load_subjects)
     resolved_ids: list[str] = []
+    reader_commands: list[tuple[str, ...] | None] = []
 
     def resolve_record(_config, **kwargs):
         resolved_ids.append(kwargs["experiment_id"])
+        reader_commands.append(kwargs["reader_command"])
         return SimpleNamespace(experiment_id=kwargs["experiment_id"])
 
     monkeypatch.setattr(operator_regeneration, "resolve_digest_verified_dataframe_record", resolve_record)
@@ -108,7 +110,11 @@ def test_operator_preserves_complete_partial_and_blocked_materialization_states(
     )
     monkeypatch.setattr(operator_regeneration, "validate_sensitivity_coverage_set", lambda *_args, **_kwargs: None)
 
-    result = operator.regenerate_metastudy(phd_root=Path("unused"))
+    reader_executable = Path("/tmp/reader-cli")
+    result = operator.regenerate_metastudy(
+        phd_root=Path("unused"),
+        reader_executable=reader_executable,
+    )
 
     blocked_id = DEFAULT_PROTOCOL.planned_kinetic_experiment_ids[-1]
     assert result.route_registry_path == operator_state.ROUTE_REGISTRY_PATH
@@ -116,6 +122,7 @@ def test_operator_preserves_complete_partial_and_blocked_materialization_states(
     assert loaded_repo_roots == [operator_checkout.active_dnadesign_checkout()]
     assert loaded_repo_roots != [(Path("unused").resolve() / "dnadesign")]
     assert resolved_ids == list(ready_ids)
+    assert reader_commands == [(str(reader_executable.resolve()),)] * len(ready_ids)
     assert result.attempts == captured["attempts"]
     assert tuple(row.status for row in result.attempts) == (
         "partial",

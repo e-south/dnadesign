@@ -37,7 +37,17 @@ from ._support import (
 def test_operator_parser_exposes_regenerate_status_and_verify() -> None:
     parser = operator_cli.build_parser()
 
-    regenerate = parser.parse_args(["regenerate", "--phd-root", "/tmp/phd", "--dnadesign-root", "/tmp/checkout"])
+    regenerate = parser.parse_args(
+        [
+            "regenerate",
+            "--phd-root",
+            "/tmp/phd",
+            "--dnadesign-root",
+            "/tmp/checkout",
+            "--reader-executable",
+            "/tmp/reader",
+        ]
+    )
     status = parser.parse_args(
         [
             "status",
@@ -47,14 +57,18 @@ def test_operator_parser_exposes_regenerate_status_and_verify() -> None:
             "/tmp/checkout",
             "--state-dir",
             "/tmp/state",
+            "--reader-executable",
+            "/tmp/reader",
         ]
     )
     verify = parser.parse_args(["verify", "--publication", "/tmp/publication"])
 
     assert regenerate.command == "regenerate"
     assert regenerate.dnadesign_root == Path("/tmp/checkout")
+    assert regenerate.reader_executable == Path("/tmp/reader")
     assert status.command == "status"
     assert status.dnadesign_root == Path("/tmp/checkout")
+    assert status.reader_executable == Path("/tmp/reader")
     assert verify.command == "verify"
 
 

@@ -144,7 +144,7 @@ def test_checked_in_protocol_and_live_descriptive_selection_match_runtime_contra
     }
     projection = state["acquisition_projection"]
     assert projection["selected_reduction"] == [6.0, 10.0]
-    assert len(projection["coordinates"]) == 32
+    assert len(projection["coordinates"]) == 65
     assert {row["reduction_id"] for row in projection["coordinates"]} == {"window-6-10h"}
 
     route_text = (study_root / "routes/README.md").read_text(encoding="utf-8")

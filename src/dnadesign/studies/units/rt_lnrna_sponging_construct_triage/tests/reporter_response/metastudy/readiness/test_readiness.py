@@ -99,18 +99,26 @@ def test_live_bridge_runner_is_the_selection_authority(
     _install_live_bridge_fixture(tmp_path)
     receipt = _readiness_receipt(ready_ids=KINETIC_IDS)
 
-    monkeypatch.setattr(
-        "subprocess.run",
-        lambda *_args, **_kwargs: type(
+    observed_command: list[str] = []
+
+    def run(command: list[str], **_kwargs: object) -> object:
+        observed_command.extend(command)
+        return type(
             "Completed",
             (),
             {"stdout": json.dumps(receipt), "stderr": "", "returncode": 0},
-        )(),
+        )()
+
+    monkeypatch.setattr("subprocess.run", run)
+
+    reader_executable = tmp_path / "reader-cli"
+    readiness = readiness_from_live_bridge(
+        phd_root=tmp_path,
+        reader_executable=reader_executable,
     )
 
-    readiness = readiness_from_live_bridge(phd_root=tmp_path)
-
     assert readiness.is_selection_authorized
+    assert observed_command[-2:] == ["--reader-executable", str(reader_executable.resolve())]
     assert evaluate_metastudy(_evidence(), readiness=readiness).status == "selected"
 
 

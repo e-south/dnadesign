@@ -1,8 +1,8 @@
 ---
 name: rt-lnrna-reporter-response
-description: Route admitted RT-lnRNA reporter-response profiles, interval recommendations, and objective readiness. Use after the workspace bridge verifies Reader evidence; not for generic Reader plots or MSD design.
+description: Route admitted RT-lnRNA reporter-response profiles, interval recommendations, and objective readiness. Use for verified Reader-to-study evidence handoffs; not for generic Reader plots or MSD design.
 metadata:
-  version: 1.3.0
+  version: 1.3.1
   category: workflow-automation
   tags: [rt-lnrna, reader, reporter-response, evidence, study]
   owner: rt_lnrna_sponging_construct_triage

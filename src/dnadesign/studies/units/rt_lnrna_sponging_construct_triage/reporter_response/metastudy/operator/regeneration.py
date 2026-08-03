@@ -123,6 +123,7 @@ def regenerate_metastudy(
     *,
     phd_root: Path,
     dnadesign_root: Path | None = None,
+    reader_executable: Path | None = None,
 ) -> RegenerationResult:
     """Reconstruct selected routes through public Reader records and canonical evaluation."""
 
@@ -131,7 +132,8 @@ def regenerate_metastudy(
     reader_root = root / "reader"
     route_registry = root / ROUTE_REGISTRY_PATH
     route_registry_digest = digest_file(route_registry)
-    readiness = readiness_from_live_bridge(phd_root=root)
+    executable = Path(reader_executable).expanduser().resolve() if reader_executable is not None else None
+    readiness = readiness_from_live_bridge(phd_root=root, reader_executable=executable)
     if not readiness.is_selection_authorized:
         raise MetastudyContractError("canonical regeneration requires owner-bound Reader readiness")
     ready_ids = set(readiness.ready_experiment_ids) & set(DEFAULT_PROTOCOL.planned_kinetic_experiment_ids)
@@ -193,6 +195,7 @@ def regenerate_metastudy(
             protocol_id=PROTOCOL_ID,
             record_id=RECORD_ID,
             contract_id=RECORD_CONTRACT_ID,
+            reader_command=((str(executable),) if executable is not None else None),
         )
         bindings = build_reader_evidence_bindings(record=record, subject_registry=registry)
         materialized = materialize_record_evidence(
@@ -228,12 +231,17 @@ def validate_live_source_controlled_state(
     *,
     phd_root: Path,
     dnadesign_root: Path | None = None,
+    reader_executable: Path | None = None,
 ) -> LiveStateValidation:
     """Require exact parity between checked state and one canonical live regeneration."""
 
     repo_root = require_active_dnadesign_checkout(dnadesign_root)
     state = validate_source_controlled_state(path, phd_root=phd_root)
-    regeneration = regenerate_metastudy(phd_root=phd_root, dnadesign_root=repo_root)
+    regeneration = regenerate_metastudy(
+        phd_root=phd_root,
+        dnadesign_root=repo_root,
+        reader_executable=reader_executable,
+    )
     expected_decision = json.loads(json.dumps(decision_to_dict(regeneration.decision), allow_nan=False))
     if state["decision"] != expected_decision:
         raise MetastudyContractError("source-controlled meta-study state differs from canonical live regeneration")
