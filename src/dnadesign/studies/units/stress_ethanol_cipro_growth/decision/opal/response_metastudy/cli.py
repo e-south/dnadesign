@@ -74,7 +74,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("stress_ethanol_cipro_growth RMF calibration preview")
             print(f"primary_reduction={preview['primary_reduction_id']}")
+            print(f"ready_for_campaign={preview['ready_for_campaign']}")
+            print(f"source_ready={preview['source_ready']}")
+            print(f"reader_record_receipt_sha256={preview['reader_record_receipt_sha256']}")
             print(f"campaign_matches={preview['campaign_matches_reader_calibration']}")
+            for blocker in preview["blockers"]:  # type: ignore[union-attr]
+                print(f"blocker={blocker}")
             for row in preview["selection_views"]:  # type: ignore[union-attr]
                 print(f"{row['selection_view_id']}={row['derived_calibration']}")
         return 0

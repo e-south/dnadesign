@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/historical/__init__.py
 
-Explicit decoders for immutable pre-RecordStore study evidence.
+Frozen pre-RecordStore evidence readers for historical campaign replay only.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

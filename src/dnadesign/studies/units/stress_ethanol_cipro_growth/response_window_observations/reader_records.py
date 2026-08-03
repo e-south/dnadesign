@@ -12,15 +12,13 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-from types import MappingProxyType
-from typing import cast
 
 import pandas as pd
-import yaml
 
 from dnadesign.studies.core.reader_records import (
     READER_CATALOG_SCHEMA_VERSION,
@@ -33,15 +31,23 @@ from dnadesign.studies.core.reader_records import (
     resolve_digest_verified_records,
 )
 
-from .display_contract import response_example_labels, validate_study_display
-from .reader_record_receipt import READER_EVENT_WINDOW_RECORD_CONTRACTS
+from .reader_config_attestation import (
+    ReaderResponseConfigAttestation,
+    attest_reader_response_config,
+)
+from .reader_projection import (
+    READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID,
+    READER_EVENT_WINDOW_PROTOCOL_ID,
+    READER_EVENT_WINDOW_RECORD_CONTRACTS,
+    STATE_ORDER,
+    STUDY_PROJECTION_SCHEMA,
+    ReaderResponseProjection,
+    load_reader_response_projection,
+)
 from .reader_record_validation import validate_reader_response_frames
+from .reader_snapshot import resolve_matching_reader_snapshot
 
-READER_EVENT_WINDOW_PROTOCOL_ID = "plate_reader/four_state_event_window"
-READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID = "plot:four_state_event_window_diagnostic"
-STUDY_PROJECTION_SCHEMA = "stress_ethanol_cipro_growth.reader_response_projection.v3"
 EXPECTED_RECORDS = READER_EVENT_WINDOW_RECORD_CONTRACTS
-STATE_ORDER = ("00", "10", "01", "11")
 VALUE_COLUMNS = tuple(f"r{state}" for state in STATE_ORDER) + tuple(f"b{state}" for state in STATE_ORDER)
 
 ReaderResponseRecordError = ReaderRecordError
@@ -53,18 +59,14 @@ class ReaderResponseRecords:
     """Verified Reader records plus the study-owned semantic projection."""
 
     source: ReaderRecordSet
-    projection_path: Path
-    projection_sha256: str
-    projection: Mapping[str, object]
+    projection: ReaderResponseProjection
+    config_attestation: ReaderResponseConfigAttestation
     designs: pd.DataFrame
     descriptive_resampling_draws: pd.DataFrame
     wells: pd.DataFrame
     traces: pd.DataFrame
     events: pd.DataFrame
-
-    def __post_init__(self) -> None:
-        frozen = _freeze_contract_value(self.projection)
-        object.__setattr__(self, "projection", cast(Mapping[str, object], frozen))
+    reader_command: tuple[str, ...] = ()
 
     @property
     def reader_root(self) -> Path:
@@ -103,28 +105,57 @@ class ReaderResponseRecords:
         return self.source.records
 
     @property
+    def projection_path(self) -> Path:
+        return self.projection.path
+
+    @property
+    def projection_sha256(self) -> str:
+        return self.projection.sha256
+
+    @property
     def primary_reduction_id(self) -> str:
-        return str(self.projection["primary_reduction_id"])
+        return self.projection.primary_reduction_id
 
     @property
     def response_examples(self) -> dict[str, str]:
-        return response_example_labels(self.projection["display"])
+        return self.projection.response_examples
 
     @property
     def reference_design_id(self) -> str:
-        display = _mapping(self.projection["display"], label="projection.display")
-        channels = _mapping(display.get("channels"), label="projection.display.channels")
-        return _text(channels.get("reference_design_id"), label="projection.display.channels.reference_design_id")
+        return self.projection.reference_design_id
 
     def source_receipt(self) -> dict[str, object]:
         receipt = self.source.source_receipt()
         receipt.update(
             {
                 "schema_version": STUDY_PROJECTION_SCHEMA,
+                "config": self.config_attestation.to_dict(),
                 "projection_sha256": self.projection_sha256,
             }
         )
         return receipt
+
+    def source_receipt_sha256(self) -> str:
+        """Return the canonical digest approved by the study policy."""
+
+        encoded = json.dumps(
+            self.source_receipt(),
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def verify_config_attestation(self) -> None:
+        """Re-attest the current Reader authoring contract before publication."""
+
+        observed = attest_reader_response_config(
+            self.source,
+            self.projection,
+            reader_command=self.reader_command or None,
+        )
+        if observed.to_dict() != self.config_attestation.to_dict():
+            raise ReaderResponseRecordError("Reader config attestation drifted after record resolution")
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,37 +185,52 @@ def load_reader_response_records(
 ) -> ReaderResponseRecords:
     """Resolve the five canonical records and apply study-owned validation."""
 
-    projection_file = Path(projection_path).expanduser().resolve()
-    projection, projection_sha256 = _load_projection_snapshot(projection_file)
+    projection = load_reader_response_projection(projection_path)
     experiment = Path(experiment_root).expanduser().resolve()
     source = resolve_digest_verified_records(
         experiment / "config.yaml",
         reader_root=reader_root,
-        experiment_id=str(projection["reader_experiment_id"]),
+        experiment_id=projection.reader_experiment_id,
         protocol_id=READER_EVENT_WINDOW_PROTOCOL_ID,
         expected_records=_record_expectations(),
         reader_command=reader_command,
     )
-    frames = {name: _parse_dataframe(record, name=name) for name, record in source.records.items()}
+    config_attestation = attest_reader_response_config(
+        source,
+        projection,
+        reader_command=reader_command,
+    )
+    confirmed_source = resolve_matching_reader_snapshot(
+        source,
+        config_attestation=config_attestation,
+        expected_records=_record_expectations(),
+        reader_command=reader_command,
+        resolver=resolve_digest_verified_records,
+    )
+    frames = {name: _parse_dataframe(record, name=name) for name, record in confirmed_source.records.items()}
     validate_reader_response_frames(
         designs=frames["designs"],
         draws=frames["descriptive_resampling_draws"],
         wells=frames["wells"],
         traces=frames["traces"],
         events=frames["events"],
-        primary_reduction_id=str(projection["primary_reduction_id"]),
-        reference_design_id=_projection_reference_design(projection),
+        primary_reduction_id=projection.primary_reduction_id,
+        reference_design_id=projection.reference_design_id,
+        source_experiment_ids=projection.source_experiment_ids,
+        event=projection.event,
+        aggregation=projection.aggregation,
+        reductions=projection.reductions,
     )
     return ReaderResponseRecords(
-        source=source,
-        projection_path=projection_file,
-        projection_sha256=projection_sha256,
+        source=confirmed_source,
         projection=projection,
+        config_attestation=config_attestation,
         designs=frames["designs"],
         descriptive_resampling_draws=frames["descriptive_resampling_draws"],
         wells=frames["wells"],
         traces=frames["traces"],
         events=frames["events"],
+        reader_command=tuple(reader_command or ()),
     )
 
 
@@ -195,7 +241,7 @@ def load_reader_response_display_record(
 ) -> ReaderResponseDisplay:
     """Resolve and verify the optional study-pinned diagnostic plot record."""
 
-    specification = _display_artifact_spec(records.projection)
+    specification = records.projection.display_artifact_spec()
     expectations = {
         **_record_expectations(),
         "diagnostic": ReaderRecordExpectation(
@@ -303,92 +349,6 @@ def _validate_diagnostic(
             )
 
 
-def _load_projection_snapshot(path: Path) -> tuple[dict[str, object], str]:
-    if not path.is_file():
-        raise ReaderResponseRecordError(f"study Reader projection is missing: {path}")
-    try:
-        source_bytes = path.read_bytes()
-        payload = yaml.safe_load(source_bytes.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
-        raise ReaderResponseRecordError(f"could not read study Reader projection {path}: {exc}") from exc
-    fields = {
-        "schema_version",
-        "study_id",
-        "projection_id",
-        "reader_experiment_id",
-        "primary_reduction_id",
-        "state_order",
-        "records",
-        "display",
-        "display_artifact",
-    }
-    if not isinstance(payload, dict) or set(payload) != fields:
-        raise ReaderResponseRecordError(f"study Reader projection fields must be exactly {sorted(fields)}")
-    if payload["schema_version"] != STUDY_PROJECTION_SCHEMA:
-        raise ReaderResponseRecordError(f"study Reader projection must use {STUDY_PROJECTION_SCHEMA!r}")
-    if payload["study_id"] != "stress_ethanol_cipro_growth":
-        raise ReaderResponseRecordError("study Reader projection identity disagrees")
-    for field_name in ("projection_id", "reader_experiment_id", "primary_reduction_id"):
-        _text(payload[field_name], label=f"projection.{field_name}")
-    if tuple(payload["state_order"]) != STATE_ORDER:
-        raise ReaderResponseRecordError(f"study Reader projection state order must be {STATE_ORDER}")
-    configured_records = payload["records"]
-    expected_records = {
-        name: {"record_id": record_id, "contract_id": contract_id}
-        for name, (record_id, contract_id) in EXPECTED_RECORDS.items()
-    }
-    if configured_records != expected_records:
-        raise ReaderResponseRecordError("study Reader projection record contracts disagree with Reader")
-    validate_study_display(payload["display"])
-    if payload["display_artifact"] is not None:
-        _validate_display_artifact_spec(payload["display_artifact"])
-    return dict(payload), hashlib.sha256(source_bytes).hexdigest()
-
-
-def _display_artifact_spec(projection: Mapping[str, object]) -> dict[str, str]:
-    value = projection.get("display_artifact")
-    if value is None:
-        raise ReaderResponseRecordError(
-            "study Reader projection has no display_artifact pin; run and verify the canonical Reader "
-            "diagnostic, then pin its source experiment, design, producer-config digest, and path"
-        )
-    return _validate_display_artifact_spec(value)
-
-
-def _validate_display_artifact_spec(value: object) -> dict[str, str]:
-    fields = {"record_id", "source_experiment_id", "design_id", "producer_config_digest", "path"}
-    if not isinstance(value, Mapping) or set(value) != fields:
-        raise ReaderResponseRecordError(f"projection.display_artifact fields must be exactly {sorted(fields)}")
-    result = {field: _text(value[field], label=f"projection.display_artifact.{field}") for field in fields}
-    if result["record_id"] != READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID:
-        raise ReaderResponseRecordError(
-            f"projection.display_artifact.record_id must be {READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID!r}"
-        )
-    _sha256_digest(result["producer_config_digest"], label="projection.display_artifact.producer_config_digest")
-    path = Path(result["path"])
-    if path.is_absolute() or ".." in path.parts or path.suffix.lower() not in {".png", ".pdf"}:
-        raise ReaderResponseRecordError(
-            "projection.display_artifact.path must be a confined outputs-relative PNG or PDF path"
-        )
-    return result
-
-
-def _projection_reference_design(projection: Mapping[str, object]) -> str:
-    display = _mapping(projection.get("display"), label="projection.display")
-    channels = _mapping(display.get("channels"), label="projection.display.channels")
-    return _text(channels.get("reference_design_id"), label="projection.display.channels.reference_design_id")
-
-
-def _freeze_contract_value(value: object) -> object:
-    if isinstance(value, Mapping):
-        return MappingProxyType({key: _freeze_contract_value(item) for key, item in value.items()})
-    if isinstance(value, (list, tuple)):
-        return tuple(_freeze_contract_value(item) for item in value)
-    if isinstance(value, (set, frozenset)):
-        return frozenset(_freeze_contract_value(item) for item in value)
-    return value
-
-
 def _verify_media_signature(value: ReaderArtifactFile) -> None:
     suffix = Path(value.reader_path).suffix.lower()
     signature = value.content[:8]
@@ -398,25 +358,10 @@ def _verify_media_signature(value: ReaderArtifactFile) -> None:
         raise ReaderResponseRecordError("Reader diagnostic PDF signature is invalid")
 
 
-def _mapping(value: object, *, label: str) -> Mapping[str, object]:
-    if not isinstance(value, Mapping):
-        raise ReaderResponseRecordError(f"{label} must be an object")
-    return value
-
-
 def _text(value: object, *, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ReaderResponseRecordError(f"{label} must be a non-empty string")
     return value.strip()
-
-
-def _sha256_digest(value: object, *, label: str) -> str:
-    token = _text(value, label=label)
-    if not token.startswith("sha256:") or len(token) != 71:
-        raise ReaderResponseRecordError(f"{label} must be a sha256 digest")
-    if any(character not in "0123456789abcdef" for character in token[7:]):
-        raise ReaderResponseRecordError(f"{label} must be a lowercase sha256 digest")
-    return token
 
 
 __all__ = [

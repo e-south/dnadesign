@@ -9,8 +9,8 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observation_policy.v2"
-SCHEMA_VERSION = "2"
+SCHEMA_ID = "stress_ethanol_cipro_growth.response_window_observation_policy.v3"
+SCHEMA_VERSION = "3"
 STUDY_ID = "stress_ethanol_cipro_growth"
 APPROVAL_STATUSES = frozenset({"review_required", "approved"})
 
@@ -28,7 +28,11 @@ TOP_LEVEL_FIELDS = {
     "repeat_decisions",
 }
 APPROVAL_FIELDS = {"status", "approved_by", "approved_at", "rationale"}
-SOURCE_MANIFEST_FIELDS = {"reader_bundle_sha256", "candidate_bindings_sha256"}
+SOURCE_MANIFEST_FIELDS = {
+    "reader_bundle_sha256",
+    "reader_record_receipt_sha256",
+    "candidate_bindings_sha256",
+}
 LABEL_FIELDS = {"y_space", "observed_round", "batch_id", "primary_reduction_id", "value_order"}
 AGGREGATION_FIELDS = {
     "experiment_unit",

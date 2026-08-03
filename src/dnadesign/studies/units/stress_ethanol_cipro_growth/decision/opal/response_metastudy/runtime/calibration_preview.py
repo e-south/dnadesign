@@ -30,7 +30,7 @@ from ..core.response_contracts import RESPONSE_REVIEW_SPEC
 from ..evaluation.response_uncertainty import estimate_response_calibration_from_reader_draws
 from .loading import assert_campaign_response_reduction, load_stress_campaign_contract
 
-SCHEMA_ID = "stress_ethanol_cipro_growth.rmf_calibration_preview.v3"
+SCHEMA_ID = "stress_ethanol_cipro_growth.rmf_calibration_preview.v4"
 CALIBRATION_COHORT_ID = "exact_primary_reader_candidate_experiments_v1"
 _COMPONENT_FIELDS = {
     "response_separation": ("response_separation_min", "response_separation_scale"),
@@ -111,6 +111,10 @@ def preview_response_calibration(
         reader_projection_sha256=evidence.reader_projection_sha256,
         candidate_bindings_manifest_sha256=evidence.candidate_bindings_manifest_sha256,
         observation_policy_sha256=evidence.policy.config_sha256,
+        reader_record_receipt_sha256=evidence.reader_record_receipt_sha256,
+        approved_reader_record_receipt_sha256=evidence.policy.reader_record_receipt_sha256,
+        approval_status=evidence.policy.approval_status,
+        source_blockers=evidence.preview.blockers,
         primary_reduction_id=primary_reduction_id,
         calibration_unit_count=cohort.unit_count,
         calibration_candidate_count=cohort.candidate_count,
@@ -185,6 +189,10 @@ def build_calibration_preview_payload(
     reader_projection_sha256: str,
     candidate_bindings_manifest_sha256: str,
     observation_policy_sha256: str,
+    reader_record_receipt_sha256: str,
+    approved_reader_record_receipt_sha256: str | None,
+    approval_status: str,
+    source_blockers: tuple[str, ...],
     primary_reduction_id: str,
     calibration_unit_count: int,
     calibration_candidate_count: int,
@@ -247,6 +255,13 @@ def build_calibration_preview_payload(
         "excluded_nonexact_unit_count": calibration_cohort["excluded_nonexact_unit_count"],
     }
     cohort_matches = configured_cohort == campaign_cohort_projection
+    blockers = sorted(set(source_blockers))
+    source_ready = (
+        approval_status == "approved"
+        and approved_reader_record_receipt_sha256 == reader_record_receipt_sha256
+        and not blockers
+    )
+    calibration_matches = matches and cohort_matches
     return {
         "schema_id": SCHEMA_ID,
         "study_id": "stress_ethanol_cipro_growth",
@@ -256,13 +271,20 @@ def build_calibration_preview_payload(
         "reader_projection_sha256": reader_projection_sha256,
         "candidate_bindings_manifest_sha256": candidate_bindings_manifest_sha256,
         "observation_policy_sha256": observation_policy_sha256,
+        "reader_record_receipt_sha256": reader_record_receipt_sha256,
+        "approved_reader_record_receipt_sha256": approved_reader_record_receipt_sha256,
+        "approval_status": approval_status,
+        "source_ready": source_ready,
+        "ready_for_campaign": source_ready and calibration_matches,
+        "blocker_count": len(blockers),
+        "blockers": blockers,
         "calibration_cohort": calibration_cohort,
         "configured_campaign_calibration_cohort": configured_cohort,
         "campaign_matches_calibration_cohort": cohort_matches,
         "bootstrap_samples": int(bootstrap_samples),
         "scale_quantile": float(calibration["scale_quantile"].iloc[0]),
         "scale_basis": sorted(calibration["scale_basis"].astype(str).unique().tolist()),
-        "campaign_matches_reader_calibration": matches and cohort_matches,
+        "campaign_matches_reader_calibration": calibration_matches,
         "selection_views": view_rows,
     }
 

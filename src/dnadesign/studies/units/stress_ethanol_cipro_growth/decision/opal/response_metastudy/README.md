@@ -50,9 +50,17 @@ Reader-owned response-window Y.
   pairs used only by the retrospective response model screen. It contains no
   candidate IDs, accounts explicitly for Reader designs that have no study
   candidate binding, and has no label-truth role.
-- `config/multistate_response_behavior_shadow_v1.yaml`: persisted, shadow-only
-  binding for target masks, the shared soft-min scale recipe, evidence roles,
-  and activation gates. It does not configure a campaign.
+- `config/multistate_response_behavior_shadow_v1.yaml`: immutable protocol
+  bytes referenced by the historical activation receipt. Runtime replay does
+  not amend or select this file.
+- `config/multistate_response_behavior_shadow_v2.yaml`: current shadow-only
+  replay binding for target masks, source snapshots, the shared soft-min scale
+  recipe, evidence roles, and activation gates. It cannot configure a campaign.
+- `config/historical_response_window_observation_policy_v2.yaml`: immutable
+  policy snapshot used only to replay the frozen shadow. Its request, approval,
+  source identities, and digest are pinned by the shadow protocol.
+- `runtime/historical/`: verifies that snapshot and projects only the fields
+  needed by replay. The active response-window policy is not a replay input.
 
 The shadow behavior modules expose a bounded builder for observed rows, Reader
 joint-bootstrap draws, and fixed prediction matrices. They use OPAL's public
@@ -118,10 +126,12 @@ uv run reader verify "$READER_EXPERIMENT" --format json
 uv run reader notebook "$READER_EXPERIMENT" --mode none
 ```
 
-The aggregate is a verified `plate_reader/four_state_event_window` RecordStore
-experiment under catalog v4 and record v6. The study commands below consume
-those exact records and fail closed if their identities, digests, or contracts
-change. They do not fall back to bundle v5.
+The aggregate must be a verified `plate_reader/four_state_event_window`
+RecordStore experiment under catalog v4 and record v6. The current stored
+aggregate still fails Reader verification because its producing build differs
+from the current build. Rerun and verify it before treating the preview as
+campaign-ready. The study commands consume exact records and do not fall back
+to the historical bundle.
 
 Then run the metastudy from `dnadesign/`:
 
@@ -140,7 +150,10 @@ non-reference primary Reader candidate-experiment row. This declared cohort is
 independent of the retrospective model-screen selection and repeated-candidate
 label decisions. The output records the cohort rule, Reader and candidate-binding
 digests, counts, target masks, exact derived values, and six-decimal campaign
-parity.
+parity. It reports mathematical parity separately from source readiness. An
+unapproved policy, unpinned Reader receipt, or other source blocker always sets
+`ready_for_campaign=false`, even when the derived values match the configured
+campaign values.
 
 Publish the complete review bundle:
 

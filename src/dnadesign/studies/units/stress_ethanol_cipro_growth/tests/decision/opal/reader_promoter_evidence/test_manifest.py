@@ -183,6 +183,24 @@ def test_materialize_rejects_symlinked_media_namespace(
             lambda payload: payload["rows"][0]["selected_binding"].__setitem__("candidate_id", "different-candidate"),
             "selected binding",
         ),
+        (
+            lambda payload: payload["rows"][0]["sources"]["response_window"]["records"]["diagnostic"].__setitem__(
+                "config_digest", "sha256:" + "f" * 64
+            ),
+            "one config digest",
+        ),
+        (
+            lambda payload: payload["rows"][0]["sources"]["response_window"]["records"]["diagnostic"][
+                "producer"
+            ].__setitem__("plugin", "plot/different"),
+            "producer identity",
+        ),
+        (
+            lambda payload: payload["rows"][0]["sources"]["response_window"]["records"]["diagnostic"]["inputs"][
+                0
+            ].__setitem__("record_revision_digest", "sha256:" + "f" * 64),
+            "designs input revision",
+        ),
     ],
 )
 def test_display_verifier_rejects_provenance_tampering(

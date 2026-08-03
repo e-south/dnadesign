@@ -40,7 +40,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 
 PACKAGE = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy")
 PROTOCOL = behavior_protocol.load_multistate_behavior_protocol(
-    PACKAGE / "config/multistate_response_behavior_shadow_v1.yaml"
+    PACKAGE / "config/multistate_response_behavior_shadow_v2.yaml"
 )
 
 

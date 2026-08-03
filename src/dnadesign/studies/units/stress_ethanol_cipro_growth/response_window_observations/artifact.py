@@ -49,6 +49,10 @@ def materialize_response_window_observations(
         )
     if evidence.policy.approval_status != "approved":
         raise ResponseWindowObservationArtifactError("response-window observation policy is not approved.")
+    if not evidence.integrity_matches():
+        raise ResponseWindowObservationArtifactError(
+            "response-window evidence changed after its verified preview was constructed."
+        )
     _verify_live_sources(evidence)
     validate_frames(evidence.preview, bootstrap_samples=evidence.policy.aggregation.bootstrap_samples)
     output = _output_path(out_dir, allowed_output_root=allowed_output_root)
@@ -161,6 +165,12 @@ def _record_frames(preview: ResponseWindowObservationPreview) -> dict[str, pd.Da
 
 
 def _verify_live_sources(evidence: ResponseWindowObservationEvidence) -> None:
+    evidence.reader_records.verify_config_attestation()
+    receipt_sha256 = evidence.reader_records.source_receipt_sha256()
+    if receipt_sha256 != evidence.reader_record_receipt_sha256:
+        raise ResponseWindowObservationArtifactError("Reader record receipt drift detected after observation preview.")
+    if receipt_sha256 != evidence.policy.reader_record_receipt_sha256:
+        raise ResponseWindowObservationArtifactError("Reader record receipt is not pinned by the observation policy.")
     if file_sha256(evidence.reader_catalog_path) != evidence.reader_catalog_sha256:
         raise ResponseWindowObservationArtifactError("Reader catalog drift detected after observation preview.")
     if file_sha256(evidence.reader_projection_path) != evidence.reader_projection_sha256:
@@ -181,7 +191,8 @@ def _verify_live_sources(evidence: ResponseWindowObservationEvidence) -> None:
     )
     verify_reader_record_bytes(evidence.reader_records.record_refs)
     if (
-        file_sha256(evidence.reader_catalog_path) != evidence.reader_catalog_sha256
+        evidence.reader_records.source_receipt_sha256() != evidence.reader_record_receipt_sha256
+        or file_sha256(evidence.reader_catalog_path) != evidence.reader_catalog_sha256
         or file_sha256(evidence.reader_projection_path) != evidence.reader_projection_sha256
         or file_sha256(evidence.candidate_bindings_manifest_path) != evidence.candidate_bindings_manifest_sha256
     ):

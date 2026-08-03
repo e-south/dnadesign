@@ -141,6 +141,36 @@ def test_source_manifest_drift_blocks_publication_before_staging(tmp_path: Path)
         )
 
 
+def test_materialization_requires_the_policy_pinned_current_reader_receipt(tmp_path: Path) -> None:
+    evidence = _evidence(tmp_path)
+    evidence = replace(evidence, policy=replace(evidence.policy, reader_record_receipt_sha256="f" * 64))
+
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="not pinned"):
+        artifact.materialize_response_window_observations(
+            evidence,
+            out_dir=tmp_path / "published",
+            allowed_output_root=tmp_path,
+        )
+
+    assert not (tmp_path / "published").exists()
+
+
+def test_materialization_rejects_coordinated_preview_mutation(tmp_path: Path) -> None:
+    evidence = _evidence(tmp_path)
+    evidence.preview.contributions.loc[0, "r00"] = 9.0
+    evidence.preview.observations.loc[0, "r00"] = 9.0
+    evidence.preview.uncertainty.loc[evidence.preview.uncertainty["component"].eq("r00"), "point_estimate"] = 9.0
+
+    with pytest.raises(artifact.ResponseWindowObservationArtifactError, match="changed after its verified preview"):
+        artifact.materialize_response_window_observations(
+            evidence,
+            out_dir=tmp_path / "published",
+            allowed_output_root=tmp_path,
+        )
+
+    assert not (tmp_path / "published").exists()
+
+
 @pytest.mark.parametrize("source", ["reader", "candidate_bindings"])
 def test_source_record_drift_blocks_publication_before_staging(tmp_path: Path, source: str) -> None:
     evidence = _evidence(tmp_path)
@@ -215,6 +245,10 @@ def test_verifier_rejects_duplicate_manifest_keys(tmp_path: Path) -> None:
         ("extra_catalog", "identity is malformed"),
         ("absolute_path", "path is invalid"),
         ("traversal_path", "path is invalid"),
+        ("bad_config_digest", "malformed revisions"),
+        ("inconsistent_config_digest", "must share one experiment config digest"),
+        ("bad_producer", "provenance is malformed"),
+        ("bad_input_revision", "provenance is malformed"),
     ],
 )
 def test_verifier_requires_exact_reader_projection_receipt(
@@ -249,8 +283,16 @@ def test_verifier_requires_exact_reader_projection_receipt(
         manifest["source_manifests"]["reader_records"]["catalog"]["unexpected"] = "value"
     elif mutation == "absolute_path":
         records["designs"]["path"] = "/tmp/designs.parquet"
-    else:
+    elif mutation == "traversal_path":
         records["designs"]["path"] = "tables/../designs.parquet"
+    elif mutation == "bad_config_digest":
+        records["designs"]["config_digest"] = "sha256:not-a-digest"
+    elif mutation == "inconsistent_config_digest":
+        records["designs"]["config_digest"] = "sha256:" + ("e" * 64)
+    elif mutation == "bad_producer":
+        records["designs"]["producer"]["kind"] = "study"
+    else:
+        records["designs"]["inputs"][0]["record_revision_digest"] = "sha256:not-a-digest"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(artifact.ResponseWindowObservationArtifactError, match=message):
@@ -487,6 +529,22 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
             "schema_version": 6,
             "revision": 1,
             "revision_digest": "sha256:" + ("a" * 64),
+            "config_digest": "sha256:" + ("b" * 64),
+            "producer_config_digest": "sha256:" + ("c" * 64),
+            "producer": {
+                "kind": "pipeline",
+                "id": name,
+                "plugin": "transform/four_state_event_window",
+            },
+            "inputs": [
+                {
+                    "label": "source",
+                    "kind": "record",
+                    "record": "source/df",
+                    "discovery_policy": "record",
+                    "record_revision_digest": "sha256:" + ("d" * 64),
+                }
+            ],
             "contract_id": READER_EVENT_WINDOW_RECORD_CONTRACTS[name][1],
             "path": f"tables/{name}.parquet",
             "size_bytes": record_refs[name].size_bytes,
@@ -494,21 +552,34 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
         }
         for name in record_refs
     }
+    receipt = {
+        "schema_version": "stress_ethanol_cipro_growth.reader_response_projection.v5",
+        "experiment_id": "aggregate",
+        "protocol_id": "plate_reader/four_state_event_window",
+        "catalog": {
+            "schema_version": 4,
+            "provenance_epoch_id": "epoch-test",
+            "sha256": reader_sha,
+        },
+        "config": {
+            "schema_version": "stress_ethanol_cipro_growth.reader_config_attestation.v1",
+            "config_sha256": "c" * 64,
+            "authoring_sha256": "d" * 64,
+            "analysis": {},
+        },
+        "projection_sha256": projection_sha,
+        "records": receipt_records,
+    }
+    receipt_sha = hashlib.sha256(
+        json.dumps(receipt, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    ).hexdigest()
     reader_records = SimpleNamespace(
         record_refs=record_refs,
-        source_receipt=lambda: {
-            "schema_version": "stress_ethanol_cipro_growth.reader_response_projection.v3",
-            "experiment_id": "aggregate",
-            "protocol_id": "plate_reader/four_state_event_window",
-            "catalog": {
-                "schema_version": 4,
-                "provenance_epoch_id": "epoch-test",
-                "sha256": reader_sha,
-            },
-            "projection_sha256": projection_sha,
-            "records": receipt_records,
-        },
+        source_receipt=lambda: receipt,
+        source_receipt_sha256=lambda: receipt_sha,
+        verify_config_attestation=lambda: None,
     )
+    policy = replace(policy, reader_record_receipt_sha256=receipt_sha)
     return ResponseWindowObservationEvidence(
         policy=policy,
         resolved=ResolvedReaderCandidateEvidence(
@@ -522,6 +593,7 @@ def _evidence(tmp_path: Path, *, blockers: tuple[str, ...] = ()) -> ResponseWind
         reader_catalog_sha256=reader_sha,
         reader_projection_path=reader_projection,
         reader_projection_sha256=projection_sha,
+        reader_record_receipt_sha256=receipt_sha,
         candidate_bindings_manifest_path=binding_manifest,
         candidate_bindings_manifest_sha256=binding_sha,
         candidate_bindings_path=binding_rows,

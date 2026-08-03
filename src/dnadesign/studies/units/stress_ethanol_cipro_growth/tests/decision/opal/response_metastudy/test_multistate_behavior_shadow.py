@@ -91,7 +91,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.decision.opal.response_
 )
 
 PACKAGE = Path("src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy")
-PROTOCOL_PATH = PACKAGE / "config/multistate_response_behavior_shadow_v1.yaml"
+PROTOCOL_PATH = PACKAGE / "config/multistate_response_behavior_shadow_v2.yaml"
 AUDIT_PATH = PACKAGE / "config/multistate_response_behavior_adversarial_audit_v1.json"
 
 
@@ -135,6 +135,10 @@ def test_adversarial_audit_is_declared_as_package_data() -> None:
     studies_package_data = pyproject["tool"]["setuptools"]["package-data"]["dnadesign.studies"]
 
     assert "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/*.json" in studies_package_data
+    assert (
+        "units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/evidence/*.json"
+        in studies_package_data
+    )
     assert "units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/*.yaml" in studies_package_data
     assert "units/stress_ethanol_cipro_growth/decision/opal/multistate_response_behavior/*.json" in studies_package_data
 
@@ -165,10 +169,16 @@ def test_adversarial_audit_pins_reviewed_snapshot_and_rejects_provenance_drift()
 def test_checked_in_behavior_protocol_is_shadow_only_and_complete() -> None:
     protocol = load_multistate_behavior_protocol(PROTOCOL_PATH)
 
-    assert protocol.schema_id == "stress_ethanol_cipro_growth.multistate_response_behavior_shadow.v1"
-    assert protocol.protocol_id == "secg_multistate_response_behavior_shadow_v1"
+    assert protocol.schema_id == "stress_ethanol_cipro_growth.multistate_response_behavior_shadow.v2"
+    assert protocol.protocol_id == "secg_multistate_response_behavior_shadow_v2"
     assert protocol.source_equivalence.prior_observation_bundle_repo_path.endswith(
         "workbench/outputs/response_window_observations/4_8h_v1"
+    )
+    assert protocol.source_equivalence.prior_observation_policy_sha256 == (
+        "72e8f26251f4486e757d5d09ec653bf81e8c4d6504dfe0ec94e2fe6880e65091"  # pragma: allowlist secret
+    )
+    assert protocol.source_equivalence.prior_observation_approval_sha256 == (
+        "536e21c29a40d77ec5057f87bd0af250f04e9d2e69aac1b9b700acd1cb843997"  # pragma: allowlist secret
     )
     assert protocol.objective_name == "multistate_response_behavior_v1"
     assert protocol.status == "shadow_only"

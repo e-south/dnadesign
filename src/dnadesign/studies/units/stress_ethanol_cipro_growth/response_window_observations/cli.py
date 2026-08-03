@@ -114,6 +114,7 @@ def _preview_payload(evidence: ResponseWindowObservationEvidence) -> dict[str, o
         "approval_status": evidence.policy.approval_status,
         "reader_catalog_sha256": evidence.reader_catalog_sha256,
         "reader_projection_sha256": evidence.reader_projection_sha256,
+        "reader_record_receipt_sha256": evidence.reader_record_receipt_sha256,
         "candidate_bindings_manifest_sha256": evidence.candidate_bindings_manifest_sha256,
         "candidate_count": int(primary["candidate_id"].nunique()),
         "candidate_observation_preview_count": len(publishable),

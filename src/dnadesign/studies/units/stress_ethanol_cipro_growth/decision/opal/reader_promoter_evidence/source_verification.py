@@ -15,9 +15,21 @@ from pathlib import PurePosixPath
 from typing import Mapping
 from uuid import UUID
 
+from dnadesign.studies.core.reader_records import (
+    ReaderRecordError,
+    parse_record_inputs,
+    parse_record_producer,
+)
+
 from .contracts import READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID, ReaderPromoterEvidenceError
 from .display_artifact_verification import is_sha256
 
+_PROVENANCE_FIELDS = {
+    "config_digest",
+    "producer_config_digest",
+    "producer",
+    "inputs",
+}
 _DATAFRAME_FIELDS = {
     "record_id",
     "kind",
@@ -28,16 +40,15 @@ _DATAFRAME_FIELDS = {
     "path",
     "size_bytes",
     "content_digest",
-}
+} | _PROVENANCE_FIELDS
 _DIAGNOSTIC_FIELDS = {
     "record_id",
     "kind",
     "schema_version",
     "revision",
     "revision_digest",
-    "producer_config_digest",
     "file_evidence",
-}
+} | _PROVENANCE_FIELDS
 
 
 def verify_display_sources(value: object, *, row: Mapping[str, object]) -> dict[str, object]:
@@ -155,7 +166,14 @@ def _verify_response_source(value: object, *, row: Mapping[str, object]) -> dict
         record_id="four_state_event_window/traces",
         contract_id="plate_reader.four_state_event_window.traces.v3",
     )
-    _verify_diagnostic_record(records["diagnostic"])
+    _verify_diagnostic_record(
+        records["diagnostic"],
+        designs=records["designs"],
+        traces=records["traces"],
+    )
+    config_digests = {record["config_digest"] for record in records.values() if isinstance(record, dict)}
+    if len(config_digests) != 1:
+        raise ReaderPromoterEvidenceError("Reader response-window records do not share one config digest.")
     return dict(value)
 
 
@@ -173,10 +191,11 @@ def _verify_dataframe_record(value: object, *, record_id: str, contract_id: str)
         or not _nonnegative_int(value["size_bytes"])
     ):
         raise ReaderPromoterEvidenceError(f"Reader dataframe source {record_id!r} is invalid.")
+    _verify_record_provenance(value, record_id=record_id)
     _relative_path(value["path"], field=f"{record_id}.path")
 
 
-def _verify_diagnostic_record(value: object) -> None:
+def _verify_diagnostic_record(value: object, *, designs: object, traces: object) -> None:
     if not isinstance(value, dict) or set(value) != _DIAGNOSTIC_FIELDS:
         raise ReaderPromoterEvidenceError("Reader diagnostic source fields are malformed.")
     if (
@@ -188,6 +207,26 @@ def _verify_diagnostic_record(value: object) -> None:
         or not is_sha256(value["producer_config_digest"])
     ):
         raise ReaderPromoterEvidenceError("Reader diagnostic source is invalid.")
+    producer, inputs = _verify_record_provenance(value, record_id=READER_EVENT_WINDOW_DIAGNOSTIC_RECORD_ID)
+    if producer != {
+        "kind": "plot",
+        "id": "four_state_event_window_diagnostic",
+        "plugin": "plot/four_state_event_window_diagnostic",
+    }:
+        raise ReaderPromoterEvidenceError("Reader diagnostic producer identity is invalid.")
+    if not isinstance(designs, dict) or not isinstance(traces, dict):
+        raise ReaderPromoterEvidenceError("Reader diagnostic input records are malformed.")
+    expected_inputs = {
+        "designs": (designs.get("record_id"), designs.get("revision_digest")),
+        "traces": (traces.get("record_id"), traces.get("revision_digest")),
+    }
+    by_label = {item.get("label"): item for item in inputs}
+    if set(by_label) != set(expected_inputs) or len(by_label) != len(inputs):
+        raise ReaderPromoterEvidenceError("Reader diagnostic inputs must be exactly designs and traces.")
+    for label, (record_id, revision_digest) in expected_inputs.items():
+        item = by_label[label]
+        if item.get("record") != record_id or item.get("record_revision_digest") != revision_digest:
+            raise ReaderPromoterEvidenceError(f"Reader diagnostic {label} input revision is invalid.")
     evidence = value["file_evidence"]
     if not isinstance(evidence, list) or not evidence:
         raise ReaderPromoterEvidenceError("Reader diagnostic source has no file evidence.")
@@ -199,6 +238,19 @@ def _verify_diagnostic_record(value: object) -> None:
         if path in paths or not _nonnegative_int(item["size_bytes"]) or not is_sha256(item["content_digest"]):
             raise ReaderPromoterEvidenceError("Reader diagnostic file evidence is invalid.")
         paths.add(path)
+
+
+def _verify_record_provenance(
+    value: Mapping[str, object], *, record_id: str
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    if not is_sha256(value["config_digest"]) or not is_sha256(value["producer_config_digest"]):
+        raise ReaderPromoterEvidenceError(f"Reader record source {record_id!r} provenance digests are invalid.")
+    try:
+        producer = parse_record_producer(value["producer"], record_id=record_id)
+        inputs = parse_record_inputs(value["inputs"], record_id=record_id)
+    except ReaderRecordError as exc:
+        raise ReaderPromoterEvidenceError(f"Reader record source {record_id!r} provenance is invalid: {exc}") from exc
+    return producer.to_dict(), [item.to_dict() for item in inputs]
 
 
 def _text(value: object, *, field: str) -> str:

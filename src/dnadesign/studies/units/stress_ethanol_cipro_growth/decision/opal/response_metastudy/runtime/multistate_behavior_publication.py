@@ -19,7 +19,7 @@ import pandas as pd
 from ..reporting.multistate_behavior_plots import render_multistate_behavior_plots
 from ..reporting.multistate_behavior_report import render_multistate_behavior_report
 from .multistate_behavior_audit_verification import verify_behavior_adversarial_audit_record
-from .multistate_behavior_bundle_verification import (
+from .multistate_behavior_bundle_verification_v2 import (
     SCHEMA_ID,
     verify_multistate_behavior_shadow,
 )

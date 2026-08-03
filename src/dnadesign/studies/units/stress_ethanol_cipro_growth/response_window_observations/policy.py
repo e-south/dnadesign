@@ -19,8 +19,6 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
-from yaml.constructor import ConstructorError
-from yaml.resolver import BaseResolver
 
 from .aggregation import (
     DECISION_COLUMNS,
@@ -28,6 +26,7 @@ from .aggregation import (
     VALUE_COLUMNS,
     ResponseWindowAggregationPolicy,
 )
+from .contract_yaml import load_unique_yaml
 from .contracts import ResponseWindowAggregationError
 from .policy_contract import (
     AGGREGATION_FIELDS as _AGGREGATION_FIELDS,
@@ -72,33 +71,6 @@ class ResponseWindowObservationPolicyError(ValueError):
     """Raised when the checked-in observation policy is incomplete or ambiguous."""
 
 
-class _UniqueKeyLoader(yaml.SafeLoader):
-    """Safe YAML loader that rejects ambiguous duplicate mapping keys."""
-
-
-def _construct_unique_mapping(
-    loader: _UniqueKeyLoader,
-    node: yaml.MappingNode,
-    deep: bool = False,
-) -> dict[object, object]:
-    loader.flatten_mapping(node)
-    result: dict[object, object] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=deep)
-        if key in result:
-            raise ConstructorError(
-                "while constructing a mapping",
-                node.start_mark,
-                f"found duplicate key {key!r}",
-                key_node.start_mark,
-            )
-        result[key] = loader.construct_object(value_node, deep=deep)
-    return result
-
-
-_UniqueKeyLoader.add_constructor(BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping)
-
-
 @dataclass(frozen=True)
 class ResponseWindowObservationPolicy:
     config_path: Path
@@ -109,6 +81,7 @@ class ResponseWindowObservationPolicy:
     approved_at: str | None
     approval_rationale: str
     reader_bundle_sha256: str
+    reader_record_receipt_sha256: str | None
     candidate_bindings_sha256: str
     y_space: str
     observed_round: int
@@ -129,7 +102,7 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
         raise ResponseWindowObservationPolicyError(f"response-window observation policy not found: {config_path}")
     raw = config_path.read_bytes()
     try:
-        payload = yaml.load(raw.decode("utf-8"), Loader=_UniqueKeyLoader)
+        payload = load_unique_yaml(raw.decode("utf-8"))
     except (UnicodeError, yaml.YAMLError) as exc:
         raise ResponseWindowObservationPolicyError(
             f"could not parse response-window observation policy: {exc}"
@@ -173,6 +146,12 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
         source_manifests["reader_bundle_sha256"],
         field="source_manifests.reader_bundle_sha256",
     )
+    reader_record_receipt_sha256 = _optional_sha256(
+        source_manifests["reader_record_receipt_sha256"],
+        field="source_manifests.reader_record_receipt_sha256",
+    )
+    if approval_status == "approved" and reader_record_receipt_sha256 is None:
+        raise ResponseWindowObservationPolicyError("approved policy requires a pinned Reader record receipt.")
     primary_reduction_id = _required_text(
         label["primary_reduction_id"],
         field="label_identity.primary_reduction_id",
@@ -217,6 +196,7 @@ def load_response_window_observation_policy(path: Path) -> ResponseWindowObserva
         approved_at=approved_at,
         approval_rationale=_required_text(approval["rationale"], field="approval.rationale"),
         reader_bundle_sha256=reader_bundle_sha256,
+        reader_record_receipt_sha256=reader_record_receipt_sha256,
         candidate_bindings_sha256=_required_sha256(
             source_manifests["candidate_bindings_sha256"],
             field="source_manifests.candidate_bindings_sha256",
@@ -390,10 +370,16 @@ def _finite_float(value: object, *, field: str) -> float:
 
 
 def _required_sha256(value: object, *, field: str) -> str:
-    result = _required_text(value, field=field).lower()
+    result = _required_text(value, field=field)
     if re.fullmatch(r"[0-9a-f]{64}", result) is None:
         raise ResponseWindowObservationPolicyError(f"{field} must be a lowercase SHA-256 digest.")
     return result
+
+
+def _optional_sha256(value: object, *, field: str) -> str | None:
+    if value is None:
+        return None
+    return _required_sha256(value, field=field)
 
 
 def _timestamp(value: str, *, field: str) -> None:

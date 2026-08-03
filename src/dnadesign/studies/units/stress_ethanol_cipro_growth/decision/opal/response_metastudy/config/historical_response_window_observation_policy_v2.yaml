@@ -1,17 +1,14 @@
-schema_id: stress_ethanol_cipro_growth.response_window_observation_policy.v3
-schema_version: "3"
+schema_id: stress_ethanol_cipro_growth.response_window_observation_policy.v2
+schema_version: "2"
 study_id: stress_ethanol_cipro_growth
 policy_id: explicit_label_source_response_observations_v1
 approval:
-  status: review_required
-  approved_by: null
-  approved_at: null
-  rationale: Rerun and verify the canonical Reader aggregate with the current build, then review and pin its exact record receipt before authoring another observation bundle.
+  status: approved
+  approved_by: Eric J. South
+  approved_at: "2026-07-15T19:33:54-04:00"
+  rationale: Use the latest reviewed Reader experiment where source agreement is accepted; exclude unresolved discordant repeats.
 source_manifests:
-  # Frozen replay evidence only. This digest cannot authorize current Reader records.
   reader_bundle_sha256: e0065183fe010fe40e88e75da998cff5ed1399e56ff1d2bc1268f9331b573a67  # pragma: allowlist secret
-  # Current authoring remains closed until this exact record receipt is reviewed and pinned.
-  reader_record_receipt_sha256: null
   candidate_bindings_sha256: 273dbe8ba0b97bef3ae6318e2c7b5b95d4174b79688633fcdf06bf25c38d32f8  # pragma: allowlist secret
 label_identity:
   y_space: reader_response_window_vector_v1

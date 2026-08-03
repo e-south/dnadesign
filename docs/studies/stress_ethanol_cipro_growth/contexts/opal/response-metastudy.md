@@ -154,7 +154,7 @@ Response-Magnitude Feasibility (RMF) mathematics:
 Multistate Response Behavior objective and study evidence:
 
 - `src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md`
-- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/multistate_response_behavior_shadow_v1.yaml`
+- `src/dnadesign/studies/units/stress_ethanol_cipro_growth/decision/opal/response_metastudy/config/multistate_response_behavior_shadow_v2.yaml`
 - `docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md`
 
 Reader response-window contract:

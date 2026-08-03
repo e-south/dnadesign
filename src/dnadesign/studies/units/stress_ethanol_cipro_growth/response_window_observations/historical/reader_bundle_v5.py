@@ -3,7 +3,10 @@
 dnadesign
 src/dnadesign/studies/units/stress_ethanol_cipro_growth/response_window_observations/historical/reader_bundle_v5.py
 
-Read immutable response-window bundle-v5 evidence for historical replay only.
+Verify immutable bundle-v5 evidence for frozen campaign replay only.
+
+This module is not an authoring source and must not be imported by the active
+preview or materialization path.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

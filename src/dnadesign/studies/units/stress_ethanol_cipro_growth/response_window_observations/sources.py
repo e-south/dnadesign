@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -24,6 +24,7 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
 )
 
 from .aggregation import VALUE_COLUMNS, ResponseWindowObservationPreview, aggregate_response_window_observations
+from .evidence_integrity import evidence_integrity_sha256
 from .policy import ResponseWindowObservationPolicy, load_response_window_observation_policy
 from .reader_records import ReaderResponseRecords, load_reader_response_records
 
@@ -64,9 +65,19 @@ class ResponseWindowObservationEvidence:
     reader_catalog_sha256: str
     reader_projection_path: Path
     reader_projection_sha256: str
+    reader_record_receipt_sha256: str
     candidate_bindings_manifest_path: Path
     candidate_bindings_manifest_sha256: str
     candidate_bindings_path: Path
+    _integrity_sha256: str = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_integrity_sha256", _evidence_integrity_sha256(self))
+
+    def integrity_matches(self) -> bool:
+        """Whether mutable dataframe members still match the verified preview."""
+
+        return self._integrity_sha256 == _evidence_integrity_sha256(self)
 
 
 def preview_response_window_observation_evidence(
@@ -89,6 +100,11 @@ def preview_response_window_observation_evidence(
         raise ResponseWindowObservationSourceError(
             "Reader primary reduction disagrees with the response-window observation policy."
         )
+    reader_receipt_sha256 = reader.source_receipt_sha256()
+    if policy.reader_record_receipt_sha256 is not None and reader_receipt_sha256 != policy.reader_record_receipt_sha256:
+        raise ResponseWindowObservationSourceError(
+            "Reader record receipt digest disagrees with the response-window observation policy."
+        )
     binding_root = Path(candidate_bindings_root).expanduser().resolve()
     verification = verify_promoter_candidate_bindings(binding_root, allowed_root=binding_root)
     binding_digest = _sha256(verification.manifest_json)
@@ -109,6 +125,8 @@ def preview_response_window_observation_evidence(
         repeat_decisions=policy.repeat_decisions,
     )
     blockers = list(preview.blockers)
+    if policy.reader_record_receipt_sha256 is None:
+        blockers.append("canonical Reader record receipt requires study review and approval")
     if policy.approval_status != "approved":
         blockers.append("response-window observation policy requires study approval")
     preview = ResponseWindowObservationPreview(
@@ -130,6 +148,7 @@ def preview_response_window_observation_evidence(
         reader_catalog_sha256=reader.catalog_sha256,
         reader_projection_path=reader.projection_path,
         reader_projection_sha256=reader.projection_sha256,
+        reader_record_receipt_sha256=reader_receipt_sha256,
         candidate_bindings_manifest_path=verification.manifest_json,
         candidate_bindings_manifest_sha256=binding_digest,
         candidate_bindings_path=verification.bindings_parquet,
@@ -226,6 +245,31 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _evidence_integrity_sha256(evidence: ResponseWindowObservationEvidence) -> str:
+    scalar_identity = {
+        "policy_config_sha256": evidence.policy.config_sha256,
+        "reader_record_receipt_sha256": evidence.reader_record_receipt_sha256,
+        "reader_projection_sha256": evidence.reader_projection_sha256,
+        "candidate_bindings_manifest_sha256": evidence.candidate_bindings_manifest_sha256,
+        "blockers": list(evidence.preview.blockers),
+    }
+    frames = (
+        ("policy.repeat_decisions", evidence.policy.repeat_decisions),
+        ("policy.unbound_reader_designs", evidence.policy.unbound_reader_designs),
+        ("resolved.measurements", evidence.resolved.measurements),
+        ("resolved.bootstrap_draws", evidence.resolved.bootstrap_draws),
+        ("resolved.excluded_reader_designs", evidence.resolved.excluded_reader_designs),
+        ("preview.observations", evidence.preview.observations),
+        ("preview.contributions", evidence.preview.contributions),
+        ("preview.bootstrap_draws", evidence.preview.bootstrap_draws),
+        ("preview.uncertainty", evidence.preview.uncertainty),
+        ("preview.repeat_diagnostics", evidence.preview.repeat_diagnostics),
+        ("preview.reduction_sensitivity", evidence.preview.reduction_sensitivity),
+        ("preview.event_time_sensitivity", evidence.preview.event_time_sensitivity),
+    )
+    return evidence_integrity_sha256(scalar_identity=scalar_identity, frames=frames)
 
 
 __all__ = [

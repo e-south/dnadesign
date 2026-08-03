@@ -123,6 +123,7 @@ def _evidence(tmp_path: Path):
         reader_catalog_sha256="a" * 64,
         reader_projection_path=tmp_path / "reader_response_projection.yaml",
         reader_projection_sha256="c" * 64,
+        reader_record_receipt_sha256="d" * 64,
         candidate_bindings_manifest_path=tmp_path / "bindings.json",
         candidate_bindings_manifest_sha256="b" * 64,
         candidate_bindings_path=tmp_path / "bindings.parquet",

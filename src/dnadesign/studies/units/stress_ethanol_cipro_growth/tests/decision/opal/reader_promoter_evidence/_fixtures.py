@@ -29,10 +29,18 @@ from dnadesign.studies.units.stress_ethanol_cipro_growth.promoter_candidate_bind
     materialize_promoter_candidate_bindings,
     preview_promoter_candidate_bindings,
 )
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_config_attestation import (
+    ReaderResponseConfigAttestation,
+)
+from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_projection import (
+    ReaderResponseProjection,
+)
 from dnadesign.studies.units.stress_ethanol_cipro_growth.response_window_observations.reader_records import (
     ReaderResponseDisplay,
     ReaderResponseRecords,
 )
+
+CONFIG_DIGEST = "sha256:" + "0" * 64
 
 
 def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
@@ -71,6 +79,7 @@ def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
         schema_version=6,
         revision=3,
         revision_digest="sha256:" + "d" * 64,
+        config_digest=CONFIG_DIGEST,
         contract_id=None,
         producer={
             "kind": "plot",
@@ -125,9 +134,16 @@ def verified_source(tmp_path: Path) -> VerifiedReaderPromoterEvidenceSource:
     )
     records = ReaderResponseRecords(
         source=record_set,
-        projection_path=projection_path,
-        projection_sha256=hashlib.sha256(projection_path.read_bytes()).hexdigest(),
-        projection={"primary_reduction_id": "event_logmean_4_8h_post"},
+        projection=ReaderResponseProjection(
+            path=projection_path,
+            sha256=hashlib.sha256(projection_path.read_bytes()).hexdigest(),
+            payload={"primary_reduction_id": "event_logmean_4_8h_post"},
+        ),
+        config_attestation=ReaderResponseConfigAttestation(
+            config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(),
+            authoring_sha256="7" * 64,
+            analysis={},
+        ),
         designs=pd.DataFrame(),
         descriptive_resampling_draws=pd.DataFrame(),
         wells=pd.DataFrame(),
@@ -252,9 +268,14 @@ def _dataframe_record(
         schema_version=6,
         revision=2,
         revision_digest="sha256:" + digest_character * 64,
+        config_digest=CONFIG_DIGEST,
         contract_id=contract_id,
-        producer={},
-        producer_config_digest=None,
+        producer={
+            "kind": "pipeline",
+            "id": "four_state_event_window",
+            "plugin": "protocol/plate_reader_four_state_event_window",
+        },
+        producer_config_digest="sha256:" + "9" * 64,
         inputs=(),
         path=Path("/verified") / reader_path,
         reader_path=reader_path,

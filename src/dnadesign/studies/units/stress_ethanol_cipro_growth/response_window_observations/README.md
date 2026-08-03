@@ -3,7 +3,7 @@ id: stress-ethanol-cipro-growth-response-window-observations
 title: Response-window observations
 owner: stress_ethanol_cipro_growth
 status: active
-last_verified: 2026-07-29
+last_verified: 2026-08-02
 first_hop: config/reader_response_projection.yaml
 ---
 
@@ -31,18 +31,23 @@ label publication. It does not choose among Reader experiments.
 ## Open next
 
 - `config/reader_response_projection.yaml`: the exact canonical Reader
-  experiment, record contracts, primary reduction, and study display
-  vocabulary consumed by this package.
+  experiment, source set, analysis settings, record contracts, primary
+  reduction, and study display vocabulary consumed by this package.
 - `config/observation_policy.yaml`: source-manifest pins, exact label-source
-  decisions, censoring policy, and study approval. Its Reader-bundle digest is
-  retained as provenance for the already approved historical adjudication; a
-  new publication pins the live catalog and exact record revisions separately.
+  decisions, censoring policy, and study approval. The historical Reader-bundle
+  digest supports replay only. Current authoring requires an approved exact
+  Reader record receipt; that pin is presently unset.
 - `config/evidence/repeat_adjudication_4_8h_v1.json`: typed comparison evidence
   for every repeated candidate.
 - `reader_records.py`: thin study projection over the shared public Reader
   record resolver in `dnadesign.studies.core.reader_records`.
+- `reader_config_attestation.py`: exact comparison of Reader's public authoring
+  payload with the study projection, bracketed by Reader verification.
+- `reader_record_structure.py` and `reader_record_relations.py`: dataframe
+  shape, identity, coverage, and cross-record checks.
 - `historical/reader_bundle_v5.py`: explicit decoder used only to verify the
-  frozen pre-RecordStore evidence path.
+  frozen pre-RecordStore evidence path. Active source loading and publication
+  cannot import it.
 - `sources.py`: exact Reader alias resolution through the study candidate
   binding public API.
 - `label_sources.py`: one explicit label source per eligible candidate while
@@ -98,10 +103,11 @@ reduction, candidate ID, exact experiment set, selected source or exclusion,
 status, classification, and all eight component ranges. It validates evidence
 identity but does not encode a universal disagreement cutoff.
 
-The current approved policy selects the newest reviewed source for eight
-repeated candidates. ES22, ES25, ES28, and ES30 are excluded because unresolved
-source disagreement prevents one defensible label. ES26 selects its newest
-source, but exact-only censoring excludes that bounded source from labels.
+The frozen repeat adjudications select a reviewed source for eight repeated
+candidates. ES22, ES25, ES28, and ES30 are excluded because unresolved source
+disagreement prevents one defensible label. ES26 selects a reviewed source, but
+exact-only censoring excludes that bounded source from labels. These decisions
+remain evidence; they do not approve the current Reader record set.
 “Unresolved source disagreement” does not claim biological heterogeneity,
 technical failure, or assay-context drift; the present bulk data do not
 distinguish those causes.
@@ -111,8 +117,12 @@ distinguish those causes.
 Publication fails on any unresolved repeat, missing or ambiguous alias, source
 digest drift, candidate or sequence mismatch, undeclared experiment, malformed
 repeat evidence, incomplete bootstrap coverage, non-finite vector, or missing
-study approval. Artifact verification recomputes selected-source values,
-one-source contribution flags, uncertainty, sensitivities, and record digests.
+study approval. It also fails if Reader's public channel mapping, state mapping,
+random seed, reduction window, or pre-window differs from the projection. The
+in-memory evidence is sealed at preview time, so coordinated dataframe changes
+cannot be published under unchanged source receipts. Artifact verification
+rechecks selected-source values, contribution flags, uncertainty, sensitivities,
+and record digests.
 
 Candidate bindings remain the study source of truth for Reader aliases,
 candidate IDs, sequence identity, and BaseRender metadata. This package carries
@@ -155,11 +165,14 @@ uv run python -m \
   --candidate-bindings src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/outputs/promoter_candidate_bindings/latest
 ```
 
-The adapter accepts only `plate_reader/four_state_event_window`, catalog schema v4,
-record schema v6, the five exact dataframe contracts in the projection, and
-digest-verified bytes. The canonical aggregate is published and verified under
-that contract. A live v3 dry-run reproduced all seven accepted v2 scientific
-tables exactly; only provenance and schema identity changed. No fallback to
+The adapter accepts only `plate_reader/four_state_event_window`, catalog schema
+v4, record schema v6, the five exact dataframe contracts in the projection,
+and digest-verified bytes. It also reads Reader's public `authoring` inspection
+and compares the complete analysis block with the projection. Read-only
+comparison of the stored neutral records found the same scientific values as
+the earlier bundle, but current `reader verify` reports
+`build.identity_mismatch`. That comparison is not approval. Reader must rerun
+and verify the aggregate before the study can pin its receipt. No fallback to
 the historical bundle exists on the active path.
 
 Publish an approved immutable bundle:
@@ -187,9 +200,9 @@ contains:
 - `reduction_sensitivity.parquet`
 - `event_time_sensitivity.parquet`
 
-The manifest pins the policy, Reader catalog and provenance epoch, exact record
-revisions and content digests, study projection, candidate bindings, value
-order, primary reduction, and every output digest. Publication is create-only;
-a new scientific decision receives a new named bundle. The accepted v2 bundle
-remains verifiable historical evidence for the frozen campaign, but is not an
+The manifest pins the policy, Reader config and authoring digests, catalog and
+provenance epoch, exact record revisions and content digests, study projection,
+candidate bindings, value order, primary reduction, and every output digest.
+Publication is create-only; a new scientific decision receives a new named
+bundle. The accepted v2 bundle remains frozen campaign evidence, but is not an
 authoring input for future observations.
