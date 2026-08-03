@@ -1,7 +1,7 @@
 ## OPAL Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-02
 
 Start with a workflow for command order. Use the plugin, concept, and reference
 pages for mathematical and interface contracts.

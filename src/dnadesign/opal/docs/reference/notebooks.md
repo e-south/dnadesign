@@ -3,7 +3,7 @@ id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 audience:
   - operator
   - maintainer
@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-02
 
 ## OPAL Notebooks
 

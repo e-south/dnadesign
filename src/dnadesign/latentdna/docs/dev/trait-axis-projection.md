@@ -2,8 +2,8 @@
 
 **Owner:** dnadesign-maintainers
 **Status:** implemented generic runtime contract
-**Last verified:** 2026-08-01
-**Last edited:** 2026-08-01
+**Last verified:** 2026-08-02
+**Last edited:** 2026-08-02
 **First dogfood workspace:** `rt_lnrna_sponging_construct_triage`
 
 This note defines a generic LatentDNA fitted-geometry primitive,

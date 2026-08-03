@@ -3,14 +3,14 @@ id: opal-objective-response-magnitude-feasibility-v1
 title: Response-Magnitude Feasibility objective
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 ---
 
 ## Response-Magnitude Feasibility `response_magnitude_feasibility_v1`
 
 **Short name:** RMF
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-02
 
 `response_magnitude_feasibility_v1` is a built-in objective plugin, not a
 selector or label contract. The plugin does not declare whether a particular

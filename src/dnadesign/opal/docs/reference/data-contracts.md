@@ -1,7 +1,7 @@
 ## OPAL Data and Artifact Contracts v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-02
 
 ### Candidate records
 

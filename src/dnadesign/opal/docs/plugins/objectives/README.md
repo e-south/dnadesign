@@ -3,13 +3,13 @@ id: opal-objective-plugins
 title: OPAL objective plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 ---
 
 ## OPAL Objective Plugins
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-02
 
 Objective plugins convert shared model predictions into named score and
 uncertainty channels. Objective-specific pages define the equations.
