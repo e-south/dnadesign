@@ -238,6 +238,7 @@ environments = [
 constraint-dependencies = [
   "cryptography>=48.0.1",
   "click>=8.3.3",
+  "idna>=3.15",
   "onnx>=1.22.0",
   "pillow>=12.3.0",
   "pymdown-extensions>=11.0.1",

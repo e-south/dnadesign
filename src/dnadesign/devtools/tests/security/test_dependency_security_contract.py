@@ -42,6 +42,7 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     assert "marimo>=0.23.16" in dependencies
     assert "pillow>=12.3.0" in dependencies
     assert "zstd>=1.5.7.2,!=1.5.7.3" in dependencies
+    assert "idna>=3.15" in constraint_dependencies
     assert "pymdown-extensions>=11.0.1" in constraint_dependencies
     assert any(requirement.startswith("onnx>=1.22.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("pip>=26.1.2;") for requirement in evo2_dependencies)
