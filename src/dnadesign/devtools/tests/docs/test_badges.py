@@ -19,7 +19,9 @@ from dnadesign.devtools.docs.badges import (
     ROOT_README_ALLOWED_BADGES,
     find_markdown_badge_policy_issues,
     rendered_markdown_badge_lines,
+    rendered_markdown_images,
 )
+from dnadesign.devtools.docs.parser_compat import SourceMappedHTMLParser
 
 
 def _write(path: Path, text: str) -> None:
@@ -384,6 +386,55 @@ def test_badge_policy_requires_root_badges_to_be_rendered(tmp_path: Path, conten
     _write(root_readme, content)
 
     assert rendered_markdown_badge_lines(root_readme.read_text(encoding="utf-8")) == ()
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        '<img hidden src="https://img.shields.io/badge/build-passing.svg">\n',
+        '<section hidden><img src="https://img.shields.io/badge/build-passing.svg"></section>\n',
+        '<dialog><img src="https://img.shields.io/badge/build-passing.svg"></dialog>\n',
+        '<picture><source hidden srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img src="diagram.svg"></picture>\n',
+        '<picture><source srcset="https://img.shields.io/badge/build-passing.svg">'
+        '<img hidden src="diagram.svg"></picture>\n',
+        '<svg><defs><image href="https://img.shields.io/badge/build-passing.svg"/></defs></svg>\n',
+        '<svg><symbol><image href="https://img.shields.io/badge/build-passing.svg"/></symbol></svg>\n',
+        '<svg><clipPath><image href="https://img.shields.io/badge/build-passing.svg"/></clipPath></svg>\n',
+        '<svg><mask><image href="https://img.shields.io/badge/build-passing.svg"/></mask></svg>\n',
+        '<svg><pattern><image href="https://img.shields.io/badge/build-passing.svg"/></pattern></svg>\n',
+    ],
+)
+def test_badge_policy_ignores_images_in_nonrendering_contexts(tmp_path: Path, content: str) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(tool_readme, content)
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        '<dialog open><img src="https://img.shields.io/badge/build-passing.svg"></dialog>\n',
+        '<svg><image href="https://img.shields.io/badge/build-passing.svg"/></svg>\n',
+    ],
+)
+def test_badge_policy_keeps_images_in_rendering_contexts_visible(tmp_path: Path, content: str) -> None:
+    tool_readme = tmp_path / "src" / "dnadesign" / "aligner" / "README.md"
+    _write(tool_readme, content)
+
+    assert find_markdown_badge_policy_issues(tmp_path, [tool_readme]) == [
+        f"{tool_readme}:1: badges belong only in the root README; use a plain text link instead."
+    ]
+
+
+def test_parser_compat_import_and_malformed_html_smoke() -> None:
+    assert SourceMappedHTMLParser.__name__ == "SourceMappedHTMLParser"
+    images = rendered_markdown_images(
+        '<table><tr><svg><defs><image href="badge.svg"></table><dialog open><img alt="visible" src="visible.svg">'
+    )
+
+    assert [(image.label, image.sources) for image in images] == [("visible", ("visible.svg",))]
 
 
 def test_badge_policy_keeps_plaintext_content_inert_through_eof(tmp_path: Path) -> None:

@@ -853,6 +853,29 @@ def test_tool_readme_banner_check_accepts_existing_local_svg_banner(tmp_path: Pa
     assert issues == []
 
 
+@pytest.mark.parametrize(
+    "banner_syntax",
+    [
+        "<!-- ![Alpha banner](assets/alpha-banner.svg) -->",
+        r"\![Alpha banner](assets/alpha-banner.svg)",
+        "`![Alpha banner](assets/alpha-banner.svg)`",
+    ],
+)
+def test_tool_readme_banner_check_requires_a_rendered_image(tmp_path: Path, banner_syntax: str) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        f"{banner_syntax}\n\nCompact subtitle.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+
+    issues = _find_tool_readme_banner_issues(tmp_path)
+
+    assert any("alpha/README.md" in issue and "missing top banner image" in issue for issue in issues)
+
+
 def test_tool_readme_banner_check_rejects_uncatalogued_and_orphaned_paths(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 import yaml
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
-from dnadesign.devtools.docs.badges import find_markdown_badge_policy_issues
+from dnadesign.devtools.docs.badges import find_markdown_badge_policy_issues, rendered_markdown_images
 from dnadesign.devtools.docs.banners.catalog import BANNERS
 from dnadesign.devtools.docs.banners.render import check_banners
 from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
@@ -45,7 +45,7 @@ from dnadesign.ops.status import list_status_kind_specs_for_repo
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
 README_TOOL_COMPONENT_COVERAGE_PATTERN = re.compile(r"codecov\.io/[^\s)]+[?&]component=", flags=re.IGNORECASE)
-TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
+TOOL_README_BANNER_LABEL_PATTERN = re.compile(r"\bbanner\b", flags=re.IGNORECASE)
 TOOL_README_BANNER_DIMENSION_PATTERN = re.compile(
     r"<svg[^>]*\bwidth=\"1200\"[^>]*\bheight=\"180\"[^>]*\bviewBox=\"0 0 1200 180\"",
     flags=re.IGNORECASE,
@@ -2095,6 +2095,16 @@ def _resolve_readme_banner_reference(*, repo_root: Path, readme_path: Path, targ
     return declared_relative, target_path
 
 
+def _top_rendered_readme_banner(text: str) -> tuple[int, str] | None:
+    for image in rendered_markdown_images(text):
+        if image.line_no > 25 or TOOL_README_BANNER_LABEL_PATTERN.search(image.label) is None:
+            continue
+        if len(image.sources) != 1:
+            return image.line_no, ""
+        return image.line_no, image.sources[0]
+    return None
+
+
 def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
     banner_source = repo_root / "src" / "dnadesign" / "devtools" / "docs" / "banners"
     if not banner_source.is_dir():
@@ -2102,11 +2112,10 @@ def _find_banner_catalog_inventory_issues(repo_root: Path) -> list[str]:
 
     referenced_paths_by_readme: dict[str, str] = {}
     for readme_path in sorted((repo_root / "src" / "dnadesign").rglob("README.md")):
-        top_block = "\n".join(readme_path.read_text(encoding="utf-8").splitlines()[:25])
-        banner_match = TOOL_README_BANNER_PATTERN.search(top_block)
-        if banner_match is None:
+        banner = _top_rendered_readme_banner(readme_path.read_text(encoding="utf-8"))
+        if banner is None:
             continue
-        link = banner_match.group("link").strip().split()[0]
+        _line_no, link = banner
         parsed = urlparse(link)
         if parsed.scheme or link.startswith("mailto:") or not link.lower().endswith(".svg"):
             continue
@@ -2175,12 +2184,12 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
 
         text = readme_path.read_text(encoding="utf-8")
         top_block = "\n".join(text.splitlines()[:25])
-        banner_match = TOOL_README_BANNER_PATTERN.search(top_block)
-        if banner_match is None:
+        banner = _top_rendered_readme_banner(text)
+        if banner is None:
             issues.append(f"{readme_path}: missing top banner image markdown line with '* banner' alt text.")
             continue
 
-        link = banner_match.group("link").strip().split()[0]
+        _line_no, link = banner
         parsed = urlparse(link)
         if parsed.scheme or link.startswith("mailto:") or not link.lower().endswith(".svg"):
             issues.append(f"{readme_path}: banner link must target a local .svg asset.")
@@ -2258,8 +2267,8 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
             continue
 
         first_index = non_empty_indices[0]
-        first_line = lines[first_index].strip()
-        if TOOL_README_BANNER_PATTERN.search(first_line) is None:
+        banner = _top_rendered_readme_banner(text)
+        if banner is None or banner[0] != first_index + 1:
             issues.append(f"{readme_path}: first non-empty line must be the banner image line.")
             continue
 

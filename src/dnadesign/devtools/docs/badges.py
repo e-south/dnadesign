@@ -17,20 +17,20 @@ import secrets
 from bisect import bisect_right
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from itertools import count
 from pathlib import Path
 from urllib.parse import unquote
 from xml.etree.ElementTree import Element
 
-import html5lib
-from html5lib._tokenizer import HTMLTokenizer, tokenTypes
-from html5lib.html5parser import HTMLParser, _ReparseException
 from markdown_it import MarkdownIt
-from markdown_it.rules_inline import html_inline as markdown_html_inline_rule
-from markdown_it.rules_inline import image as markdown_image_rule
-from markdown_it.rules_inline.state_inline import StateInline
-from markdown_it.token import Token
 from upa_url import URL
+
+from dnadesign.devtools.docs.parser_compat import (
+    MarkdownStateInline,
+    MarkdownToken,
+    SourceMappedHTMLParser,
+    markdown_html_inline_rule,
+    markdown_image_rule,
+)
 
 BADGE_PATH_PATTERN = re.compile(r"(?:^|[/_.-])badges?(?:[./?_-]|$)", flags=re.IGNORECASE)
 BADGE_PROVIDER_HOSTS = frozenset({"shields.io", "codecov.io"})
@@ -41,7 +41,6 @@ ASCII_WHITESPACE = frozenset("\t\n\f\r ")
 C0_CONTROL_OR_SPACE = "".join(chr(codepoint) for codepoint in range(0x21))
 CSS_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", flags=re.DOTALL)
 MIME_SUBTYPE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*")
-RAW_IMAGE_TAGS = frozenset({"image", "img", "source"})
 MARKDOWN_RENDER_BASE_URL = "https://example.test/docs/"
 XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml"
 SVG_NAMESPACE = "http://www.w3.org/2000/svg"
@@ -49,7 +48,16 @@ XLINK_HREF_ATTRIBUTE = "{http://www.w3.org/1999/xlink}href"
 NON_RENDERING_CONTAINERS = frozenset(
     {
         (XHTML_NAMESPACE, "template"),
+        (SVG_NAMESPACE, "clippath"),
         (SVG_NAMESPACE, "desc"),
+        (SVG_NAMESPACE, "defs"),
+        (SVG_NAMESPACE, "marker"),
+        (SVG_NAMESPACE, "mask"),
+        (SVG_NAMESPACE, "metadata"),
+        (SVG_NAMESPACE, "pattern"),
+        (SVG_NAMESPACE, "script"),
+        (SVG_NAMESPACE, "style"),
+        (SVG_NAMESPACE, "symbol"),
         (SVG_NAMESPACE, "title"),
     }
 )
@@ -78,6 +86,16 @@ class _ImageOccurrence:
     line_no: int
     ordinal: int
     spec: _ImageSpec
+
+
+@dataclass(frozen=True, slots=True)
+class RenderedMarkdownImage:
+    """A rendered image and its source location in Markdown."""
+
+    line_no: int
+    label: str
+    sources: tuple[str, ...]
+    linked: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,9 +173,9 @@ def _line_start_offsets(content: str) -> tuple[int, ...]:
 
 
 def _record_inline_source_span(
-    state: StateInline,
+    state: MarkdownStateInline,
     silent: bool,
-    rule: Callable[[StateInline, bool], bool],
+    rule: Callable[[MarkdownStateInline, bool], bool],
     *,
     expected_type: str,
 ) -> bool:
@@ -173,11 +191,11 @@ def _record_inline_source_span(
     return True
 
 
-def _source_mapped_image_rule(state: StateInline, silent: bool) -> bool:
+def _source_mapped_image_rule(state: MarkdownStateInline, silent: bool) -> bool:
     return _record_inline_source_span(state, silent, markdown_image_rule, expected_type="image")
 
 
-def _source_mapped_html_inline_rule(state: StateInline, silent: bool) -> bool:
+def _source_mapped_html_inline_rule(state: MarkdownStateInline, silent: bool) -> bool:
     return _record_inline_source_span(state, silent, markdown_html_inline_rule, expected_type="html_inline")
 
 
@@ -213,7 +231,7 @@ def _looks_like_badge(*, label: str, sources: Sequence[str], linked: bool) -> bo
 
 
 def _annotate_inline_candidates(
-    children: Sequence[Token],
+    children: Sequence[MarkdownToken],
     *,
     source: str,
     start_line_no: int,
@@ -276,94 +294,6 @@ def _render_markdown_with_markers(content: str) -> tuple[str, str, _RawHTMLSourc
         marker_attribute,
         _RawHTMLSourceMap.from_fragments(rendered_html, raw_fragments),
     )
-
-
-class _SourceMappedHTMLTokenizer(HTMLTokenizer):
-    def __init__(
-        self,
-        stream: str,
-        *,
-        parser: HTMLParser,
-        marker_attribute: str,
-        raw_source_map: _RawHTMLSourceMap,
-        **kwargs: object,
-    ) -> None:
-        if not isinstance(stream, str):
-            raise TypeError("source-mapped HTML parsing requires rendered text")
-        self._line_starts = _line_start_offsets(stream)
-        super().__init__(stream, parser=parser, **kwargs)
-        self._marker_attribute = marker_attribute
-        self._raw_source_map = raw_source_map
-        self._ordinals = count()
-
-    def tagOpenState(self) -> bool:
-        rendered_line, rendered_column = self.stream.position()
-        rendered_offset = self._line_starts[rendered_line - 1] + rendered_column - 1
-        previous_token = getattr(self, "currentToken", None)
-        result = super().tagOpenState()
-        token = getattr(self, "currentToken", None)
-        if token is not previous_token and token is not None and token.get("type") == tokenTypes["StartTag"]:
-            token["dnadesign_rendered_line"] = rendered_line
-            token["dnadesign_rendered_offset"] = rendered_offset
-        return result
-
-    def emitCurrentToken(self) -> None:
-        token = self.currentToken
-        rendered_line = token.pop("dnadesign_rendered_line", None)
-        rendered_offset = token.pop("dnadesign_rendered_offset", None)
-        super().emitCurrentToken()
-        if token.get("type") != tokenTypes["StartTag"] or token.get("name") not in RAW_IMAGE_TAGS:
-            return
-        attributes = token.get("data")
-        if not isinstance(attributes, dict):
-            raise RuntimeError("HTML tokenizer emitted a start tag without normalized attributes")
-        source_line = None
-        if isinstance(rendered_line, int) and isinstance(rendered_offset, int):
-            source_line = self._raw_source_map.source_line_for(
-                rendered_offset=rendered_offset,
-                rendered_line=rendered_line,
-            )
-        if source_line is None:
-            declared_line = attributes.get(self._marker_attribute)
-            if isinstance(declared_line, str) and declared_line.isdigit():
-                source_line = int(declared_line)
-        if source_line is None:
-            return
-        if source_line < 1:
-            raise RuntimeError("HTML tokenizer resolved an invalid source line")
-        attributes[self._marker_attribute] = f"{source_line}:{next(self._ordinals)}"
-
-
-class _SourceMappedHTMLParser(HTMLParser):
-    def __init__(self, *, marker_attribute: str, raw_source_map: _RawHTMLSourceMap) -> None:
-        self._marker_attribute = marker_attribute
-        self._raw_source_map = raw_source_map
-        super().__init__(tree=html5lib.getTreeBuilder("etree"), namespaceHTMLElements=True)
-
-    def _parse(
-        self,
-        stream: str,
-        innerHTML: bool = False,
-        container: str = "div",
-        scripting: bool = False,
-        **kwargs: object,
-    ) -> None:
-        self.innerHTMLMode = innerHTML
-        self.container = container
-        self.scripting = scripting
-        self.tokenizer = _SourceMappedHTMLTokenizer(
-            stream,
-            parser=self,
-            marker_attribute=self._marker_attribute,
-            raw_source_map=self._raw_source_map,
-            **kwargs,
-        )
-        self.reset()
-        try:
-            self.mainLoop()
-        except _ReparseException:
-            self.reset()
-            self.mainLoop()
 
 
 def _positive_integer_descriptor(value: str) -> str | None:
@@ -520,6 +450,15 @@ def _element_is_link(element: Element) -> bool:
     )
 
 
+def _element_hides_descendants(element: Element) -> bool:
+    name = _element_name(element)
+    if name is None:
+        return False
+    if "hidden" in element.attrib:
+        return True
+    return name == (XHTML_NAMESPACE, "dialog") and "open" not in element.attrib
+
+
 def _normalized_media_query(media: str) -> str:
     return " ".join(CSS_COMMENT_PATTERN.sub(" ", media).casefold().split())
 
@@ -556,7 +495,7 @@ def _picture_sources_before_image(
     """Return reachable sources and whether the image fallback URL is unreachable."""
     candidates: list[tuple[Element, tuple[str, ...]]] = []
     for element in children[:image_index]:
-        if _element_name(element) != (XHTML_NAMESPACE, "source"):
+        if _element_name(element) != (XHTML_NAMESPACE, "source") or _element_hides_descendants(element):
             continue
         if not _picture_source_is_potentially_eligible(element):
             continue
@@ -599,7 +538,7 @@ def _dom_image_occurrences(
     marker_attribute: str,
     raw_source_map: _RawHTMLSourceMap,
 ) -> tuple[_ImageOccurrence, ...]:
-    parser = _SourceMappedHTMLParser(
+    parser = SourceMappedHTMLParser(
         marker_attribute=marker_attribute,
         raw_source_map=raw_source_map,
     )
@@ -626,14 +565,14 @@ def _dom_image_occurrences(
     while stack:
         element, ancestor_linked = stack.pop()
         name = _element_name(element)
-        if name in NON_RENDERING_CONTAINERS:
+        if name in NON_RENDERING_CONTAINERS or _element_hides_descendants(element):
             continue
         linked = ancestor_linked or _element_is_link(element)
         children = list(element)
 
         if name == (XHTML_NAMESPACE, "picture"):
             for image_index, child in enumerate(children):
-                if _element_name(child) == (XHTML_NAMESPACE, "img"):
+                if _element_name(child) == (XHTML_NAMESPACE, "img") and not _element_hides_descendants(child):
                     previous_sources, is_terminal = _picture_sources_before_image(
                         children,
                         image_index=image_index,
@@ -669,6 +608,20 @@ def _rendered_image_occurrences(content: str) -> tuple[_ImageOccurrence, ...]:
         rendered_html,
         marker_attribute=marker_attribute,
         raw_source_map=raw_source_map,
+    )
+
+
+def rendered_markdown_images(content: str) -> tuple[RenderedMarkdownImage, ...]:
+    """Return images that survive Markdown rendering and HTML visibility rules."""
+
+    return tuple(
+        RenderedMarkdownImage(
+            line_no=occurrence.line_no,
+            label=occurrence.spec.label,
+            sources=occurrence.spec.sources,
+            linked=occurrence.spec.linked,
+        )
+        for occurrence in _rendered_image_occurrences(content)
     )
 
 
