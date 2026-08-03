@@ -22,6 +22,7 @@ from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_respons
     MaterializationBlocker,
     MaterializationOmission,
     MetastudyContractError,
+    MetastudyDecision,
     decision_from_readiness,
     decision_to_dict,
     publish_metastudy,
@@ -42,7 +43,9 @@ from .._builders import (
 
 
 def test_mutated_payload_is_rejected_before_publication(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy import publication
+    from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reporter_response.metastudy.publication import (
+        service,
+    )
 
     decision = decision_from_readiness(
         EvidenceReadiness._from_validated_receipt(
@@ -58,11 +61,33 @@ def test_mutated_payload_is_rejected_before_publication(monkeypatch: pytest.Monk
     with pytest.raises(MetastudyContractError, match="blocked decision"):
         validate_decision_payload(payload)
 
-    monkeypatch.setattr(publication, "decision_to_dict", lambda _decision: payload)
-    destination = tmp_path / "must-not-exist"
+    monkeypatch.setattr(service, "decision_to_dict", lambda _decision: payload)
+    destination = tmp_path / "missing-parent" / "must-not-exist"
     with pytest.raises(MetastudyContractError, match="blocked decision"):
         publish_metastudy(decision, destination)
-    assert not destination.exists()
+    assert not destination.parent.exists()
+
+
+def test_selected_decision_cannot_be_reconstructed_from_copied_fields() -> None:
+    selected = evaluate_metastudy(_evidence(), readiness=_ready())
+
+    with pytest.raises(MetastudyContractError, match="canonical evaluation"):
+        MetastudyDecision(
+            contract_id=selected.contract_id,
+            protocol_id=selected.protocol_id,
+            condition_ontology_digest=selected.condition_ontology_digest,
+            status=selected.status,
+            selection_use=selected.selection_use,
+            evidence_grade=selected.evidence_grade,
+            selected_reduction=selected.selected_reduction,
+            blockers=selected.blockers,
+            limitations=selected.limitations,
+            policy_digest=selected.policy_digest,
+            evidence_digest=selected.evidence_digest,
+            readiness=selected.readiness,
+            evaluations=selected.evaluations,
+            materialization_attempts=selected.materialization_attempts,
+        )
 
 
 def test_selected_decision_serialization_binds_attempts_but_is_not_a_publication() -> None:

@@ -117,6 +117,7 @@ _EXPECTED_OPERATOR_TEST_MODULES = {
     "test_persistence.py",
     "test_regeneration.py",
     "test_state.py",
+    "test_state_selection.py",
 }
 _OPERATOR_TEST_LINE_BUDGETS = {
     "__init__.py": 20,
@@ -126,6 +127,7 @@ _OPERATOR_TEST_LINE_BUDGETS = {
     "test_persistence.py": 120,
     "test_regeneration.py": 380,
     "test_state.py": 200,
+    "test_state_selection.py": 130,
 }
 _ACQUISITION_PROJECTION_LINE_BUDGETS = {
     "__init__.py": 30,

@@ -19,7 +19,8 @@ from pathlib import Path
 
 from ..contracts.decision import decision_is_evidence_bearing
 from ..contracts.decision_codec import decision_to_dict
-from ..publication import publish_metastudy, verify_publication
+from ..publication.service import publish_metastudy
+from ..publication.verification import verify_publication
 from ..sensitivity import sensitivity_evaluations_to_payload
 from .checkout import require_active_dnadesign_checkout
 from .persistence import write_source_controlled_state

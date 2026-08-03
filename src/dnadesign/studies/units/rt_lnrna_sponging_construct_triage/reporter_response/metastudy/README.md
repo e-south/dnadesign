@@ -34,8 +34,10 @@ The public surface is intentionally small:
   the source-controlled decision, compact coverage receipts, and sibling
   sensitivity summaries; an internally valid but stale profile or sensitivity
   digest cannot pass.
-- `publication.py` creates one deterministic meta-study envelope in a new
-  directory. Every bundle contains `manifest.json`, `report.md`, and
+- `publication/` owns the study-specific envelope, canonical report, and
+  scientific verification. It delegates create-only installation and rollback
+  to the shared `dnadesign.artifacts` boundary instead of maintaining a second
+  filesystem publisher. Every bundle contains `manifest.json`, `report.md`, and
   `sensitivity.json`; every evaluated bundle, whether selected or
   scientifically blocked, additionally contains primary `evidence.json`.
   A selected bundle also contains `acquisition.json`, which is restricted to the
