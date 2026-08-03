@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import pickle
 import re
+import subprocess
 import tomllib
 from datetime import date
 from pathlib import Path
@@ -29,6 +30,42 @@ def _repo_root() -> Path:
 def _pyproject() -> dict[str, object]:
     with (_repo_root() / "pyproject.toml").open("rb") as handle:
         return tomllib.load(handle)
+
+
+def _repository_source_files(
+    repo_root: Path,
+    *,
+    roots: tuple[str, ...],
+    suffixes: frozenset[str],
+) -> tuple[Path, ...]:
+    completed = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            *roots,
+        ],
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git ls-files failed: {detail or 'unknown error'}")
+
+    sources: list[Path] = []
+    for raw_path in completed.stdout.split(b"\0"):
+        if not raw_path:
+            continue
+        relative_path = Path(raw_path.decode("utf-8"))
+        if relative_path.suffix in suffixes:
+            sources.append(relative_path)
+    return tuple(sorted(sources))
 
 
 def test_security_floors_are_published_by_their_owning_dependency_sets() -> None:
@@ -70,14 +107,16 @@ def test_bounded_dependency_exception_does_not_enter_supported_code() -> None:
     forbidden = ("torch.jit." + "script",)
     violations: list[str] = []
 
-    for root in (repo_root / ".github", repo_root / "src"):
-        for path in root.rglob("*"):
-            if not path.is_file() or path.suffix not in {".json", ".py", ".toml", ".yaml", ".yml"}:
-                continue
-            text = path.read_text(encoding="utf-8")
-            for symbol in forbidden:
-                if symbol in text:
-                    violations.append(f"{path.relative_to(repo_root)}: {symbol}")
+    source_files = _repository_source_files(
+        repo_root,
+        roots=(".github", "src"),
+        suffixes=frozenset({".json", ".py", ".toml", ".yaml", ".yml"}),
+    )
+    for relative_path in source_files:
+        text = (repo_root / relative_path).read_text(encoding="utf-8")
+        for symbol in forbidden:
+            if symbol in text:
+                violations.append(f"{relative_path}: {symbol}")
 
     assert violations == []
 
@@ -197,17 +236,48 @@ def _torch_boundary_violations(source: str, *, filename: str) -> list[str]:
 def test_torch_deserialization_and_execution_boundaries_fail_closed() -> None:
     repo_root = _repo_root()
     violations: list[str] = []
-    for path in (repo_root / "src" / "dnadesign").rglob("*.py"):
-        if "tests" in path.parts:
+    source_files = _repository_source_files(
+        repo_root,
+        roots=("src/dnadesign",),
+        suffixes=frozenset({".py"}),
+    )
+    for relative_path in source_files:
+        if "tests" in relative_path.parts:
             continue
+        path = repo_root / relative_path
         violations.extend(
             _torch_boundary_violations(
                 path.read_text(encoding="utf-8"),
-                filename=path.relative_to(repo_root).as_posix(),
+                filename=relative_path.as_posix(),
             )
         )
 
     assert violations == []
+
+
+def test_torch_boundary_scope_includes_new_source_and_excludes_ignored_archives(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    tracked = tmp_path / "src" / "dnadesign" / "live.py"
+    tracked.parent.mkdir(parents=True)
+    tracked.write_text("import torch\ntorch.load('safe.pt', weights_only=True)\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", tracked.relative_to(tmp_path)], check=True)
+
+    candidate = tmp_path / "src" / "dnadesign" / "candidate.py"
+    candidate.write_text("import torch\ntorch.load('unsafe.pt')\n", encoding="utf-8")
+
+    (tmp_path / ".gitignore").write_text("src/dnadesign/archived/\n", encoding="utf-8")
+    ignored = tmp_path / "src" / "dnadesign" / "archived" / "legacy.py"
+    ignored.parent.mkdir(parents=True)
+    ignored.write_text("import torch\ntorch.load('unsafe.pt')\n", encoding="utf-8")
+
+    assert _repository_source_files(
+        tmp_path,
+        roots=("src/dnadesign",),
+        suffixes=frozenset({".py"}),
+    ) == (
+        Path("src/dnadesign/candidate.py"),
+        Path("src/dnadesign/live.py"),
+    )
 
 
 @pytest.mark.parametrize(

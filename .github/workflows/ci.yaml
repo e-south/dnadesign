@@ -137,7 +137,7 @@ jobs:
         run: uv run python -m dnadesign.devtools.architecture.boundaries
 
       - name: Package layout contracts
-        run: uv run pytest -q src/dnadesign/devtools/tests/package/test_layout.py
+        run: uv run pytest -q src/dnadesign/devtools/tests/package
 
       - name: Pre-commit (non-Ruff hooks)
         env:

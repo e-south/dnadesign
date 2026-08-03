@@ -114,8 +114,35 @@ test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
 
+[tool.setuptools]
+# Runtime-owned resource trees rely on Git-backed package data in addition to
+# the targeted package-data declarations below.
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["src"]
+exclude = [
+  "dnadesign.archived",
+  "dnadesign.archived.*",
+  "dnadesign.prototypes",
+  "dnadesign.prototypes.*",
+  "dnadesign.usr.archived",
+  "dnadesign.usr.archived.*",
+  "dnadesign.usr.datasets.usr_regulondb_native_promoters",
+  "dnadesign.usr.datasets.usr_regulondb_native_promoters.*",
+  "dnadesign.opal.campaigns.*.notebooks",
+  "dnadesign.opal.campaigns.*.notebooks.*",
+  "dnadesign.densegen.workspaces.*.outputs.notebooks",
+  "dnadesign.densegen.workspaces.*.outputs.notebooks.*",
+  "dnadesign.latentdna.workspaces.*.outputs.notebooks",
+  "dnadesign.latentdna.workspaces.*.outputs.notebooks.*",
+  "dnadesign.studies.units.*.workspaces.*.outputs.*.notebooks",
+  "dnadesign.studies.units.*.workspaces.*.outputs.*.notebooks.*",
+  "dnadesign.studies.units.*.workbench.outputs",
+  "dnadesign.studies.units.*.workbench.outputs.*",
+  "dnadesign.studies.units.*.workbench.source_evidence.*.notebooks",
+  "dnadesign.studies.units.*.workbench.source_evidence.*.notebooks.*",
+]
 
 [tool.setuptools.package-data]
 "dnadesign.cruncher" = [
@@ -184,6 +211,15 @@ where = ["src"]
 ]
 "dnadesign.usr" = [
   "ops/status.registry.yaml",
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = [
+  "reader_spop_*.parquet",
+  "remotes.yaml",
+]
+"dnadesign.densegen" = [
+  "workspaces/*/config.probe.*.yaml",
 ]
 
 [tool.pytest.ini_options]

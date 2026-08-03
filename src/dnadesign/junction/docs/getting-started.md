@@ -3,7 +3,7 @@
 **Type:** tutorial
 **Audience:** first-time users
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-03
 
 This tutorial publishes and verifies one small synthetic design. Its short
 oligos, 8-nt toeholds, loose composition bounds, and small search budgets make
@@ -70,9 +70,11 @@ primers or predict PCR behavior. The order labels are copied into the output;
 the tool does not choose a supplier or submit an order.
 
 `nominal_fragment_oligo_length` sets the planner's locus geometry. It is not a
-promise that every fragment order has that length: candidate offsets can
-produce an order as long as the nominal value plus `search_range - 1`, and a
-terminal fragment can be shorter. The tutorial sets
+promise that every fragment order has that length. The maximum is the larger
+of the offset-expanded length `L + R - 1` and the terminal-complement length
+`L - b + t`, where `L`, `R`, `b`, and `t` are the nominal length, search range,
+barcode length, and toehold length. A terminal fragment can also be shorter.
+The tutorial sets
 `minimum_fragment_oligo_length: 1` only so its small synthetic example is easy
 to run. Choose and review a real minimum for synthesis work. `junction` checks
 the declared minimum and maximum as string lengths; it does not judge whether

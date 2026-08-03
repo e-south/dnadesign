@@ -128,7 +128,7 @@ def test_core_lane_fails_fast_on_package_layout_contracts() -> None:
     step_names = [str(step.get("name", "")) for step in steps]
     layout_step = next(step for step in steps if step.get("name") == "Package layout contracts")
 
-    assert layout_step["run"] == "uv run pytest -q src/dnadesign/devtools/tests/package/test_layout.py"
+    assert layout_step["run"] == "uv run pytest -q src/dnadesign/devtools/tests/package"
     assert step_names.index("Package layout contracts") < step_names.index("Tests (core lane) + coverage report")
 
 
