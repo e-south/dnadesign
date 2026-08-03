@@ -3,7 +3,7 @@
 **Type:** guide
 **Audience:** users turning exact targets into a reviewed design request
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-03
 
 `junction` does not infer a complete design from a sequence alone. Before
 planning, supply five things:
@@ -126,11 +126,17 @@ The tool never relaxes these values automatically. Candidate exhaustion fails
 with the original request preserved.
 
 `nominal_fragment_oligo_length` is a coordinate parameter, not a physical
-length guarantee. The current method can emit fragment orders as long as
-`nominal_fragment_oligo_length + search_range - 1`; terminal fragment orders
-can be shorter than the nominal value. This differs from the Nature paper's
-use of `L` for the physical input-oligo length. Inspect the planned order
-lengths instead of treating the field name as a purchasing specification.
+length guarantee. The longest possible fragment order is the larger of:
+
+- `nominal_fragment_oligo_length + search_range - 1`, for an offset-expanded
+  strand; and
+- `nominal_fragment_oligo_length - barcode_length + toehold_length`, for a
+  terminal complement strand.
+
+Terminal fragment orders can also be shorter than the nominal value. This
+differs from the Nature paper's use of `L` for the physical input-oligo length.
+Inspect the planned order lengths instead of treating the field name as a
+purchasing specification.
 
 ## Declare order metadata
 
