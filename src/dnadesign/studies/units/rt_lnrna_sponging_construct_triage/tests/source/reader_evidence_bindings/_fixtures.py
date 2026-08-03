@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from dnadesign.studies.core.reader_records import ReaderRecordProducer
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_evidence import (
     ReaderDataframeRecordRef,
 )
@@ -74,6 +75,14 @@ def _resolve_record(
         record_schema_version=6,
         revision=1,
         revision_digest=_REVISION_DIGEST,
+        config_digest="sha256:" + ("b" * 64),
+        producer_config_digest="sha256:" + ("c" * 64),
+        producer=ReaderRecordProducer(
+            kind="pipeline",
+            id="sample_measurements",
+            plugin="transform/sample_measurements",
+        ),
+        inputs=(),
         contract_id="plate_reader.annotated.v1",
         reader_path="artifacts/sample_measurements/df.parquet",
         path=artifact,

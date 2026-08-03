@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import statistics
 import subprocess
 from pathlib import Path
 
 import pandas as pd
 
+from dnadesign.studies.core.reader_records import ReaderRecordProducer
 from dnadesign.studies.units.rt_lnrna_sponging_construct_triage.reader_evidence import (
     BiologicalReplicateIdentityScope,
     ReaderDataframeRecordRef,
@@ -96,15 +98,17 @@ for trace in payload["traces"]:
     outputs.append(result.value)
 json.dump(outputs, sys.stdout)
 """
+    reader_python = Path(os.environ.get("DNADESIGN_READER_PYTHON", str(reader_root / ".venv/bin/python"))).expanduser()
     completed = subprocess.run(
-        [str(reader_root / ".venv/bin/python"), "-c", script],
+        [str(reader_python), "-c", script],
         input=json.dumps(payload, sort_keys=True),
         text=True,
         capture_output=True,
         check=False,
     )
     if completed.returncode != 0:
-        raise ValueError(completed.stderr.strip())
+        diagnostic = completed.stderr.strip() or completed.stdout.strip() or "<no output>"
+        raise ValueError(f"Reader temporal conformance process failed: {diagnostic}")
     return float(statistics.median(json.loads(completed.stdout)))
 
 
@@ -202,6 +206,14 @@ def _source_closed_inputs(
         record_schema_version=6,
         revision=1,
         revision_digest=_REVISION_DIGEST,
+        config_digest="sha256:" + ("b" * 64),
+        producer_config_digest="sha256:" + ("c" * 64),
+        producer=ReaderRecordProducer(
+            kind="pipeline",
+            id="sample_measurements",
+            plugin="transform/sample_measurements",
+        ),
+        inputs=(),
         contract_id="plate_reader.annotated.v1",
         reader_path="artifacts/sample_measurements/df.parquet",
         path=artifact,

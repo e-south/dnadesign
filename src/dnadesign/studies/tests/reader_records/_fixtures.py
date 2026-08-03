@@ -8,6 +8,9 @@ from dnadesign.studies.core.reader_records import (
 )
 
 _REVISION_DIGEST = "sha256:" + ("a" * 64)
+_CONFIG_DIGEST = "sha256:" + ("b" * 64)
+_PRODUCER_CONFIG_DIGEST = "sha256:" + ("c" * 64)
+_INPUT_REVISION_DIGEST = "sha256:" + ("d" * 64)
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path, Path, str]:
@@ -90,6 +93,26 @@ def _record(
         "path": path,
         "revision": 1,
         "revision_digest": _REVISION_DIGEST,
+        "config_digest": _CONFIG_DIGEST,
+        "producer_config_digest": _PRODUCER_CONFIG_DIGEST,
+        "producer": {
+            "kind": "pipeline",
+            "id": "ratio_reporter_normalizer",
+            "plugin": "transform/ratio_reporter_normalizer",
+            "source_recipe": {
+                "recipe": "plate_reader/single_reporter_screen_base",
+                "with": {"normalizer_channel": "OD600", "reporter_channel": "RFP"},
+            },
+        },
+        "inputs": [
+            {
+                "label": "df",
+                "kind": "record",
+                "record": "labels/df",
+                "discovery_policy": "record",
+                "record_revision_digest": _INPUT_REVISION_DIGEST,
+            }
+        ],
     }
 
 

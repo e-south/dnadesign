@@ -19,6 +19,14 @@ from .contracts import (
     ReaderRecordSet,
     ReaderResolvedRecord,
 )
+from .provenance import (
+    ReaderInputArtifactEvidence,
+    ReaderRecordInputEvidence,
+    ReaderRecordProducer,
+    ReaderRecordRecipeSource,
+    parse_record_inputs,
+    parse_record_producer,
+)
 from .resolver import resolve_digest_verified_dataframe_record, resolve_digest_verified_records
 from .validation import ReaderDataframeRecordError, ReaderRecordError
 
@@ -29,10 +37,16 @@ __all__ = [
     "ReaderArtifactFile",
     "ReaderDataframeRecordError",
     "ReaderDataframeRecordRef",
+    "ReaderInputArtifactEvidence",
     "ReaderRecordError",
     "ReaderRecordExpectation",
+    "ReaderRecordInputEvidence",
+    "ReaderRecordProducer",
+    "ReaderRecordRecipeSource",
     "ReaderRecordSet",
     "ReaderResolvedRecord",
+    "parse_record_inputs",
+    "parse_record_producer",
     "resolve_digest_verified_dataframe_record",
     "resolve_digest_verified_records",
 ]

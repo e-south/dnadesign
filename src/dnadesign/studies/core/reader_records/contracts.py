@@ -15,7 +15,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .validation import ReaderRecordError, require_contained
+from .provenance import (
+    ReaderRecordInputEvidence,
+    ReaderRecordProducer,
+    parse_record_inputs,
+    parse_record_producer,
+)
+from .validation import ReaderRecordError, require_contained, sha256_digest
 
 READER_CLI_SCHEMA = "reader.cli/v1"
 READER_CATALOG_SCHEMA_VERSION = 4
@@ -36,6 +42,10 @@ class ReaderDataframeRecordRef:
     record_schema_version: int
     revision: int
     revision_digest: str
+    config_digest: str
+    producer_config_digest: str
+    producer: ReaderRecordProducer
+    inputs: tuple[ReaderRecordInputEvidence, ...]
     contract_id: str
     reader_path: str
     path: Path
@@ -58,6 +68,10 @@ class ReaderDataframeRecordRef:
         record_schema_version: int,
         revision: int,
         revision_digest: str,
+        config_digest: str,
+        producer_config_digest: str,
+        producer: ReaderRecordProducer,
+        inputs: tuple[ReaderRecordInputEvidence, ...],
         contract_id: str,
         reader_path: str,
         path: Path,
@@ -71,6 +85,12 @@ class ReaderDataframeRecordRef:
         manifest = Path(manifest_path).expanduser().resolve()
         require_contained(artifact, root, label="Reader artifact")
         require_contained(manifest, root, label="Reader record manifest")
+        sha256_digest(config_digest, label="Reader record config_digest")
+        sha256_digest(producer_config_digest, label="Reader record producer_config_digest")
+        if not isinstance(producer, ReaderRecordProducer):
+            raise ReaderRecordError("Reader record producer must be validated public producer evidence")
+        if any(not isinstance(item, ReaderRecordInputEvidence) for item in inputs):
+            raise ReaderRecordError("Reader record inputs must be validated public input evidence")
         reference = cls(
             experiment_id=experiment_id,
             protocol_id=protocol_id,
@@ -81,6 +101,10 @@ class ReaderDataframeRecordRef:
             record_schema_version=record_schema_version,
             revision=revision,
             revision_digest=revision_digest,
+            config_digest=config_digest,
+            producer_config_digest=producer_config_digest,
+            producer=producer,
+            inputs=inputs,
             contract_id=contract_id,
             reader_path=reader_path,
             path=artifact,
@@ -148,10 +172,11 @@ class ReaderResolvedRecord:
     schema_version: int
     revision: int
     revision_digest: str
+    config_digest: str
     contract_id: str | None
-    producer: Mapping[str, object]
-    producer_config_digest: str | None
-    inputs: tuple[Mapping[str, object], ...]
+    producer: ReaderRecordProducer
+    producer_config_digest: str
+    inputs: tuple[ReaderRecordInputEvidence, ...]
     path: Path | None
     reader_path: str | None
     size_bytes: int | None
@@ -162,6 +187,31 @@ class ReaderResolvedRecord:
 
     @classmethod
     def _verified(cls, **values: object) -> ReaderResolvedRecord:
+        record_id = values.get("record_id")
+        if not isinstance(record_id, str) or not record_id.strip():
+            raise ReaderRecordError("verified Reader records require a non-empty record_id")
+        values["config_digest"] = sha256_digest(
+            values.get("config_digest"),
+            label=f"{record_id}.config_digest",
+        )
+        values["producer_config_digest"] = sha256_digest(
+            values.get("producer_config_digest"),
+            label=f"{record_id}.producer_config_digest",
+        )
+        producer = values.get("producer")
+        values["producer"] = (
+            producer
+            if isinstance(producer, ReaderRecordProducer)
+            else parse_record_producer(producer, record_id=record_id)
+        )
+        raw_inputs = values.get("inputs")
+        if isinstance(raw_inputs, tuple) and all(isinstance(item, ReaderRecordInputEvidence) for item in raw_inputs):
+            inputs = raw_inputs
+        elif isinstance(raw_inputs, (list, tuple)):
+            inputs = parse_record_inputs(list(raw_inputs), record_id=record_id)
+        else:
+            raise ReaderRecordError(f"{record_id}.inputs must be an array")
+        values["inputs"] = inputs
         result = cls(**values)  # type: ignore[arg-type]
         object.__setattr__(result, "_source_closure", _SOURCE_CLOSURE_TOKEN)
         return result
@@ -179,6 +229,10 @@ class ReaderResolvedRecord:
             "schema_version": self.schema_version,
             "revision": self.revision,
             "revision_digest": self.revision_digest,
+            "config_digest": self.config_digest,
+            "producer_config_digest": self.producer_config_digest,
+            "producer": _mapping_payload(self.producer),
+            "inputs": [_mapping_payload(item) for item in self.inputs],
         }
         if self.contract_id is not None:
             result["contract_id"] = self.contract_id
@@ -191,12 +245,7 @@ class ReaderResolvedRecord:
                 }
             )
         if self.files:
-            result.update(
-                {
-                    "producer_config_digest": self.producer_config_digest,
-                    "file_evidence": [item.to_dict() for item in self.files],
-                }
-            )
+            result["file_evidence"] = [item.to_dict() for item in self.files]
         return result
 
 
@@ -217,6 +266,15 @@ class ReaderRecordSet:
     experiment_evidence: Mapping[str, object]
     records: Mapping[str, ReaderResolvedRecord]
 
+    def __post_init__(self) -> None:
+        if not self.records:
+            raise ReaderRecordError("resolved Reader record sets cannot be empty")
+        if any(not record.is_source_closed for record in self.records.values()):
+            raise ReaderRecordError("resolved Reader record sets require source-closed records")
+        config_digests = {record.config_digest for record in self.records.values()}
+        if len(config_digests) != 1:
+            raise ReaderRecordError("resolved Reader records must share one experiment config_digest")
+
     def source_receipt(self) -> dict[str, object]:
         return {
             "experiment_id": self.experiment_id,
@@ -228,3 +286,10 @@ class ReaderRecordSet:
             },
             "records": {name: self.records[name].to_dict() for name in sorted(self.records)},
         }
+
+
+def _mapping_payload(value: Mapping[str, object]) -> dict[str, object]:
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return dict(to_dict())
+    return dict(value)

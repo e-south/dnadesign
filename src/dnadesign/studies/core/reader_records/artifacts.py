@@ -21,6 +21,7 @@ from .contracts import (
     ReaderRecordExpectation,
     ReaderResolvedRecord,
 )
+from .provenance import parse_record_inputs, parse_record_producer
 from .validation import (
     ReaderRecordError,
     list_value,
@@ -52,13 +53,13 @@ def resolve_record(
         raise ReaderRecordError(f"{record_id}: kind must equal {expectation.kind!r}")
     revision = positive_revision(record.get("revision"), label=f"{record_id}.revision")
     revision_digest = sha256_digest(record.get("revision_digest"), label=f"{record_id}.revision_digest")
-    producer_value = record.get("producer")
-    producer = {} if producer_value is None else dict(mapping(producer_value, label=f"{record_id}.producer"))
-    inputs_value = record.get("inputs", [])
-    inputs = tuple(
-        dict(mapping(value, label=f"{record_id}.inputs[{index}]"))
-        for index, value in enumerate(list_value(inputs_value, label=f"{record_id}.inputs"))
+    config_digest = sha256_digest(record.get("config_digest"), label=f"{record_id}.config_digest")
+    producer = parse_record_producer(record.get("producer"), record_id=record_id)
+    producer_config_digest = sha256_digest(
+        record.get("producer_config_digest"),
+        label=f"{record_id}.producer_config_digest",
     )
+    inputs = parse_record_inputs(record.get("inputs"), record_id=record_id)
     if kind == "dataframe_artifact":
         if record.get("contract_id") != expectation.contract_id:
             raise ReaderRecordError(f"{record_id}: contract must equal {expectation.contract_id!r}")
@@ -79,9 +80,10 @@ def resolve_record(
             schema_version=READER_RECORD_SCHEMA_VERSION,
             revision=revision,
             revision_digest=revision_digest,
+            config_digest=config_digest,
             contract_id=expectation.contract_id,
             producer=producer,
-            producer_config_digest=None,
+            producer_config_digest=producer_config_digest,
             inputs=inputs,
             path=path,
             reader_path=reader_path.as_posix(),
@@ -91,10 +93,6 @@ def resolve_record(
             files=(),
         )
 
-    producer_config_digest = sha256_digest(
-        record.get("producer_config_digest"),
-        label=f"{record_id}.producer_config_digest",
-    )
     files = resolve_file_evidence(record, outputs_root=outputs_root, record_id=record_id)
     return ReaderResolvedRecord._verified(
         record_id=record_id,
@@ -102,6 +100,7 @@ def resolve_record(
         schema_version=READER_RECORD_SCHEMA_VERSION,
         revision=revision,
         revision_digest=revision_digest,
+        config_digest=config_digest,
         contract_id=None,
         producer=producer,
         producer_config_digest=producer_config_digest,

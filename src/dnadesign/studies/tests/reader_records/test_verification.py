@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.studies.core.reader_records import ReaderDataframeRecordError
+from dnadesign.studies.core.reader_records import (
+    ReaderDataframeRecordError,
+    ReaderRecordExpectation,
+    resolve_digest_verified_records,
+)
 from dnadesign.studies.core.reader_records import transport as reader_transport
 
 from ._fixtures import _fixture, _page, _reader_runner, _record, _resolve, _verify_page
@@ -37,6 +41,30 @@ def test_reader_cli_timeout_fails_closed(tmp_path: Path, monkeypatch) -> None:
         (
             lambda payload: payload["data"]["records"][0].update(content_digest="sha256:" + ("A" * 64)),
             "content_digest must be a lowercase sha256 digest",
+        ),
+        (
+            lambda payload: payload["data"]["records"][0].pop("config_digest"),
+            "config_digest must be a non-empty string",
+        ),
+        (
+            lambda payload: payload["data"]["records"][0].pop("producer_config_digest"),
+            "producer_config_digest must be a non-empty string",
+        ),
+        (
+            lambda payload: payload["data"]["records"][0].pop("producer"),
+            "producer must be an object",
+        ),
+        (
+            lambda payload: payload["data"]["records"][0]["producer"].update(kind="not-a-producer"),
+            "producer.kind is unsupported",
+        ),
+        (
+            lambda payload: payload["data"]["records"][0]["inputs"][0].pop("record_revision_digest"),
+            "inputs\\[0\\] fields are malformed",
+        ),
+        (
+            lambda payload: payload["data"]["records"][0]["inputs"][0].update(discovery_policy="plugin_discovery"),
+            "inputs\\[0\\].discovery_policy must equal 'record'",
         ),
         (lambda payload: payload["data"]["records"][0].update(path="../outside.parquet"), "outputs-relative"),
     ],
@@ -137,6 +165,45 @@ def test_public_reader_record_rejects_invalid_exact_revision_identity(
 
     with pytest.raises(ReaderDataframeRecordError, match=message):
         _resolve(reader_root, config)
+
+
+def test_record_set_rejects_inconsistent_experiment_config_digests(tmp_path: Path, monkeypatch) -> None:
+    reader_root, config, artifact, digest = _fixture(tmp_path)
+    primary = _record(digest=digest)
+    secondary = _record(digest=digest, record_id="other/df")
+    secondary["config_digest"] = "sha256:" + ("e" * 64)
+    payload = _page(config=config, artifact=artifact, digest=digest, records=[primary, secondary], total=2)
+    verification = _verify_page()
+    verification["data"]["summary"]["checked"] = 2
+    verification["data"]["records"].append(
+        {
+            "record_id": "other/df",
+            "kind": "dataframe_artifact",
+            "schema_version": 6,
+            "status": "ok",
+            "issues": [],
+        }
+    )
+    monkeypatch.setattr(reader_transport, "run_reader_json", _reader_runner(payload, verify_payload=verification))
+
+    with pytest.raises(ReaderDataframeRecordError, match="must share one experiment config_digest"):
+        resolve_digest_verified_records(
+            config,
+            reader_root=reader_root,
+            experiment_id="20260101_demo",
+            protocol_id="plate_reader/single_reporter_screen",
+            expected_records={
+                "primary": ReaderRecordExpectation(
+                    record_id="ratio_reporter_normalizer/df",
+                    contract_id="plate_reader.annotated.v1",
+                ),
+                "secondary": ReaderRecordExpectation(
+                    record_id="other/df",
+                    contract_id="plate_reader.annotated.v1",
+                ),
+            },
+            reader_command=("reader-fixture",),
+        )
 
 
 @pytest.mark.parametrize("identity_kind", ["record_revision", "catalog_epoch"])

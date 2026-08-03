@@ -64,7 +64,7 @@ def test_condition_summary_uses_reader_absolute_boundary_tolerance_without_relat
 
 def test_live_reader_matches_source_bound_temporal_conformance_probe(tmp_path: Path) -> None:
     phd_roots = [
-        parent for parent in Path(__file__).resolve().parents if (parent / "reader/.venv/bin/python").is_file()
+        parent for parent in Path(__file__).resolve().parents if (parent / "reader/src/reader_workbench").is_dir()
     ]
     if not phd_roots:
         pytest.skip("optional sibling Reader checkout is unavailable")
