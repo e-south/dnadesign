@@ -199,6 +199,21 @@ def test_third_party_workflow_actions_are_pinned_to_full_commit_shas() -> None:
     assert unpinned == []
 
 
+def test_uv_action_caches_are_pruned_before_persistence() -> None:
+    workflow = _workflow()
+    uv_steps = [
+        step
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", ())
+        if str(step.get("uses", "")).startswith("astral-sh/setup-uv@")
+    ]
+
+    assert len(uv_steps) == 3
+    for step in uv_steps:
+        assert step["with"]["enable-cache"] is True
+        assert step["with"]["prune-cache"] is True
+
+
 def test_dependency_review_workflow_is_pr_only_and_least_privilege() -> None:
     workflow = _workflow("dependency-review.yaml")
     triggers = workflow.get("on", workflow.get(True))
@@ -306,7 +321,10 @@ def test_scoped_core_lanes_run_workflow_contract_before_target_resolution() -> N
 
     assert match is not None, "core lane must declare invariant_targets as a shell array"
     invariant_targets = [line.strip().strip("\"'") for line in match.group("targets").splitlines() if line.strip()]
-    assert invariant_targets == ["src/dnadesign/devtools/tests/ci/test_workflow_contract.py"]
+    assert invariant_targets == [
+        "src/dnadesign/devtools/tests/ci/test_precommit_contract.py",
+        "src/dnadesign/devtools/tests/ci/test_workflow_contract.py",
+    ]
     invariant_run = 'uv run pytest -q --durations=25 "${invariant_targets[@]}"'
     assert invariant_run in run_script
     assert run_script.index(invariant_run) < run_script.index('affected_csv="')
