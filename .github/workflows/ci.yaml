@@ -134,6 +134,9 @@ jobs:
       - name: Architecture boundary checks
         run: uv run python -m dnadesign.devtools.architecture.boundaries
 
+      - name: Package layout contracts
+        run: uv run pytest -q src/dnadesign/devtools/tests/package/test_layout.py
+
       - name: Pre-commit (non-Ruff hooks)
         env:
           SKIP: ruff-check,ruff-format,detect-secrets
