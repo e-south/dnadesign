@@ -1,4 +1,13 @@
-"""Parse responsive-image candidates without choosing a browser viewport."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/docs/badges/responsive.py
+
+Parse responsive-image candidates without choosing a browser viewport.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

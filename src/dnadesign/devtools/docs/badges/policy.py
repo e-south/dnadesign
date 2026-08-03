@@ -1,4 +1,13 @@
-"""Apply the repository's restrained Markdown badge policy."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/docs/badges/policy.py
+
+Apply the repository's restrained Markdown badge policy.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

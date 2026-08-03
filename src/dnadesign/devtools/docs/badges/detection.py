@@ -1,4 +1,13 @@
-"""Classify image URLs and labels that represent documentation badges."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/docs/badges/detection.py
+
+Classify image URLs and labels that represent documentation badges.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

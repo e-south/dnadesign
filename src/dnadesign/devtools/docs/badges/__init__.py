@@ -1,4 +1,13 @@
-"""Public badge-policy surface for documentation checks."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/docs/badges/__init__.py
+
+Public badge-policy surface for documentation checks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.devtools.docs.badges.images import rendered_markdown_images
 from dnadesign.devtools.docs.badges.policy import (

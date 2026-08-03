@@ -1,4 +1,13 @@
-"""Resolve images that survive Markdown rendering and HTML selection rules."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/docs/badges/images.py
+
+Resolve images that survive Markdown rendering and HTML selection rules.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

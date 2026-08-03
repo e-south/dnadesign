@@ -1,4 +1,13 @@
-"""Render Markdown while retaining raw HTML and image source locations."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/docs/badges/rendering.py
+
+Render Markdown while retaining raw HTML and image source locations.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
