@@ -24,10 +24,10 @@ uv run junction --help
 Save this as `request.yaml`:
 
 ```yaml
-schema: dnadesign.junction.request.v1
+schema: dnadesign.junction.request.v2
 seed: 17
 planning:
-  oligo_length: 46
+  nominal_fragment_oligo_length: 46
   barcode_length: 16
   toehold_length: 8
   search_range: 2
@@ -59,6 +59,7 @@ order_policy:
   complement_purification: example-purification
   primer_purification: example-purification
   complement_end_preparation: vendor_5_prime_phosphate
+  minimum_fragment_oligo_length: 1
   max_oligo_length: 64
 ```
 
@@ -67,6 +68,15 @@ terminal primer strings, including an explicit empty `five_prime_extension`.
 `junction` checks those strings against the target but does not design the
 primers or predict PCR behavior. The order labels are copied into the output;
 the tool does not choose a supplier or submit an order.
+
+`nominal_fragment_oligo_length` sets the planner's locus geometry. It is not a
+promise that every fragment order has that length: candidate offsets can
+produce an order as long as the nominal value plus `search_range - 1`, and a
+terminal fragment can be shorter. The tutorial sets
+`minimum_fragment_oligo_length: 1` only so its small synthetic example is easy
+to run. Choose and review a real minimum for synthesis work. `junction` checks
+the declared minimum and maximum as string lengths; it does not judge whether
+an oligo is synthesizable.
 
 `assembly_group_id` is the boundary across which `junction` compares candidate
 sequences. Put targets in the same group when their fragments must be designed
@@ -84,7 +94,7 @@ to run `preflight` or `plan` first unless you want their no-file output.
 junction_demo_root="$(mktemp -d)"
 junction_demo_root="$(cd "$junction_demo_root" && pwd -P)"
 uv run junction build request.yaml \
-  --output "$junction_demo_root/design-v1" \
+  --output "$junction_demo_root/design-demo" \
   --format json
 ```
 
@@ -100,7 +110,7 @@ they do not make sequences safe to commit, sync, or share.
 ## 4. Verify it again later
 
 ```bash
-uv run junction verify "$junction_demo_root/design-v1" --format json
+uv run junction verify "$junction_demo_root/design-demo" --format json
 ```
 
 Verification checks the exact inventory and hashes, parses the recorded

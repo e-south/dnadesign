@@ -42,8 +42,8 @@ orientation and domain formulas map to the paper's barcode and coding oligos.
 
 The implementation is not a copy or compatibility layer for PyWinder. No
 output-equivalence claim is made. Where the papers leave recurrence, ranking,
-tie, stopping, or failure behavior underspecified, v1 makes a versioned local
-choice documented in [Method v1](method-v1.md).
+tie, stopping, or failure behavior underspecified, method v1 makes a versioned
+local choice documented in [Method v1](method-v1.md).
 
 The papers use different oligo-preparation routes. The Nature workflow
 phosphorylates coding oligos before pairing them with barcode oligos. The pooled
@@ -57,11 +57,17 @@ specify either complete preparation route or generate a reaction protocol.
   thermodynamic orthogonality.
 - Paper-reported fidelity, scale, yield, and parameter results apply to the
   tested experiments, not to arbitrary `junction` output.
-- The tool does not implement NUPACK screening, automatic primer design,
-  buffer equalization, Type IIS payload removal, degenerate library
-  compilation, laboratory execution, supplier submission, or purchasing.
+- The tool does not implement thermodynamic screening, including the
+  NUPACK-guided and NUPACK-inspired approaches described by the sources.
+- It also does not implement automatic primer design, buffer equalization,
+  Type IIS payload removal, degenerate library compilation, laboratory
+  execution, supplier submission, or purchasing.
 - A shared `universal` primer declaration does not reproduce the preprint's
   complete universal-recovery and hierarchical-assembly architecture.
+- The preprint reports that PCR can favor shorter products and can therefore
+  enrich a truncated misassembly that retains both terminal priming regions.
+  `junction` does not model that amplification bias or turn the paper's
+  observed error counts into a general prediction.
 - The repository's software tests do not show that a generated oligo set will
   synthesize, anneal, ligate, amplify, clone, or function experimentally.
 

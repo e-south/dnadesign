@@ -24,8 +24,8 @@ _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MIN_BARCODE_POOL_FACTOR_V1 = 5
 JUNCTION_STRING_V1_ALGORITHM = "dnadesign.junction.string.v1"
 _UINT64_MAX = (1 << 64) - 1
-# junction request v1 permits 100,000 iterations in each randomized search
-# stage; every v1 selector also evaluates one baseline before that budget.
+# Junction request v2 permits 100,000 iterations in each randomized search
+# stage; every string-v1 selector also evaluates one baseline before that budget.
 _JUNCTION_STRING_V1_MAX_SEARCH_EVALUATIONS = 100_001
 
 

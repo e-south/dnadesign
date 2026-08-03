@@ -62,7 +62,8 @@ association, ligation, displacement, or amplification occurred.
 6. **Check strings and limits.** The target domains and toeholds must reconstruct
    the submitted target exactly. Reverse-order complement strands must
    reconstruct its reverse complement. Primer strings must match the target
-   termini, and every order row must fit the declared length ceiling.
+   termini, every fragment order must meet the caller's declared minimum, and
+   every order row must fit the declared maximum.
 7. **Publish evidence.** `build` writes the request, plan, checks, order rows,
    review records, and manifest to a new directory, then verifies the installed
    bundle by replay.
@@ -77,6 +78,7 @@ to an assembly group can change the group's selected toeholds and barcodes.
 | **Target** | The exact linear 5′→3′ DNA string expected before any later cleavage or cloning step. |
 | **Assembly group** | Boundary across which `junction` compares candidate sequences. Targets belong together when their fragments must be designed against one another because they may encounter one another during the intended three-way-junction assembly. The field does not identify procurement, annealing, PCR, a study, or a biological condition. |
 | **Locus** | A planner-defined decision site containing several possible target-derived toehold windows. |
+| **Nominal fragment-oligo length** | A locus-spacing parameter. It does not promise an equal physical length for every emitted order. |
 | **Selected junction** | The software record that binds one chosen toehold to one external barcode. It is not the complete physical three-way-junction complex. |
 | **Toehold** | A short sequence copied from the target at a locus. It remains part of the reconstructed target. |
 | **Barcode** | An externally generated assembly sequence assigned to a junction. It is absent from the reconstructed target. This is not a sequencing index. |
@@ -101,13 +103,13 @@ to an assembly group can change the group's selected toeholds and barcodes.
 | 3WJ assembly | no claimed physical output | `junction` records sequence layout but does not perform or validate the reaction. |
 | restored 2WJ | expected submitted target and complement strings | A software expectation, not an observed PCR product. |
 | construct-specific PCR | `target_specific` recovery | The spelling is generic; the caller still supplies the primers. |
-| universal PCR | `universal` recovery | V1 only checks one shared exact primer pair for the group. |
+| universal PCR | `universal` recovery | Method v1 only checks one shared exact primer pair for the group. |
 
 ## What the checks mean
 
 | Question | Status |
 | --- | --- |
-| Does the request match the v1 schema and declared limits? | Checked. |
+| Does the request match the v2 schema and declared limits? | Checked. |
 | Do selected target domains and toeholds reconstruct the submitted target string? | Checked. |
 | Do the complement strings reconstruct `rc(target)` in the modeled order? | Checked. |
 | Are the selected barcode and toehold assignments one-to-one within the assembly group? | Checked as strings. |
@@ -128,6 +130,14 @@ was `L=96`, `b=22`, `t=10`, and `R=15`, yielding stated final oligo lengths of
 82 to 110 nt. These are reported experimental or algorithmic contexts, not
 validated `junction` presets.
 
+The two sources use `L` differently. In the Nature paper, `L` is the physical
+input-oligo length and the coding capacity is `L - 2b`. In the pooled
+preprint's generator, `L` is a nominal coordinate parameter and candidate
+offsets can change the emitted length. `junction` follows the latter geometry
+and names the field `nominal_fragment_oligo_length` to keep that distinction
+visible. Its terminal-locus rule can also produce short terminal fragment
+orders, so the caller must declare a separate minimum fragment-oligo length.
+
 The current planner accepts a broader software geometry, uses deterministic
 string objectives, adds fixed GC and homopolymer filters, and fails instead of
 relaxing declared substring constraints. It also selects toeholds jointly
@@ -141,6 +151,15 @@ rows. It does not design the pooled paper's shared priming regions, variable
 buffers for length equalization, internal Type IIS sites, payload spans,
 cleavage products, or downstream hierarchical assembly.
 
+Universal recovery also has a source-observed risk that the request mode does
+not evaluate. The preprint notes that PCR can favor shorter products, so a
+truncated misassembly with both terminal priming regions can be preferentially
+amplified. Under the reported conditions, the universal experiment observed a
+junction misconnection rate of 1 in 217,985, while the highlighted
+construct-specific condition observed 1 in 10,048,851. Those counts describe
+different experiments in that preprint; they are not a general error rate or a
+prediction for a `junction` plan.
+
 Laboratory preparation also differs between the two sources. The Nature paper
 phosphorylates coding oligos before annealing fragment pairs; the pooled
 preprint phosphorylates and anneals the pooled oligos together. `junction`
@@ -151,7 +170,7 @@ choose or execute either reaction protocol.
 
 - No bare-sequence or FASTA onboarding command exists; callers prepare the
   complete request themselves.
-- No thermodynamic filter or PyWinder output-equivalence study exists.
+- No thermodynamic validation or PyWinder output-equivalence study exists.
 - No automatic primer design, primer-temperature analysis, or broad off-target
   search exists.
 - No post-Type-IIS payload model or combinatorial/degenerate library compiler

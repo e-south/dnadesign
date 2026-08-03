@@ -35,7 +35,7 @@ def test_single_target_bounded_search_bundle_round_trip_at_declared_lengths(
             target_count=1,
             target_length=target_length,
             topology="shared",
-            oligo_length=96,
+            nominal_fragment_oligo_length=96,
             search_range=2,
             barcode_generation_attempts=250_000,
         )
@@ -59,7 +59,7 @@ def test_bundle_bytes_do_not_depend_on_destination(tmp_path: Path) -> None:
             target_count=1,
             target_length=1_000,
             topology="shared",
-            oligo_length=96,
+            nominal_fragment_oligo_length=96,
             search_range=2,
             barcode_generation_attempts=250_000,
         )
@@ -82,7 +82,7 @@ def test_shared_100_target_bounded_search_load_shape_is_jointly_planned() -> Non
             target_count=100,
             target_length=1_000,
             topology="shared",
-            oligo_length=200,
+            nominal_fragment_oligo_length=200,
             search_range=2,
             barcode_generation_attempts=500_000,
         )
@@ -108,7 +108,7 @@ def test_independent_1000_target_bundle_round_trip_stays_within_bounded_load_sha
             target_count=1_000,
             target_length=1_000,
             topology="independent",
-            oligo_length=200,
+            nominal_fragment_oligo_length=200,
             search_range=2,
             barcode_generation_attempts=500,
         )
@@ -134,7 +134,7 @@ def test_1000_target_shared_assembly_group_fails_closed_without_automatic_chunki
             target_count=1_000,
             target_length=1_000,
             topology="shared",
-            oligo_length=200,
+            nominal_fragment_oligo_length=200,
             search_range=1,
             barcode_generation_attempts=500_000,
         )

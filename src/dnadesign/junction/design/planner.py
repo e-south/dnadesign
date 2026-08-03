@@ -24,10 +24,8 @@ from dnadesign.junction.contracts.plan import (
     SelectedJunction,
 )
 from dnadesign.junction.contracts.request import JunctionRequest
-from dnadesign.junction.design.loci import (
-    enumerate_loci,
-    predict_locus_count,
-)
+from dnadesign.junction.design.fragment_constraints import FragmentPathConstraint
+from dnadesign.junction.design.loci import enumerate_loci, predict_locus_count
 from dnadesign.junction.design.matching import JunctionAssignment
 from dnadesign.junction.design.randomness import derive_seed
 from dnadesign.junction.design.recovery import merge_universal_recovery_orders, validate_recovery_set
@@ -78,7 +76,8 @@ def _compile_junction(
     if missing_loci:
         joined = ", ".join(missing_loci)
         raise JunctionDesignError(
-            f"Three-way-junction target(s) have no complete toehold locus: {joined}. "
+            f"Three-way-junction target(s) have no complete toehold locus with a nonempty terminal domain: "
+            f"{joined}. "
             "Adjust the declared geometry or use a direct-synthesis workflow outside junction."
         )
     guard_artifact_projection(
@@ -118,6 +117,12 @@ def _compile_junction(
         )
         loci_by_target = {target.id: enumerate_loci(target, profile) for target in targets}
         loci = tuple(locus for target_loci in loci_by_target.values() for locus in target_loci)
+        path_constraint = FragmentPathConstraint(
+            target_lengths=tuple((target.id, len(target.sequence)) for target in targets),
+            barcode_length=profile.barcode_length,
+            toehold_length=profile.toehold_length,
+            minimum_fragment_oligo_length=request.order_policy.minimum_fragment_oligo_length,
+        )
         toehold_seed = derive_seed(request.seed, assembly_group_id=assembly_group_id, stage="toeholds")
         barcode_generation_seed = derive_seed(
             request.seed, assembly_group_id=assembly_group_id, stage="barcode-generation"
@@ -130,7 +135,12 @@ def _compile_junction(
             loci,
             iterations=profile.toehold_search_iterations,
             seed=toehold_seed,
+            path_constraint=path_constraint,
         )
+        if not path_constraint.allows(toehold_selection.candidates):
+            raise JunctionDesignError(
+                f"Toehold search returned a fragment-length-infeasible path for assembly group {assembly_group_id!r}."
+            )
         selected_toeholds = tuple(candidate.sequence for candidate in toehold_selection.candidates)
         candidate_pool = pipeline.generate_barcode_candidates(
             selected_toeholds,

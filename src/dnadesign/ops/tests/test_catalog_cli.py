@@ -48,6 +48,9 @@ def test_load_runbook_catalog_reads_shared_registry() -> None:
     assert catalog.find_procedure("cluster.downstream.exploratory-clustering") is not None
     assert catalog.find_tool_source("usr") is not None
     assert catalog.find_tool_source("latentdna") is not None
+    junction_review_route = catalog.find_tool_route(tool="baserender", route_id="junction-review")
+    assert junction_review_route is not None
+    assert junction_review_route.doc_path == "../../src/dnadesign/baserender/docs/integrations/junction.md"
 
 
 def test_catalog_registry_metadata_rejects_unknown_top_level_keys(tmp_path: Path) -> None:

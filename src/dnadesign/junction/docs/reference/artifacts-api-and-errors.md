@@ -76,7 +76,7 @@ The plan contains:
 
 Search backends are private composition points. A future optimizer that changes
 meaning or scale behavior needs a new algorithm identifier and its own
-validation evidence; it cannot silently replace v1 semantics.
+validation evidence; it cannot silently replace method-v1 semantics.
 
 ## Bundle inventory
 
@@ -116,13 +116,13 @@ renderer still materializes one complete artifact and serializer temporaries.
 ## Offline verification
 
 `verify` opens the bundle with descriptor-anchored, no-follow filesystem
-operations and requires the exact v1 inventory. It rejects:
+operations and requires the exact bundle-v1 inventory. It rejects:
 
 - missing, extra, moved, aliased, non-regular, or symlinked entries;
 - declared sizes above the verification limits;
 - byte-length or digest mismatches;
 - malformed or non-canonical JSON/TSV payloads;
-- a request that cannot reproduce a valid v1 plan; and
+- a request that cannot reproduce a valid plan-v1 artifact; and
 - any rendered artifact that differs from replay.
 
 Only request bytes are retained long enough to parse the embedded request.

@@ -27,9 +27,9 @@ from .validation import (
     require_plain_text,
 )
 
-REQUEST_SCHEMA = "dnadesign.junction.request.v1"
+REQUEST_SCHEMA = "dnadesign.junction.request.v2"
 
-# Schema-v1 ceilings bound offline planning and verification work while leaving
+# Schema-v2 ceilings bound offline planning and verification work while leaving
 # ample headroom above the literature-derived defaults.
 MAX_TOEHOLD_SEARCH_ITERATIONS = 100_000
 MAX_BARCODE_GENERATION_ATTEMPTS = 10_000_000
@@ -54,7 +54,7 @@ RecoveryPrimerMode: TypeAlias = Literal["target_specific", "universal"]
 class PlanningProfile:
     """Search and sequence-layout budgets for a planning request."""
 
-    oligo_length: int
+    nominal_fragment_oligo_length: int
     barcode_length: int
     toehold_length: int
     search_range: int
@@ -71,7 +71,7 @@ class PlanningProfile:
 
     def __post_init__(self) -> None:
         for field_name in (
-            "oligo_length",
+            "nominal_fragment_oligo_length",
             "barcode_length",
             "toehold_length",
             "search_range",
@@ -113,9 +113,10 @@ class PlanningProfile:
         if self.barcode_pair_k <= self.barcode_toehold_k:
             raise JunctionConfigError("planning.barcode_pair_k must be greater than barcode_toehold_k")
         minimum_exclusive = 2 * self.barcode_length + self.toehold_length + self.search_range - 1
-        if self.oligo_length <= minimum_exclusive:
+        if self.nominal_fragment_oligo_length <= minimum_exclusive:
             raise JunctionConfigError(
-                "planning.oligo_length must be greater than 2 * barcode_length + toehold_length + search_range - 1"
+                "planning.nominal_fragment_oligo_length must be greater than "
+                "2 * barcode_length + toehold_length + search_range - 1"
             )
 
 
@@ -189,6 +190,7 @@ class OrderPolicy:
     complement_purification: str
     primer_purification: str
     complement_end_preparation: ComplementEndPreparation
+    minimum_fragment_oligo_length: int
     max_oligo_length: int
 
     def __post_init__(self) -> None:
@@ -205,7 +207,14 @@ class OrderPolicy:
         ):
             allowed = ", ".join(sorted(COMPLEMENT_END_PREPARATIONS))
             raise JunctionConfigError(f"order_policy.complement_end_preparation must be one of: {allowed}")
+        require_int(
+            self.minimum_fragment_oligo_length,
+            context="order_policy.minimum_fragment_oligo_length",
+            minimum=1,
+        )
         require_int(self.max_oligo_length, context="order_policy.max_oligo_length", minimum=1)
+        if self.minimum_fragment_oligo_length > self.max_oligo_length:
+            raise JunctionConfigError("order_policy.minimum_fragment_oligo_length must not exceed max_oligo_length")
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,10 +239,14 @@ class JunctionRequest:
             raise JunctionConfigError("request must contain at least one target")
         if any(not isinstance(target, Target) for target in self.targets):
             raise JunctionConfigError("targets must contain only Target values")
-        maximum_expected_length = self.planning.oligo_length + self.planning.search_range - 1
+        maximum_expected_length = max(
+            self.planning.nominal_fragment_oligo_length + self.planning.search_range - 1,
+            self.planning.nominal_fragment_oligo_length - self.planning.barcode_length + self.planning.toehold_length,
+        )
         if self.order_policy.max_oligo_length < maximum_expected_length:
             raise JunctionConfigError(
-                "order_policy.max_oligo_length must be at least planning.oligo_length + planning.search_range - 1"
+                "order_policy.max_oligo_length must cover the maximum possible fragment order length "
+                f"of {maximum_expected_length} nt"
             )
         for target in self.targets:
             for direction, primer in (

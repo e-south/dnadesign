@@ -42,7 +42,7 @@ from .validation import (
 
 _PLANNING_FIELDS = frozenset(
     {
-        "oligo_length",
+        "nominal_fragment_oligo_length",
         "barcode_length",
         "toehold_length",
         "search_range",
@@ -68,6 +68,7 @@ _ORDER_FIELDS = frozenset(
         "complement_purification",
         "primer_purification",
         "complement_end_preparation",
+        "minimum_fragment_oligo_length",
         "max_oligo_length",
     }
 )
@@ -78,7 +79,11 @@ def _parse_planning(raw: object) -> PlanningProfile:
     planning_raw = require_mapping(raw, context="planning")
     require_exact_fields(planning_raw, required=_PLANNING_FIELDS, context="planning")
     return PlanningProfile(
-        oligo_length=require_int(planning_raw["oligo_length"], context="planning.oligo_length", minimum=1),
+        nominal_fragment_oligo_length=require_int(
+            planning_raw["nominal_fragment_oligo_length"],
+            context="planning.nominal_fragment_oligo_length",
+            minimum=1,
+        ),
         barcode_length=require_int(planning_raw["barcode_length"], context="planning.barcode_length", minimum=1),
         toehold_length=require_int(planning_raw["toehold_length"], context="planning.toehold_length", minimum=1),
         search_range=require_int(planning_raw["search_range"], context="planning.search_range", minimum=1),
@@ -205,6 +210,11 @@ def _parse_order_policy(raw: object) -> OrderPolicy:
             order_raw["primer_purification"], context="order_policy.primer_purification"
         ),
         complement_end_preparation=cast(ComplementEndPreparation, complement_end_preparation),
+        minimum_fragment_oligo_length=require_int(
+            order_raw["minimum_fragment_oligo_length"],
+            context="order_policy.minimum_fragment_oligo_length",
+            minimum=1,
+        ),
         max_oligo_length=require_int(order_raw["max_oligo_length"], context="order_policy.max_oligo_length", minimum=1),
     )
 
@@ -239,7 +249,7 @@ def request_to_mapping(request: JunctionRequest) -> dict[str, object]:
         "schema": request.schema,
         "seed": request.seed,
         "planning": {
-            "oligo_length": request.planning.oligo_length,
+            "nominal_fragment_oligo_length": request.planning.nominal_fragment_oligo_length,
             "barcode_length": request.planning.barcode_length,
             "toehold_length": request.planning.toehold_length,
             "search_range": request.planning.search_range,
@@ -279,6 +289,7 @@ def request_to_mapping(request: JunctionRequest) -> dict[str, object]:
             "complement_purification": request.order_policy.complement_purification,
             "primer_purification": request.order_policy.primer_purification,
             "complement_end_preparation": request.order_policy.complement_end_preparation,
+            "minimum_fragment_oligo_length": request.order_policy.minimum_fragment_oligo_length,
             "max_oligo_length": request.order_policy.max_oligo_length,
         },
     }

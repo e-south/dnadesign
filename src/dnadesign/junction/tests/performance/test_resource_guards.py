@@ -119,7 +119,7 @@ def test_many_safe_assembly_groups_fail_request_guard_before_candidate_materiali
     visits_per_assembly_group = profile.barcode_generation_attempts * profile.barcode_length
     assembly_group_count = MAX_REQUEST_BARCODE_GENERATION_BASE_VISITS // visits_per_assembly_group + 1
     request = JunctionRequest(
-        schema="dnadesign.junction.request.v1",
+        schema="dnadesign.junction.request.v2",
         seed=17,
         planning=profile,
         targets=tuple(
@@ -137,6 +137,7 @@ def test_many_safe_assembly_groups_fail_request_guard_before_candidate_materiali
             complement_purification="declared-test-purification",
             primer_purification="declared-test-purification",
             complement_end_preparation="vendor_5_prime_phosphate",
+            minimum_fragment_oligo_length=1,
             max_oligo_length=64,
         ),
     )
@@ -152,7 +153,7 @@ def test_many_safe_assembly_groups_fail_request_guard_before_candidate_materiali
 
 def test_oversized_target_fails_before_candidate_materialization() -> None:
     profile = PlanningProfile(
-        oligo_length=96,
+        nominal_fragment_oligo_length=96,
         barcode_length=22,
         toehold_length=10,
         search_range=15,
@@ -263,11 +264,11 @@ def test_large_kmer_payload_fails_request_guard_before_locus_materialization(
 ) -> None:
     barcode_length = 1_000_000
     toehold_length = 200_000
-    oligo_length = 2_200_001
+    nominal_fragment_oligo_length = 2_200_001
     target_length = 2_400_001
     sequence = "A" * target_length
     profile = PlanningProfile(
-        oligo_length=oligo_length,
+        nominal_fragment_oligo_length=nominal_fragment_oligo_length,
         barcode_length=barcode_length,
         toehold_length=toehold_length,
         search_range=1,
@@ -283,7 +284,7 @@ def test_large_kmer_payload_fails_request_guard_before_locus_materialization(
         barcode_max_homopolymer=barcode_length,
     )
     request = JunctionRequest(
-        schema="dnadesign.junction.request.v1",
+        schema="dnadesign.junction.request.v2",
         seed=17,
         planning=profile,
         targets=(
@@ -304,7 +305,8 @@ def test_large_kmer_payload_fails_request_guard_before_locus_materialization(
             complement_purification="declared-test-purification",
             primer_purification="declared-test-purification",
             complement_end_preparation="vendor_5_prime_phosphate",
-            max_oligo_length=oligo_length,
+            minimum_fragment_oligo_length=1,
+            max_oligo_length=nominal_fragment_oligo_length,
         ),
     )
 

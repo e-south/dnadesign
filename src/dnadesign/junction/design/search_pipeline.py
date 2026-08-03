@@ -25,6 +25,7 @@ from dnadesign.junction.design import toeholds as _toeholds
 
 if _TYPE_CHECKING:
     from dnadesign.junction.design.barcodes import BarcodeSelection
+    from dnadesign.junction.design.fragment_constraints import FragmentPathConstraint
     from dnadesign.junction.design.loci import ToeholdCandidate, ToeholdLocus
     from dnadesign.junction.design.matching import MatchingSelection
     from dnadesign.junction.design.toeholds import ToeholdSelection
@@ -39,6 +40,7 @@ class _ToeholdSelector(_Protocol):
         *,
         iterations: int,
         seed: int,
+        path_constraint: FragmentPathConstraint | None = None,
     ) -> ToeholdSelection: ...
 
 

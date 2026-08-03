@@ -32,6 +32,9 @@ if TYPE_CHECKING:
     from dnadesign.junction.contracts.request import OrderPolicy, Target
 
 
+_FRAGMENT_ORDER_ROLES = frozenset({"barcode_bearing_strand", "complement_strand"})
+
+
 @dataclass(frozen=True, slots=True)
 class TargetComposition:
     target: TargetPlan
@@ -50,6 +53,11 @@ def _order_record(
     purification: str,
     policy: OrderPolicy,
 ) -> OrderRecord:
+    if role in _FRAGMENT_ORDER_ROLES and len(sequence) < policy.minimum_fragment_oligo_length:
+        raise JunctionDesignError(
+            f"Order '{order_id}' is {len(sequence)} nt but the declared fragment synthesis minimum is "
+            f"{policy.minimum_fragment_oligo_length} nt."
+        )
     if len(sequence) > policy.max_oligo_length:
         raise JunctionDesignError(
             f"Order '{order_id}' is {len(sequence)} nt but the declared synthesis ceiling is "
@@ -157,6 +165,12 @@ def compose_target(
     for previous, current in zip(target_assignments, target_assignments[1:], strict=False):
         domain_spans.append((previous.candidate.start + toehold_length, current.candidate.start))
     domain_spans.append((target_assignments[-1].candidate.start + toehold_length, len(target.sequence)))
+    for start, end in domain_spans:
+        if end <= start:
+            raise JunctionDesignError(
+                f"Target '{target.id}' has a nonpositive domain span [{start}, {end}); "
+                "every fragment domain must contain at least one target base."
+            )
     domains = tuple(target.sequence[start:end] for start, end in domain_spans)
 
     fragments: list[FragmentPlan] = []
@@ -298,10 +312,16 @@ def compose_target(
             detail="primer strings match the declared termini; PCR behavior was not evaluated",
         ),
         CheckResult(
+            check="fragment_synthesis_length_floor",
+            status="passed",
+            subject=CheckSubject(kind="target", id=target.id),
+            detail="every fragment order row meets the declared minimum",
+        ),
+        CheckResult(
             check="synthesis_length_ceiling",
             status="passed",
             subject=CheckSubject(kind="target", id=target.id),
-            detail="every order row is within ceiling",
+            detail="every order row is within the declared ceiling",
         ),
     )
     return TargetComposition(target=plan, orders=tuple(orders), checks=checks)

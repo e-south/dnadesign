@@ -30,7 +30,7 @@ For a target string `S` of length `N`, the planning profile declares:
 
 | Symbol | Request field | Meaning |
 | --- | --- | --- |
-| `L` | `oligo_length` | nominal strand-length geometry |
+| `L` | `nominal_fragment_oligo_length` | nominal fragment-oligo geometry |
 | `b` | `barcode_length` | barcode length |
 | `t` | `toehold_length` | toehold length |
 | `R` | `search_range` | number of candidate offsets at each locus |
@@ -55,19 +55,37 @@ Locus `m` contains the `R` complete candidate windows
 S[p_m + r : p_m + r + t],  r in {0, ..., R - 1}.
 ```
 
-The first locus exists only when
-`p_0 + (R - 1) + t <= N`. After enumerating locus `m`, planning stops when
+The first locus exists only when every candidate is complete and leaves a
+nonempty terminal target domain:
+
+```text
+p_0 + (R - 1) + t < N,
+```
+
+which is equivalent to `N >= L - b + R`. After enumerating locus `m`, planning
+stops when
 
 ```text
 N - (p_m + t) <= c_max.
 ```
 
-Otherwise, it advances to `p_(m+1)`. This stopping rule bounds the last
+Otherwise, it advances to `p_(m+1)` only when that locus also has complete
+candidates with a nonempty terminal domain. This stopping rule bounds the last
 barcode-bearing strand by `L`; the candidate offset bounds first and internal
-strands by `L + R - 1`. Truncated candidates are errors; a target with no
-complete locus cannot be planned by v1. This stopping rule deliberately differs
-from the pooled paper's literal next-locus predicate. The policy table below
-records the difference.
+strands by `L + R - 1`. Truncated candidates and empty domains are errors; a
+target with no complete valid locus cannot be planned by v1. This stopping rule
+deliberately differs from the pooled paper's literal next-locus predicate. The
+last complement strand can reach `L - b + t`, so the request ceiling must cover
+`max(L + R - 1, L - b + t)`. The policy table below records the difference.
+
+Here `L` is a coordinate parameter, not a promise that every ordered strand is
+`L` bases long. The Nature paper instead uses `L` for the physical input-oligo
+length and derives a coding capacity of `L - 2b`. The v2 request therefore
+spells the field `nominal_fragment_oligo_length`. Candidate offsets can yield
+fragment orders up to `max(L + R - 1, L - b + t)`, and terminal fragment
+orders can be shorter than `L`. The caller-declared
+`minimum_fragment_oligo_length` and `max_oligo_length` bound the actual emitted
+fragment strings.
 
 ## Selected Domains and Strand Orientation
 
@@ -135,7 +153,7 @@ stable lexical tie-breaking. The formulas below define the v1 implementation.
 
 `junction` selects one candidate per locus. For zero-based position `i` in a
 toehold of length `t`, the pooled preprint defines `u = i / (t - 1)` and the
-directional edit weight
+directional edit penalty
 
 ```text
 w(u) = 1 + exp(-u).
@@ -145,6 +163,30 @@ The v1 dynamic program weights substitutions and deletions at the source
 position, insertions at the target position, and exact matches at zero. Values
 are quantized to fixed-point nanounits. Pair distance is the minimum of the two
 directional scores.
+
+Each sampled path follows the preprint's local construction rule. The planner
+randomly orders the loci for that trial, chooses the first locus's candidate
+uniformly, and then considers each remaining locus in that order. If the
+partial path is `v_1, ..., v_q`, a candidate `u_j` has the ideal weight
+
+```text
+omega(u_j) = 1 + sum(exp(d(v_l, u_j)) for l in 1..q).
+```
+
+The implementation does not evaluate the large exponentials directly. At each
+selection step it finds the local maximum distance `M` across that trial's
+candidate-to-prior pairs and multiplies every ideal weight by `exp(-M)`. It
+therefore evaluates the equivalent shifted form
+
+```text
+exp(-M) + sum(exp(d(v_l, u_j) - M) for l in 1..q).
+```
+
+Each exponential contribution is scaled by `10^12` and rounded to the nearest
+integer with ties to even. Integer weighted sampling then uses those local
+fixed-point weights. The common shift preserves the ideal relative weights
+before rounding; the fixed-point conversion is a local reproducibility choice,
+not a formula stated by the preprint.
 
 For each sampled path, `junction` records the minimum and mean pairwise
 distance. The pooled preprint does not fully specify rank normalization or tie
@@ -157,8 +199,8 @@ ranks to `[0, 1]`, and computes
 ```
 
 The largest score wins, followed by stable lexical tie-breaking. Search always
-includes the first-candidate baseline and then applies the declared seeded
-iteration budget.
+includes the lexicographically first feasible path in addition to the declared
+number of seeded sampled paths.
 
 ### Barcode pool and subset
 
@@ -242,16 +284,16 @@ met.
 
 | Topic | Paper-stated behavior | junction v1 contract |
 | --- | --- | --- |
-| Terminal locus | The pooled Methods text stops when `N - p_(m+1) <= c_max`. For some lengths that leaves a terminal barcode-bearing oligo longer than the stated geometry. | V1 stops when `N - (p_m + t) <= c_max`, retaining another junction when necessary so the last barcode-bearing strand is at most `L` and every candidate-offset order is at most `L + R - 1`. Edge-case tests preserve this deliberate correction. |
+| Terminal locus and order length | The pooled Methods text stops when `N - p_(m+1) <= c_max` and states final oligo lengths in `[L - R + 1, L + R - 1]`. For some target lengths, the literal predicate leaves a terminal barcode-bearing oligo longer than the stated geometry. | V1 stops from the current locus, retains another junction when needed, requires a nonempty terminal domain for every candidate, and covers both the `L + R - 1` offset bound and `L - b + t` terminal-complement bound. This correction can produce a terminal fragment order shorter than the preprint's stated lower bound. The v2 request makes the caller declare `minimum_fragment_oligo_length`; infeasible candidate paths are removed before path ranking and barcode work. |
 | Toehold selection scope | The pooled procedure selects a toehold set target by target before global barcode design. | V1 uses a different joint, cross-target-constrained search for all loci in one assembly group. Adding a target may therefore change existing assignments. No comparative laboratory result establishes either search as superior. |
 | Substring exclusion | The pooled method starts with `q = floor(t / 2)` for barcode-to-toehold exclusion and `k = max(floor(b / 4), q + 1)` for barcode-to-barcode exclusion, including reverse complements. | `barcode_toehold_k` and `barcode_pair_k` are fixed request fields. The paper-derived values are documented starting points, never inferred at runtime. |
 | Constraint pressure | The pooled method requires at least `5|T|` admissible barcodes. If its generator returns fewer, the described software reruns while alternating constraint relaxation: increment `k` on even iterations (or whenever `q >= t`) and increment `q` on eligible odd iterations, halting if the threshold still cannot be met. | Attempt and iteration budgets are explicit. Candidate exhaustion fails under the declared `q` and `k`; junction never changes them automatically. A reviewed replacement request may declare different values. |
 | Barcode generation | The pooled Methods text describes seqwalk generation of a maximally sized shared-substring-constrained pool. | V1 uses seeded rejection sampling with explicit GC and homopolymer filters and stops at the declared candidate count. Exhaustion can be a conservative false negative even when another generator could find a feasible pool; it fails rather than changing algorithms or constraints silently. |
-| Stochastic search | The design methods use stochastic or sampled selection. | Canonical ordering, stage-specific derived seeds, a baseline candidate, fixed-point scoring, and stable tie-breaking make a request reproducible. |
+| Stochastic search | The design methods use stochastic or sampled selection. | Canonical ordering, stage-specific derived seeds, a lexicographically first feasible baseline path, fixed-point scoring, and stable tie-breaking make a request reproducible. |
 | Weighted edit distance and rank aggregation | The pooled method gives `w(u) = 1 + exp(-u)` but does not fully specify directional insertion/deletion coordinates, rank normalization, or tie policy. | V1 names the directional recurrence, symmetrizes by the minimum direction, gives equal values a shared descending dense rank normalized to `[0, 1]`, aggregates as `1.0 * minimum-rank + 0.5 * mean-rank`, and records how many paths it evaluated. |
-| Optional thermodynamic filter | The Nature work uses NUPACK-guided or prevalidated barcode choices. The pooled preprint uses string generation and also describes an optional NUPACK filter for ranking completed candidate sets. | No thermodynamic backend runs. `thermodynamic_screening` is always `not_run`; string checks do not imply thermodynamic orthogonality. |
+| Optional thermodynamic filter | The Nature work uses NUPACK-guided or prevalidated barcode choices. The pooled preprint uses string generation and describes an optional thermodynamic filter, inspired by prior NUPACK-based work, for ranking completed candidate sets. | No thermodynamic backend runs. `thermodynamic_screening` is always `not_run`; string checks do not imply thermodynamic orthogonality. |
 | Performance and experiments | The publications report timings and experimental results for their implementations and tested designs. | No PyWinder speed or output equivalence is claimed. Software checks do not imply assembly yield or laboratory validity. |
-| Recovery and ordering | The pooled paper describes construct-specific (its term) and universal PCR recovery and experimental oligo use. | V1 names the mode `target_specific`, checks exact terminal primer strings, preserves 5-prime extensions, and writes vendor-neutral rows. It does not design primers, reproduce the paper's universal buffer/Type-IIS architecture, execute a protocol, or place an order. |
+| Recovery and ordering | The pooled paper describes construct-specific (its term) and universal PCR recovery and experimental oligo use. It also warns that PCR can favor shorter products and reports a higher observed junction-misconnection rate in its universal experiment than in the highlighted construct-specific condition. | V1 names the mode `target_specific`, checks exact terminal primer strings, preserves 5-prime extensions, and writes vendor-neutral rows. It does not model amplification bias, design primers, reproduce the paper's universal buffer/Type-IIS architecture, execute a protocol, or place an order. |
 
 For request fields, use the [request contract](request.md). For commands and
 publication, use [Artifacts, API, and errors](artifacts-api-and-errors.md).
