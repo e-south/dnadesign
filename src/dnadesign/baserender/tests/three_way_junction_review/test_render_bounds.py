@@ -236,13 +236,12 @@ def test_review_renderer_bounds_geometry_artist_counts() -> None:
         geometry_text = "\n".join(item.get_text() for item in geometry_axis.texts)
         junction_text = "\n".join(item.get_text() for item in junction_axis.texts)
 
-        assert "6/21 fragments" in geometry_text
-        assert "6/20 junctions" in geometry_text
+        assert "15 more fragment pairs" in geometry_text
         assert "bounded target-junction preview" in junction_text
         assert "every target junction shown" not in junction_text
-        assert "14 target junctions omitted from preview" in junction_text
+        assert "14 more junctions" in junction_text
         assert len(geometry_axis.patches) <= 12
-        assert len(geometry_axis.texts) <= 12
+        assert len(geometry_axis.texts) <= 22
         assert len(junction_axis.lines) <= 6
         assert len(junction_axis.texts) <= 18
     finally:

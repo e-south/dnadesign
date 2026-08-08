@@ -42,10 +42,10 @@ _WARNING = "#B45309"
 _WARNING_BG = "#FFF3D6"
 
 _AXIS_GIDS = (
-    "three-way-junction-review:target-geometry",
-    "three-way-junction-review:junction-assignments",
-    "three-way-junction-review:strands-and-recovery",
-    "three-way-junction-review:search-and-checks",
+    "three-way-junction-review:input-oligos",
+    "three-way-junction-review:annealed-junctions",
+    "three-way-junction-review:recovered-product",
+    "three-way-junction-review:checks",
 )
 
 _MAX_DISPLAYED_LOCI = 6
@@ -135,7 +135,7 @@ def _setup_axis(axis, *, title: str, gid: str) -> None:
     axis.set_title(title, loc="left", fontsize=11, fontweight="semibold", color=_INK, pad=10)
 
 
-def _panel_geometry(axis, review: ThreeWayJunctionReviewV1) -> None:
+def _panel_input_oligos(axis, review: ThreeWayJunctionReviewV1) -> None:
     target_length = len(review.target.sequence_5to3)
     target_id = bounded_text_preview(review.target.target_id)
     if target_id.abbreviated:
@@ -156,44 +156,47 @@ def _panel_geometry(axis, review: ThreeWayJunctionReviewV1) -> None:
     axis.text(
         0.02,
         summary_y,
-        f"{target_length} nt  ·  {len(review.geometry.fragments)} fragments  ·  {len(review.geometry.junctions)} "
-        f"junction{'s' if len(review.geometry.junctions) != 1 else ''}",
+        f"{target_length} bp target  ·  {len(review.strands) * 2} fragment oligos",
         fontsize=8.2,
         color=_MUTED,
         va="top",
     )
-    y = 0.55
-    axis.plot([0.05, 0.95], [y, y], color=_INK, linewidth=1.2, zorder=1)
-    fragment_indices = set(_display_indices(len(review.geometry.fragments)))
-    junction_indices = set(_display_indices(len(review.geometry.junctions)))
-    for index, fragment in enumerate(review.geometry.fragments):
-        if index not in fragment_indices:
-            continue
-        x = 0.05 + 0.90 * fragment.domain_span.start / target_length
-        width = 0.90 * (fragment.domain_span.end - fragment.domain_span.start) / target_length
-        axis.add_patch(Rectangle((x, y - 0.08), width, 0.16, facecolor=_FRAGMENT, edgecolor="white", linewidth=1.0))
-        axis.text(x + width / 2, y, f"F{fragment.index + 1}", ha="center", va="center", fontsize=8, color=_INK)
-    for index, junction in enumerate(review.geometry.junctions):
-        if index not in junction_indices:
-            continue
-        x = 0.05 + 0.90 * junction.toehold_span.start / target_length
-        width = 0.90 * (junction.toehold_span.end - junction.toehold_span.start) / target_length
-        axis.add_patch(Rectangle((x, y - 0.08), width, 0.16, facecolor=_TOEHOLD, edgecolor="white", linewidth=0.8))
-        axis.plot([x + width / 2, x + width / 2], [y - 0.16, y + 0.16], color=_INK, linewidth=0.7)
-    axis.text(0.05, 0.32, "0", fontsize=7.5, color=_MUTED, ha="center")
-    axis.text(0.95, 0.32, str(target_length), fontsize=7.5, color=_MUTED, ha="center")
-    if len(fragment_indices) < len(review.geometry.fragments):
+    displayed_indices = _display_indices(len(review.strands))
+    row_gap = min(0.105, 0.55 / max(1, len(displayed_indices)))
+    for display_index, strand_index in enumerate(displayed_indices):
+        strand = review.strands[strand_index]
+        row_y = 0.66 - display_index * row_gap
+        axis.text(0.02, row_y, f"F{strand_index + 1}", fontsize=7, fontweight="semibold", color=_INK, va="center")
+        axis.add_patch(Rectangle((0.11, row_y + 0.012), 0.82, 0.026, facecolor=_BARCODE, edgecolor="none"))
+        axis.add_patch(Rectangle((0.11, row_y - 0.038), 0.82, 0.026, facecolor=_FRAGMENT, edgecolor="none"))
+        axis.text(
+            0.13,
+            row_y + 0.025,
+            f"barcode-bearing · {len(strand.barcode_bearing_sequence_5to3)} nt",
+            fontsize=5.9,
+            color=_INK,
+            va="center",
+        )
+        axis.text(
+            0.13,
+            row_y - 0.025,
+            f"complement · {len(strand.complement_sequence_5to3)} nt",
+            fontsize=5.9,
+            color=_INK,
+            va="center",
+        )
+    if len(displayed_indices) < len(review.strands):
+        omitted = len(review.strands) - len(displayed_indices)
         axis.text(
             0.02,
-            0.13,
-            f"Geometry preview · {len(fragment_indices)}/{len(review.geometry.fragments)} fragments · "
-            f"{len(junction_indices)}/{len(review.geometry.junctions)} junctions",
-            fontsize=6.8,
+            0.08,
+            f"{omitted} more fragment pairs; exact sequences are in the review JSON.",
+            fontsize=6.3,
             color=_MUTED,
         )
     else:
-        axis.text(0.02, 0.13, "Gray: target domains", fontsize=7.6, color=_MUTED)
-        axis.text(0.54, 0.13, "Blue: selected toeholds", fontsize=7.6, color=_MUTED)
+        axis.text(0.02, 0.10, "Green: barcode-bearing oligo", fontsize=6.8, color=_BARCODE)
+        axis.text(0.52, 0.10, "Gray: complement oligo", fontsize=6.8, color=_MUTED)
 
 
 def _panel_junctions(axis, review: ThreeWayJunctionReviewV1) -> None:
@@ -259,60 +262,100 @@ def _panel_junctions(axis, review: ThreeWayJunctionReviewV1) -> None:
         axis.text(
             0.03,
             0.08,
-            f"{omitted} target junctions omitted from preview; exact assignments remain in the typed contract.",
+            f"{omitted} more junctions; exact assignments are in the typed contract.",
             fontsize=6.5,
             color=_MUTED,
         )
 
 
-def _panel_strands_and_recovery(axis, review: ThreeWayJunctionReviewV1) -> None:
-    role_counts = {role: 0 for role in ("first", "internal", "last")}
-    for strand in review.strands:
-        role_counts[strand.role] += 1
+def _panel_recovered_product(axis, review: ThreeWayJunctionReviewV1) -> None:
+    recovery = review.recovery
+    product_length = len(recovery.extended_top_sequence_5to3)
     axis.text(
         0.02,
         0.92,
-        f"{len(review.strands)} paired-fragment records validated",
+        f"Predicted recovery product · {product_length} bp",
         fontsize=8.5,
         color=_MUTED,
         va="top",
     )
-    labels = [("first", _TOEHOLD), ("internal", _FRAGMENT), ("last", _BARCODE)]
-    for index, (role, color) in enumerate(labels):
-        x = 0.03 + index * 0.31
-        axis.add_patch(
-            FancyBboxPatch(
-                (x, 0.66),
-                0.27,
-                0.11,
-                boxstyle="round,pad=0.01,rounding_size=0.02",
-                facecolor=color,
-                edgecolor="none",
-                alpha=0.9,
-            )
-        )
-        axis.text(x + 0.135, 0.715, f"{role} · {role_counts[role]}", ha="center", va="center", fontsize=7.5, color=_INK)
-    recovery = review.recovery
-    axis.text(0.03, 0.53, f"Recovery · {recovery.mode}", fontsize=8.5, fontweight="semibold", color=_RECOVERY)
-    axis.text(0.03, 0.46, "Primer sequence previews · digest = SHA-256[:12]", fontsize=6.8, color=_MUTED)
+    axis.text(0.02, 0.84, f"Primer mode · {recovery.mode}", fontsize=7.3, color=_MUTED, va="top")
+    axis.plot([0.13, 0.87], [0.64, 0.64], color=_INK, linewidth=4.0, solid_capstyle="butt")
+    axis.plot([0.13, 0.87], [0.56, 0.56], color=_GRID, linewidth=4.0, solid_capstyle="butt")
+    axis.annotate(
+        "FWD",
+        xy=(0.30, 0.70),
+        xytext=(0.08, 0.70),
+        color=_RECOVERY,
+        fontsize=7,
+        fontweight="semibold",
+        va="center",
+        arrowprops={"arrowstyle": "-|>", "color": _RECOVERY, "linewidth": 1.4},
+    )
+    axis.annotate(
+        "REV",
+        xy=(0.70, 0.50),
+        xytext=(0.92, 0.50),
+        color=_RECOVERY,
+        fontsize=7,
+        fontweight="semibold",
+        ha="right",
+        va="center",
+        arrowprops={"arrowstyle": "-|>", "color": _RECOVERY, "linewidth": 1.4},
+    )
+    axis.text(0.02, 0.41, "Declared primer orders", fontsize=7.3, fontweight="semibold", color=_INK)
+    axis.text(
+        0.02,
+        0.35,
+        f"FWD · {len(recovery.forward.binding_sequence_5to3)} nt bind + "
+        f"{len(recovery.forward.five_prime_extension_5to3)} nt 5′ extension",
+        fontsize=6.2,
+        color=_MUTED,
+    )
+    axis.text(
+        0.02,
+        0.30,
+        f"REV · {len(recovery.reverse.binding_sequence_5to3)} nt bind + "
+        f"{len(recovery.reverse.five_prime_extension_5to3)} nt 5′ extension",
+        fontsize=6.2,
+        color=_MUTED,
+    )
+    axis.text(0.02, 0.25, "Order previews · digest = SHA-256[:12]", fontsize=6.2, color=_MUTED)
     primer_rows = (
-        ("FWD bind", recovery.forward.binding_sequence_5to3),
-        ("FWD 5′ ext", recovery.forward.five_prime_extension_5to3),
-        ("REV bind", recovery.reverse.binding_sequence_5to3),
-        ("REV 5′ ext", recovery.reverse.five_prime_extension_5to3),
+        ("FWD", recovery.forward.order_sequence_5to3),
+        ("REV", recovery.reverse.order_sequence_5to3),
     )
     for index, (label, sequence) in enumerate(primer_rows):
         preview = bounded_sequence_preview(sequence)
         axis.text(
             0.03,
-            0.39 - index * 0.065,
+            0.20 - index * 0.065,
             preview.label(label),
             fontsize=6.5,
             family="monospace",
             color=_INK,
         )
-    axis.text(0.03, 0.10, "Order = declared 5′ extension + binding sequence", fontsize=6.8, color=_MUTED)
-    axis.text(0.03, 0.03, "Exact sequences remain in the typed review contract.", fontsize=6.8, color=_MUTED)
+    axis.add_patch(
+        FancyBboxPatch(
+            (0.02, 0.015),
+            0.94,
+            0.075,
+            boxstyle="round,pad=0.01,rounding_size=0.02",
+            facecolor=_WARNING_BG,
+            edgecolor=_WARNING,
+            linewidth=0.8,
+        )
+    )
+    axis.text(
+        0.49,
+        0.0525,
+        "SEQUENCE PRODUCT ONLY · PCR NOT SIMULATED",
+        ha="center",
+        va="center",
+        fontsize=7.1,
+        fontweight="semibold",
+        color=_WARNING,
+    )
 
 
 def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
@@ -369,10 +412,10 @@ def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
             color=_MUTED,
         )
     for index, line in enumerate(metrics):
-        axis.text(0.03, metrics_y - index * 0.075, line, fontsize=6.5, color=_INK, family="monospace")
+        axis.text(0.03, metrics_y - index * 0.067, line, fontsize=6.5, color=_INK, family="monospace")
     passed = sum(check.status == "passed" for check in review.checks)
     not_run = sum(check.status == "not_run" for check in review.checks)
-    axis.text(0.03, 0.25, f"Checks  {passed} passed  ·  {not_run} not run", fontsize=7.8, color=_MUTED)
+    axis.text(0.03, 0.20, f"Checks  {passed} passed  ·  {not_run} not run", fontsize=7.8, color=_MUTED)
     axis.add_patch(
         FancyBboxPatch(
             (0.02, 0.06),
@@ -413,15 +456,15 @@ class ThreeWayJunctionReviewRenderer:
             figsize=figure_size,
             dpi=style.dpi,
         )
-        titles = ("Target geometry", "Junction assignments", "Strands and recovery", "Search and checks")
+        titles = ("Input oligos", "Annealed junctions", "Recovered PCR product", "Checks")
         for axis, title, gid in zip(axes, titles, _AXIS_GIDS, strict=True):
             _setup_axis(axis, title=title, gid=gid)
-        _panel_geometry(axes[0], review)
+        _panel_input_oligos(axes[0], review)
         _panel_junctions(axes[1], review)
-        _panel_strands_and_recovery(axes[2], review)
+        _panel_recovered_product(axes[2], review)
         _panel_search_and_checks(axes[3], review)
         figure.suptitle(
-            "Three-way-junction design review",
+            "Junction design review",
             x=0.02,
             y=0.99,
             ha="left",

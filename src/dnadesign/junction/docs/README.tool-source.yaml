@@ -14,7 +14,7 @@ routes:
     summary: Learn the physical idea, software model, vocabulary, and evidence limits.
   - id: getting-started
     path: getting-started.md
-    summary: Build and verify one small software demonstration.
+    summary: Build and verify one synthetic gene-scale example.
   - id: prepare-a-request
     path: guides/prepare-a-request.md
     summary: Declare exact targets, assembly groups, primers, search policy, and order labels.
