@@ -52,6 +52,8 @@ def sha256_digest(value: object, *, label: str) -> str:
 
 
 def iso_date(value: object, *, label: str) -> str:
+    if type(value) is date:
+        return value.isoformat()
     token = text(value, label=label)
     try:
         date.fromisoformat(token)

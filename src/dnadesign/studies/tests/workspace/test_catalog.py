@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -180,3 +181,15 @@ def test_manifest_rejects_unresolved_workflow_route(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="workflow reader route does not exist"):
         load_study_workspace(root)
+
+
+def test_manifest_accepts_yaml_calendar_date(tmp_path: Path) -> None:
+    root = _workspace(tmp_path)
+    manifest_path = root / "programs/stress-response/studies/promoter-response/study.yaml"
+    payload = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    payload["last_verified"] = date(2026, 8, 8)
+    _write_yaml(manifest_path, payload)
+
+    workspace = load_study_workspace(root)
+
+    assert workspace.studies[0].last_verified == "2026-08-08"
