@@ -70,6 +70,8 @@ _RETAINED_PACKAGE_SENTINELS = {
 }
 _REQUIRED_WHEEL_MEMBERS = {
     "dnadesign/baserender/styles/style_v1/presentation_default.yaml",
+    "dnadesign/junction/docs/assets/gene-scale-review.svg",
+    "dnadesign/junction/examples/gene-scale/request.yaml",
     "dnadesign/opal/campaigns/demo_gp_topn/configs/campaign.yaml",
     "dnadesign/opal/campaigns/demo_rf_sfxi_topn/records.parquet",
     "dnadesign/usr/datasets/registry.yaml",

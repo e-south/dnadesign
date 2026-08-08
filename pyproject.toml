@@ -175,6 +175,10 @@ exclude = [
   "workspaces/*/*.yaml",
   "workspaces/*/inputs/*",
 ]
+"dnadesign.junction" = [
+  "docs/assets/*.svg",
+  "examples/*/*.yaml",
+]
 "dnadesign.latentdna" = [
   "ops/status.registry.yaml",
   "workspaces/templates/*/*.yaml",
