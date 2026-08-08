@@ -96,13 +96,14 @@ def test_guide_json_includes_campaign_plugins_steps_and_doc_pointers(tmp_path: P
     assert out["campaign"]["slug"] == "demo"
     assert out["plugins"]["model"]["name"] == "random_forest"
     assert out["plugins"]["selection_views"][0]["selection"]["name"] == "top_n"
-    assert out["workflow_key"] == "rf_sfxi_topn"
+    assert out["workflow_key"] == "rf_topn"
     assert any("opal run -c" in str(step["command"]) for step in out["steps"])
     assert out["steps"][0]["title"] == "Validate schema and plugin wiring"
     assert "opal validate -c" in out["steps"][0]["command"]
     assert out["steps"][1]["title"] == "Initialize campaign workspace"
     assert "opal init -c" in out["steps"][1]["command"]
     assert "docs/plugins/objectives/sfxi.md" in out["learn_more"]["docs"]
+    assert "docs/workflows/campaign-round.md" in out["learn_more"]["docs"]
     assert "src/dnadesign/opal/src/models/random_forest.py" in out["learn_more"]["source"]
     assert "src/dnadesign/opal/src/runtime/round/stages/scoring.py" in out["learn_more"]["source"]
 
@@ -124,6 +125,11 @@ def test_guide_json_uses_usr_records_and_shared_label_source_sidecar(tmp_path: P
     assert "shared USR observed-label sidecar" in ingest_step["why"]
     assert str(sidecar.resolve()) in ingest_step["writes"]
     assert "records.parquet" not in ingest_step["writes"]
+    assert out["workflow_key"] == "rf_topn"
+    assert "docs/workflows/campaign-round.md" in out["learn_more"]["docs"]
+    assert "docs/plugins/objectives/sfxi.md" not in out["learn_more"]["docs"]
+    assert "<labels-file>" in ingest_step["command"]
+    assert "vec8-b0" not in ingest_step["command"]
 
 
 def test_guide_markdown_contains_round_semantics_and_commands(tmp_path: Path) -> None:

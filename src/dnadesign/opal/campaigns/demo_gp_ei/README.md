@@ -41,4 +41,6 @@ uv run opal verify-outputs -c configs/campaign.yaml --view primary --round lates
 
 ### Full guide
 
-- [GP, SFXI, and expected-improvement workflow](../../docs/workflows/gp-sfxi-ei.md)
+- [Campaign round](../../docs/workflows/campaign-round.md)
+- [Expected Improvement contract](../../docs/plugins/selection/expected-improvement.md)
+- [SFXI objective contract](../../docs/plugins/objectives/sfxi.md)

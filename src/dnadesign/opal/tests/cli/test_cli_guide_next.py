@@ -300,6 +300,26 @@ def test_guide_next_counts_shared_usr_sidecar_labels(tmp_path: Path) -> None:
     assert out["labels_in_observed_round"] == 1
 
 
+def test_guide_next_keeps_neutral_campaign_docs_objective_neutral(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_usr_sidecar_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
+    assert init_res.exit_code == 0, init_res.stdout
+
+    res = runner.invoke(
+        app,
+        ["--no-color", "guide", "next", "-c", str(campaign), "--round", "0", "--json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    out = json.loads(res.stdout)
+
+    assert out["stage"] == "ingest"
+    assert "docs/workflows/campaign-round.md" in out["learn_more"]
+    assert "docs/plugins/objectives/sfxi.md" not in out["learn_more"]
+
+
 def test_guide_next_recommends_verify_after_round_exists(tmp_path: Path) -> None:
     workdir, campaign, records = _setup_workspace(tmp_path)
     _write_round0_label(records)

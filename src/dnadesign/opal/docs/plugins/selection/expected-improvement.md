@@ -1,7 +1,7 @@
 ## Pool-relative weighted acquisition (`expected_improvement`)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-20
+**Last verified:** 2026-08-08
 
 
 `expected_improvement` is the stable registry identifier. The implementation is
@@ -38,20 +38,21 @@ surfaces:
 * `score_ref` pulls the **score values** for that channel key.
 * `uncertainty_ref` pulls the **standard deviation values** for that channel key.
 
-Some objectives publish uncertainty under the **same channel key** as the score (SFXI does this for `sfxi`). In that case it is valid for `score_ref` and `uncertainty_ref` to be identical.
+An objective may publish score and uncertainty under the same channel key. In
+that case, `score_ref` and `uncertainty_ref` may be identical.
 
-Minimal v3 example (SFXI + EI):
+Minimal wiring example:
 
 ```yaml
 selection_views:
   - id: primary
-    objective: {name: sfxi_v1, params: {...}}
+    objective: {name: <objective-plugin>, params: {...}}
     selection:
       name: expected_improvement
       params:
         top_k: 5
-        score_ref: sfxi
-        uncertainty_ref: sfxi
+        score_ref: <score-channel>
+        uncertainty_ref: <uncertainty-channel>
         objective_mode: maximize
         tie_handling: competition_rank
         alpha: 1.0

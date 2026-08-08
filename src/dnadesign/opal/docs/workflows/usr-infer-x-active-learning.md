@@ -11,7 +11,7 @@
 **Status-kind:** opal-campaign-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-08-08
 
 Use this workflow when a USR candidate table already contains one or more
 infer-derived feature columns and OPAL should own the label/train/select loop.
@@ -190,11 +190,16 @@ uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --round 1 --resume # Re
 
 ### Model and selection variations
 
-- use [RF + SFXI + top_n](rf-sfxi-topn.md) for the cheapest deterministic baseline
-- use [GP + SFXI + top_n](gp-sfxi-topn.md) when predictive uncertainty must be recorded with deterministic ranking
-- use [GP + SFXI + expected_improvement](gp-sfxi-ei.md) when selection should consume both score and uncertainty
+- use a random forest when a deterministic ensemble is sufficient;
+- use a Gaussian process when the configured objective and selector need
+  predictive uncertainty;
+- use `top_n` for direct score ranking; or
+- use `expected_improvement` only when the objective emits the referenced
+  score and standard-deviation channels.
 
-The infer-to-OPAL handoff contract does not change across those choices. Only `x_column_name` and the campaign config do.
+The Infer-to-OPAL handoff does not change across those choices. See the
+[campaign round](campaign-round.md) for the shared lifecycle and the plugin
+pages for exact channel contracts.
 
 ## Verification checklist
 

@@ -6,7 +6,7 @@ shared phenotype model per campaign, applies named target views to the shared
 predictions, and records one final deduplicated selection batch. Start at
 the [OPAL docs index](docs/index.md).
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-08-08
 
 ## Documentation
 
@@ -17,6 +17,8 @@ the [OPAL docs index](docs/index.md).
 - [Configuration](docs/reference/configuration.md): strict v3 schema.
 - [Campaign routes](campaigns/README.md): maintained demos, study-owned
   campaigns, and placement rules.
+- [Campaign round](docs/workflows/campaign-round.md): the canonical validate,
+  initialize, label, run, and verify loop.
 - [USR infer-derived X workflow](docs/workflows/usr-infer-x-active-learning.md):
   active learning when Infer has already written the feature column.
 - [CLI reference](docs/reference/cli.md): command contracts and flags.
