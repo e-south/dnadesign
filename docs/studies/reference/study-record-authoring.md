@@ -1,11 +1,13 @@
 ## Study Record Authoring
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-08-08
 
-Checked-in study records keep long-running project context discoverable without
-turning the top-level [Study Records](../README.md) index into a status/preflight
-ladder.
+Study records keep long-running project context discoverable without turning
+the top-level [Study Records](../README.md) index into a status/preflight
+ladder. The same shape works in this public repository or in an explicit
+private study repository; the public/private boundary decides which one owns
+the record.
 
 ### Required record shape
 

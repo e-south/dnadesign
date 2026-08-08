@@ -1,14 +1,15 @@
 ![Studies banner](assets/studies-banner.svg)
 
-`studies` contains narrow helpers for checked-in study records that need code
-without becoming generic tool features. Ops owns the status and preflight APIs;
-this package keeps concrete study logic inside the owning study unit and shared
-record parsing under `core`.
+`studies` contains shared study-record mechanics and narrow helpers for
+deliberately public study units. Private study code and records belong in an
+external private workspace that imports dnadesign's public APIs. Ops owns the
+status and preflight APIs; `core` owns neutral record parsing.
 
 ## Documentation
 
 - [Study records index](../../../docs/studies/README.md): checked-in study
   manifests, routes, and status notes.
+- [Public/private boundary](../../../docs/studies/reference/public-private-boundary.md): decide whether a study may live in this public repository.
 - [Ops README](../ops/README.md): status, preflight, and orchestration entry
   points.
 - [Repository docs index](../../../docs/README.md): cross-tool workflow routing.

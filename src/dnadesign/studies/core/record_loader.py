@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/core/record_loader.py
 
-Loads the OPS-facing checked-in study contract.
+Loads an OPS-facing study contract from an explicit workspace.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -928,7 +928,7 @@ def _discover_repo_root(study_root: Path) -> Path:
     for parent in (study_root, *study_root.parents):
         if (parent / "pyproject.toml").exists():
             return parent
-    raise ValueError(f"study record must live inside a dnadesign repository checkout: {study_root}")
+    raise ValueError(f"study record must live inside a repository with pyproject.toml: {study_root}")
 
 
 __all__ = ["load_study_ops_contract"]

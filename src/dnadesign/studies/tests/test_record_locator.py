@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/tests/test_record_locator.py
 
-Focused tests for flat checked-in study index loading and active-study.
+Focused tests for explicit study-index loading and active-study selection.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -32,6 +32,7 @@ def _repo_root() -> Path:
 
 def _write_repo(tmp_path: Path) -> Path:
     repo_root = tmp_path
+    repo_root.mkdir(parents=True, exist_ok=True)
     (repo_root / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.0.0'\n", encoding="utf-8")
     _write_minimal_ops_contract(
         repo_root / "docs" / "studies" / "demo_study",
@@ -107,6 +108,16 @@ def test_load_study_index_reads_flat_study_first_layout(tmp_path: Path) -> None:
 
     assert index.active_study_id == "demo_study"
     assert index.studies[0].record_root == (repo_root / "docs" / "studies" / "demo_study").resolve()
+
+
+def test_external_workspace_can_use_study_contracts_without_being_dnadesign_repo(tmp_path: Path) -> None:
+    repo_root = _write_repo(tmp_path / "private-study-workspace")
+
+    index = load_study_index(repo_root)
+    contract = load_study_ops_contract(index.studies[0].record_root)
+
+    assert contract.study_id == "demo_study"
+    assert index.repo_root == repo_root.resolve()
 
 
 def test_indexed_study_records_have_loadable_ops_contracts() -> None:
