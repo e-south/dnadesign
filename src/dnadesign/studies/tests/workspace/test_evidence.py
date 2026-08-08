@@ -1,4 +1,13 @@
-"""Contract tests for study evidence indexes."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/workspace/test_evidence.py
+
+Contract tests for study evidence indexes.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

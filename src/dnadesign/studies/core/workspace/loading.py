@@ -1,4 +1,13 @@
-"""Load a portable study workspace from one explicit repository root."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/core/workspace/loading.py
+
+Load a portable study workspace from one explicit repository root.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

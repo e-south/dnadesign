@@ -1,4 +1,13 @@
-"""Portable, fail-fast contracts for external study workspaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/core/workspace/__init__.py
+
+Package exports for portable external study workspace contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .contracts import (
     StudyArtifact,

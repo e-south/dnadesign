@@ -1,4 +1,13 @@
-"""Primitive validation shared by study workspace loaders."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/core/workspace/validation.py
+
+Primitive validation shared by study workspace loaders.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

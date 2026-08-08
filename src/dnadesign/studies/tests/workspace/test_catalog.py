@@ -1,4 +1,13 @@
-"""Contract tests for a portable study workspace catalog."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/tests/workspace/test_catalog.py
+
+Contract tests for a portable study workspace catalog.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

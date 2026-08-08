@@ -1,4 +1,13 @@
-"""Immutable values exposed by the study workspace contract."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/core/workspace/contracts.py
+
+Immutable values exposed by the study workspace contract.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

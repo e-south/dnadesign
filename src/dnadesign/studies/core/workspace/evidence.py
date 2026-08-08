@@ -1,4 +1,13 @@
-"""Load and verify study evidence indexes."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/studies/core/workspace/evidence.py
+
+Load and verify study evidence indexes.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
