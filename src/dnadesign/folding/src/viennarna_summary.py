@@ -35,18 +35,7 @@ def structure_subtitle_lines(
     if visual_contract is None:
         return []
     lines: list[str] = []
-    payload_name = _payload_name(section_annotations)
-    left_base = _stem_base_sequence(visual_contract, section_annotations, side="left")
-    right_base = _stem_base_sequence(visual_contract, section_annotations, side="right")
-    first_line_parts: list[str] = []
-    if payload_name:
-        first_line_parts.append(f"{payload_name} payload")
-    base_phrase = _base_phrase(left_base=left_base, right_base=right_base)
-    if base_phrase:
-        first_line_parts.append(base_phrase)
-    mismatch_profile = _mismatch_profile_phrase(visual_contract)
-    if mismatch_profile:
-        first_line_parts.append(mismatch_profile)
+    first_line_parts = _display_fact_phrases(visual_contract)
     if first_line_parts:
         lines.append(" | ".join(first_line_parts))
     cap = _cap_summary(visual_contract, section_annotations)
@@ -77,48 +66,21 @@ def _pretty_token(token: str) -> str:
     return token[:1].upper() + token[1:].lower()
 
 
-def _payload_name(section_annotations: list[dict[str, object]]) -> str:
-    labels = [
-        _clean_label(str(section.get("label", "")))
-        for section in section_annotations
-        if str(section.get("section_kind", "")) != "stem_base"
-    ]
-    for label in labels:
-        lowered = label.lower()
-        if "primary" not in lowered and "complement" not in lowered:
-            continue
-        candidate = re.sub(r"\b(primary|complement|reverse complement)\b", "", label, flags=re.IGNORECASE)
-        candidate = _clean_label(candidate)
-        if candidate:
-            return candidate
-    for label in labels:
-        if "payload" in label.lower():
-            return "Payload"
-    return ""
-
-
 def _clean_label(value: str) -> str:
     return re.sub(r"\s+", " ", value.replace("_", " ").strip())
 
 
-def _base_phrase(*, left_base: str, right_base: str) -> str:
-    if left_base and right_base:
-        return f"left {left_base} / right {right_base}"
-    if left_base:
-        return f"left {left_base}"
-    if right_base:
-        return f"right {right_base}"
-    return ""
-
-
-def _mismatch_profile_phrase(visual_contract: SequenceEvidenceMapV1) -> str:
-    scar_nick = visual_contract.meta.get("scar_nick")
-    if not isinstance(scar_nick, dict):
-        return ""
-    profile = str(scar_nick.get("profile_s3s2s1s0", "")).strip().upper()
-    if not profile:
-        return ""
-    return f"mismatch profile {profile}"
+def _display_fact_phrases(visual_contract: SequenceEvidenceMapV1) -> list[str]:
+    facts = visual_contract.meta.get("facts")
+    if not isinstance(facts, list):
+        return []
+    return [
+        f"{_clean_label(str(fact.get('label') or ''))} {_clean_label(str(fact.get('value') or ''))}".strip()
+        for fact in facts
+        if isinstance(fact, dict)
+        and _clean_label(str(fact.get("label") or ""))
+        and _clean_label(str(fact.get("value") or ""))
+    ]
 
 
 def _cap_summary(
@@ -138,36 +100,6 @@ def _cap_summary(
     sequence = visual_contract.primary_sequence[start:end]
     label = _clean_label(str(section.get("label", "Cap"))) or "Cap"
     return f"{label} {sequence} ({end - start} nt)"
-
-
-def _stem_base_sequence(
-    visual_contract: SequenceEvidenceMapV1,
-    section_annotations: list[dict[str, object]],
-    *,
-    side: str,
-) -> str:
-    section = _stem_base_section(section_annotations, side=side)
-    if section is None:
-        return ""
-    start = int(section["start"])
-    end = int(section["end"])
-    return visual_contract.primary_sequence[start:end]
-
-
-def _stem_base_section(
-    section_annotations: list[dict[str, object]],
-    *,
-    side: str,
-) -> dict[str, object] | None:
-    side_text = side.lower()
-    for section in section_annotations:
-        if str(section.get("section_kind", "")) != "stem_base":
-            continue
-        label = str(section.get("label", "")).lower()
-        section_id = str(section.get("section_id", "")).lower()
-        if side_text in label or side_text in section_id:
-            return section
-    return None
 
 
 __all__ = ["structure_subtitle_lines", "structure_title"]

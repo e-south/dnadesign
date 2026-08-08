@@ -917,11 +917,12 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                             "edge_color": "#E45756",
                         },
                     ],
-                    "scar_nick": {
-                        "left_base": "G",
-                        "right_base": "A",
-                        "profile_s3s2s1s0": "MXMM",
-                    },
+                    "facts": [
+                        {"fact_id": "payload", "label": "Payload", "value": "TetO"},
+                        {"fact_id": "left_base", "label": "Left base", "value": "G"},
+                        {"fact_id": "right_base", "label": "Right base", "value": "A"},
+                        {"fact_id": "pairing_profile", "label": "Pairing profile", "value": "MXMM"},
+                    ],
                     "segment_labels": [
                         {"text": "Left stem base", "start": 0, "end": 1, "label_side": "below"},
                         {"text": "TetO primary", "start": 0, "end": 2, "label_side": "above"},
@@ -1055,7 +1056,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     root = ET.fromstring(annotated)
     text_values = [node.text for node in root.findall(".//svg:text", namespace)]
     assert "Retron 43 TetO x8" in text_values
-    assert "TetO payload | left G / right A | mismatch profile MXMM" in text_values
+    assert "Payload TetO | Left base G | Right base A | Pairing profile MXMM" in text_values
     assert "Cap CC (2 nt)" in text_values
     assert not any(
         str(value).startswith(("sections:", "components:", "snapback:", "scar_nick:")) for value in text_values

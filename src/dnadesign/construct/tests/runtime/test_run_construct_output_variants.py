@@ -326,7 +326,7 @@ job:
         run_from_config(variant_config_path)
 
 
-def test_run_construct_on_conflict_ignore_does_not_duplicate_existing_sequence_id_views(tmp_path: Path) -> None:
+def test_run_construct_on_conflict_ignore_publishes_current_view_beside_retired_view_id(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)
     _write_registry(usr_root)
@@ -395,9 +395,9 @@ job:
 
     assert rerun.records_written == 0
     assert rerun.records_skipped_existing == 1
-    assert len(views) == 1
-    assert views[0].sequence_id == current_view.sequence_id
-    assert views[0].view_id == legacy_view.view_id
+    assert len(views) == 2
+    assert {view.sequence_id for view in views} == {current_view.sequence_id}
+    assert {view.view_id for view in views} == {current_view.view_id, legacy_view.view_id}
 
 
 def test_run_construct_output_variants_allow_same_sequence_with_distinct_views(tmp_path: Path) -> None:

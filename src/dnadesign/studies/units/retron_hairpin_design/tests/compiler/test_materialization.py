@@ -552,17 +552,18 @@ def test_retron_msd_materialize_writes_single_unit_genbank_png_and_reverse_compl
     assert composition_overview_png_path.stat().st_size > 0
     assert secondary_structure_native_png_path.stat().st_size > 0
     visual_contract = json.loads((variant_dir / "manifest" / "visual" / "sequence_evidence_map_v1.json").read_text())
-    assert visual_contract["meta"]["scar_nick"] == {
-        "left_base": "CGGT",
-        "right_base": "ACAG",
-        "profile_s3s2s1s0": "MXMM",
-    }
+    assert visual_contract["meta"]["facts"] == [
+        {"fact_id": "payload", "label": "Payload", "value": "msd[teto]"},
+        {"fact_id": "left_base", "label": "Left base", "value": "CGGT"},
+        {"fact_id": "right_base", "label": "Right base", "value": "ACAG"},
+        {"fact_id": "pairing_profile", "label": "Pairing profile", "value": "MXMM"},
+    ]
     annotated_structure_svg = (
         construct_bundle / "visual" / "viennarna_secondary_structure" / "secondary_structure.annotated.svg"
     ).read_text(encoding="utf-8")
     composition_overview_svg = composition_overview_svg_path.read_text(encoding="utf-8")
-    assert "mismatch profile MXMM" in annotated_structure_svg
-    assert "mismatch profile MXMM" in composition_overview_svg
+    assert "Payload msd[teto] | Left base CGGT | Right base ACAG | Pairing profile MXMM" in annotated_structure_svg
+    assert "Pairing profile MXMM" in composition_overview_svg
     assert "Cap AGA (3 nt)" in annotated_structure_svg
     assert "Cap AGA (3 nt)" in composition_overview_svg
     assert "Cap Geometry" not in annotated_structure_svg

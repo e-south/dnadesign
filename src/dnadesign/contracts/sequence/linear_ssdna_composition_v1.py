@@ -70,19 +70,19 @@ class UsrSourceRefV1(SequenceContractModel):
         return _not_blank(value, label="source field")
 
 
-class StudyRecordSourceRefV1(SequenceContractModel):
-    kind: Literal["study_record"]
-    study_id: str
-    ref: str
+class RecordSourceRefV1(SequenceContractModel):
+    kind: Literal["record"]
+    authority: str
+    record_id: str
 
-    @field_validator("study_id", "ref")
+    @field_validator("authority", "record_id")
     @classmethod
     def _not_blank(cls, value: str) -> str:
-        return _not_blank(value, label="study_record source field")
+        return _not_blank(value, label="record source field")
 
 
-class CruncherArtifactSourceRefV1(SequenceContractModel):
-    kind: Literal["cruncher_artifact"]
+class ArtifactSourceRefV1(SequenceContractModel):
+    kind: Literal["artifact"]
     contract: str
     uri: str
     selector: dict[str, Any] = Field(default_factory=dict)
@@ -92,11 +92,11 @@ class CruncherArtifactSourceRefV1(SequenceContractModel):
     @field_validator("contract", "uri")
     @classmethod
     def _not_blank(cls, value: str) -> str:
-        return _not_blank(value, label="cruncher artifact source field")
+        return _not_blank(value, label="artifact source field")
 
 
 SourceRefV1 = Annotated[
-    LiteralSourceRefV1 | DerivedSourceRefV1 | UsrSourceRefV1 | StudyRecordSourceRefV1 | CruncherArtifactSourceRefV1,
+    LiteralSourceRefV1 | DerivedSourceRefV1 | UsrSourceRefV1 | RecordSourceRefV1 | ArtifactSourceRefV1,
     Field(discriminator="kind"),
 ]
 
@@ -361,23 +361,15 @@ class LinearSsdnaPrimitiveVisualRoleV1(SequenceContractModel):
         return value
 
 
-class LinearSsdnaScarNickDisplayMetadataV1(SequenceContractModel):
-    left_base: str
-    right_base: str
-    profile_s3s2s1s0: str
+class LinearSsdnaDisplayFactV1(SequenceContractModel):
+    fact_id: str = Field(min_length=1, max_length=128)
+    label: str = Field(min_length=1, max_length=128)
+    value: str = Field(min_length=1, max_length=512)
 
-    @field_validator("left_base", "right_base")
+    @field_validator("fact_id", "label", "value")
     @classmethod
-    def _base_not_blank(cls, value: str) -> str:
-        return _not_blank(value, label="visual.display_profile.scar_nick base").upper()
-
-    @field_validator("profile_s3s2s1s0")
-    @classmethod
-    def _profile_is_valid(cls, value: str) -> str:
-        profile = _not_blank(value, label="visual.display_profile.scar_nick.profile_s3s2s1s0").upper()
-        if not re.fullmatch(r"[MWX]{4}", profile):
-            raise ValueError("visual.display_profile.scar_nick.profile_s3s2s1s0 must contain four M/W/X symbols.")
-        return profile
+    def _text_not_blank(cls, value: str) -> str:
+        return _not_blank(value, label="visual.display_profile.fact field")
 
 
 class LinearSsdnaVisualDisplayProfileV1(SequenceContractModel):
@@ -387,7 +379,9 @@ class LinearSsdnaVisualDisplayProfileV1(SequenceContractModel):
     component_hues: dict[str, str] = Field(default_factory=dict)
     component_styles: dict[str, LinearSsdnaVisualStyleConfigV1] = Field(default_factory=dict)
     primitive_visual_roles: dict[str, LinearSsdnaPrimitiveVisualRoleV1] = Field(default_factory=dict)
-    scar_nick: LinearSsdnaScarNickDisplayMetadataV1 | None = None
+    facts: list[LinearSsdnaDisplayFactV1] = Field(default_factory=list, max_length=32)
+    overview_hidden_components: list[str] = Field(default_factory=list, max_length=256)
+    overview_hidden_annotations: list[str] = Field(default_factory=list, max_length=256)
     base_highlight_color: str | None = None
 
     @field_validator("title", "base_highlight_color")
@@ -422,6 +416,22 @@ class LinearSsdnaVisualDisplayProfileV1(SequenceContractModel):
                     f"({key!r} != {role.role_id!r})."
                 )
             normalized[key] = role
+        return normalized
+
+    @field_validator("facts")
+    @classmethod
+    def _fact_ids_unique(cls, value: list[LinearSsdnaDisplayFactV1]) -> list[LinearSsdnaDisplayFactV1]:
+        fact_ids = [fact.fact_id for fact in value]
+        if len(set(fact_ids)) != len(fact_ids):
+            raise ValueError("visual.display_profile.facts fact_id values must be unique.")
+        return value
+
+    @field_validator("overview_hidden_components", "overview_hidden_annotations")
+    @classmethod
+    def _hidden_ids_unique_and_not_blank(cls, value: list[str]) -> list[str]:
+        normalized = [_not_blank(item, label="visual.display_profile hidden id") for item in value]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("visual.display_profile hidden ids must be unique.")
         return normalized
 
 
@@ -520,6 +530,6 @@ __all__ = [
     "LinearSsdnaAssertionV1",
     "LinearSsdnaVisualDisplayProfileV1",
     "LinearSsdnaPrimitiveVisualRoleV1",
-    "LinearSsdnaScarNickDisplayMetadataV1",
+    "LinearSsdnaDisplayFactV1",
     "LinearSsdnaVisualStyleConfigV1",
 ]

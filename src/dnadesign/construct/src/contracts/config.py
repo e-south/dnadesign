@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/construct/src/contracts/config.py
 
-Compatibility facade for construct configuration contracts.
+Canonical import surface for Construct configuration contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

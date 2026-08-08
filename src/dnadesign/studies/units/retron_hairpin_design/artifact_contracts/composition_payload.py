@@ -106,9 +106,9 @@ def _msd_unit_segments(
             "role": "flank_5p",
             "sequence": flank_5p,
             "source": {
-                "kind": "study_record",
-                "study_id": "retron_hairpin_design",
-                "ref": record.construct_label,
+                "kind": "record",
+                "authority": "dnadesign.study.retron_hairpin_design",
+                "record_id": record.construct_label,
             },
         },
         {
@@ -129,9 +129,9 @@ def _msd_unit_segments(
             "role": "flank_3p",
             "sequence": flank_3p,
             "source": {
-                "kind": "study_record",
-                "study_id": "retron_hairpin_design",
-                "ref": record.construct_label,
+                "kind": "record",
+                "authority": "dnadesign.study.retron_hairpin_design",
+                "record_id": record.construct_label,
             },
         },
     ]
@@ -205,7 +205,12 @@ def _msd_unit_annotations(
     return annotations
 
 
-def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) -> dict[str, object]:
+def _msd_display_profile(
+    record: MsdDesignReferenceV1,
+    *,
+    payload_label: str,
+    has_cap_topology: bool,
+) -> dict[str, object]:
     return {
         "title": f"{record.construct_id} {payload_label}",
         "component_labels": {
@@ -222,11 +227,20 @@ def _msd_display_profile(record: MsdDesignReferenceV1, *, payload_label: str) ->
             "snapback_cap": "Cap",
             "snapback_foldback_return": "Foldback return",
         },
-        "scar_nick": {
-            "left_base": record.scar_nick.left_base,
-            "right_base": record.scar_nick.right_base,
-            "profile_s3s2s1s0": record.scar_nick.profile_s3s2s1s0,
-        },
+        "facts": [
+            {"fact_id": "payload", "label": "Payload", "value": payload_label},
+            {"fact_id": "left_base", "label": "Left base", "value": record.scar_nick.left_base},
+            {"fact_id": "right_base", "label": "Right base", "value": record.scar_nick.right_base},
+            {
+                "fact_id": "pairing_profile",
+                "label": "Pairing profile",
+                "value": record.scar_nick.profile_s3s2s1s0,
+            },
+        ],
+        "overview_hidden_components": [SNAPBACK_FOLDBACK_SEGMENT_ID] if has_cap_topology else [],
+        "overview_hidden_annotations": (
+            ["snapback_retained_stem", "snapback_foldback_return"] if has_cap_topology else []
+        ),
         "component_hues": primitive_component_hues(),
         "component_styles": primitive_component_styles(),
         "primitive_visual_roles": primitive_visual_roles_payload(),
@@ -316,7 +330,11 @@ def composition_config_payload(
         },
         "visual": {
             "emit": ["sequence_evidence_map_v1", "viennarna_secondary_structure_svg_v1"],
-            "display_profile": _msd_display_profile(record, payload_label=payload_label),
+            "display_profile": _msd_display_profile(
+                record,
+                payload_label=payload_label,
+                has_cap_topology=cap_topology is not None,
+            ),
             "render_exports": {"formats": list(render_formats)},
         },
         "benchling_export": {

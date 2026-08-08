@@ -52,7 +52,8 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "../../../docs/README.md" in top_readme
     assert "## Start here" not in top_readme
     assert "## Boundary reminder" not in top_readme
-    assert "Construct takes anchor sequences or other focal DNA parts" in top_readme
+    assert "Construct realizes declared DNA parts inside explicit sequence contexts" in top_readme
+    assert "that specialized topology is one Construct route" in top_readme
     assert "reference/template-contexts.md" in readme
     assert "template-contexts.md" in config_doc
     assert "../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in outputs

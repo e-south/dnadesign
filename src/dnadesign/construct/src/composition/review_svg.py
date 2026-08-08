@@ -173,20 +173,13 @@ def _structure_caption(visual_contract: SequenceEvidenceMapV1) -> tuple[str, lis
     )
     title = re.sub(r"\s+", " ", title.strip())
     subtitles: list[str] = []
-    scar_nick = visual_contract.meta.get("scar_nick")
-    if isinstance(scar_nick, dict):
-        subtitle_parts: list[str] = []
-        left_base = str(scar_nick.get("left_base") or "").strip()
-        right_base = str(scar_nick.get("right_base") or "").strip()
-        profile = str(scar_nick.get("profile_s3s2s1s0") or "").strip().upper()
-        if left_base and right_base:
-            subtitle_parts.append(f"left {left_base} / right {right_base}")
-        elif left_base:
-            subtitle_parts.append(f"left {left_base}")
-        elif right_base:
-            subtitle_parts.append(f"right {right_base}")
-        if profile:
-            subtitle_parts.append(f"mismatch profile {profile}")
+    facts = visual_contract.meta.get("facts")
+    if isinstance(facts, list):
+        subtitle_parts = [
+            f"{str(fact.get('label') or '').strip()} {str(fact.get('value') or '').strip()}".strip()
+            for fact in facts
+            if isinstance(fact, dict) and str(fact.get("label") or "").strip() and str(fact.get("value") or "").strip()
+        ]
         if subtitle_parts:
             subtitles.append(" | ".join(subtitle_parts))
     return title, subtitles

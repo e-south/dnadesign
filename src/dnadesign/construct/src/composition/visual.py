@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
@@ -223,7 +224,6 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
             *_segment_span_backdrops(
                 segment_spans,
                 view,
-                annotation_spans=annotation_spans,
                 display_profile=display_profile,
             ),
             *_annotation_span_backdrops(annotation_spans, view, display_profile=display_profile),
@@ -232,7 +232,6 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
             *_segment_label_entries(
                 segment_spans,
                 view,
-                annotation_spans=annotation_spans,
                 display_profile=display_profile,
             ),
             *_annotation_label_entries(annotation_spans, view, display_profile=display_profile),
@@ -249,9 +248,9 @@ def _canonical_visual_meta(composed: Any, view: dict[str, Any], *, title: str) -
             for span in duplicate_annotations
         ],
     }
-    scar_nick = _display_profile_scar_nick_meta(display_profile)
-    if scar_nick:
-        meta["scar_nick"] = scar_nick
+    facts = _display_profile_facts_meta(display_profile)
+    if facts:
+        meta["facts"] = facts
     return meta
 
 
@@ -259,19 +258,14 @@ def _segment_span_backdrops(
     segment_spans: list[Any],
     view: dict[str, Any],
     *,
-    annotation_spans: list[Any],
     display_profile: Any,
 ) -> list[dict[str, object]]:
     backdrops: list[dict[str, object]] = []
-    has_snapback_subsections = _has_snapback_subsection_annotations(annotation_spans)
+    hidden = set(display_profile.overview_hidden_components)
     for span in segment_spans:
         styles = display_profile.component_styles
         configured_style = styles.get(span.segment_id) or styles.get(span.role)
-        if _suppresses_overview_markup(
-            span.segment_id,
-            span.role,
-            has_snapback_subsections=has_snapback_subsections,
-        ):
+        if _is_hidden(span.segment_id, span.role, hidden):
             continue
         if configured_style is None and span.segment_id not in display_profile.component_labels:
             continue
@@ -297,17 +291,12 @@ def _segment_label_entries(
     segment_spans: list[Any],
     view: dict[str, Any],
     *,
-    annotation_spans: list[Any],
     display_profile: Any,
 ) -> list[dict[str, object]]:
     labels: list[dict[str, object]] = []
-    has_snapback_subsections = _has_snapback_subsection_annotations(annotation_spans)
+    hidden = set(display_profile.overview_hidden_components)
     for span in segment_spans:
-        if _suppresses_overview_markup(
-            span.segment_id,
-            span.role,
-            has_snapback_subsections=has_snapback_subsections,
-        ):
+        if _is_hidden(span.segment_id, span.role, hidden):
             continue
         text = display_profile.component_labels.get(span.segment_id)
         if not text:
@@ -331,8 +320,9 @@ def _annotation_label_entries(
     display_profile: Any,
 ) -> list[dict[str, object]]:
     labels: list[dict[str, object]] = []
+    hidden = set(display_profile.overview_hidden_annotations)
     for span in annotation_spans:
-        if _suppresses_overview_markup(span.annotation_id, span.role):
+        if _is_hidden(span.annotation_id, span.role, hidden):
             continue
         text = display_profile.annotation_labels.get(span.annotation_id)
         if not text:
@@ -349,19 +339,8 @@ def _annotation_label_entries(
     return labels
 
 
-def _has_snapback_subsection_annotations(annotation_spans: list[Any]) -> bool:
-    subsection_ids = {"snapback_retained_stem", "snapback_cap", "snapback_foldback_return"}
-    return any(span.annotation_id in subsection_ids or span.role in subsection_ids for span in annotation_spans)
-
-
-def _suppresses_overview_markup(identifier: str, role: str, *, has_snapback_subsections: bool = False) -> bool:
-    if identifier in {"snapback_retained_stem", "snapback_foldback_return"}:
-        return True
-    if role in {"snapback_retained_stem", "snapback_foldback_return"}:
-        return True
-    if identifier == "snapback_foldback_geometry" or role == "snapback_foldback_geometry":
-        return has_snapback_subsections
-    return False
+def _is_hidden(identifier: str, role: str, hidden_ids: Collection[str]) -> bool:
+    return identifier in hidden_ids or role in hidden_ids
 
 
 def _annotation_span_backdrops(
@@ -371,7 +350,10 @@ def _annotation_span_backdrops(
     display_profile: Any,
 ) -> list[dict[str, object]]:
     backdrops: list[dict[str, object]] = []
+    hidden = set(display_profile.overview_hidden_annotations)
     for span in annotation_spans:
+        if _is_hidden(span.annotation_id, span.role, hidden):
+            continue
         styles = display_profile.component_styles
         configured_style = styles.get(span.annotation_id) or styles.get(span.role)
         if configured_style is None:
@@ -437,9 +419,9 @@ def _display_profile_meta(display_profile: Any, *, title: str) -> dict[str, obje
         "component_hues": dict(display_profile.component_hues),
         "primitive_visual_roles": _primitive_visual_roles_meta(display_profile),
     }
-    scar_nick = _display_profile_scar_nick_meta(display_profile)
-    if scar_nick:
-        meta["scar_nick"] = scar_nick
+    facts = _display_profile_facts_meta(display_profile)
+    if facts:
+        meta["facts"] = facts
     return meta
 
 
@@ -451,12 +433,15 @@ def _primitive_visual_roles_meta(display_profile: Any) -> dict[str, object]:
     return payload
 
 
-def _display_profile_scar_nick_meta(display_profile: Any) -> dict[str, object]:
-    scar_nick = getattr(display_profile, "scar_nick", None)
-    if scar_nick is None:
-        return {}
-    payload = scar_nick.model_dump(exclude_none=True) if hasattr(scar_nick, "model_dump") else dict(scar_nick)
-    return {key: value for key, value in payload.items() if str(value).strip()}
+def _display_profile_facts_meta(display_profile: Any) -> list[dict[str, str]]:
+    return [
+        {
+            "fact_id": str(fact.fact_id),
+            "label": str(fact.label),
+            "value": str(fact.value),
+        }
+        for fact in getattr(display_profile, "facts", [])
+    ]
 
 
 def _pretty_display_label(raw: str) -> str:
