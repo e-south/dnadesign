@@ -20,6 +20,7 @@ from dnadesign.msd import (
     RankedPrimitiveSelectorSpec,
     RetronMsdRegistryError,
     compile_msd_design_unit,
+    compute_scar_nick_profile,
     resolve_msd_compiler_spec_payload,
     validate_dna_sequence,
 )
@@ -88,3 +89,4 @@ def test_registry_path_is_explicit_and_required(tmp_path: Path) -> None:
 def test_public_helpers_validate_sequence_and_rank_selection() -> None:
     assert validate_dna_sequence("acgt", label="payload") == "acgt"
     assert RankedPrimitiveSelectorSpec(rank=3).requested_ranks() == [3]
+    assert compute_scar_nick_profile(left_base="CGGT", right_base="ACAG") == "MXMM"

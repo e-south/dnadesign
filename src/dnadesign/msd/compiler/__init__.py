@@ -15,6 +15,7 @@ from .identifiers import (
     MsdIdError,
     ParsedMsdConstructLabel,
     canonical_msd_construct_label,
+    compute_scar_nick_profile,
     parse_msd_construct_label,
     parse_msd_design_parts,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "RetronMsdRegistry",
     "RetronMsdRegistryError",
     "canonical_msd_construct_label",
+    "compute_scar_nick_profile",
     "compile_msd_design_unit",
     "load_msd_compiler_spec",
     "load_retron_msd_registry",
