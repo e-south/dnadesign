@@ -26,10 +26,10 @@ not a hidden subtree inside the public checkout. It depends on a pinned
 dnadesign version and calls public APIs or CLIs. dnadesign must not discover it
 through machine-specific paths or import its study modules.
 
-`dnadesign.studies.core` already loads `docs/studies/index.yaml` and
-`operations/ops.study.yaml` from an explicit repository root. The external
-repository therefore keeps the same record contract without becoming a
-dnadesign source subtree.
+`dnadesign.studies.core.load_study_workspace()` loads the portable
+[`study/v1` workspace contract](study-workspace-contract.md) from an explicit
+repository root. The external repository therefore owns its catalog and study
+records without becoming a dnadesign source subtree.
 
 ### External workspace contract
 
@@ -37,7 +37,7 @@ A private study workspace should declare:
 
 1. its own repository and access policy;
 2. a pinned dnadesign revision or release;
-3. one explicit study root;
+3. one `catalog/studies.yaml` entrypoint with stable study identifiers;
 4. typed inputs and outputs at each tool handoff; and
 5. private CI that runs its routes against that pinned dependency.
 

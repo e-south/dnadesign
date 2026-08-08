@@ -49,6 +49,16 @@ from .record_locator import (
     discover_study_selection_for_status_kind,
 )
 from .registry import StudyIndex, StudyIndexEntry, load_study_index
+from .workspace import (
+    StudyArtifact,
+    StudyCatalogProgram,
+    StudyEvidenceIndex,
+    StudyManifest,
+    StudyWorkflow,
+    StudyWorkspace,
+    load_study_evidence_index,
+    load_study_workspace,
+)
 
 __all__ = [
     "ActiveStudySelection",
@@ -68,6 +78,10 @@ __all__ = [
     "ReaderResolvedRecord",
     "StudyIndex",
     "StudyIndexEntry",
+    "StudyArtifact",
+    "StudyCatalogProgram",
+    "StudyEvidenceIndex",
+    "StudyManifest",
     "StudyOpsContract",
     "StudyPhaseContract",
     "StudyPreflightContract",
@@ -75,11 +89,15 @@ __all__ = [
     "StudyPreflightPlan",
     "StudyStatusService",
     "StudyStatusContext",
+    "StudyWorkflow",
+    "StudyWorkspace",
     "build_study_preflight_plan",
     "discover_active_study_selection",
     "discover_study_selection_for_status_kind",
     "load_study_index",
+    "load_study_evidence_index",
     "load_study_ops_contract",
+    "load_study_workspace",
     "normalize_study_preflight_scope",
     "parse_record_inputs",
     "parse_record_producer",

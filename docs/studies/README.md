@@ -38,6 +38,7 @@ Use these surfaces by intent:
 | A request asks for status, history, blockers, or readiness | [Study Ops status surfaces](reference/study-status-ops-surfaces.md) | Use Ops only when the task is explicitly observation or readiness. |
 | A request asks how to add or refresh study records | [Study record authoring](reference/study-record-authoring.md) | Keep authoring and promoter-template details out of this top-level router. |
 | A study contains private sequences, measurements, campaign state, or unpublished intent | [Public/private study boundary](reference/public-private-boundary.md) | Keep the study in a private external workspace and depend on dnadesign's public contracts. |
+| An external repository needs a portable catalog and evidence inventory | [Study workspace contract](reference/study-workspace-contract.md) | Use the strict, tool-neutral `study/v1` contract instead of path-based discovery. |
 
 ### Checked-In Study Routes
 
@@ -178,6 +179,7 @@ instead of growing a study-local tool.
 - [Study status and preflight surfaces](reference/study-status-ops-surfaces.md)
 - [Study record authoring](reference/study-record-authoring.md)
 - [Public/private study boundary](reference/public-private-boundary.md)
+- [External study workspace contract](reference/study-workspace-contract.md)
 - [Study index](index.yaml)
 - [Retron hairpin route map](retron_hairpin_design/routes/README.md)
 - [Stress ethanol/cipro route map](stress_ethanol_cipro_growth/routes/README.md)

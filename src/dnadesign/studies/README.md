@@ -10,6 +10,7 @@ status and preflight APIs; `core` owns neutral record parsing.
 - [Study records index](../../../docs/studies/README.md): checked-in study
   manifests, routes, and status notes.
 - [Public/private boundary](../../../docs/studies/reference/public-private-boundary.md): decide whether a study may live in this public repository.
+- [External workspace contract](../../../docs/studies/reference/study-workspace-contract.md): load a private repository's catalog, study manifests, and evidence indexes.
 - [Ops README](../ops/README.md): status, preflight, and orchestration entry
   points.
 - [Repository docs index](../../../docs/README.md): cross-tool workflow routing.
@@ -17,8 +18,8 @@ status and preflight APIs; `core` owns neutral record parsing.
 ## Source Layout
 
 - `assets/`: study-package visual/static assets.
-- `core/`: study-record contracts, loaders, selectors, and preflight planning
-  primitives that are not tied to one study.
+- `core/`: study-record contracts, portable workspace loading, selectors, and
+  preflight planning primitives that are not tied to one study.
 - `units/<study-id>/`: concrete study source units. Study-specific status,
   preflight, compiler, or handoff logic stays inside the owning study.
 - `units/<study-id>/tests/`: concrete study tests. Study-specific tests stay
