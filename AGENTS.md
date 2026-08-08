@@ -54,7 +54,7 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - Repo-local RT-lnRNA reporter-response routing skill: `.agents/skills/rt-lnrna-reporter-response/SKILL.md`
 - Critical reusable operational workflows live under `.agents/skills/`.
   Native project-scope skill discovery only applies when the Codex session is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the repo docs and explicit CLI entrypoints instead of assuming a repo-local skill will appear in the advertised skill list.
-- Checked-in live study records: `docs/studies/README.md`
+- Repository-local public study records: `docs/studies/README.md`
 - Study active-study registry: `docs/studies/index.yaml`
 - Maintainer docs and CI/testing notes: `docs/dev/README.md`
 

@@ -2,7 +2,7 @@
 
 - `interfaces/api.py`: public run/load entrypoints exported by `dnadesign.construct`
 - `interfaces/contracts.py`: public contract helpers exported by `dnadesign.construct`
-- `contracts/config.py`: compatibility facade for YAML config contracts
+- `contracts/config.py`: canonical import surface for YAML config contracts
 - `contracts/base.py`: strict Pydantic model base shared by config contracts
 - `contracts/datasets.py`: USR dataset locators and input selection contracts
 - `contracts/templates.py`: literal, path, and USR-backed template source schemas

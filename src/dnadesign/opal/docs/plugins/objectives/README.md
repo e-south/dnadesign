@@ -9,7 +9,7 @@ last_verified: 2026-08-02
 ## OPAL Objective Plugins
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-08
 
 Objective plugins convert shared model predictions into named score and
 uncertainty channels. Objective-specific pages define the equations.
@@ -83,15 +83,18 @@ Pool-relative weighted acquisition (`expected_improvement` registry ID):
 ```yaml
 selection_views:
   - id: primary
-    objective: {name: sfxi_v1, params: {...}}
+    objective: {name: <objective-plugin>, params: {...}}
     selection:
       name: expected_improvement
       params:
         top_k: 12
-        score_ref: sfxi
-        uncertainty_ref: sfxi
+        score_ref: <score-channel>
+        uncertainty_ref: <uncertainty-channel>
         objective_mode: maximize
         tie_handling: competition_rank
         alpha: 1.0
         beta: 1.0
 ```
+
+This selector is available only when the objective publishes a standard
+deviation channel. Objective-specific pages document their channel names.

@@ -1,7 +1,7 @@
 ## Gaussian Process Plugin (`gaussian_process`)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-08-08
 
 
 `gaussian_process` follows the equations and runtime invariants below.
@@ -64,10 +64,11 @@ If a model emits standard deviation and a configured y-op lacks `inverse_std`, O
 - shape mismatch between `y_pred` and `y_pred_std` in runtime path
 - invalid kernel/config shape resolved by strict schema/loader checks
 
-### Used in workflow demos
+### Use in a campaign
 
-- [GP + SFXI + Top-N](../../workflows/gp-sfxi-topn.md)
-- [GP + SFXI + Expected Improvement](../../workflows/gp-sfxi-ei.md)
+The model participates in the same [campaign round](../../workflows/campaign-round.md)
+as every other model. `top_n` needs a score channel. `expected_improvement`
+also needs a standard-deviation channel emitted by the configured objective.
 
 To confirm uncertainty is present in a completed round:
 

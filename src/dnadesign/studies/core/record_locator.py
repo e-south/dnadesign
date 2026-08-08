@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/core/record_locator.py
 
-Active-study selection helpers for the flat checked-in study registry.
+Active-study selection helpers for an explicit study registry.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ def discover_study_selection_for_status_kind(
 ) -> ActiveStudySelection:
     requested_status_kind = str(status_kind or "").strip()
     if not requested_status_kind:
-        raise ValueError("status kind is required to select a checked-in study record")
+        raise ValueError("status kind is required to select a study record")
     resolved_repo_root = _resolve_repo_root(repo_root=repo_root, status_kind=requested_status_kind)
     study_index = load_study_index(resolved_repo_root)
 
@@ -69,13 +69,13 @@ def discover_study_selection_for_status_kind(
 
     if not matches:
         raise ValueError(
-            f"status kind '{requested_status_kind}' is not declared by any checked-in study "
+            f"status kind '{requested_status_kind}' is not declared by any indexed study "
             f"ops_surfaces.status_kind or ops_surfaces.preflight_kind in {study_index.index_path}"
         )
     if len(matches) > 1:
         study_ids = ", ".join(entry.study_id for entry in matches)
         raise ValueError(
-            f"status kind '{requested_status_kind}' is declared by multiple checked-in study records "
+            f"status kind '{requested_status_kind}' is declared by multiple indexed study records "
             f"in {study_index.index_path}: {study_ids}"
         )
 
@@ -93,8 +93,7 @@ def _resolve_repo_root(*, repo_root: Path | None, status_kind: str) -> Path:
     resolved_repo_root = repo_root.expanduser().resolve() if repo_root is not None else discover_repo_root(Path.cwd())
     if resolved_repo_root is None:
         raise ValueError(
-            f"status kind '{status_kind}' requires --study-dir or a dnadesign repository checkout "
-            "with docs/studies/index.yaml"
+            f"status kind '{status_kind}' requires --study-dir or a repository root with docs/studies/index.yaml"
         )
     return resolved_repo_root
 

@@ -3,7 +3,7 @@
 **Type:** guide
 **Audience:** users turning exact targets into a reviewed design request
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-03
+**Last verified:** 2026-08-08
 
 `junction` does not infer a complete design from a sequence alone. Before
 planning, supply five things:
@@ -109,10 +109,11 @@ universal/Type-IIS workflow.
 ## Declare the planning profile
 
 The planning profile controls geometry, search budgets, barcode composition,
-and substring exclusions. There is no production preset. The small tutorial
-values only exercise the software. The papers report useful experimental and
-algorithmic contexts, but `junction` has not validated a drop-in laboratory
-profile.
+and substring exclusions. There is no production preset. The checked-in
+gene-scale example starts from dimensions reported in the pooled paper, but
+its search settings remain explicit Junction policy. The papers provide useful
+experimental and algorithmic context; Junction has not validated a drop-in
+laboratory profile.
 
 Review at least:
 

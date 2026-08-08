@@ -237,6 +237,11 @@ visual:
       snapback_retained_stem: Foldback stem
       snapback_cap: Cap
       snapback_foldback_return: Foldback return
+    overview_hidden_components:
+      - snapback_foldback_geometry
+    overview_hidden_annotations:
+      - snapback_retained_stem
+      - snapback_foldback_return
     component_hues:
       flank_5p: "#4C78A8"
       flank_3p: "#72B7B2"

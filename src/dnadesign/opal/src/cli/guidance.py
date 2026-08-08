@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/opal/src/cli/guidance.py
 
-Builds guided workflow runbooks and state-aware next-step recommendations for.
+Builds config-specific runbooks and state-aware next-step recommendations.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -59,24 +59,34 @@ class NextGuidance:
     label_source: dict[str, Any] = field(default_factory=dict)
 
 
+_OBJECTIVE_DOCS = {
+    "sfxi_v1": "docs/plugins/objectives/sfxi.md",
+    "multistate_response_behavior_v1": "docs/plugins/objectives/multistate-response-behavior.md",
+    "response_magnitude_feasibility_v1": "docs/plugins/objectives/response-magnitude-feasibility.md",
+}
+
+
 def detect_workflow_key(cfg: RootConfig) -> str:
     model_name = str(cfg.model.name)
     selection_names = {str(view.selection.name) for view in cfg.selection_views}
-    objective_names = [str(view.objective.name) for view in cfg.selection_views]
-    has_sfxi = "sfxi_v1" in objective_names
-    if model_name == "random_forest" and selection_names == {"top_n"} and has_sfxi:
-        return "rf_sfxi_topn"
-    if model_name == "gaussian_process" and selection_names == {"top_n"} and has_sfxi:
-        return "gp_sfxi_topn"
-    if model_name == "gaussian_process" and selection_names == {"expected_improvement"} and has_sfxi:
-        return "gp_sfxi_ei"
+    if model_name == "random_forest" and selection_names == {"top_n"}:
+        return "rf_topn"
+    if model_name == "gaussian_process" and selection_names == {"top_n"}:
+        return "gp_topn"
+    if model_name == "gaussian_process" and selection_names == {"expected_improvement"}:
+        return "gp_expected_improvement"
     return "custom"
 
 
-def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[str]]:
+def _objective_doc_pointers(cfg: RootConfig) -> list[str]:
+    objective_names = {str(view.objective.name) for view in cfg.selection_views}
+    return sorted(_OBJECTIVE_DOCS[name] for name in objective_names if name in _OBJECTIVE_DOCS)
+
+
+def _build_doc_pointers(cfg: RootConfig) -> dict[str, list[str]]:
     src_root = "src/dnadesign/opal/src"
     docs: list[str] = [
-        "docs/workflows",
+        "docs/workflows/campaign-round.md",
         "docs/reference/configuration.md",
         "docs/reference/cli.md",
         "docs/concepts/architecture.md",
@@ -101,27 +111,21 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     else:
         docs.append("docs/plugins/models/README.md")
         source.append(f"{src_root}/models/random_forest.py")
+    docs.extend(_objective_doc_pointers(cfg))
     if "sfxi_v1" in objective_names:
-        docs.append("docs/plugins/objectives/sfxi.md")
         source.append(f"{src_root}/objectives/sfxi_v1.py")
+    if "multistate_response_behavior_v1" in objective_names:
+        source.append(f"{src_root}/objectives/multistate_response_behavior_v1.py")
+    if "response_magnitude_feasibility_v1" in objective_names:
+        source.append(f"{src_root}/objectives/response_magnitude_feasibility_v1.py")
     if "expected_improvement" in selection_names:
         docs.append("docs/plugins/selection/expected-improvement.md")
         source.append(f"{src_root}/selection/expected_improvement.py")
     docs.append("docs/plugins/selection/README.md")
-    if workflow_key == "rf_sfxi_topn":
-        docs.append("docs/workflows/rf-sfxi-topn.md")
-    elif workflow_key == "gp_sfxi_topn":
-        docs.append("docs/workflows/gp-sfxi-topn.md")
-    elif workflow_key == "gp_sfxi_ei":
-        docs.append("docs/workflows/gp-sfxi-ei.md")
     return {
         "docs": sorted(set(docs)),
         "source": sorted(set(source)),
     }
-
-
-def _default_labels_file(cfg_path: Path) -> str:
-    return str((cfg_path.parent.parent / "inputs" / "r0" / "vec8-b0.xlsx").resolve())
 
 
 def _records_path_from_cfg(cfg: RootConfig) -> Path:
@@ -161,7 +165,7 @@ def _ingest_command(*, cfg_path: Path, cfg: RootConfig, labels_as_of: int, label
 
 def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[GuidanceStep]:
     c = str(cfg_path.resolve())
-    labels_file = _default_labels_file(cfg_path)
+    labels_file = "<labels-file>"
     records_path = str(_records_path_from_cfg(cfg))
     label_source = _label_source_summary(cfg)
     if label_source["kind"] == "usr_sidecar":
@@ -194,7 +198,7 @@ def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[Gui
         ),
         GuidanceStep(
             title="Run train/score/select round",
-            why="Train surrogate, evaluate objectives, and produce selected candidates.",
+            why="Fit the configured model, evaluate objective views, and select candidates.",
             command=f"opal run -c {c} --round {labels_as_of}",
             reads=[records_path, "state.json"],
             writes=[
@@ -212,8 +216,8 @@ def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[Gui
             writes=[],
         ),
         GuidanceStep(
-            title="Inspect runtime carriers",
-            why="Review RoundCtx contracts emitted by the latest run.",
+            title="Audit round context",
+            why="Review the inputs and contract state recorded for the latest run.",
             command=f"opal ctx audit -c {c} --round latest",
             reads=["outputs/rounds/round_*/metadata/round_ctx.json", records_path],
             writes=[],
@@ -240,10 +244,13 @@ def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int 
         for view in cfg.selection_views
     ]
     objective_names = [str(view.objective.name) for view in cfg.selection_views]
-    common_errors = [
-        "EI requires uncertainty_ref resolving to a finite, strictly positive standard-deviation channel.",
-        "Each view's score_ref and uncertainty_ref must name channels declared by that view's objective.",
-    ]
+    selection_names = {str(view.selection.name) for view in cfg.selection_views}
+    common_errors = ["Each view's score_ref must name a channel declared by that view's objective."]
+    if "expected_improvement" in selection_names:
+        common_errors.append(
+            "Expected improvement requires uncertainty_ref to name a finite, strictly positive "
+            "standard-deviation channel declared by the objective."
+        )
     if "sfxi_v1" in objective_names:
         common_errors.insert(
             0,
@@ -269,7 +276,7 @@ def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int 
         },
         steps=_build_steps(cfg_path, cfg, int(labels_as_of)),
         common_errors=common_errors,
-        learn_more=_build_doc_pointers(cfg, workflow_key),
+        learn_more=_build_doc_pointers(cfg),
     )
     return report
 
@@ -330,7 +337,7 @@ def build_next_guidance(
                 f"opal validate -c {ws.config_path}",
                 f"opal init -c {ws.config_path}",
             ],
-            learn_more=["docs/reference/cli.md", "docs/workflows"],
+            learn_more=["docs/reference/cli.md", "docs/workflows/campaign-round.md"],
             records_path=str(store.records_path),
             records_exists=store.records_path.exists(),
             label_source=_label_source_summary(cfg),
@@ -363,7 +370,11 @@ def build_next_guidance(
                     labels_file="<labels.xlsx>",
                 ),
             ],
-            learn_more=["docs/reference/cli.md", "docs/plugins/objectives/sfxi.md"],
+            learn_more=[
+                "docs/reference/cli.md",
+                "docs/workflows/campaign-round.md",
+                *_objective_doc_pointers(cfg),
+            ],
         )
 
     if not run_exists:

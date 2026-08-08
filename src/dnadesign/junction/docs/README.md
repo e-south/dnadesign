@@ -1,7 +1,7 @@
 # `junction` documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-08
 
 `junction` converts a complete design request into a deterministic oligo plan.
 The request must supply exact linear DNA targets, their joint-design boundary,
@@ -13,7 +13,7 @@ those scientific choices from a FASTA file or a bare sequence.
 - [How `junction` works](explanation/how-junction-works.md) explains the
   target-to-oligo process, maps paper terms to software terms, and separates
   string checks from laboratory evidence.
-- [Getting started](getting-started.md) builds one small synthetic example.
+- [Getting started](getting-started.md) builds one synthetic gene-scale example.
 
 ## Use
 

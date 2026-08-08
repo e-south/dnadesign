@@ -3,12 +3,13 @@
 **Type:** tutorial
 **Audience:** first-time users
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-03
+**Last verified:** 2026-08-08
 
-This tutorial publishes and verifies one small synthetic design. Its short
-oligos, 8-nt toeholds, loose composition bounds, and small search budgets make
-the example quick to run. They are software-demonstration values, not a
-paper-validated laboratory profile or purchasing advice.
+This tutorial publishes and verifies one synthetic 705 bp target. The request
+uses 96 nt nominal fragment geometry, 22 nt barcodes, 10 nt toeholds, and a
+15 nt locus search range. Those dimensions start from the pooled Sidewinder
+paper's method profile. The search policy and synthetic sequence are junction
+examples, not a paper-validated laboratory protocol or purchasing advice.
 
 ## 1. Prepare the repository
 
@@ -19,48 +20,12 @@ uv sync --locked
 uv run junction --help
 ```
 
-## 2. Save a complete request
+## 2. Copy the complete request
 
-Save this as `request.yaml`:
+The checked-in request explains each field in YAML comments:
 
-```yaml
-schema: dnadesign.junction.request.v2
-seed: 17
-planning:
-  nominal_fragment_oligo_length: 46
-  barcode_length: 16
-  toehold_length: 8
-  search_range: 2
-  toehold_search_iterations: 40
-  barcode_pool_factor: 5
-  barcode_generation_attempts: 100000
-  barcode_toehold_k: 4
-  barcode_pair_k: 5
-  barcode_subset_iterations: 40
-  matching_iterations: 100
-  barcode_gc_min: 0.25
-  barcode_gc_max: 0.75
-  barcode_max_homopolymer: 3
-targets:
-  - id: target-a
-    assembly_group_id: assembly-a
-    sequence: ACGATTCGGTACCTGATGCACTGAACGATTCGGTACCTGATGCACTGAACGATTCGGTACCTGATGCACTGA
-    recovery_primers:
-      mode: target_specific
-      forward:
-        binding_sequence: ACGATTCG
-        five_prime_extension: ""
-      reverse:
-        binding_sequence: TCAGTGCA
-        five_prime_extension: ""
-order_policy:
-  synthesis_scale: example-scale
-  barcode_bearing_purification: example-purification
-  complement_purification: example-purification
-  primer_purification: example-purification
-  complement_end_preparation: vendor_5_prime_phosphate
-  minimum_fragment_oligo_length: 1
-  max_oligo_length: 64
+```bash
+cp src/dnadesign/junction/examples/gene-scale/request.yaml request.yaml
 ```
 
 The target is an exact uppercase 5′→3′ `ACGT` string. The caller supplies the
@@ -69,16 +34,10 @@ terminal primer strings, including an explicit empty `five_prime_extension`.
 primers or predict PCR behavior. The order labels are copied into the output;
 the tool does not choose a supplier or submit an order.
 
-`nominal_fragment_oligo_length` sets the planner's locus geometry. It is not a
-promise that every fragment order has that length. The maximum is the larger
-of the offset-expanded length `L + R - 1` and the terminal-complement length
-`L - b + t`, where `L`, `R`, `b`, and `t` are the nominal length, search range,
-barcode length, and toehold length. A terminal fragment can also be shorter.
-The tutorial sets
-`minimum_fragment_oligo_length: 1` only so its small synthetic example is easy
-to run. Choose and review a real minimum for synthesis work. `junction` checks
-the declared minimum and maximum as string lengths; it does not judge whether
-an oligo is synthesizable.
+For this exact request, the deterministic plan contains 13 fragment pairs and
+12 three-way junctions. Its 26 fragment orders range from 46 to 106 nt and are
+checked against the request's declared 45-to-110-nt interval. The contract does
+not decide whether an allowed oligo is synthesizable.
 
 `assembly_group_id` is the boundary across which `junction` compares candidate
 sequences. Put targets in the same group when their fragments must be designed
@@ -129,6 +88,10 @@ Start with:
    receipts;
 3. `orders/oligos.tsv` for complete vendor-neutral sequences; and
 4. `views/three_way_junction_review.v1.json` for one review record per target.
+
+Render that last artifact with [BaseRender](../../baserender/docs/integrations/junction.md) to see
+the input oligos, annealed junction assignments, declared recovery product,
+and software checks in one row.
 
 A successful verification establishes deterministic string construction and
 file integrity within the documented software checks. It does not establish

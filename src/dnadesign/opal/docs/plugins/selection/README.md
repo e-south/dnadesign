@@ -9,7 +9,7 @@ last_verified: 2026-07-20
 ## OPAL Selection Strategies
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-20
+**Last verified:** 2026-08-08
 
 
 Selection plugins consume named objective channels and emit ranked candidate
@@ -126,22 +126,25 @@ Pool-relative weighted acquisition:
 ```yaml
 selection_views:
   - id: primary
-    objective: {name: sfxi_v1, params: {...}}
+    objective: {name: <objective-plugin>, params: {...}}
     selection:
       name: expected_improvement
       params:
         top_k: 12
-        score_ref: sfxi
-        uncertainty_ref: sfxi
+        score_ref: <score-channel>
+        uncertainty_ref: <uncertainty-channel>
         objective_mode: maximize
         tie_handling: competition_rank
         alpha: 1.0
         beta: 1.0
 ```
 
+The chosen objective must publish both referenced channels. OPAL does not
+assume a particular scientific objective from the selector.
+
 ### See also
 
 - [Model plugins](../models/README.md)
 - [Gaussian Process behavior and math](../models/gaussian-process.md)
 - [Objective plugins](../objectives/README.md)
-- [GP + expected_improvement workflow](../../workflows/gp-sfxi-ei.md)
+- [Campaign round](../../workflows/campaign-round.md)

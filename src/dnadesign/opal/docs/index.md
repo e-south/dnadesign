@@ -1,15 +1,15 @@
 ## OPAL Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-08
 
-Start with a workflow for command order. Use the plugin, concept, and reference
-pages for mathematical and interface contracts.
+Start with the campaign round for command order. Objective pages describe
+individual scoring plugins; they are not alternate OPAL lifecycles.
 
 ### Start here
 
-1. Only if infer has already written the chosen feature column into USR, start with [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md).
-2. For a tool-local baseline campaign, start with [RF + SFXI + top_n](./workflows/rf-sfxi-topn.md).
+1. Start with the [campaign round](./workflows/campaign-round.md) for the canonical validate, initialize, label, run, and verify loop.
+2. If Infer has already written the chosen feature column into USR, use the [USR-to-OPAL route](./workflows/usr-infer-x-active-learning.md).
 3. For configuration or CLI lookup, use [Configuration (`campaign.yaml`)](./reference/configuration.md) or [CLI commands](./reference/cli.md).
 4. If a downstream study needs physically valid selected sequences, check the
    generic [candidate and label contracts](./reference/configuration.md#candidate-and-label-contracts)
@@ -20,10 +20,8 @@ pages for mathematical and interface contracts.
 
 ### Workflows
 
-- [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md): downstream active-learning path once infer has already written the chosen `X` column into a USR dataset.
-- [RF + SFXI + top_n](./workflows/rf-sfxi-topn.md): baseline campaign flow from config to selected candidates.
-- [GP + SFXI + top_n](./workflows/gp-sfxi-topn.md): GP-driven scoring flow with top_n selection.
-- [GP + SFXI + expected_improvement](./workflows/gp-sfxi-ei.md): GP-driven scoring flow with EI selection.
+- [Campaign round](./workflows/campaign-round.md): the one OPAL lifecycle, independent of model, objective, and selector choices.
+- [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md): use a feature column already written into a USR dataset.
 
 ### Plugin docs
 
@@ -32,7 +30,7 @@ pages for mathematical and interface contracts.
 - [Selection](./plugins/selection/README.md): selection-plugin contracts and channel requirements.
 - [Expected Improvement behavior and math](./plugins/selection/expected-improvement.md): EI formulation and selection semantics.
 - [Objectives and channel refs](./plugins/objectives/README.md): objective plugin contracts and channel naming rules.
-- [SFXI behavior and math](./plugins/objectives/sfxi.md): SFXI objective mechanics and output interpretation.
+- [SFXI behavior and math](./plugins/objectives/sfxi.md): retained objective-specific mechanics and output interpretation.
 - [Response-Magnitude Feasibility (RMF) behavior and math](./plugins/objectives/response-magnitude-feasibility.md): non-compensatory response separation and reference-relative magnitude constraints.
 - [Multistate Response Behavior math and contract](./plugins/objectives/multistate-response-behavior.md): threshold-free, strictly monotone response ordering, ON expression, and OFF suppression.
 - [X transforms](./plugins/transforms/x.md): input transform contracts for feature generation.

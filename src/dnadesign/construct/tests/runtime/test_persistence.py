@@ -140,16 +140,13 @@ def test_sequence_views_to_append_fails_fast_on_mutable_metadata_drift() -> None
         sequence_views_to_append([view], existing_by_id={str(view.view_id): drifted_existing})
 
 
-def test_sequence_views_to_append_skips_legacy_view_id_for_existing_sequence() -> None:
+def test_sequence_views_to_append_does_not_treat_same_sequence_as_same_view() -> None:
     view = _view(sequence_id="seq_a")
 
-    assert (
-        sequence_views_to_append(
-            [view],
-            existing_by_id={"legacy_view": {"view_id": "legacy_view", "sequence_id": "seq_a"}},
-        )
-        == []
-    )
+    assert sequence_views_to_append(
+        [view],
+        existing_by_id={"other_view": {"view_id": "other_view", "sequence_id": "seq_a"}},
+    ) == [view]
 
 
 def test_sequence_views_to_append_allows_distinct_slot_view_for_existing_sequence() -> None:

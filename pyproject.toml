@@ -175,6 +175,10 @@ exclude = [
   "workspaces/*/*.yaml",
   "workspaces/*/inputs/*",
 ]
+"dnadesign.junction" = [
+  "docs/assets/*.svg",
+  "examples/*/*.yaml",
+]
 "dnadesign.latentdna" = [
   "ops/status.registry.yaml",
   "workspaces/templates/*/*.yaml",
@@ -272,7 +276,7 @@ environments = [
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 constraint-dependencies = [
-  "cryptography>=48.0.1",
+  "cryptography>=50.0.0",
   "click>=8.3.3",
   "idna>=3.15",
   "onnx>=1.22.0",

@@ -17,7 +17,7 @@ last_verified: 2026-08-02
 **Input:** `views/three_way_junction_review.v1.json` from a verified junction bundle
 **Output:** a separate private BaseRender bundle
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-08
 
 Use BaseRender to make optional review images from a junction design.
 junction plans and verifies the sequences. BaseRender reads the saved review
@@ -32,9 +32,9 @@ each JSON row. Its exact `contract_kind` is
 
 Each image has four panels:
 
-1. target coordinates, fragment domains, and selected toeholds;
-2. the selected toehold-to-barcode assignments;
-3. strand roles and declared recovery primers;
+1. the paired fragment oligos supplied to the assembly;
+2. target geometry and the selected toehold-to-barcode junctions;
+3. the sequence product expected from the declared recovery primers; and
 4. search counts, checks, and the fact that thermodynamic screening was not run.
 
 For targets with at most five junctions, the junction panel shows bounded
@@ -43,6 +43,11 @@ prefix. Larger targets show a bounded set of junction identifiers instead. The
 recovery panel also uses bounded sequence previews. An ellipsis means the label
 is only a review aid; use the review JSON and `orders/oligos.tsv` for complete
 sequences.
+
+The third panel says “Recovered PCR product” because it shows the declared
+primer geometry and the extension-aware product string. It does not simulate
+PCR or establish that amplification will work; the panel marks that limit
+directly.
 
 The contract keeps primer mechanics separate:
 

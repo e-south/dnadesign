@@ -83,14 +83,14 @@ def _write_records_vec8(records_path: Path, *, slug: str = "demo") -> None:
     "case_name,model_name,model_params,selection_name,selection_params",
     [
         (
-            "rf_sfxi_topn",
+            "rf_topn",
             "random_forest",
             {"n_estimators": 8, "random_state": 7, "oob_score": False},
             "top_n",
             {"top_k": 1, "score_ref": "sfxi", "objective_mode": "maximize"},
         ),
         (
-            "gp_sfxi_topn",
+            "gp_topn",
             "gaussian_process",
             {
                 "alpha": 1.0e-6,
@@ -101,7 +101,7 @@ def _write_records_vec8(records_path: Path, *, slug: str = "demo") -> None:
             {"top_k": 1, "score_ref": "sfxi", "objective_mode": "maximize"},
         ),
         (
-            "gp_sfxi_ei",
+            "gp_expected_improvement",
             "gaussian_process",
             {
                 "alpha": 1.0e-6,

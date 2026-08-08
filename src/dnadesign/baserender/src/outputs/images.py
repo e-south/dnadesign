@@ -64,6 +64,42 @@ def _figure_rgba(fig):
     return data.reshape((height, width, 4)).copy()
 
 
+def _image_metadata(fmt: str) -> dict[str, object] | None:
+    """Suppress clock-derived SVG metadata so identical jobs stay byte-stable."""
+
+    if fmt == "svg":
+        return {"Date": None}
+    return None
+
+
+def _normalize_svg(path: Path) -> None:
+    """Remove insignificant trailing whitespace from deterministic SVG output."""
+
+    payload = path.read_bytes()
+    normalized = b"\n".join(line.rstrip(b" \t") for line in payload.splitlines()) + b"\n"
+    path.write_bytes(normalized)
+
+
+def _save_figure(fig, *, out_path: Path, fmt: str) -> None:
+    """Write one figure with deterministic SVG IDs and metadata."""
+
+    import matplotlib
+
+    save_kwargs = {
+        "format": fmt,
+        "bbox_inches": None,
+        "pad_inches": 0.0,
+        "facecolor": "white",
+        "metadata": _image_metadata(fmt),
+    }
+    if fmt == "svg":
+        with matplotlib.rc_context({"svg.hashsalt": "dnadesign.baserender"}):
+            fig.savefig(out_path, **save_kwargs)
+        _normalize_svg(out_path)
+        return
+    fig.savefig(out_path, **save_kwargs)
+
+
 def _render_record_grid_figure_local(
     records: list[Record],
     *,
@@ -185,13 +221,7 @@ def write_images(
             )
         fig.patch.set_facecolor("white")
         fig.patch.set_alpha(1.0)
-        fig.savefig(
-            out_path,
-            format=output.fmt,
-            bbox_inches=None,
-            pad_inches=0.0,
-            facecolor="white",
-        )
+        _save_figure(fig, out_path=out_path, fmt=output.fmt)
         plt.close(fig)
         return out_path
 
@@ -208,13 +238,7 @@ def write_images(
         fig = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
         fig.patch.set_facecolor("white")
         fig.patch.set_alpha(1.0)
-        fig.savefig(
-            out_path,
-            format=output.fmt,
-            bbox_inches=None,
-            pad_inches=0.0,
-            facecolor="white",
-        )
+        _save_figure(fig, out_path=out_path, fmt=output.fmt)
         plt.close(fig)
     return out_dir
 

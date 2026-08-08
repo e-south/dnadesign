@@ -10,16 +10,18 @@ record_root_contract: docs/studies/<study-id>
 ## Study Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-19
+**Last verified:** 2026-08-08
 
-Studies hold cross-tool context, motivation, notes, selected command surfaces,
-and current handoff docs for long-running work. They are not generic workflow
-docs and they are not the Ops API.
+Studies hold scientific context and handoffs for long-running work. This public
+repository may contain the shared study framework and deliberately public,
+sanitized records. Private study state belongs in an external private workspace
+that calls dnadesign through public contracts.
 
-Study records are checked-in record artifacts for one live effort. They are not
-runbooks or generated outputs. Treat them as the record plane: `ops progress`
-may read them for observation, while `ops runbook` remains the control plane
-for planning and execution.
+The checked-in records listed below predate that stricter boundary. Treat them
+as already public. Moving or deleting them later will not remove them from Git
+history, clones, or caches. See the
+[public/private study boundary](reference/public-private-boundary.md) before
+adding another study.
 
 Checked-in studies carry an `operations/ops.study.yaml` contract for lifecycle
 and owned execution surfaces. A study declares `ops_surfaces.status_kind` and
@@ -35,6 +37,7 @@ Use these surfaces by intent:
 | A request names a checked-in study | `docs/studies/<study-id>/routes/README.md` when present, otherwise the study directory README/status note | Start from the named study's living route map instead of assuming the repo-wide active study. |
 | A request asks for status, history, blockers, or readiness | [Study Ops status surfaces](reference/study-status-ops-surfaces.md) | Use Ops only when the task is explicitly observation or readiness. |
 | A request asks how to add or refresh study records | [Study record authoring](reference/study-record-authoring.md) | Keep authoring and promoter-template details out of this top-level router. |
+| A study contains private sequences, measurements, campaign state, or unpublished intent | [Public/private study boundary](reference/public-private-boundary.md) | Keep the study in a private external workspace and depend on dnadesign's public contracts. |
 
 ### Checked-In Study Routes
 
@@ -174,6 +177,7 @@ instead of growing a study-local tool.
 - [Study reference docs](reference/README.md)
 - [Study status and preflight surfaces](reference/study-status-ops-surfaces.md)
 - [Study record authoring](reference/study-record-authoring.md)
+- [Public/private study boundary](reference/public-private-boundary.md)
 - [Study index](index.yaml)
 - [Retron hairpin route map](retron_hairpin_design/routes/README.md)
 - [Stress ethanol/cipro route map](stress_ethanol_cipro_growth/routes/README.md)

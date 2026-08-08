@@ -1,7 +1,7 @@
 ## OPAL Models — Registry
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-08-08
 
 
 Model plugins fit one campaign phenotype surface and predict the configured Y
@@ -91,5 +91,5 @@ before objective evaluation, so `score_ref` and `uncertainty_ref` are always in 
 - [Selection plugins](../selection/README.md)
 - [Expected Improvement behavior and math](../selection/expected-improvement.md)
 - [Objective plugins](../objectives/README.md)
-- [GP + top_n workflow](../../workflows/gp-sfxi-topn.md)
-- [GP + expected_improvement workflow](../../workflows/gp-sfxi-ei.md)
+- [Campaign round](../../workflows/campaign-round.md)
+- [Expected Improvement](../selection/expected-improvement.md)

@@ -308,6 +308,100 @@ def test_linear_ssdna_composition_contract_accepts_retron43_literal() -> None:
     assert config.visual.display_profile.component_labels["payload_primary"] == "TetO primary"
 
 
+def test_linear_ssdna_composition_contract_accepts_neutral_sources_and_display_policy() -> None:
+    config = LinearSsdnaCompositionV1.model_validate(
+        {
+            "composition_id": "provider_neutral_example",
+            "units": [
+                {
+                    "unit_id": "unit",
+                    "segments": [
+                        {
+                            "segment_id": "record_segment",
+                            "sequence": "ACGT",
+                            "source": {
+                                "kind": "record",
+                                "authority": "catalog.example",
+                                "record_id": "part-1",
+                            },
+                        },
+                        {
+                            "segment_id": "artifact_segment",
+                            "sequence": "TGCA",
+                            "source": {
+                                "kind": "artifact",
+                                "contract": "sequence_part_v1",
+                                "uri": "artifact://parts/2",
+                            },
+                        },
+                    ],
+                }
+            ],
+            "visual": {
+                "display_profile": {
+                    "facts": [{"fact_id": "source", "label": "Source", "value": "review fixture"}],
+                    "overview_hidden_components": ["artifact_segment"],
+                }
+            },
+        }
+    )
+
+    assert config.units[0].segments[0].source.kind == "record"
+    assert config.units[0].segments[1].source.kind == "artifact"
+    assert config.visual.display_profile.facts[0].fact_id == "source"
+    assert config.visual.display_profile.overview_hidden_components == ["artifact_segment"]
+
+
+@pytest.mark.parametrize("source_kind", ["study_record", "cruncher_artifact"])
+def test_linear_ssdna_composition_contract_rejects_retired_provider_source_kinds(source_kind: str) -> None:
+    with pytest.raises(PydanticValidationError):
+        LinearSsdnaCompositionV1.model_validate(
+            {
+                "composition_id": "retired_source_kind",
+                "units": [
+                    {
+                        "unit_id": "unit",
+                        "segments": [
+                            {
+                                "segment_id": "payload",
+                                "sequence": "ACGT",
+                                "source": {"kind": source_kind},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+
+def test_linear_ssdna_composition_contract_rejects_study_specific_display_shape() -> None:
+    with pytest.raises(PydanticValidationError, match=r"(?s)scar_nick.*Extra inputs are not permitted"):
+        LinearSsdnaCompositionV1.model_validate(
+            {
+                "composition_id": "study_display_shape",
+                "units": [{"unit_id": "unit", "segments": [{"segment_id": "payload", "sequence": "ACGT"}]}],
+                "visual": {"display_profile": {"scar_nick": {"payload": "TetR"}}},
+            }
+        )
+
+
+def test_linear_ssdna_composition_contract_bounds_display_fact_count() -> None:
+    with pytest.raises(PydanticValidationError, match="at most 32 items"):
+        LinearSsdnaCompositionV1.model_validate(
+            {
+                "composition_id": "too_many_display_facts",
+                "units": [{"unit_id": "unit", "segments": [{"segment_id": "payload", "sequence": "ACGT"}]}],
+                "visual": {
+                    "display_profile": {
+                        "facts": [
+                            {"fact_id": f"fact-{index}", "label": "Fact", "value": str(index)} for index in range(33)
+                        ]
+                    }
+                },
+            }
+        )
+
+
 def test_linear_ssdna_composition_contract_rejects_invalid_visual_style_alpha() -> None:
     with pytest.raises(PydanticValidationError, match="less than or equal to 1"):
         LinearSsdnaCompositionV1.model_validate(

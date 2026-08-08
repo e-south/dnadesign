@@ -1,0 +1,73 @@
+# Complete Junction v2 request. Unknown fields and missing required fields fail.
+schema: dnadesign.junction.request.v2
+
+# One seed derives every bounded search seed, making the plan reproducible.
+seed: 20260801
+
+planning:
+  # Literature-aligned starting geometry: L=96, barcode=22, toehold=10,
+  # and a 15-position locus search. These are inputs, not lab validation.
+  nominal_fragment_oligo_length: 96
+  barcode_length: 22
+  toehold_length: 10
+  search_range: 15
+
+  # Bounded work budgets. Exhaustion is an error; Junction never relaxes them.
+  toehold_search_iterations: 1000
+  barcode_pool_factor: 5
+  barcode_generation_attempts: 500000
+  barcode_subset_iterations: 100
+  matching_iterations: 100
+
+  # Reject barcodes that share these exact substring lengths with selected
+  # toeholds or other candidate barcodes. These are Junction search settings,
+  # not parameters copied from the papers.
+  barcode_toehold_k: 5
+  barcode_pair_k: 9
+
+  # Composition limits applied while generating barcode candidates.
+  barcode_gc_min: 0.30
+  barcode_gc_max: 0.70
+  barcode_max_homopolymer: 3
+
+targets:
+  - id: synthetic-gene-scale-target
+
+    # Targets in one assembly group are searched together. This example has
+    # one target, so there is no cross-target barcode competition.
+    assembly_group_id: gene-scale-example
+
+    # Exact uppercase 5′→3′ linear DNA. This deterministic synthetic sequence
+    # has no asserted biological meaning.
+    sequence: TCATTCTAGGCTAGCTGAGTGCGCTATAAGCGTAGAACTACTACATCACATCCGCTACGCTCTCACCGTAGAGGGACTAGGGTCTATCAGATGATGCTTAGCGGAATAAGGTACAGGTATAATCCGAAACGCTTTGAATTTTGGGGACGCCTGATTAACGTAGTCTGATGAACGCCTCTAGCTCACCTTGGATTGACAGGGGCCGACTCACATTGCGTATCCAGATCGGTGGCTAAAAACGTTCGAGCCTAAGGATATAGCATTAGTGACTTATACTAGCACAATAGGCGGTCAGCTTTCCTGCAAAAGCCCTTTACGCATTCAGCGATCGTAGTCAGTGAGTCAGATAAACTCCTAAGCACGGATTCTACTGTACATTCCGGTATCAAAAAGGCAGGGGAGTATCAAGAATAATTGAGGCGGCATTTTCTTCCAACTACTAGCGTGGGATCAGATCAGTCATGCTGGGGAGGGACGCCGCGACTTTGGACATATGAACAGTGGGCGTCGGTGGCGCCGGACCCACTAACGACTAGTCGTACTACAATATTCCCTGTGTGTCGTACTGCACAGCGCTAGTTCTCGATGCGTCCCCATGACCTCCTAATCTCTTTCTTACCCAGTGCGGGCTCCCACTAATCGACTGGTCGACCGCGGTCGATACTAGACGGCTCGGGGTATAGGGTTCTGCAGTACTCGGTCCTG
+
+    recovery_primers:
+      # Junction checks caller-supplied primers; it does not design them.
+      mode: target_specific
+      forward:
+        binding_sequence: TCATTCTAGGCTAGCTGAGT
+        # Put any reviewed 5′ adapter or Type IIS sequence here. Empty means
+        # that the ordered primer is only the target-binding sequence.
+        five_prime_extension: ""
+      reverse:
+        binding_sequence: CAGGACCGAGTACTGCAGAA
+        five_prime_extension: ""
+
+order_policy:
+  # Vendor-neutral labels are copied into orders/oligos.tsv. They are not
+  # recommendations and must be replaced for a real ordering workflow.
+  synthesis_scale: review-required
+  barcode_bearing_purification: review-required
+  complement_purification: review-required
+  primer_purification: review-required
+
+  # Sidewinder assembly requires a phosphorylated complement strand. Declare
+  # whether that state is supplied by the vendor or created downstream.
+  complement_end_preparation: vendor_5_prime_phosphate
+
+  # This request emits fragment oligos from 46 through 106 nt and permits the
+  # explicit 45-to-110-nt interval below. Changing the target or search
+  # settings may require a different reviewed interval; Junction fails instead
+  # of expanding it automatically.
+  minimum_fragment_oligo_length: 45
+  max_oligo_length: 110

@@ -41,4 +41,5 @@ uv run opal verify-outputs -c configs/campaign.yaml --view primary --round lates
 
 ### Full guide
 
-- [RF, SFXI, and top-N workflow](../../docs/workflows/rf-sfxi-topn.md)
+- [Campaign round](../../docs/workflows/campaign-round.md)
+- [SFXI objective contract](../../docs/plugins/objectives/sfxi.md)

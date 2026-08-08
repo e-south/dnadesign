@@ -1,7 +1,7 @@
 ## Linear ssDNA Composition
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-08
 **Surface role:** tool-local reference; generic authority for
 `linear_ssdna_composition_v1` and producer-owned Folding/BaseRender handoffs
 
@@ -52,6 +52,27 @@ high-resolution `visual/reviews/composition_overview.png`.
 
 Segments assemble sequence. Annotations interpret spans. A composition config
 should never depend on annotation labels to create nucleotides.
+
+### Provenance and display
+
+Segment sources use neutral provenance shapes:
+
+- `literal` for sequence supplied in the config;
+- `derived` for a sequence transformed from another declared segment;
+- `usr` for a USR dataset record;
+- `record` for an external record named by `authority` and `record_id`; and
+- `artifact` for a typed artifact named by contract, URI, selector, and
+  resolution evidence.
+
+The shared contract does not name a study, provider, or upstream tool. Put that
+identity in `authority`, `contract`, or the artifact URI. Old provider-specific
+source kinds are invalid rather than silently translated.
+
+Display policy is also declarative. `facts` carries ordered label/value rows
+for a review caption. `overview_hidden_components` and
+`overview_hidden_annotations` remove caller-selected semantic IDs from the
+overview when more precise labels would overlap. Construct does not recognize
+study-specific IDs when applying those lists.
 
 ### Output Ownership
 

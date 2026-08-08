@@ -113,19 +113,19 @@ def test_review_renderer_emits_one_semantic_four_panel_figure() -> None:
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
         assert [axis.get_gid() for axis in figure.axes] == [
-            "three-way-junction-review:target-geometry",
-            "three-way-junction-review:junction-assignments",
-            "three-way-junction-review:strands-and-recovery",
-            "three-way-junction-review:search-and-checks",
+            "three-way-junction-review:input-oligos",
+            "three-way-junction-review:annealed-junctions",
+            "three-way-junction-review:recovered-product",
+            "three-way-junction-review:checks",
         ]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
         assert "universal" in text
         assert "THERMODYNAMIC SCREENING NOT RUN" in text
-        assert "1 junction" in text
-        assert "FWD bind · 4 nt" in text
-        assert "FWD 5′ ext · 0 nt" in text
-        assert "Primer sequence previews · digest = SHA-256[:12]" in text
+        assert "1 target junction" in text
+        assert "FWD · 4 nt bind + 0 nt 5′ extension" in text
+        assert "REV · 4 nt bind + 0 nt 5′ extension" in text
+        assert "Order previews · digest = SHA-256[:12]" in text
         assert "AAAA" not in text
         assert "AA…A" in text
     finally:
@@ -309,6 +309,34 @@ def test_review_renderer_rejects_multi_record_grids_on_public_and_writer_surface
         )
 
     assert not output_root.exists()
+
+
+def test_svg_writer_omits_clock_derived_metadata(tmp_path: Path) -> None:
+    record = _adapt_payload(_payload())
+    style = baserender.resolve_style(preset=None, overrides=None)
+
+    output_dir = write_images(
+        [record],
+        output=ImagesOutputCfg(kind="images", dir=tmp_path / "images", path=None, fmt="svg"),
+        renderer_name="three_way_junction_review",
+        style=style,
+        palette=baserender.Palette(style.palette),
+    )
+
+    [output_path] = output_dir.glob("*.svg")
+    svg = output_path.read_text(encoding="utf-8")
+    assert "<dc:date>" not in svg
+    assert not any(line.endswith((" ", "\t")) for line in svg.splitlines())
+
+    second_dir = write_images(
+        [record],
+        output=ImagesOutputCfg(kind="images", dir=tmp_path / "second", path=None, fmt="svg"),
+        renderer_name="three_way_junction_review",
+        style=style,
+        palette=baserender.Palette(style.palette),
+    )
+    [second_path] = second_dir.glob("*.svg")
+    assert second_path.read_bytes() == output_path.read_bytes()
 
 
 @pytest.mark.parametrize(

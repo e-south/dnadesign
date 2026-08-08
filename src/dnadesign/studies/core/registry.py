@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/studies/core/registry.py
 
-Checked-in study index loading for flat study-first record roots.
+Study-index loading for explicit repository roots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -43,23 +43,23 @@ class StudyIndex:
 def load_study_index(repo_root: Path | None) -> StudyIndex:
     resolved_repo_root = repo_root.expanduser().resolve() if repo_root is not None else discover_repo_root(Path.cwd())
     if resolved_repo_root is None:
-        raise ValueError("checked-in study index requires a dnadesign repository checkout with docs/studies/index.yaml")
+        raise ValueError("study index requires a repository root with docs/studies/index.yaml")
 
     index_path = resolved_repo_root / "docs" / "studies" / "index.yaml"
     if not index_path.exists():
-        raise ValueError(f"checked-in study index not found: {index_path}")
+        raise ValueError(f"study index not found: {index_path}")
 
     payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
-        raise ValueError(f"checked-in study index must be a mapping: {index_path}")
+        raise ValueError(f"study index must be a mapping: {index_path}")
     version = int(payload.get("version") or 0)
     if version != 1:
-        raise ValueError(f"unsupported checked-in study index version {version}: {index_path}")
+        raise ValueError(f"unsupported study index version {version}: {index_path}")
 
     active_study_id = _required_text(payload.get("active_study_id"), label="active_study_id", source=index_path)
     studies_payload = payload.get("studies") or []
     if not isinstance(studies_payload, list) or not studies_payload:
-        raise ValueError(f"checked-in study index must define a non-empty studies list: {index_path}")
+        raise ValueError(f"study index must define a non-empty studies list: {index_path}")
 
     studies: list[StudyIndexEntry] = []
     seen_study_ids: set[str] = set()
@@ -68,12 +68,12 @@ def load_study_index(repo_root: Path | None) -> StudyIndex:
             raise ValueError(f"study index entry {index} must be a mapping: {index_path}")
         if "family" in item:
             raise ValueError(
-                "checked-in study index entries must not define legacy family; "
+                "study index entries must not define legacy family; "
                 f"use the study record's explicit ops_surfaces instead: {index_path}"
             )
         study_id = _required_text(item.get("study_id"), label="study_id", source=index_path)
         if study_id in seen_study_ids:
-            raise ValueError(f"checked-in study index must not duplicate study_id {study_id!r}: {index_path}")
+            raise ValueError(f"study index must not duplicate study_id {study_id!r}: {index_path}")
         seen_study_ids.add(study_id)
         raw_record_root = _required_text(
             item.get("record_root"), label=f"studies.{study_id}.record_root", source=index_path
