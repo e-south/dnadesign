@@ -29,6 +29,7 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "infer",
     "latentdna",
     "libshuffle",
+    "msd",
     "nmf",
     "notify",
     "opal",
@@ -75,6 +76,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("libshuffle", "aligner"),
     ("libshuffle", "billboard"),
     ("libshuffle", "nmf"),
+    ("msd", "cruncher"),
     ("notify", "construct"),
     ("notify", "densegen"),
     ("notify", "infer"),
@@ -124,6 +126,7 @@ _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]]
     ),
 }
 _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
+    ("msd", "cruncher"): ("dnadesign.cruncher.scar_nick", "dnadesign.cruncher.snapback"),
     ("studies", "cruncher"): ("dnadesign.cruncher.scar_nick", "dnadesign.cruncher.snapback"),
     ("studies", "thread"): (
         "dnadesign.thread.adapters.biohub_esmc",

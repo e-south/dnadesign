@@ -2,13 +2,13 @@
 doc_id: documentation-index
 surface: docs-router
 owner: dnadesign-maintainers
-last_verified: 2026-08-02
+last_verified: 2026-08-08
 ---
 
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-08
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -111,6 +111,7 @@ contract artifacts or bundle manifest.
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `libshuffle` | n/a | [libshuffle docs](../src/dnadesign/libshuffle/docs/README.md) |
+| `msd` | Python API | [MSD compiler](../src/dnadesign/msd/README.md); resolves and compiles typed Retron MSD designs |
 | `nmf` | n/a | [nmf docs](../src/dnadesign/nmf/docs/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter docs](../src/dnadesign/permuter/docs/README.md) |
