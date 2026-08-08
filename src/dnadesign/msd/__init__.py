@@ -15,6 +15,7 @@ from .compiler import (
     MsdCompilerSpecError,
     MsdDesignPartInput,
     MsdIdError,
+    MsdSequenceInputError,
     ParsedMsdConstructLabel,
     ResolvedMsdCompilerSpec,
     RetronMsdCompilerError,
@@ -28,7 +29,9 @@ from .compiler import (
     parse_msd_construct_label,
     parse_msd_design_parts,
     resolve_msd_compiler_spec_payload,
+    validate_dna_sequence,
 )
+from .contracts import RankedPrimitiveSelectorSpec
 
 __all__ = [
     "MsdCompiledSegment",
@@ -36,6 +39,8 @@ __all__ = [
     "MsdCompilerSpecError",
     "MsdDesignPartInput",
     "MsdIdError",
+    "MsdSequenceInputError",
+    "RankedPrimitiveSelectorSpec",
     "ParsedMsdConstructLabel",
     "ResolvedMsdCompilerSpec",
     "RetronMsdCompilerError",
@@ -49,4 +54,5 @@ __all__ = [
     "parse_msd_construct_label",
     "parse_msd_design_parts",
     "resolve_msd_compiler_spec_payload",
+    "validate_dna_sequence",
 ]

@@ -26,6 +26,7 @@ from .resolution import (
     load_msd_compiler_spec,
     resolve_msd_compiler_spec_payload,
 )
+from .sequence import MsdSequenceInputError, validate_dna_sequence
 from .units import MsdCompiledSegment, MsdCompiledUnitV1, compile_msd_design_unit
 
 __all__ = [
@@ -34,6 +35,7 @@ __all__ = [
     "MsdCompilerSpecError",
     "MsdDesignPartInput",
     "MsdIdError",
+    "MsdSequenceInputError",
     "ParsedMsdConstructLabel",
     "ResolvedMsdCompilerSpec",
     "RetronMsdCompilerError",
@@ -47,4 +49,5 @@ __all__ = [
     "parse_msd_construct_label",
     "parse_msd_design_parts",
     "resolve_msd_compiler_spec_payload",
+    "validate_dna_sequence",
 ]

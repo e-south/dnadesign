@@ -16,7 +16,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from dnadesign.msd import RetronMsdRegistryError, compile_msd_design_unit, resolve_msd_compiler_spec_payload
+from dnadesign.msd import (
+    RankedPrimitiveSelectorSpec,
+    RetronMsdRegistryError,
+    compile_msd_design_unit,
+    resolve_msd_compiler_spec_payload,
+    validate_dna_sequence,
+)
 
 
 def _registry(path: Path) -> Path:
@@ -77,3 +83,8 @@ def test_registry_path_is_explicit_and_required(tmp_path: Path) -> None:
             },
             registry_path=tmp_path / "missing.yaml",
         )
+
+
+def test_public_helpers_validate_sequence_and_rank_selection() -> None:
+    assert validate_dna_sequence("acgt", label="payload") == "acgt"
+    assert RankedPrimitiveSelectorSpec(rank=3).requested_ranks() == [3]
