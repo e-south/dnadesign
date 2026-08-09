@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-08
 
 ## At a glance
 This document records security expectations for code, data, secrets, and dependency handling in `dnadesign`.
@@ -31,30 +31,6 @@ It is a policy map with links to operator runbooks and implementation details.
 - Pull requests that change dependency manifests run GitHub dependency review.
 - CI and local workflows must avoid unpinned installs for operational paths.
 
-### Bounded dependency exceptions
-
-Two upstream advisories on one constrained dependency cannot yet be resolved
-without migrating and revalidating the owning GPU runtime. They remain open,
-visible, and time-bounded:
-
-- `torch` is constrained to the Evo2-compatible 2.10 series.
-  GHSA-53q9-r3pm-6pq6 affects restricted `torch.load` deserialization before
-  2.6 and is fixed in the supported series. Every repository-owned
-  `torch.load` call still sets `weights_only=True`; loaders reject unsupported
-  globals instead of falling back to unrestricted pickle.
-  PYSEC-2026-139 affects PT2 loading through 2.10.0. PT2 artifacts and
-  `torch.export.load` are not supported serialization surfaces.
-  GHSA-rrmf-rvhw-rf47 affects `torch.jit.script` and is fixed in 2.13.
-  Repository-owned code does not call that function. PyTorch 2.13 is
-  available, but adopting it requires a coupled migration from Torch 2.10,
-  torchvision 0.25, torchaudio 2.10, and the CUDA 12.8 wheel index, which does
-  not publish 2.13 wheels. Revalidate that GPU stack rather than changing
-  Torch alone, and reassess no later than 2026-10-29.
-
-The unresolved exception statements narrow supported reachability; they do not
-claim that affected installed versions are patched. Do not dismiss the
-corresponding alerts.
-
 ## Data handling expectations
 - Treat dataset and run artifacts as operational data, not source-of-truth code.
 - Do not hand-edit generated outputs; regenerate from code/config.
@@ -76,8 +52,6 @@ corresponding alerts.
   - `pre-commit run detect-secrets --all-files` scans the full tracked tree against baseline policy.
 - Core CI lane runs pre-commit checks on PR diff or full tree (`.github/workflows/ci.yaml`).
 - CI validates workflow definitions using `check-github-workflows` via pre-commit configuration.
-- CI checks that bounded exceptions remain inside the documented native
-  deployment boundary and that their review dates have not expired.
 - GitHub secret scanning, push protection, Dependabot, and CodeQL complement
   the checked-in controls and must remain enabled in repository settings.
 

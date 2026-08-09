@@ -41,8 +41,8 @@ dependencies = [
   "upa-url>=1.1.0,<2",
   "duckdb>=1.5.5,<2",
   "xlrd",
-  # Compatibility-pinned for the Evo2/CUDA stack; the bounded security exception is documented in SECURITY.md.
-  "torch>=2.10,<2.11; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # Keep the base and optional Evo2 environments on one supported Torch family.
+  "torch>=2.13,<2.14; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "dense-arrays",
   "polars>=1.36.1",
   "altair>=6.0.0",
@@ -84,9 +84,7 @@ ops        = "dnadesign.ops.cli:main"
 # GPU stack (Linux x86_64 only)
 infer-evo2 = [
   # --- torch (GPU wheels via uv sources below)
-  "torch>=2.10,<2.11; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchvision>=0.25,<0.26; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "torchaudio>=2.10,<2.11; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torch>=2.13,<2.14; sys_platform == 'linux' and platform_machine == 'x86_64'",
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
   "pip>=26.1.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "setuptools>=83.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -275,20 +273,14 @@ name = "flash-attn"
 requires-dist = ["torch", "einops"]
 
 [[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv.sources]
 dense-arrays = { git = "https://github.com/e-south/dense-arrays" }
 
-# When infer-evo2 is enabled, use CUDA 12.8 wheels for torch-family from PyTorch's CUDA index.
+# When infer-evo2 is enabled, use CUDA 13.0 wheels for the Torch family.
 torch = [
-  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-]
-torchvision = [
-  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
-]
-torchaudio = [
-  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+  { index = "pytorch-cu130", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]

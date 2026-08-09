@@ -1,7 +1,7 @@
 ## BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-03
+**Last verified:** 2026-08-08
 
 ### Purpose
 
@@ -439,7 +439,7 @@ PY
 - FP8 checkpoints (`evo2_20b`, `evo2_40b`, `evo2_40b_base`, `evo2_1b_base`) require Transformer Engine and Hopper-class-or-newer GPUs.
 - On BU SCC, `gpu_c=9.0` is the generic model-fit floor for `evo2_20b`; H200 is a common visible lane, but newer higher-capability lanes also satisfy the same floor when memory is sufficient.
 - If the current `dnadesign` Evo2 environment is family-pinned, also request an exact GPU type. On the current SCC probe surface, the visible Blackwell-family lane is `gpu_t=RTXP6000` with `gpu_c=12.0` and `96 GiB` VRAM.
-- `dnadesign` currently constrains Torch to `>=2.10,<2.11`. Use the locked
+- `dnadesign` currently constrains Torch to `>=2.13,<2.14`. Use the locked
   environment rather than substituting an example version, and run the
   target-host smoke tests after every sync.
 - `infer` currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id` in this stack.
@@ -664,7 +664,7 @@ print("UV_CACHE_DIR:", os.environ.get("UV_CACHE_DIR"))
 print("UV_PROJECT_ENVIRONMENT:", os.environ.get("UV_PROJECT_ENVIRONMENT"))
 print("TMPDIR:", os.environ.get("TMPDIR"))
 
-for dist in ["torch", "torchvision", "torchaudio", "transformer-engine", "flash-attn", "evo2"]:
+for dist in ["torch", "transformer-engine", "flash-attn", "evo2"]:
     print(f"{dist}:", v(dist) or "(not installed)")
 
 def ldd_torch_so():
