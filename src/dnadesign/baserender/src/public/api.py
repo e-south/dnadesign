@@ -356,6 +356,7 @@ def render_record_figure(
     renderer_name: str = "sequence_rows",
     style_preset: str | Path | None = None,
     style_overrides: Mapping[str, object] | None = None,
+    renderer_options: Mapping[str, object] | None = None,
 ):
     initialize_runtime()
     style = resolve_style(
@@ -367,6 +368,14 @@ def render_record_figure(
     palette = Palette(style.palette)
     from ..render import render_record
 
+    if renderer_options:
+        return render_record(
+            record,
+            renderer_name=renderer_name,
+            style=style,
+            palette=palette,
+            renderer_options=renderer_options,
+        )
     return render_record(record, renderer_name=renderer_name, style=style, palette=palette)
 
 
@@ -394,6 +403,7 @@ def render_record_grid_figure(
     style_preset: str | Path | None = None,
     style_overrides: Mapping[str, object] | None = None,
     ncols: int = 3,
+    renderer_options: Mapping[str, object] | None = None,
 ):
     import matplotlib.pyplot as plt
 
@@ -407,14 +417,14 @@ def render_record_grid_figure(
     )
     from ..render import Palette, validate_records_for_rendering
 
-    records_list = list(
-        validate_records_for_rendering(
-            records_list,
-            renderer_name=renderer_name,
-            style=style,
-            palette=Palette(style.palette),
-        )
-    )
+    validation_kwargs = {
+        "renderer_name": renderer_name,
+        "style": style,
+        "palette": Palette(style.palette),
+    }
+    if renderer_options:
+        validation_kwargs["renderer_options"] = renderer_options
+    records_list = list(validate_records_for_rendering(records_list, **validation_kwargs))
     limits = tuple(
         limit
         for limit in (
@@ -431,12 +441,14 @@ def render_record_grid_figure(
 
     panel_images: list[object] = []
     for record in records_list:
-        panel = render_record_figure(
-            record,
-            renderer_name=renderer_name,
-            style_preset=style_preset,
-            style_overrides=style_overrides,
-        )
+        panel_kwargs = {
+            "renderer_name": renderer_name,
+            "style_preset": style_preset,
+            "style_overrides": style_overrides,
+        }
+        if renderer_options:
+            panel_kwargs["renderer_options"] = renderer_options
+        panel = render_record_figure(record, **panel_kwargs)
         panel_images.append(_figure_rgba(panel))
         plt.close(panel)
 
@@ -560,6 +572,7 @@ def render(
     renderer: str = "sequence_rows",
     style: Mapping[str, object] | None = None,
     grid: Mapping[str, object] | None = None,
+    options: Mapping[str, object] | None = None,
 ):
     if style is None:
         style_preset = None
@@ -578,12 +591,14 @@ def render(
             raise SchemaError("style must be a mapping")
 
     if isinstance(record_or_records, Record):
-        return render_record_figure(
-            record_or_records,
-            renderer_name=renderer,
-            style_preset=style_preset,
-            style_overrides=style_overrides,
-        )
+        figure_kwargs = {
+            "renderer_name": renderer,
+            "style_preset": style_preset,
+            "style_overrides": style_overrides,
+        }
+        if options:
+            figure_kwargs["renderer_options"] = options
+        return render_record_figure(record_or_records, **figure_kwargs)
 
     records_list = list(record_or_records)
     ncols = len(records_list)
@@ -597,13 +612,15 @@ def render(
             ncols = int(grid["ncols"])
     if ncols < 1:
         raise SchemaError("grid.ncols must be >= 1")
-    return render_record_grid_figure(
-        records_list,
-        renderer_name=renderer,
-        style_preset=style_preset,
-        style_overrides=style_overrides,
-        ncols=ncols,
-    )
+    grid_kwargs = {
+        "renderer_name": renderer,
+        "style_preset": style_preset,
+        "style_overrides": style_overrides,
+        "ncols": ncols,
+    }
+    if options:
+        grid_kwargs["renderer_options"] = options
+    return render_record_grid_figure(records_list, **grid_kwargs)
 
 
 def cruncher_showcase_style_overrides() -> Mapping[str, object]:

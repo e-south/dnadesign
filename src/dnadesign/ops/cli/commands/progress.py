@@ -72,8 +72,10 @@ app = typer.Typer(
 
 def get_click_command():
     command = typer.main.get_command(app)
-    if isinstance(command, click.Group):
-        command.add_command(_build_progress_show_click_command(), "show")
+    add_command = getattr(command, "add_command", None)
+    if not callable(add_command):
+        raise RuntimeError("OPS progress command must expose group command registration")
+    add_command(_build_progress_show_click_command(), "show")
     return command
 
 

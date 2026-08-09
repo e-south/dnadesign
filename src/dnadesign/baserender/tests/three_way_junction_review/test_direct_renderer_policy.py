@@ -193,10 +193,10 @@ def test_direct_surfaces_reject_adapter_renderer_mismatch_before_render_or_figur
 def test_direct_surface_accepts_adapter_supported_renderer() -> None:
     record = _review_record()
 
-    figure = baserender.render(record, renderer="three_way_junction_review")
+    figure = baserender.render(record, renderer="junction_three_way_assembly")
     try:
         assert len(figure.axes) == 1
-        assert figure.axes[0].get_gid() == "three-way-junction-review:base-pair-map"
+        assert figure.axes[0].get_gid() == "junction-three-way-assembly:overview"
     finally:
         plt.close(figure)
 

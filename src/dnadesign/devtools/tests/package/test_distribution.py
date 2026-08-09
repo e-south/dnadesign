@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import tomllib
 import zipfile
@@ -60,8 +61,14 @@ _RETAINED_PACKAGE_SENTINELS = {
 }
 _REQUIRED_WHEEL_MEMBERS = {
     "dnadesign/baserender/styles/style_v1/presentation_default.yaml",
-    "dnadesign/junction/docs/assets/gene-scale-review.svg",
+    "dnadesign/junction/docs/assets/annealed-fragments.svg",
+    "dnadesign/junction/docs/assets/assembly-overview.svg",
+    "dnadesign/junction/docs/assets/junction-detail.svg",
     "dnadesign/junction/examples/gene-scale/request.yaml",
+    "dnadesign/junction/examples/three-fragment-review/request.yaml",
+    "dnadesign/junction/examples/three-fragment-review/jobs/annealed-fragments.yaml",
+    "dnadesign/junction/examples/three-fragment-review/jobs/assembly-overview.yaml",
+    "dnadesign/junction/examples/three-fragment-review/jobs/junction-detail.yaml",
     "dnadesign/opal/campaigns/demo_gp_topn/configs/campaign.yaml",
     "dnadesign/opal/campaigns/_fixtures/scalar-regression/records.parquet",
     "dnadesign/usr/datasets/registry.yaml",
@@ -73,11 +80,36 @@ _FORBIDDEN_WHEEL_PREFIXES = (
     "dnadesign/usr/datasets/usr_regulondb_native_promoters/",
     "dnadesign/studies/",
 )
+_FORBIDDEN_WHEEL_MEMBERS = {
+    "dnadesign/junction/docs/assets/three-fragment-review.svg",
+    "dnadesign/junction/examples/three-fragment-review/review.job.yaml",
+}
 
 
 def _repo_root() -> Path:
     current = Path(__file__).resolve()
     return next(parent for parent in current.parents if (parent / "pyproject.toml").exists())
+
+
+def _copy_build_source(repo_root: Path, destination: Path) -> None:
+    """Copy only Git-accepted files so ignored build residue cannot enter a wheel."""
+
+    accepted = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    ).stdout.split(b"\0")
+    for raw_path in accepted:
+        if not raw_path:
+            continue
+        relative = Path(raw_path.decode())
+        source = repo_root / relative
+        if not source.exists() and not source.is_symlink():
+            continue
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target, follow_symlinks=False)
 
 
 def test_distribution_excludes_internal_source_shelves(tmp_path: Path) -> None:
@@ -191,21 +223,25 @@ def test_distribution_excludes_private_and_generated_package_data() -> None:
 
 def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path: Path) -> None:
     repo_root = _repo_root()
+    source_root = tmp_path / "source"
+    wheel_dir = tmp_path / "dist"
+    _copy_build_source(repo_root, source_root)
     subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(tmp_path)],
-        cwd=repo_root,
+        ["uv", "build", "--wheel", "--out-dir", str(wheel_dir)],
+        cwd=source_root,
         check=True,
         capture_output=True,
         text=True,
         timeout=120,
     )
-    wheels = list(tmp_path.glob("*.whl"))
+    wheels = list(wheel_dir.glob("*.whl"))
     assert len(wheels) == 1
 
     with zipfile.ZipFile(wheels[0]) as wheel:
         members = set(wheel.namelist())
 
     assert _REQUIRED_WHEEL_MEMBERS <= members
+    assert members.isdisjoint(_FORBIDDEN_WHEEL_MEMBERS)
     assert not any(member.startswith(_FORBIDDEN_WHEEL_PREFIXES) for member in members)
     assert not any("config.probe." in member for member in members)
     assert "dnadesign/usr/remotes.yaml" not in members

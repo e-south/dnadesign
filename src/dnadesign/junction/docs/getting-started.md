@@ -96,9 +96,10 @@ Start with:
 
 Render that last artifact with
 [BaseRender](../../baserender/docs/integrations/junction.md) to inspect every
-displayed nucleotide, its aligned complement, fragment and toehold boundaries,
-barcode duplexes, and complete oligo and primer orders. Read search receipts
-and check states in the JSON bundle rather than inferring them from the image.
+selected nucleotide, its aligned complement, fragment and toehold boundaries,
+and a three-arm junction schematic. Read complete order rows, primer
+sequences, search receipts, and check states in the bundle rather than
+inferring them from a plot.
 
 A successful verification establishes deterministic string construction and
 file integrity within the documented software checks. It does not establish

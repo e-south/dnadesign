@@ -2,120 +2,44 @@
 doc_id: dnadesign-thread-docs
 surface: tool-docs
 owner: dnadesign-maintainers
-last_verified: 2026-06-29
+last_verified: 2026-08-09
 ---
 
-# Thread Docs
+# Thread
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+Thread standardizes the files passed between protein-design and
+structure-analysis tools. Its contracts keep sequence identity, runtime
+provenance, results, and checks explicit. A caller supplies the scientific
+selection and decides what the results mean.
 
-`dnadesign.thread` is intentionally small right now. Its public surfaces are the
-generic ProteinMPNN adapter, generic ColabFold output normalizer, generic ESM
-Atlas annotation adapter, ProteinMPNN candidate normalization, generic
-fold-check request/report contracts, and a generic structure-prediction
-registry. It also exposes a small browser structure-view contract for
-notebook-based review of existing PDB/mmCIF files.
+## Routes
 
-The adapter owns reusable fixed-backbone mechanics:
+| Job | Surface | Result |
+| --- | --- | --- |
+| Prepare a ProteinMPNN run | `dnadesign.thread.adapters.proteinmpnn` | Validated request sidecars and a request manifest |
+| Read ProteinMPNN samples | `dnadesign.thread.adapters.proteinmpnn` | Normalized backend sample rows |
+| Build stable candidate rows | `dnadesign.thread.candidates` | Sequence, mutation, and mask-audit fields |
+| Read ColabFold output | `dnadesign.thread.adapters.colabfold` | Normalized confidence, PAE, and RMSD rows |
+| Define a fold check | `dnadesign.thread.foldcheck` | Backend-neutral request and report artifacts |
+| Record predicted structures | `dnadesign.thread.structure_predictions` | Provenance-separated registry rows |
+| Read Atlas annotations | `dnadesign.thread.adapters.esm_atlas` | Sparse protein and residue annotations |
+| Query Biohub ESMC | `dnadesign.thread.adapters.biohub_esmc` | Authenticated sparse annotations with redacted runtime metadata |
+| Inspect existing structures | `dnadesign.thread.structure_views` | An interactive browser view |
 
-- chain-local ProteinMPNN position conversion
-- helper-compatible parsed-PDB, assigned-chain, and fixed-position JSONL payloads
-- protein-only backbone export
-- request manifests and request hashes
-- explicit official-checkout preflight
-- helper parity checks before backend execution
-- backend-run manifests
-- normalized sample tables
-- generic no-fallback request validation
+## Boundaries
 
-The adapter follows the public ProteinMPNN CLI path. It prepares sidecars,
-checks them against official helpers, runs `protein_mpnn_run.py` only when an
-explicit checkout root is provided, and normalizes the resulting sequences. It
-does not decide study masks, infer raw PDB residue ids as fixed positions, or
-silently fall back to another inverse-folding backend.
+- Adapters own translation to or from one external tool. They do not own
+  candidate selection or biological interpretation.
+- `foldcheck` owns artifact shape and explicit thresholds supplied by the
+  caller. It does not choose a folding backend or acceptance policy.
+- `structure_predictions` keeps each backend result as a separate provenance
+  row. Results from different runtimes are never merged into one authority.
+- `structure_views` renders existing PDB or mmCIF content for interactive
+  notebook inspection. Its py3Dmol HTML is a browser viewer, not a scientific
+  plot, evidence bundle, or replacement for a deterministic BaseRender figure.
+- Model execution, credentials, schedulers, and device storage remain explicit
+  operator concerns. There is no hidden fallback.
 
-The fold-check contract owns model-agnostic artifact shape:
-
-- fold-check FASTA request records
-- WT baseline presence
-- request-sequence hash binding
-- runtime kind/version and parameter hash fields
-- threshold id and threshold values
-- normalized fold-check report rows with accepted/rejected/errored states
-- subset FASTA and external-run manifest preparation through
-  `python -m dnadesign.thread.foldcheck.subset`
-
-`dnadesign.thread.adapters.colabfold` owns reusable ColabFold output parsing:
-
-- ColabFold output-file discovery by request sequence id, with longer
-  manifest sequence ids matched before shorter prefixes and file matching
-  limited to exact ids or known ColabFold-generated suffixes
-- one-pass output indexing with rank-token parsing for ColabFold model/score
-  files
-- pLDDT extraction from model PDB B-factors
-- PAE JSON summarization when available
-- C-alpha RMSD against the WT runtime baseline or an explicit reference PDB
-- failure rows for missing output or missing required metrics
-
-The adapter normalizes completed `colabfold_batch` output directories. It does
-not install ColabFold, call a hosted API, submit scheduler jobs, or choose the
-study's fold-check thresholds.
-
-`dnadesign.thread.adapters.esm_atlas` owns reusable Atlas API annotation
-mechanics:
-
-- no-auth Atlas protein lookup by sequence MD5 hash
-- bounded query parameters and explicit `fold_on_miss` handling
-- query MD5 hashes, request hashes, and raw response hashes
-- top SAE feature summaries
-- sparse protein-level activations
-- sparse per-residue activations
-- compact feature catalog rows
-- explicit error rows when the alpha API drifts or a query is absent
-- optional Atlas on-demand structure payload extraction when a caller has
-  explicitly enabled `fold_on_miss`
-
-The adapter does not claim function, rank processivity, or choose which study
-candidates to query. Study packages own sequence selection, feature panel
-interpretation, WT-relative comparisons, and assay-panel decisions. Do not add a
-wider semantic-profile framework until a second backend needs the same contract.
-
-`dnadesign.thread.adapters.biohub_esmc` owns authenticated Biohub ESMC
-query-time SAE mechanics:
-
-- runtime-only credential loading with redacted manifests
-- public `POST /api/v1/encode` -> `POST /api/v1/logits` request flow
-- encoded SAE tensor decoding
-- sparse per-sequence and per-residue SAE feature rows
-- explicit error rows for API, decode, or schema failures
-
-This is not an Atlas lookup adapter and not a fold adapter. Study wrappers may
-use it to annotate synthetic sequences that do not exist in Atlas, but those
-rows remain semantic context unless a study-specific policy uses them later.
-
-`dnadesign.thread.structure_predictions` owns the backend-neutral registry for
-model-predicted structures. It records candidate id, sequence hash, backend,
-model family/name/version, runtime or endpoint, parameter hash, request hash,
-raw response hash, structure hash, structure source URI, local structure path,
-confidence fields, status, and failure reason. This registry is deliberately
-separate from fold-check reports and Atlas semantic profiles. A ColabFold
-structure used for fold validation and an Atlas/ESMFold-derived structure for
-the same sequence must be two provenance-separated rows, not one merged result.
-
-`dnadesign.thread.structure_views` owns browser-embedded structure-view
-contracts for existing structure files. It defines backend-neutral model/view
-specs and currently renders HTML through py3Dmol. This package is for
-interactive notebook review of structures that already exist; it does not run a
-fold model, pick study structures, capture publication camera poses, or replace
-ChimeraX still renders.
-
-Study packages own biological masks, evidence interpretation, source selection,
-candidate batch policy, fold-check threshold policy, and candidate-ranking
-policy.
-
-Fold model execution is a runtime boundary, not a hidden `thread` fallback.
-Scheduler templates, device storage, and environment activation belong to the
-operator surface that runs the model. `thread` should parse or write compact
-fold-check artifacts through public contracts; it should not choose a study's
-fold backend, thresholds, or downstream promotion rule.
+Study-owned code may call these public packages after it has chosen subjects,
+masks, thresholds, and comparison policy. Thread must not import study code,
+name study objectives, or publish promotion decisions.

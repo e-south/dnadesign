@@ -308,6 +308,25 @@ def test_cli_progress_show_reports_ops_audit_surface() -> None:
         assert payload["evidence"]["phase_counts"] == {"preflight": 1, "submit": 1}
 
 
+def test_progress_show_registration_uses_the_group_capability(monkeypatch) -> None:
+    from dnadesign.ops.cli.commands import progress
+
+    class VendoredClickGroup:
+        def __init__(self) -> None:
+            self.commands: dict[str, object] = {}
+
+        def add_command(self, command: object, name: str) -> None:
+            self.commands[name] = command
+
+    group = VendoredClickGroup()
+    monkeypatch.setattr(progress.typer.main, "get_command", lambda _app: group)
+
+    command = progress.get_click_command()
+
+    assert command is group
+    assert "show" in group.commands
+
+
 def test_cli_progress_show_reports_usr_sync_audit_surface() -> None:
     runner = CliRunner()
     with runner.isolated_filesystem():

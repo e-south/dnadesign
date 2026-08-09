@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 _THREAD_ROOT_FILES = {"__init__.py"}
@@ -173,6 +174,32 @@ def test_structure_views_package_owns_generic_browser_view_contracts() -> None:
         assert "mestre" not in text
         assert "wang" not in text
     assert "StructureViewSpec" in (root / "models.py").read_text(encoding="utf-8")
+
+
+def test_thread_production_code_has_no_study_or_objective_coupling() -> None:
+    root = _repo_root() / "src/dnadesign/thread"
+    violations: list[str] = []
+    forbidden_terms = ("retron", "sfxi", "msrb", "spop", "ciprofloxacin", "ethanol")
+    for path in root.rglob("*.py"):
+        if "tests" in path.parts:
+            continue
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                targets = tuple(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                targets = (node.module,)
+            else:
+                continue
+            for target in targets:
+                if target == "dnadesign.studies" or target.startswith("dnadesign.studies."):
+                    violations.append(f"{path.relative_to(root)} imports {target}")
+                if target == "research_studies" or target.startswith("research_studies."):
+                    violations.append(f"{path.relative_to(root)} imports {target}")
+        lowered = source.lower()
+        violations.extend(f"{path.relative_to(root)} names {term}" for term in forbidden_terms if term in lowered)
+    assert violations == []
 
 
 def _repo_root() -> Path:

@@ -91,7 +91,7 @@ Render-contract descriptors:
 - `hairpin_cartoon_render_v3`: hairpin topology cartoon visualization; accepts `hairpin_cartoon`
 - `topology_cartoon_render_v3`: explicit segment-topology cartoon visualization; accepts `topology_cartoon`
 - `snapback_map_render_v3`: snapback visual-map rendering; accepts `snapback_map`
-- `three_way_junction_review_render_v1`: private nucleotide-level quality review; accepts `three_way_junction_review` and limits input to 64 MiB, 2,000 records, and 10,000,000 target bases
+- `three_way_junction_review_render_v1`: private Junction quality review; accepts `junction_annealed_fragments` and `junction_three_way_assembly`, with a 64 MiB, 2,000-record, and 10,000,000-base input envelope
 
 Adapters:
 - `densegen_tfbs`
@@ -152,9 +152,14 @@ Renderer families:
 - `topology_cartoon`
   - topology cartoons require explicit segment geometry; zero-length separator spans are ignored, and visible bands must be positive-length
 - `snapback_map`
-- `three_way_junction_review`
-  - consumes exact target geometry, junction assignments, strand roles, primer declarations, and search receipts
-  - reports thermodynamic screening as `not_run`; it does not infer or simulate missing evidence
+- `junction_annealed_fragments`
+  - draws exact selected fragment strands, junction spans, and declared Watson–Crick edges
+  - requires explicit `fragment_ids` when a target has more than 18 fragments
+- `junction_three_way_assembly`
+  - draws either a target-scale interface overview or one to eight explicitly selected nucleotide-level three-way junctions
+  - accepts at most 256 fragments in the target overview
+  - rejects a selected detail above 512 base glyphs before figure allocation
+  - reports thermodynamic screening as `not_run`; it does not infer folding or experimental outcomes
 
 Shared cross-tool contract models live under `dnadesign.contracts.visual`. Cruncher and other producers publish those contracts; BaseRender parses them and adapts them to `Record`.
 

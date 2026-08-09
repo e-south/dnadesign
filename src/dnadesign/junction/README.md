@@ -8,29 +8,25 @@ last_verified: 2026-08-08
 
 ![junction banner](assets/junction-banner.svg)
 
-`junction` turns exact linear DNA targets into oligo plans for Sidewinder-style
-three-way-junction assembly. You provide the targets, grouping, recovery
-primers, search limits, and order labels. The tool selects sequence junctions,
-checks exact reconstruction, and writes a reproducible bundle. It does not
-predict molecular behavior, design primers, run PCR, or place orders.
+`junction` makes an oligo plan for assembling exact linear DNA targets with
+Sidewinder-style three-way junctions. You supply the targets, target groups,
+recovery primers, search settings, and order labels. `junction` chooses the
+junction sequences, checks that the plan reconstructs each target, and writes a
+verified bundle. It does not design primers, predict molecular behavior, run an
+experiment, or place an order.
 
 ## Documentation
 
-- [Documentation index](docs/README.md): choose a learning, use, or reference
-  route.
-- [Getting started](docs/getting-started.md): build and verify one gene-scale
-  software example.
-- [How `junction` works](docs/explanation/how-junction-works.md): learn the
-  physical idea, software model, and vocabulary before reading formulas.
-- [Prepare a request](docs/guides/prepare-a-request.md): choose assembly groups,
-  primers, settings, and order labels explicitly.
-- [Inspect and verify](docs/guides/inspect-and-verify.md): find the evidence for
-  each review question.
+- [Start here](docs/README.md) for the learning, use, and reference routes.
+- [Build an example](docs/getting-started.md) to see the complete software path.
+- [Understand the method](docs/explanation/how-junction-works.md) before changing search settings.
+- [Prepare a request](docs/guides/prepare-a-request.md) or [review a bundle](docs/guides/inspect-and-verify.md).
 
-## Review image
+## Review the design
 
-[![Nucleotide-level BaseRender audit of a synthetic 705 bp junction design](docs/assets/gene-scale-review.svg)](docs/assets/gene-scale-review.svg)
+[![Base-level details for two selected three-way junctions](docs/assets/junction-detail.svg)](docs/assets/junction-detail.svg)
 
-Open the map at full size to inspect every base, pairing edge, fragment order,
-and recovery primer. It is generated from the checked-in gene-scale request
-through the same typed review contract used for other junction plans.
+BaseRender can draw selected fragment pairs, a target-scale assembly map, or
+selected three-way junctions from the verified review record. The
+[review jobs](examples/three-fragment-review/jobs/) generate only what you ask
+for. These schematics do not predict folding, ligation, PCR, yield, or fidelity.

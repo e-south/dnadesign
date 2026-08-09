@@ -25,6 +25,7 @@ from .metadata import (
 )
 from .models import RunbookCatalog
 from .paths import resolve_catalog_repo_root
+from .provider_sources import discover_external_catalog_registry_sources
 
 
 def load_runbook_catalog(*, repo_root: Path | None = None) -> RunbookCatalog:
@@ -39,6 +40,7 @@ def load_runbook_catalog(*, repo_root: Path | None = None) -> RunbookCatalog:
         repo_root=resolved_repo_root,
         catalog_path=catalog_path,
         metadata_paths=metadata_paths.registry_paths,
+        external_sources=discover_external_catalog_registry_sources(),
     )
     tool_sources = load_catalog_tool_sources(
         repo_root=resolved_repo_root,
