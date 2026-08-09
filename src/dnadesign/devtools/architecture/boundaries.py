@@ -462,12 +462,34 @@ def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutV
 
 def find_external_study_boundary_violations(*, repo_root: Path) -> list[TopLevelLayoutViolation]:
     """Reject live study packages from the public dnadesign source tree."""
-    studies_root = repo_root.expanduser().resolve() / "src" / "dnadesign" / "studies"
+    resolved_repo_root = repo_root.expanduser().resolve()
+    studies_root = resolved_repo_root / "src" / "dnadesign" / "studies"
     if not studies_root.exists():
         return []
-    if _is_ignored_untracked_path(repo_root=repo_root.expanduser().resolve(), path=studies_root):
+
+    relative_root = studies_root.relative_to(resolved_repo_root)
+    try:
+        tracked_result = subprocess.run(
+            ["git", "ls-files", "-z", "--cached", "--", relative_root.as_posix()],
+            cwd=resolved_repo_root,
+            check=False,
+            capture_output=True,
+        )
+    except OSError:
+        tracked_files: tuple[bytes, ...] = ()
+    else:
+        tracked_files = tuple(path for path in tracked_result.stdout.split(b"\0") if path)
+    if tracked_files:
+        return [
+            TopLevelLayoutViolation(
+                path=studies_root,
+                reason="live study packages must remain external to dnadesign",
+            )
+        ]
+
+    if _is_ignored_untracked_path(repo_root=resolved_repo_root, path=studies_root):
         return []
-    ignored_local_segments = {"outputs", "workbench", "workspaces", "__pycache__"}
+    ignored_local_segments = {"__pycache__"}
     source_files = [
         path
         for path in studies_root.rglob("*")

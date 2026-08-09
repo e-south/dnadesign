@@ -752,6 +752,24 @@ def test_architecture_checks_ignore_untracked_local_study_backup(tmp_path: Path)
     assert find_external_study_boundary_violations(repo_root=tmp_path) == []
 
 
+def test_external_study_boundary_rejects_tracked_code_under_artifact_named_directory(tmp_path: Path) -> None:
+    _write(tmp_path / ".gitignore", "src/dnadesign/studies/\n")
+    tracked_path = tmp_path / "src" / "dnadesign" / "studies" / "demo" / "workbench" / "impl.py"
+    _write(tracked_path, "# tracked study code\n")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "add", "--force", tracked_path.relative_to(tmp_path).as_posix()],
+        cwd=tmp_path,
+        check=True,
+    )
+
+    violations = find_external_study_boundary_violations(repo_root=tmp_path)
+
+    assert [(item.reason, item.path.relative_to(tmp_path).as_posix()) for item in violations] == [
+        ("live study packages must remain external to dnadesign", "src/dnadesign/studies")
+    ]
+
+
 def test_find_top_level_layout_violations_flags_unexpected_top_level_module(tmp_path: Path) -> None:
     _scaffold_top_level_layout(tmp_path)
     _write(tmp_path / "src" / "dnadesign" / "helpers.py", "# drift\n")
