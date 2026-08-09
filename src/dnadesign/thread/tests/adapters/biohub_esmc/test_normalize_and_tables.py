@@ -102,7 +102,12 @@ def test_normalize_logits_response_handles_sparse_tensor_with_special_tokens() -
     request_hash = _request_hash(("candidate_a",))
     indices = torch.tensor([[0, 1, 2, 5], [9, 3, 7, 11]])
     values = torch.tensor([99.0, 1.5, 2.0, 88.0])
-    sparse = torch.sparse_coo_tensor(indices, values, size=(len(sequence) + 2, 16)).coalesce()
+    sparse = torch.sparse_coo_tensor(
+        indices,
+        values,
+        size=(len(sequence) + 2, 16),
+        check_invariants=True,
+    ).coalesce()
 
     normalized = normalize_logits_response(
         candidate_id="candidate_a",
