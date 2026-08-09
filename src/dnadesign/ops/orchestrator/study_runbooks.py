@@ -42,7 +42,7 @@ def discover_infer_runbook_paths_for_study(*, study_dir: Path, repo_root: Path) 
                 runbook_ref,
                 repo_root=repo_root,
                 manifest_dir=resolved_study_dir,
-                default_base="repo",
+                default_base="manifest",
                 label=f"ops.study.yaml execution_surfaces.{surface_id}.runbook_ref",
             )
         )
