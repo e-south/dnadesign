@@ -26,6 +26,14 @@ from dnadesign.baserender.src.core import RenderingError
 from dnadesign.baserender.src.outputs.images import write_images
 from dnadesign.baserender.src.outputs.names import _unique_stem
 from dnadesign.baserender.src.outputs.video import write_video
+from dnadesign.baserender.src.render.junction_pairing_layout import review_content_height
+from dnadesign.baserender.src.render.three_way_junction_review import (
+    _draw_junctions,
+    _draw_oligo_orders,
+    _draw_primers,
+    _draw_target,
+)
+from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from .three_way_junction_review.fixtures import (
     _adapt_payload,
@@ -127,6 +135,21 @@ def test_review_renderer_emits_one_base_pair_audit_figure() -> None:
         assert "Sequence pairing map; not a thermodynamic, annealing, or PCR simulation." in text
         assert "Input oligos" not in text
         assert "Checks" not in text
+    finally:
+        plt.close(figure)
+
+
+def test_review_layout_reserves_the_full_body_for_many_junctions() -> None:
+    review = ThreeWayJunctionReviewV1.model_validate(_payload_with_many_junctions())
+    height = review_content_height(review)
+    figure, axis = plt.subplots()
+    try:
+        y = _draw_target(axis, review, y=height - 0.82)
+        y = _draw_junctions(axis, review, y=y - 0.08)
+        y = _draw_oligo_orders(axis, review, y=y - 0.08)
+        bottom = _draw_primers(axis, review, y=y - 0.08)
+
+        assert bottom >= 0.20 - 1e-9
     finally:
         plt.close(figure)
 

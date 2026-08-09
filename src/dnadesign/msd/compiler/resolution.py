@@ -193,10 +193,11 @@ def resolve_msd_compiler_spec_payload(
     if not isinstance(payload, Mapping):
         raise MsdCompilerSpecError("Compiler spec payload must be a mapping.")
     resolved_spec_path = Path(spec_path).expanduser().resolve() if spec_path is not None else Path("<inline>")
+    source_base = resolved_spec_path.parent if spec_path is not None else None
     spec = RetronMsdCompilerSpecV1.model_validate(payload)
     registry = load_retron_msd_registry(registry_path)
 
-    cap_sequences, cap_metadata = _resolve_cap_sequences(spec.cap_sequences)
+    cap_sequences, cap_metadata = _resolve_cap_sequences(spec.cap_sequences, source_base=source_base)
     payload_sequences, payload_metadata = _resolve_literal_sequence_map(
         spec.payload_sequences,
         label="payload_sequences",
@@ -222,7 +223,7 @@ def resolve_msd_compiler_spec_payload(
             )
         )
     for design in spec.designs:
-        parts, scar_nick_metadata = _resolve_design_parts(design)
+        parts, scar_nick_metadata = _resolve_design_parts(design, source_base=source_base)
         parsed = parse_msd_design_parts(parts, allow_non_ligatable_s0=allow_s0_exception)
         records.append(
             registry.build_reference_from_parts(
@@ -271,6 +272,8 @@ def _resolve_literal_sequence_map(
 
 def _resolve_cap_sequences(
     values: dict[str, CapSequenceInputSpec],
+    *,
+    source_base: Path | None,
 ) -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
     sequences: dict[str, str] = {}
     metadata: dict[str, dict[str, Any]] = {}
@@ -284,7 +287,12 @@ def _resolve_cap_sequences(
             continue
         if entry.source is None:
             raise MsdCompilerSpecError(f"cap_sequences.{cap_id} requires sequence or source.")
-        primitive = _select_single_snapback_cap(entry.source, label=f"cap_sequences.{cap_id}.source")
+        source_label = f"cap_sequences.{cap_id}.source"
+        primitive = _select_single_snapback_cap(
+            entry.source,
+            run_dir=_resolve_primitive_run_dir(entry.source.run_dir, source_base=source_base, label=source_label),
+            label=source_label,
+        )
         sequences[cap_id] = primitive.sequence
         metadata[cap_id] = {
             "source_construct": primitive.primitive_id,
@@ -294,14 +302,24 @@ def _resolve_cap_sequences(
     return sequences, metadata
 
 
-def _resolve_design_parts(design: MsdDesignInputSpec) -> tuple[MsdDesignPartInput, dict[str, Any] | None]:
+def _resolve_design_parts(
+    design: MsdDesignInputSpec,
+    *,
+    source_base: Path | None,
+) -> tuple[MsdDesignPartInput, dict[str, Any] | None]:
     left_base = design.left_base
     right_base = design.right_base
     scar_nick_metadata: dict[str, Any] | None = None
     if design.stem_base_source is not None:
+        source_label = f"designs.{design.construct_id}.stem_base_source"
         primitive = _select_single_stem_base(
             design.stem_base_source,
-            label=f"designs.{design.construct_id}.stem_base_source",
+            run_dir=_resolve_primitive_run_dir(
+                design.stem_base_source.run_dir,
+                source_base=source_base,
+                label=source_label,
+            ),
+            label=source_label,
         )
         if left_base is not None and left_base.upper() != primitive.left_base:
             raise MsdCompilerSpecError(
@@ -354,10 +372,19 @@ def _resolve_design_parts(design: MsdDesignInputSpec) -> tuple[MsdDesignPartInpu
     )
 
 
-def _select_single_snapback_cap(source: SnapbackCapSourceSpec, *, label: str):
+def _resolve_primitive_run_dir(run_dir: Path, *, source_base: Path | None, label: str) -> Path:
+    candidate = run_dir.expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    if source_base is None:
+        raise MsdCompilerSpecError(f"{label}.run_dir must be absolute when the compiler spec is inline.")
+    return (source_base / candidate).resolve()
+
+
+def _select_single_snapback_cap(source: SnapbackCapSourceSpec, *, run_dir: Path, label: str):
     from dnadesign.cruncher.snapback import load_released_solve_cap_primitives
 
-    primitives = load_released_solve_cap_primitives(source.run_dir)
+    primitives = load_released_solve_cap_primitives(run_dir)
     selected = _select_ranked(primitives, selector=source.selector, label=label)
     if len(selected) != 1:
         raise MsdCompilerSpecError(
@@ -367,10 +394,10 @@ def _select_single_snapback_cap(source: SnapbackCapSourceSpec, *, label: str):
     return selected[0]
 
 
-def _select_single_stem_base(source: ScarNickStemBaseSourceSpec, *, label: str):
+def _select_single_stem_base(source: ScarNickStemBaseSourceSpec, *, run_dir: Path, label: str):
     from dnadesign.cruncher.scar_nick import load_scar_nick_stem_base_primitives
 
-    primitives = load_scar_nick_stem_base_primitives(source.run_dir)
+    primitives = load_scar_nick_stem_base_primitives(run_dir)
     selected = _select_ranked(primitives, selector=source.selector, label=label)
     if len(selected) != 1:
         raise MsdCompilerSpecError(

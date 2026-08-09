@@ -65,9 +65,9 @@ def review_content_height(review: ThreeWayJunctionReviewV1) -> float:
     )
     return max(
         6.5,
-        2.05
+        2.32
         + target_rows * 0.46
-        + len(review.geometry.junctions) * 0.16
+        + len(review.geometry.junctions) * 0.20
         + junction_pair_rows * 0.36
         + len(review.strands) * 0.14
         + oligo_rows * 0.19
