@@ -18,6 +18,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pytest
+from matplotlib.collections import LineCollection
 
 import dnadesign.baserender as baserender
 import dnadesign.junction as junction
@@ -26,12 +27,14 @@ from dnadesign.baserender.src.core import RenderingError
 from dnadesign.baserender.src.outputs.images import write_images
 from dnadesign.baserender.src.outputs.names import _unique_stem
 from dnadesign.baserender.src.outputs.video import write_video
+from dnadesign.baserender.src.render.junction_annealed_review import draw_annealed_fragments
 from dnadesign.baserender.src.render.junction_pairing_layout import review_content_height
-from dnadesign.baserender.src.render.three_way_junction_review import (
-    _draw_junctions,
-    _draw_oligo_orders,
-    _draw_primers,
-    _draw_target,
+from dnadesign.baserender.src.render.junction_review_sections import (
+    draw_junctions,
+    draw_oligo_orders,
+    draw_primers,
+    draw_recovered_duplex,
+    draw_stage_path,
 )
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
@@ -123,18 +126,65 @@ def test_review_renderer_emits_one_base_pair_audit_figure() -> None:
         assert [axis.get_gid() for axis in figure.axes] == ["three-way-junction-review:base-pair-map"]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
-        assert "Target duplex" in text
+        assert "1  Oligos to order" in text
+        assert "2  Annealed fragment pairs" in text
+        assert "3  Three-way-junction interfaces" in text
+        assert "4  Recovered duplex" in text
         assert "A A A A C C C C G G G G T T T T A A A A C C C C" in text
         assert "T T T T G G G G C C C C A A A A T T T T G G G G" in text
         assert "J01 · F01 → F02 · target bp 11–14" in text
         assert "toehold" in text
         assert "barcode" in text
         assert "A A C C G G T T" in text
-        assert "Fragment oligo orders" in text
         assert "Recovery primers · universal" in text
-        assert "Sequence pairing map; not a thermodynamic, annealing, or PCR simulation." in text
+        assert "Exact sequence-pairing audit; not a thermodynamic, annealing, ligation, or PCR simulation." in text
         assert "Input oligos" not in text
         assert "Checks" not in text
+    finally:
+        plt.close(figure)
+
+
+def test_small_review_draws_every_declared_watson_crick_pair() -> None:
+    payload = _payload()
+    figure = baserender.render(_adapt_payload(payload), renderer="three_way_junction_review")
+    try:
+        pair_collections = [item for item in figure.axes[0].collections if isinstance(item, LineCollection)]
+        paired_fragment_bases = sum(
+            fragment["domain_span"]["end"] - fragment["domain_span"]["start"]
+            for fragment in payload["geometry"]["fragments"]
+        )
+        junction_bases = sum(
+            len(junction["toehold"]) + len(junction["barcode"]) for junction in payload["geometry"]["junctions"]
+        )
+        recovered_bases = len(payload["recovery"]["extended_top_sequence_5to3"])
+
+        assert sum(len(item.get_segments()) for item in pair_collections) == (
+            paired_fragment_bases + junction_bases + recovered_bases
+        )
+    finally:
+        plt.close(figure)
+
+
+def test_recovered_duplex_includes_declared_primer_extensions() -> None:
+    payload = _payload()
+    target = payload["target"]["sequence_5to3"]
+    payload["recovery"]["forward"]["five_prime_extension_5to3"] = "GG"
+    payload["recovery"]["forward"]["order_sequence_5to3"] = (
+        "GG" + payload["recovery"]["forward"]["binding_sequence_5to3"]
+    )
+    payload["recovery"]["reverse"]["five_prime_extension_5to3"] = "CC"
+    payload["recovery"]["reverse"]["order_sequence_5to3"] = (
+        "CC" + payload["recovery"]["reverse"]["binding_sequence_5to3"]
+    )
+    payload["recovery"]["extended_top_sequence_5to3"] = "GG" + target + "GG"
+    payload["recovery"]["extended_bottom_sequence_5to3"] = "CC" + _reverse_complement(target) + "CC"
+
+    figure = baserender.render(_adapt_payload(payload), renderer="three_way_junction_review")
+    try:
+        text = "\n".join(item.get_text() for item in figure.axes[0].texts)
+        assert "28 bp product · 24 bp target" in text
+        assert "5′ extension" in text
+        assert "3′ extension" in text
     finally:
         plt.close(figure)
 
@@ -144,10 +194,12 @@ def test_review_layout_reserves_the_full_body_for_many_junctions() -> None:
     height = review_content_height(review)
     figure, axis = plt.subplots()
     try:
-        y = _draw_target(axis, review, y=height - 0.82)
-        y = _draw_junctions(axis, review, y=y - 0.08)
-        y = _draw_oligo_orders(axis, review, y=y - 0.08)
-        bottom = _draw_primers(axis, review, y=y - 0.08)
+        y = draw_stage_path(axis, y=height - 0.70)
+        y = draw_oligo_orders(axis, review, y=y)
+        y = draw_annealed_fragments(axis, review, y=y - 0.08)
+        y = draw_junctions(axis, review, y=y - 0.08)
+        y = draw_recovered_duplex(axis, review, y=y - 0.08)
+        bottom = draw_primers(axis, review, y=y - 0.08)
 
         assert bottom >= 0.20 - 1e-9
     finally:

@@ -171,6 +171,17 @@ def test_review_renderer_keeps_artist_counts_linear_without_one_text_artist_per_
         plt.close(figure)
 
 
+def test_large_review_uses_the_compact_annealed_fragment_stage() -> None:
+    payload = _payload_with_many_junctions()
+    figure, text = _rendered_text(payload)
+    try:
+        fragment_count = len(payload["strands"])
+        assert f"Compact view for {fragment_count} fragments" in text
+        assert "exact order strands, junction pairs, and recovered duplex remain below" in text
+    finally:
+        plt.close(figure)
+
+
 @pytest.mark.parametrize(
     ("style_overrides", "message"),
     [

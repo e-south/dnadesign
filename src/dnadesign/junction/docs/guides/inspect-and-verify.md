@@ -73,11 +73,15 @@ Follow the [BaseRender integration](../../../baserender/docs/integrations/juncti
 Use a new BaseRender output directory beside the source bundle; never add
 images inside the verified source bundle.
 
-The image shows the target duplex, fragment and toehold spans, each toehold and
-barcode duplex, complete fragment-oligo orders, and complete recovery-primer
-orders. Light gray edges mark aligned Watson-Crick pairs. Search receipts and
-software checks stay in the JSON files. The image does not add thermodynamic
-or experimental evidence and is not part of the `junction` plan identity.
+The image follows four evidence stages: complete fragment-oligo orders,
+annealed fragment pairs, each `t/t*` and `b/b*` interface, and the exact
+recovered duplex. It also shows complete recovery-primer orders. Light gray
+edges mark aligned Watson–Crick pairs. Requests with at most three fragments
+expand every annealed pair when each fits one nucleotide row. Larger requests
+collapse that duplicated stage while retaining every exact order strand,
+junction pair, and recovered-product base. Search receipts and software checks
+stay in the JSON files. The image does not add thermodynamic or experimental
+evidence and is not part of the `junction` plan identity.
 
 ## Review before any order or experiment
 

@@ -29,17 +29,20 @@ each JSON row. Its exact `contract_kind` is
 
 Each image is one base-pair audit. It shows:
 
-1. the target 5′→3′ strand aligned to its 3′→5′ complement;
-2. fragment domains, selected target-derived toeholds, and their coordinates;
-3. every toehold and barcode duplex with light gray Watson-Crick pairing edges;
-4. complete fragment-oligo orders; and
-5. complete recovery-primer orders.
+1. every fragment-oligo order in the submitted 5′→3′ orientation;
+2. the annealed fragment pairs, including unpaired barcode and toehold arms;
+3. every `t/t*` and `b/b*` interface with light gray Watson-Crick pairing edges;
+4. the exact recovered duplex, including declared primer extensions; and
+5. both recovery-primer orders.
 
 Sequences wrap into exact, fixed-width rows; they are not shortened to
-previews. Long content makes a taller image. BaseRender rejects a render before
-figure allocation if the requested canvas would exceed its memory or dimension
-limit. Search counts and check receipts remain in the review JSON and source
-bundle because they are not sequence geometry.
+previews. For up to three fragments, BaseRender expands every annealed pair when
+each pair fits one nucleotide row. Larger targets use a compact annealed-stage
+note because the exact sequences already appear in the order, interface, and
+recovered-product sections. Long content makes a taller image. BaseRender
+rejects a render before figure allocation if the requested canvas would exceed
+its memory or dimension limit. Search counts and check receipts remain in the
+review JSON and source bundle because they are not sequence geometry.
 
 The contract keeps primer mechanics separate:
 

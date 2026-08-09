@@ -27,10 +27,12 @@ predict molecular behavior, design primers, run PCR, or place orders.
 - [Inspect and verify](docs/guides/inspect-and-verify.md): find the evidence for
   each review question.
 
-## Review image
+## Nucleotide review
 
-[![Nucleotide-level BaseRender audit of a synthetic 705 bp junction design](docs/assets/gene-scale-review.svg)](docs/assets/gene-scale-review.svg)
+[![Nucleotide-level BaseRender audit of a synthetic three-fragment junction design](docs/assets/three-fragment-review.svg)](docs/assets/three-fragment-review.svg)
 
-Open the map at full size to inspect every base, pairing edge, fragment order,
-and recovery primer. It is generated from the checked-in gene-scale request
-through the same typed review contract used for other junction plans.
+Open the map at full size to follow the exact order strands, annealed fragment
+pairs, `t/t*` and `b/b*` interfaces, recovered duplex, and recovery primers.
+Light gray lines mark declared Watson–Crick pairs. The image comes from the
+checked-in 170 bp, three-fragment request through the same typed review contract
+used for larger plans. It is a sequence audit, not a molecular simulation.
