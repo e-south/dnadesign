@@ -39,6 +39,7 @@ from .paths import (
     resolve_doc_path_for_metadata,
     resolve_doc_path_for_sidecar,
 )
+from .provider_sources import CatalogRegistrySource
 
 _REGISTRY_METADATA_KEYS = frozenset(
     {
@@ -89,19 +90,24 @@ def load_catalog_procedures(
     repo_root: Path,
     catalog_path: Path,
     metadata_paths: tuple[Path, ...] | None = None,
+    external_sources: tuple[CatalogRegistrySource, ...] = (),
 ) -> tuple[tuple[CatalogProcedureEntry, ...], dict[str, tuple[CatalogProcedureRelation, ...]]]:
     if metadata_paths is None:
         metadata_paths = discover_catalog_metadata_paths(repo_root).registry_paths
-    if not metadata_paths:
+    if not metadata_paths and not external_sources:
         raise ValueError("runbook catalog requires at least one '*.registry.yaml' procedure metadata file")
 
     unsorted_entries: list[CatalogProcedureEntry] = []
     unsorted_relations: dict[str, tuple[CatalogProcedureRelation, ...]] = {}
     orders_by_value: dict[int, str] = {}
-    for metadata_path in metadata_paths:
+    sources = (
+        *(CatalogRegistrySource(path=path, package_root=repo_root) for path in metadata_paths),
+        *external_sources,
+    )
+    for source in sources:
         entry, relations = _load_registry_metadata_file(
-            metadata_path=metadata_path,
-            repo_root=repo_root,
+            metadata_path=source.path,
+            repo_root=source.package_root,
             catalog_path=catalog_path,
         )
         existing_registry_id = orders_by_value.get(entry.catalog_order)

@@ -14,11 +14,12 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.ops.catalog import CatalogQuery, filter_runbook_catalog, load_runbook_catalog
+from dnadesign.ops.catalog import CatalogQuery, filter_runbook_catalog, load_runbook_catalog, metadata, provider_sources
 from dnadesign.ops.catalog.metadata import _load_registry_metadata_file, _load_tool_source_metadata_file
 from dnadesign.ops.cli import app
 
@@ -113,6 +114,81 @@ summary: Demo preflight contract.
     assert entry.title == "Demo Preflight"
     assert entry.doc_path == "../studies/demo_study/operations/catalog/contracts/preflight.md"
     assert relations == ()
+
+
+def test_external_catalog_registry_entry_point_is_owner_confined(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "research_studies"
+    doc_path = package_root / "studies" / "demo" / "operations" / "catalog" / "contracts" / "status.md"
+    metadata_path = doc_path.parent / "registry" / "status.registry.yaml"
+    catalog_path = tmp_path / "dnadesign" / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Study Status\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 55
+registry_id: studies.demo.status
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: demo study record
+exit_artifact: demo status
+execution_kind: iterative
+status_kind: demo-status
+summary: Read the demo study status.
+""",
+    )
+    entry_point = SimpleNamespace(
+        name="research-studies",
+        value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
+        load=lambda: lambda: (metadata_path,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+    )
+
+    sources = provider_sources.discover_external_catalog_registry_sources()
+    procedures, relations = metadata.load_catalog_procedures(
+        repo_root=tmp_path / "dnadesign",
+        catalog_path=catalog_path,
+        metadata_paths=(),
+        external_sources=sources,
+    )
+
+    assert procedures[0].registry_id == "studies.demo.status"
+    assert Path(catalog_path.parent, procedures[0].doc_path).resolve() == doc_path.resolve()
+    assert relations == {"studies.demo.status": ()}
+
+
+def test_external_catalog_registry_entry_point_rejects_path_outside_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "research_studies"
+    package_root.mkdir()
+    external_metadata = tmp_path / "status.registry.yaml"
+    external_metadata.write_text("schema_version: 1\n", encoding="utf-8")
+    entry_point = SimpleNamespace(
+        name="research-studies",
+        value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
+        load=lambda: lambda: (external_metadata,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+    )
+
+    with pytest.raises(ValueError, match="path must stay under its entry-point package"):
+        provider_sources.discover_external_catalog_registry_sources()
 
 
 def test_catalog_tool_source_metadata_rejects_unknown_route_keys(tmp_path: Path) -> None:
