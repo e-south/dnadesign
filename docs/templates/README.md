@@ -1,7 +1,7 @@
 ## Documentation Templates
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 ### At a glance
 Templates provide consistent structure for system-of-record docs, runbooks, ADRs, and execution plans.

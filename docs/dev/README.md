@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 Use this index to find maintainer workflows, checks, and planning records.
 
