@@ -20,7 +20,7 @@ _ROOT = Path(junction_review_common.__file__).parent
 _MODULE_BUDGETS = {
     "junction_review_common.py": 190,
     "junction_annealed_fragments.py": 300,
-    "junction_three_way_assembly.py": 270,
+    "junction_three_way_assembly.py": 290,
     "junction_three_way_detail.py": 260,
 }
 

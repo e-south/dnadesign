@@ -42,6 +42,7 @@ _RENDERER = "junction_three_way_assembly"
 _FIGURE_WIDTH = 15.2
 _MAX_DETAIL_JUNCTIONS = 8
 _MAX_DETAIL_BASE_GLYPHS_PER_JUNCTION = 512
+_MAX_OVERVIEW_FRAGMENTS = 256
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +97,15 @@ def _validate_detail_workload(review: ThreeWayJunctionReviewV1, indices: tuple[i
                 f"{_RENDERER} junction {junction_id!r} requires {count} base glyphs; "
                 f"the per-junction limit is {_MAX_DETAIL_BASE_GLYPHS_PER_JUNCTION}"
             )
+
+
+def _validate_overview_workload(review: ThreeWayJunctionReviewV1) -> None:
+    count = len(review.geometry.fragments)
+    if count > _MAX_OVERVIEW_FRAGMENTS:
+        raise SchemaError(
+            f"{_RENDERER} target {review.target.target_id!r} contains {count} fragments; "
+            f"the overview limit is {_MAX_OVERVIEW_FRAGMENTS}"
+        )
 
 
 def _draw_overview(axis, review: ThreeWayJunctionReviewV1) -> None:
@@ -180,7 +190,9 @@ class JunctionThreeWayAssemblyRenderer:
         _ = palette
         review = review_from_record(record)
         resolved = _resolve_options(review, options)
-        if resolved.view == "junction_detail":
+        if resolved.view == "overview":
+            _validate_overview_workload(review)
+        else:
             _validate_detail_workload(review, resolved.junction_indices)
         _overview_size(style) if resolved.view == "overview" else _detail_size(style, len(resolved.junction_indices))
 
@@ -195,6 +207,7 @@ class JunctionThreeWayAssemblyRenderer:
         review = review_from_record(record)
         resolved = _resolve_options(review, options)
         if resolved.view == "overview":
+            _validate_overview_workload(review)
             figure, axis = plt.subplots(figsize=_overview_size(style), dpi=style.dpi)
             _draw_overview(axis, review)
             figure.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)

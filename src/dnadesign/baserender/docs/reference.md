@@ -157,6 +157,7 @@ Renderer families:
   - requires explicit `fragment_ids` when a target has more than 18 fragments
 - `junction_three_way_assembly`
   - draws either a target-scale interface overview or one to eight explicitly selected nucleotide-level three-way junctions
+  - accepts at most 256 fragments in the target overview
   - rejects a selected detail above 512 base glyphs before figure allocation
   - reports thermodynamic screening as `not_run`; it does not infer folding or experimental outcomes
 

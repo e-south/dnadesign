@@ -45,6 +45,8 @@ unknown IDs, duplicate IDs, and unsafe canvas sizes fail before figure
 allocation. A detail view also rejects any junction that would require more
 than 512 base glyphs; exact longer sequences remain available in the source
 record without forcing Matplotlib to allocate an unbounded number of artists.
+The target overview accepts at most 256 fragments; larger assemblies remain
+available as typed records but require a purpose-built aggregate view.
 
 The fragment map prints exact bases, strand ends, junction spans, and declared
 Watson–Crick edges. The target overview is intentionally symbolic. The junction
