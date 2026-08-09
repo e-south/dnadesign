@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 ## At a glance
 This document defines reliability intent for runtime behavior, CI behavior, and operator workflows.
