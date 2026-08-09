@@ -1,7 +1,7 @@
 ## OPS mental model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-08-09
 
 OPS owns neutral command routing, read-only observation, and deterministic
 runbook control. Tool and study status runtime policy stays outside OPS core.
@@ -28,11 +28,12 @@ It owns:
 | Discovery plane | `ops catalog` | Browse registered procedures, ownership docs, and related routes. |
 | Observation plane | `ops progress` | Read one status surface or one manifest without mutating state. |
 | Control plane | `ops runbook` | Initialize, plan, inspect active jobs, and execute orchestration. |
-| Record plane | observed by snapshot surfaces | Checked-in study records, manifests, dataset contracts, and audit files already on disk. |
+| Record plane | observed by snapshot surfaces | Manifests, dataset contracts, and audit files already on disk. |
 | Execution-readiness plane | observed by preflight surfaces | Host, workspace, scheduler, and command blockers for the next action. |
 
 The plane a command belongs to is not always the same as the plane it observes.
-Example: `ops progress show studies.stress-ethanol-cipro-growth.preflight` belongs to the observation plane, but it observes the execution-readiness plane.
+For example, a preflight route registered by an installed provider belongs to
+the observation plane but observes the execution-readiness plane.
 When a route or workflow needs more nuance than the plane enum provides, keep
 `Plane` on the canonical enum and add a separate field such as `Surface role`
 instead of inventing replacement plane names.
@@ -45,10 +46,10 @@ OPS uses one global state lattice:
 - `attention`: evidence exists, but it shows an unsatisfactory or action-needed posture
 - `missing`: required evidence or artifact is absent or unreadable
 
-For study records, `ok` means the checked-in posture is coherent for the
-declared current item. That item may be a phase in a sequential study or a track
-in an open-ended study. Planned future outputs and historical upstream targets
-can remain in evidence without escalating the current item to `attention`.
+For an externally registered study record, `ok` means its provider reports a
+coherent checked-in posture for the declared current item. Planned future
+outputs and historical upstream targets can remain in evidence without
+escalating the current item to `attention`.
 
 Severity order is global, not subsystem-local:
 
@@ -60,7 +61,7 @@ That same precedence is used for campaign summaries, preflight blocker ordering,
 
 Use the cheap snapshot first:
 
-- `uv run ops progress show studies.stress-ethanol-cipro-growth.status --json`
+- `uv run ops progress show <snapshot-registry-id> --json`
 
 Snapshot answers record-backed questions:
 
@@ -71,7 +72,7 @@ Snapshot answers record-backed questions:
 
 Escalate to preflight when the question is about blockers or readiness:
 
-- `uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --command-timeout-seconds 30 --json`
+- `uv run ops progress show <preflight-registry-id> --scope next --command-timeout-seconds 30 --json`
 
 Preflight answers readiness questions:
 

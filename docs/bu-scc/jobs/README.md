@@ -2,7 +2,7 @@
 doc_id: bu-scc-job-templates
 surface: ops-runbook
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-09
 ---
 
 ## BU SCC job templates
@@ -12,24 +12,20 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-cpu.qsub`: DenseGen CPU batch run
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
-- `eco1-proteinmpnn-generation-policy.qsub`: Eco1 ProteinMPNN v3 generation-policy array run
-- `eco1-colabfold-foldcheck.qsub`: Eco1 fold-check ColabFold smoke/full run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
 ### Quick start
 
-Use project (`-P`) and runtime/config overrides at submit time for reusable
-templates. The Eco1 ColabFold fold-check template is study-specific and pins
-`#$ -P dunlop` so the SCC smoke/full runs fail fast under the intended project.
-Set the operator-specific values once before using the examples below:
+Use project (`-P`) and runtime/config overrides at submit time. Set the
+operator-specific values once before using the examples below:
 
 ```bash
 export SCC_USER="<scc_login>"
 export SCC_PROJECT_ROOT="/project/<project>/${SCC_USER}"
 export SCC_PROJECTNB_ROOT="/projectnb/<project>/${SCC_USER}"
 export SCC_LOG_ROOT="${SCC_PROJECT_ROOT}/dnadesign-sge-logs"
-mkdir -p "$SCC_LOG_ROOT" "${SCC_LOG_ROOT}/eco1-rt-repack"
+mkdir -p "$SCC_LOG_ROOT"
 ```
 
 ```bash
@@ -46,14 +42,6 @@ qsub -P <project> \
   -o "${SCC_LOG_ROOT}/evo2-infer.\$JOB_ID.out" \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
-qsub -t 1 \
-  -o "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
-qsub \
-  -o "${SCC_LOG_ROOT}/eco1-rt-repack/colabfold.\$JOB_ID.out" \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH="${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch",COLABFOLD_EXTRA_ARGS='--num-models 1' \
-  docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 qsub -P <project> \
   -o "${SCC_LOG_ROOT}/permuter-evaluate.\$JOB_ID.out" \
   -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with smoke:placeholder:log_likelihood' \
@@ -172,7 +160,8 @@ Before first submit on a host, run deterministic environment bootstrap:
 
 ### Study-owned HPC jobs
 
-Study-specific scheduler scripts and instructions belong with the external study workspace. Public templates in this directory cover reusable dnadesign tool surfaces only.
+Study-specific scheduler scripts and instructions belong with the external
+study workspace. This directory contains reusable dnadesign templates only.
 
 ### Permuter evaluate submissions
 
