@@ -156,6 +156,9 @@ def test_annealed_fragment_map_draws_every_declared_domain_pair() -> None:
         complement = str.maketrans("ACGT", "TGCA")
         for fragment in payload["geometry"]["fragments"]:
             fragment_id = fragment["fragment_id"]
+            domain_start = fragment["domain_span"]["start"]
+            domain_end = fragment["domain_span"]["end"]
+            expected_domain = payload["target"]["sequence_5to3"][domain_start:domain_end]
             top = _base_map(
                 _base_artists(figure.axes[0], f"junction-annealed:{fragment_id}:top"),
                 coordinate=0,
@@ -167,12 +170,18 @@ def test_annealed_fragment_map_draws_every_declared_domain_pair() -> None:
             pairs = next(
                 item for item in pair_collections if item.get_gid() == f"junction-annealed:{fragment_id}:watson-crick"
             )
+            paired_top: list[str] = []
+            paired_bottom: list[str] = []
             for segment in pairs.get_segments():
                 top_x = round(segment[0][0], 12)
                 bottom_x = round(segment[1][0], 12)
                 assert top_x == bottom_x
                 assert top_x in top and bottom_x in bottom
                 assert top[top_x].translate(complement) == bottom[bottom_x]
+                paired_top.append(top[top_x])
+                paired_bottom.append(bottom[bottom_x])
+            assert "".join(paired_top) == expected_domain
+            assert "".join(paired_bottom) == expected_domain.translate(complement)
     finally:
         plt.close(figure)
 
