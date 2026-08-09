@@ -164,16 +164,21 @@ summary: Run the local procedure.
     entry_point = SimpleNamespace(
         name="research-studies",
         value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
+        dist=SimpleNamespace(name="research-studies"),
         load=lambda: lambda: (metadata_path,),
     )
     monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
     monkeypatch.setattr(
         provider_sources,
         "find_spec",
-        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+        lambda module: SimpleNamespace(
+            submodule_search_locations=None,
+            origin=str(package_root / "integrations" / "dnadesign_ops.py"),
+        ),
     )
 
     sources = provider_sources.discover_external_catalog_registry_sources()
+    assert sources[0].provider_id == "research-studies:research-studies"
     procedures, relations = metadata.load_catalog_procedures(
         repo_root=tmp_path / "dnadesign",
         catalog_path=catalog_path,
@@ -221,6 +226,91 @@ summary: Demo procedure.
         )
 
 
+def test_catalog_order_scope_uses_provider_identity_not_package_root(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "catalog" / "README.md"
+    _write(catalog_path, "# Runbooks\n")
+    shared_root = tmp_path / "shared_namespace"
+    sources: list[provider_sources.CatalogRegistrySource] = []
+    for provider_id, registry_id in (("dist-a:provider-a", "a.status"), ("dist-b:provider-b", "b.status")):
+        doc_path = shared_root / provider_id.split(":", 1)[1] / "status.md"
+        metadata_path = doc_path.with_suffix(".registry.yaml")
+        _write(doc_path, f"# {registry_id}\n")
+        _write(
+            metadata_path,
+            f"""
+schema_version: 1
+catalog_order: 4
+registry_id: {registry_id}
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: record
+exit_artifact: status
+execution_kind: iterative
+status_kind: demo-status
+summary: Provider status.
+""",
+        )
+        sources.append(
+            provider_sources.CatalogRegistrySource(
+                provider_id=provider_id,
+                path=metadata_path,
+                package_root=shared_root,
+            )
+        )
+
+    procedures, _ = metadata.load_catalog_procedures(
+        repo_root=tmp_path,
+        catalog_path=catalog_path,
+        metadata_paths=(),
+        external_sources=tuple(sources),
+    )
+
+    assert [entry.registry_id for entry in procedures] == ["a.status", "b.status"]
+
+
+def test_one_provider_cannot_reuse_order_across_package_roots(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "catalog" / "README.md"
+    _write(catalog_path, "# Runbooks\n")
+    sources: list[provider_sources.CatalogRegistrySource] = []
+    for index in (1, 2):
+        package_root = tmp_path / f"namespace-root-{index}"
+        doc_path = package_root / "status.md"
+        metadata_path = doc_path.with_suffix(".registry.yaml")
+        _write(doc_path, f"# Provider status {index}\n")
+        _write(
+            metadata_path,
+            f"""
+schema_version: 1
+catalog_order: 4
+registry_id: provider.status-{index}
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: record
+exit_artifact: status
+execution_kind: iterative
+status_kind: demo-status
+summary: Provider status.
+""",
+        )
+        sources.append(
+            provider_sources.CatalogRegistrySource(
+                provider_id="one-dist:one-provider",
+                path=metadata_path,
+                package_root=package_root,
+            )
+        )
+
+    with pytest.raises(ValueError, match="duplicate catalog_order within one registry provider"):
+        metadata.load_catalog_procedures(
+            repo_root=tmp_path,
+            catalog_path=catalog_path,
+            metadata_paths=(),
+            external_sources=tuple(sources),
+        )
+
+
 def test_external_catalog_registry_entry_point_rejects_path_outside_package(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -232,13 +322,17 @@ def test_external_catalog_registry_entry_point_rejects_path_outside_package(
     entry_point = SimpleNamespace(
         name="research-studies",
         value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
+        dist=SimpleNamespace(name="research-studies"),
         load=lambda: lambda: (external_metadata,),
     )
     monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
     monkeypatch.setattr(
         provider_sources,
         "find_spec",
-        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+        lambda module: SimpleNamespace(
+            submodule_search_locations=None,
+            origin=str(package_root / "integrations" / "dnadesign_ops.py"),
+        ),
     )
 
     with pytest.raises(ValueError, match="path must stay under its entry-point package"):

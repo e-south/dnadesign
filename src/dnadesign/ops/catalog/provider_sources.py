@@ -25,6 +25,7 @@ _CATALOG_REGISTRY_ENTRY_POINT_GROUP = "dnadesign.ops.catalog_registries"
 class CatalogRegistrySource:
     """One provider-owned procedure sidecar and its package root."""
 
+    provider_id: str
     path: Path
     package_root: Path
 
@@ -39,7 +40,8 @@ def discover_external_catalog_registry_sources() -> tuple[CatalogRegistrySource,
         loader = entry_point.load()
         if not callable(loader):
             raise ValueError(f"catalog registry entry point must resolve to a callable: {entry_point.name}")
-        package_roots = _entry_point_package_roots(entry_point=entry_point)
+        provider_id = _entry_point_provider_id(entry_point=entry_point)
+        package_root = _entry_point_package_root(entry_point=entry_point)
         raw_paths = loader()
         if isinstance(raw_paths, (str, Path)):
             raw_paths = (raw_paths,)
@@ -51,35 +53,54 @@ def discover_external_catalog_registry_sources() -> tuple[CatalogRegistrySource,
                 raise ValueError(
                     f"catalog registry entry point returned an invalid metadata path: {entry_point.name}: {path}"
                 )
-            package_root = next((root for root in package_roots if path.is_relative_to(root)), None)
-            if package_root is None:
+            if not path.is_relative_to(package_root):
                 raise ValueError(
                     "catalog registry path must stay under its entry-point package: "
-                    f"{entry_point.name}: {path} package_roots={package_roots}"
+                    f"{entry_point.name}: {path} package_root={package_root}"
                 )
             if path in seen_paths:
                 raise ValueError(f"catalog registry path registered more than once: {path}")
             seen_paths.add(path)
-            sources.append(CatalogRegistrySource(path=path, package_root=package_root))
+            sources.append(CatalogRegistrySource(provider_id=provider_id, path=path, package_root=package_root))
     return tuple(sources)
 
 
-def _entry_point_package_roots(*, entry_point: EntryPoint) -> tuple[Path, ...]:
+def _entry_point_provider_id(*, entry_point: EntryPoint) -> str:
     module_name = entry_point.value.partition(":")[0].strip()
-    top_level_package = module_name.partition(".")[0]
-    if not top_level_package:
+    distribution = getattr(entry_point, "dist", None)
+    owner = str(getattr(distribution, "name", "") or module_name.partition(".")[0]).strip()
+    if not owner:
+        raise ValueError(f"catalog registry entry point has no provider identity: {entry_point.name}")
+    return f"{owner}:{entry_point.name}"
+
+
+def _entry_point_package_root(*, entry_point: EntryPoint) -> Path:
+    module_name = entry_point.value.partition(":")[0].strip()
+    module_parts = tuple(part for part in module_name.split(".") if part)
+    if not module_parts:
         raise ValueError(f"catalog registry entry point has no import package: {entry_point.name}")
-    spec = find_spec(top_level_package)
+    spec = find_spec(module_name)
     if spec is None:
+        raise ValueError(f"catalog registry entry-point module cannot be resolved: {entry_point.name}: {module_name}")
+    origin = getattr(spec, "origin", None)
+    if not origin or origin in {"built-in", "frozen"}:
         raise ValueError(
-            f"catalog registry entry-point package cannot be resolved: {entry_point.name}: {top_level_package}"
+            f"catalog registry entry point must resolve to a package file: {entry_point.name}: {module_name}"
         )
-    search_locations = tuple(spec.submodule_search_locations or ())
-    if search_locations:
-        return tuple(sorted({Path(location).expanduser().resolve() for location in search_locations}))
-    raise ValueError(
-        f"catalog registry entry point must belong to an import package: {entry_point.name}: {top_level_package}"
-    )
+    package_root = Path(origin).expanduser().resolve().parent
+    is_package = bool(getattr(spec, "submodule_search_locations", None))
+    parent_steps = len(module_parts) - (1 if is_package else 2)
+    if parent_steps < 0:
+        raise ValueError(
+            f"catalog registry entry point must belong to an import package: {entry_point.name}: {module_name}"
+        )
+    for _ in range(parent_steps):
+        package_root = package_root.parent
+    if package_root.name != module_parts[0]:
+        raise ValueError(
+            f"catalog registry package root is ambiguous: {entry_point.name}: {module_name}: {package_root}"
+        )
+    return package_root
 
 
 __all__ = ["CatalogRegistrySource", "discover_external_catalog_registry_sources"]
