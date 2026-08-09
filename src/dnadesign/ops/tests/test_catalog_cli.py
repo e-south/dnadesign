@@ -123,8 +123,11 @@ def test_external_catalog_registry_entry_point_is_owner_confined(
     package_root = tmp_path / "research_studies"
     doc_path = package_root / "studies" / "demo" / "operations" / "catalog" / "contracts" / "status.md"
     metadata_path = doc_path.parent / "registry" / "status.registry.yaml"
+    local_doc_path = tmp_path / "dnadesign" / "docs" / "operations" / "local.md"
+    local_metadata_path = local_doc_path.with_name("local.registry.yaml")
     catalog_path = tmp_path / "dnadesign" / "docs" / "runbooks" / "README.md"
     _write(doc_path, "# Demo Study Status\n")
+    _write(local_doc_path, "# Local Procedure\n")
     _write(catalog_path, "# Runbooks\n")
     _write(
         metadata_path,
@@ -140,6 +143,22 @@ exit_artifact: demo status
 execution_kind: iterative
 status_kind: demo-status
 summary: Read the demo study status.
+""",
+    )
+    _write(
+        local_metadata_path,
+        """
+schema_version: 1
+catalog_order: 55
+registry_id: ops.local.procedure
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: local request
+exit_artifact: local result
+execution_kind: executable
+status_kind: local-status
+summary: Run the local procedure.
 """,
     )
     entry_point = SimpleNamespace(
@@ -158,13 +177,48 @@ summary: Read the demo study status.
     procedures, relations = metadata.load_catalog_procedures(
         repo_root=tmp_path / "dnadesign",
         catalog_path=catalog_path,
-        metadata_paths=(),
+        metadata_paths=(local_metadata_path,),
         external_sources=sources,
     )
 
-    assert procedures[0].registry_id == "studies.demo.status"
-    assert Path(catalog_path.parent, procedures[0].doc_path).resolve() == doc_path.resolve()
-    assert relations == {"studies.demo.status": ()}
+    assert [entry.registry_id for entry in procedures] == ["ops.local.procedure", "studies.demo.status"]
+    external = next(entry for entry in procedures if entry.registry_id == "studies.demo.status")
+    assert Path(catalog_path.parent, external.doc_path).resolve() == doc_path.resolve()
+    assert relations == {"ops.local.procedure": (), "studies.demo.status": ()}
+
+
+def test_catalog_order_remains_unique_within_one_provider(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(catalog_path, "# Runbooks\n")
+    metadata_paths: list[Path] = []
+    for registry_id in ("demo.first", "demo.second"):
+        doc_path = tmp_path / "docs" / "operations" / f"{registry_id}.md"
+        metadata_path = doc_path.with_suffix(".registry.yaml")
+        _write(doc_path, f"# {registry_id}\n")
+        _write(
+            metadata_path,
+            f"""
+schema_version: 1
+catalog_order: 7
+registry_id: {registry_id}
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: request
+exit_artifact: result
+execution_kind: executable
+status_kind: demo-status
+summary: Demo procedure.
+""",
+        )
+        metadata_paths.append(metadata_path)
+
+    with pytest.raises(ValueError, match="duplicate catalog_order within one registry provider"):
+        metadata.load_catalog_procedures(
+            repo_root=tmp_path,
+            catalog_path=catalog_path,
+            metadata_paths=tuple(metadata_paths),
+        )
 
 
 def test_external_catalog_registry_entry_point_rejects_path_outside_package(

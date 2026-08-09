@@ -99,12 +99,14 @@ def load_catalog_procedures(
 
     unsorted_entries: list[CatalogProcedureEntry] = []
     unsorted_relations: dict[str, tuple[CatalogProcedureRelation, ...]] = {}
-    orders_by_value: dict[int, str] = {}
+    orders_by_provider: dict[Path, dict[int, str]] = {}
     sources = (
         *(CatalogRegistrySource(path=path, package_root=repo_root) for path in metadata_paths),
         *external_sources,
     )
     for source in sources:
+        provider_root = source.package_root.expanduser().resolve()
+        orders_by_value = orders_by_provider.setdefault(provider_root, {})
         entry, relations = _load_registry_metadata_file(
             metadata_path=source.path,
             repo_root=source.package_root,
@@ -113,8 +115,9 @@ def load_catalog_procedures(
         existing_registry_id = orders_by_value.get(entry.catalog_order)
         if existing_registry_id is not None:
             raise ValueError(
-                "duplicate catalog_order in registry metadata: "
-                f"{entry.catalog_order} used by both {existing_registry_id} and {entry.registry_id}"
+                "duplicate catalog_order within one registry provider: "
+                f"{entry.catalog_order} used by both {existing_registry_id} and {entry.registry_id} "
+                f"under {provider_root}"
             )
         orders_by_value[entry.catalog_order] = entry.registry_id
         unsorted_entries.append(entry)
