@@ -46,6 +46,17 @@ def _add_break(axis, *, x: float, y: float, gid: str) -> None:
         axis.add_line(mark)
 
 
+def junction_detail_base_glyph_count(review: ThreeWayJunctionReviewV1, index: int) -> int:
+    """Count the per-base text artists required by one local detail view."""
+
+    junction = review.geometry.junctions[index]
+    left_fragment = review.geometry.fragments[index]
+    right_fragment = review.geometry.fragments[index + 1]
+    left_bases = min(_CONTEXT_BASES, junction.toehold_span.start - left_fragment.domain_span.start)
+    right_bases = min(_CONTEXT_BASES, right_fragment.domain_span.end - junction.toehold_span.end)
+    return 2 * (left_bases + len(junction.toehold) + right_bases + len(junction.barcode))
+
+
 def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> None:
     """Draw one exact, sequence-derived three-arm interface."""
 
@@ -244,4 +255,4 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
     axis.text(-0.96, -0.86, safe_identifier(junction.junction_id), fontsize=5.0, color=MUTED, va="bottom")
 
 
-__all__ = ["draw_junction_detail"]
+__all__ = ["draw_junction_detail", "junction_detail_base_glyph_count"]

@@ -42,7 +42,9 @@ directories use mode `0700`; files use mode `0600`.
 Target selection uses BaseRender's normal selection CSV. Fragment and junction
 selection belongs in `render.options`; it is not visual style. Unknown options,
 unknown IDs, duplicate IDs, and unsafe canvas sizes fail before figure
-allocation.
+allocation. A detail view also rejects any junction that would require more
+than 512 base glyphs; exact longer sequences remain available in the source
+record without forcing Matplotlib to allocate an unbounded number of artists.
 
 The fragment map prints exact bases, strand ends, junction spans, and declared
 Watson–Crick edges. The target overview is intentionally symbolic. The junction

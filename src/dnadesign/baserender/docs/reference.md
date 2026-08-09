@@ -157,6 +157,7 @@ Renderer families:
   - requires explicit `fragment_ids` when a target has more than 18 fragments
 - `junction_three_way_assembly`
   - draws either a target-scale interface overview or one to eight explicitly selected nucleotide-level three-way junctions
+  - rejects a selected detail above 512 base glyphs before figure allocation
   - reports thermodynamic screening as `not_run`; it does not infer folding or experimental outcomes
 
 Shared cross-tool contract models live under `dnadesign.contracts.visual`. Cruncher and other producers publish those contracts; BaseRender parses them and adapts them to `Record`.

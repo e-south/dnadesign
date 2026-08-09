@@ -35,12 +35,13 @@ from .junction_review_common import (
     selected_ids,
     validate_figure_size,
 )
-from .junction_three_way_detail import draw_junction_detail
+from .junction_three_way_detail import draw_junction_detail, junction_detail_base_glyph_count
 from .palette import Palette
 
 _RENDERER = "junction_three_way_assembly"
 _FIGURE_WIDTH = 15.2
 _MAX_DETAIL_JUNCTIONS = 8
+_MAX_DETAIL_BASE_GLYPHS_PER_JUNCTION = 512
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +85,17 @@ def _detail_size(style: Style, count: int) -> tuple[float, float]:
         width=_FIGURE_WIDTH,
         height=1.15 + math.ceil(count / 2) * 4.0,
     )
+
+
+def _validate_detail_workload(review: ThreeWayJunctionReviewV1, indices: tuple[int, ...]) -> None:
+    for index in indices:
+        count = junction_detail_base_glyph_count(review, index)
+        if count > _MAX_DETAIL_BASE_GLYPHS_PER_JUNCTION:
+            junction_id = review.geometry.junctions[index].junction_id
+            raise SchemaError(
+                f"{_RENDERER} junction {junction_id!r} requires {count} base glyphs; "
+                f"the per-junction limit is {_MAX_DETAIL_BASE_GLYPHS_PER_JUNCTION}"
+            )
 
 
 def _draw_overview(axis, review: ThreeWayJunctionReviewV1) -> None:
@@ -166,7 +178,10 @@ class JunctionThreeWayAssemblyRenderer:
         options: Mapping[str, object] | None = None,
     ) -> None:
         _ = palette
-        resolved = _resolve_options(review_from_record(record), options)
+        review = review_from_record(record)
+        resolved = _resolve_options(review, options)
+        if resolved.view == "junction_detail":
+            _validate_detail_workload(review, resolved.junction_indices)
         _overview_size(style) if resolved.view == "overview" else _detail_size(style, len(resolved.junction_indices))
 
     def render(
@@ -185,6 +200,7 @@ class JunctionThreeWayAssemblyRenderer:
             figure.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
             return figure
 
+        _validate_detail_workload(review, resolved.junction_indices)
         count = len(resolved.junction_indices)
         rows = math.ceil(count / 2)
         figure, axes = plt.subplots(rows, 2, figsize=_detail_size(style, count), dpi=style.dpi, squeeze=False)

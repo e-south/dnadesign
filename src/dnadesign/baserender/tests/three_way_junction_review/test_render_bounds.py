@@ -111,6 +111,24 @@ def test_detail_preserves_every_junction_base_and_pairing_edge() -> None:
         plt.close(figure)
 
 
+def test_detail_rejects_excessive_base_glyphs_before_figure_allocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _payload_with_long_junction_sequences(toehold_length=120, barcode_length=150)
+    junction = payload["geometry"]["junctions"][0]  # type: ignore[index]
+
+    def fail_if_allocated(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("oversized detail workload must reject before figure allocation")
+
+    monkeypatch.setattr(assembly_renderer.plt, "subplots", fail_if_allocated)
+    with pytest.raises(baserender.SchemaError, match="requires 564 base glyphs; the per-junction limit is 512"):
+        baserender.render(
+            _adapt_payload(payload),
+            renderer="junction_three_way_assembly",
+            options={"view": "junction_detail", "junction_ids": [junction["junction_id"]]},
+        )
+
+
 def test_annealed_map_requires_fragment_selection_before_large_allocation() -> None:
     payload = _payload_with_many_junctions(junction_count=20)
     record = _adapt_payload(payload)

@@ -298,13 +298,17 @@ def _payload_with_long_recovery_primers() -> dict[str, object]:
     return payload
 
 
-def _payload_with_long_junction_sequences() -> dict[str, object]:
+def _payload_with_long_junction_sequences(
+    *,
+    toehold_length: int = 100,
+    barcode_length: int = 100,
+) -> dict[str, object]:
     payload = _payload_with_long_recovery_primers()
     target = payload["target"]["sequence_5to3"]
-    toehold_start = 70
-    toehold_end = 170
+    toehold_start = (len(target) - toehold_length) // 2
+    toehold_end = toehold_start + toehold_length
     toehold = target[toehold_start:toehold_end]
-    barcode = ("AACCGGTT" * 13)[:100]
+    barcode = ("AACCGGTT" * ((barcode_length + 7) // 8))[:barcode_length]
     payload["geometry"]["fragments"] = [
         {
             "fragment_id": "fragment-01",
