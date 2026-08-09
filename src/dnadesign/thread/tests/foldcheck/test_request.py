@@ -118,8 +118,8 @@ def test_foldcheck_request_hash_is_portable_across_local_paths(tmp_path: Path) -
         **common_kwargs,
     )
     scc_manifest = build_foldcheck_request_manifest(
-        input_fasta_path=Path("/project/dunlop/esouth/dnadesign/input.fasta"),
-        output_root=Path("/project/dunlop/esouth/foldcheck/outputs"),
+        input_fasta_path=Path("/project/example/dnadesign/input.fasta"),
+        output_root=Path("/project/example/foldcheck/outputs"),
         **common_kwargs,
     )
 

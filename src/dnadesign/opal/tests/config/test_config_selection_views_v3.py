@@ -205,7 +205,7 @@ def test_v2_shape_is_rejected_without_compatibility_path(tmp_path: Path) -> None
         (
             {
                 "owner_scope": "opal_demo",
-                "study_id": "stress_ethanol_cipro_growth",
+                "study_id": "example_study",
                 "portable": True,
             },
             "opal_demo.*study_id",
@@ -247,8 +247,8 @@ def test_v3_rejects_incoherent_campaign_ownership(tmp_path: Path, ownership: dic
         {"owner_scope": "opal_demo", "portable": True},
         {
             "owner_scope": "study_campaign",
-            "study_id": "stress_ethanol_cipro_growth",
-            "dataset_id": "usr_prom_eth_cip_opal_candidates",
+            "study_id": "example_study",
+            "dataset_id": "example_candidates",
             "portable": False,
         },
     ],

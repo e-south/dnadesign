@@ -10,7 +10,7 @@ LatentDNA compares learned sequence representations and turns those comparisons 
 - [Workspace schema](docs/reference/workspace-schema.md): `latentdna.workspace.v1` core config shape.
 - [Workspace snapshot contract](docs/reference/workspace-snapshot-contract.md): study-facing status surface.
 - [Artifact naming grammar](docs/reference/artifact-naming.md): canonical representation, scope, and deliverable naming.
-- [Stress ethanol/cipro representation comparison workflow](docs/workflows/stress-ethanol-cipro-representation-comparison.md): active stress study comparison path.
 - [Context-geometry workflow](docs/workflows/context-shift.md): paired anchor-versus-full-context geometry metrics.
 - [Cross-view agreement workflow](docs/workflows/cross-view-agreement.md): structural agreement diagnostics outside the promoter-study path.
+- [External study workspaces](../../../docs/integrations/study-workspaces.md): bind a private study without copying its policy into LatentDNA.
 - [Repository docs index](../../../docs/README.md): repo-wide upstream and downstream handoff index.

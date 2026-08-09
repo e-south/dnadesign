@@ -1,9 +1,0 @@
-version: 1
-path_base: repo
-campaign_id: rt_lnrna_sponging_construct_triage
-steps:
-  - label: latentdna-rt-lnrna-representation-review
-    registry_id: latentdna.workspace.review
-    inputs:
-      workspace: repo:src/dnadesign/latentdna/workspaces/rt_lnrna_sponging_construct_triage/config.yaml
-      dataset: rt_lnrna_sponging_construct_triage_construct_contexts_2000bp_v1

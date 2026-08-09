@@ -793,7 +793,7 @@ def test_discover_dnadesign_data_promoter_association_sources_fails_fast_when_re
 
 
 def test_export_dnadesign_data_promoter_superset_accounts_for_real_missing_sequence_rows(tmp_path) -> None:
-    data_root = Path("/Users/Shockwing/Dropbox/projects/phd/dnadesign-data")
+    data_root = Path("/path/to/dnadesign-data")
     if not (data_root / "sources/databases/regulondb/13.0/promoters/PromoterSet.tsv").exists():
         pytest.skip("sibling dnadesign-data checkout is not available")
     sys.path.insert(0, str(data_root / "src"))

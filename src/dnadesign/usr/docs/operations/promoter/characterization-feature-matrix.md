@@ -11,12 +11,9 @@
 **Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+**Last verified:** 2026-08-09
 
 Use this runbook when promoter candidates come from multiple USR-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
-
-If you still need to choose between source assembly, construct expansion, and feature extraction, start with [Promoter study Evo2 workflow journey](evo2-journey.md) first.
-If you need a maintained answer to "where is this real study right now?", keep the companion [Stress ethanol/cipro status contract](../../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md) next to the active study manifest and affiliated-dataset registry.
 
 Use this runbook to:
 
@@ -110,12 +107,6 @@ After construct materializes the expanded context dataset, set:
 ```bash
 export FEATURE_DATASET="multi_source_construct_truth_demo" # Reuse the construct-backed dataset as the infer target plane.
 ```
-
-For the live `stress_ethanol_cipro_growth` study, keep the study-owned source
-datasets explicit:
-
-- `densegen_prom_eth_cip_source` and `usr_promoter_references` are separate source datasets until the USR merge step is complete
-- if the study needs pDual-backed contexts, merge in USR first, then point Construct at that merged source dataset while keeping `usr_pdual10_plasmid_template` as the template dataset
 
 ### 4) Define the infer job matrix explicitly
 

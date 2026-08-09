@@ -29,13 +29,13 @@ For `scheduler_queue` checks, “probe unavailable” includes missing scheduler
 ### Where these checks come from
 
 - the vocabulary is declared by OPS generic preflight code
-- each study chooses which checks to run by declaring them in `docs/studies/<study-id>/operations/ops.study.yaml`
+- each external study chooses which checks to run in its own
+  `operations/ops.study.yaml`
 - blocker semantics come from the checked-in study contract too: `required: true`
   makes a failing check eligible to block the next action, while `required:
   false` keeps the failure visible as advisory-only evidence
 - snapshot surfaces stay record-backed; these checks belong to execution-readiness surfaces
 
-For `stress_ethanol_cipro_growth`, the default notify-enabled Infer batch route
-marks notify environment, notify profile/event resolution, and notify-enabled
-runbook-plan checks as `required: true` so the preflight surface reports strict
-submit-readiness instead of "ready with advisories."
+Study-owned checks may be stricter than the generic vocabulary. Their provider
+must keep those rules in the study package and expose only the resulting typed
+status through OPS.

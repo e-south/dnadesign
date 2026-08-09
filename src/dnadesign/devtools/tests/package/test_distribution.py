@@ -24,6 +24,8 @@ _DISTRIBUTION_EXCLUDES = [
     "dnadesign.archived.*",
     "dnadesign.prototypes",
     "dnadesign.prototypes.*",
+    "dnadesign.studies",
+    "dnadesign.studies.*",
     "dnadesign.usr.archived",
     "dnadesign.usr.archived.*",
     "dnadesign.usr.datasets.usr_regulondb_native_promoters",
@@ -34,12 +36,6 @@ _DISTRIBUTION_EXCLUDES = [
     "dnadesign.densegen.workspaces.*.outputs.notebooks.*",
     "dnadesign.latentdna.workspaces.*.outputs.notebooks",
     "dnadesign.latentdna.workspaces.*.outputs.notebooks.*",
-    "dnadesign.studies.units.*.workspaces.*.outputs.*.notebooks",
-    "dnadesign.studies.units.*.workspaces.*.outputs.*.notebooks.*",
-    "dnadesign.studies.units.*.workbench.outputs",
-    "dnadesign.studies.units.*.workbench.outputs.*",
-    "dnadesign.studies.units.*.workbench.source_evidence.*.notebooks",
-    "dnadesign.studies.units.*.workbench.source_evidence.*.notebooks.*",
 ]
 _DISTRIBUTION_DATA_EXCLUDES = [
     "reader_spop_*.parquet",
@@ -56,24 +52,18 @@ _EXCLUDED_PACKAGE_SENTINELS = {
     "dnadesign.opal.campaigns.demo.notebooks",
     "dnadesign.densegen.workspaces.demo.outputs.notebooks",
     "dnadesign.latentdna.workspaces.demo.outputs.notebooks",
-    "dnadesign.studies.units.demo.workspaces.demo.outputs.review.notebooks",
-    "dnadesign.studies.units.demo.workbench.outputs.review",
-    "dnadesign.studies.units.demo.workbench.source_evidence.legacy.notebooks",
 }
 _RETAINED_PACKAGE_SENTINELS = {
     "dnadesign.opal.campaigns.demo.notebooks_api",
     "dnadesign.densegen.workspaces.demo.outputs.notebooks_api",
     "dnadesign.latentdna.workspaces.demo.outputs.notebooks_api",
-    "dnadesign.studies.units.demo.workspaces.demo.outputs.review.notebooks_api",
-    "dnadesign.studies.units.demo.workbench.outputs_api",
-    "dnadesign.studies.units.demo.workbench.source_evidence.legacy.notebooks_api",
 }
 _REQUIRED_WHEEL_MEMBERS = {
     "dnadesign/baserender/styles/style_v1/presentation_default.yaml",
     "dnadesign/junction/docs/assets/gene-scale-review.svg",
     "dnadesign/junction/examples/gene-scale/request.yaml",
     "dnadesign/opal/campaigns/demo_gp_topn/configs/campaign.yaml",
-    "dnadesign/opal/campaigns/demo_rf_sfxi_topn/records.parquet",
+    "dnadesign/opal/campaigns/_fixtures/scalar-regression/records.parquet",
     "dnadesign/usr/datasets/registry.yaml",
 }
 _FORBIDDEN_WHEEL_PREFIXES = (
@@ -81,6 +71,7 @@ _FORBIDDEN_WHEEL_PREFIXES = (
     "dnadesign/prototypes/",
     "dnadesign/usr/archived/",
     "dnadesign/usr/datasets/usr_regulondb_native_promoters/",
+    "dnadesign/studies/",
 )
 
 

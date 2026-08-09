@@ -1,9 +1,14 @@
-# Getting started
+---
+doc_id: junction-getting-started
+title: Getting started with junction
+type: tutorial
+audience: first-time users
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Type:** tutorial
-**Audience:** first-time users
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+# Getting started
 
 This tutorial publishes and verifies one synthetic 705 bp target. The request
 uses 96 nt nominal fragment geometry, 22 nt barcodes, 10 nt toeholds, and a
@@ -89,9 +94,11 @@ Start with:
 3. `orders/oligos.tsv` for complete vendor-neutral sequences; and
 4. `views/three_way_junction_review.v1.json` for one review record per target.
 
-Render that last artifact with [BaseRender](../../baserender/docs/integrations/junction.md) to see
-the input oligos, annealed junction assignments, declared recovery product,
-and software checks in one row.
+Render that last artifact with
+[BaseRender](../../baserender/docs/integrations/junction.md) to inspect every
+displayed nucleotide, its aligned complement, fragment and toehold boundaries,
+barcode duplexes, and complete oligo and primer orders. Read search receipts
+and check states in the JSON bundle rather than inferring them from the image.
 
 A successful verification establishes deterministic string construction and
 file integrity within the documented software checks. It does not establish

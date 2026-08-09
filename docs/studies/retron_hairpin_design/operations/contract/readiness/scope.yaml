@@ -1,8 +1,0 @@
-default_scope: next
-scopes:
-  next:
-    include_tracks:
-    - current_track
-  full:
-    include_tracks:
-    - all

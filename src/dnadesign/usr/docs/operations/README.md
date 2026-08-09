@@ -7,7 +7,7 @@
 **Exit artifact:** USR runbook or downstream handoff route
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-09
 
 Use this index to pick the next dataset, sync, or handoff step.
 
@@ -33,15 +33,11 @@ Use this index to pick the next dataset, sync, or handoff step.
 | Build one construct-backed dataset, then hand it to infer | [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md) |
 | Route Permuter RT-lnRNA (`rt_lnrna`) variants through study-owned construct-subject promotion, Construct context realization, and Infer sidecars | [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md) |
 
-## Promoter study workflows
+## Feature assembly
 
 | Need | Runbook |
 | --- | --- |
-| Bootstrap a fresh thread, recover a missing study record, or find the next study-owned handoff | [../../../../../docs/studies/README.md](../../../../../docs/studies/README.md) |
-| Current study status | [status contract](../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md) |
-| Current study preflight | [preflight contract](../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md) |
-| Build one infer-annotated promoter-study feature dataset, then continue to cluster or prepare OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter/characterization-feature-matrix.md) |
-| Review the full DenseGen/manual/wildtype -> optional Construct -> Infer Evo2 -> Notify/Cluster/OPAL path before choosing one branch | [promoter-evo2-journey.md](promoter/evo2-journey.md) |
+| Build one infer-annotated promoter feature dataset, then continue to Cluster or OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter/characterization-feature-matrix.md) |
 
 ## Validation and drills
 
@@ -67,10 +63,7 @@ Use this index to pick the next dataset, sync, or handoff step.
    [multi-source-shared-dataset-assembly.md](assembly/multi-source-shared-dataset.md),
    [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md),
    [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md)
-4. Promoter study workflows:
-   [promoter-evo2-journey.md](promoter/evo2-journey.md),
-   [status contract](../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md),
-   [preflight contract](../../../../../docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md),
+4. Feature assembly:
    [promoter-characterization-feature-matrix.md](promoter/characterization-feature-matrix.md)
 5. Validation drills:
    [sync-fidelity-drills.md](sync/fidelity-drills.md),

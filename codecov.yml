@@ -47,10 +47,6 @@ component_management:
       name: ops
       paths:
         - src/dnadesign/ops/**
-    - component_id: studies
-      name: studies
-      paths:
-        - src/dnadesign/studies/**
     - component_id: notify
       name: notify
       paths:
@@ -127,6 +123,10 @@ component_management:
       name: junction
       paths:
         - src/dnadesign/junction/**
+    - component_id: msd
+      name: msd
+      paths:
+        - src/dnadesign/msd/**
 
 comment:
   require_changes: true

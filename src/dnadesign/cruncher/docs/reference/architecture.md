@@ -1,7 +1,7 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-09
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13
@@ -111,7 +111,7 @@ The scar-nick workflow is a peer lane, not a Snapback or YIU submode:
 This workflow does not solve cap geometry, assemble Retron MSD products, run
 YIU payload rendering, or create one workspace per hit.
 
-For operator-facing usage, start with [`../guides/scar_nick_workflow.md`](../guides/scar_nick_workflow.md) and the checked-in [`scar_nick_teto` runbook](../../workspaces/scar_nick_teto/runbook.md). For module ownership, use the [`scar_nick` package map](../../src/scar_nick/README.md).
+For operator-facing usage, start with [`../guides/scar_nick_workflow.md`](../guides/scar_nick_workflow.md). For module ownership, use the [`scar_nick` package map](../../src/scar_nick/README.md).
 
 #### Study lifecycle
 

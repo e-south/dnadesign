@@ -21,7 +21,6 @@ import yaml
 from dnadesign.devtools.docs import checks as docs_checks
 from dnadesign.devtools.docs.banners.catalog import BannerSpec
 from dnadesign.devtools.docs.checks import (
-    _find_active_shared_usr_dataset_id_issues,
     _find_agents_path_reference_issues,
     _find_broken_links,
     _find_cross_tool_doc_metadata_issues,
@@ -32,7 +31,6 @@ from dnadesign.devtools.docs.checks import (
     _find_legacy_contract_surface_doc_issues,
     _find_operational_runbook_path_issues,
     _find_ops_deprecated_semantics_issues,
-    _find_packaged_runbook_variant_issues,
     _find_public_interface_doc_contract_issues,
     _find_readme_tool_catalog_issues,
     _find_repo_local_skill_frontmatter_issues,
@@ -42,9 +40,6 @@ from dnadesign.devtools.docs.checks import (
     _find_shared_usr_dataset_layout_issues,
     _find_shared_utils_path_issues,
     _find_stale_overlay_guard_term_issues,
-    _find_study_execution_source_drift_issues,
-    _find_study_record_doc_issues,
-    _find_study_status_surface_semantics_issues,
     _find_tool_docs_metadata_issues,
     _find_tool_readme_banner_issues,
     _find_tool_readme_structure_issues,
@@ -56,10 +51,7 @@ from dnadesign.ops.catalog import (
     render_catalog_procedure_section,
     render_catalog_tool_source_section,
 )
-from dnadesign.ops.runbooks import (
-    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
-    REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
-)
+from dnadesign.ops.runbooks import REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
 
 VALID_TOOL_BANNER_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180"></svg>\n'
@@ -75,16 +67,6 @@ def _write_changed_files(repo_root: Path, *relative_paths: str) -> Path:
     path = repo_root / "changed-files.txt"
     path.write_text("".join(f"{relative_path}\n" for relative_path in relative_paths), encoding="utf-8")
     return path
-
-
-def _write_required_study_record_files(study_root: Path) -> None:
-    for required_name in (
-        "record/campaign.yaml",
-        "record/datasets.yaml",
-        "record/status.md",
-        "operations/ops.study.yaml",
-    ):
-        _write(study_root / required_name, "placeholder\n")
 
 
 def _git_init(repo_root: Path) -> None:
@@ -281,408 +263,6 @@ def test_broken_link_check_still_flags_body_markdown_links(tmp_path: Path) -> No
     assert broken == [(index_path, "./nope.md")]
 
 
-def test_find_study_record_doc_issues_flags_legacy_router_index_paths(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "`record/campaign.yaml`",
-                "`record/datasets.yaml`",
-                "`record/status.md`",
-                "`operations/ops.study.yaml`",
-                "legacy path: docs/studies/promoter/demo_study/status.md",
-            ]
-        )
-        + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [
-                    {
-                        "study_id": "demo_study",
-                        "record_root": "docs/studies/demo_study",
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-    )
-    _write_required_study_record_files(tmp_path / "docs" / "studies" / "demo_study")
-    _write(tmp_path / "AGENTS.md", "- Promoter study active-study registry: `docs/studies/promoter/index.yaml`\n")
-    _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "AGENTS.md",
-        "- Active promoter-study registry: `docs/studies/promoter/index.yaml`\n",
-    )
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert any("AGENTS.md" in issue and "docs/studies/promoter/index.yaml" in issue for issue in issues)
-    assert any(
-        "src/dnadesign/usr/AGENTS.md" in issue and "docs/studies/promoter/index.yaml" in issue for issue in issues
-    )
-    assert any("AGENTS.md" in issue and "docs/studies/index.yaml" in issue for issue in issues)
-    assert any("docs/studies/README.md" in issue and "docs/studies/promoter/" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_requires_navigable_required_file_references(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "Study records normally include campaign.yaml, datasets.yaml, status.md, and ops.study.yaml.\n",
-    )
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert any("campaign.yaml" in issue and "markdown link or code span" in issue for issue in issues)
-    assert any("datasets.yaml" in issue and "markdown link or code span" in issue for issue in issues)
-    assert any("status.md" in issue and "markdown link or code span" in issue for issue in issues)
-    assert any("ops.study.yaml" in issue and "markdown link or code span" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_accepts_code_span_required_file_references(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "- `record/campaign.yaml`",
-                "- `record/datasets.yaml`",
-                "- `record/status.md`",
-                "- `operations/ops.study.yaml`",
-            ]
-        )
-        + "\n",
-    )
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert not any("missing navigable study-record contract reference" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_rejects_record_root_outside_study_records(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "- `record/campaign.yaml`",
-                "- `record/datasets.yaml`",
-                "- `record/status.md`",
-                "- `operations/ops.study.yaml`",
-            ]
-        )
-        + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [
-                    {
-                        "study_id": "demo_study",
-                        "record_root": "docs/other/demo_study",
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-    )
-    _write_required_study_record_files(tmp_path / "docs" / "other" / "demo_study")
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert any("record_root must live under docs/studies/<study-id>" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_accepts_split_ops_contract_layout(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "- `record/campaign.yaml`",
-                "- `record/datasets.yaml`",
-                "- `record/status.md`",
-                "- `operations/ops.study.yaml`",
-            ]
-        )
-        + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [
-                    {
-                        "study_id": "demo_study",
-                        "record_root": "docs/studies/demo_study",
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-    )
-    study_root = tmp_path / "docs" / "studies" / "demo_study"
-    for required_name in ("record/campaign.yaml", "record/datasets.yaml", "record/status.md"):
-        _write(study_root / required_name, "placeholder\n")
-    _write(study_root / "operations" / "runtime" / "command-groups" / "pipeline.yaml", "version: 1\n")
-    _write(
-        study_root / "operations" / "ops.study.yaml",
-        yaml.safe_dump(
-            {
-                "version": 2,
-                "study_id": "demo_study",
-                "record_sources": {
-                    "pipeline_ref": "manifest:operations/runtime/command-groups/pipeline.yaml",
-                },
-                "parts": {
-                    "lifecycle": "contract/lifecycle/mode.yaml",
-                    "phases": "contract/lifecycle/phases.yaml",
-                    "preflight": "contract/readiness/preflight.yaml",
-                },
-            },
-            sort_keys=False,
-        ),
-    )
-    for part_name in ("lifecycle/mode.yaml", "lifecycle/phases.yaml", "readiness/preflight.yaml"):
-        _write(study_root / "operations" / "contract" / part_name, "{}\n")
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert not any("ops.study.yaml" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_accepts_study_navigation_frontmatter(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "- `record/campaign.yaml`",
-                "- `record/datasets.yaml`",
-                "- `record/status.md`",
-                "- `operations/ops.study.yaml`",
-            ]
-        )
-        + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [{"study_id": "demo_study", "record_root": "docs/studies/demo_study"}],
-            },
-            sort_keys=False,
-        ),
-    )
-    study_root = tmp_path / "docs" / "studies" / "demo_study"
-    _write_required_study_record_files(study_root)
-    _write(
-        study_root / "README.md",
-        "---\n"
-        "doc_id: study-demo\n"
-        "surface: study-root\n"
-        "study_id: demo_study\n"
-        "owner: demo\n"
-        "last_verified: 2026-05-18\n"
-        "first_hop: routes/README.md\n"
-        "---\n\n"
-        "## Demo\n",
-    )
-    _write(
-        study_root / "routes" / "README.md",
-        "---\n"
-        "doc_id: study-demo-routes\n"
-        "surface: study-route-map\n"
-        "study_id: demo_study\n"
-        "owner: demo\n"
-        "last_verified: 2026-05-18\n"
-        "entrypoint: self\n"
-        "---\n\n"
-        "## Demo Routes\n",
-    )
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert not any("frontmatter" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_rejects_missing_study_navigation_frontmatter(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "- `record/campaign.yaml`",
-                "- `record/datasets.yaml`",
-                "- `record/status.md`",
-                "- `operations/ops.study.yaml`",
-            ]
-        )
-        + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [{"study_id": "demo_study", "record_root": "docs/studies/demo_study"}],
-            },
-            sort_keys=False,
-        ),
-    )
-    study_root = tmp_path / "docs" / "studies" / "demo_study"
-    _write_required_study_record_files(study_root)
-    _write(study_root / "README.md", "## Demo\n")
-    _write(study_root / "routes" / "README.md", "## Demo Routes\n")
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert any("YAML frontmatter" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_rejects_oversized_ops_contract_part(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "- `record/campaign.yaml`",
-                "- `record/datasets.yaml`",
-                "- `record/status.md`",
-                "- `operations/ops.study.yaml`",
-            ]
-        )
-        + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [{"study_id": "demo_study", "record_root": "docs/studies/demo_study"}],
-            },
-            sort_keys=False,
-        ),
-    )
-    study_root = tmp_path / "docs" / "studies" / "demo_study"
-    for required_name in ("record/campaign.yaml", "record/datasets.yaml", "record/status.md"):
-        _write(study_root / required_name, "placeholder\n")
-    _write(
-        study_root / "operations" / "ops.study.yaml",
-        yaml.safe_dump(
-            {
-                "version": 2,
-                "study_id": "demo_study",
-                "parts": {
-                    "preflight": "contract/readiness/oversized.yaml",
-                },
-            },
-            sort_keys=False,
-        ),
-    )
-    _write(study_root / "operations" / "contract" / "readiness" / "oversized.yaml", "x:\n" * 181)
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert any("split bulky owner lanes" in issue for issue in issues)
-
-
-def test_find_study_record_doc_issues_rejects_flat_ops_contract_sprawl(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "\n".join(
-            [
-                "- `record/campaign.yaml`",
-                "- `record/datasets.yaml`",
-                "- `record/status.md`",
-                "- `operations/ops.study.yaml`",
-            ]
-        )
-        + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [
-                    {
-                        "study_id": "demo_study",
-                        "record_root": "docs/studies/demo_study",
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-    )
-    study_root = tmp_path / "docs" / "studies" / "demo_study"
-    for required_name in ("record/campaign.yaml", "record/datasets.yaml", "record/status.md"):
-        _write(study_root / required_name, "placeholder\n")
-    _write(study_root / "operations" / "pipeline.yaml", "version: 1\n")
-    _write(
-        study_root / "operations" / "ops.study.yaml",
-        yaml.safe_dump(
-            {
-                "version": 2,
-                "study_id": "demo_study",
-                "record_sources": {
-                    "pipeline_ref": "manifest:operations/pipeline.yaml",
-                },
-                "lifecycle": {},
-                "parts": {
-                    "lifecycle": "lifecycle.yaml",
-                },
-            },
-            sort_keys=False,
-        ),
-    )
-    _write(study_root / "operations" / "lifecycle.yaml", "{}\n")
-
-    issues = _find_study_record_doc_issues(tmp_path)
-
-    assert any("operations/runtime/command-groups/pipeline.yaml" in issue for issue in issues)
-    assert any("parts.lifecycle duplicates an inline lifecycle section" in issue for issue in issues)
-    assert any("operations/contract/" in issue for issue in issues)
-
-
-def test_find_study_status_surface_semantics_issues_rejects_family_routing_terms(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "ARCHITECTURE.md",
-        "Study status adapters are explicit seams. "
-        "Study-family adapters are explicit seams and family routing resolves through "
-        "`src/dnadesign/studies/families/<family>/`.\n",
-    )
-    _write(
-        tmp_path / "docs" / "README.md",
-        "Verify the active study selector, `family`, and `record_root` in the study index.\n",
-    )
-    _write(
-        tmp_path
-        / "docs"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "operations"
-        / "catalog"
-        / "contracts"
-        / "status.md",
-        "The selected study entry must declare `family` and `record_root`.\n",
-    )
-
-    issues = _find_study_status_surface_semantics_issues(tmp_path)
-
-    assert any("Study status adapters" in issue for issue in issues)
-    assert any("Study-family adapters" in issue for issue in issues)
-    assert any("`family`, and `record_root`" in issue for issue in issues)
-    assert any("declare `family` and `record_root`" in issue for issue in issues)
-
-
 def test_find_repo_local_skill_frontmatter_issues_rejects_overlong_description(tmp_path: Path) -> None:
     _write(
         tmp_path / ".agents" / "skills" / "demo-skill" / "SKILL.md",
@@ -705,84 +285,6 @@ def test_find_repo_local_skill_frontmatter_issues_rejects_overlong_description(t
     issues = _find_repo_local_skill_frontmatter_issues(tmp_path)
 
     assert any("frontmatter description length 221/220" in issue for issue in issues)
-
-
-def _write_active_study_datasets(tmp_path: Path, datasets: list[dict[str, object]]) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "index.yaml",
-        yaml.safe_dump(
-            {
-                "version": 1,
-                "active_study_id": "demo_study",
-                "studies": [
-                    {
-                        "study_id": "demo_study",
-                        "record_root": "docs/studies/demo_study",
-                    }
-                ],
-            },
-            sort_keys=False,
-        ),
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "demo_study" / "record" / "datasets.yaml",
-        yaml.safe_dump({"datasets": datasets}, sort_keys=False),
-    )
-
-
-def test_active_shared_usr_dataset_id_check_flags_nested_shared_ids(tmp_path: Path) -> None:
-    _write_active_study_datasets(
-        tmp_path,
-        [
-            {
-                "role": "densegen_anchor",
-                "dataset": "densegen/demo_nested_source",
-                "root_kind": "shared",
-                "status": "present",
-                "sync": {
-                    "remote_dataset": "promoter/demo_anchor",
-                    "remote_root_kind": "shared",
-                },
-            }
-        ],
-    )
-
-    issues = _find_active_shared_usr_dataset_id_issues(tmp_path)
-
-    assert any("densegen/demo_nested_source" in issue for issue in issues)
-    assert any("remote_dataset" in issue and "promoter/demo_anchor" in issue for issue in issues)
-    assert all("Active shared USR dataset IDs must be flat owner-first IDs" in issue for issue in issues)
-    assert all("archived/ is the only special top-level bucket" in issue for issue in issues)
-
-
-def test_active_shared_usr_dataset_id_check_allows_flat_ids_and_archived_bucket(tmp_path: Path) -> None:
-    _write_active_study_datasets(
-        tmp_path,
-        [
-            {
-                "role": "densegen_anchor",
-                "dataset": "densegen_prom_eth_cip_source",
-                "root_kind": "shared",
-                "status": "present",
-                "sync": {
-                    "remote_dataset": "densegen_prom_eth_cip_source",
-                    "remote_root_kind": "shared",
-                },
-            },
-            {
-                "role": "archived_prior_anchor",
-                "dataset": "archived/promoter/prior_anchor",
-                "root_kind": "shared",
-                "status": "archived",
-                "sync": {
-                    "remote_dataset": "archived/promoter/prior_anchor",
-                    "remote_root_kind": "shared",
-                },
-            },
-        ],
-    )
-
-    assert _find_active_shared_usr_dataset_id_issues(tmp_path) == []
 
 
 def test_shared_usr_dataset_layout_check_flags_nested_dataset_roots(tmp_path: Path) -> None:
@@ -1047,6 +549,37 @@ def test_tool_readme_structure_check_accepts_banner_narrative_and_docs_link(tmp_
     issues = _find_tool_readme_structure_issues(tmp_path)
 
     assert issues == []
+
+
+def test_tool_readme_structure_check_accepts_frontmatter_before_banner(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "\n".join(
+            [
+                "---",
+                "doc_id: alpha-package",
+                "owner: maintainers",
+                f"last_verified: {dt.date.today().isoformat()}",
+                "---",
+                "",
+                "![Alpha banner](assets/alpha-banner.svg)",
+                "",
+                "Short narrative overview.",
+                "",
+                "## Documentation",
+                "",
+                "See [docs index](docs/README.md) for workflows and references.",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        VALID_TOOL_BANNER_SVG,
+    )
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "# Alpha docs\n")
+
+    assert _find_tool_readme_structure_issues(tmp_path) == []
 
 
 def test_tool_readme_structure_check_rejects_multi_paragraph_intro(tmp_path: Path) -> None:
@@ -1783,66 +1316,6 @@ def test_find_operational_runbook_path_issues_skips_generated_output_yaml_noise(
     assert issues == []
 
 
-def test_find_packaged_runbook_variant_issues_flags_duration_suffixed_preset(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo_with_notify_6h.yaml",
-        "\n".join(
-            [
-                "runbook:",
-                "  schema_version: 1",
-                "  id: densegen_demo_with_notify_6h",
-                "  workflow_id: densegen_batch_with_notify",
-                "  project: dunlop",
-                "  workspace_root: /tmp/workspace",
-                "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/densegen_demo_with_notify_6h",
-                "  densegen:",
-                "    config: /tmp/workspace/config.yaml",
-                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
-                "  resources:",
-                "    pe_omp: 16",
-                "    h_rt: 06:00:00",
-                "    mem_per_core: 8G",
-            ]
-        )
-        + "\n",
-    )
-
-    issues = _find_packaged_runbook_variant_issues(tmp_path)
-
-    assert any("duration-suffixed operational variants are not allowed in presets" in issue for issue in issues)
-
-
-def test_find_packaged_runbook_variant_issues_allows_base_preset_name(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo_with_notify.yaml",
-        "\n".join(
-            [
-                "runbook:",
-                "  schema_version: 1",
-                "  id: densegen_demo_with_notify",
-                "  workflow_id: densegen_batch_with_notify",
-                "  project: dunlop",
-                "  workspace_root: /tmp/workspace",
-                "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/densegen_demo_with_notify",
-                "  densegen:",
-                "    config: /tmp/workspace/config.yaml",
-                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
-                "  resources:",
-                "    pe_omp: 16",
-                "    h_rt: 08:00:00",
-                "    mem_per_core: 8G",
-            ]
-        )
-        + "\n",
-    )
-
-    issues = _find_packaged_runbook_variant_issues(tmp_path)
-
-    assert issues == []
-
-
 def test_find_shared_utils_path_issues_flags_top_level_utils_package(tmp_path: Path) -> None:
     disallowed_utils_path = tmp_path / "src" / "dnadesign" / "utils"
     disallowed_utils_path.mkdir(parents=True, exist_ok=True)
@@ -1865,7 +1338,7 @@ def test_docs_checks_reuses_ops_path_policy_contract_constants() -> None:
     from dnadesign.devtools.docs import checks as docs_checks
 
     assert docs_checks.TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES == REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
-    assert docs_checks.OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES[0] == PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR
+    assert docs_checks.OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES == (Path("docs/templates"),)
 
 
 def test_find_transient_operational_artifact_path_issues_flags_repo_root_codex_tmp(tmp_path: Path) -> None:
@@ -3015,6 +2488,17 @@ def test_tool_docs_metadata_check_accepts_valid_owner_and_last_verified(tmp_path
     assert issues == []
 
 
+def test_tool_docs_metadata_check_accepts_yaml_frontmatter(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    _write(tmp_path / "src" / "dnadesign" / "alpha" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md",
+        f"---\nowner: maintainers\nlast_verified: {today}\n---\n\n# Alpha docs\n",
+    )
+
+    assert _find_tool_docs_metadata_issues(tmp_path) == []
+
+
 def test_tool_docs_metadata_check_does_not_expire_unchanged_docs(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "alpha" / "__init__.py", "")
     _write(
@@ -3604,24 +3088,11 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
                 "Use `densegen_batch_with_notify_slack`.",
                 "",
                 "The precedents surface remains available.",
+                "Use infer_local_runtime and notify_profile_doctor.",
+                "Read notify.profile.*.details.setup_command after infer_validate_config.",
             ]
         )
         + "\n",
-    )
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "Use infer_local_runtime and notify_profile_doctor in ops.study.yaml.\n",
-    )
-    _write(
-        tmp_path
-        / "docs"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "operations"
-        / "catalog"
-        / "contracts"
-        / "preflight.md",
-        "Read notify.profile.*.details.setup_command after infer_validate_config.\n",
     )
 
     issues = _find_ops_deprecated_semantics_issues(tmp_path)
@@ -3631,29 +3102,6 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
     assert any("infer_local_runtime" in issue for issue in issues)
     assert any("notify_profile_doctor" in issue for issue in issues)
     assert any("details.setup_command" in issue for issue in issues)
-
-
-def test_study_execution_source_drift_check_flags_pipeline_only_claims(tmp_path: Path) -> None:
-    _write(
-        tmp_path / "docs" / "studies" / "README.md",
-        "Use pipeline.yaml as the only source for real Construct, Infer, and runbook paths.\n",
-    )
-    _write(
-        tmp_path
-        / "docs"
-        / "studies"
-        / "stress_ethanol_cipro_growth"
-        / "operations"
-        / "catalog"
-        / "contracts"
-        / "preflight.md",
-        "pipeline.yaml remains the only valid source for exact execution surfaces.\n",
-    )
-
-    issues = _find_study_execution_source_drift_issues(tmp_path)
-
-    assert any("docs/studies/README.md" in issue for issue in issues)
-    assert any("preflight.md" in issue for issue in issues)
 
 
 def test_legacy_contract_surface_docs_check_flags_repo_root_contract_references(tmp_path: Path) -> None:

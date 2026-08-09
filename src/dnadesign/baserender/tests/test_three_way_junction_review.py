@@ -26,6 +26,14 @@ from dnadesign.baserender.src.core import RenderingError
 from dnadesign.baserender.src.outputs.images import write_images
 from dnadesign.baserender.src.outputs.names import _unique_stem
 from dnadesign.baserender.src.outputs.video import write_video
+from dnadesign.baserender.src.render.junction_pairing_layout import review_content_height
+from dnadesign.baserender.src.render.three_way_junction_review import (
+    _draw_junctions,
+    _draw_oligo_orders,
+    _draw_primers,
+    _draw_target,
+)
+from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from .three_way_junction_review.fixtures import (
     _adapt_payload,
@@ -107,27 +115,41 @@ def test_review_image_stems_are_collision_safe_on_case_insensitive_filesystems()
     assert _unique_stem("target-a", used) == "target-a_2"
 
 
-def test_review_renderer_emits_one_semantic_four_panel_figure() -> None:
+def test_review_renderer_emits_one_base_pair_audit_figure() -> None:
     record = _adapt_payload(_payload())
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
-        assert [axis.get_gid() for axis in figure.axes] == [
-            "three-way-junction-review:input-oligos",
-            "three-way-junction-review:annealed-junctions",
-            "three-way-junction-review:recovered-product",
-            "three-way-junction-review:checks",
-        ]
+        assert [axis.get_gid() for axis in figure.axes] == ["three-way-junction-review:base-pair-map"]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
-        assert "universal" in text
-        assert "THERMODYNAMIC SCREENING NOT RUN" in text
-        assert "1 target junction" in text
-        assert "FWD · 4 nt bind + 0 nt 5′ extension" in text
-        assert "REV · 4 nt bind + 0 nt 5′ extension" in text
-        assert "Order previews · digest = SHA-256[:12]" in text
-        assert "AAAA" not in text
-        assert "AA…A" in text
+        assert "Target duplex" in text
+        assert "A A A A C C C C G G G G T T T T A A A A C C C C" in text
+        assert "T T T T G G G G C C C C A A A A T T T T G G G G" in text
+        assert "J01 · F01 → F02 · target bp 11–14" in text
+        assert "toehold" in text
+        assert "barcode" in text
+        assert "A A C C G G T T" in text
+        assert "Fragment oligo orders" in text
+        assert "Recovery primers · universal" in text
+        assert "Sequence pairing map; not a thermodynamic, annealing, or PCR simulation." in text
+        assert "Input oligos" not in text
+        assert "Checks" not in text
+    finally:
+        plt.close(figure)
+
+
+def test_review_layout_reserves_the_full_body_for_many_junctions() -> None:
+    review = ThreeWayJunctionReviewV1.model_validate(_payload_with_many_junctions())
+    height = review_content_height(review)
+    figure, axis = plt.subplots()
+    try:
+        y = _draw_target(axis, review, y=height - 0.82)
+        y = _draw_junctions(axis, review, y=y - 0.08)
+        y = _draw_oligo_orders(axis, review, y=y - 0.08)
+        bottom = _draw_primers(axis, review, y=y - 0.08)
+
+        assert bottom >= 0.20 - 1e-9
     finally:
         plt.close(figure)
 

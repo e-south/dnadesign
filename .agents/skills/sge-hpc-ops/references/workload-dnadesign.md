@@ -28,16 +28,13 @@ Placement guidance:
 - place large generated artifacts under project disk (`/project` or `/projectnb`) rather than home
 - use node-local scratch only for temporary runtime intermediates
 
-### Stress ethanol and ciprofloxacin workspace
+### Choose a DenseGen workspace
 
-Workspace path:
-- `src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml`
-
-Current packaged solver backend is `GUROBI` in this workspace.
-Use this check to verify backend state before submit:
+Use the workspace that owns the run. Check its declared solver before submit:
 
 ```bash
-rg -n "backend:" src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
+CONFIG=src/dnadesign/densegen/workspaces/<workspace>/config.yaml
+grep -n "backend:" "$CONFIG"
 ```
 
 ### BU SCC DenseGen batch submit pattern
@@ -49,7 +46,7 @@ uv run ops runbook presets
 uv run ops runbook init \
   --workflow densegen \
   --runbook <runbook.yaml> \
-  --workspace-root src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro \
+  --workspace-root src/dnadesign/densegen/workspaces/<workspace> \
   --repo-root <repo> \
   --preset bu-scc-dunlop \
   --id <runbook-id> \
@@ -68,7 +65,7 @@ qsub -P <project> \
   -pe omp 16 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<repo>/src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml \
+  -v DENSEGEN_CONFIG=<repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
@@ -130,22 +127,17 @@ For `GUROBI` runs:
 
 Solver backend defaults are workspace-specific; verify `config.yaml` before submit.
 
-### RT-lnRNA Infer six-view workload
+### Study-owned Infer workloads
 
-Workspace path:
-- `src/dnadesign/infer/workspaces/rt_lnrna_sponging_construct_triage/config.sequence_views.six_view.evo2_7b.yaml`
-
-Runbook preset:
-- `src/dnadesign/ops/runbooks/presets/infer_rt_lnrna_sponging_construct_triage_six_view_7b_batch_with_notify.yaml`
-
-Use the study-aware fill command to plan, execute, or submit only the missing
-sidecar work:
+Use the study's private workflow to select the exact workspace, views, model,
+and runbook. Then use the generic fill command to plan, execute, or submit only
+the missing sidecar work:
 
 ```bash
-uv run ops runbook fill-infer --study-dir docs/studies/rt_lnrna_sponging_construct_triage
+uv run ops runbook fill-infer --study-dir /path/to/study
 ```
 
-The lane uses explicit `view_name` selectors for the six RT-lnRNA Construct
-views and one Notify watcher for the lane. Completion planning should reuse
-current-fingerprint sidecars, block missing sequence products, and resume
-missing or stale vector/scalar sidecars through the normal Infer shard ledger.
+Study workflows should use explicit `view_name` selectors. Completion planning
+should reuse current-fingerprint sidecars, block missing sequence products, and
+resume missing or stale vector/scalar sidecars through the normal Infer shard
+ledger.

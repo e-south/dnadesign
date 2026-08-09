@@ -1,9 +1,14 @@
-# Prepare a request
+---
+doc_id: junction-prepare-request
+title: Prepare a junction request
+type: guide
+audience: users turning exact targets into a reviewed design request
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Type:** guide
-**Audience:** users turning exact targets into a reviewed design request
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+# Prepare a request
 
 `junction` does not infer a complete design from a sequence alone. Before
 planning, supply five things:
@@ -111,8 +116,8 @@ universal/Type-IIS workflow.
 The planning profile controls geometry, search budgets, barcode composition,
 and substring exclusions. There is no production preset. The checked-in
 gene-scale example starts from dimensions reported in the pooled paper, but
-its search settings remain explicit Junction policy. The papers provide useful
-experimental and algorithmic context; Junction has not validated a drop-in
+its search settings remain explicit `junction` policy. The papers provide useful
+experimental and algorithmic context; `junction` has not validated a drop-in
 laboratory profile.
 
 Review at least:

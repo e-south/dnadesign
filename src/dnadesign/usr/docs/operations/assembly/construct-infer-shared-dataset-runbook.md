@@ -11,22 +11,16 @@
 **Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-09
 
 Use this runbook when construct should write one shared USR dataset and infer plus Notify should read that same dataset next.
 
 If upstream inputs still span multiple USR datasets, start with [multi-source-shared-dataset.md](multi-source-shared-dataset.md) first, then return here once one construct-input dataset is already consolidated.
 
-This runbook uses the packaged construct workspace as a local tracer bullet.
-Its early commands intentionally write into that packaged workspace-local USR
-root. For live stress_ethanol_cipro_growth status and continuation, keep the study record's
-declared shared USR root authoritative and repoint construct configs
-deliberately before treating the dataset as the cross-tool source of truth.
-
-For the live `stress_ethanol_cipro_growth` study, the real source datasets are
-not the packaged demo inputs. Merge `densegen_prom_eth_cip_source` and
-`usr_promoter_references` in USR first, then point Construct at that merged source
-dataset while keeping `usr_pdual10_plasmid_template` as the pDual-backed template dataset.
+This runbook uses the packaged Construct workspace as a small end-to-end
+example. Its early commands write only to the example's local USR root. A live
+study must declare its own USR root, source datasets, and templates before it
+uses the resulting dataset as a cross-tool source of truth.
 
 ### Boundary decisions
 

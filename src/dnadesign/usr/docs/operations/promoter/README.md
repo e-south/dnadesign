@@ -1,10 +1,9 @@
-## USR Promoter Study Runbooks
+## Promoter data routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-08-09
 
-Use this folder for promoter-study data-plane routes that assemble or annotate
+Use this folder for data-plane routes that assemble or annotate promoter
 feature datasets before downstream analysis.
 
-- [Evo2 journey](evo2-journey.md): pick the correct DenseGen, Construct, Infer, Notify, Cluster, or OPAL branch.
 - [Characterization feature matrix](characterization-feature-matrix.md): build one infer-annotated promoter feature dataset before Cluster or OPAL.

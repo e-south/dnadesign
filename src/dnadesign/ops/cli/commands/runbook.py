@@ -340,20 +340,11 @@ def _resolve_runbook_init_preset(name: str) -> RunbookInitPreset:
     raise ValueError(f"unknown init preset: {normalized_name}")
 
 
-def _packaged_preset_paths() -> list[Path]:
-    preset_dir = Path(__file__).resolve().parents[2] / "runbooks" / "presets"
-    if not preset_dir.exists():
-        return []
-    return sorted(path.resolve() for path in preset_dir.glob("*.yaml"))
-
-
-def _emit_packaged_runbook_presets() -> None:
-    presets = [{"name": path.stem, "path": str(path)} for path in _packaged_preset_paths()]
+def _emit_runbook_init_presets() -> None:
     typer.echo(
         json.dumps(
             {
                 "init_presets": [preset.as_dict() for preset in _load_runbook_init_presets()],
-                "presets": presets,
             },
             indent=2,
             sort_keys=True,
@@ -490,7 +481,7 @@ def runbook_init(
             "--preset",
             help=(
                 "Explicit init preset that supplies site-local project/template defaults; "
-                "use `ops runbook presets` to list presets."
+                "use `ops runbook presets` to list init presets."
             ),
         ),
     ] = None,
@@ -498,7 +489,7 @@ def runbook_init(
     cuda_module: Annotated[
         str,
         typer.Option("--cuda-module", help="Infer workflow CUDA module name."),
-    ] = "cuda/12.4",
+    ] = "cuda/13.0",
     gcc_module: Annotated[
         str,
         typer.Option("--gcc-module", help="Infer workflow GCC module name."),
@@ -601,7 +592,7 @@ def runbook_init(
 
 @app.command("presets")
 def runbook_presets() -> None:
-    _emit_packaged_runbook_presets()
+    _emit_runbook_init_presets()
 
 
 @app.command("plan")
@@ -703,10 +694,7 @@ def runbook_fill_infer(
         Path | None,
         typer.Option(
             "--study-dir",
-            help=(
-                "Checked-in study record root. If omitted and --runbook is not provided, "
-                "the active study from docs/studies/index.yaml is used."
-            ),
+            help="Explicit external study workspace root used to discover Infer runbooks.",
         ),
     ] = None,
     runbook: Annotated[

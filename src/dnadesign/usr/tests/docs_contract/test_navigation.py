@@ -35,8 +35,6 @@ def test_docs_indexes_route_to_expected_usr_surfaces() -> None:
     assert "../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md" in docs_index_links
     assert "../src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md" in docs_index_links
     assert "../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_index_links
-    assert "studies/README.md" in docs_index_links
-
     assert "operations/routes/workflow-map.md" in usr_docs_links
     assert "operations/sync/README.md" in usr_docs_links
     assert "reference/python-api.md" in usr_docs_links

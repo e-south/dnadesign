@@ -69,7 +69,7 @@ def screen_cmd(
     release_variant_id: list[str] = typer.Option(
         ["BspQI"],
         "--release-variant-id",
-        help="Release-enzyme variant id to include in the screen (repeatable). Defaults to BspQI for de033.",
+        help="Release-enzyme variant id to include in the screen (repeatable). Defaults to BspQI.",
     ),
     allow_retained_strands: str = typer.Option(
         "top,bottom",

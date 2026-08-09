@@ -78,7 +78,7 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
     assert "how-to-use-ops.md" in text
     assert "../../../../docs/operations/README.md" in text
     assert "../../../../docs/operations/orchestration/runbooks.md" in text
-    assert "../runbooks/presets" in text
+    assert "uv run ops runbook presets" in text
     assert "../../../../docs/README.md" in text
     assert "uv run ops catalog list --simple" in text
     assert "How to use Ops" in text
@@ -205,7 +205,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "--project <project>" in text
     assert "--preset bu-scc-dunlop" in text
     assert "uv run ops runbook presets" in text
-    assert "uv run ops runbook fill-infer --study-dir docs/studies/<study-id>" in text
+    assert "uv run ops runbook fill-infer --study-dir /path/to/study" in text
     assert "uv run ops runbook active-jobs" in text
     assert "ops runbook diagnostics session-counts" in text
     assert "--allow-unknown-active-jobs" in text
@@ -299,7 +299,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "uv run ops progress scaffold <registry-id> ..." in text
     assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in text
     assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
-    assert "uv run ops runbook fill-infer --study-dir docs/studies/<study-id>" in text
+    assert "uv run ops runbook fill-infer --study-dir /path/to/study" in text
     assert "prints to stdout unless you pass `--out`" in text
     assert "### Common examples" in text
     assert "### Cross-tool procedures" in text

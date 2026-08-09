@@ -1,7 +1,7 @@
 ## OPAL Internal Notes Archive
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-09
 
 
 Use `docs/dev/journal.md` for active development notes. This file is retained as historical archive.
@@ -33,7 +33,7 @@ Use `docs/dev/journal.md` for active development notes. This file is retained as
 - Starting from a clean baseline commit on `opal-dashboard-debug`.
 - New campaign layout uses `configs/` for `campaign.yaml` + `plots.yaml`.
 - Goal: anchor campaign IO to campaign root, add native XLSX ingest, and define a clean-slate demo reset.
-- Demo inputs: `inputs/r0/vec8-b0.xlsx`; records at campaign root `records.parquet`.
+- Demo inputs were later replaced with the current synthetic scalar fixture.
 - Decisions: outputs layout standardized to `outputs/ledger/` + `outputs/rounds/round_<k>/`.
 - Label history schema uses value wrappers `{value,dtype,schema?}` for y_obs/y_pred; y_pred accepts non-numeric JSON.
 - Demo reset command added (hidden from `--help`) to prune records.parquet, remove outputs/, and delete state.json.

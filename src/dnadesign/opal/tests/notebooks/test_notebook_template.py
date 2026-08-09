@@ -828,7 +828,7 @@ def test_notebook_baserender_panel_titles_candidate_by_selection_view_and_rank()
 
     panel = render_notebook_visual_panel(
         active_view_mode="Campaign",
-        baserender_campaign_model={"campaign": {"slug": "secg_msrb_greedy"}},
+        baserender_campaign_model={"campaign": {"slug": "demo_campaign"}},
         baserender_record_id="candidate-record-alpha-with-long-id",
         baserender_record_row={"id": "candidate-record-alpha-with-long-id", "sequence": "ACGT"},
         baserender_candidate_evidence={
@@ -868,7 +868,7 @@ def test_notebook_baserender_panel_titles_candidate_by_selection_view_and_rank()
     assert visual["kind"] == "image"
     assert rendered["title"] == ("AND selection · competition rank 7 · candidate candidate-re...-long-id")
     assert visual["caption"] == "DenseGen TFBS annotation · 60 bp · 5 annotated elements"
-    assert visual["alt"].endswith("Selected in campaign secg_msrb_greedy, round 0.")
+    assert visual["alt"].endswith("Selected in campaign demo_campaign, round 0.")
     assert "candidate-record-alpha-with-long-id" not in str(rendered["title"])
     assert "Candidate and campaign evidence" in panel["items"][1]["items"]
 

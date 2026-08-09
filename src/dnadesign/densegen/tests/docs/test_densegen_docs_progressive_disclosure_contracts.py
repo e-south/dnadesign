@@ -22,13 +22,11 @@ RUNBOOK_TUTORIALS = (
     "demo_tfbs_baseline.md",
     "demo_sampling_baseline.md",
     "study_constitutive_sigma_panel.md",
-    "study_stress_ethanol_cipro.md",
 )
 ANALYSIS_NOTEBOOK_COMMAND = {
     "demo_tfbs_baseline.md": 'uv run dense notebook run -c "$PWD/config.yaml"',
     "demo_sampling_baseline.md": 'pixi run dense notebook run -c "$PWD/config.yaml"',
     "study_constitutive_sigma_panel.md": 'pixi run dense notebook run -c "$PWD/config.yaml"',
-    "study_stress_ethanol_cipro.md": 'pixi run dense notebook run -c "$PWD/config.yaml"',
 }
 
 
@@ -151,26 +149,6 @@ def test_densegen_tutorials_include_analysis_only_existing_outputs_path() -> Non
         assert "### If outputs already exist (analysis mode)" in text
         assert "./runbook.sh --mode analysis" in text
         assert ANALYSIS_NOTEBOOK_COMMAND[name] in text
-
-
-def test_stress_tutorial_exposes_core_batch_analysis_modes_and_resume_guardrails() -> None:
-    path = TUTORIALS / "study_stress_ethanol_cipro.md"
-    text = _read(path)
-    _assert_token_order(
-        text,
-        [
-            "#### Mode 1: Core generation run (interactive or OnDemand shell)",
-            "#### Mode 2: BU SCC batch loop (target quota)",
-            "#### Mode 3: Post-run analysis only",
-        ],
-        label=path.name,
-    )
-    assert "backend: GUROBI" in text
-    assert "1,000,000" in text
-    assert "Config changed beyond plan quotas." in text
-    assert "dense run --resume --no-plot" in text
-    assert "outputs/meta/run.lock" in text
-    assert "usr maintenance merge" in text
 
 
 def test_hpc_howto_exposes_core_batch_and_analysis_flows() -> None:

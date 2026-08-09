@@ -393,7 +393,7 @@ def test_bstnbi_reverse_complemented_precursor_bolds_bottom_canonical_site(
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True)
     report = run_released_snapback_target_search(
         request=SingleNickReleasedTargetSearchRequest(
@@ -601,8 +601,8 @@ def test_released_design_writes_bundle_and_released_show_revalidates_it(tmp_path
 
 
 def test_released_design_rejects_left_of_origin_outside_site_exact_bundle(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspaces" / "de033"
-    spec_path = workspace / "configs" / "snapback" / "de033.released.snapback.yaml"
+    workspace = tmp_path / "workspaces" / "released_snapback"
+    spec_path = workspace / "configs" / "snapback" / "invalid_origin.released.snapback.yaml"
     nick_catalog_path = workspace / "inputs" / "nickases" / "local.nickases.yaml"
     release_catalog_path = workspace / "inputs" / "release_enzymes" / "local.release.yaml"
     spec_path.parent.mkdir(parents=True, exist_ok=True)
@@ -657,7 +657,7 @@ def test_released_design_rejects_left_of_origin_outside_site_exact_bundle(tmp_pa
                 "released_snapback": {
                     "schema_version": 1,
                     "kind": "single_nick_released_snapback_v1",
-                    "name": "de033_left_prefix",
+                    "name": "demo_left_prefix",
                 },
                 "input": {
                     "precursor_top_strand": "GTCTCAAACGTTGTTCCAA",
@@ -788,7 +788,7 @@ def test_released_design_fails_closed_on_ambiguous_precursor_origin(tmp_path: Pa
     assert report.candidate is None
 
 
-def test_checked_in_de033_released_design_fixture_stays_invalid() -> None:
+def test_checked_in_released_snapback_demo_fixture_stays_invalid() -> None:
     repo_root = Path(__file__).resolve().parents[5]
     spec_path = (
         repo_root
@@ -796,10 +796,10 @@ def test_checked_in_de033_released_design_fixture_stays_invalid() -> None:
         / "dnadesign"
         / "cruncher"
         / "workspaces"
-        / "de033"
+        / "demo_released_snapback"
         / "configs"
         / "snapback"
-        / "de033.released.snapback.yaml"
+        / "invalid_origin.released.snapback.yaml"
     )
 
     report = validate_released_snapback_spec(spec_path)
@@ -809,7 +809,7 @@ def test_checked_in_de033_released_design_fixture_stays_invalid() -> None:
 
 
 def test_released_hit_plot_context_marks_degenerate_assignments_without_losing_resolved_bases(tmp_path: Path) -> None:
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
     search_report = run_released_snapback_target_search(
         request=SingleNickReleasedTargetSearchRequest(
@@ -859,7 +859,7 @@ def test_released_hit_plot_context_marks_degenerate_assignments_without_losing_r
 
 
 def test_released_solve_real_presets_materializes_exact_hits_with_bottom_strand_context(tmp_path: Path) -> None:
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
     request = SingleNickReleasedTargetSearchRequest(
         target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),
@@ -1056,7 +1056,7 @@ def test_released_solve_real_presets_materializes_exact_hits_with_bottom_strand_
 def test_released_solve_real_presets_materializes_retained_active_hits_with_route_metadata(
     tmp_path: Path,
 ) -> None:
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
     request = SingleNickReleasedTargetSearchRequest(
         target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),

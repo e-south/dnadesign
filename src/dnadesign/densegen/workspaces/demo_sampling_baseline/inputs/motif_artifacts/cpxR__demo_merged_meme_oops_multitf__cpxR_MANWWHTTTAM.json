@@ -160,7 +160,7 @@
     "citation": null,
     "license": null,
     "raw_artifact_paths": [
-      "/Users/Shockwing/Dropbox/projects/phd/dnadesign-cruncher-expanding/src/dnadesign/cruncher/.cruncher/demo_multitf/discoveries/discover_cpxR_20260218_205959_7eca65/meme.txt"
+      "${DNADESIGN_ROOT}/src/dnadesign/cruncher/.cruncher/demo_multitf/discoveries/discover_cpxR_20260218_205959_7eca65/meme.txt"
     ],
     "retrieved_at": "2026-02-19T01:59:59.444797+00:00",
     "source_url": null,
@@ -178,7 +178,7 @@
     "discovery_site_sets": "2",
     "discovery_site_sources": "demo_local_meme, regulondb",
     "discovery_tool": "meme",
-    "discovery_tool_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign-cruncher-expanding/.pixi/envs/default/bin/meme",
+    "discovery_tool_path": "${DNADESIGN_ROOT}/.pixi/envs/default/bin/meme",
     "discovery_tool_version": "5.5.9",
     "matrix_source": "meme"
   },

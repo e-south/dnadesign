@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,7 +38,6 @@ _FULL_CORE_EXACT_FILES = {
     ".github/tool-coverage-baseline.json",
 }
 _SHARED_PACKAGE_TOOLS = {"contracts", "thread"}
-_STUDIES_TOOL_NAME = "studies"
 _NON_TOOL_DIRS = {
     "artifacts",
     "devtools",
@@ -122,8 +122,29 @@ def discover_repo_tools(*, repo_root: Path) -> set[str]:
         if path.is_dir()
         and path.name not in _NON_TOOL_DIRS
         and not path.name.startswith("_")
+        and not _is_git_ignored_untracked_path(repo_root=repo_root, path=path)
         and not _is_generated_artifact_only_dir(path)
     }
+
+
+def _is_git_ignored_untracked_path(*, repo_root: Path, path: Path) -> bool:
+    """Return whether Git ignores a local directory that is absent from its index."""
+
+    try:
+        relative_path = path.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return False
+    try:
+        result = subprocess.run(
+            ["git", "check-ignore", "--quiet", "--", relative_path.as_posix()],
+            cwd=repo_root,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
 
 
 def _is_generated_artifact_only_dir(path: Path) -> bool:
@@ -227,13 +248,6 @@ def determine_scope(
 
         if path in _FULL_CORE_EXACT_FILES:
             run_full_core = True
-
-        if parts[:2] == ("docs", "studies"):
-            if _STUDIES_TOOL_NAME in tool_names:
-                affected_tools.add(_STUDIES_TOOL_NAME)
-            else:
-                run_full_core = True
-                run_external_integration = True
 
         if path.startswith("src/dnadesign/"):
             if len(parts) < 3:

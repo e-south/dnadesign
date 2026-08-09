@@ -149,20 +149,17 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
                 "reference/snapback_artifacts.md",
                 "reference/released_snapback_artifacts.md",
                 "reference/release_enzyme_catalogs.md",
-                "../workspaces/de033/README.md",
-                "../workspaces/de033/runbook.md",
             ),
         ),
         "scar_nick": (
             "Design Retained-Scar Terminal Nicks",
             (
                 "guides/scar_nick_workflow.md",
-                "../workspaces/scar_nick_teto/runbook.md",
                 "../src/scar_nick/README.md",
             ),
         ),
         "yiu": (
-            "Payload-Centric YIU Workflows",
+            "Inspect Payload Junctions",
             (
                 "demos/demo_yiu_workspace.md",
                 "guides/yiu_workflow.md",
@@ -172,7 +169,7 @@ def _render_docs_map(catalog: DocsCatalog) -> str:
             ),
         ),
         "study": (
-            "Run Studies and Portfolio Aggregation",
+            "Summarize Sweeps and Aggregate Artifacts",
             (
                 "guides/studies.md",
                 "guides/study_length_vs_score.md",

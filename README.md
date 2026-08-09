@@ -32,6 +32,7 @@ README for commands, inputs, and outputs.
 | [**densegen**](src/dnadesign/densegen/README.md) | Generate DNA sequence libraries from saved design inputs. |
 | [**infer**](src/dnadesign/infer/README.md) | Run sequence models and add their predictions to datasets. |
 | [**construct**](src/dnadesign/construct/README.md) | Build DNA constructs from reusable templates. |
+| [**msd**](src/dnadesign/msd/README.md) | Resolve and compile typed Retron MSD designs. |
 | [**junction**](src/dnadesign/junction/README.md) | Turn exact DNA targets into checked three-way-junction oligo plans. |
 | [**opal**](src/dnadesign/opal/README.md) | Use measured results to choose which DNA designs to test next. |
 | [**cluster**](src/dnadesign/cluster/README.md) | Group similar rows and visualize the groups. |

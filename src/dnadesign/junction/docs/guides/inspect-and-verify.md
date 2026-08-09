@@ -1,9 +1,14 @@
-# Inspect and verify a bundle
+---
+doc_id: junction-inspect-and-verify
+title: Inspect and verify a junction bundle
+type: guide
+audience: reviewers of an existing junction design
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Type:** guide
-**Audience:** reviewers of an existing `junction` design
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# Inspect and verify a bundle
 
 A bundle is a reproducible software record, not a laboratory acceptance
 packet. Review the evidence in this order.
@@ -63,14 +68,16 @@ retain every rejected candidate or a full rejection trace.
 
 ## Create optional review images
 
-BaseRender can render each neutral review record as a four-panel QA image.
+BaseRender can render each neutral review record as a nucleotide-level audit.
 Follow the [BaseRender integration](../../../baserender/docs/integrations/junction.md).
 Use a new BaseRender output directory beside the source bundle; never add
 images inside the verified source bundle.
 
-The image helps inspect tiling, assignments, strands, recovery strings, search
-receipts, and unresolved checks. It does not add thermodynamic or experimental
-evidence and is not part of the `junction` plan identity.
+The image shows the target duplex, fragment and toehold spans, each toehold and
+barcode duplex, complete fragment-oligo orders, and complete recovery-primer
+orders. Light gray edges mark aligned Watson-Crick pairs. Search receipts and
+software checks stay in the JSON files. The image does not add thermodynamic
+or experimental evidence and is not part of the `junction` plan identity.
 
 ## Review before any order or experiment
 

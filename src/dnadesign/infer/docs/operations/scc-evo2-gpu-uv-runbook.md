@@ -1,7 +1,7 @@
 ## SCC Evo2 GPU Environment Runbook (UV + infer)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-09
 
 Use this page when you need a deterministic SCC GPU environment build for infer.
 
@@ -182,7 +182,7 @@ the landed family before trusting batch portability.
 cd "$DNADESIGN_REPO" # Enter repo root used for SCC setup.
 
 module purge # Clear inherited module state before deterministic loads.
-module load cuda/12.8 # Load CUDA toolchain for torch/flash-attn builds.
+module load cuda/13.0 # Match the CUDA major used by the locked Torch wheel and extension builds.
 module load gcc/13.2.0 # Load compiler toolchain compatible with CUDA build flow.
 
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv" # Use the active uv environment path for the current GPU family.
@@ -309,8 +309,9 @@ Treat live study collection as four explicit gates:
 For study-owned USR write-back lanes, run:
 
 ```bash
-uv run ops progress show studies.stress-ethanol-cipro-growth.status --json # Confirm the checked-in study snapshot is current.
-NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show studies.stress-ethanol-cipro-growth.preflight --scope next --json # Confirm the current host is execution-ready.
+uv run ops catalog list --simple # Discover routes supplied by the installed study package.
+uv run ops progress show <study-status-registry-id> --json # Confirm the checked-in study snapshot is current.
+NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show <study-preflight-registry-id> --scope next --json # Confirm the current host is execution-ready.
 uv run infer validate usr-registry --config <lane-config> # Derive the canonical infer namespace registration contract.
 uv run usr --root src/dnadesign/usr/datasets namespace show infer # Confirm the shared USR root already knows the infer namespace.
 ```

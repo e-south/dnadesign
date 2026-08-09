@@ -1,7 +1,7 @@
 ## Linear ssDNA Composition
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 **Surface role:** tool-local reference; generic authority for
 `linear_ssdna_composition_v1` and producer-owned Folding/BaseRender handoffs
 
@@ -105,4 +105,4 @@ only validated composition specs into Construct.
 - [Construct CLI reference](cli.md)
 - [Construct outputs reference](outputs.md)
 - [Folding docs](../../../folding/docs/README.md)
-- [Composition spec](../../../../../docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
+- [Composition boundary decision](../../../../../docs/architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)

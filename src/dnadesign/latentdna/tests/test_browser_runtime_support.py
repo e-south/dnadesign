@@ -899,8 +899,16 @@ def test_available_reference_hues_for_frames_filters_to_selected_reference_rows(
     ) == ["tf_bin"]
 
 
-def test_display_hue_label_names_sfxi_reference_metric() -> None:
-    assert display_hue_label("sfxi_ref__metric_value") == "SFXI selected metric"
+def test_display_hue_label_uses_explicit_axis_style_for_external_metrics() -> None:
+    axis_styles = {
+        "external_metric__value": {
+            "column": "external_metric__value",
+            "label": "Study score",
+            "kind": "continuous",
+        }
+    }
+
+    assert display_hue_label("external_metric__value", axis_styles=axis_styles) == "Study score"
 
 
 def test_reference_label_limit_for_annotation_mode_maps_notebook_options() -> None:

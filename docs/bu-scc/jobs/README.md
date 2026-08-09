@@ -2,7 +2,7 @@
 doc_id: bu-scc-job-templates
 surface: ops-runbook
 owner: dnadesign-maintainers
-last_verified: 2026-07-30
+last_verified: 2026-08-09
 ---
 
 ## BU SCC job templates
@@ -12,24 +12,20 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-cpu.qsub`: DenseGen CPU batch run
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
-- `eco1-proteinmpnn-generation-policy.qsub`: Eco1 ProteinMPNN v3 generation-policy array run
-- `eco1-colabfold-foldcheck.qsub`: Eco1 fold-check ColabFold smoke/full run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
 - `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
 ### Quick start
 
-Use project (`-P`) and runtime/config overrides at submit time for reusable
-templates. The Eco1 ColabFold fold-check template is study-specific and pins
-`#$ -P dunlop` so the SCC smoke/full runs fail fast under the intended project.
-Set the operator-specific values once before using the examples below:
+Use project (`-P`) and runtime/config overrides at submit time. Set the
+operator-specific values once before using the examples below:
 
 ```bash
 export SCC_USER="<scc_login>"
 export SCC_PROJECT_ROOT="/project/<project>/${SCC_USER}"
 export SCC_PROJECTNB_ROOT="/projectnb/<project>/${SCC_USER}"
 export SCC_LOG_ROOT="${SCC_PROJECT_ROOT}/dnadesign-sge-logs"
-mkdir -p "$SCC_LOG_ROOT" "${SCC_LOG_ROOT}/eco1-rt-repack"
+mkdir -p "$SCC_LOG_ROOT"
 ```
 
 ```bash
@@ -46,14 +42,6 @@ qsub -P <project> \
   -o "${SCC_LOG_ROOT}/evo2-infer.\$JOB_ID.out" \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
-qsub -t 1 \
-  -o "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
-qsub \
-  -o "${SCC_LOG_ROOT}/eco1-rt-repack/colabfold.\$JOB_ID.out" \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH="${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch",COLABFOLD_EXTRA_ARGS='--num-models 1' \
-  docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
 qsub -P <project> \
   -o "${SCC_LOG_ROOT}/permuter-evaluate.\$JOB_ID.out" \
   -v PERMUTER_WORKSPACE=<dnadesign_repo>/src/dnadesign/permuter/workspaces/<workspace>/config.yaml,PERMUTER_REF=<ref_name>,PERMUTER_RUN_FIRST=1,PERMUTER_EVALUATE_ARGS='--with smoke:placeholder:log_likelihood' \
@@ -170,207 +158,10 @@ Before first submit on a host, run deterministic environment bootstrap:
 - [BU SCC install GPU setup and verification runbook](../setup/install.md#gpu-setup-and-verification-runbook)
 - [infer SCC Evo2 GPU environment runbook](../../../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md)
 
-### Eco1 ProteinMPNN generation-policy submissions
+### Study-owned HPC jobs
 
-The Eco1 generation-policy template is the v3 lane. It consumes request
-roots under:
-
-```text
-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
-```
-
-It maps SGE task ids to the three complete v3 policies:
-`distal_scaffold_repack_v1`, `near_dna_rna_acid_free_v1`, and
-`combined_near_acid_free_plus_distal_v1`. Each task runs one complete
-ProteinMPNN policy. The template does not combine mutations across policy
-outputs.
-
-If request sidecars are missing, the template materializes
-`generation_policy_manifest.yaml`, `generation_policy_positions.parquet`,
-`generation_policy_alphabets.parquet`, and per-policy
-`proteinmpnn_request/request_manifest.yaml` before running ProteinMPNN.
-
-Use a one-policy smoke first:
-
-```bash
-qsub -t 1 \
-  -o "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
-```
-
-After the smoke writes `sample_table.parquet` and `candidate_table.parquet` for
-the first policy, run the remaining policies:
-
-```bash
-qsub -t 2-3 \
-  -o "${SCC_LOG_ROOT}/eco1-rt-repack/proteinmpnn.\$JOB_ID.\$TASK_ID.out" \
-  -v DNADESIGN_REPO=<dnadesign_repo>,PROTEINMPNN_ROOT=<dnadesign_repo>/.var/tools/proteinmpnn \
-  docs/bu-scc/jobs/eco1-proteinmpnn-generation-policy.qsub
-```
-
-Use `qsub -t 1-3` only when no policy has already been materialized or when
-`ECO1_PROTEINMPNN_OVERWRITE=1` is intentional.
-
-After all policy tasks finish, check that each policy wrote the expected sample
-and candidate tables before starting fold checks:
-
-```bash
-cd <dnadesign_repo>
-uv run python - <<'PY'
-from pathlib import Path
-import polars as pl
-
-root = Path(
-    "src/dnadesign/studies/units/eco1_rt_repack/workspaces/"
-    "eco1_rt_conservative_v1/outputs/thread/generation_policies_v3"
-)
-for policy_id in (
-    "distal_scaffold_repack_v1",
-    "near_dna_rna_acid_free_v1",
-    "combined_near_acid_free_plus_distal_v1",
-):
-    policy_root = root / policy_id
-    sample = policy_root / "sample_table.parquet"
-    candidate = policy_root / "candidate_table.parquet"
-    sample_rows = pl.read_parquet(sample).height if sample.exists() else "missing"
-    candidate_rows = pl.read_parquet(candidate).height if candidate.exists() else "missing"
-    print(f"{policy_id}\tsample_rows={sample_rows}\tcandidate_rows={candidate_rows}")
-PY
-```
-
-To continue the study on a local workstation, pull the generated v3 policy
-bundle back into the same ignored output path. This is a generated-artifact
-transfer, not a USR dataset sync:
-
-```bash
-rsync -avz \
-  "${SCC_USER}@scc1.bu.edu:${SCC_PROJECT_ROOT}/dnadesign/src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/" \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/
-
-mkdir -p src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/sge_logs
-rsync -avz \
-  "${SCC_USER}@scc1.bu.edu:${SCC_LOG_ROOT}/eco1-rt-repack/" \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/sge_logs/
-```
-
-This ProteinMPNN generation lane stops after per-policy `sample_table.parquet`
-and `candidate_table.parquet` materialization. It does not automatically run
-ColabFold. After local pull-back, regenerate the v3 candidate-pool/fold-check
-inputs from the policy-provenance tables, then run the local ColabFold path.
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies \
-  --repo-root . \
-  candidate-pool
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.generation_policies \
-  --repo-root . \
-  foldcheck-request
-```
-
-For a bounded local smoke run, create a six-record FASTA from the v3 request
-before running `colabfold_batch`:
-
-```bash
-uv run python -m dnadesign.thread.foldcheck.subset \
-  --request-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_request/foldcheck_request_manifest.yaml \
-  --sequence-limit 6 \
-  --sequence-start 1 \
-  --input-fasta src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/input_sequences.fasta \
-  --run-manifest src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/colabfold_run_manifest.yaml \
-  --output-dir src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/colabfold_outputs \
-  --schema-id eco1_rt.colabfold_local_run_manifest \
-  --execution-status planned_local_colabfold_cli
-colabfold_batch --num-models 1 \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/input_sequences.fasta \
-  src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/generation_policies_v3/foldcheck_local_runs/smoke_6/colabfold_outputs
-```
-
-### Eco1 ColabFold fold-check submissions
-
-The Eco1 ColabFold template consumes the materialized fold-check request:
-
-```text
-src/dnadesign/studies/units/eco1_rt_repack/workspaces/eco1_rt_conservative_v1/outputs/thread/foldcheck_request/foldcheck_request_manifest.yaml
-```
-
-The runtime is the ColabFold `colabfold_batch` CLI. On BU SCC that command is
-currently exposed by a LocalColabFold pixi environment at:
-
-```text
-${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch
-```
-
-LocalColabFold is the install path and environment wrapper. It should not be
-described as a separate fold model, a hosted API, or a native DeepMind AlphaFold2
-run.
-
-Smoke run, WT plus the first five accepted ProteinMPNN candidates:
-
-```bash
-qsub \
-  -o "${SCC_LOG_ROOT}/eco1-colabfold-smoke.\$JOB_ID.out" \
-  -l h_rt=04:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=6,COLABFOLD_BATCH="${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch",COLABFOLD_EXTRA_ARGS='--num-models 1' \
-  docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
-```
-
-Full current request, WT plus 96 accepted candidates:
-
-```bash
-qsub \
-  -o "${SCC_LOG_ROOT}/eco1-colabfold-full.\$JOB_ID.out" \
-  -l h_rt=24:00:00 \
-  -v DNADESIGN_REPO=<dnadesign_repo>,FOLDCHECK_SEQUENCE_LIMIT=all,COLABFOLD_BATCH="${SCC_PROJECTNB_ROOT}/tools/localcolabfold/.pixi/envs/default/bin/colabfold_batch",COLABFOLD_EXTRA_ARGS='--num-models 1',FOLDCHECK_RUN_ROOT="${SCC_PROJECT_ROOT}/foldcheck/eco1_rt/full_96_<run_id>" \
-  docs/bu-scc/jobs/eco1-colabfold-foldcheck.qsub
-```
-
-`eco1-colabfold-foldcheck.qsub` defaults:
-- fail-fast gates: request manifest exists, request FASTA exists, output
-  directory is empty unless `FOLDCHECK_ALLOW_EXISTING_OUTPUT=1`, and
-  `colabfold_batch` is discoverable through `COLABFOLD_BATCH` or the activated
-  environment. When `COLABFOLD_BATCH` points into a pixi environment, the
-  wrapper prepends the sibling `lib/` directory to `LD_LIBRARY_PATH` so SCC does
-  not fall back to the older system `libstdc++`.
-- GPU floor: the template requests `gpus=1` and
-  `gpu_compute_capability=6.0`. ColabFold on this LocalColabFold environment
-  failed on a lower-capability GPU path with DNN initialization errors during
-  the expanded design-class run.
-- subset control: `FOLDCHECK_SEQUENCE_LIMIT=6` for smoke; use `all` for the
-  full 97-record baseline request. For larger expanded requests, pass
-  `FOLDCHECK_SHARD_SIZE=<count>` with `qsub -t <start>-<end> -tc <limit>`.
-  The wrapper derives `FOLDCHECK_SEQUENCE_START` from `SGE_TASK_ID`, allows a
-  shorter final shard, and writes each shard under `FOLDCHECK_RUN_ROOT/shard_N`.
-  For one-off manual shards, pass `FOLDCHECK_SEQUENCE_START=<one-based-start>`
-  with a bounded `FOLDCHECK_SEQUENCE_LIMIT=<count>`. The template delegates
-  FASTA subsetting and run manifest writing to
-  `python -m dnadesign.thread.foldcheck.subset`, which validates FASTA ids and
-  sequence hashes against the request manifest.
-- runtime args: pass `COLABFOLD_EXTRA_ARGS='--num-models 1'` for fast
-  preflight smoke runs and the first full coverage screen; reserve heavier
-  multi-model checks for selected candidates after this first pass
-- durable output root: set `FOLDCHECK_RUN_ROOT` to an SCC project path when
-  outputs should live outside the checkout. Otherwise the template writes to
-  the study's ignored `outputs/thread/foldcheck_scc_runs/` directory.
-- scheduler logs: every documented submission passes `qsub -o` with a path
-  under `SCC_LOG_ROOT`. Direct template use without `-o` falls back to SGE's
-  submission default.
-- compact run manifest: `colabfold_run_manifest.yaml` records the source
-  request hash, selected sequence ids, input FASTA, and output directory
-
-This template deliberately does not parse ColabFold outputs into
-`foldcheck_report.parquet`. Normalize completed output directories through the
-study wrapper around `dnadesign.thread.adapters.colabfold`:
-
-```bash
-uv run python -m dnadesign.studies.units.eco1_rt_repack.operations.materialization.foldcheck_report \
-  --repo-root . \
-  --colabfold-output-root "${SCC_PROJECT_ROOT}/foldcheck/eco1_rt/<run_id>" \
-  --runtime-version <colabfold_version>
-```
-
-Raw model directories stay on SCC by default. The compact report can be synced
-back after validation.
+Study-specific scheduler scripts and instructions belong with the external
+study workspace. This directory contains reusable dnadesign templates only.
 
 ### Permuter evaluate submissions
 

@@ -29,7 +29,11 @@ def test_banner_catalog_matches_readme_references() -> None:
     repo_root = Path(__file__).resolve().parents[5]
     referenced: set[str] = set()
     for readme in (repo_root / "src" / "dnadesign").rglob("README.md"):
-        for line in readme.read_text(encoding="utf-8").splitlines()[:5]:
+        lines = readme.read_text(encoding="utf-8").splitlines()
+        if lines and lines[0].strip() == "---":
+            closing_index = lines[1:].index("---") + 1
+            lines = lines[closing_index + 1 :]
+        for line in lines[:5]:
             if "banner" not in line.lower() or not line.rstrip().endswith(".svg)"):
                 continue
             link = line.rsplit("(", 1)[1][:-1]

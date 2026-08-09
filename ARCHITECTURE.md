@@ -2,14 +2,14 @@
 doc_id: architecture
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-08-01
+last_verified: 2026-08-09
 ---
 
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-09
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -33,6 +33,9 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## System boundaries
 - Tool packages: each top-level tool under `src/dnadesign/<tool>/` owns its CLI behavior, configs, and tests.
+- Domain-qualified tools may own reusable biological operations. For example,
+  `dnadesign.msd` resolves and compiles Retron MSD designs while callers retain
+  ownership of registry contents, candidate choices, and study evidence.
 - Shared artifact schemas live under `src/dnadesign/contracts/` when a producer and consumer need a neutral, versioned handoff model without importing either tool's internals.
 - Shared create-only filesystem publication mechanics live under `src/dnadesign/artifacts/`; producing tools still own their artifact schemas and manifest meaning.
 - Shared test infrastructure lives under `src/dnadesign/devtools/tests/support/` and is test-only by contract; production code must not depend on it.
@@ -73,11 +76,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
   built-in providers live under `src/dnadesign/ops/providers/*/status.registry.yaml`.
   OPS recursively discovers those fragments, renders help from metadata alone,
   and imports provider code only for the selected surface.
-- Checked-in study records are study-first rather than family-nested:
-  `docs/studies/index.yaml` selects the active study, each live study record
-  lives under `docs/studies/<study-id>/`, and Ops-facing routes are declared
-  explicitly with `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind`
-  in `ops.study.yaml`.
+- Live studies are external clients. They own their scientific intent,
+  configurations, evidence, and decisions, and call versioned dnadesign APIs
+  through explicit workspace paths. Dnadesign does not select a global active
+  study or infer one from its repository layout.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Active shared USR dataset ids are flat owner-first contracts, for example
@@ -93,9 +95,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
 - Study status and preflight logic is study-owned once it becomes specific.
-  OPS discovers provider metadata and imports only the selected provider
-  entrypoint; study-specific execution taxonomy stays under
-  `src/dnadesign/studies/units/<study-id>/`.
+  External packages register status metadata through the
+  `dnadesign.ops.status_registries` entry-point group. OPS imports only the
+  selected provider; dnadesign does not contain study-specific execution
+  taxonomies.
 - Document-type semantics are explicit:
   - `route`: index entry or decision surface only
   - `runbook`: authoritative operator procedure with ordered commands and verification

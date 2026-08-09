@@ -1,7 +1,7 @@
 ## Generation model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-09
 This concept page explains how DenseGen turns Stage-A pools into accepted sequences under plan constraints. Read it when you need to reason about quotas, fixed elements, and solver feasibility before editing generation config. For exact field definitions, use the **[config reference](../../reference/config.md)**.
 
 ### What plans control
@@ -88,10 +88,6 @@ plan:
 - `study_constitutive_sigma_panel` uses matrix expansion for a full panel:
   - `sigma70_panel`: `6 x 8 = 48` variants, `sequences: 100`.
   - Total: `48` concrete plans, aggregate target `100` (`4` variants at quota `3`, `44` variants at quota `2`).
-- `study_stress_ethanol_cipro` uses curated upstream variants with fixed downstream consensus:
-  - Three base plans (`ethanol`, `ciprofloxacin`, `ethanol_ciprofloxacin`) each expand to `5` variants.
-  - Total: `15` concrete plans.
-  - Uniform per-variant quotas: `60/5=12`, `60/5=12`, `80/5=16`.
 
 ### How sequence constraints work
 

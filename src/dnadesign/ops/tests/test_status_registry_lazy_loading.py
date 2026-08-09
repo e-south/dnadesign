@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -56,16 +57,6 @@ def test_status_registry_fragments_load_provider_owned_specs() -> None:
     )
     assert supported_specs["usr-dataset-state"].owner_boundary == "usr"
     assert supported_specs["usr-dataset-state"].observes_plane == "data"
-    assert supported_specs["stress-ethanol-cipro-growth-preflight"].provider_ref == (
-        "dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider:provide_stress_ethanol_cipro_growth_preflight"
-    )
-    assert supported_specs["stress-ethanol-cipro-growth-preflight"].owner_boundary == "studies"
-    assert supported_specs["stress-ethanol-cipro-growth-preflight"].observes_plane == "execution_readiness"
-    assert supported_specs["retron-hairpin-design-preflight"].provider_ref == (
-        "dnadesign.studies.units.retron_hairpin_design.status.ops.provider:provide_retron_hairpin_design_preflight"
-    )
-    assert supported_specs["retron-hairpin-design-preflight"].owner_boundary == "studies"
-    assert supported_specs["retron-hairpin-design-preflight"].observes_plane == "execution_readiness"
     assert supported_specs["cluster-run-index"].provider_ref == (
         "dnadesign.cluster.ops.status_providers:provide_cluster_run_index_status"
     )
@@ -108,61 +99,8 @@ print(json.dumps(sorted(
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
-        'dnadesign.studies.units.retron_hairpin_design.status.service',
-        'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
 )))
-"""
-    )
-
-    assert imported_modules == []
-
-
-def test_stress_status_provider_import_does_not_load_service_or_heavy_stacks() -> None:
-    imported_modules = _run_python(
-        """
-import importlib
-import json
-import sys
-
-importlib.import_module('dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider')
-watched = {
-    'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
-    'dnadesign.densegen',
-    'dnadesign.infer',
-    'dnadesign.usr',
-    'numpy',
-    'pandas',
-    'pyarrow',
-    'yaml',
-}
-print(json.dumps(sorted(name for name in sys.modules if name in watched)))
-"""
-    )
-
-    assert imported_modules == []
-
-
-def test_retron_status_provider_import_does_not_load_service_or_heavy_stacks() -> None:
-    imported_modules = _run_python(
-        """
-import importlib
-import json
-import sys
-
-importlib.import_module('dnadesign.studies.units.retron_hairpin_design.status.ops.provider')
-watched = {
-    'dnadesign.studies.units.retron_hairpin_design.status.service',
-    'dnadesign.cruncher',
-    'dnadesign.usr',
-    'numpy',
-    'pandas',
-    'pyarrow',
-    'yaml',
-}
-print(json.dumps(sorted(name for name in sys.modules if name in watched)))
 """
     )
 
@@ -257,98 +195,109 @@ entries:
         registry_loader.list_status_kind_specs.cache_clear()
 
 
-def test_status_registry_fragment_owner_prefix_handles_nested_concrete_study_packages() -> None:
-    dnadesign_root = _repo_root() / "src" / "dnadesign"
-
-    assert (
-        registry_loader._expected_provider_ref_prefix(  # noqa: SLF001 - regression coverage for owner-boundary guard
-            fragment_path=dnadesign_root
-            / "studies"
-            / "units"
-            / "retron_hairpin_design"
-            / "status"
-            / "ops"
-            / "status.registry.yaml",
-            dnadesign_root=dnadesign_root,
-        )
-        == "dnadesign.studies.units.retron_hairpin_design.status.ops."
-    )
-    assert (
-        registry_loader._expected_provider_ref_prefix(  # noqa: SLF001 - regression coverage for owner-boundary guard
-            fragment_path=dnadesign_root
-            / "studies"
-            / "units"
-            / "stress_ethanol_cipro_growth"
-            / "operations"
-            / "status"
-            / "ops"
-            / "status.registry.yaml",
-            dnadesign_root=dnadesign_root,
-        )
-        == "dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops."
-    )
-
-
-def test_nested_study_status_registry_rejects_provider_ref_outside_concrete_study_owner(
+def test_external_status_registry_entry_point_is_owner_confined(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    dnadesign_root = tmp_path / "src" / "dnadesign"
-    fragment = dnadesign_root / "studies" / "units" / "demo_study" / "status" / "ops" / "status.registry.yaml"
-    fragment.parent.mkdir(parents=True, exist_ok=True)
+    package_root = tmp_path / "research_studies"
+    package_root.mkdir()
+    fragment = package_root / "status.registry.yaml"
     fragment.write_text(
         """
 version: 1
-provider_id: demo-study.provider
+provider_id: research-studies.demo
 entries:
-  - status_kind: demo-study-status
+  - status_kind: private-study-status
     owner_boundary: studies
     observes_plane: record
-    provider_ref: dnadesign.ops.providers.builtin.status_provider:provide_ops_audit_status
-    description: Demo study status.
+    provider_ref: research_studies.demo.status:provide_status
+    description: Read one private study record.
     surface_type: study_record
     cost_class: cheap
     summary_scope: repo
 """,
         encoding="utf-8",
     )
-
-    with pytest.raises(ValueError, match="provider_ref must stay under the fragment owner package"):
-        registry_loader._load_status_kind_specs(  # noqa: SLF001 - fail-fast owner-boundary regression
-            fragment_paths=(fragment,),
-            dnadesign_root=dnadesign_root,
-        )
-
-
-def test_operations_status_registry_rejects_provider_ref_outside_concrete_study_owner(
-    tmp_path: Path,
-) -> None:
-    dnadesign_root = tmp_path / "src" / "dnadesign"
-    fragment = (
-        dnadesign_root / "studies" / "units" / "demo_study" / "operations" / "status" / "ops" / "status.registry.yaml"
+    entry_point = SimpleNamespace(
+        name="research-studies",
+        value="research_studies.integrations.dnadesign_ops:status_registry_paths",
+        load=lambda: lambda: (fragment,),
     )
-    fragment.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(registry_loader, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        registry_loader,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+    )
+
+    fragments = registry_loader._load_external_status_registry_fragments()  # noqa: SLF001
+    specs = registry_loader._load_status_kind_specs(  # noqa: SLF001
+        fragment_paths=tuple(path for path, _ in fragments),
+        dnadesign_root=_repo_root() / "src" / "dnadesign",
+        provider_prefixes={path: prefix for path, prefix in fragments},
+    )
+
+    assert specs[0].provider_ref == "research_studies.demo.status:provide_status"
+
     fragment.write_text(
-        """
-version: 1
-provider_id: demo-study.provider
-entries:
-  - status_kind: demo-study-status
-    owner_boundary: studies
-    observes_plane: record
-    provider_ref: dnadesign.ops.providers.builtin.status_provider:provide_ops_audit_status
-    description: Demo study status.
-    surface_type: study_record
-    cost_class: cheap
-    summary_scope: repo
-""",
+        fragment.read_text(encoding="utf-8").replace(
+            "research_studies.demo.status:provide_status",
+            "unrelated_package.demo:provide_status",
+        ),
         encoding="utf-8",
     )
-
     with pytest.raises(ValueError, match="provider_ref must stay under the fragment owner package"):
-        registry_loader._load_status_kind_specs(  # noqa: SLF001 - fail-fast owner-boundary regression
-            fragment_paths=(fragment,),
-            dnadesign_root=dnadesign_root,
+        registry_loader._load_status_kind_specs(  # noqa: SLF001
+            fragment_paths=tuple(path for path, _ in fragments),
+            dnadesign_root=_repo_root() / "src" / "dnadesign",
+            provider_prefixes={path: prefix for path, prefix in fragments},
         )
+
+
+def test_external_status_registry_entry_point_rejects_path_outside_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "research_studies"
+    package_root.mkdir()
+    external_fragment = tmp_path / "status.registry.yaml"
+    external_fragment.write_text("version: 1\nprovider_id: escaped\nentries: []\n", encoding="utf-8")
+    entry_point = SimpleNamespace(
+        name="research-studies",
+        value="research_studies.integrations.dnadesign_ops:status_registry_paths",
+        load=lambda: lambda: (external_fragment,),
+    )
+    monkeypatch.setattr(registry_loader, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        registry_loader,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+    )
+
+    with pytest.raises(ValueError, match="path must stay under its entry-point package"):
+        registry_loader._load_external_status_registry_fragments()  # noqa: SLF001
+
+
+def test_external_status_registry_entry_point_rejects_plain_module_owner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fragment = tmp_path / "status.registry.yaml"
+    fragment.write_text("version: 1\nprovider_id: demo\nentries: []\n", encoding="utf-8")
+    entry_point = SimpleNamespace(
+        name="plain-module",
+        value="plain_provider:status_registry_paths",
+        load=lambda: lambda: (fragment,),
+    )
+    monkeypatch.setattr(registry_loader, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        registry_loader,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=None, origin=str(tmp_path / "plain_provider.py")),
+    )
+
+    with pytest.raises(ValueError, match="must belong to an import package"):
+        registry_loader._load_external_status_registry_fragments()  # noqa: SLF001
 
 
 def test_status_registry_fragments_are_included_as_package_data() -> None:
@@ -360,10 +309,6 @@ def test_status_registry_fragments_are_included_as_package_data() -> None:
         "dnadesign.latentdna": ("ops/status.registry.yaml",),
         "dnadesign.opal": ("src/ops/status.registry.yaml",),
         "dnadesign.ops": ("providers/*/status.registry.yaml",),
-        "dnadesign.studies": (
-            "units/retron_hairpin_design/status/ops/status.registry.yaml",
-            "units/stress_ethanol_cipro_growth/operations/status/ops/status.registry.yaml",
-        ),
         "dnadesign.usr": ("ops/status.registry.yaml",),
     }
     for package_name, patterns in expected_patterns.items():
@@ -556,10 +501,6 @@ print(json.dumps(sorted(
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
-        'dnadesign.studies.units.retron_hairpin_design.status.service',
-        'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
 )))
 """
@@ -586,10 +527,6 @@ print(json.dumps(sorted(
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
-        'dnadesign.studies.units.retron_hairpin_design.status.service',
-        'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
 )))
 """
@@ -739,10 +676,6 @@ print(json.dumps(sorted(
         'dnadesign.usr.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
-        'dnadesign.studies.units.retron_hairpin_design.status.service',
-        'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
 )))
 """
@@ -771,10 +704,6 @@ print(json.dumps(sorted(
         'dnadesign.usr.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.service',
-        'dnadesign.studies.units.stress_ethanol_cipro_growth.operations.status.ops.provider',
-        'dnadesign.studies.units.retron_hairpin_design.status.service',
-        'dnadesign.studies.units.retron_hairpin_design.status.ops.provider',
     }
 )))
 """

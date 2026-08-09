@@ -1,7 +1,7 @@
 ## DenseGen documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-09
 
 ### Documentation by workflow
 
@@ -10,7 +10,6 @@
 - [Dense array showcase tutorial](tutorials/demo_dense_array_showcase.md): run a local CBC demo with dense TFBS packing and fixed-anchor variants.
 - [Sampling baseline tutorial](tutorials/demo_sampling_baseline.md): run the sampling-enabled path and inspect artifacts.
 - [Constitutive sigma panel tutorial](tutorials/study_constitutive_sigma_panel.md): execute a constitutive sigma study workflow.
-- [Stress ethanol and ciprofloxacin tutorial](tutorials/study_stress_ethanol_cipro.md): execute a stress-condition study and verify outputs.
 
 #### Run with Notify
 - [DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md): run event-producing flow across DenseGen, USR, and Notify.

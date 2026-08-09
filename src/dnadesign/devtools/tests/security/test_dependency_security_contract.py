@@ -13,10 +13,8 @@ from __future__ import annotations
 
 import ast
 import pickle
-import re
 import subprocess
 import tomllib
-from datetime import date
 from pathlib import Path
 
 import pytest
@@ -63,7 +61,7 @@ def _repository_source_files(
         if not raw_path:
             continue
         relative_path = Path(raw_path.decode("utf-8"))
-        if relative_path.suffix in suffixes:
+        if relative_path.suffix in suffixes and (repo_root / relative_path).is_file():
             sources.append(relative_path)
     return tuple(sorted(sources))
 
@@ -84,6 +82,9 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     assert any(requirement.startswith("onnx>=1.22.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("pip>=26.1.2;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("setuptools>=83.0.0;") for requirement in evo2_dependencies)
+    assert any(requirement.startswith("torch>=2.13,<2.14;") for requirement in dependencies)
+    assert any(requirement.startswith("torch>=2.13,<2.14;") for requirement in evo2_dependencies)
+    assert all(not requirement.startswith(("torchaudio", "torchvision")) for requirement in evo2_dependencies)
     assert "setuptools>=83.0.0" in build_dependencies
     assert all("email" not in author for author in project["authors"])
 
@@ -102,7 +103,7 @@ def test_dependabot_covers_each_tracked_dependency_surface() -> None:
         assert tuple(entry["groups"].values())[0]["patterns"] == ["*"]
 
 
-def test_bounded_dependency_exception_does_not_enter_supported_code() -> None:
+def test_unsupported_torch_execution_does_not_enter_supported_code() -> None:
     repo_root = _repo_root()
     forbidden = ("torch.jit." + "script",)
     violations: list[str] = []
@@ -119,20 +120,6 @@ def test_bounded_dependency_exception_does_not_enter_supported_code() -> None:
                 violations.append(f"{relative_path}: {symbol}")
 
     assert violations == []
-
-
-def test_bounded_dependency_exception_review_dates_have_not_expired() -> None:
-    policy = (_repo_root() / "SECURITY.md").read_text(encoding="utf-8")
-    section = policy.split("### Bounded dependency exceptions", maxsplit=1)[1].split(
-        "## Data handling expectations", maxsplit=1
-    )[0]
-    entries = tuple(re.findall(r"(?ms)^- `.+?(?=^- `|\Z)", section))
-
-    assert len(entries) == 1
-    for entry in entries:
-        deadlines = re.findall(r"no later than (\d{4}-\d{2}-\d{2})", entry)
-        assert len(deadlines) == 1
-        assert date.today() <= date.fromisoformat(deadlines[0])
 
 
 def _torch_aliases(tree: ast.Module) -> tuple[dict[str, str], dict[str, str]]:

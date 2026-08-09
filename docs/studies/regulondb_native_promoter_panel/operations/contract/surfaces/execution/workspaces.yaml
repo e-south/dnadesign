@@ -1,9 +1,0 @@
-construct_workspace:
-  surface_type: workspace
-  workspace_ref: repo:src/dnadesign/construct/workspaces/study_regulondb_native_promoter_panel
-infer_workspace:
-  surface_type: workspace
-  workspace_ref: repo:src/dnadesign/infer/workspaces/study_regulondb_native_promoter_panel
-latentdna_workspace:
-  surface_type: workspace
-  workspace_ref: repo:src/dnadesign/latentdna/workspaces/regulondb_native_promoter_panel

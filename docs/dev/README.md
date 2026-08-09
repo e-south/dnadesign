@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-09
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -33,7 +33,7 @@ Do not bump verification dates without reviewing the affected content.
 | OPS native gate stderr or audit-fidelity behavior | `uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr` |
 | OPS orchestration state or active-job discovery | `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"` |
 | OPS status aggregation semantics | `uv run pytest -q src/dnadesign/ops/tests/test_state_semantics.py` |
-| study-unit code under `src/dnadesign/studies/units/<study-id>/` | `printf '%s\n' <changed-paths> > .ci_changed_files.txt && uv run python -m dnadesign.devtools.ci.test_targets --repo-root . --affected-tools-csv studies --changed-files-file .ci_changed_files.txt` then run `uv run pytest -q` on the printed targets |
+| external study integration seams | `uv run pytest -q src/dnadesign/contracts/tests/reader_records src/dnadesign/ops/tests` |
 | code in one tool | `uv run pytest -q <tool test path>` and then broaden to the repo-level checks when the slice is stable |
 
 ### Day-to-day tasks
@@ -46,8 +46,6 @@ Do not bump verification dates without reviewing the affected content.
 5. Run boundary checks when changing cross-tool imports:
 `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
 6. Run the repo-local skill audits when changing `.agents/skills/`:
-`bash .agents/skills/stress-ethanol-cipro-growth-status/scripts/audit-stress-ethanol-cipro-growth-status-skill.sh`
-`bash .agents/skills/retron-hairpin-study/scripts/audit-retron-hairpin-study-skill.sh`
 `bash .agents/skills/notify-ops/scripts/audit-notify-ops-skill.sh`
 `bash .agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh`
 `bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
@@ -90,10 +88,8 @@ uv run python -m dnadesign.devtools.ci.test_targets \
   --changed-files-file .ci_changed_files.txt
 ```
 
-When `studies` is affected, the resolver includes `src/dnadesign/studies/tests`
-plus the changed `src/dnadesign/studies/units/<study-id>/tests` directories. If
-the changed-file context is unavailable or shared `studies` code changed, it
-broadens to every study-unit test directory.
+Live study tests run in their owning repository. Dnadesign CI tests only the
+public contracts and extension points those repositories consume.
 
 ### CI and quality checks
 
@@ -123,16 +119,8 @@ uv run python -m dnadesign.devtools.runtime.pytest_gate --junit-xml external-int
 1. Proposal lifecycle and promotion rules: [PLANS](../../PLANS.md)
 2. Execution plan indexes: [active plans](../exec-plans/active/README.md), [completed plans](../exec-plans/completed/README.md)
 3. Decision records: [architecture decisions](../architecture/decisions/README.md)
-4. Sequence-view, reference-product, reverse-complement context, and Infer-completion hardening proposal:
-   [2026-04-28 sequence-view ontology and Infer completion spec](plans/cross-tool/sequence-view/2026-04-28-ontology-and-infer-completion-hardening.md)
-5. Generic linear ssDNA composition proposal for Construct, folding QA, BaseRender handoff, and Retron dogfooding:
-   [2026-05-13 generic linear ssDNA composition spec](plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md)
-6. Completed implementation record:
-   [generic linear ssDNA composition execution plan](../exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md)
-7. Active follow-up checklist:
-   [linear ssDNA composition hardening follow-ups](../exec-plans/active/2026-05-14-linear-ssdna-composition-hardening-followups.md)
-8. Active OPAL notebook consolidation spec:
-   [OPAL campaign notebook consolidation](plans/tools/opal/2026-05-15-campaign-notebook-consolidation.md)
+4. Current tool and cross-tool proposals: [design proposal index](plans/README.md)
+5. Public sequence-composition boundary: [ADR-0002](../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
 
 ### Naming and file layout
 

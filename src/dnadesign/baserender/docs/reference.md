@@ -3,13 +3,10 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-02
+last_verified: 2026-08-09
 ---
 
 # BaseRender reference
-
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
 
 Single technical reference for operators and integrators.
 
@@ -94,7 +91,7 @@ Render-contract descriptors:
 - `hairpin_cartoon_render_v3`: hairpin topology cartoon visualization; accepts `hairpin_cartoon`
 - `topology_cartoon_render_v3`: explicit segment-topology cartoon visualization; accepts `topology_cartoon`
 - `snapback_map_render_v3`: snapback visual-map rendering; accepts `snapback_map`
-- `three_way_junction_review_render_v1`: private four-panel quality review; accepts `three_way_junction_review` and limits input to 64 MiB, 2,000 records, and 10,000,000 target bases
+- `three_way_junction_review_render_v1`: private nucleotide-level quality review; accepts `three_way_junction_review` and limits input to 64 MiB, 2,000 records, and 10,000,000 target bases
 
 Adapters:
 - `densegen_tfbs`

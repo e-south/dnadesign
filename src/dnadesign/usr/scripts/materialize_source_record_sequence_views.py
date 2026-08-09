@@ -16,7 +16,7 @@ import json
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import pyarrow.parquet as pq
 
@@ -63,13 +63,6 @@ DATASET_PROFILES: dict[str, SourceRecordSemanticProfile] = {
         view_collections=("densegen_demo_sampling_baseline_source_records",),
         role_tags=("source_record", "demo_fixture"),
     ),
-    "densegen_prom_eth_cip_source": SourceRecordSemanticProfile(
-        source_family="densegen_generated",
-        selection_basis="densegen_source_record",
-        view_collections=("densegen_prom_eth_cip_source_records", "stress_ethanol_cipro_growth_sources"),
-        role_tags=("source_record", "design_population"),
-        study_id="stress_ethanol_cipro_growth",
-    ),
     "densegen_study_constitutive_sigma_panel": SourceRecordSemanticProfile(
         source_family="densegen_generated",
         selection_basis="densegen_source_record",
@@ -81,27 +74,6 @@ DATASET_PROFILES: dict[str, SourceRecordSemanticProfile] = {
         selection_basis="demo_source_record",
         view_collections=("usr_demo_cli_examples_source_records",),
         role_tags=("source_record", "demo_fixture"),
-    ),
-    "usr_mg1655_promoter_controls": SourceRecordSemanticProfile(
-        source_family="legacy_reference_control",
-        selection_basis="curated_control_source_record",
-        view_collections=("usr_mg1655_promoter_controls_source_records", "stress_ethanol_cipro_growth_sources"),
-        role_tags=("source_record", "reference_control"),
-        study_id="stress_ethanol_cipro_growth",
-    ),
-    "usr_pdual10_plasmid_template": SourceRecordSemanticProfile(
-        source_family="construct_template",
-        selection_basis="template_source_record",
-        view_collections=("usr_pdual10_plasmid_template_source_records", "stress_ethanol_cipro_growth_sources"),
-        role_tags=("source_record", "template_seed"),
-        study_id="stress_ethanol_cipro_growth",
-    ),
-    "usr_sfxi_pdual10_densegen_promoters": SourceRecordSemanticProfile(
-        source_family="sfxi_archive",
-        selection_basis="archive_backed_source_record",
-        view_collections=("usr_sfxi_pdual10_densegen_promoters_source_records", "stress_ethanol_cipro_growth_sources"),
-        role_tags=("source_record", "archive_source", "design_population"),
-        study_id="stress_ethanol_cipro_growth",
     ),
 }
 
@@ -120,8 +92,12 @@ def _dataset_names_with_records(usr_root: Path) -> list[str]:
     return names
 
 
-def _profile_for_dataset(name: str) -> SourceRecordSemanticProfile:
-    profile = DATASET_PROFILES.get(name)
+def _profile_for_dataset(
+    name: str,
+    *,
+    profiles: Mapping[str, SourceRecordSemanticProfile],
+) -> SourceRecordSemanticProfile:
+    profile = profiles.get(name)
     if profile is not None:
         return profile
     if name.startswith("densegen_"):
@@ -246,12 +222,16 @@ def materialize_source_record_sequence_views(
     *,
     usr_root: Path,
     dataset_names: list[str] | None = None,
+    profiles: Mapping[str, SourceRecordSemanticProfile] | None = None,
     write: bool = False,
 ) -> SourceRecordSidecarResult:
     names = list(dataset_names or _dataset_names_with_records(usr_root))
     _validate_requested_names(names)
     created_at = now_utc()
     created_by = "dnadesign.usr.materialize_source_record_sequence_views"
+    resolved_profiles = dict(DATASET_PROFILES)
+    if profiles is not None:
+        resolved_profiles.update(profiles)
 
     by_dataset: dict[str, dict[str, object]] = {}
     planned_views: list[tuple[Dataset, list[SequenceViewRecord], list[ViewSemanticsRecord]]] = []
@@ -267,7 +247,7 @@ def materialize_source_record_sequence_views(
         existing_views = load_sequence_views(dataset)
         existing_semantics = load_view_semantics_index(dataset)
         views_seen += len(existing_views)
-        profile = _profile_for_dataset(dataset.name)
+        profile = _profile_for_dataset(dataset.name, profiles=resolved_profiles)
 
         if existing_views:
             missing_semantics = []

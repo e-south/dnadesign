@@ -3,14 +3,12 @@ id: opal-objective-response-magnitude-feasibility-v1
 title: Response-Magnitude Feasibility objective
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-02
+last_verified: 2026-08-09
 ---
 
-## Response-Magnitude Feasibility `response_magnitude_feasibility_v1`
+# Response-Magnitude Feasibility `response_magnitude_feasibility_v1`
 
 **Short name:** RMF
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
 
 `response_magnitude_feasibility_v1` is a built-in objective plugin, not a
 selector or label contract. The plugin does not declare whether a particular
@@ -294,5 +292,6 @@ does not fall back to SFXI.
 - Objective tests:
   `src/dnadesign/opal/tests/objectives/test_objective_response_magnitude_feasibility_v1.py`
 - Reader assay contract: `reader/docs/lib/plate_reader/four_state_event_window.md`
-- Stress-study decision:
-  `docs/studies/stress_ethanol_cipro_growth/contexts/opal/response-magnitude-feasibility.md`
+
+Window selection, reference choice, and campaign decisions belong in the
+external study workspace.

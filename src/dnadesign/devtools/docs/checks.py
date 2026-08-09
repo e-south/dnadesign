@@ -36,10 +36,7 @@ from dnadesign.ops.catalog import (
     resolve_catalog_doc_path,
     resolve_registry_metadata_path_for_doc_path,
 )
-from dnadesign.ops.runbooks import (
-    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
-    REPO_TRANSIENT_OPERATIONAL_DIR_NAMES,
-)
+from dnadesign.ops.runbooks import REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
 from dnadesign.ops.status import list_status_kind_specs_for_repo
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -102,7 +99,6 @@ INDEX_MARKDOWN_FILES = (
     "docs/dev/README.md",
     "docs/bu-scc/README.md",
     "docs/notify/README.md",
-    "docs/studies/reference/README.md",
 )
 RUNBOOK_MARKDOWN_FILES = (
     "docs/setup/installation.md",
@@ -147,7 +143,6 @@ PUBLIC_INTERFACE_DOC_PATHS = (
     "docs/README.md",
     "docs/dev/README.md",
     "docs/runbooks/README.md",
-    "docs/studies/README.md",
     "src/dnadesign/cruncher/docs/demos",
     "src/dnadesign/cruncher/docs/reference/cli.md",
     "src/dnadesign/cruncher/workspaces",
@@ -157,7 +152,6 @@ PUBLIC_INTERFACE_DOC_PATHS = (
     "src/dnadesign/densegen/workspaces/README.md",
     "src/dnadesign/ops/README.md",
     "src/dnadesign/ops/docs",
-    "src/dnadesign/studies/README.md",
 )
 ABSOLUTE_DOC_PATH_TOKENS = ("/Users/", "/private/", "/tmp/", "/home/", "/var/", "C:\\")
 INTERNAL_SOURCE_INREACH_PATTERN = re.compile(r"(?:dnadesign\.[a-z0-9_]+\.src\.|src/dnadesign/[a-z0-9_-]+/src/)")
@@ -195,7 +189,6 @@ DENSEGEN_DOC_LANGUAGE_PATHS = (
 DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
 CONSTRUCT_OPERATOR_DOC_PATHS = (
     "src/dnadesign/usr/docs/operations",
-    "docs/studies",
     "src/dnadesign/notify/docs/reference/command-contracts.md",
 )
 CONSTRUCT_LEGACY_OPERATOR_PATTERNS = (
@@ -217,78 +210,6 @@ LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
     re.compile(r"src/dnadesign/usr_roots\.py\b"),
     re.compile(r"src/dnadesign/usr/src/roots\.py\b"),
     re.compile(r"src/dnadesign/ops/orchestrator/contracts\.py\b"),
-)
-STUDY_RECORD_REQUIRED_FILES = (
-    "record/campaign.yaml",
-    "record/datasets.yaml",
-    "record/status.md",
-    "operations/ops.study.yaml",
-)
-STUDY_OPS_CONTRACT_PART_KEYS = {
-    "lifecycle",
-    "phases",
-    "tracks",
-    "artifacts",
-    "execution_surfaces",
-    "snapshot",
-    "preflight",
-}
-STUDY_OPS_CONTRACT_PARTS_DIR = "contract"
-STUDY_OPS_CONTRACT_PART_MAX_LINES = 180
-STUDY_README_FRONTMATTER_REQUIRED_KEYS = {
-    "doc_id",
-    "surface",
-    "study_id",
-    "owner",
-    "last_verified",
-}
-STUDY_RUNTIME_PIPELINE_REF = "manifest:operations/runtime/command-groups/pipeline.yaml"
-STUDY_LEGACY_PIPELINE_REFS = {
-    "manifest:operations/pipeline.yaml",
-    "manifest:operations/runtime/pipeline.yaml",
-    "operations/pipeline.yaml",
-    "operations/runtime/pipeline.yaml",
-}
-STUDY_RECORD_REQUIRED_READMES = ("docs/studies/README.md",)
-STUDY_RECORD_ROUTER_FILES = (
-    "AGENTS.md",
-    "src/dnadesign/usr/AGENTS.md",
-)
-STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS = (
-    "ARCHITECTURE.md",
-    "docs/README.md",
-    "docs/studies/README.md",
-    "docs/studies/reference/study-status-ops-surfaces.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
-    "docs/studies/stress_ethanol_cipro_growth/routes/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/routes/analysis/latentdna.md",
-    "docs/studies/stress_ethanol_cipro_growth/routes/decision/opal/README.md",
-    "docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md",
-    "docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md",
-)
-LEGACY_STUDY_STATUS_SURFACE_TERMS = (
-    "Study status adapters",
-    "study-status adapter",
-    "status adapter policy",
-    "study-family policy",
-    "family routing resolves",
-    "src/dnadesign/studies/families/",
-    "Study-family adapters",
-    "family-specific execution taxonomy",
-    "family-owned status",
-    "`family`, and `record_root`",
-    "declare `family` and `record_root`",
-    "promoter-family code",
-    "promoter-family adapter",
-)
-ACTIVE_STUDY_INDEX_PATH = "docs/studies/index.yaml"
-LEGACY_STUDY_INDEX_PATH = "docs/studies/promoter/index.yaml"
-LEGACY_STUDY_RECORD_PREFIX = "docs/studies/promoter/"
-ACTIVE_SHARED_USR_DATASET_ID_NUDGE = (
-    "Active shared USR dataset IDs must be flat owner-first IDs like "
-    "'densegen_prom_eth_cip_source'; use root_kind, owner_tool, overlays, and "
-    "study metadata for provenance. archived/ is the only special top-level bucket."
 )
 SHARED_USR_DATASETS_ROOT = "src/dnadesign/usr/datasets"
 SHARED_USR_DATASET_LAYOUT_NUDGE = (
@@ -358,26 +279,6 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "data-plane",
         "owner_boundary": "usr",
     },
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/status.md": {
-        "type": "contract",
-        "plane": "data-plane",
-        "owner_boundary": "studies",
-    },
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md": {
-        "type": "contract",
-        "plane": "data-plane",
-        "owner_boundary": "studies",
-    },
-    "docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md": {
-        "type": "contract",
-        "plane": "data-plane",
-        "owner_boundary": "studies",
-    },
-    "docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md": {
-        "type": "contract",
-        "plane": "data-plane",
-        "owner_boundary": "studies",
-    },
     "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
         "type": "workflow",
         "plane": "downstream-tool",
@@ -401,14 +302,8 @@ _REGISTRY_ID_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+
 _METADATA_TOKEN_VALUE_PATTERN = re.compile(r"^[a-z][a-z0-9-]*(?:-[a-z0-9]+)*$")
 RUNBOOK_CATALOG_DOC_PATH = "docs/runbooks/README.md"
 RUNBOOK_STATUS_GLOSSARY_HEADING = "### Status views"
-OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (
-    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
-    Path("docs/templates"),
-)
-OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS = (
-    PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR,
-    Path("docs/templates"),
-)
+OPS_OPERATIONAL_RUNBOOK_ALLOWED_PREFIXES = (Path("docs/templates"),)
+OPS_OPERATIONAL_RUNBOOK_FALLBACK_SCAN_ROOTS = (Path("docs/templates"),)
 TRANSIENT_OPERATIONAL_ROOT_DIR_NAMES = REPO_TRANSIENT_OPERATIONAL_DIR_NAMES
 DISALLOWED_SHARED_UTILS_PATHS = (Path("src/dnadesign/utils"),)
 DISALLOWED_REPO_ROOT_OUTPUT_DIR_NAMES = ("outputs",)
@@ -420,14 +315,7 @@ OVERLAY_GUARD_DOC_PATHS = (
 OPS_DEPRECATED_SEMANTICS_DOC_PATHS = (
     "docs/operations/README.md",
     "docs/operations/orchestration/runbooks.md",
-    "docs/studies/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/record/status.md",
     "src/dnadesign/ops/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
-)
-STUDY_EXECUTION_SOURCE_DOC_PATHS = (
-    "docs/studies/README.md",
-    "docs/studies/stress_ethanol_cipro_growth/operations/catalog/contracts/preflight.md",
 )
 STALE_OVERLAY_GUARD_TERMS = (
     "densegen-overlay-guard",
@@ -444,11 +332,6 @@ OPS_DEPRECATED_SEMANTICS_TERMS = (
     "notify_resolve_events",
     "details.setup_command",
 )
-PIPELINE_ONLY_EXECUTION_SOURCE_PATTERN = re.compile(
-    r"pipeline\.yaml[\s\S]{0,120}only (?:valid )?source",
-    flags=re.IGNORECASE,
-)
-PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN = re.compile(r"_(?:\d+)(?:h|hr|hrs|hour|hours)$", re.IGNORECASE)
 OPERATIONAL_RUNBOOK_SCAN_PRUNE_DIRS = {
     ".git",
     ".pytest_cache",
@@ -1065,6 +948,47 @@ def _extract_metadata_field(text: str, pattern: re.Pattern[str]) -> str | None:
     return match.group(1).strip()
 
 
+def _load_markdown_frontmatter(text: str, *, path: Path) -> Mapping[str, object]:
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        raise ValueError(f"{path}: YAML front matter is missing its closing '---'.")
+    try:
+        payload = yaml.safe_load(text[4:end])
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{path}: invalid YAML front matter: {exc}") from exc
+    if payload is None:
+        return {}
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"{path}: YAML front matter must be a mapping.")
+    return payload
+
+
+def _extract_doc_metadata_field(
+    text: str,
+    *,
+    frontmatter: Mapping[str, object],
+    frontmatter_key: str,
+    body_pattern: re.Pattern[str],
+) -> str | None:
+    value = frontmatter.get(frontmatter_key)
+    if value is not None:
+        if isinstance(value, dt.date):
+            return value.isoformat()
+        return str(value).strip()
+    return _extract_metadata_field(text, body_pattern)
+
+
+def _markdown_body_without_frontmatter(text: str) -> str:
+    if not text.startswith("---\n"):
+        return text
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        return text
+    return text[end + len("\n---\n") :]
+
+
 def _parse_iso_date(value: str, *, field_name: str, path: Path) -> dt.date:
     try:
         return dt.date.fromisoformat(value)
@@ -1198,7 +1122,17 @@ def _find_owner_last_verified_metadata_issues_for_files(
             continue
 
         text = path.read_text(encoding="utf-8")
-        owner = _extract_metadata_field(text, OWNER_PATTERN)
+        try:
+            frontmatter = _load_markdown_frontmatter(text, path=path)
+        except ValueError as exc:
+            issues.append(str(exc))
+            continue
+        owner = _extract_doc_metadata_field(
+            text,
+            frontmatter=frontmatter,
+            frontmatter_key="owner",
+            body_pattern=OWNER_PATTERN,
+        )
         owner_valid = True
         if owner is None:
             issues.append(f"{path}: missing '**Owner:**' metadata field.")
@@ -1206,7 +1140,12 @@ def _find_owner_last_verified_metadata_issues_for_files(
         elif not owner:
             issues.append(f"{path}: '**Owner:**' must not be empty.")
 
-        last_verified_raw = _extract_metadata_field(text, LAST_VERIFIED_PATTERN)
+        last_verified_raw = _extract_doc_metadata_field(
+            text,
+            frontmatter=frontmatter,
+            frontmatter_key="last_verified",
+            body_pattern=LAST_VERIFIED_PATTERN,
+        )
         last_verified_valid = True
         if last_verified_raw is None:
             issues.append(f"{path}: missing '**Last verified:**' metadata field.")
@@ -1511,289 +1450,6 @@ def _extract_markdown_section(text: str, *, heading: str) -> str | None:
     return "\n".join(section_lines)
 
 
-def _find_study_record_doc_issues(repo_root: Path) -> list[str]:
-    issues: list[str] = []
-    resolved_repo_root = repo_root.resolve()
-
-    legacy_study_root = repo_root / "docs" / "studies" / "promoter"
-    if legacy_study_root.exists():
-        issues.append(f"{legacy_study_root}: legacy family-nested study record path must not exist.")
-
-    for relative_path in STUDY_RECORD_REQUIRED_READMES:
-        path = repo_root / relative_path
-        if not path.exists():
-            continue
-        text = path.read_text(encoding="utf-8")
-        if LEGACY_STUDY_RECORD_PREFIX in text:
-            issues.append(
-                f"{path}: legacy family-nested study path "
-                f"'{LEGACY_STUDY_RECORD_PREFIX}<study-id>/...' must not appear; "
-                "use 'docs/studies/<study-id>/...'."
-            )
-        documented_references = _collect_markdown_reference_names(text)
-        for required_name in STUDY_RECORD_REQUIRED_FILES:
-            if required_name not in documented_references:
-                issues.append(
-                    f"{path}: missing navigable study-record contract reference for '{required_name}' "
-                    "as a markdown link or code span."
-                )
-
-    for relative_path in STUDY_RECORD_ROUTER_FILES:
-        path = repo_root / relative_path
-        if not path.exists():
-            continue
-        text = path.read_text(encoding="utf-8")
-        if LEGACY_STUDY_INDEX_PATH in text:
-            issues.append(
-                f"{path}: legacy study index path '{LEGACY_STUDY_INDEX_PATH}' must not appear; "
-                f"use '{ACTIVE_STUDY_INDEX_PATH}'."
-            )
-        if LEGACY_STUDY_RECORD_PREFIX in text:
-            issues.append(
-                f"{path}: legacy family-nested study path "
-                f"'{LEGACY_STUDY_RECORD_PREFIX}<study-id>/...' must not appear; "
-                "use 'docs/studies/<study-id>/...'."
-            )
-        if ACTIVE_STUDY_INDEX_PATH not in text:
-            issues.append(f"{path}: study-record router must reference '{ACTIVE_STUDY_INDEX_PATH}'.")
-
-    index_path = repo_root / "docs" / "studies" / "index.yaml"
-    if not index_path.exists():
-        return issues
-
-    study_records_root = (repo_root / "docs" / "studies").resolve()
-    payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
-    if not isinstance(payload, dict):
-        return [f"{index_path}: study index must be a mapping."]
-
-    version = payload.get("version")
-    if version != 1:
-        issues.append(f"{index_path}: study index must declare version: 1.")
-
-    active_study = payload.get("active_study_id")
-    studies_payload = payload.get("studies") or []
-    if not isinstance(studies_payload, list):
-        issues.append(f"{index_path}: 'studies' must be a list.")
-        return issues
-
-    entries_by_id: dict[str, Path] = {}
-    for index, entry in enumerate(studies_payload, start=1):
-        if not isinstance(entry, dict):
-            issues.append(f"{index_path}: study entry {index} must be a mapping.")
-            continue
-        study_id = str(entry.get("study_id") or "").strip()
-        raw_path = str(entry.get("record_root") or "").strip()
-        if not study_id:
-            issues.append(f"{index_path}: study entry {index} must define study_id.")
-            continue
-        if "family" in entry:
-            issues.append(
-                f"{index_path}: study entry {study_id!r} must not define legacy family; "
-                "use the study record's explicit ops_surfaces instead."
-            )
-            continue
-        if not raw_path:
-            issues.append(f"{index_path}: study entry {study_id!r} must define record_root.")
-            continue
-        resolved_path = (
-            (repo_root / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
-        )
-        try:
-            resolved_path.relative_to(resolved_repo_root)
-        except ValueError:
-            issues.append(f"{index_path}: study entry {study_id!r} path escapes the repository: {raw_path}")
-            continue
-        try:
-            resolved_path.relative_to(study_records_root)
-        except ValueError:
-            issues.append(
-                f"{index_path}: study entry {study_id!r} record_root must live under "
-                f"docs/studies/<study-id> (path={raw_path!r})."
-            )
-            continue
-        if resolved_path.name != study_id:
-            issues.append(
-                f"{index_path}: study entry {study_id!r} path must end with the same study id (path={raw_path!r})."
-            )
-        if study_id in entries_by_id:
-            issues.append(f"{index_path}: duplicate study_id {study_id!r}.")
-            continue
-        entries_by_id[study_id] = resolved_path
-
-    for study_id, study_root in sorted(entries_by_id.items()):
-        issues.extend(_find_study_readme_frontmatter_issues(study_root=study_root, study_id=study_id))
-        issues.extend(_find_study_ops_contract_layout_issues(study_root=study_root, study_id=study_id))
-
-    active_study_text = str(active_study or "").strip() or None
-    if active_study_text is None:
-        issues.append(f"{index_path}: active_study_id must be a non-empty study id.")
-        return issues
-    if active_study_text not in entries_by_id:
-        issues.append(f"{index_path}: active_study_id {active_study_text!r} is not declared under studies.")
-        return issues
-
-    study_root = entries_by_id[active_study_text]
-    if not study_root.is_dir():
-        issues.append(f"{index_path}: active study path is not a directory: {study_root}")
-        return issues
-    for required_name in STUDY_RECORD_REQUIRED_FILES:
-        required_path = study_root / required_name
-        if not required_path.exists():
-            issues.append(
-                f"{index_path}: active study {active_study_text!r} is missing "
-                f"required file {required_name}: {required_path}"
-            )
-
-    return issues
-
-
-def _find_study_ops_contract_layout_issues(*, study_root: Path, study_id: str) -> list[str]:
-    issues: list[str] = []
-    operations_root = study_root / "operations"
-    ops_path = operations_root / "ops.study.yaml"
-    if not ops_path.exists():
-        return issues
-
-    try:
-        payload = yaml.safe_load(ops_path.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        return [f"{ops_path}: unable to parse ops.study.yaml ({exc})."]
-    if not isinstance(payload, dict):
-        return [f"{ops_path}: ops.study.yaml for study {study_id!r} must be a mapping."]
-
-    legacy_pipeline_paths = (
-        operations_root / "pipeline.yaml",
-        operations_root / "runtime" / "pipeline.yaml",
-    )
-    for legacy_pipeline_path in legacy_pipeline_paths:
-        if not legacy_pipeline_path.exists():
-            continue
-        issues.append(
-            f"{legacy_pipeline_path}: study pipeline belongs under operations/runtime/command-groups/pipeline.yaml "
-            "so OPS contracts, runtime plans, and contract fragments stay separate."
-        )
-
-    record_sources = payload.get("record_sources") or {}
-    if record_sources and not isinstance(record_sources, dict):
-        issues.append(f"{ops_path}: record_sources must be a mapping.")
-    elif isinstance(record_sources, dict):
-        pipeline_ref = str(record_sources.get("pipeline_ref") or "").strip()
-        if pipeline_ref in STUDY_LEGACY_PIPELINE_REFS:
-            issues.append(
-                f"{ops_path}: record_sources.pipeline_ref must use {STUDY_RUNTIME_PIPELINE_REF!r}, "
-                "not a legacy flat pipeline path."
-            )
-
-    parts = payload.get("parts")
-    if parts is None:
-        return issues
-    if not isinstance(parts, dict):
-        return [*issues, f"{ops_path}: parts must be a mapping."]
-
-    unknown_parts = sorted(str(key) for key in parts if str(key) not in STUDY_OPS_CONTRACT_PART_KEYS)
-    if unknown_parts:
-        issues.append(f"{ops_path}: parts contains unknown section(s): {', '.join(unknown_parts)}.")
-
-    for raw_section, raw_ref in parts.items():
-        section = str(raw_section or "").strip()
-        if section in payload:
-            issues.append(f"{ops_path}: parts.{section} duplicates an inline {section} section.")
-        if isinstance(raw_ref, list):
-            raw_refs = raw_ref
-            if not raw_refs:
-                issues.append(f"{ops_path}: parts.{section} must list at least one operations-relative path.")
-                continue
-        else:
-            raw_refs = [raw_ref]
-        for index, raw_part_ref in enumerate(raw_refs):
-            ref_label = f"parts.{section}" if len(raw_refs) == 1 else f"parts.{section}[{index}]"
-            ref = str(raw_part_ref or "").strip()
-            if not ref:
-                issues.append(f"{ops_path}: {ref_label} must be a non-empty operations-relative path.")
-                continue
-            if ref.startswith(("repo:", "manifest:")):
-                issues.append(f"{ops_path}: {ref_label} must be operations-relative, not a path ref.")
-                continue
-            part_rel = Path(ref)
-            if part_rel.is_absolute() or ".." in part_rel.parts:
-                issues.append(f"{ops_path}: {ref_label} must stay inside the operations directory.")
-                continue
-            if not part_rel.parts or part_rel.parts[0] != STUDY_OPS_CONTRACT_PARTS_DIR:
-                issues.append(
-                    f"{ops_path}: {ref_label} must live under operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/ "
-                    "to keep the root OPS record as a one-hop index."
-                )
-            part_path = operations_root / part_rel
-            if not part_path.exists():
-                issues.append(f"{ops_path}: {ref_label} references missing file {part_path}.")
-                continue
-            if part_path.suffix in {".yaml", ".yml"}:
-                line_count = len(part_path.read_text(encoding="utf-8").splitlines())
-                if line_count > STUDY_OPS_CONTRACT_PART_MAX_LINES:
-                    issues.append(
-                        f"{part_path}: ops contract part has {line_count} lines; split bulky owner lanes into "
-                        f"semantic fragments below operations/{STUDY_OPS_CONTRACT_PARTS_DIR}/."
-                    )
-            continue
-
-    return issues
-
-
-def _find_study_readme_frontmatter_issues(*, study_root: Path, study_id: str) -> list[str]:
-    issues: list[str] = []
-    for relative_name, expected_surface, extra_key in (
-        ("README.md", "study-root", "first_hop"),
-        ("routes/README.md", "study-route-map", "entrypoint"),
-    ):
-        path = study_root / relative_name
-        if not path.exists():
-            continue
-        text = path.read_text(encoding="utf-8")
-        if not text.startswith("---\n"):
-            issues.append(f"{path}: study navigation docs must start with YAML frontmatter.")
-            continue
-        try:
-            raw_frontmatter = text.split("---", 2)[1]
-            payload = yaml.safe_load(raw_frontmatter)
-        except (IndexError, yaml.YAMLError) as exc:
-            issues.append(f"{path}: unable to parse YAML frontmatter ({exc}).")
-            continue
-        if not isinstance(payload, dict):
-            issues.append(f"{path}: YAML frontmatter must be a mapping.")
-            continue
-        missing = sorted(
-            key
-            for key in (*STUDY_README_FRONTMATTER_REQUIRED_KEYS, extra_key)
-            if not str(payload.get(key) or "").strip()
-        )
-        if missing:
-            issues.append(f"{path}: missing study navigation frontmatter key(s): {', '.join(missing)}.")
-        if str(payload.get("study_id") or "").strip() != study_id:
-            issues.append(f"{path}: frontmatter study_id must be {study_id!r}.")
-        if str(payload.get("surface") or "").strip() != expected_surface:
-            issues.append(f"{path}: frontmatter surface must be {expected_surface!r}.")
-    return issues
-
-
-def _find_study_status_surface_semantics_issues(repo_root: Path) -> list[str]:
-    issues: list[str] = []
-    target_files = _collect_markdown_files_from_relative_paths(
-        repo_root,
-        relative_paths=STUDY_STATUS_SURFACE_SEMANTICS_DOC_PATHS,
-    )
-    for path in target_files:
-        content = _markdown_text_without_fenced_code(path.read_text(encoding="utf-8"))
-        for term in LEGACY_STUDY_STATUS_SURFACE_TERMS:
-            if term not in content:
-                continue
-            line_no = content[: content.index(term)].count("\n") + 1
-            issues.append(
-                f"{path}:{line_no}: stale study-status ontology term {term!r} is not allowed; "
-                "route studies through concrete study-owned providers only when those providers exist."
-            )
-    return issues
-
-
 def _find_repo_local_skill_frontmatter_issues(repo_root: Path) -> list[str]:
     skills_root = repo_root / REPO_LOCAL_SKILLS_DIR
     if not skills_root.exists():
@@ -1843,90 +1499,6 @@ def _collect_markdown_reference_names(text: str) -> set[str]:
             references.add(target_rel)
             references.add(Path(target_rel).name)
     return references
-
-
-def _find_active_shared_usr_dataset_id_issues(repo_root: Path) -> list[str]:
-    issues: list[str] = []
-    resolved_repo_root = repo_root.resolve()
-    index_path = repo_root / ACTIVE_STUDY_INDEX_PATH
-    if not index_path.exists():
-        return issues
-
-    payload = yaml.safe_load(index_path.read_text(encoding="utf-8")) or {}
-    if not isinstance(payload, dict):
-        return issues
-
-    active_study = str(payload.get("active_study_id") or "").strip()
-    studies_payload = payload.get("studies") or []
-    if not active_study or not isinstance(studies_payload, list):
-        return issues
-
-    study_root: Path | None = None
-    for entry in studies_payload:
-        if not isinstance(entry, dict):
-            continue
-        if str(entry.get("study_id") or "").strip() != active_study:
-            continue
-        raw_path = str(entry.get("record_root") or "").strip()
-        if not raw_path:
-            return issues
-        candidate = (repo_root / raw_path).resolve() if not Path(raw_path).is_absolute() else Path(raw_path).resolve()
-        try:
-            candidate.relative_to(resolved_repo_root)
-        except ValueError:
-            return issues
-        study_root = candidate
-        break
-
-    if study_root is None:
-        return issues
-
-    datasets_path = study_root / "record" / "datasets.yaml"
-    if not datasets_path.exists():
-        return issues
-
-    datasets_payload = yaml.safe_load(datasets_path.read_text(encoding="utf-8")) or {}
-    if not isinstance(datasets_payload, dict):
-        return issues
-    entries = datasets_payload.get("datasets") or []
-    if not isinstance(entries, list):
-        return issues
-
-    def is_disallowed_nested_id(dataset_id: str, *, status: str) -> bool:
-        if "/" not in dataset_id:
-            return False
-        top_level = dataset_id.split("/", maxsplit=1)[0]
-        return not (top_level == "archived" and status == "archived")
-
-    for index, entry in enumerate(entries, start=1):
-        if not isinstance(entry, dict):
-            continue
-        root_kind = str(entry.get("root_kind") or "").strip()
-        if root_kind != "shared":
-            continue
-
-        role = str(entry.get("role") or index).strip()
-        status = str(entry.get("status") or "").strip()
-        dataset_id = str(entry.get("dataset") or "").strip()
-        if dataset_id and is_disallowed_nested_id(dataset_id, status=status):
-            issues.append(
-                f"{datasets_path}: dataset entry {role!r} uses nested active shared "
-                f"dataset id {dataset_id!r}. {ACTIVE_SHARED_USR_DATASET_ID_NUDGE}"
-            )
-
-        sync = entry.get("sync")
-        if not isinstance(sync, dict):
-            continue
-        remote_root_kind = str(sync.get("remote_root_kind") or "").strip()
-        remote_dataset = str(sync.get("remote_dataset") or "").strip()
-        if remote_root_kind == "shared" and remote_dataset not in {"", "n/a"}:
-            if is_disallowed_nested_id(remote_dataset, status=status):
-                issues.append(
-                    f"{datasets_path}: dataset entry {role!r} uses nested active shared "
-                    f"remote_dataset id {remote_dataset!r}. {ACTIVE_SHARED_USR_DATASET_ID_NUDGE}"
-                )
-
-    return issues
 
 
 def _find_shared_usr_dataset_layout_issues(repo_root: Path) -> list[str]:
@@ -2182,7 +1754,7 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
         if not readme_path.exists():
             continue
 
-        text = readme_path.read_text(encoding="utf-8")
+        text = _markdown_body_without_frontmatter(readme_path.read_text(encoding="utf-8"))
         top_block = "\n".join(text.splitlines()[:25])
         banner = _top_rendered_readme_banner(text)
         if banner is None:
@@ -2253,7 +1825,7 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
         if not readme_path.exists():
             continue
 
-        text = readme_path.read_text(encoding="utf-8")
+        text = _markdown_body_without_frontmatter(readme_path.read_text(encoding="utf-8"))
         lines = text.splitlines()
         if len(lines) > TOOL_README_MAX_LINES:
             issues.append(
@@ -2613,26 +2185,6 @@ def _should_descend_operational_runbook_dir(relative_parts: tuple[str, ...]) -> 
     return True
 
 
-def _find_packaged_runbook_variant_issues(repo_root: Path) -> list[str]:
-    issues: list[str] = []
-    preset_root = repo_root / PACKAGED_RUNBOOK_PRESETS_RELATIVE_DIR
-    if not preset_root.exists():
-        return issues
-    for suffix in ("*.yaml", "*.yml"):
-        for path in sorted(preset_root.rglob(suffix)):
-            if not path.is_file():
-                continue
-            if not _is_ops_operational_runbook_contract(path):
-                continue
-            if PACKAGED_RUNBOOK_DURATION_SUFFIX_PATTERN.search(path.stem) is None:
-                continue
-            issues.append(
-                f"{path}: duration-suffixed operational variants are not allowed in presets; "
-                "use workspace outputs/logs/ops/runbooks/."
-            )
-    return issues
-
-
 def _find_transient_operational_artifact_path_issues(repo_root: Path) -> list[str]:
     issues: list[str] = []
     for dir_name in DISALLOWED_REPO_ROOT_OUTPUT_DIR_NAMES:
@@ -2700,26 +2252,6 @@ def _find_ops_deprecated_semantics_issues(repo_root: Path) -> list[str]:
                     f"{path}: deprecated ops semantics term '{term}' is not allowed; "
                     "use transport-neutral workflow ids and the presets surface only."
                 )
-    return issues
-
-
-def _find_study_execution_source_drift_issues(repo_root: Path) -> list[str]:
-    issues: list[str] = []
-    target_files = _collect_markdown_files_from_relative_paths(
-        repo_root,
-        relative_paths=STUDY_EXECUTION_SOURCE_DOC_PATHS,
-    )
-    for path in target_files:
-        content = path.read_text(encoding="utf-8")
-        match = PIPELINE_ONLY_EXECUTION_SOURCE_PATTERN.search(content)
-        if match is None:
-            continue
-        line_no = content[: match.start()].count("\n") + 1
-        issues.append(
-            f"{path}:{line_no}: docs must not claim pipeline.yaml is the only execution-surface source; "
-            "use ops.study.yaml for OPS-facing execution surfaces and pipeline.yaml only for "
-            "supplemental runtime context."
-        )
     return issues
 
 
@@ -2801,31 +2333,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
-    study_record_doc_issues = _find_study_record_doc_issues(repo_root)
-    if study_record_doc_issues:
-        print("Study record docs check failed:")
-        for issue in study_record_doc_issues:
-            print(f" - {issue}")
-        return 1
-
-    study_status_surface_semantics_issues = _find_study_status_surface_semantics_issues(repo_root)
-    if study_status_surface_semantics_issues:
-        print("Study status surface semantics check failed:")
-        for issue in study_status_surface_semantics_issues:
-            print(f" - {issue}")
-        return 1
-
     repo_local_skill_frontmatter_issues = _find_repo_local_skill_frontmatter_issues(repo_root)
     if repo_local_skill_frontmatter_issues:
         print("Repo-local skill frontmatter check failed:")
         for issue in repo_local_skill_frontmatter_issues:
-            print(f" - {issue}")
-        return 1
-
-    active_shared_usr_dataset_id_issues = _find_active_shared_usr_dataset_id_issues(repo_root)
-    if active_shared_usr_dataset_id_issues:
-        print("Active shared USR dataset id check failed:")
-        for issue in active_shared_usr_dataset_id_issues:
             print(f" - {issue}")
         return 1
 
@@ -2878,13 +2389,6 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
-    packaged_runbook_variant_issues = _find_packaged_runbook_variant_issues(repo_root)
-    if packaged_runbook_variant_issues:
-        print("Packaged runbook variant check failed:")
-        for issue in packaged_runbook_variant_issues:
-            print(f" - {issue}")
-        return 1
-
     transient_operational_artifact_path_issues = _find_transient_operational_artifact_path_issues(repo_root)
     if transient_operational_artifact_path_issues:
         print("Transient operational artifact placement check failed:")
@@ -2910,13 +2414,6 @@ def main(argv: list[str] | None = None) -> int:
     if ops_deprecated_semantics_issues:
         print("Ops terminology drift check failed:")
         for issue in ops_deprecated_semantics_issues:
-            print(f" - {issue}")
-        return 1
-
-    study_execution_source_drift_issues = _find_study_execution_source_drift_issues(repo_root)
-    if study_execution_source_drift_issues:
-        print("Study execution-source docs check failed:")
-        for issue in study_execution_source_drift_issues:
             print(f" - {issue}")
         return 1
 

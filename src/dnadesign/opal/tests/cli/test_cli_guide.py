@@ -129,7 +129,6 @@ def test_guide_json_uses_usr_records_and_shared_label_source_sidecar(tmp_path: P
     assert "docs/workflows/campaign-round.md" in out["learn_more"]["docs"]
     assert "docs/plugins/objectives/sfxi.md" not in out["learn_more"]["docs"]
     assert "<labels-file>" in ingest_step["command"]
-    assert "vec8-b0" not in ingest_step["command"]
 
 
 def test_guide_markdown_contains_round_semantics_and_commands(tmp_path: Path) -> None:

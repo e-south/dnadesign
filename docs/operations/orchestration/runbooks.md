@@ -11,7 +11,7 @@
 **Status-kind:** ops-audit-json
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-08-09
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
 It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next procedure is about shared datasets rather than scheduler sequencing.
@@ -102,42 +102,22 @@ uv run ops runbook init \
   --no-notify
 ```
 
-### Packaged presets
+### Init presets
 
-List packaged starter runbooks:
+List site/account defaults accepted by `ops runbook init`:
 
 ```bash
 uv run ops runbook presets
 ```
 
-`ops runbook presets` now lists two explicit preset families:
-
-1. `init_presets`: named site/account shortcuts used by `ops runbook init --preset ...`
-2. `presets`: packaged starter runbooks that you copy or materialize into a workspace before planning or execution
-
+The result contains `init_presets`, a list of named site/account shortcuts.
 Current init presets include:
 
 1. `bu-scc-dunlop`
 
-Current presets include:
-
-1. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch.yaml`
-2. `src/dnadesign/ops/runbooks/presets/densegen_stress_ethanol_cipro_batch_with_notify.yaml`
-3. `src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml`
-4. `src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml`
-5. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml`
-6. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml`
-7. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml`
-8. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml`
-9. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml`
-10. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml`
-11. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml`
-12. `src/dnadesign/ops/runbooks/presets/infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b_batch_with_notify.yaml`
-
-Infer auto/resume resolves exactly one USR write-back destination or one sequence-view input dataset per
-runbook. If a study has separate anchor, forward-context, and reverse-complement context datasets or
-view selectors, ship one batch preset per operational lane instead of one multi-destination Infer
-preset.
+Live study runbooks remain in their external study workspaces. Dnadesign ships
+the runbook schema, planner, executor, templates, and init defaults; it does not
+ship study-specific runbook instances.
 
 Infer runbooks whose config uses `feature_bundle.sequence_view_inputs` render an
 extra preflight command before `infer run --dry-run`:
@@ -177,13 +157,13 @@ Result expectations:
 
 ### Fill remaining Infer lanes
 
-Use the fill command when a checked-in study has multiple Infer runbooks and the
+Use the fill command when an external study has multiple Infer runbooks and the
 operator question is "run whatever sequence-view inference is still missing":
 
 ```bash
-uv run ops runbook fill-infer --study-dir docs/studies/<study-id>
-uv run ops runbook fill-infer --study-dir docs/studies/<study-id> --execute
-uv run ops runbook fill-infer --study-dir docs/studies/<study-id> --submit
+uv run ops runbook fill-infer --study-dir /path/to/study
+uv run ops runbook fill-infer --study-dir /path/to/study --execute
+uv run ops runbook fill-infer --study-dir /path/to/study --submit
 ```
 
 The command is a control-plane wrapper around ordinary Infer runbooks. It reads
@@ -230,17 +210,17 @@ Workflow ids are transport-neutral. Notify transport and delivery wiring live in
 ```yaml
 runbook:
   schema_version: 1
-  id: study_stress_ethanol_cipro
+  id: example_densegen_run
   workflow_id: densegen_batch_submit
   project: <project>
-  workspace_root: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro
+  workspace_root: <workspace-root>
   logging:
-    stdout_dir: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/outputs/logs/ops/sge/study_stress_ethanol_cipro
+    stdout_dir: <workspace-root>/outputs/logs/ops/sge/example_densegen_run
     retention:
       keep_last: 20
       max_age_days: 14
   densegen:
-    config: src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
+    config: <workspace-root>/config.yaml
     qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub
     post_run:
       qsub_template: docs/bu-scc/jobs/densegen-analysis.qsub

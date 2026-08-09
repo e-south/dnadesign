@@ -83,10 +83,6 @@ does not run folding or assemble sequences.
   `docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md`
 - Generic operator authority:
   `src/dnadesign/construct/docs/reference/linear-ssdna-composition.md`
-- Implementation record:
-  `docs/exec-plans/completed/2026-05-13-generic-linear-ssdna-composition.md`
-- Study handoff:
-  `docs/studies/retron_hairpin_design/contexts/composition/linear-ssdna-composition.md`
 - Implementation:
   `src/dnadesign/construct/src/composition.py`
   `src/dnadesign/folding/`

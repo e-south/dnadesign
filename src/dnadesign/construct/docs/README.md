@@ -1,7 +1,12 @@
-## Construct docs
+---
+doc_id: construct-docs
+title: Construct documentation
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+# Construct documentation
 
 Construct places declared DNA parts into explicit sequence contexts and records
 the realized spans and lineage. Most users start with a workspace. Use the
@@ -17,7 +22,6 @@ intended product is linear ssDNA.
 - [Run a workspace project by registry id](reference/workspace-registry.md): use the registry-backed workflow in the [CLI reference](reference/cli.md) and verify outputs with the [outputs reference](reference/outputs.md).
 - [Assemble multiple upstream USR datasets before Construct](../../usr/docs/operations/assembly/multi-source-shared-dataset.md): use the shared USR-owned runbook when DenseGen outputs, manual imports, or other USR-backed sources must be consolidated before Construct reads them.
 - [Hand off a Construct-backed shared dataset to infer](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): use the shared cross-tool runbook when one USR dataset should stay shared across Construct, infer, and downstream event consumers.
-- [Continue into a promoter-study feature dataset for Cluster or OPAL](../../usr/docs/operations/promoter/characterization-feature-matrix.md): use the shared USR-owned runbook when construct-expanded contexts should be compared against anchor-only promoter records through infer-derived feature columns.
 - [Debug a Construct run](reference/cli.md): start with runtime validation, then check the [config reference](reference/config.md), [workspace registry reference](reference/workspace-registry.md), and [outputs reference](reference/outputs.md).
 - [Compose a declared linear ssDNA product](reference/linear-ssdna-composition.md): use the specialized workspace-less route when sequence parts are already selected.
 
@@ -43,3 +47,10 @@ intended product is linear ssDNA.
 - Packaged workspaces default to workspace-local `outputs/usr_datasets`; shared USR roots are always explicit.
 - `construct compose` writes caller-chosen local artifact bundles and does not create or register Construct workspaces.
 - Provider and study names belong in caller-owned provenance values, not in the shared composition schema.
+
+### Cross-tool examples
+
+Use these only after the generic Construct flow is clear:
+
+- [Construct → USR → Infer shared dataset](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- [Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md)

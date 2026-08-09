@@ -19,12 +19,10 @@ WORKSPACE_IDS = (
     "demo_tfbs_baseline",
     "demo_sampling_baseline",
     "study_constitutive_sigma_panel",
-    "study_stress_ethanol_cipro",
 )
 USR_WORKSPACE_IDS = (
     "demo_sampling_baseline",
     "study_constitutive_sigma_panel",
-    "study_stress_ethanol_cipro",
 )
 
 
@@ -93,7 +91,6 @@ def test_packaged_workspace_runbooks_exist() -> None:
         "demo_tfbs_baseline",
         "demo_sampling_baseline",
         "study_constitutive_sigma_panel",
-        "study_stress_ethanol_cipro",
     }
     found = {path.parent.name for path in WORKSPACES.glob("*/runbook.md")}
     assert expected.issubset(found), f"Missing runbooks: {sorted(expected - found)}"
@@ -124,19 +121,16 @@ def test_workspace_runbooks_include_workspace_local_runbook_script() -> None:
         "demo_tfbs_baseline": "uv",
         "demo_sampling_baseline": "pixi",
         "study_constitutive_sigma_panel": "pixi",
-        "study_stress_ethanol_cipro": "pixi",
     }
     expected_usr_registry = {
         "demo_tfbs_baseline": "false",
         "demo_sampling_baseline": "true",
         "study_constitutive_sigma_panel": "true",
-        "study_stress_ethanol_cipro": "true",
     }
     expected_require_fimo = {
         "demo_tfbs_baseline": "false",
         "demo_sampling_baseline": "true",
         "study_constitutive_sigma_panel": "true",
-        "study_stress_ethanol_cipro": "true",
     }
     for workspace_id in WORKSPACE_IDS:
         text = _read_runbook(workspace_id)
@@ -223,9 +217,6 @@ def test_workspace_runbooks_single_command_matches_step_sequence() -> None:
         "study_constitutive_sigma_panel": [
             "./runbook.sh --mode fresh",
         ],
-        "study_stress_ethanol_cipro": [
-            "./runbook.sh --mode fresh",
-        ],
     }
     step_tokens_by_workspace = {
         "demo_tfbs_baseline": [
@@ -244,14 +235,6 @@ def test_workspace_runbooks_single_command_matches_step_sequence() -> None:
             "dense notebook generate",
         ],
         "study_constitutive_sigma_panel": [
-            "fimo --version",
-            "dense validate-config --probe-solver",
-            "dense run --fresh --no-plot",
-            "dense inspect run --events --library",
-            "dense plot",
-            "dense notebook generate",
-        ],
-        "study_stress_ethanol_cipro": [
             "fimo --version",
             "dense validate-config --probe-solver",
             "dense run --fresh --no-plot",

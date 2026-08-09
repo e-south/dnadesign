@@ -71,12 +71,12 @@ def test_find_privacy_issues_rejects_tracked_active_remotes_config(tmp_path: Pat
     ]
 
 
-def test_find_privacy_issues_covers_study_and_tool_operator_routes(tmp_path: Path) -> None:
+def test_find_privacy_issues_covers_operator_routes(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     token = "/projectnb/dunlop/" + "esouth/tool"
     _track(
         tmp_path,
-        "docs/studies/demo/operations/runtime/command-groups/pipeline.yaml",
+        "docs/operations/runbook.yaml",
         f"command: {token}\n".encode(),
     )
     _track(
@@ -86,17 +86,17 @@ def test_find_privacy_issues_covers_study_and_tool_operator_routes(tmp_path: Pat
     )
     _track(
         tmp_path,
-        "src/dnadesign/ops/runbooks/presets/demo.yaml",
+        "docs/templates/runbook.yaml",
         f"path: {token}\n".encode(),
     )
 
     assert [(issue.path.as_posix(), issue.token_name) for issue in find_privacy_issues(tmp_path)] == [
         (
-            "docs/studies/demo/operations/runtime/command-groups/pipeline.yaml",
+            "docs/operations/runbook.yaml",
             "personal_scc_projectnb_root",
         ),
+        ("docs/templates/runbook.yaml", "personal_scc_projectnb_root"),
         ("src/dnadesign/infer/docs/operations/runbook.md", "personal_scc_projectnb_root"),
-        ("src/dnadesign/ops/runbooks/presets/demo.yaml", "personal_scc_projectnb_root"),
     ]
 
 
@@ -113,13 +113,39 @@ def test_find_privacy_issues_allows_examples_and_skips_binary_files(tmp_path: Pa
     assert find_privacy_issues(tmp_path) == ()
 
 
-def test_find_privacy_issues_rejects_personal_paths_in_structure_provenance(tmp_path: Path) -> None:
+def test_find_privacy_issues_scans_non_doc_fixtures_for_home_paths(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    _track(
+        tmp_path,
+        "src/package/fixtures/provenance.json",
+        b'{"source": "/Users/' + b'private-operator/project/output.json"}\n',
+    )
+
+    issues = find_privacy_issues(tmp_path)
+
+    assert [(issue.path.as_posix(), issue.token_name) for issue in issues] == [
+        ("src/package/fixtures/provenance.json", "absolute_home_path")
+    ]
+
+
+def test_find_privacy_issues_rejects_private_study_identifiers_in_content_and_paths(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    private_identifier = "stress_" + "ethanol_cipro_growth"
+    _track(tmp_path, "docs/reference.md", f"study_id: {private_identifier}\n".encode())
+    _track(tmp_path, f"docs/{private_identifier}/README.md", b"private study\n")
+
+    issues = find_privacy_issues(tmp_path)
+
+    assert [(issue.path.as_posix(), issue.token_name) for issue in issues] == [
+        ("docs/reference.md", "private_study_identifier"),
+        (f"docs/{private_identifier}/README.md", "private_study_identifier"),
+    ]
+
+
+def test_find_privacy_issues_rejects_personal_paths_in_provenance(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     token = "/Users/" + "Shockwing"
-    provenance_path = (
-        "docs/studies/retron_hairpin_design/workbench/provenance/msd_region_records/"
-        "retron_msd_structure_panel_v1/manifest.yaml"
-    )
+    provenance_path = "docs/provenance/structure/manifest.yaml"
     _track(tmp_path, provenance_path, f"path: {token}\n".encode())
     issues = find_privacy_issues(tmp_path)
 
@@ -134,18 +160,15 @@ def test_main_fails_closed_when_a_tracked_token_is_present(tmp_path: Path, capsy
     assert "docs/bu-scc/operator.md:1: personal_scc_login" in capsys.readouterr().err
 
 
-def test_study_records_never_reference_a_tracked_active_remote_profile() -> None:
+def test_public_tree_contains_no_tracked_study_implementations() -> None:
     repo_root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").exists())
-    records = sorted((repo_root / "docs" / "studies").glob("*/record/datasets.yaml"))
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    tracked_paths = tuple(path.decode() for path in result.stdout.split(b"\0") if path)
 
-    assert records
-    for record in records:
-        text = record.read_text(encoding="utf-8")
-        assert "usr_remotes_path: src/dnadesign/usr/remotes.yaml" not in text
-
-    stress_record = repo_root / "docs/studies/stress_ethanol_cipro_growth/record/datasets.yaml"
-    assert "usr_remotes_path: n/a" in stress_record.read_text(encoding="utf-8")
-    stress_record_readme = repo_root / "docs/studies/stress_ethanol_cipro_growth/record/README.md"
-    readme_text = stress_record_readme.read_text(encoding="utf-8")
-    assert "--remotes-config" in readme_text
-    assert "USR_REMOTES_PATH" in readme_text
+    forbidden_prefixes = ("docs/studies/", "src/dnadesign/studies/")
+    assert not [path for path in tracked_paths if path.startswith(forbidden_prefixes)]

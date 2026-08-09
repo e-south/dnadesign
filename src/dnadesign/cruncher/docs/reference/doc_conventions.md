@@ -1,7 +1,7 @@
 ## Cruncher Doc Conventions
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-09
 
 
 **Last updated by:** cruncher-maintainers on 2026-02-23
@@ -25,7 +25,7 @@
   - `<run_dir>`
   - `<study_id>`
   - `<portfolio_id>`
-- Avoid user-machine absolute paths (for example `/Users/...`).
+- Avoid user-machine absolute paths; use one of the placeholders above.
 
 ### Metadata conventions
 Every markdown page must include near the top:

@@ -1,19 +1,26 @@
-## Construct Template Contexts
+---
+doc_id: construct-template-contexts
+title: Construct template contexts
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+# Construct template contexts
 
 Use this page when construct is supplying larger resolved contexts for infer or other downstream tools.
 
 ### Ownership boundary
 
-- `construct` owns anchor placement, template realization, and coordinate mapping
+- `construct` owns part placement, template realization, and coordinate mapping
 - `infer` reads resolved sequences plus `construct__*` metadata
 - downstream tools should not reconstruct anchor/template geometry themselves
 
 ### Repo-aligned context contract
 
-For template-backed inference or other downstream analysis, the resolved construct row should carry:
+The general result is a realized sequence plus named part spans and lineage.
+For template-backed inference or another downstream analysis, the resolved row
+should carry:
 
 - `construct__context_id`
 - `construct__context_kind`
@@ -28,11 +35,14 @@ For template-backed inference or other downstream analysis, the resolved constru
 - `construct__resolved_length`
 - `construct__spec_id`
 
-These values are emitted relative to the realized sequence that construct writes.
-For multi-slot jobs, `construct__anchor_*` remains the focal part span for
-existing consumers, while `construct__slots` carries every named slot span.
+These values use coordinates on the realized sequence. `construct__slots` is
+the complete named-span map. The singular `construct__anchor_*` projection is
+the declared focal span for consumers that accept one span; the field name does
+not make every Construct part an anchor or impose a biological role.
+
+For multi-slot jobs, `construct__slots` remains authoritative for all parts.
 Any job that emits `realized_context` sequence-view variants must therefore
-declare an anchor handoff span when the view needs `anchor_mean`, either through
+declare a focal handoff span when the view needs `anchor_mean`, either through
 `output_variants[].anchor_part`, `realize.focal_part`, or a single part named or
 role-tagged `anchor`.
 For slot-specific views, prefer `output_variants[].anchor_part`: Construct copies
@@ -76,9 +86,9 @@ Use multiple construct projects when you need:
 
 That keeps template choice explicit as workspace/config state instead of hiding a template matrix inside one infer job.
 
-### Cross-tool route
+### Cross-tool routes
 
 Use one of these next steps after construct materializes template-backed contexts:
 
 - [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md): promoter-study branch for feature extraction, cluster, and OPAL prep.
+- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md): one study-specific example; it does not define the shared Construct contract.

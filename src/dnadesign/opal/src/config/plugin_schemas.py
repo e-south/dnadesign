@@ -211,7 +211,7 @@ class _VectorTableParams(BaseModel):
 class _RFParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
     n_estimators: int = 100
-    criterion: str = "friedman_mse"
+    criterion: str = "squared_error"
     emit_feature_importance: bool = False
     max_depth: Optional[int] = None
     min_samples_split: int = 2

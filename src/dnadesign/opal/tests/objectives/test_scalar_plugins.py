@@ -61,7 +61,46 @@ def test_scalar_identity_objective_scores() -> None:
     y_pred = np.array([[0.1], [0.2]])
     res = scalar_identity_v1(y_pred=y_pred, params={}, ctx=None, train_view=None, y_pred_std=None)
     assert res.scores_by_name["scalar"].tolist() == [0.1, 0.2]
+    assert res.uncertainty_by_name == {}
     assert "summary_stats" in res.diagnostics
+
+
+def test_scalar_identity_objective_preserves_predictive_standard_deviation() -> None:
+    y_pred = np.array([[0.1], [0.2]])
+    y_pred_std = np.array([[0.03], [0.04]])
+
+    result = scalar_identity_v1(
+        y_pred=y_pred,
+        params={},
+        ctx=None,
+        train_view=None,
+        y_pred_std=y_pred_std,
+    )
+
+    assert result.scores_by_name["scalar"].tolist() == [0.1, 0.2]
+    assert result.uncertainty_by_name["scalar"].tolist() == [0.03, 0.04]
+
+
+def test_scalar_identity_objective_rejects_invalid_predictive_standard_deviation() -> None:
+    y_pred = np.array([[0.1], [0.2]])
+
+    with pytest.raises(ValueError, match="match y_pred shape"):
+        scalar_identity_v1(
+            y_pred=y_pred,
+            params={},
+            ctx=None,
+            train_view=None,
+            y_pred_std=np.array([0.03, 0.04]),
+        )
+
+    with pytest.raises(ValueError, match="non-negative"):
+        scalar_identity_v1(
+            y_pred=y_pred,
+            params={},
+            ctx=None,
+            train_view=None,
+            y_pred_std=np.array([[0.03], [-0.04]]),
+        )
 
 
 def test_scalar_identity_objective_rejects_shape() -> None:

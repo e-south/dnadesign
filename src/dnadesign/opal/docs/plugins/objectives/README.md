@@ -3,13 +3,10 @@ id: opal-objective-plugins
 title: OPAL objective plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-02
+last_verified: 2026-08-09
 ---
 
-## OPAL Objective Plugins
-
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+# OPAL objective plugins
 
 Objective plugins convert shared model predictions into named score and
 uncertainty channels. Objective-specific pages define the equations.
@@ -47,7 +44,7 @@ of the same objective plugin cannot collide.
 | [`sfxi_v1`](sfxi.md) | SFXI-specific logic and intensity vec8 | `sfxi` | `sfxi` SD | Setpoint fidelity multiplied by scaled intensity |
 | `vector_target_similarity_v1` | Generic vector in one declared coordinate system | `negative_mse` | None | Unweighted distance to an absolute target |
 | `vector_channel_v1` | Generic vector | Configured channel | None | One selected channel only |
-| `scalar_identity_v1` | One scalar that already is the objective | `scalar` | None | Passthrough |
+| `scalar_identity_v1` | One scalar that already is the objective | `scalar` | `scalar` when the model emits predictive standard deviation | Passthrough |
 
 Do not register a study-named alias for `scalar_identity_v1` merely to rename
 its channel. Preserve the scalar's scientific identity in the study-owned label

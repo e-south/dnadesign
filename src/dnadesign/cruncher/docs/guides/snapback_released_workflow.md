@@ -3,9 +3,9 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** guide
 **Audience:** snapback workflow users and maintainers
-**Last updated by:** cruncher-maintainers on 2026-04-23
+**Last updated by:** cruncher-maintainers on 2026-08-08
 **Applies to:** `uv run cruncher snapback released-design|released-target-search|released-solve|released-show`
-**Last verified:** 2026-04-23
+**Last verified:** 2026-08-09
 **Primary artifacts:** released-product search/solve reports, projection JSON, pre-event site records, released-design summary table, and per-hit triptychs for precursor sites, post-release fragments, and foldback
 
 ### Contents
@@ -19,8 +19,7 @@
 
 ### Why this exists
 
-The released-product lane answers a different question from the preserved-site snapback lane.
-The legacy operational `de033` posture remains:
+The released-product lane answers a different question from the preserved-site snapback lane:
 
 > can a two-stage precursor carry one nickase site plus one downstream release-enzyme site such that the exposed post-release bottom strand satisfies the final snapback geometry?
 
@@ -60,7 +59,7 @@ Key semantics:
 - the default operational policy keeps `final_geometry_source=exposed_bottom_strand`
 - the default route is `route_family=bottom_active_from_top_nick`, which implies `active_strand=bottom` and `physical_nicked_strand=top`
 - broader retained-active audits use `route_family=top_active_from_bottom_nick`, which implies `active_strand=top`, `physical_nicked_strand=bottom`, and `final_geometry_source=retained_active_strand`
-- enabling `--allow-top-active-routes` plus `--allow-precut-footprint-outside-active-product` broadens the search to retained-active audits without changing the study default lane
+- enabling `--allow-top-active-routes` plus `--allow-precut-footprint-outside-active-product` broadens the search to retained-active audits without changing the default lane
 - precursor and post-release fragment rows keep physical top/bottom placement
 - when the active product is top-strand-derived, the triptych moves that active product to the top fragment row and the retained bottom fragment to the bottom row
 - the foldback panel rebases that same active strand at the origin boundary while keeping it on the same top/bottom row
@@ -76,7 +75,7 @@ This lane stays geometry-first and construction-first. It is not a thermodynamic
 released_snapback:
   schema_version: 1
   kind: single_nick_released_snapback_v1
-  name: local_exact033
+  name: demo_exact_geometry
 input:
   precursor_top_strand: AACGTTGTTCCAA
 nick_stage:
@@ -102,12 +101,12 @@ output:
   run_dir: outputs/released_design
 ```
 
-For the checked-in operational workspace, use
-[`../../workspaces/de033/runbook.md`](../../workspaces/de033/runbook.md).
-`de033` now carries both the whole-catalog search/solve surface and one pinned
-explicit downstream-`BspQI` bundle at
-[`../../workspaces/de033/configs/snapback/de033.released.snapback.yaml`](../../workspaces/de033/configs/snapback/de033.released.snapback.yaml),
-which currently resolves to `Nt.BsmAI + BspQI`.
+For a runnable example, use the
+[`demo_released_snapback` runbook](../../workspaces/demo_released_snapback/runbook.md).
+Its search and solve steps use the packaged enzyme catalogs. The accompanying
+[`invalid_origin` spec](../../workspaces/demo_released_snapback/configs/snapback/invalid_origin.released.snapback.yaml)
+is a negative fixture: it demonstrates that invalid precursor geometry fails
+before publication.
 
 The search and solve surfaces also collapse redundant exact and near hits to
 one representative per active-product `stem + cap` geometry. That keeps the
@@ -123,7 +122,7 @@ than merely rebasing the nick event to boundary `0`.
 
 ```bash
 set -euo pipefail
-cd src/dnadesign/cruncher/workspaces/de033
+cd src/dnadesign/cruncher/workspaces/demo_released_snapback
 cruncher() { uv run cruncher "$@"; }
 
 # Probe the real dual-enzyme 0/3/3 space before writing a bundle.
@@ -167,7 +166,6 @@ cruncher snapback released-solve \
   --force-overwrite \
   --json
 
-# Materialize the checked-in released-product bundle.
 ```
 
 ### Target-search behavior
@@ -189,7 +187,7 @@ The report surfaces:
 - blocker counts by reason
 - pre-truncation and post-truncation hit counts
 
-Legacy released-product search does not permit release-site geometry to begin
+Released-product search does not permit release-site geometry to begin
 left of logical origin `0`, and it only permits left-of-origin nickase slack
 when the omitted prefix is a single contiguous fully degenerate `N` segment
 after top-strand normalization. When
@@ -228,8 +226,8 @@ Use `--allow-demo-hits` when you intentionally want demo-only entries to flow
 through solve as well as target-search.
 Nickases carrying `FREQUENT_CUTTER` are also excluded by default; use
 `--allow-frequent-cutter-nickases` only for policy-comparison or historical audits.
-The checked-in operational `de033` runbook resolves the whole local built-in
-nickase preset surface as `neb_nicking_v1 + thermo_nicking_v1`.
+The checked-in demo resolves the packaged nickase presets as
+`neb_nicking_v1 + thermo_nicking_v1`.
 
 ### Failure modes
 
@@ -242,7 +240,7 @@ Common fail-fast cases:
 - no pre-nick site matches the requested normalized boundary
 - no release site produces a fully separated downstream sacrificial fragment
 - the selected nickase carries a disallowed warning code such as `FREQUENT_CUTTER`
-- a legacy retained-top nick-survival constraint is enabled for a released-design bundle
+- a retained-top nick-survival constraint is enabled for a released-design bundle
 - the released-product plot context cannot be derived from the retained active-strand geometry
 
 For the file-by-file bundle layout, use [`../reference/released_snapback_artifacts.md`](../reference/released_snapback_artifacts.md).

@@ -482,20 +482,21 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
 
 def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_template(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
-    study_dir = tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth"
+    study_dir = tmp_path / "external_studies" / "demo_study"
     study_dir.mkdir(parents=True)
+    (study_dir / "analysis").mkdir()
     (study_dir / "record").mkdir()
     (study_dir / "operations").mkdir()
     (study_dir / "record" / "campaign.yaml").write_text("version: 1\nsteps: []\n", encoding="utf-8")
     (study_dir / "record" / "status.md").write_text("## test study\n", encoding="utf-8")
     (study_dir / "operations" / "ops.study.yaml").write_text(
-        "version: 2\nstudy_id: stress_ethanol_cipro_growth\n",
+        "version: 2\nstudy_id: demo_study\n",
         encoding="utf-8",
     )
     (study_dir / "record" / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
-                "study_id": "stress_ethanol_cipro_growth",
+                "study_id": "demo_study",
                 "datasets": [
                     {
                         "role": "merged_anchor_source",
@@ -543,12 +544,9 @@ def test_workspace_init_from_study_dir_hydrates_promoter_reference_margin_templa
     assert config_payload["sources"]["merged_anchor_insert"]["dataset"] == "promoter/test_anchor"
     assert config_payload["sources"]["full_context_1kb"]["root"] == expected_usr_root
     assert config_payload["sources"]["full_context_1kb"]["dataset"] == "promoter/test_contexts"
-    assert config_payload["study_binding"]["study_id"] == "stress_ethanol_cipro_growth"
+    assert config_payload["study_binding"]["study_id"] == "demo_study"
     assert config_payload["study_binding"]["record_root"] == study_dir.resolve().as_posix()
-    assert (
-        config_payload["study_binding"]["deliverable_docs_root"]
-        == "src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench"
-    )
+    assert config_payload["study_binding"]["deliverable_docs_root"] == (study_dir / "analysis").resolve().as_posix()
 
 
 def test_workspace_show_reports_workspace_summary(tmp_path: Path) -> None:
@@ -904,20 +902,21 @@ def test_workspace_init_promoter_reference_margin_template_validates_with_realis
     tmp_path: Path,
 ) -> None:
     usr_root = _build_committee_usr_sources(tmp_path)
-    study_dir = tmp_path / "docs" / "studies" / "stress_ethanol_cipro_growth"
+    study_dir = tmp_path / "external_studies" / "demo_study"
     study_dir.mkdir(parents=True)
+    (study_dir / "analysis").mkdir()
     (study_dir / "record").mkdir()
     (study_dir / "operations").mkdir()
     (study_dir / "record" / "campaign.yaml").write_text("version: 1\nsteps: []\n", encoding="utf-8")
     (study_dir / "record" / "status.md").write_text("## test study\n", encoding="utf-8")
     (study_dir / "operations" / "ops.study.yaml").write_text(
-        "version: 2\nstudy_id: stress_ethanol_cipro_growth\n",
+        "version: 2\nstudy_id: demo_study\n",
         encoding="utf-8",
     )
     (study_dir / "record" / "datasets.yaml").write_text(
         yaml.safe_dump(
             {
-                "study_id": "stress_ethanol_cipro_growth",
+                "study_id": "demo_study",
                 "datasets": [
                     {
                         "role": "merged_anchor_source",

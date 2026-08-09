@@ -3,13 +3,10 @@ id: opal-campaign-round
 title: OPAL campaign round
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Campaign round
-
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
 
 **Type:** workflow
 **Owner-boundary:** opal
@@ -81,10 +78,9 @@ thresholds, calibration, and interpretation still belong to the campaign or
 study that chose them. OPAL stores those declarations and applies them; it does
 not turn one objective into the meaning of every campaign.
 
-The stress-promoter study is the maintained end-to-end example that currently
-uses Multistate Response Behavior (MSRB). Its campaign route is
-[`secg_msrb_greedy`](../../campaigns/secg_msrb_greedy/README.md), while the
-study owns the scientific rationale and synthesis gate.
+Study workspaces keep their objective policy, evidence, and campaign config
+together. They call this same OPAL surface without placing private campaign
+state or scientific rationale in the public package.
 
 ## Continue
 

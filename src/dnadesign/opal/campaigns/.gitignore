@@ -3,18 +3,9 @@
 **/outputs/
 **/state.json
 
-# Accepted stress-study order bundle. This exact digest-bound handoff is a
-# durable review artifact; all other campaign outputs remain local.
-!secg_msrb_greedy/outputs/
-secg_msrb_greedy/outputs/*
-!secg_msrb_greedy/outputs/synthesis_handoff/
-secg_msrb_greedy/outputs/synthesis_handoff/*
-!secg_msrb_greedy/outputs/synthesis_handoff/stress-opal-assay-b1-r0-msrb-v1/
-!secg_msrb_greedy/outputs/synthesis_handoff/stress-opal-assay-b1-r0-msrb-v1/**
-
-# Local campaign-scoped data copies used for demo runs
+# Local campaign-scoped data copies used for runs
 **/records.parquet
-!demo_rf_sfxi_topn/records.parquet
+!_fixtures/scalar-regression/records.parquet
 
 # macOS metadata
 .DS_Store

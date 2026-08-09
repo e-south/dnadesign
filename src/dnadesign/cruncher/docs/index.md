@@ -1,38 +1,28 @@
-## Cruncher docs
+---
+doc_id: cruncher-docs-map
+title: Cruncher documentation map
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
-
-**Last updated by:** cruncher-maintainers on 2026-07-13
+# Cruncher documentation map
 
 ### Contents
-- [Workflow families](#workflow-families)
+- [Workflow routes](#workflow-routes)
 - [Documentation map](#documentation-map)
 
-### Workflow families
+### Workflow routes
 
-Cruncher currently registers seven peer workflow families.
-Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, `portfolio`.
-
-- `sample` owns fixed-length optimization, artifact-only analysis, and export
-- `cassette` owns cassette validation, design, solve, and show surfaces
-- `yiu` owns payload-centric validation, render, and show surfaces
-- `snapback` owns preserved-site and released-product single-nick foldback surfaces
-- `scar_nick` owns retained-scar terminal-nick validation, design, and show surfaces
-- `study` owns study orchestration over explicit source-family runs
-- `portfolio` owns cross-study aggregation and reporting
-
-The `study` and `portfolio` families orchestrate explicit source-family runs.
-The currently shipped examples are sample-backed, but they are still separate
-command families rather than hidden submodes of `sample`.
-They aggregate explicit source-family outputs instead of redefining source
-contracts.
+Cruncher exposes separate routes for sequence optimization, cassette design,
+payload inspection, foldback and nick geometry, parameter sweeps, and artifact
+aggregation. Each route owns its input and output contract. Exact route IDs are
+listed in the [CLI reference](reference/cli.md), where command vocabulary is
+useful rather than architectural.
 
 ### Documentation map
 <!-- docs:map:start -->
 #### Optimize Fixed-Length Sequences
-Run the fixed-length optimization lane from demos through analysis and export.
-
 - [Pairwise Demo](demos/demo_pairwise.md)
 - [MultiTF Demo](demos/demo_multitf.md)
 - [Project Workspace Demo](demos/project_all_tfs.md)
@@ -43,9 +33,6 @@ Run the fixed-length optimization lane from demos through analysis and export.
 - [Artifacts Reference](reference/artifacts.md)
 
 #### Design and Search Cassettes
-Design or search cassettes through validated workspace inputs and explicit
-artifact contracts.
-
 - [Cassette Workspace Demo](demos/demo_cassette_workspace.md)
 - [Cassette Workflow](guides/cassette_workflow.md)
 - [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
@@ -54,17 +41,12 @@ artifact contracts.
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
-#### Payload-Centric YIU Workflows
-Run YIU workflows against explicit source-family artifacts.
-Reuse explicit source-family outputs in YIU instead of treating YIU as a solver.
-
+#### Inspect Payload Junctions
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)
-- [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md)
-- [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
 
 #### Validate and Search Single-Nick Foldbacks
 - [Snapback Workflow](guides/snapback_workflow.md)
@@ -72,15 +54,12 @@ Reuse explicit source-family outputs in YIU instead of treating YIU as a solver.
 - [Snapback Artifacts](reference/snapback_artifacts.md)
 - [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
 - [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
-- [de033 README](../workspaces/de033/README.md)
-- [de033 runbook](../workspaces/de033/runbook.md)
 
 #### Design Retained-Scar Terminal Nicks
 - [Scar-Nick Workflow](guides/scar_nick_workflow.md)
-- [scar_nick_teto runbook](../workspaces/scar_nick_teto/runbook.md)
 - [scar_nick Package Map](../src/scar_nick/README.md)
 
-#### Run Studies and Portfolio Aggregation
+#### Summarize Sweeps and Aggregate Artifacts
 - [Studies](guides/studies.md)
 - [Study Length vs Score](guides/study_length_vs_score.md)
 - [Study Diversity vs Score](guides/study_diversity_vs_score.md)

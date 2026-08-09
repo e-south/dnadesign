@@ -150,7 +150,7 @@ selection_views:
 
 
 def test_checked_in_campaign_discovery_rejects_missing_ownership(tmp_path: Path) -> None:
-    source = Path("src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/configs/campaign.yaml")
+    source = Path("src/dnadesign/opal/campaigns/demo_rf_topn/configs/campaign.yaml")
     payload = yaml.safe_load(source.read_text())
     payload.pop("ownership")
     payload["campaign"]["slug"] = "unowned"

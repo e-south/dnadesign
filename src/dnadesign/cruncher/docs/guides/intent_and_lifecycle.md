@@ -1,10 +1,12 @@
-## Cruncher intent and lifecycle
+---
+doc_id: cruncher-intent-and-lifecycle
+title: Cruncher intent and lifecycle
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
-
-
-**Last updated by:** cruncher-maintainers on 2026-07-13
+# Cruncher intent and lifecycle
 
 ### Contents
 - [Intent](#intent)
@@ -26,9 +28,8 @@
 
 ### Intent
 
-Cruncher is an artifact-first, reproducible DNA design platform organized as
-peer workflow families rather than one monolithic optimizer.
-Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, `portfolio`.
+Cruncher is a set of reproducible DNA design routes that share artifact and
+workspace conventions. It is not one optimizer with hidden modes.
 
 The package favors:
 

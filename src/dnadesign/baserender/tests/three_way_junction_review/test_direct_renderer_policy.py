@@ -195,7 +195,8 @@ def test_direct_surface_accepts_adapter_supported_renderer() -> None:
 
     figure = baserender.render(record, renderer="three_way_junction_review")
     try:
-        assert len(figure.axes) == 4
+        assert len(figure.axes) == 1
+        assert figure.axes[0].get_gid() == "three-way-junction-review:base-pair-map"
     finally:
         plt.close(figure)
 

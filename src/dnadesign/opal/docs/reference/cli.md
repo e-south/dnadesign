@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-16
+last_verified: 2026-08-09
 audience:
   - operator
   - maintainer
@@ -12,10 +12,7 @@ entrypoints:
   cli: uv run opal
 ---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-16
-
-## OPAL Command Line Interface
+# OPAL Command Line Interface
 
 
 The OPAL CLI initializes campaigns, ingests labels, executes rounds, inspects
@@ -72,7 +69,7 @@ opal demo-matrix [--tmp-root <dir>] [--rounds 0|0,1] [--json] [--keep] [--fail-f
 
 **Notes**
 
-* Runs `demo_rf_sfxi_topn`, `demo_gp_topn`, and `demo_gp_ei`.
+* Runs `demo_rf_topn`, `demo_gp_topn`, and `demo_gp_ei` against one synthetic scalar fixture.
 * Executes reset/init/validate/ingest/run/verify checks per flow and round.
 * Exits non-zero when any flow fails or verify mismatches occur.
 * Intended for demo pressure testing and CI-style validation.

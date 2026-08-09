@@ -133,6 +133,14 @@ BANNERS = (
         "shuffle",
     ),
     BannerSpec(
+        "src/dnadesign/msd/assets/msd-banner.svg",
+        "src/dnadesign/msd/README.md",
+        "msd",
+        "COMPILE MSD DESIGNS",
+        "Resolve typed Retron MSD parts into explicit DNA sequences.",
+        "msd",
+    ),
+    BannerSpec(
         "src/dnadesign/nmf/assets/nmf-banner.svg",
         "src/dnadesign/nmf/README.md",
         "nmf",
@@ -171,14 +179,6 @@ BANNERS = (
         "MAKE AND SCORE VARIANTS",
         "Generate sequence variants and score them with chosen tools.",
         "permute",
-    ),
-    BannerSpec(
-        "src/dnadesign/studies/assets/studies-banner.svg",
-        "src/dnadesign/studies/README.md",
-        "studies",
-        "ORGANIZE STUDIES",
-        "Keep study methods, records, and decisions together.",
-        "study",
     ),
     BannerSpec(
         "src/dnadesign/tfkdanalysis/assets/tfkdanalysis-banner.svg",

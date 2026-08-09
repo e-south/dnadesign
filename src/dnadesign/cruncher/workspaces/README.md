@@ -37,7 +37,7 @@ contract.
 Current layout:
 
 - didactic demos:
-  `de033/`,
+  `demo_released_snapback/`,
   `demo_pairwise/`,
   `demo_multitf/`,
   `demo_monotypic_baer/`,
@@ -195,7 +195,7 @@ or `uv run ops catalog list --section tool-sources`.
 
 YIU bundle layout and sample-backed handoff rules live in [YIU Workflow](../docs/guides/yiu_workflow.md), [YIU Artifacts](../docs/reference/yiu_artifacts.md), and the relevant workspace runbook.
 
-Snapback workspace layout and narrow single-nick foldback scope live in [Snapback Workflow](../docs/guides/snapback_workflow.md), [Snapback Artifacts](../docs/reference/snapback_artifacts.md), and [`de033/runbook.md`](de033/runbook.md).
+Snapback workspace layout and narrow single-nick foldback scope live in [Snapback Workflow](../docs/guides/snapback_workflow.md), [Snapback Artifacts](../docs/reference/snapback_artifacts.md), and the [`demo_released_snapback` runbook](demo_released_snapback/runbook.md).
 
 Packaged workspace configs resolve `discover.tool_path` relative to their `configs/config.yaml`, so keep packaged workspaces under the repository layout (`src/dnadesign/cruncher/workspaces/...`). If you copy a workspace elsewhere, update `discover.tool_path` explicitly before running `discover motifs`.
 

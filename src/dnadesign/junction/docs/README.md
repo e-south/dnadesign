@@ -1,18 +1,22 @@
+---
+doc_id: junction-docs
+title: junction documentation
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
+
 # `junction` documentation
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
-
-`junction` converts a complete design request into a deterministic oligo plan.
-The request must supply exact linear DNA targets, their joint-design boundary,
-recovery primers, search policy, and order metadata. The tool does not infer
-those scientific choices from a FASTA file or a bare sequence.
+Start with a complete request: exact linear DNA targets, which targets must be
+designed together, recovery primers, bounded search settings, and order
+labels. `junction` does not guess those choices from a bare sequence.
 
 ## Learn
 
 - [How `junction` works](explanation/how-junction-works.md) explains the
-  target-to-oligo process, maps paper terms to software terms, and separates
-  string checks from laboratory evidence.
+  target-to-oligo process and separates software checks from laboratory
+  evidence.
 - [Getting started](getting-started.md) builds one synthetic gene-scale example.
 
 ## Use
@@ -42,7 +46,7 @@ those scientific choices from a FASTA file or a bare sequence.
 | --- | --- | --- |
 | Full design with a short, no-file summary | `uv run junction preflight <request>` | Runs the complete search; writes nothing. |
 | Full design as JSON | `uv run junction plan <request> --format json` | Runs the complete search; writes nothing. |
-| Publish a new, internally verified bundle | `uv run junction build <request> --output <new-directory>` | Runs the design, publishes create-only files, then repeats the design while verifying the installed bundle by replay. |
+| Publish a new, verified bundle | `uv run junction build <request> --output <new-directory>` | Runs the design, writes create-only files, then verifies the installed bundle by replay. |
 | Check an existing bundle later | `uv run junction verify <bundle>` | Replays the recorded request and checks every file and identity. |
 
 These commands are alternatives, not four stages of one efficient run.

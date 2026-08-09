@@ -1,7 +1,7 @@
 ## Workspace Runbook Steps
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-09
 
 
 **Last updated by:** cruncher-maintainers on 2026-04-05
@@ -17,8 +17,6 @@ This table is generated from workspace machine runbooks and is the standard cros
 <!-- docs:runbook-steps:start -->
 | Workspace | Step ID | Description | Command |
 | --- | --- | --- | --- |
-| `de033` | `snapback_released_target_search` | Search the operational dual-enzyme 0/3/3 lane against explicit nickase presets and the BspQI-pinned Type IIS release policy under the default no-frequent-cutter policy. | `cruncher snapback released-target-search --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --json` |
-| `de033` | `snapback_released_solve` | Materialize BspQI-pinned 0/3/3 exact or bounded near released-product hits and emit one rendered triptych per hit. | `cruncher snapback released-solve --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --run-dir outputs/released_solve --materialize-top-k 16 --render-format pdf --emit-renders --force-overwrite --json` |
 | `demo_monotypic_baer` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |
 | `demo_monotypic_baer` | `config_summary` |  | `cruncher config summary -c configs/config.yaml` |
 | `demo_monotypic_baer` | `fetch_sites_regulondb` |  | `cruncher fetch sites --source regulondb --tf baeR --update -c configs/config.yaml` |
@@ -128,6 +126,8 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_pairwise` | `render_logos` |  | `cruncher catalog logos --source demo_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `demo_pairwise` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `demo_pairwise` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
+| `demo_released_snapback` | `snapback_released_target_search` | Search the demo dual-enzyme 0/3/3 geometry against explicit nickase presets and a BspQI-pinned Type IIS release policy. | `cruncher snapback released-target-search --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --json` |
+| `demo_released_snapback` | `snapback_released_solve` | Materialize BspQI-pinned 0/3/3 exact or bounded near released-product hits and emit one rendered triptych per hit. | `cruncher snapback released-solve --workspace-root . --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product --run-dir outputs/released_solve --materialize-top-k 16 --render-format pdf --emit-renders --force-overwrite --json` |
 | `demo_yiu_payload` | `yiu_validate` | Validate the checked-in user-sequence YIU demo spec. | `cruncher yiu validate --spec configs/yiu/example_payload.yiu.yaml` |
 | `demo_yiu_payload` | `yiu_render` | Publish the deterministic user-sequence YIU v4 payload bundle and render the standard views. | `cruncher yiu render --spec configs/yiu/example_payload.yiu.yaml --force-overwrite --emit-renders` |
 | `demo_yiu_payload` | `yiu_show` | Inspect the published user-sequence payload bundle and integrity checks. | `cruncher yiu show --bundle outputs/example_payload` |
@@ -284,10 +284,4 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `render_logos` |  | `cruncher catalog logos --source project_merged_meme_oops_all_tfs --set 1 -c configs/config.yaml` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
-| `scar_nick_teto` | `scar_nick_bbsI_hf_validate` | Validate the BbsI-HF retained-scar terminal-nick panel. | `cruncher scar-nick validate --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml` |
-| `scar_nick_teto` | `scar_nick_bbsI_hf_design` | Write the deterministic BbsI-HF scar-nick design bundle. | `cruncher scar-nick design --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml --force-overwrite` |
-| `scar_nick_teto` | `scar_nick_bbsI_hf_show` | Inspect the BbsI-HF scar-nick bundle and drift checks. | `cruncher scar-nick show --run outputs/scar_nick/teto_upstream_processing_bbsI_hf` |
-| `scar_nick_teto` | `scar_nick_paqci_core_panel_validate` | Validate the PaqCI core retained-scar terminal-nick panel. | `cruncher scar-nick validate --spec configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml` |
-| `scar_nick_teto` | `scar_nick_paqci_core_panel_design` | Write the deterministic PaqCI core scar-nick design bundle. | `cruncher scar-nick design --spec configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml --force-overwrite` |
-| `scar_nick_teto` | `scar_nick_paqci_core_panel_show` | Inspect the PaqCI core scar-nick bundle and drift checks. | `cruncher scar-nick show --run outputs/scar_nick/teto_upstream_processing_paqci_core_panel` |
 <!-- docs:runbook-steps:end -->

@@ -11,7 +11,7 @@
 **Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+**Last verified:** 2026-08-09
 
 Use this runbook when inputs already span multiple USR-backed datasets, but downstream consumers should still see one consolidated construct-backed dataset plus one event stream.
 
@@ -21,11 +21,10 @@ Use this runbook to:
 - construct realization into one downstream dataset
 - handoff into the shared downstream infer/notify continuation once that construct-backed dataset exists
 
-This runbook uses a packaged construct workspace as a local tracer bullet. The
-commands below intentionally keep early mutations inside that workspace-local
-USR root. For live stress_ethanol_cipro_growth status and continuation, keep the study
-record's declared shared USR root authoritative and move or repoint the flow
-deliberately before treating the dataset as the cross-tool source of truth.
+This runbook uses a packaged Construct workspace as a small end-to-end example.
+The commands below keep early writes inside that workspace's local USR root. A
+live study must declare its own USR root and datasets before it treats the
+result as a cross-tool source of truth.
 
 ### Boundary decisions
 
@@ -89,13 +88,6 @@ Tracer-bullet example when the seeded control dataset should act as the primary 
 ```bash
 export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace with the real upstream dataset that should be folded into the primary input dataset.
 ```
-
-For the live `stress_ethanol_cipro_growth` study, replace the packaged demo
-inputs with the real shared datasets explicitly:
-
-- `PRIMARY_INPUT_DATASET="usr_promoter_references"`
-- `EXTRA_INPUT_DATASET="densegen_prom_eth_cip_source"`
-- keep `usr_pdual10_plasmid_template` as the pDual-backed template dataset when you repoint the Construct configs in step 3
 
 ### 2) Validate and consolidate the upstream USR datasets
 

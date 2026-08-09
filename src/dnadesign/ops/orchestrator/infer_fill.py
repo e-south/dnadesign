@@ -23,7 +23,7 @@ from ..runbooks.schema import OrchestrationRunbookV1, is_infer_workflow_id, load
 from .execute import BatchExecutionResult, execute_batch_plan
 from .plan import BatchPlan, build_batch_plan
 from .state import ActiveJobResolution, resolve_active_job_resolution
-from .study_runbooks import discover_infer_runbook_paths_for_study, resolve_active_study_dir
+from .study_runbooks import discover_infer_runbook_paths_for_study
 
 InferFillLaneAction = Literal["run", "skip_complete", "skip_unsupported", "blocked"]
 
@@ -147,7 +147,7 @@ def build_infer_fill_plan(
 ) -> InferFillPlan:
     selected_study_dir = study_dir.resolve() if study_dir is not None else None
     if selected_study_dir is None and not runbook_paths:
-        selected_study_dir = resolve_active_study_dir(repo_root=repo_root)
+        raise ValueError("provide --study-dir or at least one --runbook")
     discovered_paths = (
         discover_infer_runbook_paths_for_study(study_dir=selected_study_dir, repo_root=repo_root)
         if selected_study_dir is not None

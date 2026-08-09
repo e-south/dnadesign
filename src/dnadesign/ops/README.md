@@ -23,6 +23,6 @@ and deterministic batch orchestration across tool-owned workflows.
 - `status/`: provider registry, status models, and service contracts.
 - `orchestrator/`: runbook planning, execution, scheduler state, and gates.
 
-Keep command routing, rendering, and status-provider loading separate. Study
-status behavior belongs in concrete study packages under `dnadesign.studies`,
-then registers through the OPS status-provider contract.
+Keep command routing, rendering, and status-provider loading separate. A study
+package owns any study-specific status behavior and registers its metadata
+through the `dnadesign.ops.status_registries` entry-point group.

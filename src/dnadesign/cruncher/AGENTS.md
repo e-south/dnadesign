@@ -4,9 +4,7 @@ Supplement to repo-root `AGENTS.md` with cruncher-specific layout + test guidanc
 
 ### Key paths
 - README: `src/dnadesign/cruncher/README.md`
-- Tracked study records: `docs/studies/README.md`
-- Checked-in retron hairpin study: `docs/studies/retron_hairpin_design/`
-- Repo-local retron hairpin study skill: `.agents/skills/retron-hairpin-study/SKILL.md`
+- External study integration: `docs/integrations/study-workspaces.md`
 - Default config: `src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml`
 - Source: `src/dnadesign/cruncher/src/` (cli/, config/, core/, ingest/, io/, analysis/, artifacts/, viz/, integrations/, app/, store/, utils/)
 - Results: per-workspace `out_dir`; treat generated output directories as run artifacts.

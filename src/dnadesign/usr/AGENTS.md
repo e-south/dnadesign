@@ -69,10 +69,8 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Namespace registry: `registry.yaml` under the datasets root
 - Sync details: `src/dnadesign/usr/docs/operations/sync/README.md`
 - Repo-local BU SCC sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
-- Repo-local stress ethanol cipro growth status skill: `.agents/skills/stress-ethanol-cipro-growth-status/SKILL.md`
   - Do not add tool-local skills under `src/dnadesign/usr/skills/`; the canonical skill root for this repo is `.agents/skills/`.
-- Checked-in study records: `docs/studies/README.md`
-- Active study registry: `docs/studies/index.yaml`
+- External study integration: `docs/integrations/study-workspaces.md`
 - Dataset naming ontology: active shared dataset ids must be flat owner-first ids such as `usr_mg1655_promoter_controls`, `usr_pdual10_plasmid_template`, or `densegen_prom_eth_cip_source`; use `root_kind`, `owner_tool`, overlays, and study metadata for provenance instead of nested tool-routing paths.
 - Human-readable record names belong in `usr_label__primary` / `usr_label__aliases`.
 

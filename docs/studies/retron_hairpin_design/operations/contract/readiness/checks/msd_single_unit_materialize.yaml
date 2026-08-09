@@ -1,8 +1,0 @@
-checks:
-  msd_design_reference_catalog:
-  - kind: command
-    check_id: study.msd_materialize_spec_lint
-    check_group: msd_materialize_readiness
-    summary: Retron MSD materialize spec lint completed before mutating sequence output.
-    required: true
-    surface: msd_single_unit_materialize_lint

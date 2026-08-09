@@ -46,7 +46,6 @@ from dnadesign.usr.src.sequence_views import (
 from dnadesign.usr.src.storage.parquet import now_utc
 
 DEFAULT_OUTPUT_DATASET = "usr_regulondb_native_promoters"
-DEFAULT_STUDY_ID = "regulondb_native_promoter_panel"
 CREATED_BY = "dnadesign.usr.create_regulondb_native_promoters"
 REGULONDB_NAMESPACE = "regulondb"
 RELATIONS_DIRNAME = "_relations"
@@ -1481,9 +1480,9 @@ def _regulondb_source_record_view_semantics(
             sequence_id=view.sequence_id,
             source_family="regulondb_native_promoter",
             selection_basis="regulondb_curated_promoter_sequence_with_sigma",
-            view_collections=["regulondb_native_promoter_panel", "native_promoter_source_records"],
+            view_collections=["native_promoter_source_records"],
             role_tags=["native_promoter_source", "reference_source"],
-            study_id=DEFAULT_STUDY_ID,
+            study_id=None,
             created_at=created_at,
             created_by=CREATED_BY,
         )

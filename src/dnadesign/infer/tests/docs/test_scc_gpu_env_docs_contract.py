@@ -66,7 +66,7 @@ def test_infer_scc_gpu_env_runbook_exists_and_covers_uv_stack_contract() -> None
     assert "HUGGINGFACE_HUB_CACHE" in doc
     assert "TRANSFORMERS_CACHE" in doc
     assert 'HF_HOME_20B="${HF_HOME_20B:-$SCC_MODEL_CACHE_ROOT/evo2_20b}"' in doc
-    assert "/project/dunlop/esouth" not in doc
+    assert "/project/private-user" not in doc
     assert "400B model is out of scope" in doc
     assert "gpu_c=9.0" in doc
     assert "H200" in doc

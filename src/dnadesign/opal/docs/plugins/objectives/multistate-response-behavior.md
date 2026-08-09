@@ -5,13 +5,10 @@ short_name: MSRB
 objective_id: multistate_response_behavior_v1
 owner: dnadesign-maintainers
 status: available
-last_verified: 2026-07-20
+last_verified: 2026-08-09
 ---
 
-## Multistate Response Behavior (MSRB)
-
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-20
+# Multistate Response Behavior (MSRB)
 
 Multistate Response Behavior (MSRB) ranks a measured or predicted phenotype—the
 ordered values that describe behavior across measured states—against a fixed
@@ -386,9 +383,8 @@ eight values can be rescored under several binary masks without retraining the
 raw-phenotype model.
 
 The assay window, replicate handling, reference identity, target patterns,
-soft-min-scale recipe, and campaign evidence belong to the study. See [MSRB in
-the stress-promoter study](../../../../../../docs/studies/stress_ethanol_cipro_growth/contexts/opal/multistate-response-behavior.md)
-for one complete binding.
+soft-min-scale recipe, and campaign evidence belong to the external study
+workspace. This page defines only the reusable score contract.
 
 ### What the score does not establish
 

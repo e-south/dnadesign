@@ -1,9 +1,14 @@
-# Request contract
+---
+doc_id: junction-request-contract
+title: junction request contract
+type: reference
+scope: dnadesign.junction.request.v2
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Type:** reference
-**Scope:** `dnadesign.junction.request.v2`
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# Request contract
 
 Requests are strict JSON or YAML objects. Unknown fields, missing fields,
 duplicate mapping keys, YAML anchors, and YAML aliases fail parsing. Files must

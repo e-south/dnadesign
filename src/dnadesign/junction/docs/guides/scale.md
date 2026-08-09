@@ -1,9 +1,14 @@
-# Scale
+---
+doc_id: junction-scale
+title: Scale junction requests
+type: guide
+audience: users evaluating larger requests
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-09
+---
 
-**Type:** guide
-**Audience:** users evaluating larger requests
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# Scale
 
 Target count alone does not determine cost. Work also depends on target length,
 the number of loci in each assembly group, candidate width, sequence lengths,

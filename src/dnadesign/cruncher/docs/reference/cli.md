@@ -1,7 +1,7 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-09
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13
@@ -564,8 +564,7 @@ Deep contracts live in:
 * [`released_snapback_artifacts.md`](released_snapback_artifacts.md)
 * [`release_enzyme_catalogs.md`](release_enzyme_catalogs.md)
 * [`architecture.md`](architecture.md)
-* [`../../workspaces/de033/README.md`](../../workspaces/de033/README.md)
-* [`../../workspaces/de033/runbook.md`](../../workspaces/de033/runbook.md)
+* [`../../workspaces/demo_released_snapback/README.md`](../../workspaces/demo_released_snapback/README.md)
 
 #### `cruncher snapback init-workspace`
 
@@ -684,8 +683,8 @@ Validate one explicit two-stage precursor spec and write the released-product bu
 
 Examples:
 
-* `uv run cruncher snapback released-design --spec src/dnadesign/cruncher/workspaces/de033/configs/snapback/de033.released.snapback.yaml`
-* `uv run cruncher snapback released-design --spec src/dnadesign/cruncher/workspaces/de033/configs/snapback/de033.released.snapback.yaml --force-overwrite`
+* `uv run cruncher snapback released-design --spec configs/snapback/example.released.snapback.yaml`
+* `uv run cruncher snapback released-design --spec configs/snapback/example.released.snapback.yaml --force-overwrite`
 
 Outputs:
 
@@ -703,12 +702,12 @@ Notes:
 
 #### `cruncher snapback released-target-search`
 
-Search paired nickase plus release-enzyme combinations for released-product geometry without assuming an authored precursor. The `de033` study route opts into retained-active top and bottom products and pins the release enzyme to `BspQI`.
+Search paired nickase plus release-enzyme combinations for released-product geometry without assuming an authored precursor.
 
 Examples:
 
-* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --allow-top-active-routes --allow-precut-footprint-outside-active-product --json`
-* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product`
+* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/demo_released_snapback --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --allow-top-active-routes --allow-precut-footprint-outside-active-product --json`
+* `uv run cruncher snapback released-target-search --workspace-root src/dnadesign/cruncher/workspaces/demo_released_snapback --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --nick-boundary 0 --paired-bp 3 --cap-nt 3 --allow-top-active-routes --allow-precut-footprint-outside-active-product`
 
 Outputs:
 
@@ -721,8 +720,8 @@ Notes:
 * this mode is target-first and separate from preserved-site `target-search`
 * without route-policy flags, the command evaluates `final_geometry_source=exposed_bottom_strand` via `route_family=bottom_active_from_top_nick`
 * broader retained-active searches use `route_family=top_active_from_bottom_nick` plus `final_geometry_source=retained_active_strand`
-* `--allow-top-active-routes` plus `--allow-precut-footprint-outside-active-product` opt into the retained-active audit surface used by `de033`
-* `--release-variant-id` restricts the release-enzyme cross-product; `de033` uses `--release-variant-id BspQI`
+* `--allow-top-active-routes` plus `--allow-precut-footprint-outside-active-product` opt into retained-active auditing
+* `--release-variant-id` restricts the release-enzyme cross-product; the checked-in demo uses `BspQI`
 * the command requires at least one explicit nickase source and one explicit release-enzyme source
 * CLI parsing delegates typed request construction to `app/snapback_cli_requests.py`; the command module does not build released search models inline
 * demo-only catalog entries are excluded unless `--allow-demo-hits` is passed
@@ -734,8 +733,8 @@ Search the released-product dual-enzyme catalog space, materialize ranked hits, 
 
 Examples:
 
-* `uv run cruncher snapback released-solve --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --allow-top-active-routes --allow-precut-footprint-outside-active-product --json`
-* `uv run cruncher snapback released-solve --workspace-root src/dnadesign/cruncher/workspaces/de033 --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --allow-top-active-routes --allow-precut-footprint-outside-active-product --run-dir outputs/released_solve --materialize-top-k 16 --render-format pdf --emit-renders --force-overwrite`
+* `uv run cruncher snapback released-solve --workspace-root src/dnadesign/cruncher/workspaces/demo_released_snapback --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --allow-top-active-routes --allow-precut-footprint-outside-active-product --json`
+* `uv run cruncher snapback released-solve --workspace-root src/dnadesign/cruncher/workspaces/demo_released_snapback --nick-preset neb_nicking_v1 --nick-additional-preset thermo_nicking_v1 --release-preset type_iis_release_v1 --release-variant-id BspQI --allow-top-active-routes --allow-precut-footprint-outside-active-product --run-dir outputs/released_solve --materialize-top-k 16 --render-format pdf --emit-renders --force-overwrite`
 
 Outputs:
 
@@ -755,7 +754,7 @@ Notes:
 * the solve plot keeps `Nick / origin` at the left boundary and is rendered from the released-product projection payloads
 * without route-policy flags, solved hits stay on `route_family=bottom_active_from_top_nick`; retained-active searches can materialize `route_family=top_active_from_bottom_nick`
 * `--allow-top-active-routes` and `--allow-precut-footprint-outside-active-product` mirror the retained-active audit path from `released-target-search`
-* `--release-variant-id` restricts materialization to a release-enzyme variant; `de033` pins this to `BspQI`
+* `--release-variant-id` restricts materialization to one release-enzyme variant; the checked-in demo uses `BspQI`
 * demo-only catalog entries are excluded unless `--allow-demo-hits` is passed
 * nickases carrying `FREQUENT_CUTTER` are excluded unless `--allow-frequent-cutter-nickases` is passed
 
@@ -801,7 +800,6 @@ bundle under `<workspace>/outputs/scar_nick/<name>/`.
 Deep contracts live in:
 
 * [`../guides/scar_nick_workflow.md`](../guides/scar_nick_workflow.md)
-* [`../../workspaces/scar_nick_teto/runbook.md`](../../workspaces/scar_nick_teto/runbook.md)
 * [`../../src/scar_nick/README.md`](../../src/scar_nick/README.md)
 * [`nickase_catalog.md`](nickase_catalog.md)
 * [`architecture.md`](architecture.md)

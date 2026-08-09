@@ -1,6 +1,0 @@
-de033_workspace:
-  surface_type: workspace
-  workspace_ref: repo:src/dnadesign/cruncher/workspaces/de033
-demo_monotypic_tetr_workspace:
-  surface_type: workspace
-  workspace_ref: repo:src/dnadesign/cruncher/workspaces/demo_monotypic_tetr

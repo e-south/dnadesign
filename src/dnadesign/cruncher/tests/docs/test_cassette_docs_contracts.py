@@ -38,17 +38,17 @@ def test_top_level_docs_route_both_workflow_families() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "Cruncher solves workspace-based sequence optimization" in package_readme
+    assert "Cruncher runs reproducible DNA design jobs" in package_readme
     assert "DNA design package in `dnadesign`" not in package_readme
     assert "cassette design" in package_readme
-    assert "YIU payload windows" in package_readme
+    assert "inspect payload windows" in package_readme
     assert "docs/README.md" in package_readme
     assert "docs/demos/demo_cassette_workspace.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
     assert "docs/reference/cli.md" in package_readme
     assert "This README stays light on purpose." not in package_readme
-    assert "study and portfolio flows" in package_readme
+    assert "Aggregate parameter sweeps" in package_readme
 
     assert "Optimize Fixed-Length Sequences" in docs_readme
     assert "Design and Search Cassettes" in docs_readme
@@ -60,9 +60,9 @@ def test_top_level_docs_route_both_workflow_families() -> None:
     assert "guides/studies.md" in docs_readme
     assert "guides/portfolio_aggregation.md" in docs_readme
 
-    assert "Design or search cassettes" in docs_index
-    assert "Run the fixed-length optimization lane" in docs_index
-    assert "Run Studies and Portfolio Aggregation" in docs_index
+    assert "Design and Search Cassettes" in docs_index
+    assert "Optimize Fixed-Length Sequences" in docs_index
+    assert "Summarize Sweeps and Aggregate Artifacts" in docs_index
     assert "demos/demo_pairwise.md" in docs_index
     assert "demos/demo_multitf.md" in docs_index
     assert "demos/project_all_tfs.md" in docs_index
