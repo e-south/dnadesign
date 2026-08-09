@@ -1,4 +1,13 @@
-"""Documentation guards for external study-owned operator surfaces."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/tests/docs/test_external_study_boundaries.py
+
+Documentation guards for external study-owned operator surfaces.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

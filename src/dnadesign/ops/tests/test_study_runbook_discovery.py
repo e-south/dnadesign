@@ -1,4 +1,13 @@
-"""Contract tests for external-study Infer runbook discovery."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/tests/test_study_runbook_discovery.py
+
+Contract tests for external-study Infer runbook discovery.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
