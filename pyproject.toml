@@ -135,6 +135,9 @@ exclude = [
 ]
 
 [tool.setuptools.package-data]
+"dnadesign.baserender" = [
+  "styles/*/*.yaml",
+]
 "dnadesign.cruncher" = [
   "resources/cassette/catalogs/*.yaml",
 ]
@@ -168,6 +171,7 @@ exclude = [
 "dnadesign.junction" = [
   "docs/assets/*.svg",
   "examples/*/*.yaml",
+  "examples/*/jobs/*.yaml",
 ]
 "dnadesign.latentdna" = [
   "ops/status.registry.yaml",
@@ -175,6 +179,7 @@ exclude = [
   "workspaces/templates/*/*.md",
 ]
 "dnadesign.opal" = [
+  "campaigns/*/configs/*.yaml",
   "campaigns/_fixtures/scalar-regression/records.parquet",
   "src/ops/status.registry.yaml",
 ]
@@ -189,6 +194,7 @@ exclude = [
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.usr" = [
+  "datasets/registry.yaml",
   "ops/status.registry.yaml",
 ]
 
