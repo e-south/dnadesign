@@ -4141,6 +4141,7 @@ def test_cli_runbook_init_generates_infer_notify_scaffold_with_infer_policy(tmp_
     raw_payload = yaml.safe_load(runbook_path.read_text(encoding="utf-8"))
     assert raw_payload["runbook"]["notify"]["tool"] == "infer"
     assert raw_payload["runbook"]["notify"]["policy"] == "infer"
+    assert raw_payload["runbook"]["infer"]["cuda_module"] == "cuda/13.0"
     assert "Notify contract required before planning" in result.stderr
     assert "NOTIFY_WEBHOOK_FILE" in result.stderr
     assert str(workspace_root / "outputs" / "notify" / "infer" / "profile.json") in result.stderr

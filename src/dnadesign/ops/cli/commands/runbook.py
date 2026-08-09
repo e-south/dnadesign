@@ -489,7 +489,7 @@ def runbook_init(
     cuda_module: Annotated[
         str,
         typer.Option("--cuda-module", help="Infer workflow CUDA module name."),
-    ] = "cuda/12.4",
+    ] = "cuda/13.0",
     gcc_module: Annotated[
         str,
         typer.Option("--gcc-module", help="Infer workflow GCC module name."),
