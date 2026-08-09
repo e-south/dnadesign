@@ -5,7 +5,7 @@ short_name: MSRB
 objective_id: multistate_response_behavior_v1
 owner: dnadesign-maintainers
 status: available
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Multistate Response Behavior (MSRB)

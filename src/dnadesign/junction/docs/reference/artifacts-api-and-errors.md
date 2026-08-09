@@ -5,7 +5,7 @@ type: reference
 scope: public operations, plan identity, publication, and verification
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Artifacts, API, and errors

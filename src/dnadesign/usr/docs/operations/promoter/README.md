@@ -1,7 +1,7 @@
 ## Promoter data routes
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 Use this folder for data-plane routes that assemble or annotate promoter
 feature datasets before downstream analysis.

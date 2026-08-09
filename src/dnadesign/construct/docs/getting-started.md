@@ -3,7 +3,7 @@ doc_id: construct-getting-started
 title: Construct getting started
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Construct getting started

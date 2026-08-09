@@ -1,7 +1,7 @@
 # Expanded Reference and View Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 This spec defines the LatentDNA contract for promoter-reference visibility after
 the stress ethanol/ciprofloxacin study expanded from three carried controls to a

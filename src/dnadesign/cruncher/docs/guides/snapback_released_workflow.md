@@ -5,7 +5,7 @@
 **Audience:** snapback workflow users and maintainers
 **Last updated by:** cruncher-maintainers on 2026-08-08
 **Applies to:** `uv run cruncher snapback released-design|released-target-search|released-solve|released-show`
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 **Primary artifacts:** released-product search/solve reports, projection JSON, pre-event site records, released-design summary table, and per-hit triptychs for precursor sites, post-release fragments, and foldback
 
 ### Contents

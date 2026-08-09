@@ -3,7 +3,7 @@ doc_id: construct-template-contexts
 title: Construct template contexts
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Construct template contexts

@@ -1,7 +1,7 @@
 # Performance budgets
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 LatentDNA keeps interactive control paths separate from array-heavy analysis.
 Status checks, notebook controls, and workspace summaries should read manifests

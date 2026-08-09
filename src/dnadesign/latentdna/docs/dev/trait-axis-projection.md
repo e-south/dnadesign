@@ -2,7 +2,7 @@
 
 **Owner:** dnadesign-maintainers
 **Status:** implemented
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 `trait_axis_projection` fits a signed direction between declared low and high
 cohorts in an existing representation, then projects chosen rows onto that

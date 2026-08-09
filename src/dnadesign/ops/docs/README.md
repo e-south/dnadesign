@@ -1,7 +1,7 @@
 ## Ops docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 Ops package docs cover packaged presets and command reference. The repo-wide
 command list lives in `docs/runbooks/README.md`.

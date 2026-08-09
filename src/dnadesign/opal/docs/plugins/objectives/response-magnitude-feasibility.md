@@ -3,7 +3,7 @@ id: opal-objective-response-magnitude-feasibility-v1
 title: Response-Magnitude Feasibility objective
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Response-Magnitude Feasibility `response_magnitude_feasibility_v1`

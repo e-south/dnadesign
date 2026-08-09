@@ -11,7 +11,7 @@
 **Status-kind:** usr-dataset-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 Use this runbook when construct should write one shared USR dataset and infer plus Notify should read that same dataset next.
 

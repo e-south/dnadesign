@@ -5,7 +5,7 @@ type: explanation
 audience: readers new to three-way-junction DNA assembly
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # How `junction` works

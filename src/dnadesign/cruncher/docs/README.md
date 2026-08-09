@@ -3,7 +3,7 @@ doc_id: cruncher-docs
 title: Cruncher documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Cruncher documentation

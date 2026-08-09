@@ -1,7 +1,7 @@
 ## Linear ssDNA Composition
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 **Surface role:** tool-local reference; generic authority for
 `linear_ssdna_composition_v1` and producer-owned Folding/BaseRender handoffs
 

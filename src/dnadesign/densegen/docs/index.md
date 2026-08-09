@@ -1,7 +1,7 @@
 ## DenseGen docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 
 Use **[docs/README.md](README.md)** as the primary docs entry. This page is a compact by-type index for direct browsing.

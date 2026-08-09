@@ -5,7 +5,7 @@ type: guide
 audience: users turning exact targets into a reviewed design request
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Prepare a request

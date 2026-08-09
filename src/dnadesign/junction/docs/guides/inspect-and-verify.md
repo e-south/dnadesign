@@ -5,7 +5,7 @@ type: guide
 audience: reviewers of an existing junction design
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Inspect and verify a bundle

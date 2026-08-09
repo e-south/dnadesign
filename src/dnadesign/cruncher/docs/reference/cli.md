@@ -1,7 +1,7 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13

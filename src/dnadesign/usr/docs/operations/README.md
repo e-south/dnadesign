@@ -7,7 +7,7 @@
 **Exit artifact:** USR runbook or downstream handoff route
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 
 Use this index to pick the next dataset, sync, or handoff step.
 

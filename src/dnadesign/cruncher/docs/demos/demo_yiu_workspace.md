@@ -1,7 +1,7 @@
 ## YIU Workspace Demo
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-08-09
 **Last updated by:** cruncher-maintainers on 2026-08-08
 
 Use this walkthrough to validate a strict `.yiu.yaml` request, publish its
