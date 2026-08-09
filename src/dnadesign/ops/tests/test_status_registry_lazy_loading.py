@@ -199,7 +199,9 @@ def test_external_status_registry_entry_point_is_owner_confined(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fragment = tmp_path / "status.registry.yaml"
+    package_root = tmp_path / "research_studies"
+    package_root.mkdir()
+    fragment = package_root / "status.registry.yaml"
     fragment.write_text(
         """
 version: 1
@@ -222,6 +224,11 @@ entries:
         load=lambda: lambda: (fragment,),
     )
     monkeypatch.setattr(registry_loader, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        registry_loader,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+    )
 
     fragments = registry_loader._load_external_status_registry_fragments()  # noqa: SLF001
     specs = registry_loader._load_status_kind_specs(  # noqa: SLF001
@@ -245,6 +252,52 @@ entries:
             dnadesign_root=_repo_root() / "src" / "dnadesign",
             provider_prefixes={path: prefix for path, prefix in fragments},
         )
+
+
+def test_external_status_registry_entry_point_rejects_path_outside_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "research_studies"
+    package_root.mkdir()
+    external_fragment = tmp_path / "status.registry.yaml"
+    external_fragment.write_text("version: 1\nprovider_id: escaped\nentries: []\n", encoding="utf-8")
+    entry_point = SimpleNamespace(
+        name="research-studies",
+        value="research_studies.integrations.dnadesign_ops:status_registry_paths",
+        load=lambda: lambda: (external_fragment,),
+    )
+    monkeypatch.setattr(registry_loader, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        registry_loader,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=(str(package_root),), origin=None),
+    )
+
+    with pytest.raises(ValueError, match="path must stay under its entry-point package"):
+        registry_loader._load_external_status_registry_fragments()  # noqa: SLF001
+
+
+def test_external_status_registry_entry_point_rejects_plain_module_owner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fragment = tmp_path / "status.registry.yaml"
+    fragment.write_text("version: 1\nprovider_id: demo\nentries: []\n", encoding="utf-8")
+    entry_point = SimpleNamespace(
+        name="plain-module",
+        value="plain_provider:status_registry_paths",
+        load=lambda: lambda: (fragment,),
+    )
+    monkeypatch.setattr(registry_loader, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        registry_loader,
+        "find_spec",
+        lambda package: SimpleNamespace(submodule_search_locations=None, origin=str(tmp_path / "plain_provider.py")),
+    )
+
+    with pytest.raises(ValueError, match="must belong to an import package"):
+        registry_loader._load_external_status_registry_fragments()  # noqa: SLF001
 
 
 def test_status_registry_fragments_are_included_as_package_data() -> None:

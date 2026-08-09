@@ -12,7 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from functools import lru_cache
-from importlib.metadata import entry_points
+from importlib.metadata import EntryPoint, entry_points
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Mapping
 
@@ -266,6 +267,7 @@ def _load_external_status_registry_fragments() -> tuple[tuple[Path, str], ...]:
         loader = entry_point.load()
         if not callable(loader):
             raise ValueError(f"status registry entry point must resolve to a callable: {entry_point.name}")
+        package_roots = _entry_point_package_roots(entry_point=entry_point)
         raw_paths = loader()
         if isinstance(raw_paths, (str, Path)):
             raw_paths = (raw_paths,)
@@ -278,11 +280,34 @@ def _load_external_status_registry_fragments() -> tuple[tuple[Path, str], ...]:
                 raise ValueError(
                     f"status registry entry point returned an invalid registry path: {entry_point.name}: {path}"
                 )
+            if not any(path.is_relative_to(package_root) for package_root in package_roots):
+                raise ValueError(
+                    "status registry path must stay under its entry-point package: "
+                    f"{entry_point.name}: {path} package_roots={package_roots}"
+                )
             if path in seen_paths:
                 raise ValueError(f"status registry path registered more than once: {path}")
             seen_paths.add(path)
             fragments.append((path, provider_prefix))
     return tuple(fragments)
+
+
+def _entry_point_package_roots(*, entry_point: EntryPoint) -> tuple[Path, ...]:
+    module_name = entry_point.value.partition(":")[0].strip()
+    top_level_package = module_name.partition(".")[0]
+    if not top_level_package:
+        raise ValueError(f"status registry entry point has no import package: {entry_point.name}")
+    spec = find_spec(top_level_package)
+    if spec is None:
+        raise ValueError(
+            f"status registry entry-point package cannot be resolved: {entry_point.name}: {top_level_package}"
+        )
+    search_locations = tuple(spec.submodule_search_locations or ())
+    if search_locations:
+        return tuple(sorted({Path(location).expanduser().resolve() for location in search_locations}))
+    raise ValueError(
+        f"status registry entry point must belong to an import package: {entry_point.name}: {top_level_package}"
+    )
 
 
 def _iter_status_registry_fragment_paths_for_root(*, dnadesign_root: Path) -> tuple[Path, ...]:
