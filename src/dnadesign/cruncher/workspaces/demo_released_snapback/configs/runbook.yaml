@@ -1,9 +1,9 @@
 runbook:
   schema_version: 1
-  name: de033
+  name: demo_released_snapback
   steps:
   - id: snapback_released_target_search
-    description: Search the operational dual-enzyme 0/3/3 lane against explicit nickase presets and the BspQI-pinned Type IIS release policy under the default no-frequent-cutter policy.
+    description: Search the demo dual-enzyme 0/3/3 geometry against explicit nickase presets and a BspQI-pinned Type IIS release policy.
     run:
     - snapback
     - released-target-search

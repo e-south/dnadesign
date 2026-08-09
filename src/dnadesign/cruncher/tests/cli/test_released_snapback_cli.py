@@ -211,7 +211,7 @@ def test_released_target_search_json_reports_route_policy_when_top_active_routes
 
 
 def test_snapback_screen_json_reports_study_semantics(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspaces" / "de033"
+    workspace = tmp_path / "workspaces" / "released_snapback"
     workspace.mkdir(parents=True, exist_ok=True)
 
     result = runner.invoke(

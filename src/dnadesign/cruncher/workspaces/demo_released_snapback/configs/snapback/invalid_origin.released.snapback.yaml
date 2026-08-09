@@ -1,7 +1,7 @@
 released_snapback:
   schema_version: 1
   kind: single_nick_released_snapback_v1
-  name: de033_left_of_origin_bspqi_invalid
+  name: demo_left_of_origin_bspqi_invalid
 input:
   precursor_top_strand: GTCTCAAAAAAATTTAGAAGAGC
 nick_stage:

@@ -38,7 +38,7 @@ def test_snapback_screen_request_defaults_encode_origin_zero_retained_active_sem
 
 
 def test_snapback_screen_real_presets_emit_exact_mechanism_ledger(tmp_path: Path) -> None:
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
 
     report = run_snapback_screen(

@@ -252,7 +252,7 @@ def test_build_precursor_sequence_allows_left_of_origin_when_truncated_prefix_is
 def test_builtin_neb_candidates_do_not_gain_origin_slack_without_leading_degenerate_prefix(
     tmp_path: Path,
 ) -> None:
-    workspace = tmp_path / "workspaces" / "de033"
+    workspace = tmp_path / "workspaces" / "released_snapback"
     workspace.mkdir(parents=True, exist_ok=True)
     catalog, _resolved_paths = load_merged_nickase_catalog(
         preset_id="neb_nicking_v1",
@@ -409,7 +409,7 @@ def test_released_target_search_can_materialize_top_active_routes_with_vendor_fo
 def test_released_target_search_real_presets_find_expected_retained_active_routes(
     tmp_path: Path,
 ) -> None:
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
 
     report = run_released_snapback_target_search(
@@ -452,10 +452,10 @@ def test_released_target_search_real_presets_find_expected_retained_active_route
     assert exact_hits_by_id["Nb.BtsI"].pre_nick_site.local_start == -2
 
 
-def test_released_target_search_can_pin_release_variant_for_de033_bspqi_policy(
+def test_released_target_search_can_pin_release_variant_for_bspqi_policy(
     tmp_path: Path,
 ) -> None:
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
 
     report = run_released_snapback_target_search(
@@ -976,7 +976,7 @@ def test_search_released_target_hits_keeps_near_hits_when_pair_has_exact_hit(mon
 
 
 def test_released_target_search_against_real_presets_evaluates_the_full_cross_product(tmp_path: Path) -> None:
-    workspace_root = tmp_path / "workspaces" / "de033"
+    workspace_root = tmp_path / "workspaces" / "released_snapback"
     workspace_root.mkdir(parents=True, exist_ok=True)
     request = SingleNickReleasedTargetSearchRequest(
         target=ReleasedFinalTargetGeometry(nick_boundary_from_left=0, paired_bp=3, cap_nt=3),

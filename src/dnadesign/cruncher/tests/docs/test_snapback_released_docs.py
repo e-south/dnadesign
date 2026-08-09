@@ -30,14 +30,12 @@ def test_docs_hubs_route_to_released_snapback_surfaces() -> None:
         assert "reference/snapback_artifacts.md" in content
         assert "reference/released_snapback_artifacts.md" in content
         assert "reference/release_enzyme_catalogs.md" in content
-        assert "../workspaces/de033/README.md" in content
-        assert "../workspaces/de033/runbook.md" in content
 
 
-def test_runbook_step_reference_includes_released_snapback_de033_steps() -> None:
+def test_runbook_step_reference_includes_released_snapback_demo_steps() -> None:
     runbook_steps = _read("docs/reference/runbook_steps.md")
 
-    assert "`de033`" in runbook_steps
+    assert "`demo_released_snapback`" in runbook_steps
     assert "`snapback_released_solve`" in runbook_steps
     assert "`snapback_released_target_search`" in runbook_steps
     assert "thermo_nicking_v1" in runbook_steps

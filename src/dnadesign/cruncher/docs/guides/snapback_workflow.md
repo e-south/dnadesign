@@ -3,9 +3,9 @@
 **Owner:** dnadesign-maintainers
 **Doc kind:** guide
 **Audience:** snapback workflow users and maintainers
-**Last updated by:** cruncher-maintainers on 2026-07-13
+**Last updated by:** cruncher-maintainers on 2026-08-08
 **Applies to:** `uv run cruncher snapback init-workspace|validate|design|solve|target-search|show`
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-08
 **Primary artifacts:** `analysis/reports/report.json`, `analysis/reports/solve_report.json`, `analysis/views/views_manifest.v1.json`, `analysis/materialized_hits/hit_<rank>/`
 
 ### Contents
@@ -200,7 +200,7 @@ Notes:
 - `target-search` does not write a bundle; it prints a typed exact-hit / near-hit report to stdout.
 - the scaffold keeps `Nt.Bpu10I` as the explicit authored example, but the solve demo searches the broader NEB + Thermo preset catalog
 - `show` reads snapback-specific bundles only and refuses drift instead of guessing.
-- the released-product lane is a sibling contract surface and does not overload preserved-site `target-search` or `solve`; use [`snapback_released_workflow.md`](snapback_released_workflow.md) and the checked-in `de033` workspace for dual-enzyme examples
+- the released-product lane is a sibling contract surface and does not overload preserved-site `target-search` or `solve`; use [`snapback_released_workflow.md`](snapback_released_workflow.md) and the checked-in `demo_released_snapback` workspace for a dual-enzyme example
 
 ### Target-first catalog search
 
