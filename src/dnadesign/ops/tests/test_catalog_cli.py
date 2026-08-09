@@ -142,12 +142,12 @@ routes:
         _load_tool_source_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
 
 
-def test_ops_package_data_declares_packaged_runbook_presets() -> None:
+def test_ops_package_data_declares_registry_and_runbook_templates() -> None:
     pyproject = (_repo_root() / "pyproject.toml").read_text(encoding="utf-8")
 
     assert '"dnadesign.ops"' in pyproject
     assert "providers/*/status.registry.yaml" in pyproject
-    assert "runbooks/presets/*.yaml" in pyproject
+    assert "runbooks/presets/*.yaml" not in pyproject
     assert "runbooks/templates/*.qsub" in pyproject
 
 
@@ -356,41 +356,6 @@ def test_cli_catalog_list_supports_related_tool_sources() -> None:
     assert "procedures" not in payload
 
 
-def test_cli_catalog_list_supports_related_tool_sources_for_stress_ethanol_cipro_growth_status() -> None:
-    runner = CliRunner()
-
-    result = runner.invoke(
-        app,
-        [
-            "catalog",
-            "list",
-            "--repo-root",
-            str(_repo_root()),
-            "--section",
-            "tool-sources",
-            "--related-to",
-            "studies.stress-ethanol-cipro-growth.status",
-            "--json",
-        ],
-    )
-
-    assert result.exit_code == 0
-    payload = json.loads(result.output)
-    assert payload["filters"] == {"related_to": "studies.stress-ethanol-cipro-growth.status"}
-    assert payload["counts"] == {"tool_sources": 8}
-    assert [entry["tool"] for entry in payload["tool_sources"]] == [
-        "densegen",
-        "construct",
-        "infer",
-        "cluster",
-        "opal",
-        "latentdna",
-        "notify",
-        "ops",
-    ]
-    assert "procedures" not in payload
-
-
 def test_cli_catalog_list_supports_related_to_filter() -> None:
     runner = CliRunner()
 
@@ -419,37 +384,6 @@ def test_cli_catalog_list_supports_related_to_filter() -> None:
         "cluster.downstream.exploratory-clustering",
         "opal.downstream.usr-infer-x-active-learning",
     ]
-    assert "tool_sources" not in payload
-
-
-def test_cli_catalog_list_supports_related_to_filter_for_stress_ethanol_cipro_growth_status() -> None:
-    runner = CliRunner()
-
-    result = runner.invoke(
-        app,
-        [
-            "catalog",
-            "list",
-            "--repo-root",
-            str(_repo_root()),
-            "--section",
-            "procedures",
-            "--related-to",
-            "studies.stress-ethanol-cipro-growth.status",
-            "--json",
-        ],
-    )
-
-    assert result.exit_code == 0
-    payload = json.loads(result.output)
-    assert payload["filters"] == {"related_to": "studies.stress-ethanol-cipro-growth.status"}
-    assert payload["counts"] == {"procedures": 4}
-    assert {entry["registry_id"] for entry in payload["procedures"]} == {
-        "studies.stress-ethanol-cipro-growth.preflight",
-        "usr.data-plane.multi-source-source-of-truth",
-        "usr.data-plane.construct-infer-source-of-truth",
-        "opal.downstream.usr-infer-x-active-learning",
-    }
     assert "tool_sources" not in payload
 
 
@@ -499,12 +433,12 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
     assert "- usr: USR docs" in result.output
     assert "Related tool docs:" in result.output
     assert "- densegen: DenseGen documentation" in result.output
-    assert "- construct: Construct docs" in result.output
+    assert "- construct: Construct documentation" in result.output
     assert "- infer: infer docs" in result.output
     assert "- cluster: Cluster docs" in result.output
-    assert "- opal: OPAL Documentation" in result.output
+    assert "- opal: OPAL documentation" in result.output
     assert "Related deep docs:" in result.output
-    assert "- construct/template-contexts: Construct Template Contexts" in result.output
+    assert "- construct/template-contexts: Construct template contexts" in result.output
     assert "- infer/architecture: Infer Architecture" in result.output
     assert "- infer/evo2-provider: Evo2 Provider Reference" in result.output
     assert "- infer/evo2-sequence-features: Evo2 Sequence-Feature Runbook" in result.output
@@ -617,42 +551,6 @@ def test_cli_catalog_show_json_includes_related_procedures() -> None:
         ("depends-on", "usr.data-plane.construct-infer-source-of-truth"),
         ("handoff-to", "cluster.downstream.exploratory-clustering"),
         ("handoff-to", "opal.downstream.usr-infer-x-active-learning"),
-    ]
-
-
-def test_cli_catalog_show_json_exposes_latentdna_route_from_stress_ethanol_cipro_growth_status() -> None:
-    runner = CliRunner()
-
-    result = runner.invoke(
-        app,
-        [
-            "catalog",
-            "show",
-            "studies.stress-ethanol-cipro-growth.status",
-            "--repo-root",
-            str(_repo_root()),
-            "--json",
-        ],
-    )
-
-    assert result.exit_code == 0
-    payload = json.loads(result.output)
-    assert payload["owner_boundary"] == "studies"
-    assert [entry["tool"] for entry in payload["related_tool_sources"]] == [
-        "densegen",
-        "construct",
-        "infer",
-        "latentdna",
-        "cluster",
-        "opal",
-        "notify",
-        "ops",
-    ]
-    assert ("latentdna", "stress-ethanol-cipro-representation-comparison") in [
-        (entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]
-    ]
-    assert ("handoff-to", "studies.stress-ethanol-cipro-growth.preflight") in [
-        (entry["relation_type"], entry["registry_id"]) for entry in payload["related_procedures"]
     ]
 
 

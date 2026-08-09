@@ -33,11 +33,11 @@ from .run import cmd_run
 from .validate import cmd_validate
 
 DEMO_FLOWS = (
-    "demo_rf_sfxi_topn",
+    "demo_rf_topn",
     "demo_gp_topn",
     "demo_gp_ei",
 )
-DEMO_RECORDS_SOURCE = "demo_rf_sfxi_topn"
+DEMO_FIXTURE = "scalar-regression"
 
 
 def _run_cli_quiet(fn, /, **kwargs) -> dict[str, str]:
@@ -117,15 +117,19 @@ def _run_demo_flow(*, flow_name: str, tmp_root: Path, rounds: list[int], fail_fa
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
-    base_records = campaigns_root / DEMO_RECORDS_SOURCE / "records.parquet"
+    fixture_root = campaigns_root / "_fixtures" / DEMO_FIXTURE
+    base_records = fixture_root / "records.parquet"
     if not base_records.exists():
         raise OpalError(f"Base records missing: {base_records}")
     shutil.copy2(base_records, dst / "records.parquet")
 
     cfg_path = dst / "configs" / "campaign.yaml"
-    labels_file = dst / "inputs" / "r0" / "vec8-b0.xlsx"
-    if not labels_file.exists():
-        raise OpalError(f"Demo labels file missing: {labels_file}")
+    fixture_labels = fixture_root / "labels.csv"
+    if not fixture_labels.exists():
+        raise OpalError(f"Demo labels file missing: {fixture_labels}")
+    labels_file = dst / "inputs" / "r0" / "labels.csv"
+    labels_file.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(fixture_labels, labels_file)
 
     round_summaries: list[dict[str, Any]] = []
     try:

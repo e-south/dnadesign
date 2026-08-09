@@ -11,13 +11,10 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from dnadesign.latentdna.src.contracts.errors import ContractViolationError
 from dnadesign.latentdna.src.metrics.definitions import METRIC_DEFINITIONS, resolve_metric_definition
-from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
 
 
 def test_metric_registry_uses_comparison_metadata_and_drops_selection_state() -> None:
@@ -72,13 +69,3 @@ def test_global_metric_registry_does_not_ship_sigma35_study_vocabulary() -> None
     assert offenders == {}
     with pytest.raises(ContractViolationError, match="no metric definition is registered"):
         resolve_metric_definition("sig35_ordinal_spearman")
-
-
-def test_stress_workspace_declares_sigma35_metric_vocabulary() -> None:
-    context = load_workspace_config(Path("src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth"))
-
-    definition = resolve_metric_definition("sig35_ordinal_spearman", config=context.config)
-
-    assert definition.display_name == "Sigma-35 ordinal Spearman"
-    assert "configured Sigma-35 rank gaps" in definition.mathematical_definition
-    assert definition.metric_family == "ordinal_structure"

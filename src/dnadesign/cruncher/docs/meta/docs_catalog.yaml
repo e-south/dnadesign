@@ -167,8 +167,8 @@ docs_catalog:
       kind: guide
       audience: [cruncher-maintainers]
       applies_to: schema_v3
-      last_verified: "2026-05-14"
-      next: [../workspaces/scar_nick_teto/runbook.md, ../src/scar_nick/README.md, reference/nickase_catalog.md]
+      last_verified: "2026-08-08"
+      next: [../src/scar_nick/README.md, reference/nickase_catalog.md]
     - id: guide_yiu
       path: guides/yiu_workflow.md
       title: YIU Workflow
@@ -313,38 +313,14 @@ docs_catalog:
       applies_to: schema_v3
       last_verified: "2026-02-23"
       next: [demos/demo_pairwise.md, guides/portfolio_aggregation.md]
-    - id: de033_readme
-      path: ../workspaces/de033/README.md
-      title: de033 README
-      kind: tutorial
-      audience: [cruncher-maintainers]
-      applies_to: schema_v3
-      last_verified: "2026-04-22"
-      next: [guides/snapback_released_workflow.md, reference/runbook_steps.md]
-    - id: de033_runbook
-      path: ../workspaces/de033/runbook.md
-      title: de033 runbook
-      kind: tutorial
-      audience: [cruncher-maintainers]
-      applies_to: schema_v3
-      last_verified: "2026-04-22"
-      next: [reference/runbook_steps.md, guides/snapback_released_workflow.md]
-    - id: scar_nick_teto_runbook
-      path: ../workspaces/scar_nick_teto/runbook.md
-      title: scar_nick_teto runbook
-      kind: tutorial
-      audience: [cruncher-maintainers]
-      applies_to: schema_v3
-      last_verified: "2026-05-14"
-      next: [guides/scar_nick_workflow.md, ../src/scar_nick/README.md]
     - id: scar_nick_package_map
       path: ../src/scar_nick/README.md
       title: scar_nick Package Map
       kind: reference
       audience: [cruncher-maintainers]
       applies_to: schema_v3
-      last_verified: "2026-05-14"
-      next: [guides/scar_nick_workflow.md, ../workspaces/scar_nick_teto/runbook.md]
+      last_verified: "2026-08-08"
+      next: [guides/scar_nick_workflow.md, reference/nickase_catalog.md]
     - id: internals_spec
       path: internals/spec.md
       title: Cruncher Internals Spec

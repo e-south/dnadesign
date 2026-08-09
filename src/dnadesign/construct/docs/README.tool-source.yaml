@@ -1,13 +1,14 @@
 schema_version: 1
 catalog_order: 2
 tool: construct
-summary: Tool-owned workspace demos, template realization docs, and anchor-placement contracts.
+summary: Tool-owned workspace demos, sequence realization docs, and named-part placement contracts.
 keywords:
-  - promoter
+  - parts
+  - slots
   - templates
   - contexts
-  - feature matrix
+  - lineage
 routes:
   - id: template-contexts
     path: reference/template-contexts.md
-    summary: Construct-owned anchor placement, template realization, and anchor-coordinate contract for infer.
+    summary: Construct-owned part placement, template realization, named-span lineage, and optional focal-span handoff.

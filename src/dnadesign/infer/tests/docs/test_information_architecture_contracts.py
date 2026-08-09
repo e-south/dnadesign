@@ -165,15 +165,6 @@ def test_infer_workspaces_readme_mentions_workspace_inventory_command() -> None:
     assert "uv run infer workspace list" in workspaces
 
 
-def test_stress_ethanol_cipro_workspace_readme_uses_repo_root_placeholder_for_runbook_plan() -> None:
-    readme = _read("src/dnadesign/infer/workspaces/study_stress_ethanol_cipro/README.md")
-
-    assert "--repo-root <repo-root>" in readme
-    assert "/project/dunlop/esouth/dnadesign" not in readme
-    assert "prefix-conditioned in that orientation" in readme
-    assert "not an Infer target" in readme
-
-
 def test_infer_feature_schema_documents_causal_pooling_semantics() -> None:
     feature_schema = _read("src/dnadesign/infer/docs/reference/feature-schema.md")
 
@@ -218,6 +209,6 @@ def test_infer_docs_examples_and_workspaces_avoid_hardcoded_personal_usr_roots()
             if path.suffix not in {".md", ".yaml"}:
                 continue
             text = path.read_text(encoding="utf-8")
-            if "/projectnb/dunlop/esouth/outputs/usr_datasets" in text:
+            if "/projectnb/private-user/outputs/usr_datasets" in text:
                 offenders.append(str(path.relative_to(repo_root)))
     assert offenders == []

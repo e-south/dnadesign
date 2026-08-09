@@ -15,11 +15,13 @@ import hashlib
 
 import matplotlib.pyplot as plt
 import pytest
+from matplotlib.collections import LineCollection
 
 import dnadesign.baserender as baserender
 from dnadesign.baserender.src.config import Style
 from dnadesign.baserender.src.outputs.names import _safe_stem
 from dnadesign.baserender.src.render import three_way_junction_review as review_renderer_module
+from dnadesign.baserender.src.render.junction_pairing_layout import sequence_chunks
 from dnadesign.baserender.src.render.sequence_preview import bounded_sequence_preview
 
 from .fixtures import (
@@ -29,7 +31,6 @@ from .fixtures import (
     _payload_with_long_junction_sequences,
     _payload_with_long_recovery_primers,
     _payload_with_many_junctions,
-    _rename_target_geometry,
 )
 
 
@@ -78,172 +79,94 @@ def test_bounded_sequence_preview_has_a_fixed_sequence_text_budget() -> None:
     assert len(preview.label("bind")) < 64
 
 
-def test_review_renderer_bounds_long_primer_sequences_with_explicit_preview_metadata() -> None:
+def _rendered_text(payload: dict[str, object]) -> tuple[object, str]:
+    figure = baserender.render(_adapt_payload(payload), renderer="three_way_junction_review")
+    text = "\n".join(item.get_text() for item in figure.axes[0].texts)
+    return figure, text
+
+
+def _spaced(sequence: str) -> str:
+    return " ".join(sequence)
+
+
+def test_review_renderer_preserves_every_long_primer_base() -> None:
     payload = _payload_with_long_recovery_primers()
-    record = _adapt_payload(payload)
-
-    figure = baserender.render(record, renderer="three_way_junction_review")
+    figure, text = _rendered_text(payload)
     try:
-        figure.canvas.draw()
-        recovery_axis = figure.axes[2]
-        renderer = figure.canvas.get_renderer()
-        axis_box = recovery_axis.get_window_extent(renderer=renderer)
-        recovery_text = "\n".join(item.get_text() for item in recovery_axis.texts)
-
-        assert "96 nt" in recovery_text
-        assert "100 nt" in recovery_text
-        assert "SHA-256[:12]" in recovery_text
-        assert "preview" in recovery_text
-        assert payload["recovery"]["forward"]["binding_sequence_5to3"] not in recovery_text
-        for artist in recovery_axis.texts:
-            artist_box = artist.get_window_extent(renderer=renderer)
-            assert artist_box.x0 >= axis_box.x0
-            assert artist_box.x1 <= axis_box.x1
+        for direction in ("forward", "reverse"):
+            order = payload["recovery"][direction]["order_sequence_5to3"]  # type: ignore[index]
+            for chunk in sequence_chunks(order):
+                assert _spaced(chunk.sequence) in text
+        assert "SHA-256[:12]" not in text
+        assert "preview" not in text
     finally:
         plt.close(figure)
 
 
-def test_review_renderer_bounds_long_junction_sequences_with_explicit_preview_metadata() -> None:
+def test_review_renderer_preserves_every_long_junction_base_and_pairing_edge() -> None:
     payload = _payload_with_long_junction_sequences()
-    record = _adapt_payload(payload)
-
-    figure = baserender.render(record, renderer="three_way_junction_review")
+    figure, text = _rendered_text(payload)
     try:
-        figure.canvas.draw()
-        junction_axis = figure.axes[1]
-        renderer = figure.canvas.get_renderer()
-        axis_box = junction_axis.get_window_extent(renderer=renderer)
-        junction_text = "\n".join(item.get_text() for item in junction_axis.texts)
-
-        assert "T = toehold" in junction_text
-        assert "B = matched barcode" in junction_text
-        assert "100 nt" in junction_text
-        assert "digest = SHA-256[:12]" in junction_text
-        assert payload["geometry"]["junctions"][0]["toehold"] not in junction_text
-        assert payload["geometry"]["junctions"][0]["barcode"] not in junction_text
-        for artist in junction_axis.texts:
-            artist_box = artist.get_window_extent(renderer=renderer)
-            assert artist_box.x0 >= axis_box.x0
-            assert artist_box.x1 <= axis_box.x1
+        junction = payload["geometry"]["junctions"][0]  # type: ignore[index]
+        displayed = (
+            junction["toehold"],
+            junction["toehold_complement"][::-1],
+            junction["barcode"],
+            junction["barcode_complement"][::-1],
+        )
+        for sequence in displayed:
+            for chunk in sequence_chunks(sequence):
+                assert _spaced(chunk.sequence) in text
+        pair_collections = [item for item in figure.axes[0].collections if isinstance(item, LineCollection)]
+        expected_pair_count = len(junction["toehold"]) + len(junction["barcode"])
+        assert sum(len(item.get_segments()) for item in pair_collections) >= expected_pair_count
     finally:
         plt.close(figure)
 
 
-def test_review_renderer_bounds_long_ids_and_integer_metrics() -> None:
+def test_review_renderer_bounds_identifiers_and_omits_unhelpful_search_scalars() -> None:
     payload = _payload_with_large_display_scalars()
-    record = _adapt_payload(payload)
-
-    figure = baserender.render(record, renderer="three_way_junction_review")
+    figure, text = _rendered_text(payload)
     try:
-        figure.canvas.draw()
-        renderer = figure.canvas.get_renderer()
-        text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
-
         assert "10007 chars" in text
-        assert "10009 chars" in text
-        assert "10001 digits" in text
         assert "SHA-256[:12]" in text
-        assert payload["target"]["target_id"] not in text
+        assert payload["target"]["target_id"] not in text  # type: ignore[index]
         assert ("1" + ("0" * 10_000)) not in text
-        for axis in (figure.axes[0], figure.axes[3]):
-            axis_box = axis.get_window_extent(renderer=renderer)
-            for artist in axis.texts:
-                artist_box = artist.get_window_extent(renderer=renderer)
-                assert artist_box.x0 >= axis_box.x0
-                assert artist_box.x1 <= axis_box.x1
+        assert "toehold paths" not in text
+        assert "barcode candidates" not in text
     finally:
         plt.close(figure)
 
 
-def test_review_renderer_bounds_producer_valid_wide_identifiers() -> None:
-    payload = _payload()
-    identifier = "W" * 32
-    payload["target"]["target_id"] = identifier
-    payload["target"]["assembly_group_id"] = identifier
-    payload["search"]["assembly_group_id"] = identifier
-    payload["checks"][0]["subject"]["id"] = identifier
-    payload["checks"][1]["subject"]["id"] = identifier
-    record = _adapt_payload(payload)
-
-    figure = baserender.render(record, renderer="three_way_junction_review")
-    try:
-        figure.canvas.draw()
-        renderer = figure.canvas.get_renderer()
-        text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
-        assert "32 chars" in text
-        assert identifier not in text
-        for axis in (figure.axes[0], figure.axes[3]):
-            axis_box = axis.get_window_extent(renderer=renderer)
-            assert all(item.get_window_extent(renderer=renderer).x1 <= axis_box.x1 for item in axis.texts)
-    finally:
-        plt.close(figure)
-
-
-def test_review_renderer_distinguishes_target_junctions_from_assembly_group_loci() -> None:
-    first = _payload()
-    second = _payload_with_long_recovery_primers()
-    _rename_target_geometry(second, target_id="target-02")
-    for payload in (first, second):
-        payload["recovery"]["mode"] = "target_specific"
-        payload["search"]["locus_count"] = 2
-        payload["search"]["barcode_candidates_generated"] = 10
-    record = baserender.adapt_records(
-        [first, second],
-        adapter_kind="three_way_junction_review_v1",
-    )[0]
-
-    figure = baserender.render(record, renderer="three_way_junction_review")
-    try:
-        junction_text = "\n".join(item.get_text() for item in figure.axes[1].texts)
-        search_text = "\n".join(item.get_text() for item in figure.axes[3].texts)
-
-        assert "1 target junction · every target junction shown" in junction_text
-        assert "assembly-group loci  2" in search_text
-    finally:
-        plt.close(figure)
-
-
-def test_review_renderer_escapes_control_characters_in_public_adapter_identifiers() -> None:
+def test_review_renderer_escapes_control_characters_in_adapter_identifiers() -> None:
     payload = _payload()
     identifier = "assembly\n\t" * 100
-    payload["target"]["target_id"] = identifier
-    payload["target"]["assembly_group_id"] = identifier
-    payload["search"]["assembly_group_id"] = identifier
-    payload["checks"][0]["subject"]["id"] = identifier
-    payload["checks"][1]["subject"]["id"] = identifier
-    record = _adapt_payload(payload)
-
-    figure = baserender.render(record, renderer="three_way_junction_review")
+    payload["target"]["target_id"] = identifier  # type: ignore[index]
+    payload["target"]["assembly_group_id"] = identifier  # type: ignore[index]
+    payload["search"]["assembly_group_id"] = identifier  # type: ignore[index]
+    payload["checks"][0]["subject"]["id"] = identifier  # type: ignore[index]
+    payload["checks"][1]["subject"]["id"] = identifier  # type: ignore[index]
+    figure, _ = _rendered_text(payload)
     try:
-        figure.canvas.draw()
-        renderer = figure.canvas.get_renderer()
-        for axis in (figure.axes[0], figure.axes[3]):
-            axis_box = axis.get_window_extent(renderer=renderer)
-            for item in axis.texts:
-                assert "\n" not in item.get_text()
-                assert "\t" not in item.get_text()
-                assert item.get_window_extent(renderer=renderer).x1 <= axis_box.x1
+        for item in figure.axes[0].texts:
+            assert "\n" not in item.get_text()
+            assert "\t" not in item.get_text()
     finally:
         plt.close(figure)
 
 
-def test_review_renderer_bounds_geometry_artist_counts() -> None:
-    record = _adapt_payload(_payload_with_many_junctions())
-
-    figure = baserender.render(record, renderer="three_way_junction_review")
+def test_review_renderer_keeps_artist_counts_linear_without_one_text_artist_per_base() -> None:
+    payload = _payload_with_many_junctions()
+    figure, text = _rendered_text(payload)
     try:
-        geometry_axis, junction_axis = figure.axes[:2]
-        geometry_text = "\n".join(item.get_text() for item in geometry_axis.texts)
-        junction_text = "\n".join(item.get_text() for item in junction_axis.texts)
+        axis = figure.axes[0]
+        target_length = len(payload["target"]["sequence_5to3"])  # type: ignore[index]
+        junction_count = len(payload["geometry"]["junctions"])  # type: ignore[index]
 
-        assert "15 more fragment pairs" in geometry_text
-        assert "bounded target-junction preview" in junction_text
-        assert "every target junction shown" not in junction_text
-        assert "14 more junctions" in junction_text
-        assert len(geometry_axis.patches) <= 12
-        assert len(geometry_axis.texts) <= 22
-        assert len(junction_axis.lines) <= 6
-        assert len(junction_axis.texts) <= 18
+        assert f"J{junction_count:02d}" in text
+        assert len(axis.texts) < target_length + (junction_count * 32)
+        assert len(axis.patches) <= (junction_count * 2) + 1
+        assert all(isinstance(item, LineCollection) for item in axis.collections)
     finally:
         plt.close(figure)
 
@@ -279,15 +202,14 @@ def test_review_renderer_rejects_unsafe_canvas_styles_before_figure_allocation(
         )
 
 
-@pytest.mark.parametrize(
-    ("style", "expected"),
-    [
-        (Style(), (15.2, 4.2)),
-        (Style(dpi=300, figure_scale=1.6), (24.32, 6.72)),
-    ],
-)
-def test_review_renderer_accepts_normal_documented_canvas_styles(
-    style: Style,
-    expected: tuple[float, float],
-) -> None:
-    assert review_renderer_module._review_figure_size(style) == pytest.approx(expected)
+def test_review_renderer_sizes_the_canvas_from_exact_sequence_content() -> None:
+    short = review_renderer_module._review_from_record(_adapt_payload(_payload()))
+    long = review_renderer_module._review_from_record(_adapt_payload(_payload_with_many_junctions()))
+
+    short_size = review_renderer_module._review_figure_size(Style(), short)
+    long_size = review_renderer_module._review_figure_size(Style(), long)
+
+    assert short_size[0] == pytest.approx(15.2)
+    assert short_size[1] >= 6.4
+    assert long_size[0] == pytest.approx(15.2)
+    assert long_size[1] > short_size[1]

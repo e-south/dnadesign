@@ -2924,34 +2924,6 @@ def test_checked_in_tetr_direct_user_sequence_spec_renders_without_sample_handof
     assert show_payload.integrity.status == "ok"
 
 
-def test_checked_in_yiu_demo_bundles_roundtrip_show() -> None:
-    workspaces_root = Path(__file__).resolve().parents[2] / "workspaces"
-    current_normalized_contract = NormalizedPayload.model_fields["contract"].default
-    bundle_dirs = [
-        workspaces_root / "demo_yiu_payload" / "outputs" / "example_payload",
-        workspaces_root / "demo_monotypic_baer" / "outputs" / "plots" / "yiu__baer_monotypic_hit",
-        workspaces_root / "demo_monotypic_cpxr" / "outputs" / "plots" / "yiu__cpxr_monotypic_hit",
-        workspaces_root / "demo_monotypic_lexa" / "outputs" / "plots" / "yiu__lexa_monotypic_hit",
-        workspaces_root / "demo_monotypic_soxr" / "outputs" / "plots" / "yiu__soxr_monotypic_hit",
-        workspaces_root / "demo_monotypic_soxs" / "outputs" / "plots" / "yiu__soxs_monotypic_hit",
-        workspaces_root / "demo_monotypic_tetr" / "outputs" / "plots" / "yiu__tetr_monotypic_hit",
-        workspaces_root / "demo_monotypic_tetr" / "outputs" / "plots" / "yiu__tetr_teto2_wt_direct",
-    ]
-    if any(not bundle_dir.exists() for bundle_dir in bundle_dirs):
-        pytest.skip("checked-in demo bundle outputs are not present in this checkout")
-    if any(
-        json.loads((bundle_dir / "normalized_payload.json").read_text(encoding="utf-8")).get("contract")
-        != current_normalized_contract
-        for bundle_dir in bundle_dirs
-    ):
-        pytest.skip("checked-in demo bundle outputs were generated with an older normalized payload contract")
-
-    for bundle_dir in bundle_dirs:
-        outcome = show_yiu_bundle(bundle_dir)
-        assert outcome.integrity.status == "ok"
-        assert outcome.bundle_summary.mismatch_notation
-
-
 def test_show_yiu_bundle_rejects_payload_view_drift_when_pwm_effective_but_motifs_missing(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     spec_path = workspace / "configs" / "yiu" / "pwm_payload.yiu.yaml"

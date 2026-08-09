@@ -181,14 +181,6 @@ BANNERS = (
         "permute",
     ),
     BannerSpec(
-        "src/dnadesign/studies/assets/studies-banner.svg",
-        "src/dnadesign/studies/README.md",
-        "studies",
-        "ORGANIZE STUDIES",
-        "Keep study methods, records, and decisions together.",
-        "study",
-    ),
-    BannerSpec(
         "src/dnadesign/tfkdanalysis/assets/tfkdanalysis-banner.svg",
         "src/dnadesign/tfkdanalysis/README.md",
         "tfkdanalysis",

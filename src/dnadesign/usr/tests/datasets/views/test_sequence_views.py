@@ -322,7 +322,7 @@ def test_view_semantics_sidecar_validates_referenced_view_id(tmp_path: Path) -> 
                     selection_basis="native_source_length",
                     view_collections=["merged_anchor_handoff"],
                     role_tags=["design_population"],
-                    study_id="stress_ethanol_cipro_growth",
+                    study_id="example_study",
                     created_at="2026-04-28T00:00:00.000000Z",
                     created_by="test",
                 )
@@ -359,7 +359,7 @@ def test_view_semantics_collection_updates_do_not_change_view_identity(tmp_path:
         selection_basis="sigma_site_pair_midpoint",
         view_collections=["merged_anchor_handoff"],
         role_tags=["comparability_view"],
-        study_id="stress_ethanol_cipro_growth",
+        study_id="example_study",
         created_at="2026-04-28T00:00:00.000000Z",
         created_by="test",
     )

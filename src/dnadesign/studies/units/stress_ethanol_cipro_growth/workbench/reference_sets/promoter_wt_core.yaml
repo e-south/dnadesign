@@ -1,7 +1,0 @@
-reference_set_id: promoter_wt_core
-match_column: usr_label__primary
-ids:
-  - spyp
-  - sulAp
-  - J23105
-label_mode: label_and_highlight

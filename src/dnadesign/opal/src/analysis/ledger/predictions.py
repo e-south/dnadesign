@@ -145,7 +145,7 @@ def read_selection_view_predictions(
             ExitCodes.CONTRACT_VIOLATION,
         )
     projected = (
-        frame.explode("pred__selection_views")
+        frame.explode("pred__selection_views", empty_as_null=True, keep_nulls=True)
         .unnest("pred__selection_views")
         .filter(pl.col("selection_view_id") == view_id)
     )

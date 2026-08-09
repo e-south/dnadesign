@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -41,11 +42,42 @@ _PERSONAL_TOKEN_SIGNATURES = {
         "6c9ee308fae22a05b1c658ae98762ea76883b00d055123ed62b759a3d45f70ac",  # pragma: allowlist secret
     ),
 }
+_PRIVATE_STUDY_TOKEN_SIGNATURES = {
+    "24946af550a781fce523482d758dfe0dc4abb29ee87a5d615cc3ca2f2f065e3f",  # pragma: allowlist secret
+    "406267c5f1f8d5e88e1f66610d428736253f5be43b233263d189d0ee841a3350",  # pragma: allowlist secret
+    "dbe33577a145d35dbff36fdaa287352240a749886cf6deccdb68cae90c34be17",  # pragma: allowlist secret
+    "cf2d78fc2c55e41542393b34031136028e82f69080ee14384ed92054e06e4a3a",  # pragma: allowlist secret
+    "c494bdd3c55f7e7c3282eb86060c1899256b7118ecc8faca4783bfa8d0c33f72",  # pragma: allowlist secret
+}
+_IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{9,}")
 _ACTIVE_REMOTES_CONFIG = Path("src/dnadesign/usr/remotes.yaml")
-_PUBLIC_DOC_ROOT = Path("docs")
-_OPS_RUNBOOK_ROOT = Path("src/dnadesign/ops/runbooks")
-_USR_ROOT = Path("src/dnadesign/usr")
-_PUBLIC_TEXT_SUFFIXES = {".md", ".qsub", ".sh", ".toml", ".yaml", ".yml"}
+_HOME_PATH_PATTERNS = (
+    re.compile("/Users" + r"/([^/\s\"']+)"),
+    re.compile("/home" + r"/([^/\s\"']+)"),
+    re.compile(r"[A-Za-z]:\\Users\\([^\\/\s\"']+)"),
+)
+_GENERIC_HOME_NAMES = {"example", "sample", "user", "username", "you"}
+_SCANNED_TEXT_SUFFIXES = {
+    ".cfg",
+    ".csv",
+    ".html",
+    ".ini",
+    ".json",
+    ".jsonl",
+    ".md",
+    ".py",
+    ".qsub",
+    ".sh",
+    ".svg",
+    ".toml",
+    ".tsv",
+    ".txt",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+_SCANNED_TEXT_NAMES = {".gitignore", ".pre-commit-config.yaml", "Dockerfile"}
+_PRIVACY_MARKERS = ("/Users", "/home", "\\Users\\", "@gmail.com", "@scc", "/project")
 
 
 @dataclass(frozen=True, order=True)
@@ -77,28 +109,6 @@ def _read_tracked_text(path: Path) -> str | None:
         return None
 
 
-def _is_operator_surface(path: Path) -> bool:
-    if path == _ACTIVE_REMOTES_CONFIG:
-        return True
-    parts = path.parts
-    if path.suffix not in _PUBLIC_TEXT_SUFFIXES:
-        return False
-    if "tests" in parts or "outputs" in parts:
-        return False
-    if path.name == "journal.md" and "dev" in parts:
-        return False
-    if path.is_relative_to(_PUBLIC_DOC_ROOT):
-        return True
-    if path.is_relative_to(Path(".agents/skills")) or path.is_relative_to(_OPS_RUNBOOK_ROOT):
-        return True
-    if not path.is_relative_to(_USR_ROOT):
-        return "docs" in parts
-    relative_to_usr = path.relative_to(_USR_ROOT)
-    return relative_to_usr.name in {"AGENTS.md", "README.md", "remotes.example.yaml"} or relative_to_usr.parts[:1] == (
-        "docs",
-    )
-
-
 def _line_has_signature(line: str, *, length: int, digest: str) -> bool:
     if len(line) < length:
         return False
@@ -108,14 +118,33 @@ def _line_has_signature(line: str, *, length: int, digest: str) -> bool:
     )
 
 
+def _line_has_nongeneric_home(line: str) -> bool:
+    for pattern in _HOME_PATH_PATTERNS:
+        for match in pattern.finditer(line):
+            name = match.group(1).strip().lower()
+            if name in _GENERIC_HOME_NAMES or name.startswith(("$", "<", "{")):
+                continue
+            return True
+    return False
+
+
+def _has_private_study_identifier(value: str) -> bool:
+    return any(
+        hashlib.sha256(candidate.encode("utf-8")).hexdigest() in _PRIVATE_STUDY_TOKEN_SIGNATURES
+        for candidate in _IDENTIFIER_PATTERN.findall(value)
+    )
+
+
 def find_privacy_issues(repo_root: Path) -> tuple[PrivacyIssue, ...]:
     root = repo_root.resolve()
     issues: list[PrivacyIssue] = []
     for relative_path in _tracked_paths(root):
+        if _has_private_study_identifier(relative_path.as_posix()):
+            issues.append(PrivacyIssue(relative_path, 1, "private_study_identifier"))
         if relative_path == _ACTIVE_REMOTES_CONFIG:
             issues.append(PrivacyIssue(relative_path, 1, "tracked_active_remotes_config"))
 
-        if not _is_operator_surface(relative_path):
+        if relative_path.suffix.lower() not in _SCANNED_TEXT_SUFFIXES and relative_path.name not in _SCANNED_TEXT_NAMES:
             continue
 
         try:
@@ -125,9 +154,17 @@ def find_privacy_issues(repo_root: Path) -> tuple[PrivacyIssue, ...]:
         if text is None:
             continue
         for line_number, line in enumerate(text.splitlines(), start=1):
+            if _has_private_study_identifier(line):
+                issues.append(PrivacyIssue(relative_path, line_number, "private_study_identifier"))
+            if not any(marker in line for marker in _PRIVACY_MARKERS):
+                continue
+            has_known_signature = False
             for token_name, (length, digest) in _PERSONAL_TOKEN_SIGNATURES.items():
                 if _line_has_signature(line, length=length, digest=digest):
                     issues.append(PrivacyIssue(relative_path, line_number, token_name))
+                    has_known_signature = True
+            if not has_known_signature and _line_has_nongeneric_home(line):
+                issues.append(PrivacyIssue(relative_path, line_number, "absolute_home_path"))
     return tuple(sorted(issues))
 
 

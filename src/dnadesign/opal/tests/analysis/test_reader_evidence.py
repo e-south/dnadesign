@@ -142,11 +142,11 @@ def test_reader_evidence_surface_groups_media_by_plot_type(tmp_path: Path) -> No
     assert build_notebook_reader_evidence_plot_type_options(surface) == [
         "Raw Kinetics",
         "Intensity Overview",
-        "Promoter response evidence",
+        "Promoter Response Evidence",
     ]
     assert build_notebook_reader_evidence_artifact_options(
         surface,
-        selected_plot_type_label="Promoter response evidence",
+        selected_plot_type_label="Promoter Response Evidence",
     ) == ["Round 0 · 2026-07-06 · Response window OPAL 20–28 · pDual-10-SECG-B0-ETH-01 · 4–8 h post-event"]
 
 
@@ -214,7 +214,7 @@ def test_reader_evidence_labels_disambiguate_media_without_exposing_paths(tmp_pa
 
     assert build_notebook_reader_evidence_artifact_options(
         surface,
-        selected_plot_type_label="Promoter response evidence",
+        selected_plot_type_label="Promoter Response Evidence",
     ) == ["Round 0 · 2026-07-06 · Response window OPAL 20–28 · design-1 · 4–8 h post-event"]
     assert surface["media_rows"][0]["media_type"] == "image/png"
     assert [item["media_type"] for item in surface["media_rows"][0]["available_media"]] == [
@@ -305,7 +305,7 @@ def test_reader_evidence_discovery_rejects_manifest_without_public_adapter(tmp_p
     manifest.write_text(
         json.dumps(
             {
-                "schema_version": "stress_ethanol_cipro_growth.reader_promoter_evidence.v1",
+                "schema_version": "example_study.reader_evidence.v1",
                 "round": "r0",
                 "summary": {"rows": 1},
                 "rows": [],
@@ -404,20 +404,19 @@ def test_reader_evidence_controls_use_reader_scoped_plot_labels() -> None:
 
 def test_reader_evidence_record_memory_key_is_campaign_and_deliverable_scoped() -> None:
     key = build_notebook_reader_evidence_record_memory_key(
-        campaign_slug="secg_msrb_greedy",
-        reader_plot_type_label="Promoter response evidence",
+        campaign_slug="demo_campaign",
+        reader_plot_type_label="Summary evidence",
     )
 
     assert key == (
-        'reader_evidence_record_v1:{"campaign_slug":"secg_msrb_greedy",'
-        '"reader_plot_type_label":"Promoter response evidence"}'
+        'reader_evidence_record_v1:{"campaign_slug":"demo_campaign","reader_plot_type_label":"Summary evidence"}'
     )
     assert key != build_notebook_reader_evidence_record_memory_key(
         campaign_slug="other_campaign",
-        reader_plot_type_label="Promoter response evidence",
+        reader_plot_type_label="Summary evidence",
     )
     assert key != build_notebook_reader_evidence_record_memory_key(
-        campaign_slug="secg_msrb_greedy",
+        campaign_slug="demo_campaign",
         reader_plot_type_label="Raw kinetics",
     )
 
@@ -453,17 +452,17 @@ def test_reader_evidence_record_control_updates_campaign_deliverable_memory() ->
         "media_rows": [
             {
                 "label": "Round 0 · first",
-                "plot_type_label": "Promoter response evidence",
+                "plot_type_label": "Summary evidence",
             },
             {
                 "label": "Round 0 · second",
-                "plot_type_label": "Promoter response evidence",
+                "plot_type_label": "Summary evidence",
             },
         ]
     }
     key = build_notebook_reader_evidence_record_memory_key(
-        campaign_slug="secg_msrb_greedy",
-        reader_plot_type_label="Promoter response evidence",
+        campaign_slug="demo_campaign",
+        reader_plot_type_label="Summary evidence",
     )
     state = {key: "Round 0 · second"}
 
@@ -476,8 +475,8 @@ def test_reader_evidence_record_control_updates_campaign_deliverable_memory() ->
 
     control = render_notebook_reader_evidence_record_control(
         surface,
-        campaign_slug="secg_msrb_greedy",
-        selected_plot_type_label="Promoter response evidence",
+        campaign_slug="demo_campaign",
+        selected_plot_type_label="Summary evidence",
         memory=memory,
         set_memory=set_memory,
         mo=_FakeMo(),

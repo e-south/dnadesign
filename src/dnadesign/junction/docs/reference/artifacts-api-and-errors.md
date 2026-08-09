@@ -1,9 +1,14 @@
-# Artifacts, API, and errors
+---
+doc_id: junction-artifacts-api-errors
+title: junction artifacts, API, and errors
+type: reference
+scope: public operations, plan identity, publication, and verification
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-08
+---
 
-**Type:** reference
-**Scope:** public operations, plan identity, publication, and verification
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# Artifacts, API, and errors
 
 ## Public operations
 

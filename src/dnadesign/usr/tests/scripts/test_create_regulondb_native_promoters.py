@@ -562,7 +562,8 @@ def test_write_mode_creates_dataset_relations_and_event_log(tmp_path: Path) -> N
     assert semantics[0]["view_id"] == views[0]["view_id"]
     assert semantics[0]["source_family"] == "regulondb_native_promoter"
     assert semantics[0]["selection_basis"] == "regulondb_curated_promoter_sequence_with_sigma"
-    assert "regulondb_native_promoter_panel" in semantics[0]["view_collections"]
+    assert semantics[0]["view_collections"] == ["native_promoter_source_records"]
+    assert semantics[0]["study_id"] is None
     assert pq.read_table(dataset_dir / "_relations" / "excluded_source_rows.parquet").num_rows == 0
     assert skipped_rows[0]["promoter_id"] == "PM_MISSING_SEQUENCE"
     assert skipped_rows[0]["skip_reason"] == "missing_sequence"
@@ -583,7 +584,7 @@ def test_write_import_plan_rejects_orphan_relation_rows(tmp_path: Path) -> None:
 
 
 def test_real_dnadesign_data_superset_dry_run_fidelity_contract(tmp_path: Path) -> None:
-    data_root = Path("/Users/Shockwing/Dropbox/projects/phd/dnadesign-data")
+    data_root = Path("/path/to/dnadesign-data")
     if not (data_root / "sources/databases/regulondb/13.0/promoters/PromoterSet.tsv").exists():
         pytest.skip("sibling dnadesign-data checkout is not available")
     sys.path.insert(0, str(data_root / "src"))

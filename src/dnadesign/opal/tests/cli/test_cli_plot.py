@@ -13,14 +13,12 @@ import json
 import time
 from pathlib import Path
 
-import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.core.utils import ExitCodes
 from dnadesign.opal.src.plots._context import PlotContext
 from dnadesign.opal.src.plots._round_overlay import resolve_highlight_round
-from dnadesign.opal.src.plots.config import list_configured_plot_specs, load_plot_config
 from dnadesign.opal.src.plots.manifests import write_plot_manifest_index
 from dnadesign.opal.src.plots.runner import _merged_manifest_index_rows
 from dnadesign.opal.src.registries.plots import PlotMeta, describe_plot_kind, list_plots, register_plot
@@ -593,35 +591,6 @@ def test_plot_cli_list_configured_json_error_when_config_missing():
     assert "No config provided" in payload["error"]["message"]
     assert "Traceback" not in res.stdout
     assert "Traceback" not in res.stderr
-
-
-def test_stress_msrb_campaign_declares_concise_plot_policy() -> None:
-    config_path = Path("src/dnadesign/opal/campaigns/secg_msrb_greedy/configs/campaign.yaml")
-    expected = {
-        "msrb_family_frontier": "multistate_response_behavior_frontier",
-        "msrb_score_vs_rank": "scatter_score_vs_rank",
-        "msrb_allocated_evidence": "multistate_response_behavior_selected_decomposition",
-        "selected_response_window_summary": "vector_summary_heatmap",
-    }
-
-    campaign_cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    plot_cfg = load_plot_config(
-        campaign_cfg=campaign_cfg,
-        campaign_yaml=config_path,
-        plot_config_opt=None,
-    )
-    specs = list_configured_plot_specs(
-        plots_cfg=plot_cfg.plots,
-        plot_presets=plot_cfg.plot_presets,
-    )
-    assert {spec["name"]: spec["kind"] for spec in specs} == expected
-    assert {spec["name"]: spec["round_selector"] for spec in specs} == {
-        "msrb_family_frontier": "latest",
-        "msrb_score_vs_rank": "latest",
-        "msrb_allocated_evidence": "latest",
-        "selected_response_window_summary": "all",
-    }
-    assert all(spec.get("round_variants") is None for spec in specs)
 
 
 def test_plot_cli_accepts_directory(tmp_path):

@@ -25,36 +25,33 @@ def test_top_level_docs_route_readers_to_yiu_surfaces() -> None:
     docs_readme = _read("docs/README.md")
     docs_index = _read("docs/index.md")
 
-    assert "Cruncher solves workspace-based sequence optimization" in package_readme
+    assert "Cruncher runs reproducible DNA design jobs" in package_readme
     assert "DNA design package in `dnadesign`" not in package_readme
-    assert "workspace-based" in package_readme
+    assert "Each route validates its own workspace" in package_readme
     assert "docs/README.md" in package_readme
     assert "docs/guides/yiu_workflow.md" in package_readme
     assert "docs/guides/sampling_and_analysis.md" in package_readme
     assert "docs/demos/demo_cassette_workspace.md" in package_readme
     assert "This README stays light on purpose." not in package_readme
-    assert "sequence optimization, cassette design, YIU payload windows" in package_readme
+    assert "Inspect a payload window" in package_readme
 
-    assert "Payload-Centric YIU Workflows" in docs_readme
+    assert "Inspect payload junctions" in docs_readme
     assert "demos/demo_yiu_workspace.md" in docs_readme
     assert "guides/yiu_workflow.md" in docs_readme
     assert "reference/yiu_spec.md" in docs_readme
     assert "reference/yiu_artifacts.md" in docs_readme
     assert "reference/yiu_visual_system.md" in docs_readme
-    assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_readme
-    assert "workspaces/demo_monotypic_lexa/runbook.md" in docs_readme
+    assert "workspaces/demo_monotypic_tetr/runbook.md" not in docs_readme
+    assert "workspaces/demo_monotypic_lexa/runbook.md" not in docs_readme
     assert "split_yiu_payload_rendering_v4" not in docs_readme
     assert "yiu init-workspace|validate|render|show" not in docs_readme
 
-    assert "Run YIU workflows" in docs_index
-    assert "Reuse explicit source-family outputs in YIU" in docs_index
+    assert "Inspect Payload Junctions" in docs_index
     assert "demos/demo_yiu_workspace.md" in docs_index
     assert "guides/yiu_workflow.md" in docs_index
     assert "reference/yiu_spec.md" in docs_index
     assert "reference/yiu_artifacts.md" in docs_index
     assert "reference/yiu_visual_system.md" in docs_index
-    assert "workspaces/demo_monotypic_tetr/runbook.md" in docs_index
-    assert "workspaces/demo_monotypic_lexa/runbook.md" in docs_index
     assert "split_yiu_payload_rendering_v4" not in docs_index
     assert "yiu init-workspace|validate|render|show" not in docs_index
     assert "trace|solve" not in docs_index

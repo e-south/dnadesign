@@ -1,7 +1,7 @@
 # Expanded Reference and View Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-01
+**Last verified:** 2026-08-08
 
 This spec defines the LatentDNA contract for promoter-reference visibility after
 the stress ethanol/ciprofloxacin study expanded from three carried controls to a
@@ -102,8 +102,8 @@ uv run pytest -q \
   src/dnadesign/latentdna/tests/test_scalar_build.py::test_reference_alignment_summary_emits_collection_collapse_without_spyp_sulap \
   src/dnadesign/latentdna/tests/contracts/test_study_workspace_contracts.py::test_live_study_browser_controls_expose_sidecar_geometry_inventory
 
-uv run latentdna validate workspace --workspace stress_ethanol_cipro_growth --deep
-uv run latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json
+uv run latentdna validate workspace --workspace /path/to/workspace --deep
+uv run latentdna workspace snapshot --workspace /path/to/workspace --json
 ```
 
 Heavy regeneration of missing appendix projections is intentionally separate

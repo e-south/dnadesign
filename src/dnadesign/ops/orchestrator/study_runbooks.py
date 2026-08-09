@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/orchestrator/study_runbooks.py
 
-OPS-owned discovery of Infer runbook refs declared by checked-in study records.
+OPS-owned discovery of Infer runbook refs declared by an external study workspace.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,27 +17,6 @@ from pathlib import Path
 import yaml
 
 from dnadesign.ops.status.path_ref import resolve_path_ref
-
-
-def resolve_active_study_dir(*, repo_root: Path) -> Path:
-    index_path = repo_root / "docs" / "studies" / "index.yaml"
-    payload = _read_yaml_mapping(index_path)
-    active_study_id = str(payload.get("active_study_id") or "").strip()
-    if not active_study_id:
-        raise ValueError(f"active_study_id is required in {index_path}")
-    studies = payload.get("studies") or ()
-    if not isinstance(studies, Sequence) or isinstance(studies, (str, bytes)):
-        raise ValueError(f"studies must be a list in {index_path}")
-    for entry in studies:
-        if not isinstance(entry, Mapping):
-            continue
-        if str(entry.get("study_id") or "").strip() != active_study_id:
-            continue
-        record_root = str(entry.get("record_root") or "").strip()
-        if not record_root:
-            raise ValueError(f"active study {active_study_id} is missing record_root in {index_path}")
-        return (repo_root / record_root).resolve()
-    raise ValueError(f"active study {active_study_id} is not declared in {index_path}")
 
 
 def discover_infer_runbook_paths_for_study(*, study_dir: Path, repo_root: Path) -> tuple[Path, ...]:
@@ -190,4 +169,4 @@ def _dedupe_paths(paths: Sequence[Path]) -> tuple[Path, ...]:
     return tuple(deduped)
 
 
-__all__ = ["discover_infer_runbook_paths_for_study", "resolve_active_study_dir"]
+__all__ = ["discover_infer_runbook_paths_for_study"]

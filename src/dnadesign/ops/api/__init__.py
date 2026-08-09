@@ -52,7 +52,6 @@ __all__ = [
     "load_status_kind_spec",
     "probe_active_jobs_for_runbook",
     "resolve_active_job_resolution",
-    "resolve_active_study_dir",
     "resolve_ops_job_identity",
     "run_status_kind",
 ]
@@ -95,7 +94,6 @@ _EXPORT_MODULES = {
     "load_status_kind_spec": "dnadesign.ops.status.registry_loader",
     "probe_active_jobs_for_runbook": "dnadesign.ops.orchestrator.state",
     "resolve_active_job_resolution": "dnadesign.ops.orchestrator.state",
-    "resolve_active_study_dir": "dnadesign.ops.orchestrator.infer_fill",
     "resolve_ops_job_identity": "dnadesign.ops.orchestrator.state",
     "run_status_kind": "dnadesign.ops.status.service",
 }
@@ -117,7 +115,6 @@ if TYPE_CHECKING:
         build_infer_fill_plan,
         discover_infer_runbook_paths_for_study,
         execute_infer_fill_plan,
-        resolve_active_study_dir,
     )
     from dnadesign.ops.orchestrator.plan import BatchPlan, build_batch_plan
     from dnadesign.ops.orchestrator.state import (

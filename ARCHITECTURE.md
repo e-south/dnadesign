@@ -76,11 +76,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
   built-in providers live under `src/dnadesign/ops/providers/*/status.registry.yaml`.
   OPS recursively discovers those fragments, renders help from metadata alone,
   and imports provider code only for the selected surface.
-- Checked-in study records are study-first rather than family-nested:
-  `docs/studies/index.yaml` selects the active study, each live study record
-  lives under `docs/studies/<study-id>/`, and Ops-facing routes are declared
-  explicitly with `ops_surfaces.status_kind` and `ops_surfaces.preflight_kind`
-  in `ops.study.yaml`.
+- Live studies are external clients. They own their scientific intent,
+  configurations, evidence, and decisions, and call versioned dnadesign APIs
+  through explicit workspace paths. Dnadesign does not select a global active
+  study or infer one from its repository layout.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Active shared USR dataset ids are flat owner-first contracts, for example
@@ -96,9 +95,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
 - Study status and preflight logic is study-owned once it becomes specific.
-  OPS discovers provider metadata and imports only the selected provider
-  entrypoint; study-specific execution taxonomy stays under
-  `src/dnadesign/studies/units/<study-id>/`.
+  External packages register status metadata through the
+  `dnadesign.ops.status_registries` entry-point group. OPS imports only the
+  selected provider; dnadesign does not contain study-specific execution
+  taxonomies.
 - Document-type semantics are explicit:
   - `route`: index entry or decision surface only
   - `runbook`: authoritative operator procedure with ordered commands and verification

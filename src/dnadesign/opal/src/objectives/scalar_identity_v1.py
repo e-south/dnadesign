@@ -34,7 +34,7 @@ def scalar_identity_v1(
     train_view,
     y_pred_std,
 ) -> ObjectiveResultV2:
-    del params, ctx, train_view, y_pred_std
+    del params, ctx, train_view
     if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2):
         raise ValueError(f"[scalar_identity_v1] Expected y_pred shape (n, 1); got {getattr(y_pred, 'shape', None)}.")
     if y_pred.shape[1] != 1:
@@ -48,14 +48,28 @@ def scalar_identity_v1(
             "score_max": float(np.nanmax(scores)) if scores.size else float("nan"),
         },
     }
+    uncertainty_by_name: dict[str, np.ndarray] = {}
+    if y_pred_std is not None:
+        uncertainty = np.asarray(y_pred_std, dtype=float)
+        if uncertainty.shape != y_pred.shape:
+            raise ValueError(
+                "[scalar_identity_v1] Expected y_pred_std to match y_pred shape "
+                f"{y_pred.shape}; got {uncertainty.shape}."
+            )
+        if not np.all(np.isfinite(uncertainty)):
+            raise ValueError("[scalar_identity_v1] y_pred_std contains non-finite values.")
+        if np.any(uncertainty < 0.0):
+            raise ValueError("[scalar_identity_v1] y_pred_std must contain non-negative standard deviations.")
+        uncertainty_by_name["scalar"] = uncertainty[:, 0].ravel()
+
     return ObjectiveResultV2(
         scores_by_name={"scalar": scores},
-        uncertainty_by_name={},
+        uncertainty_by_name=uncertainty_by_name,
         diagnostics=diagnostics,
         modes_by_name={"scalar": "maximize"},
     )
 
 
 scalar_identity_v1.__opal_score_channels__ = ("scalar",)
-scalar_identity_v1.__opal_uncertainty_channels__ = ()
+scalar_identity_v1.__opal_uncertainty_channels__ = ("scalar",)
 scalar_identity_v1.__opal_score_modes__ = {"scalar": "maximize"}

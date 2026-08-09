@@ -1,9 +1,7 @@
 ## Scar-Nick Workflow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-14
-
-**Last updated by:** cruncher-maintainers on 2026-05-14
+**Last verified:** 2026-08-08
 
 ### Contents
 - [Purpose](#purpose)
@@ -68,12 +66,11 @@ regenerate; do not hand-edit the output bundle.
 - Scar-nick owns retained-scar and terminal-nick feasibility.
 - Snapback owns single-nick foldback cap and shortening geometry.
 - YIU remains a payload-centric contrast route.
-- Study-owned Retron MSD compilation may consume scar-nick parts, but it should
-  not move scar-nick commands out of Cruncher or create per-hit workspaces.
+- External workflows may consume scar-nick artifacts through the public bundle
+  contract. Their interpretation and selection policy stay outside Cruncher.
 
 ### Related Docs
 
-- [scar_nick_teto runbook](../../workspaces/scar_nick_teto/runbook.md)
 - [scar_nick package map](../../src/scar_nick/README.md)
 - [Nickase catalog reference](../reference/nickase_catalog.md)
 - [Cruncher CLI reference](../reference/cli.md)

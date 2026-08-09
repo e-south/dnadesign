@@ -1,7 +1,7 @@
 # Development Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-08
 
 ## Active refactor
 
@@ -33,7 +33,11 @@ Current checked-in direction:
 
 - Status/control-plane paths now load workspace config without eagerly validating every plot-semantics sidecar; explicit workspace validation still owns that fail-fast contract.
 - `WorkspaceContext` now resolves and stores the canonical `output_root` once instead of re-normalizing it on each access.
-- On the April 17, 2026 live `stress_ethanol_cipro_growth` workspace, warmed `workspace_snapshot()` measured 0.18s mean across three runs and warmed `deliverable_status(representation_health_summary)` measured 0.13s mean across three runs after the loader/control-plane split.
+- On an April 17, 2026 external-workspace pressure run, warmed
+  `workspace_snapshot()` measured 0.18s mean across three runs and warmed
+  `deliverable_status()` measured 0.13s mean across three runs after the
+  loader/control-plane split. The private study record retains the exact
+  workspace identity and command context.
 - Independent fresh-process `workspace_snapshot()` launches measured 1.75s on the first cold launch and about 1.00s on subsequent launches, so cold-cache variance remains material.
 
 ## Next checks

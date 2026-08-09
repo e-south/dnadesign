@@ -1,9 +1,14 @@
-# How `junction` works
+---
+doc_id: junction-how-it-works
+title: How junction works
+type: explanation
+audience: readers new to three-way-junction DNA assembly
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-08
+---
 
-**Type:** explanation
-**Audience:** readers new to three-way-junction DNA assembly
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# How `junction` works
 
 `junction` is a sequence planner. It turns a fully specified request into the
 oligo sequences and evidence needed for review. It does not assemble DNA.

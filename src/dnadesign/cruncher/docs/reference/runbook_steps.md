@@ -1,7 +1,7 @@
 ## Workspace Runbook Steps
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-08
 
 
 **Last updated by:** cruncher-maintainers on 2026-04-05
@@ -284,10 +284,4 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `render_logos` |  | `cruncher catalog logos --source project_merged_meme_oops_all_tfs --set 1 -c configs/config.yaml` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
-| `scar_nick_teto` | `scar_nick_bbsI_hf_validate` | Validate the BbsI-HF retained-scar terminal-nick panel. | `cruncher scar-nick validate --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml` |
-| `scar_nick_teto` | `scar_nick_bbsI_hf_design` | Write the deterministic BbsI-HF scar-nick design bundle. | `cruncher scar-nick design --spec configs/scar_nick/teto_upstream_processing.bbsI_hf.scar_nick.yaml --force-overwrite` |
-| `scar_nick_teto` | `scar_nick_bbsI_hf_show` | Inspect the BbsI-HF scar-nick bundle and drift checks. | `cruncher scar-nick show --run outputs/scar_nick/teto_upstream_processing_bbsI_hf` |
-| `scar_nick_teto` | `scar_nick_paqci_core_panel_validate` | Validate the PaqCI core retained-scar terminal-nick panel. | `cruncher scar-nick validate --spec configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml` |
-| `scar_nick_teto` | `scar_nick_paqci_core_panel_design` | Write the deterministic PaqCI core scar-nick design bundle. | `cruncher scar-nick design --spec configs/scar_nick/teto_upstream_processing.paqci_core_panel.scar_nick.yaml --force-overwrite` |
-| `scar_nick_teto` | `scar_nick_paqci_core_panel_show` | Inspect the PaqCI core scar-nick bundle and drift checks. | `cruncher scar-nick show --run outputs/scar_nick/teto_upstream_processing_paqci_core_panel` |
 <!-- docs:runbook-steps:end -->

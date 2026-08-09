@@ -72,7 +72,7 @@ def _ordered_usr_rows(ds, *, ids: List[str]) -> List[Dict[str, object]]:
         found: dict[str, dict[str, object]] = {}
         try:
             con.execute(query, params)
-            reader = con.fetch_record_batch(max(len(wanted_ids), 1))
+            reader = con.to_arrow_reader(max(len(wanted_ids), 1))
             for batch in reader:
                 payload = batch.to_pydict()
                 for row_index in range(batch.num_rows):

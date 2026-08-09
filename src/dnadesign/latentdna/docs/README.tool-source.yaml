@@ -12,9 +12,6 @@ keywords:
   - trait-axis
   - projection
 routes:
-  - id: stress-ethanol-cipro-representation-comparison
-    path: workflows/stress-ethanol-cipro-representation-comparison.md
-    summary: Study-bound comparison route for stress anchor and construct-context datasets once vector-bearing USR surfaces exist.
   - id: trait-axis-projection-dev-spec
     path: dev/trait-axis-projection.md
     summary: Proposed generic fitted-geometry scalar primitive for trait endpoint axes, row projections, summaries, and provenance.

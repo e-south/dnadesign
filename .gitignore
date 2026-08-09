@@ -186,19 +186,14 @@ src/dnadesign/opal/campaigns/**
 src/dnadesign/opal/campaigns/**/notebooks/
 src/dnadesign/opal/campaigns/**/notebooks/**
 src/dnadesign/opal/campaigns/**/inputs/
-!src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/inputs/
-!src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/inputs/**
-!src/dnadesign/opal/campaigns/demo_gp_topn/inputs/
-!src/dnadesign/opal/campaigns/demo_gp_topn/inputs/**
-!src/dnadesign/opal/campaigns/demo_gp_ei/inputs/
-!src/dnadesign/opal/campaigns/demo_gp_ei/inputs/**
 src/dnadesign/opal/campaigns/**/records.parquet
-!src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/records.parquet
+!src/dnadesign/opal/campaigns/_fixtures/**
 src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
 
-# Stress-study OPAL source evidence: preserve local immutable run artifacts
-# outside the executable campaign registry.
-src/dnadesign/studies/units/stress_ethanol_cipro_growth/workbench/source_evidence/opal_sfxi_round0/**
+# Live study state belongs in an external study repository. Ignore any local
+# residue from checkouts created before that boundary was established.
+docs/studies/
+src/dnadesign/studies/
 
 # OPAL per-run products anywhere
 **/outputs/
@@ -259,15 +254,6 @@ src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/*.json
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.md
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.sh
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/inputs/
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/inputs/motif_artifacts/
-!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/inputs/motif_artifacts/*.json
-
 # BaseRender workspaces: ignore everything by default, allow README
 src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/README.md
@@ -287,14 +273,6 @@ src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/motif_library.json
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/.gitkeep
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/.baserender-workspace
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/README.md
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/job.yaml
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/inputs/
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/inputs/README.md
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/outputs/
-!src/dnadesign/baserender/workspaces/usr_sfxi_pdual10_densegen_promoters/outputs/.gitkeep
 !src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/
 !src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/.baserender-workspace
 !src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/README.md
@@ -308,11 +286,6 @@ src/dnadesign/baserender/workspaces/**
 # The stress study snapshot is a sanctioned checked-in status record; use
 # `latentdna workspace snapshot --dry-run` for read-only inspections.
 src/dnadesign/latentdna/workspaces/**/outputs/
-!src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/
-src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/*
-!src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/
-src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/*
-!src/dnadesign/latentdna/workspaces/stress_ethanol_cipro_growth/outputs/status/workspace_snapshot.json
 
 # DenseGen run outputs retained outside active package surfaces
 src/dnadesign/densegen/runs/**

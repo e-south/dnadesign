@@ -104,7 +104,7 @@ For runbook orchestration, keep runtime visibility explicit:
 | --- | --- |
 | registered procedures and route metadata | `ops catalog` plus checked-in `*.registry.yaml` files |
 | status-kind ontology | checked-in `*/ops/status.registry.yaml` and `ops/providers/*/status.registry.yaml` files |
-| study lifecycle order, track map, and declared preflight checks | checked-in `docs/studies/<study-id>/operations/ops.study.yaml` |
-| live study summary | `stress-ethanol-cipro-growth-status` snapshot plus the checked-in study record |
-| execution blockers | `stress-ethanol-cipro-growth-preflight` |
+| study lifecycle order, track map, and declared preflight checks | the external study's `operations/ops.study.yaml` |
+| live study summary | the installed study package's registered status provider |
+| execution blockers | the installed study package's registered preflight provider |
 | orchestration outcome | workspace-scoped audit JSON observed through `ops-audit-json` |

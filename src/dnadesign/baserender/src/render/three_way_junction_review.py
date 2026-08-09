@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/render/three_way_junction_review.py
 
-Four-panel QA renderer for neutral three-way-junction review evidence.
+Nucleotide-level renderer for neutral three-way-junction review evidence.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import hashlib
 import math
 from dataclasses import dataclass
 from typing import Mapping
@@ -20,7 +19,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch, Rectangle
+from matplotlib.collections import LineCollection
+from matplotlib.patches import Rectangle
 from pydantic import ValidationError
 
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
@@ -28,38 +28,34 @@ from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 from ..config import Style
 from ..core import Record, RenderingError, SchemaError
 from ..core.pydantic_validation import format_validation_error
+from .junction_pairing_layout import BASES_PER_ROW, complement, review_content_height, sequence_chunks
 from .palette import Palette
-from .sequence_preview import bounded_sequence_preview, bounded_text_preview
+from .sequence_preview import bounded_text_preview
 
 _INK = "#172033"
 _MUTED = "#667085"
-_GRID = "#D7DCE4"
-_FRAGMENT = "#CBD5E1"
+_PAIR = "#CBD1D9"
+_FRAGMENT_A = "#EEF1F5"
+_FRAGMENT_B = "#E3E8EF"
 _TOEHOLD = "#5B8DEF"
 _BARCODE = "#2A9D8F"
-_RECOVERY = "#D97706"
-_WARNING = "#B45309"
-_WARNING_BG = "#FFF3D6"
+_PRIMER = "#D97706"
 
-_AXIS_GIDS = (
-    "three-way-junction-review:input-oligos",
-    "three-way-junction-review:annealed-junctions",
-    "three-way-junction-review:recovered-product",
-    "three-way-junction-review:checks",
-)
-
-_MAX_DISPLAYED_LOCI = 6
+_AXIS_GID = "three-way-junction-review:base-pair-map"
 _FIGURE_WIDTH_INCHES = 15.2
-_FIGURE_HEIGHT_INCHES = 4.2
 _MAX_REVIEW_DPI = 600
 _MAX_REVIEW_FIGURE_SCALE = 4.0
 _MAX_REVIEW_CANVAS_DIMENSION_PX = 16_384
 _MAX_REVIEW_CANVAS_RGBA_BYTES = 64 * 1024 * 1024
 _RGBA_BYTES_PER_PIXEL = 4
 
+_SEQUENCE_X = 0.105
+_SEQUENCE_WIDTH = 0.835
+_BASE_FONT_SIZE = 5.6
 
-def _review_figure_size(style: Style) -> tuple[float, float]:
-    """Validate and return the renderer-owned figure size in inches."""
+
+def _review_figure_size(style: Style, review: ThreeWayJunctionReviewV1) -> tuple[float, float]:
+    """Validate and return the content-aware figure size in inches."""
 
     try:
         dpi = float(style.dpi)
@@ -76,7 +72,7 @@ def _review_figure_size(style: Style) -> tuple[float, float]:
         raise SchemaError("three_way_junction_review style.figure_scale exceeds the renderer limit")
 
     figure_width = _FIGURE_WIDTH_INCHES * figure_scale
-    figure_height = _FIGURE_HEIGHT_INCHES * figure_scale
+    figure_height = review_content_height(review) * figure_scale
     width_px = math.ceil(figure_width * dpi)
     height_px = math.ceil(figure_height * dpi)
     if max(width_px, height_px) > _MAX_REVIEW_CANVAS_DIMENSION_PX:
@@ -84,30 +80,6 @@ def _review_figure_size(style: Style) -> tuple[float, float]:
     if width_px * height_px * _RGBA_BYTES_PER_PIXEL > _MAX_REVIEW_CANVAS_RGBA_BYTES:
         raise SchemaError("three_way_junction_review canvas exceeds the 64 MiB RGBA allocation limit")
     return figure_width, figure_height
-
-
-def _display_indices(length: int) -> tuple[int, ...]:
-    if length <= _MAX_DISPLAYED_LOCI:
-        return tuple(range(length))
-    side = _MAX_DISPLAYED_LOCI // 2
-    return (*range(side), *range(length - side, length))
-
-
-def _integer_preview(value: int) -> tuple[str, bool]:
-    if abs(value) < 10**18:
-        return str(value), False
-    magnitude = abs(value)
-    digit_count = max(1, (magnitude.bit_length() * 30_103) // 100_000 + 1)
-    while magnitude < 10 ** (digit_count - 1):
-        digit_count -= 1
-    while magnitude >= 10**digit_count:
-        digit_count += 1
-    leading = magnitude // (10 ** (digit_count - 4))
-    trailing = magnitude % 10**4
-    byte_length = max(1, (magnitude.bit_length() + 7) // 8)
-    digest = hashlib.sha256(magnitude.to_bytes(byte_length, "big")).hexdigest()[:12]
-    sign = "-" if value < 0 else ""
-    return f"{digit_count} digits · {digest} · {sign}{leading:04d}…{trailing:04d}", True
 
 
 def _review_from_record(record: Record) -> ThreeWayJunctionReviewV1:
@@ -124,355 +96,285 @@ def _review_from_record(record: Record) -> ThreeWayJunctionReviewV1:
         raise RenderingError(f"three_way_junction_review received invalid review evidence: {detail}") from None
 
 
-def _setup_axis(axis, *, title: str, gid: str) -> None:
-    axis.set_gid(gid)
+def _setup_axis(axis, *, height: float) -> None:
+    axis.set_gid(_AXIS_GID)
     axis.set_xlim(0.0, 1.0)
-    axis.set_ylim(0.0, 1.0)
+    axis.set_ylim(0.0, height)
     axis.set_xticks([])
     axis.set_yticks([])
     for spine in axis.spines.values():
         spine.set_visible(False)
-    axis.set_title(title, loc="left", fontsize=11, fontweight="semibold", color=_INK, pad=10)
 
 
-def _panel_input_oligos(axis, review: ThreeWayJunctionReviewV1) -> None:
-    target_length = len(review.target.sequence_5to3)
-    target_id = bounded_text_preview(review.target.target_id)
-    if target_id.abbreviated:
-        axis.text(
-            0.02,
-            0.92,
-            f"Target ID · {target_id.length_chars} chars · SHA-256[:12] {target_id.sha256_prefix}",
-            fontsize=6.5,
-            fontweight="semibold",
-            color=_INK,
-            va="top",
-        )
-        axis.text(0.02, 0.86, f"preview {target_id.preview}", fontsize=6.5, family="monospace", color=_INK, va="top")
-        summary_y = 0.78
-    else:
-        axis.text(0.02, 0.92, target_id.preview, fontsize=10, fontweight="semibold", color=_INK, va="top")
-        summary_y = 0.83
+def _safe_identifier(value: str) -> str:
+    preview = bounded_text_preview(value, visible_chars=36, exact_limit=64)
+    if preview.abbreviated:
+        return f"{preview.length_chars} chars · SHA-256[:12] {preview.sha256_prefix} · {preview.preview}"
+    return preview.preview
+
+
+def _base_x(index: int) -> float:
+    return _SEQUENCE_X + (index * _SEQUENCE_WIDTH / BASES_PER_ROW)
+
+
+def _spaced(sequence: str) -> str:
+    return " ".join(sequence)
+
+
+def _pair_edges(axis, *, length: int, top_y: float, bottom_y: float) -> None:
+    segments = [((_base_x(index), top_y), (_base_x(index), bottom_y)) for index in range(length)]
+    axis.add_collection(LineCollection(segments, colors=_PAIR, linewidths=0.42, zorder=1))
+
+
+def _draw_duplex(
+    axis,
+    *,
+    top: str,
+    bottom: str,
+    y: float,
+    coordinate_start: int | None = None,
+    label: str | None = None,
+) -> float:
+    if len(top) != len(bottom):
+        raise RenderingError("three_way_junction_review cannot draw a duplex with unequal strand lengths")
+    if label:
+        axis.text(0.018, y, label, fontsize=6.2, color=_MUTED, va="top")
+    coordinate = "" if coordinate_start is None else f"{coordinate_start + 1}–{coordinate_start + len(top)}"
+    axis.text(0.018, y - 0.12, coordinate, fontsize=5.2, family="monospace", color=_MUTED, va="center")
+    axis.text(0.076, y - 0.05, "5′", fontsize=5.5, color=_MUTED, ha="right", va="center")
+    axis.text(0.076, y - 0.24, "3′", fontsize=5.5, color=_MUTED, ha="right", va="center")
     axis.text(
-        0.02,
-        summary_y,
-        f"{target_length} bp target  ·  {len(review.strands) * 2} fragment oligos",
-        fontsize=8.2,
-        color=_MUTED,
-        va="top",
-    )
-    displayed_indices = _display_indices(len(review.strands))
-    row_gap = min(0.105, 0.55 / max(1, len(displayed_indices)))
-    for display_index, strand_index in enumerate(displayed_indices):
-        strand = review.strands[strand_index]
-        row_y = 0.66 - display_index * row_gap
-        axis.text(0.02, row_y, f"F{strand_index + 1}", fontsize=7, fontweight="semibold", color=_INK, va="center")
-        axis.add_patch(Rectangle((0.11, row_y + 0.012), 0.82, 0.026, facecolor=_BARCODE, edgecolor="none"))
-        axis.add_patch(Rectangle((0.11, row_y - 0.038), 0.82, 0.026, facecolor=_FRAGMENT, edgecolor="none"))
-        axis.text(
-            0.13,
-            row_y + 0.025,
-            f"barcode-bearing · {len(strand.barcode_bearing_sequence_5to3)} nt",
-            fontsize=5.9,
-            color=_INK,
-            va="center",
-        )
-        axis.text(
-            0.13,
-            row_y - 0.025,
-            f"complement · {len(strand.complement_sequence_5to3)} nt",
-            fontsize=5.9,
-            color=_INK,
-            va="center",
-        )
-    if len(displayed_indices) < len(review.strands):
-        omitted = len(review.strands) - len(displayed_indices)
-        axis.text(
-            0.02,
-            0.08,
-            f"{omitted} more fragment pairs; exact sequences are in the review JSON.",
-            fontsize=6.3,
-            color=_MUTED,
-        )
-    else:
-        axis.text(0.02, 0.10, "Green: barcode-bearing oligo", fontsize=6.8, color=_BARCODE)
-        axis.text(0.52, 0.10, "Gray: complement oligo", fontsize=6.8, color=_MUTED)
-
-
-def _panel_junctions(axis, review: ThreeWayJunctionReviewV1) -> None:
-    junctions = review.geometry.junctions
-    axis.text(
-        0.02,
-        0.92,
-        f"{len(junctions)} target junction{'s' if len(junctions) != 1 else ''} · "
-        f"{'every target junction shown' if len(junctions) <= 5 else 'bounded target-junction preview'}",
-        fontsize=8.5,
-        color=_MUTED,
-        va="top",
-    )
-    if len(junctions) <= 5:
-        axis.text(
-            0.02,
-            0.83,
-            "Sequence previews · digest = SHA-256[:12]",
-            fontsize=6.5,
-            color=_MUTED,
-            va="top",
-        )
-        axis.text(0.02, 0.77, "T = toehold · B = matched barcode", fontsize=6.5, color=_MUTED, va="top")
-        row_gap = min(0.125, 0.58 / max(1, len(junctions)))
-        for index, junction in enumerate(junctions):
-            row_y = 0.68 - index * row_gap
-            toehold_preview = bounded_sequence_preview(junction.toehold)
-            barcode_preview = bounded_sequence_preview(junction.barcode)
-            axis.scatter([0.04], [row_y + 0.028], s=22, color=_TOEHOLD, edgecolors="white", linewidths=0.5)
-            axis.scatter([0.04], [row_y - 0.028], s=22, color=_BARCODE, edgecolors="white", linewidths=0.5)
-            axis.text(
-                0.07,
-                row_y + 0.028,
-                toehold_preview.label(f"J{index + 1} T"),
-                fontsize=6.2,
-                family="monospace",
-                color=_INK,
-                va="center",
-            )
-            axis.text(
-                0.07,
-                row_y - 0.028,
-                barcode_preview.label(f"J{index + 1} B"),
-                fontsize=6.2,
-                family="monospace",
-                color=_INK,
-                va="center",
-            )
-    else:
-        y = 0.74
-        displayed_indices = _display_indices(len(junctions))
-        row_gap = min(0.11, 0.55 / len(displayed_indices))
-        for display_index, index in enumerate(displayed_indices):
-            row_y = y - display_index * row_gap
-            axis.scatter([0.09], [row_y], s=28, color=_TOEHOLD, edgecolors="white", linewidths=0.6, zorder=3)
-            axis.scatter([0.54], [row_y], s=28, color=_BARCODE, edgecolors="white", linewidths=0.6, zorder=3)
-            axis.plot([0.11, 0.52], [row_y, row_y], color=_GRID, linewidth=1.0, zorder=1)
-            axis.text(0.14, row_y, f"J{index + 1}", fontsize=7.6, color=_INK, va="center")
-            axis.text(0.59, row_y, f"J{index + 1}", fontsize=7.6, color=_INK, va="center")
-        axis.text(0.03, 0.18, "toehold", fontsize=7.8, color=_TOEHOLD, fontweight="semibold")
-        axis.text(0.54, 0.18, "matched barcode", fontsize=7.8, color=_BARCODE, fontweight="semibold")
-        omitted = len(junctions) - len(displayed_indices)
-        axis.text(
-            0.03,
-            0.08,
-            f"{omitted} more junctions; exact assignments are in the typed contract.",
-            fontsize=6.5,
-            color=_MUTED,
-        )
-
-
-def _panel_recovered_product(axis, review: ThreeWayJunctionReviewV1) -> None:
-    recovery = review.recovery
-    product_length = len(recovery.extended_top_sequence_5to3)
-    axis.text(
-        0.02,
-        0.92,
-        f"Predicted recovery product · {product_length} bp",
-        fontsize=8.5,
-        color=_MUTED,
-        va="top",
-    )
-    axis.text(0.02, 0.84, f"Primer mode · {recovery.mode}", fontsize=7.3, color=_MUTED, va="top")
-    axis.plot([0.13, 0.87], [0.64, 0.64], color=_INK, linewidth=4.0, solid_capstyle="butt")
-    axis.plot([0.13, 0.87], [0.56, 0.56], color=_GRID, linewidth=4.0, solid_capstyle="butt")
-    axis.annotate(
-        "FWD",
-        xy=(0.30, 0.70),
-        xytext=(0.08, 0.70),
-        color=_RECOVERY,
-        fontsize=7,
-        fontweight="semibold",
+        _SEQUENCE_X,
+        y - 0.05,
+        _spaced(top),
+        fontsize=_BASE_FONT_SIZE,
+        family="monospace",
+        color=_INK,
         va="center",
-        arrowprops={"arrowstyle": "-|>", "color": _RECOVERY, "linewidth": 1.4},
+        zorder=3,
     )
-    axis.annotate(
-        "REV",
-        xy=(0.70, 0.50),
-        xytext=(0.92, 0.50),
-        color=_RECOVERY,
-        fontsize=7,
-        fontweight="semibold",
-        ha="right",
+    axis.text(
+        _SEQUENCE_X,
+        y - 0.24,
+        _spaced(bottom),
+        fontsize=_BASE_FONT_SIZE,
+        family="monospace",
+        color=_INK,
         va="center",
-        arrowprops={"arrowstyle": "-|>", "color": _RECOVERY, "linewidth": 1.4},
+        zorder=3,
     )
-    axis.text(0.02, 0.41, "Declared primer orders", fontsize=7.3, fontweight="semibold", color=_INK)
-    axis.text(
-        0.02,
-        0.35,
-        f"FWD · {len(recovery.forward.binding_sequence_5to3)} nt bind + "
-        f"{len(recovery.forward.five_prime_extension_5to3)} nt 5′ extension",
-        fontsize=6.2,
-        color=_MUTED,
-    )
-    axis.text(
-        0.02,
-        0.30,
-        f"REV · {len(recovery.reverse.binding_sequence_5to3)} nt bind + "
-        f"{len(recovery.reverse.five_prime_extension_5to3)} nt 5′ extension",
-        fontsize=6.2,
-        color=_MUTED,
-    )
-    axis.text(0.02, 0.25, "Order previews · digest = SHA-256[:12]", fontsize=6.2, color=_MUTED)
-    primer_rows = (
-        ("FWD", recovery.forward.order_sequence_5to3),
-        ("REV", recovery.reverse.order_sequence_5to3),
-    )
-    for index, (label, sequence) in enumerate(primer_rows):
-        preview = bounded_sequence_preview(sequence)
+    end_x = _base_x(len(top) - 1) + 0.012
+    axis.text(end_x, y - 0.05, "3′", fontsize=5.5, color=_MUTED, va="center")
+    axis.text(end_x, y - 0.24, "5′", fontsize=5.5, color=_MUTED, va="center")
+    _pair_edges(axis, length=len(top), top_y=y - 0.095, bottom_y=y - 0.195)
+    return y - 0.36
+
+
+def _draw_sequence_rows(axis, *, sequence: str, y: float, label: str, color: str = _INK) -> float:
+    chunks = sequence_chunks(sequence)
+    for index, chunk in enumerate(chunks):
+        row_label = label if index == 0 else ""
+        axis.text(0.018, y - 0.02, row_label, fontsize=5.6, color=_MUTED, va="center")
+        axis.text(0.085, y - 0.02, "5′", fontsize=5.2, color=_MUTED, ha="right", va="center")
         axis.text(
-            0.03,
-            0.20 - index * 0.065,
-            preview.label(label),
-            fontsize=6.5,
+            _SEQUENCE_X,
+            y - 0.02,
+            _spaced(chunk.sequence),
+            fontsize=_BASE_FONT_SIZE,
             family="monospace",
-            color=_INK,
+            color=color,
+            va="center",
         )
-    axis.add_patch(
-        FancyBboxPatch(
-            (0.02, 0.015),
-            0.94,
-            0.075,
-            boxstyle="round,pad=0.01,rounding_size=0.02",
-            facecolor=_WARNING_BG,
-            edgecolor=_WARNING,
-            linewidth=0.8,
+        end_x = _base_x(len(chunk.sequence) - 1) + 0.012
+        axis.text(end_x, y - 0.02, "3′", fontsize=5.2, color=_MUTED, va="center")
+        y -= 0.19
+    return y
+
+
+def _intersections(start: int, end: int, review: ThreeWayJunctionReviewV1):
+    spans = []
+    for fragment in review.geometry.fragments:
+        left = max(start, fragment.domain_span.start)
+        right = min(end, fragment.domain_span.end)
+        if left < right:
+            spans.append(
+                (left, right, _FRAGMENT_A if fragment.index % 2 == 0 else _FRAGMENT_B, f"F{fragment.index + 1}")
+            )
+    for junction in review.geometry.junctions:
+        left = max(start, junction.toehold_span.start)
+        right = min(end, junction.toehold_span.end)
+        if left < right:
+            spans.append((left, right, _TOEHOLD, "t"))
+    return spans
+
+
+def _draw_target(axis, review: ThreeWayJunctionReviewV1, *, y: float) -> float:
+    axis.text(0.018, y, "Target duplex", fontsize=8.5, fontweight="semibold", color=_INK, va="top")
+    y -= 0.28
+    target = review.target.sequence_5to3
+    for chunk in sequence_chunks(target):
+        for left, right, color, label in _intersections(chunk.start, chunk.end, review):
+            x = _base_x(left - chunk.start) - 0.004
+            width = max(0.008, _base_x(right - chunk.start) - x)
+            axis.add_patch(Rectangle((x, y + 0.015), width, 0.035, facecolor=color, edgecolor="none", alpha=0.9))
+            axis.text(x, y + 0.06, label, fontsize=4.7, color=color if label == "t" else _MUTED, va="bottom")
+        y = _draw_duplex(
+            axis,
+            top=chunk.sequence,
+            bottom=complement(chunk.sequence),
+            y=y,
+            coordinate_start=chunk.start,
         )
-    )
+        y -= 0.10
+    return y
+
+
+def _draw_junctions(axis, review: ThreeWayJunctionReviewV1, *, y: float) -> float:
+    axis.text(0.018, y, "Junction duplexes", fontsize=8.5, fontweight="semibold", color=_INK, va="top")
     axis.text(
-        0.49,
-        0.0525,
-        "SEQUENCE PRODUCT ONLY · PCR NOT SIMULATED",
-        ha="center",
-        va="center",
-        fontsize=7.1,
-        fontweight="semibold",
-        color=_WARNING,
+        0.16,
+        y,
+        "t/t* is the target-derived toehold; b/b* is the assigned barcode.",
+        fontsize=5.8,
+        color=_MUTED,
+        va="top",
     )
-
-
-def _panel_search_and_checks(axis, review: ThreeWayJunctionReviewV1) -> None:
-    search = review.search
-    assembly_group_id = bounded_text_preview(search.assembly_group_id)
-    if assembly_group_id.abbreviated:
+    y -= 0.27
+    for index, junction in enumerate(review.geometry.junctions, start=1):
         axis.text(
-            0.02,
-            0.92,
+            0.018,
+            y,
             (
-                f"Assembly group ID · {assembly_group_id.length_chars} chars · "
-                f"SHA-256[:12] {assembly_group_id.sha256_prefix}"
+                f"J{index:02d} · F{index:02d} → F{index + 1:02d} · "
+                f"target bp {junction.toehold_span.start + 1}–{junction.toehold_span.end}"
             ),
-            fontsize=6.5,
-            fontweight="semibold",
-            color=_INK,
-            va="top",
-        )
-        axis.text(
-            0.02, 0.86, f"preview {assembly_group_id.preview}", fontsize=6.5, family="monospace", color=_INK, va="top"
-        )
-        metrics_y = 0.70
-    else:
-        axis.text(
-            0.02,
-            0.92,
-            f"Assembly group {assembly_group_id.preview}",
-            fontsize=9.0,
-            fontweight="semibold",
-            color=_INK,
-            va="top",
-        )
-        metrics_y = 0.81
-    locus_count, locus_abbreviated = _integer_preview(search.locus_count)
-    toehold_paths, paths_abbreviated = _integer_preview(search.toehold_paths_evaluated)
-    barcode_candidates, candidates_abbreviated = _integer_preview(search.barcode_candidates_generated)
-    barcode_subsets, subsets_abbreviated = _integer_preview(search.barcode_subsets_evaluated)
-    matchings, matchings_abbreviated = _integer_preview(search.matchings_evaluated)
-    metrics = (
-        f"assembly-group loci  {locus_count}",
-        f"toehold paths  {toehold_paths}",
-        f"toehold min / mean  {search.toehold_min_distance:g} / {search.toehold_mean_distance:g}",
-        f"barcode candidates  {barcode_candidates}",
-        f"barcode subsets  {barcode_subsets}",
-        f"barcode min / mean  {search.barcode_min_distance:g} / {search.barcode_mean_distance:g}",
-        f"matchings  {matchings}",
-    )
-    if any((locus_abbreviated, paths_abbreviated, candidates_abbreviated, subsets_abbreviated, matchings_abbreviated)):
-        axis.text(
-            0.02,
-            0.78,
-            "Large integers · digest = SHA-256(unsigned big-endian)[:12]",
             fontsize=5.8,
-            color=_MUTED,
+            fontweight="semibold",
+            color=_INK,
+            va="top",
         )
-    for index, line in enumerate(metrics):
-        axis.text(0.03, metrics_y - index * 0.067, line, fontsize=6.5, color=_INK, family="monospace")
-    passed = sum(check.status == "passed" for check in review.checks)
-    not_run = sum(check.status == "not_run" for check in review.checks)
-    axis.text(0.03, 0.20, f"Checks  {passed} passed  ·  {not_run} not run", fontsize=7.8, color=_MUTED)
-    axis.add_patch(
-        FancyBboxPatch(
-            (0.02, 0.06),
-            0.94,
-            0.11,
-            boxstyle="round,pad=0.01,rounding_size=0.02",
-            facecolor=_WARNING_BG,
-            edgecolor=_WARNING,
-            linewidth=0.8,
+        y -= 0.16
+        for kind, top, stored_complement, color in (
+            ("toehold", junction.toehold, junction.toehold_complement, _TOEHOLD),
+            ("barcode", junction.barcode, junction.barcode_complement, _BARCODE),
+        ):
+            top_chunks = sequence_chunks(top)
+            aligned_bottom = stored_complement[::-1]
+            bottom_chunks = sequence_chunks(aligned_bottom)
+            for chunk_index, (top_chunk, bottom_chunk) in enumerate(zip(top_chunks, bottom_chunks, strict=True)):
+                label = kind if chunk_index == 0 else f"{kind} cont."
+                axis.text(0.018, y - 0.12, label, fontsize=5.4, color=color, va="center")
+                y = _draw_duplex(axis, top=top_chunk.sequence, bottom=bottom_chunk.sequence, y=y)
+        y -= 0.04
+    return y
+
+
+def _draw_oligo_orders(axis, review: ThreeWayJunctionReviewV1, *, y: float) -> float:
+    axis.text(0.018, y, "Fragment oligo orders", fontsize=8.5, fontweight="semibold", color=_INK, va="top")
+    axis.text(0.16, y, "Every displayed strand is written 5′→3′.", fontsize=5.8, color=_MUTED, va="top")
+    y -= 0.26
+    for index, strand in enumerate(review.strands, start=1):
+        axis.text(
+            0.018,
+            y,
+            f"F{index:02d} · {strand.role}",
+            fontsize=5.7,
+            fontweight="semibold",
+            color=_INK,
+            va="top",
         )
-    )
+        y -= 0.14
+        y = _draw_sequence_rows(
+            axis,
+            sequence=strand.barcode_bearing_sequence_5to3,
+            y=y,
+            label="barcode",
+            color=_BARCODE,
+        )
+        y = _draw_sequence_rows(
+            axis,
+            sequence=strand.complement_sequence_5to3,
+            y=y,
+            label="complement",
+        )
+    return y
+
+
+def _draw_primers(axis, review: ThreeWayJunctionReviewV1, *, y: float) -> float:
     axis.text(
-        0.49,
-        0.115,
-        "THERMODYNAMIC SCREENING NOT RUN",
-        ha="center",
-        va="center",
-        fontsize=7.7,
+        0.018,
+        y,
+        f"Recovery primers · {review.recovery.mode}",
+        fontsize=8.5,
         fontweight="semibold",
-        color=_WARNING,
+        color=_INK,
+        va="top",
     )
+    y -= 0.25
+    y = _draw_sequence_rows(
+        axis,
+        sequence=review.recovery.forward.order_sequence_5to3,
+        y=y,
+        label="forward",
+        color=_PRIMER,
+    )
+    y = _draw_sequence_rows(
+        axis,
+        sequence=review.recovery.reverse.order_sequence_5to3,
+        y=y,
+        label="reverse",
+        color=_PRIMER,
+    )
+    return y
 
 
 @dataclass(frozen=True)
 class ThreeWayJunctionReviewRenderer:
     def preflight(self, record: Record, style: Style, palette: Palette) -> None:
         _ = palette
-        _review_figure_size(style)
-        _review_from_record(record)
+        review = _review_from_record(record)
+        _review_figure_size(style, review)
 
     def render(self, record: Record, style: Style, palette: Palette):
         _ = palette
-        figure_size = _review_figure_size(style)
         review = _review_from_record(record)
-        figure, axes = plt.subplots(
-            1,
-            4,
-            figsize=figure_size,
-            dpi=style.dpi,
-        )
-        titles = ("Input oligos", "Annealed junctions", "Recovered PCR product", "Checks")
-        for axis, title, gid in zip(axes, titles, _AXIS_GIDS, strict=True):
-            _setup_axis(axis, title=title, gid=gid)
-        _panel_input_oligos(axes[0], review)
-        _panel_junctions(axes[1], review)
-        _panel_recovered_product(axes[2], review)
-        _panel_search_and_checks(axes[3], review)
-        figure.suptitle(
-            "Junction design review",
-            x=0.02,
-            y=0.99,
-            ha="left",
-            fontsize=13,
+        figure_size = _review_figure_size(style, review)
+        figure, axis = plt.subplots(1, 1, figsize=figure_size, dpi=style.dpi)
+        height = figure_size[1] / style.figure_scale
+        _setup_axis(axis, height=height)
+
+        target_id = _safe_identifier(review.target.target_id)
+        axis.text(
+            0.018,
+            height - 0.12,
+            "Junction nucleotide audit",
+            fontsize=12.5,
             fontweight="semibold",
             color=_INK,
+            va="top",
         )
-        figure.subplots_adjust(left=0.025, right=0.99, top=0.84, bottom=0.08, wspace=0.12)
+        axis.text(
+            0.018,
+            height - 0.43,
+            f"{target_id} · {len(review.target.sequence_5to3)} bp · {len(review.strands) * 2} fragment oligos",
+            fontsize=6.8,
+            color=_MUTED,
+            va="top",
+        )
+        y = height - 0.82
+        y = _draw_target(axis, review, y=y)
+        y = _draw_junctions(axis, review, y=y - 0.08)
+        y = _draw_oligo_orders(axis, review, y=y - 0.08)
+        _draw_primers(axis, review, y=y - 0.08)
+        axis.text(
+            0.018,
+            0.12,
+            "Sequence pairing map; not a thermodynamic, annealing, or PCR simulation.",
+            fontsize=6.2,
+            color=_MUTED,
+            va="bottom",
+        )
+        figure.subplots_adjust(left=0.012, right=0.992, top=0.995, bottom=0.015)
         return figure
 
 

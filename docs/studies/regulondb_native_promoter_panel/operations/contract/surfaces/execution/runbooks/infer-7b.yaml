@@ -1,6 +1,0 @@
-infer_batch_native_full_7b:
-  surface_type: runbook
-  runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_native_full_7b_batch_with_notify.yaml
-infer_batch_core60_7b:
-  surface_type: runbook
-  runbook_ref: repo:src/dnadesign/ops/runbooks/presets/infer_regulondb_native_promoter_core60_tss_upstream_7b_batch_with_notify.yaml

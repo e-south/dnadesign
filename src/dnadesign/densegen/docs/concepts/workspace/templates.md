@@ -1,7 +1,7 @@
 ## Workspace templates
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-08
 This concept page explains how packaged DenseGen workspaces are organized and how to choose between demo and study templates. Read it when you need a consistent path from first-run tutorials to real study workspaces.
 
 For the full DenseGen doc map, use the **[DenseGen documentation index](../../index.md)**.
@@ -19,7 +19,6 @@ For the full DenseGen doc map, use the **[DenseGen documentation index](../../in
 | `demo_dense_array_showcase` | demo | Dense-array packing showcase with toy TFBS inputs and no, one, or two fixed anchors | Solver backend |
 | `demo_sampling_baseline` | demo | PWM artifact sampling walkthrough with two plans | Solver backend plus FIMO |
 | `study_constitutive_sigma_panel` | study | Sigma70 constitutive promoter panel with fixed-element combinatorics and LacI/AraC background exclusion | Solver backend plus FIMO |
-| `study_stress_ethanol_cipro` | study | Larger stress-response campaign with three plans | Solver backend plus FIMO |
 
 ### Tutorial mapping
 
@@ -27,7 +26,6 @@ For the full DenseGen doc map, use the **[DenseGen documentation index](../../in
 - Use **[dense array showcase tutorial](../../tutorials/demo_dense_array_showcase.md)** for `demo_dense_array_showcase`.
 - Use **[sampling baseline tutorial](../../tutorials/demo_sampling_baseline.md)** for `demo_sampling_baseline`.
 - Use **[constitutive sigma panel study tutorial](../../tutorials/study_constitutive_sigma_panel.md)** for `study_constitutive_sigma_panel`.
-- Use **[stress ethanol and ciprofloxacin study tutorial](../../tutorials/study_stress_ethanol_cipro.md)** for `study_stress_ethanol_cipro`.
 - Use **[DenseGen to USR to Notify tutorial](../../tutorials/demo_usr_notify.md)** when validating watcher delivery on any USR-enabled workspace.
 
 ### Standard study workflow

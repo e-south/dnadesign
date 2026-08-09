@@ -1,8 +1,0 @@
-default_scope: next
-scopes:
-  next:
-    include_phases:
-    - current_phase
-  full:
-    include_phases:
-    - all

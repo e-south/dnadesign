@@ -1,7 +1,7 @@
 ## Infer Development Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-08
 
 This journal tracks `dnadesign.infer` refactor work over time: scope, decisions, evidence, tasks, and validation outcomes.
 
@@ -1950,7 +1950,7 @@ Record concrete SCC findings for current infer behavior (7B baseline and desired
   - running jobs: `2`
   - queued jobs: `1`
   - Eqw jobs: `0`
-- Storage snapshot (`df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`):
+- Storage snapshot (`df -h ${PROJECTNB_ROOT} ${PROJECT_ROOT} /scratch/$USER`):
   - `/projectnb`: `91%` used (`799G/880G`)
   - `/project`: `44%` used (`96G/220G`)
   - `/scratch`: `14%` used (`112G/876G`)
@@ -1964,7 +1964,7 @@ Record concrete SCC findings for current infer behavior (7B baseline and desired
    - Runbook submit injects `INFER_CONFIG=...` into `qsub -v`, but `docs/bu-scc/jobs/evo2-gpu-infer.qsub` is still a GPU smoke shell and does not call `uv run infer run --config "$INFER_CONFIG"`.
    - Practical effect: a successful submit today can complete without writing infer columns.
 3. High: existing 40B model cache is large and concentrated on `/projectnb`.
-   - `models--arcinstitute--evo2_40b` exists under `/projectnb/dunlop/esouth/cache/huggingface/hub/` at ~`77G`.
+   - `models--arcinstitute--evo2_40b` exists under `${PROJECTNB_ROOT}/cache/huggingface/hub/` at ~`77G`.
    - Snapshot contains `evo2_40b.pt.part0` and `evo2_40b.pt.part1` symlinked to two ~`39G` blobs.
 4. Medium: infer mode semantics in ops are not yet hard-gated like densegen.
    - infer has no explicit resume-readiness policy in `_contracts.resume_readiness`.
@@ -2078,9 +2078,9 @@ while preserving 7B support and allowing 40B pressure tests.
 
 - `qstat -u "$USER"`
 - `uv run ops runbook diagnostics session-counts`
-- `df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`
-- `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b`
-- `ls -lah /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b/snapshots/*`
+- `df -h ${PROJECTNB_ROOT} ${PROJECT_ROOT} /scratch/$USER`
+- `du -sh ${PROJECTNB_ROOT}/cache/huggingface/hub/models--arcinstitute--evo2_40b`
+- `ls -lah ${PROJECTNB_ROOT}/cache/huggingface/hub/models--arcinstitute--evo2_40b/snapshots/*`
 - `uv run ops runbook init --workflow infer --h-rt 03:00:00 ... --no-notify`
 - `uv run ops runbook plan --runbook ... --mode auto|fresh|resume`
 - `uv run ops runbook execute --runbook ... --audit-json ... --no-submit`
@@ -2111,8 +2111,8 @@ Create an execution-ready, low-fanout plan to build and validate the SCC GPU inf
    - `evo2`, `transformer-engine`, `flash-attn`, `vtx` were reported as not installed.
    - `torch` is present at `2.8.0+cu128`.
 2. Storage pressure remains asymmetric:
-   - `/projectnb/dunlop/esouth` is at `91%`.
-   - `/project/dunlop/esouth` is at `44%`.
+   - `${PROJECTNB_ROOT}` is at `91%`.
+   - `${PROJECT_ROOT}` is at `44%`.
 3. 40B shard cache exists and is large under `/projectnb`:
    - model cache directory size ~`77G`
    - two shard blobs (`part0`, `part1`) are ~`39G` each.
@@ -2235,8 +2235,8 @@ Build the infer GPU environment deterministically, then run one bounded pressure
 - `curl -L https://raw.githubusercontent.com/ArcInstitute/evo2/main/README.md`
 - `curl -L https://raw.githubusercontent.com/ArcInstitute/evo2/main/pyproject.toml`
 - `uv run python - <<'PY' ... importlib.metadata ... PY`
-- `df -h /projectnb/dunlop/esouth /project/dunlop/esouth /scratch/$USER`
-- `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b`
+- `df -h ${PROJECTNB_ROOT} ${PROJECT_ROOT} /scratch/$USER`
+- `du -sh ${PROJECTNB_ROOT}/cache/huggingface/hub/models--arcinstitute--evo2_40b`
 
 ## 2026-03-06 - Phase 2 Slice P (Infer-Evo2 Local Env Build Attempt + Interactive Session Gate)
 
@@ -2246,7 +2246,7 @@ Attempt a real `uv sync --locked --extra infer-evo2` with transient/caches route
 
 ### Build attempt executed
 
-1. Created a dedicated env and runtime cache roots under `/project/dunlop/esouth/dnadesign/`:
+1. Created a dedicated env and runtime cache roots under `${PROJECT_ROOT}/dnadesign/`:
    - `.venv-infer-evo2-attempt`
    - `runtime/infer-evo2-attempt/{tmp,uv-cache,torch-extensions,triton-cache,pycache}`
 2. Ran:
@@ -2801,7 +2801,7 @@ Land the first implementation increment for flexible multi-GPU infer behavior wi
 
 ### Goal
 
-Pressure-test the documented SCC GPU build path in the canonical repo UV environment (`/project/dunlop/esouth/dnadesign/.venv`), run a real Evo infer smoke execution, and record operator-facing hardening updates.
+Pressure-test the documented SCC GPU build path in the canonical repo UV environment (`${PROJECT_ROOT}/dnadesign/.venv`), run a real Evo infer smoke execution, and record operator-facing hardening updates.
 
 ### Session and resource evidence
 
@@ -2810,13 +2810,13 @@ Pressure-test the documented SCC GPU build path in the canonical repo UV environ
 3. GPU class: `NVIDIA L40S` (`46068 MiB`, compute capability `8.9`).
 4. Storage posture:
    - `/projectnb/dunlop` at `91%` utilization.
-   - `HF_HOME=/projectnb/dunlop/esouth/cache/huggingface`.
-   - Runtime transients routed to `/project/dunlop/esouth/dnadesign/runtime/...`.
+   - `HF_HOME=${PROJECTNB_ROOT}/cache/huggingface`.
+   - Runtime transients routed to `${PROJECT_ROOT}/dnadesign/runtime/...`.
 
 ### Canonical build execution (actual run)
 
 1. Environment target:
-   - `UV_PROJECT_ENVIRONMENT=/project/dunlop/esouth/dnadesign/.venv`
+   - `UV_PROJECT_ENVIRONMENT=${PROJECT_ROOT}/dnadesign/.venv`
 2. Toolchain:
    - `module purge`
    - `module load cuda/12.8`
@@ -2837,7 +2837,7 @@ Pressure-test the documented SCC GPU build path in the canonical repo UV environ
      - `flash_attn import_ok`
      - `evo2 import_ok`
 5. Build log path:
-   - `/project/dunlop/esouth/dnadesign/runtime/infer-evo2-canonical-20260307-110609/build.log`
+   - `${PROJECT_ROOT}/dnadesign/runtime/infer-evo2-canonical-20260307-110609/build.log`
 
 ### Real infer smoke execution (model call)
 
@@ -2847,9 +2847,9 @@ Pressure-test the documented SCC GPU build path in the canonical repo UV environ
    - succeeded (`Outputs for job 'adhoc_extract'`, `out` count `1`, type `float`).
 3. Model cache outcome:
    - `evo2_7b` downloaded and cached:
-     - `/projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_7b` -> `13G`
+     - `${PROJECTNB_ROOT}/cache/huggingface/hub/models--arcinstitute--evo2_7b` -> `13G`
    - existing `evo2_40b` cache retained:
-     - `/projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b` -> `77G`
+     - `${PROJECTNB_ROOT}/cache/huggingface/hub/models--arcinstitute--evo2_40b` -> `77G`
 
 ### 40B capacity behavior in this current allocation
 
@@ -2954,14 +2954,14 @@ Harden SCC docs and operator sequence so infer uses one canonical repo `.venv`, 
    - execution succeeded and returned one float output.
 3. Deterministic placement evidence:
    - model load path during run:
-     - `/project/dunlop/esouth/cache/huggingface/evo2_7b/hub/models--arcinstitute--evo2_7b/.../evo2_7b.pt`
+     - `${PROJECT_ROOT}/cache/huggingface/evo2_7b/hub/models--arcinstitute--evo2_7b/.../evo2_7b.pt`
    - cache size after run:
-     - `13G /project/dunlop/esouth/cache/huggingface/evo2_7b`
+     - `13G ${PROJECT_ROOT}/cache/huggingface/evo2_7b`
 
 ### Cleanup status
 
 1. Removed leftover moved runtime trash directory:
-   - `/project/dunlop/esouth/.trash/dnadesign-runtime-20260307-123847`
+   - `${PROJECT_ROOT}/.trash/dnadesign-runtime-20260307-123847`
 2. Repo root remains clean of top-level `runtime/` directory.
 
 ## 2026-03-07 - Phase 2 Slice AC (Evo2 API Pressure Pass + Pooling/Embedding Contracts)
@@ -4850,7 +4850,7 @@ Remove the hardcoded personal USR root from infer pressure-test workspaces and m
 
 ### Findings
 
-1. The checked-in infer pressure-test workspace, the pressure-test example config, and the runbook/tutorial docs all hardcoded `/projectnb/dunlop/esouth/outputs/usr_datasets`.
+1. The checked-in infer pressure-test workspace, the pressure-test example config, and the runbook/tutorial docs all hardcoded `${PROJECTNB_ROOT}/outputs/usr_datasets`.
 2. That path shape drifted from infer workspace IA: curated infer workspaces already own `config.yaml` and `outputs/logs/ops/...`, but the USR root was leaking into a personal external `outputs/` tree.
 3. The underlying contract gap was in config-mode infer itself: `ingest.path` already resolved relative to `config.yaml`, but `ingest.root` for `source: usr` did not, which pushed examples toward absolute paths.
 
@@ -4860,7 +4860,7 @@ Remove the hardcoded personal USR root from infer pressure-test workspaces and m
    - added workspace CLI test requiring `usr-pressure` scaffolds to use `root: outputs/usr_datasets` and create that directory.
    - added run-config test requiring relative `ingest.root` to resolve against the config directory.
    - added `validate usr-registry` test requiring relative `ingest.root` to render as an absolute workspace-local path.
-   - added docs regression guard banning `/projectnb/dunlop/esouth/outputs/usr_datasets` from infer docs/examples/workspaces.
+   - added docs regression guard banning `${PROJECTNB_ROOT}/outputs/usr_datasets` from infer docs/examples/workspaces.
 2. Green:
    - added `resolve_config_usr_root(...)` in `infer/src/cli/config_inputs.py`.
    - resolved config-mode USR roots relative to `config.yaml` in `infer run` and `infer validate usr-registry`.
@@ -4952,13 +4952,13 @@ Make the repo-wide storage policy explicit after the infer pressure-workspace le
 
 ### Goal
 
-Rebuild the canonical dnadesign GPU environment in `/project/dunlop/esouth/dnadesign/.venv` with the locked dev and `infer-evo2` dependency set, then verify that infer runs against the current Evo2 package surface that includes `evo2_20b`.
+Rebuild the canonical dnadesign GPU environment in `${PROJECT_ROOT}/dnadesign/.venv` with the locked dev and `infer-evo2` dependency set, then verify that infer runs against the current Evo2 package surface that includes `evo2_20b`.
 
 ### Findings
 
 1. The correct environment-realization command after the dependency declaration change is `uv sync --locked --group dev --extra infer-evo2`, not `uv add`. The declaration was already canonical in `pyproject.toml` and `uv.lock`.
 2. A cold `flash-attn` rebuild on the current SCC GPU node took `61m 28s` with `UV_CONCURRENT_BUILDS=1`, `UV_CONCURRENT_INSTALLS=1`, `MAX_JOBS=2`, `CMAKE_BUILD_PARALLEL_LEVEL=2`, `OMP_NUM_THREADS=2`, and `FLASH_ATTN_CUDA_ARCHS=89`.
-3. The canonical environment stayed at `/project/dunlop/esouth/dnadesign/.venv`. Build transients and caches stayed under `/project/dunlop/esouth/cache/...` (`uv`, `tmp`, `torch-extensions`, `triton-cache`, `pycache`, HuggingFace cache).
+3. The canonical environment stayed at `${PROJECT_ROOT}/dnadesign/.venv`. Build transients and caches stayed under `${PROJECT_ROOT}/cache/...` (`uv`, `tmp`, `torch-extensions`, `triton-cache`, `pycache`, HuggingFace cache).
 4. Final verified package surface:
    - `evo2==0.5.3`
    - `flash-attn==2.8.3`
@@ -5016,8 +5016,8 @@ Align the SCC docs, runbooks, and actual model cache state to the intended defau
    - updated capacity-gate examples to match the current infer Hopper contract.
    - added explicit model-prefetch commands for `evo2_7b` and `evo2_20b`.
 3. Real state transition:
-   - prefetched `arcinstitute/evo2_20b` into `/project/dunlop/esouth/cache/huggingface/evo2_20b`.
-   - removed `/projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b` and its lock entry.
+   - prefetched `arcinstitute/evo2_20b` into `${PROJECT_ROOT}/cache/huggingface/evo2_20b`.
+   - removed `${PROJECTNB_ROOT}/cache/huggingface/hub/models--arcinstitute--evo2_40b` and its lock entry.
    - verified remaining `/projectnb` infer cache footprint with `du`, not `df`.
 
 ### Changes applied
@@ -5053,10 +5053,10 @@ Align the SCC docs, runbooks, and actual model cache state to the intended defau
 1. `uv run pytest -q src/dnadesign/infer/tests/docs/test_scc_gpu_env_docs_contract.py src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py src/dnadesign/ops/tests/test_ops_docs_progressive_disclosure_contracts.py -k "scc_gpu_env_runbook_exists_and_covers_uv_stack_contract or model_cache_split_policy or infer_gpu_resource_contracts_are_documented_in_ops_runbook"`
 2. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run python - <<'PY' from huggingface_hub import model_info; info = model_info("arcinstitute/evo2_20b"); print(info.id); print(info.sha) PY`
 3. `UV_PROJECT_ENVIRONMENT="$PWD/.venv" uv run python - <<'PY' from huggingface_hub import snapshot_download; print(snapshot_download("arcinstitute/evo2_20b")) PY`
-4. `du -sh /project/dunlop/esouth/cache/huggingface/evo2_7b /project/dunlop/esouth/cache/huggingface/evo2_20b`
-5. `rm -rf /projectnb/dunlop/esouth/cache/huggingface/hub/models--arcinstitute--evo2_40b /projectnb/dunlop/esouth/cache/huggingface/hub/.locks/models--arcinstitute--evo2_40b`
-6. `du -sh /projectnb/dunlop/esouth/cache/huggingface/hub`
-7. `find /projectnb/dunlop/esouth/cache/huggingface/hub -maxdepth 2 -type d -name 'models--arcinstitute--evo2*' -print | sort`
+4. `du -sh ${PROJECT_ROOT}/cache/huggingface/evo2_7b ${PROJECT_ROOT}/cache/huggingface/evo2_20b`
+5. `rm -rf ${PROJECTNB_ROOT}/cache/huggingface/hub/models--arcinstitute--evo2_40b ${PROJECTNB_ROOT}/cache/huggingface/hub/.locks/models--arcinstitute--evo2_40b`
+6. `du -sh ${PROJECTNB_ROOT}/cache/huggingface/hub`
+7. `find ${PROJECTNB_ROOT}/cache/huggingface/hub -maxdepth 2 -type d -name 'models--arcinstitute--evo2*' -print | sort`
 
 ### Contract impact
 
@@ -5074,11 +5074,11 @@ Keep the canonical repo `.venv` intact, remove stale Evo2 Hugging Face cache cru
 ### Findings
 
 1. The canonical `.venv` did not need any mutation for this slice and remained untouched.
-2. `/projectnb/dunlop/esouth/cache/huggingface` still contained only stale Evo2 material after the earlier 40B cleanup:
+2. `${PROJECTNB_ROOT}/cache/huggingface` still contained only stale Evo2 material after the earlier 40B cleanup:
    - old top-level `models--arcinstitute--evo2_40b`
    - old duplicate hub cache for `evo2_7b`
    - stale lock/xet log directories
-3. `lsof +D /projectnb/dunlop/esouth/cache/huggingface` returned no open files, so cache cleanup was safe from the current session.
+3. `lsof +D ${PROJECTNB_ROOT}/cache/huggingface` returned no open files, so cache cleanup was safe from the current session.
 4. The checked-in infer workspace `test_stress_ethanol` was only a scaffold. It had `config.yaml` but no populated workspace-local USR dataset under `outputs/usr_datasets/test_stress_ethanol`.
 5. Because the intended dataset was not present anywhere live under `/project` or `/projectnb`, the honest pressure-test route was to materialize a bounded workspace-local USR dataset under the same dataset id rather than pretending the dataset already existed.
 
@@ -5095,7 +5095,7 @@ Keep the canonical repo `.venv` intact, remove stale Evo2 Hugging Face cache cru
 
 1. Fresh run:
    - `uv run infer run --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml --no-progress`
-   - used canonical cache `/project/dunlop/esouth/cache/huggingface/evo2_7b`
+   - used canonical cache `${PROJECT_ROOT}/cache/huggingface/evo2_7b`
    - wrote both `logits_mean` and `llr_mean` for all 8 rows
 2. Resume/no-op run:
    - same command, same config
@@ -5118,16 +5118,16 @@ Keep the canonical repo `.venv` intact, remove stale Evo2 Hugging Face cache cru
 ### Cache cleanup applied
 
 1. Removed stale duplicate Evo2 Hugging Face cache tree:
-   - `rm -rf /projectnb/dunlop/esouth/cache/huggingface`
+   - `rm -rf ${PROJECTNB_ROOT}/cache/huggingface`
 2. Canonical remaining Evo2 caches:
-   - `/project/dunlop/esouth/cache/huggingface/evo2_7b` -> `13G`
-   - `/project/dunlop/esouth/cache/huggingface/evo2_20b` -> `45G`
-3. After cleanup, `/projectnb/dunlop/esouth/cache` no longer contains a Hugging Face cache tree for Evo2.
+   - `${PROJECT_ROOT}/cache/huggingface/evo2_7b` -> `13G`
+   - `${PROJECT_ROOT}/cache/huggingface/evo2_20b` -> `45G`
+3. After cleanup, `${PROJECTNB_ROOT}/cache` no longer contains a Hugging Face cache tree for Evo2.
 
 ### Verification commands
 
-1. `find /project/dunlop/esouth/cache/huggingface /projectnb/dunlop/esouth/cache/huggingface -maxdepth 4 -type d -name 'models--arcinstitute--evo2*'`
-2. `lsof +D /projectnb/dunlop/esouth/cache/huggingface`
+1. `find ${PROJECT_ROOT}/cache/huggingface ${PROJECTNB_ROOT}/cache/huggingface -maxdepth 4 -type d -name 'models--arcinstitute--evo2*'`
+2. `lsof +D ${PROJECTNB_ROOT}/cache/huggingface`
 3. `uv run infer validate usr-registry --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml`
 4. `uv run usr --root <workspace-root>/outputs/usr_datasets namespace register infer --columns 'infer__evo2_7b__pressure_evo2_logits_llr__logits_mean:list<float64>,infer__evo2_7b__pressure_evo2_logits_llr__llr_mean:float64'`
 5. `uv run usr --root <workspace-root>/outputs/usr_datasets init test_stress_ethanol --source 'infer pressure test'`
@@ -5136,7 +5136,7 @@ Keep the canonical repo `.venv` intact, remove stale Evo2 Hugging Face cache cru
 8. `time uv run infer run --config src/dnadesign/infer/workspaces/test_stress_ethanol/config.yaml --no-progress`
 9. `uv run infer prune --usr test_stress_ethanol --usr-root <workspace-root>/outputs/usr_datasets`
 10. `uv run usr --root <workspace-root>/outputs/usr_datasets info test_stress_ethanol`
-11. `du -sh /project/dunlop/esouth/cache/huggingface /projectnb/dunlop/esouth/cache`
+11. `du -sh ${PROJECT_ROOT}/cache/huggingface ${PROJECTNB_ROOT}/cache`
 
 ### Contract impact
 

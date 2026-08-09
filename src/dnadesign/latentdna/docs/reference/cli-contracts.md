@@ -1,7 +1,7 @@
 # latentdna CLI Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-08
 
 ### Common flags
 
@@ -118,11 +118,11 @@ Workspace-specific flags:
 - Scalar plots now also include `xy_scatter` for joined scalar tables, `curve` for reducer/enrichment summaries, and `correspondence_heatmap` for paired categorical cluster structure.
 - Mixing named and inline plot specs in one invocation is rejected.
 
-### Active promoter-study path
+### External study path
 
-- Use `latentdna workspace init --from-study-dir docs/studies/stress_ethanol_cipro_growth --template promoter_reference_margin_benchmark` to hydrate the promoter-study pre-assay representation-triage ladder from the checked-in study record.
+- Use `latentdna workspace init --from-study-dir /path/to/study --template <template>` to hydrate a workspace from an explicit external study record.
 - Use `latentdna workspace refresh` to clear workspace-local LatentDNA artifacts without touching upstream `usr/datasets`.
-- Use `latentdna workspace snapshot --workspace stress_ethanol_cipro_growth --json --dry-run` before study-status or promoter-study tooling inspects LatentDNA state.
+- Use `latentdna workspace snapshot --workspace /path/to/workspace --json --dry-run` before study tooling inspects LatentDNA state.
 - Use `latentdna validate workspace --deep` to confirm the declared source keys, view vector columns, cohort columns, landmark selector columns, and study-binding files against the live study data without materializing embedding matrices.
 - Use `latentdna deliverable status <deliverable-id>` after recipe or deliverable runs to surface freshness drift from recorded input-path digests rather than only presence/absence checks.
 - Canonical runtime artifacts live directly under `outputs/`. Nested output roots are rejected.

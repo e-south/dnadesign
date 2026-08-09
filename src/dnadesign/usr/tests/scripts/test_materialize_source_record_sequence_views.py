@@ -19,6 +19,7 @@ import pytest
 
 from dnadesign.usr import Dataset, load_sequence_views, load_view_semantics
 from dnadesign.usr.scripts.materialize_source_record_sequence_views import (
+    SourceRecordSemanticProfile,
     materialize_source_record_sequence_views,
 )
 
@@ -102,7 +103,7 @@ def test_materialize_source_record_sequence_views_uses_label_aliases_and_templat
     tmp_path: Path,
 ) -> None:
     usr_root = _usr_root(tmp_path)
-    dataset = Dataset(usr_root, "usr_pdual10_plasmid_template")
+    dataset = Dataset(usr_root, "custom_template")
     _write_rows(
         dataset,
         [
@@ -110,9 +111,9 @@ def test_materialize_source_record_sequence_views_uses_label_aliases_and_templat
                 "sequence": "ACGT" * 25,
                 "bio_type": "dna",
                 "alphabet": "dna_4",
-                "source": "construct seed promoter-swap-demo",
-                "usr_label__primary": "pDual-10",
-                "usr_label__aliases": ["pDual10"],
+                "source": "fixture template",
+                "usr_label__primary": "template-alpha",
+                "usr_label__aliases": ["template-a"],
             }
         ],
     )
@@ -122,19 +123,31 @@ def test_materialize_source_record_sequence_views_uses_label_aliases_and_templat
             [
                 {
                     "id": str(dataset.head(1, include_derived=False)["id"].tolist()[0]),
-                    "usr_label__primary": "pDual-10",
-                    "usr_label__aliases": ["pDual10"],
+                    "usr_label__primary": "template-alpha",
+                    "usr_label__aliases": ["template-a"],
                 }
             ]
         ),
     )
 
-    materialize_source_record_sequence_views(usr_root=usr_root, dataset_names=[dataset.name], write=True)
+    materialize_source_record_sequence_views(
+        usr_root=usr_root,
+        dataset_names=[dataset.name],
+        profiles={
+            dataset.name: SourceRecordSemanticProfile(
+                source_family="construct_template",
+                selection_basis="template_source_record",
+                view_collections=("template_source_records",),
+                role_tags=("source_record", "template_seed"),
+            )
+        },
+        write=True,
+    )
 
     view = load_sequence_views(dataset)[0]
     semantics = load_view_semantics(dataset)[0]
-    assert view.view_name == "pDual-10_source_record"
-    assert view.aliases == ["pDual-10", "pDual10"]
+    assert view.view_name == "template-alpha_source_record"
+    assert view.aliases == ["template-alpha", "template-a"]
     assert semantics.source_family == "construct_template"
     assert semantics.selection_basis == "template_source_record"
     assert semantics.role_tags == ["source_record", "template_seed"]
@@ -142,7 +155,7 @@ def test_materialize_source_record_sequence_views_uses_label_aliases_and_templat
 
 def test_materialize_source_record_sequence_views_drops_non_unique_aliases(tmp_path: Path) -> None:
     usr_root = _usr_root(tmp_path)
-    dataset = Dataset(usr_root, "usr_sfxi_pdual10_densegen_promoters")
+    dataset = Dataset(usr_root, "custom_archive")
     _write_rows(
         dataset,
         [
@@ -150,13 +163,13 @@ def test_materialize_source_record_sequence_views_drops_non_unique_aliases(tmp_p
                 "sequence": "ACGT" * 15,
                 "bio_type": "dna",
                 "alphabet": "dna_4",
-                "source": "archived/60bp_dual_promoter_cpxR_LexA;reader_sfxi_pdual",
+                "source": "archived/example",
             },
             {
                 "sequence": "TGCA" * 15,
                 "bio_type": "dna",
                 "alphabet": "dna_4",
-                "source": "archived/60bp_dual_promoter_cpxR_LexA;reader_sfxi_pdual",
+                "source": "archived/example",
             },
         ],
     )
@@ -167,13 +180,13 @@ def test_materialize_source_record_sequence_views_drops_non_unique_aliases(tmp_p
             [
                 {
                     "id": str(ids[0]),
-                    "usr_label__primary": "pDual-10-ES1p",
-                    "usr_label__aliases": ["ES1p", "reader_experiment:shared"],
+                    "usr_label__primary": "sample-1",
+                    "usr_label__aliases": ["alias-1", "source:shared"],
                 },
                 {
                     "id": str(ids[1]),
-                    "usr_label__primary": "pDual-10-ES2p",
-                    "usr_label__aliases": ["ES2p", "reader_experiment:shared"],
+                    "usr_label__primary": "sample-2",
+                    "usr_label__aliases": ["alias-2", "source:shared"],
                 },
             ]
         ),
@@ -182,8 +195,8 @@ def test_materialize_source_record_sequence_views_drops_non_unique_aliases(tmp_p
     materialize_source_record_sequence_views(usr_root=usr_root, dataset_names=[dataset.name], write=True)
 
     aliases_by_name = {view.view_name: view.aliases for view in load_sequence_views(dataset)}
-    assert aliases_by_name["pDual-10-ES1p_source_record"] == ["pDual-10-ES1p", "ES1p"]
-    assert aliases_by_name["pDual-10-ES2p_source_record"] == ["pDual-10-ES2p", "ES2p"]
+    assert aliases_by_name["sample-1_source_record"] == ["sample-1", "alias-1"]
+    assert aliases_by_name["sample-2_source_record"] == ["sample-2", "alias-2"]
 
 
 def test_materialize_source_record_sequence_views_refuses_archived_dataset(tmp_path: Path) -> None:
@@ -192,6 +205,6 @@ def test_materialize_source_record_sequence_views_refuses_archived_dataset(tmp_p
     with pytest.raises(ValueError, match="Archived datasets are excluded"):
         materialize_source_record_sequence_views(
             usr_root=usr_root,
-            dataset_names=["archived/60bp_dual_promoter_cpxR_LexA"],
+            dataset_names=["archived/example"],
             write=False,
         )

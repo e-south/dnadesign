@@ -108,7 +108,7 @@ def _read_construct_rows(ds: Dataset, *, ids: list[str]) -> dict[str, dict[str, 
         try:
             con.execute(query, params)
             rows: dict[str, dict[str, object]] = {}
-            for batch in con.fetch_record_batch(max(len(ids), 1)):
+            for batch in con.to_arrow_reader(max(len(ids), 1)):
                 payload = batch.to_pydict()
                 for row_index in range(batch.num_rows):
                     row = {name: payload[name][row_index] for name in payload}

@@ -334,7 +334,7 @@ class ReviewCheck(VisualContractModel):
 
 
 class ThreeWayJunctionReviewV1(VisualContractModel):
-    """Exact, study-neutral evidence for a semantic four-panel QA view."""
+    """Exact, study-neutral evidence for a nucleotide-level QA view."""
 
     contract_kind: Literal["three_way_junction_review_v1"]
     source: ReviewSource

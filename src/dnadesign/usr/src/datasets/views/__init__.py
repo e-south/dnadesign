@@ -83,7 +83,7 @@ def scan_dataset(
     )
     try:
         con.execute(query, params)
-        reader = con.fetch_record_batch(int(batch_size))
+        reader = con.to_arrow_reader(int(batch_size))
         for batch in reader:
             yield batch
     finally:
@@ -158,9 +158,12 @@ def get_dataset(
     )
     try:
         con.execute(query, params)
-        reader = con.fetch_record_batch(1)
-        batch = reader.read_next_batch()
-        if batch is None or batch.num_rows == 0:
+        reader = con.to_arrow_reader(1)
+        try:
+            batch = reader.read_next_batch()
+        except StopIteration:
+            return pd.DataFrame(columns=columns or dataset.schema().names)
+        if batch.num_rows == 0:
             return pd.DataFrame(columns=columns or dataset.schema().names)
         tbl = pa.Table.from_batches([batch])
         return tbl.to_pandas()
@@ -190,7 +193,7 @@ def grep_dataset(
     )
     try:
         con.execute(query, params)
-        reader = con.fetch_record_batch(int(batch_size))
+        reader = con.to_arrow_reader(int(batch_size))
         batches = []
         for batch in reader:
             batches.append(batch)

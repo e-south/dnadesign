@@ -1,7 +1,7 @@
 ## How to use Ops
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-08-08
 
 When Ops is already the right surface, start with the next command below. Use
 `uv run ops catalog list --simple` if the route is still unknown.
@@ -40,4 +40,4 @@ Once you know the route, use `uv run ops progress explain <registry-id>` to see 
 - [Runbook catalog](../../../../docs/runbooks/README.md): repo-wide command index for procedures and tool docs.
 - [Ops orchestration index](../../../../docs/operations/README.md): choose the right lifecycle route for init, plan, execute, and verification.
 - [Orchestration runbooks](../../../../docs/operations/orchestration/runbooks.md): runbook schema, command order, and contract rules.
-- [Packaged runbook presets](../runbooks/presets): checked-in starting points for common orchestration routes.
+- `uv run ops runbook presets`: list site/account defaults for runbook initialization.

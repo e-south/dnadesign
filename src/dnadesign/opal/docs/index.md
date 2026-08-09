@@ -1,7 +1,12 @@
-## OPAL Documentation
+---
+doc_id: opal-docs
+title: OPAL documentation
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-08
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+# OPAL documentation
 
 Start with the campaign round for command order. Objective pages describe
 individual scoring plugins; they are not alternate OPAL lifecycles.
@@ -15,7 +20,7 @@ individual scoring plugins; they are not alternate OPAL lifecycles.
    generic [candidate and label contracts](./reference/configuration.md#candidate-and-label-contracts)
    and the public [`selection-set`](./reference/cli.md#selection-set) surface
    before adding study-owned logistics.
-5. For maintained examples and study-owned configs, use the
+5. For maintained examples and external campaign placement rules, use the
    [campaign route index](../campaigns/README.md).
 
 ### Workflows
@@ -23,16 +28,13 @@ individual scoring plugins; they are not alternate OPAL lifecycles.
 - [Campaign round](./workflows/campaign-round.md): the one OPAL lifecycle, independent of model, objective, and selector choices.
 - [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md): use a feature column already written into a USR dataset.
 
-### Plugin docs
+### Plugin contracts
 
 - [Models](./plugins/models/README.md): model plugin contracts and configuration surface.
 - [Gaussian Process behavior and math](./plugins/models/gaussian-process.md): GP assumptions, fitting behavior, and outputs.
 - [Selection](./plugins/selection/README.md): selection-plugin contracts and channel requirements.
 - [Expected Improvement behavior and math](./plugins/selection/expected-improvement.md): EI formulation and selection semantics.
-- [Objectives and channel refs](./plugins/objectives/README.md): objective plugin contracts and channel naming rules.
-- [SFXI behavior and math](./plugins/objectives/sfxi.md): retained objective-specific mechanics and output interpretation.
-- [Response-Magnitude Feasibility (RMF) behavior and math](./plugins/objectives/response-magnitude-feasibility.md): non-compensatory response separation and reference-relative magnitude constraints.
-- [Multistate Response Behavior math and contract](./plugins/objectives/multistate-response-behavior.md): threshold-free, strictly monotone response ordering, ON expression, and OFF suppression.
+- [Objectives and channel refs](./plugins/objectives/README.md): the generic objective contract, channel naming rules, and the registry of available implementations. Objective meaning and readiness remain with the caller that selects a plugin.
 - [X transforms](./plugins/transforms/x.md): input transform contracts for feature generation.
 - [Y transforms and Y-ops](./plugins/transforms/y.md): target transform contracts and label operations.
 

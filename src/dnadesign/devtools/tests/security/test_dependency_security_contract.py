@@ -63,7 +63,7 @@ def _repository_source_files(
         if not raw_path:
             continue
         relative_path = Path(raw_path.decode("utf-8"))
-        if relative_path.suffix in suffixes:
+        if relative_path.suffix in suffixes and (repo_root / relative_path).is_file():
             sources.append(relative_path)
     return tuple(sorted(sources))
 

@@ -3,7 +3,7 @@ doc_id: baserender-junction-integration
 title: junction review integration
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-02
+last_verified: 2026-08-08
 ---
 
 # junction review integration
@@ -13,12 +13,9 @@ last_verified: 2026-08-02
 **Owner-boundary:** baserender
 **Entry artifact:** verified junction `views/three_way_junction_review.v1.json` plus an explicit BaseRender `RenderJobV4` job
 **Exit artifact:** create-only BaseRender review bundle containing per-target images and its render manifest
-**Use when:** you want one optional four-panel review image per selected target
+**Use when:** you want one optional nucleotide-level review image per selected target
 **Input:** `views/three_way_junction_review.v1.json` from a verified junction bundle
 **Output:** a separate private BaseRender bundle
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
-
 Use BaseRender to make optional review images from a junction design.
 junction plans and verifies the sequences. BaseRender reads the saved review
 records and draws them; it does not recompute the design or change the source
@@ -30,24 +27,19 @@ The shared `dnadesign.contracts.visual.ThreeWayJunctionReviewV1` model defines
 each JSON row. Its exact `contract_kind` is
 `three_way_junction_review_v1`; unknown fields fail validation.
 
-Each image has four panels:
+Each image is one base-pair audit. It shows:
 
-1. the paired fragment oligos supplied to the assembly;
-2. target geometry and the selected toehold-to-barcode junctions;
-3. the sequence product expected from the declared recovery primers; and
-4. search counts, checks, and the fact that thermodynamic screening was not run.
+1. the target 5′→3′ strand aligned to its 3′→5′ complement;
+2. fragment domains, selected target-derived toeholds, and their coordinates;
+3. every toehold and barcode duplex with light gray Watson-Crick pairing edges;
+4. complete fragment-oligo orders; and
+5. complete recovery-primer orders.
 
-For targets with at most five junctions, the junction panel shows bounded
-sequence previews with the total nucleotide length and a 12-character SHA-256
-prefix. Larger targets show a bounded set of junction identifiers instead. The
-recovery panel also uses bounded sequence previews. An ellipsis means the label
-is only a review aid; use the review JSON and `orders/oligos.tsv` for complete
-sequences.
-
-The third panel says “Recovered PCR product” because it shows the declared
-primer geometry and the extension-aware product string. It does not simulate
-PCR or establish that amplification will work; the panel marks that limit
-directly.
+Sequences wrap into exact, fixed-width rows; they are not shortened to
+previews. Long content makes a taller image. BaseRender rejects a render before
+figure allocation if the requested canvas would exceed its memory or dimension
+limit. Search counts and check receipts remain in the review JSON and source
+bundle because they are not sequence geometry.
 
 The contract keeps primer mechanics separate:
 
@@ -159,8 +151,8 @@ The review terms follow the three-way-junction and pooled-recovery concepts
 described by Robinson *et al.* in
 [the Sidewinder paper](https://doi.org/10.1038/s41586-025-10006-0) and
 [the pooled extension](https://doi.org/10.64898/2026.05.01.722326).
-The four-panel layout is original. It organizes target geometry, assignments,
-strand and recovery declarations, and software checks without copying the
+The nucleotide map is an original QA view. It exposes target geometry,
+assignments, strand orders, and declared recovery primers without copying the
 papers' figures or claiming their experimental results.
 
 For the method mapping and implementation limits, use junction's

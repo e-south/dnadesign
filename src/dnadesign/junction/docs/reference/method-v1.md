@@ -1,10 +1,14 @@
-# Method v1
+---
+doc_id: junction-method-v1
+title: junction method v1
+type: reference
+scope: paper-inspired three-way-junction geometry, string objectives, and reconstruction evidence
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-08
+---
 
-**Type:** reference
-**Scope:** paper-inspired three-way-junction geometry, string-level
-design objectives, and reconstruction evidence
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# Method v1
 
 junction is an independent planning implementation inspired by the
 Sidewinder three-way-junction method and its pooled-oligo extension:

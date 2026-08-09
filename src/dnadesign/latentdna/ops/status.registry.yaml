@@ -13,7 +13,7 @@ entries:
       - name: workspace
         manifest_key: workspace
         cli_flag: --workspace
-        placeholder: stress_ethanol_cipro_growth
+        placeholder: /path/to/workspace
         summary: Workspace id or path passed through to `latentdna workspace snapshot`.
         type: path
         required: true

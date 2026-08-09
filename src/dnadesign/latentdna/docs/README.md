@@ -1,7 +1,7 @@
 # LatentDNA Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-08
 
 LatentDNA docs are organized by task. Start with a workflow when you are
 running or reviewing a comparison, use reference docs when editing contracts,
@@ -9,9 +9,9 @@ and use concepts when aligning terminology across workspaces.
 
 ### Choose a Path
 
-- [Stress ethanol/cipro representation comparison workflow](workflows/stress-ethanol-cipro-representation-comparison.md)
 - [Context-geometry workflow](workflows/context-shift.md)
 - [Cross-view agreement workflow](workflows/cross-view-agreement.md)
+- [Export an OPAL feature matrix](workflows/export-opal-x.md)
 
 ### Reference
 
@@ -40,4 +40,5 @@ and use concepts when aligning terminology across workspaces.
 
 - Upstream source-of-truth datasets: [USR README](../../usr/README.md)
 - Upstream vector generation: [Infer docs](../../infer/docs/README.md)
+- External study integration: [study workspaces](../../../../docs/integrations/study-workspaces.md)
 - Study-facing status surfaces: [workspace snapshot contract](reference/workspace-snapshot-contract.md)

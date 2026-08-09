@@ -26,14 +26,12 @@ RUNBOOK_DOCS = (
     WORKSPACES / "demo_tfbs_baseline" / "runbook.md",
     WORKSPACES / "demo_sampling_baseline" / "runbook.md",
     WORKSPACES / "study_constitutive_sigma_panel" / "runbook.md",
-    WORKSPACES / "study_stress_ethanol_cipro" / "runbook.md",
 )
 
 DEMO_DOCS = (
     DOCS_ROOT / "tutorials" / "demo_tfbs_baseline.md",
     DOCS_ROOT / "tutorials" / "demo_sampling_baseline.md",
     DOCS_ROOT / "tutorials" / "study_constitutive_sigma_panel.md",
-    DOCS_ROOT / "tutorials" / "study_stress_ethanol_cipro.md",
     DOCS_ROOT / "tutorials" / "demo_usr_notify.md",
 )
 

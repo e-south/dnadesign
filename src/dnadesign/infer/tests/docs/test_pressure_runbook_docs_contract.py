@@ -44,7 +44,7 @@ def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
     assert "outputs/logs/ops/audit/" in doc
     assert "outputs/logs/ops/runbooks/" in doc
     assert 'export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"' in doc
-    assert "/projectnb/dunlop/esouth/outputs/usr_datasets" not in doc
+    assert "/projectnb/private-user/outputs/usr_datasets" not in doc
     assert "infer__<model_id>__<job_id>__<out_id>" in doc
     lowered = doc.lower()
     assert "path a:" not in lowered

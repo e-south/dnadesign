@@ -19,6 +19,7 @@ from scipy.stats import norm
 
 from dnadesign.opal.src.core.objective_result import ObjectiveResultV2, validate_objective_result_v2
 from dnadesign.opal.src.core.utils import OpalError
+from dnadesign.opal.src.registries import objectives as objective_registry
 from dnadesign.opal.src.registries.objectives import (
     get_objective_family,
     list_objectives,
@@ -36,10 +37,20 @@ class _ObjResult:
         self.diagnostics = diagnostics or {}
 
 
-def test_register_objective_rejects_legacy_signature() -> None:
-    name = "test_obj_v2_bad_signature"
-    if name in list_objectives():
-        pytest.skip("already registered in current process")
+@pytest.fixture
+def isolated_objective_names():
+    names = ("test_obj_v2_bad_signature", "test_obj_v2_extensible_signature")
+    for name in names:
+        objective_registry._REG_O.pop(name, None)
+        objective_registry._OBJECTIVE_FAMILIES.pop(name, None)
+    yield names
+    for name in names:
+        objective_registry._REG_O.pop(name, None)
+        objective_registry._OBJECTIVE_FAMILIES.pop(name, None)
+
+
+def test_register_objective_rejects_legacy_signature(isolated_objective_names: tuple[str, str]) -> None:
+    name = isolated_objective_names[0]
 
     with pytest.raises(ValueError, match="y_pred_std"):
 
@@ -48,10 +59,8 @@ def test_register_objective_rejects_legacy_signature() -> None:
             return _ObjResult(score=np.ones(len(y_pred), dtype=float))
 
 
-def test_register_objective_accepts_optional_extension_kwargs() -> None:
-    name = "test_obj_v2_extensible_signature"
-    if name in list_objectives():
-        pytest.skip("already registered in current process")
+def test_register_objective_accepts_optional_extension_kwargs(isolated_objective_names: tuple[str, str]) -> None:
+    name = isolated_objective_names[1]
 
     @register_objective(name)
     def _ok(*, y_pred, params, ctx, train_view, y_pred_std, extra_debug=None):  # pragma: no cover - registry only

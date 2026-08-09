@@ -23,7 +23,7 @@ from dnadesign.opal.src.cli.commands import demo_matrix as demo_matrix_cmd
 from dnadesign.opal.src.core.utils import ExitCodes
 from dnadesign.opal.src.storage.x_contracts import validate_x_parquet_column
 
-DEMO_X_COLUMN = "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+DEMO_X_COLUMN = "X"
 
 
 def test_demo_matrix_json_summary_shape(monkeypatch, tmp_path: Path) -> None:
@@ -62,15 +62,15 @@ def test_run_cli_quiet_treats_zero_typer_exit_as_success() -> None:
 
 
 def test_demo_matrix_base_records_x_contract_is_canonical() -> None:
-    records_path = demo_matrix_cmd._campaigns_root() / demo_matrix_cmd.DEMO_RECORDS_SOURCE / "records.parquet"
+    records_path = demo_matrix_cmd._campaigns_root() / "_fixtures" / demo_matrix_cmd.DEMO_FIXTURE / "records.parquet"
     report = validate_x_parquet_column(records_path, x_column=DEMO_X_COLUMN)
     x_type = pq.ParquetFile(records_path).schema_arrow.field(DEMO_X_COLUMN).type
 
     assert pa.types.is_fixed_size_list(x_type)
-    assert x_type.list_size == 512
+    assert x_type.list_size == 12
     assert report.row_count > 0
-    assert report.x_dim == 512
-    assert report.value_type == "double"
+    assert report.x_dim == 12
+    assert report.value_type == "float"
 
 
 def test_demo_matrix_json_failure_exits_bad_args_without_internal_error(monkeypatch, tmp_path: Path) -> None:

@@ -1,8 +1,13 @@
-# Sources and scope
+---
+doc_id: junction-sources-and-scope
+title: junction sources and scope
+type: reference
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-08
+---
 
-**Type:** reference
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# Sources and scope
 
 `junction` is an independently developed planner inspired by the Sidewinder
 three-way-junction assembly method. Sidewinder names the published method;

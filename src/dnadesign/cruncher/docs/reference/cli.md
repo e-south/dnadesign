@@ -1,7 +1,7 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-08
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13
@@ -801,7 +801,6 @@ bundle under `<workspace>/outputs/scar_nick/<name>/`.
 Deep contracts live in:
 
 * [`../guides/scar_nick_workflow.md`](../guides/scar_nick_workflow.md)
-* [`../../workspaces/scar_nick_teto/runbook.md`](../../workspaces/scar_nick_teto/runbook.md)
 * [`../../src/scar_nick/README.md`](../../src/scar_nick/README.md)
 * [`nickase_catalog.md`](nickase_catalog.md)
 * [`architecture.md`](architecture.md)

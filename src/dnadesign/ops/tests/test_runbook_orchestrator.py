@@ -4646,27 +4646,6 @@ def test_cli_active_jobs_emits_discovered_ids(tmp_path: Path, monkeypatch: pytes
     )
 
 
-def test_packaged_runbook_presets_exist_and_load() -> None:
-    repo_root = Path(__file__).resolve()
-    for parent in repo_root.parents:
-        if (parent / "pyproject.toml").exists():
-            repo_root = parent
-            break
-    preset_dir = repo_root / "src" / "dnadesign" / "ops" / "runbooks" / "presets"
-
-    preset_files = sorted(preset_dir.glob("*.yaml"))
-    assert preset_files
-
-    for preset_path in preset_files:
-        loaded = load_orchestration_runbook(preset_path)
-        assert loaded.workflow_id in {
-            "densegen_batch_submit",
-            "densegen_batch_with_notify",
-            "infer_batch_submit",
-            "infer_batch_with_notify",
-        }
-
-
 def test_infer_runbook_allows_workspace_local_config_variants() -> None:
     workspace_root = Path("/tmp/infer_layout_alt_config")
     payload = _infer_runbook_payload(workspace_root)
@@ -4699,135 +4678,19 @@ def test_infer_runbook_allows_lane_scoped_notify_state() -> None:
     assert loaded.notify.profile.parent.name == "anchor_only_7b"
 
 
-def test_densegen_packaged_presets_use_repo_default_qsub_tokens() -> None:
-    repo_root = Path(__file__).resolve()
-    for parent in repo_root.parents:
-        if (parent / "pyproject.toml").exists():
-            repo_root = parent
-            break
-    preset_dir = repo_root / "src" / "dnadesign" / "ops" / "runbooks" / "presets"
-
-    expected_densegen = "docs/bu-scc/jobs/densegen-cpu.qsub"
-    expected_post_run = "docs/bu-scc/jobs/densegen-analysis.qsub"
-    expected_notify = "docs/bu-scc/jobs/notify-watch.qsub"
-
-    batch_payload = yaml.safe_load(
-        (preset_dir / "densegen_stress_ethanol_cipro_batch.yaml").read_text(encoding="utf-8")
-    )
-    assert batch_payload["runbook"]["densegen"]["qsub_template"] == expected_densegen
-    assert batch_payload["runbook"]["densegen"]["post_run"]["qsub_template"] == expected_post_run
-
-    notify_payload = yaml.safe_load(
-        (preset_dir / "densegen_stress_ethanol_cipro_batch_with_notify.yaml").read_text(encoding="utf-8")
-    )
-    assert notify_payload["runbook"]["densegen"]["qsub_template"] == expected_densegen
-    assert notify_payload["runbook"]["densegen"]["post_run"]["qsub_template"] == expected_post_run
-    assert notify_payload["runbook"]["notify"]["qsub_template"] == expected_notify
-
-
-def test_stress_ethanol_cipro_infer_presets_are_blackwell_pinned() -> None:
-    repo_root = Path(__file__).resolve()
-    for parent in repo_root.parents:
-        if (parent / "pyproject.toml").exists():
-            repo_root = parent
-            break
-    preset_dir = repo_root / "src" / "dnadesign" / "ops" / "runbooks" / "presets"
-
-    for preset_name in (
-        "infer_stress_ethanol_cipro_anchor_only_20b_batch_with_notify.yaml",
-        "infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml",
-        "infer_stress_ethanol_cipro_sequence_views_anchor_construct_insert_7b_batch_with_notify.yaml",
-        "infer_stress_ethanol_cipro_sequence_views_context_forward_seq_and_anchor_mean_7b_batch_with_notify.yaml",
-        (
-            "infer_stress_ethanol_cipro_sequence_views_context_reverse_complement_seq_and_anchor_mean_7b"
-            "_batch_with_notify.yaml"
-        ),
-        ("infer_stress_ethanol_cipro_sequence_views_reference_analysis_window_core60_7b_batch_with_notify.yaml"),
-        (
-            "infer_stress_ethanol_cipro_sequence_views_reference_context_forward_seq_and_anchor_mean_7b"
-            "_batch_with_notify.yaml"
-        ),
-        (
-            "infer_stress_ethanol_cipro_sequence_views_reference_context_reverse_complement_seq_and_anchor_mean_7b"
-            "_batch_with_notify.yaml"
-        ),
-    ):
-        payload = yaml.safe_load((preset_dir / preset_name).read_text(encoding="utf-8"))
-        resources = payload["runbook"]["resources"]
-        assert resources["gpu_capability"] == "12.0"
-        assert resources["gpu_type"] == "RTXP6000"
-        assert resources["gpu_memory_gib"] == 80.0
-
-
-def test_stress_ethanol_cipro_infer_configs_match_pressure_test_matrix() -> None:
-    repo_root = Path(__file__).resolve()
-    for parent in repo_root.parents:
-        if (parent / "pyproject.toml").exists():
-            repo_root = parent
-            break
-    config_dir = repo_root / "src" / "dnadesign" / "infer" / "workspaces" / "study_stress_ethanol_cipro"
-    expected = {
-        "config.sequence_views.anchor_construct_insert.evo2_7b.yaml": 128,
-        "config.sequence_views.context_forward_seq_and_anchor_mean.evo2_7b.yaml": 128,
-        "config.sequence_views.context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml": 128,
-        "config.sequence_views.reference_analysis_window_core60.evo2_7b.yaml": 128,
-        "config.sequence_views.reference_context_forward_seq_and_anchor_mean.evo2_7b.yaml": 128,
-        "config.sequence_views.reference_context_reverse_complement_seq_and_anchor_mean.evo2_7b.yaml": 128,
-        "config.anchor_only.evo2_20b.yaml": 256,
-        "config.anchor_plus_template.evo2_20b.yaml": 48,
-    }
-
-    for config_name, batch_size in expected.items():
-        payload = yaml.safe_load((config_dir / config_name).read_text(encoding="utf-8"))
-        assert payload["model"]["batch_size"] == batch_size
-
-
-def test_stress_ethanol_cipro_anchor_plus_template_20b_preset_uses_24h_walltime() -> None:
-    repo_root = Path(__file__).resolve()
-    for parent in repo_root.parents:
-        if (parent / "pyproject.toml").exists():
-            repo_root = parent
-            break
-    preset_path = (
-        repo_root
-        / "src"
-        / "dnadesign"
-        / "ops"
-        / "runbooks"
-        / "presets"
-        / "infer_stress_ethanol_cipro_anchor_plus_template_20b_batch_with_notify.yaml"
-    )
-    payload = yaml.safe_load(preset_path.read_text(encoding="utf-8"))
-
-    assert payload["runbook"]["resources"]["h_rt"] == "24:00:00"
-
-
-def test_packaged_runbook_preset_path_is_rejected_without_repo_checkout(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    preset_path = tmp_path / "site-packages" / "dnadesign" / "ops" / "runbooks" / "presets" / "demo.yaml"
-    preset_path.parent.mkdir(parents=True, exist_ok=True)
-    preset_path.write_text("runbook: {}\n", encoding="utf-8")
-    monkeypatch.setattr(runbook_schema, "_resolve_repo_root_from_module", lambda: None)
-
-    with pytest.raises(ValueError, match="starter assets only"):
-        load_orchestration_runbook(preset_path)
-
-
-def test_cli_presets_lists_packaged_runbooks() -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["runbook", "presets"])
-
-    assert result.exit_code == 0
-    payload = json.loads(result.output)
-    assert payload["presets"]
-    assert all(entry["path"].endswith(".yaml") for entry in payload["presets"])
-
-
 def test_cli_precedents_command_is_not_supported() -> None:
     runner = CliRunner()
 
     result = runner.invoke(app, ["runbook", "precedents"])
 
     assert result.exit_code != 0
+
+
+def test_cli_presets_lists_only_init_defaults() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["runbook", "presets"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["init_presets"]
+    assert "presets" not in payload

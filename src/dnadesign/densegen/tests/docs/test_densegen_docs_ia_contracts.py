@@ -26,7 +26,6 @@ WORKSPACE_IDS = (
     "demo_tfbs_baseline",
     "demo_sampling_baseline",
     "study_constitutive_sigma_panel",
-    "study_stress_ethanol_cipro",
 )
 SIGMA70_LITERAL_SOURCE_CITATION = (
     "Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors"
@@ -153,7 +152,6 @@ def test_densegen_docs_entry_has_ordered_documentation_map() -> None:
             "tutorials/demo_tfbs_baseline.md",
             "tutorials/demo_sampling_baseline.md",
             "tutorials/study_constitutive_sigma_panel.md",
-            "tutorials/study_stress_ethanol_cipro.md",
             "tutorials/demo_usr_notify.md",
             "concepts/checklists/quick-checklist.md",
             "reference/outputs.md",
@@ -224,9 +222,7 @@ def test_densegen_markdown_heading_levels_use_single_h2_root() -> None:
 def test_sigma70_literal_docs_include_source_citation() -> None:
     targets = (
         WORKSPACES / "study_constitutive_sigma_panel" / "runbook.md",
-        WORKSPACES / "study_stress_ethanol_cipro" / "runbook.md",
         DOCS_ROOT / "tutorials" / "study_constitutive_sigma_panel.md",
-        DOCS_ROOT / "tutorials" / "study_stress_ethanol_cipro.md",
     )
     for path in targets:
         content = _read(path)

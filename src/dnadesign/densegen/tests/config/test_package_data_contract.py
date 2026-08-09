@@ -33,4 +33,3 @@ def test_densegen_package_data_uses_extensible_workspace_globs() -> None:
     assert '"workspaces/demo_tfbs_baseline/*.yaml"' not in pyproject
     assert '"workspaces/demo_sampling_baseline/*.yaml"' not in pyproject
     assert '"workspaces/study_constitutive_sigma_panel/*.yaml"' not in pyproject
-    assert '"workspaces/study_stress_ethanol_cipro/*.yaml"' not in pyproject

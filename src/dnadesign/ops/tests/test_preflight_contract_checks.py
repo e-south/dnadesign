@@ -25,7 +25,7 @@ from dnadesign.ops.preflight import (
     run_preflight_command,
 )
 from dnadesign.ops.preflight.models import supported_preflight_check_kinds
-from dnadesign.studies.core.models import (
+from dnadesign.ops.study import (
     StudyOpsContract,
     StudyPhaseContract,
     StudyPreflightContract,

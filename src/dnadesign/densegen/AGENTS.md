@@ -7,7 +7,6 @@ Use this file as a short map. Keep detailed operating and architecture material 
 - [Docs index by workflow](docs/README.md)
 - [Docs index by type](docs/index.md)
 - [Workspaces guide](workspaces/README.md)
-- [Stress ethanol and ciprofloxacin tutorial](docs/tutorials/study_stress_ethanol_cipro.md)
 - [DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)
 
 ### Pick a path
@@ -21,7 +20,10 @@ Use this file as a short map. Keep detailed operating and architecture material 
 - Run on clusters: [HPC runbook](docs/howto/hpc.md), [BU SCC guide](docs/howto/bu-scc.md), and [BU SCC quickstart](../../../docs/bu-scc/setup/quickstart.md).
 
 ### Workspace conventions
-- Packaged templates: `demo_tfbs_baseline`, `demo_sampling_baseline`, `study_constitutive_sigma_panel`, `study_stress_ethanol_cipro`.
+- Packaged templates: `demo_tfbs_baseline`, `demo_dense_array_showcase`,
+  `demo_sampling_baseline`, and `study_constitutive_sigma_panel`.
+- Live study workspaces stay external and call DenseGen through its public
+  configuration and CLI contracts.
 - Generated outputs stay under each workspace `outputs/` directory.
 - For USR sinks, stage workspaces with `dense workspace init --output-mode usr|both`.
 

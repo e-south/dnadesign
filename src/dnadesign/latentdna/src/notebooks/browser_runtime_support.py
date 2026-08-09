@@ -492,18 +492,6 @@ def display_hue_label(column: str, *, axis_styles: dict[str, object] | None = No
         return "20B log likelihood / token"
     if column.startswith("log_likelihood_per_token_"):
         return humanize_display_text(column)
-    if column == "promoter_standard__strength_value_numeric":
-        return "Reference strength"
-    if column == "sfxi_ref__metric_value":
-        return "SFXI selected metric"
-    if column == "sfxi_ref__sfxi":
-        return "SFXI score"
-    if column == "sfxi_ref__logic_fidelity":
-        return "SFXI logic fidelity"
-    if column == "sfxi_ref__effect_scaled":
-        return "SFXI effect scaled"
-    if column == "sfxi_ref__effect_raw":
-        return "SFXI raw effect"
     if column == "tf_bin":
         return "Native TF bin"
     if column.startswith("infer__evo2_") and "__log_likelihood__mean_per_token" in column:

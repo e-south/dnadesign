@@ -48,7 +48,6 @@ _REFERENCE_GROUP_VALUE_LABELS = {
     "legacy_reference_control": "Legacy Reference",
     "native_source_length": "Native Length",
     "reference_source": "Reference Source",
-    "sfxi_archive": "SFXI Archive",
     "sigma_site_pair_midpoint": "Sigma Midpoint",
     "t7_w_collection": "T7 W collection",
     "template_window_center": "Template Window",

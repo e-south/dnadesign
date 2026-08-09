@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from dnadesign.devtools.ci.changes import (
@@ -104,21 +105,6 @@ def test_determine_scope_pr_docs_only_skips_tool_coverage_gate() -> None:
     assert result.affected_tools == []
     assert result.external_integration_tools == []
     assert result.run_coverage_gate is False
-
-
-def test_determine_scope_pr_study_record_scopes_studies_tool() -> None:
-    result = determine_scope(
-        event_name="pull_request",
-        changed_files=["docs/studies/stress_ethanol_cipro_growth/operations/ops.study.yaml"],
-        tool_names={"studies", "usr"},
-        external_integration_tool_names=set(),
-    )
-
-    assert result.run_full_core is False
-    assert result.run_external_integration is False
-    assert result.affected_tools == ["studies"]
-    assert result.external_integration_tools == []
-    assert result.run_coverage_gate is True
 
 
 def test_determine_scope_pr_shared_code_change_triggers_full_core_and_external_integration() -> None:
@@ -271,6 +257,37 @@ def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_pat
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
     assert tool_names == {"latentdna"}
+
+
+def test_discover_repo_tools_ignores_untracked_local_backup(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    (src_root / "latentdna").mkdir(parents=True, exist_ok=True)
+    (src_root / "latentdna" / "__init__.py").write_text("", encoding="utf-8")
+    (src_root / "studies").mkdir(parents=True, exist_ok=True)
+    (src_root / "studies" / "private.py").write_text("SECRET = True\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text("src/dnadesign/studies/\n", encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+
+    tool_names = discover_repo_tools(repo_root=tmp_path)
+
+    assert tool_names == {"latentdna"}
+
+
+def test_discover_repo_tools_keeps_tracked_ignored_package(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    (src_root / "studies").mkdir(parents=True, exist_ok=True)
+    (src_root / "studies" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text("src/dnadesign/studies/\n", encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "add", "--force", "src/dnadesign/studies/__init__.py"],
+        cwd=tmp_path,
+        check=True,
+    )
+
+    tool_names = discover_repo_tools(repo_root=tmp_path)
+
+    assert tool_names == {"studies"}
 
 
 def test_discover_external_integration_tools_ignores_marker_text_in_comments(tmp_path: Path) -> None:

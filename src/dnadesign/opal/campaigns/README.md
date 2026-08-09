@@ -20,24 +20,19 @@ loads only that path shape and rejects invalid or unowned configs.
 
 | Campaign | Kind | Purpose |
 | --- | --- | --- |
+| [`demo_rf_topn`](demo_rf_topn/README.md) | demo | Random-forest model with direct scalar ranking |
 | [`demo_gp_topn`](demo_gp_topn/README.md) | demo | Gaussian-process model with direct score ranking |
-| [`demo_gp_ei`](demo_gp_ei/README.md) | demo | Gaussian-process model with expected-improvement selection |
+| [`demo_gp_ei`](demo_gp_ei/README.md) | demo | Gaussian-process model with uncertainty-aware selection |
 
-[`demo_rf_sfxi_topn`](demo_rf_sfxi_topn/README.md) is a portable regression
-fixture for the retained SFXI objective plugin. It owns the shared demo records
-file, but it is not OPAL's canonical workflow or a study route.
+All three use the small synthetic scalar fixture under
+[`_fixtures/scalar-regression/`](_fixtures/scalar-regression/README.md). The
+demos exercise OPAL mechanics without choosing a scientific objective.
 
-### Study campaign
+### External campaigns
 
-[`secg_msrb_greedy`](secg_msrb_greedy/README.md) is the maintained
-stress-promoter campaign. It applies named MSRB selection views to one shared
-response-window phenotype. The stress study owns the scientific meaning,
-source evidence, and synthesis gate.
-
-Run state is not declared in this index. `state.json` and the run ledger are
-the runtime sources of truth. The stress-study status and readiness routes are
-documented under
-[`docs/studies/stress_ethanol_cipro_growth/`](../../../../docs/studies/stress_ethanol_cipro_growth/).
+Live campaigns belong to their owning study workspace. They use OPAL's public
+configuration and CLI contracts but are not packaged with dnadesign. Runtime
+state remains authoritative in each campaign's `state.json` and ledger.
 
 ### Placement Rules
 

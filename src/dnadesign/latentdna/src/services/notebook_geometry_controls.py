@@ -54,29 +54,6 @@ _PREFERRED_HUE_KIND_DEFAULTS = {
     "context_shift_l2": "continuous",
 }
 
-_DEFAULT_REFERENCE_HUE_OPTIONS = [
-    WorkspaceNotebookReferenceHueOption(
-        label="Reference strength",
-        column="promoter_standard__strength_value_numeric",
-        type="continuous",
-    ),
-    WorkspaceNotebookReferenceHueOption(
-        label="SFXI score",
-        column="sfxi_ref__sfxi",
-        type="continuous",
-    ),
-    WorkspaceNotebookReferenceHueOption(
-        label="SFXI logic fidelity",
-        column="sfxi_ref__logic_fidelity",
-        type="continuous",
-    ),
-    WorkspaceNotebookReferenceHueOption(
-        label="SFXI effect scaled",
-        column="sfxi_ref__effect_scaled",
-        type="continuous",
-    ),
-]
-
 _DEFAULT_JOINABLE_VALUE_COLUMNS = set(_PREFERRED_HUES) | {"cluster_label"}
 
 _FAMILY_LABELS = {
@@ -237,8 +214,7 @@ def _preferred_hue_kind_defaults(context, *, notebook_id: str | None) -> dict[st
 
 def _reference_hue_options(context, *, notebook_id: str | None) -> list[WorkspaceNotebookReferenceHueOption]:
     notebook = _resolve_notebook(context, notebook_id)
-    configured = list(getattr(notebook, "reference_hue_options", []) or []) if notebook is not None else []
-    options = configured or list(_DEFAULT_REFERENCE_HUE_OPTIONS)
+    options = list(getattr(notebook, "reference_hue_options", []) or []) if notebook is not None else []
     exposed_reference_set_ids = {
         reference_set_id
         for reference_set_id, reference_set in context.config.reference_sets.items()

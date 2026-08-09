@@ -4,12 +4,11 @@ Use this directory for packaged construct workspace templates and examples. New 
 
 List the local construct workspaces in the active root plus the packaged templates with `uv run construct workspace list`.
 
-### Start with one of three paths
+### Start with one of these paths
 
 - [Packaged local demo](demo_anchor_template_local/README.md): a didactic anchor-into-template tracer bullet with both 1 kb window and full-context configs.
 - [Packaged shared-dataset demo](demo_anchor_template_shared_dataset/README.md): the same anchor/template contract, but with two audited projects writing into one downstream USR dataset.
-- [Study-owned pDual-10 surface](study_stress_ethanol_cipro_pdual10/README.md): the real `stress_ethanol_cipro_growth` Construct handoff, reading merged anchors from the shared USR root and writing template-backed contexts into a shared downstream dataset.
-- Blank workspace: scaffold your own study and import your own input/template datasets.
+- Blank workspace: scaffold a project and import your own input and template datasets.
 
 ### Quick start
 
@@ -98,4 +97,5 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
 - The packaged local demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.
 - The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md`.
-- The study-owned pDual-10 surface is a checked-in execution surface, not a demo profile; use its tracked workspace artifact/config contract when the question is about the live promoter study rather than generic Construct behavior.
+- Study workspaces keep their concrete Construct configs outside the public
+  package and call the same workspace and CLI contracts.

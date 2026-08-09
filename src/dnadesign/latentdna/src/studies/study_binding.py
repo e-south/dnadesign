@@ -20,7 +20,7 @@ REQUIRED_STUDY_RECORD_FILES: tuple[str, ...] = (
     "record/status.md",
     "operations/ops.study.yaml",
 )
-REQUIRED_STUDY_DELIVERABLE_DOC_FILES: tuple[str, ...] = ("study.yaml",)
+REQUIRED_STUDY_DELIVERABLE_DOC_FILES: tuple[str, ...] = ()
 
 
 def missing_required_files(root: Path, required_files: Iterable[str]) -> list[str]:

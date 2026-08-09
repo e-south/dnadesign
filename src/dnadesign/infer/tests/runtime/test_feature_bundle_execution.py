@@ -731,7 +731,7 @@ def test_resolve_sequence_contexts_usr_reads_filtered_columns_without_full_scan(
             self.executed_query = str(query)
             self.executed_params = list(params)
 
-        def fetch_record_batch(self, batch_size):
+        def to_arrow_reader(self, batch_size):
             query_kwargs["batch_size"] = int(batch_size)
             return [_FakeBatch()]
 

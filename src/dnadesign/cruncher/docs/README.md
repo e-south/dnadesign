@@ -1,42 +1,41 @@
-## Cruncher docs
+---
+doc_id: cruncher-docs
+title: Cruncher documentation
+owner: dnadesign-maintainers
+status: active
+last_verified: 2026-08-08
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+# Cruncher documentation
 
+Choose the job you need. Each route validates its own inputs and writes its own
+artifact bundle. Aggregation reads explicit prior bundles without changing
+their meaning.
 
-**Last updated by:** cruncher-maintainers on 2026-07-13
+- Optimize fixed-length sequences against declared motif models.
+- Search multi-part cassette designs.
+- Inspect payload windows and foldback or nick geometries.
+- Summarize parameter sweeps and assemble handoff tables from explicit runs.
 
-Cruncher currently registers seven peer workflow families.
-Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, `portfolio`.
-
-- fixed-length optimization workspaces for sequence sampling and artifact-only analysis
-- cassette workspaces for cassette design and ranked search
-- payload-centric YIU workspaces for payload validation, rendering, and bundle inspection
-- snapback workspaces for preserved-site and released-product single-nick foldback workflows
-- scar-nick workspaces for retained-scar terminal-nick feasibility panels
-- study orchestration workspaces for aggregate sweep execution and summary surfaces over explicit source-family runs
-- portfolio orchestration workspaces for cross-study aggregation and handoff tables over explicit source-family runs
-
-The `study` and `portfolio` families orchestrate explicit source-family runs.
-The currently shipped examples are sample-backed, but the orchestration family
-boundaries remain separate command surfaces with their own workspace contracts
-and docs surfaces.
+The CLI reference records the exact route IDs. Those IDs are command names, not
+scientific categories or a registry that callers must copy into their own
+schemas.
 
 ### Start here
 
-- **Fixed-length optimization:** [Pairwise Demo](demos/demo_pairwise.md), [Sampling and Analysis](guides/sampling_and_analysis.md), and [Intent and Lifecycle](guides/intent_and_lifecycle.md)
-- **Cassette workflows:** [Cassette Workspace Demo](demos/demo_cassette_workspace.md), [Cassette Workflow](guides/cassette_workflow.md), and [Cassette Solve Workflow](guides/cassette_solve_workflow.md)
-- **Payload-Centric YIU Workflows:** [YIU Workspace Demo](demos/demo_yiu_workspace.md), [YIU Workflow](guides/yiu_workflow.md), [YIU Spec Reference](reference/yiu_spec.md), [YIU Artifacts](reference/yiu_artifacts.md), and [YIU Visual System](reference/yiu_visual_system.md)
-- **Snapback workflows:** [Snapback Workflow](guides/snapback_workflow.md), [Released-product Snapback Workflow](guides/snapback_released_workflow.md), [Snapback Artifacts](reference/snapback_artifacts.md), [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md), [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md), and the checked-in [de033 released-product workspace README](../workspaces/de033/README.md)
-- **Scar-nick workflows:** [Scar-Nick Workflow](guides/scar_nick_workflow.md), [scar_nick_teto runbook](../workspaces/scar_nick_teto/runbook.md), and the [scar_nick package map](../src/scar_nick/README.md)
-- **Sample-backed YIU examples:** [demo_monotypic_tetr runbook](../workspaces/demo_monotypic_tetr/runbook.md) and [demo_monotypic_lexa runbook](../workspaces/demo_monotypic_lexa/runbook.md)
-- **Study orchestration:** [Studies](guides/studies.md) and [Study Length vs Score](guides/study_length_vs_score.md)
-- **Portfolio orchestration:** [Portfolio Aggregation](guides/portfolio_aggregation.md)
+- **Optimize fixed-length sequences:** [Pairwise demo](demos/demo_pairwise.md), [sampling and analysis](guides/sampling_and_analysis.md), and [intent and lifecycle](guides/intent_and_lifecycle.md).
+- **Search multi-part cassettes:** [Cassette workspace demo](demos/demo_cassette_workspace.md), [cassette workflow](guides/cassette_workflow.md), and [cassette solve workflow](guides/cassette_solve_workflow.md).
+- **Inspect payload junctions:** [Workspace demo](demos/demo_yiu_workspace.md), [workflow](guides/yiu_workflow.md), [request reference](reference/yiu_spec.md), [artifact reference](reference/yiu_artifacts.md), and [visual reference](reference/yiu_visual_system.md).
+- **Check foldback designs:** [Foldback workflow](guides/snapback_workflow.md), [released-product workflow](guides/snapback_released_workflow.md), [artifact reference](reference/snapback_artifacts.md), and [release-enzyme catalogs](reference/release_enzyme_catalogs.md).
+- **Check terminal nick designs:** [Terminal nick workflow](guides/scar_nick_workflow.md) and [package map](../src/scar_nick/README.md).
+- **Summarize prior runs:** [Sweep orchestration](guides/studies.md), [length-versus-score analysis](guides/study_length_vs_score.md), and [artifact aggregation](guides/portfolio_aggregation.md).
 - **Tool-wide references:** [CLI Reference](reference/cli.md), [Architecture](reference/architecture.md), [Config Reference](reference/config.md), [Glossary](reference/glossary.md), and [Runbook Step Reference](reference/runbook_steps.md)
 
-### Related study records
+### External studies
 
-- [Retron hairpin study route map](../../../../docs/studies/retron_hairpin_design/routes/README.md): use when a named study task needs Cruncher primitives. Use [Retron Hairpin Design Status](../../../../docs/studies/retron_hairpin_design/operations/catalog/contracts/status.md) and [Retron Hairpin Design Preflight](../../../../docs/studies/retron_hairpin_design/operations/catalog/contracts/preflight.md) only for explicit status or readiness questions.
+Live studies call Cruncher through its public CLI and Python contracts. Their
+route maps, readiness rules, and evidence stay in the owning study workspace;
+see the [study integration contract](../../../../docs/integrations/study-workspaces.md).
 
 <!-- docs:toc:off -->
 
@@ -61,7 +60,7 @@ and docs surfaces.
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
 
-#### Payload-Centric YIU Workflows
+#### Inspect Payload Junctions
 - [YIU Workspace Demo](demos/demo_yiu_workspace.md)
 - [YIU Workflow](guides/yiu_workflow.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
@@ -74,15 +73,12 @@ and docs surfaces.
 - [Snapback Artifacts](reference/snapback_artifacts.md)
 - [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
 - [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
-- [de033 README](../workspaces/de033/README.md)
-- [de033 runbook](../workspaces/de033/runbook.md)
 
 #### Design Retained-Scar Terminal Nicks
 - [Scar-Nick Workflow](guides/scar_nick_workflow.md)
-- [scar_nick_teto runbook](../workspaces/scar_nick_teto/runbook.md)
 - [scar_nick Package Map](../src/scar_nick/README.md)
 
-#### Run Studies and Portfolio Aggregation
+#### Summarize Sweeps and Aggregate Artifacts
 - [Studies](guides/studies.md)
 - [Study Length vs Score](guides/study_length_vs_score.md)
 - [Study Diversity vs Score](guides/study_diversity_vs_score.md)

@@ -17,7 +17,6 @@ from pathlib import Path
 
 DENSEGEN_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = Path(__file__).resolve().parents[5]
-DENSEGEN_TUTORIALS = DENSEGEN_ROOT / "docs" / "tutorials"
 BU_SCC_DOCS = REPO_ROOT / "docs" / "bu-scc"
 BU_SCC_REFERENCE_DOCS = BU_SCC_DOCS / "reference"
 BU_SCC_RUNBOOK_DOCS = BU_SCC_DOCS / "runbooks"
@@ -40,13 +39,6 @@ TOP_LEVEL_SYSTEM_DOCS = (
 def _read(path: Path) -> str:
     assert path.exists(), f"Missing file: {path}"
     return path.read_text()
-
-
-def test_stress_tutorial_links_to_bu_scc_operational_docs() -> None:
-    text = _read(DENSEGEN_TUTORIALS / "study_stress_ethanol_cipro.md")
-    assert "[BU SCC Quickstart]" in text
-    assert "[BU SCC Batch + Notify runbook]" in text
-    assert "[BU SCC job templates]" in text
 
 
 def test_bu_scc_quickstart_contains_status_first_submission_gate() -> None:

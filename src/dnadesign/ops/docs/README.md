@@ -1,7 +1,7 @@
 ## Ops docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-08-08
 
 Ops package docs cover packaged presets and command reference. The repo-wide
 command list lives in `docs/runbooks/README.md`.
@@ -28,7 +28,7 @@ If you are entering from the shell rather than browsing docs first, start with `
 
 ### Package-local surfaces
 
-- [Packaged runbook presets](../runbooks/presets): checked-in starter runbooks for common orchestration routes.
+- `uv run ops runbook presets`: list site/account defaults for runbook initialization.
 - [`dnadesign.ops`](../README.md): package README with the short tool overview.
 - [Runbook catalog status views](../../../../docs/runbooks/README.md#status-views): glossary for registered status providers and explicit campaign manifests.
 

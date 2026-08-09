@@ -1,8 +1,0 @@
-checks:
-  msd_design_reference_catalog:
-  - kind: command
-    check_id: study.msd_reference_lint
-    check_group: msd_reference_compile
-    summary: Retron MSD design-reference lint command completed.
-    required: true
-    surface: msd_design_reference_lint

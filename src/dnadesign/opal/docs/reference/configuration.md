@@ -1,7 +1,7 @@
 ## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-17
+**Last verified:** 2026-08-08
 
 `campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
 keys. There is no compatibility parser.
@@ -41,8 +41,8 @@ Study-owned execution uses:
 ```yaml
 ownership:
   owner_scope: study_campaign
-  study_id: stress_ethanol_cipro_growth
-  dataset_id: usr_prom_eth_cip_opal_candidates
+  study_id: example_study
+  dataset_id: example_candidates
   portable: false
 ```
 

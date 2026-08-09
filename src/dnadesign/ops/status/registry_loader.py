@@ -12,7 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from functools import lru_cache
+from importlib.metadata import entry_points
 from pathlib import Path
+from typing import Mapping
 
 import yaml
 
@@ -21,6 +23,7 @@ from dnadesign.ops.discovery import discover_named_files
 from .models import InputFieldSpec, StatusKindSpec
 
 _STATUS_REGISTRY_FILENAME = "status.registry.yaml"
+_STATUS_REGISTRY_ENTRY_POINT_GROUP = "dnadesign.ops.status_registries"
 _REGISTRY_TOP_LEVEL_KEYS = frozenset({"version", "provider_id", "entries"})
 _REGISTRY_ENTRY_KEYS = frozenset(
     {
@@ -69,9 +72,14 @@ _REGISTRY_INPUT_KEYS = frozenset(
 @lru_cache(maxsize=1)
 def list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
     dnadesign_root = Path(__file__).resolve().parents[2]
+    external_fragments = _load_external_status_registry_fragments()
     return _load_status_kind_specs(
-        fragment_paths=_iter_status_registry_fragment_paths(),
+        fragment_paths=(
+            *_iter_status_registry_fragment_paths(),
+            *(path for path, _ in external_fragments),
+        ),
         dnadesign_root=dnadesign_root,
+        provider_prefixes={path: prefix for path, prefix in external_fragments},
     )
 
 
@@ -89,6 +97,7 @@ def _load_status_kind_specs(
     *,
     fragment_paths: tuple[Path, ...],
     dnadesign_root: Path,
+    provider_prefixes: Mapping[Path, str] | None = None,
 ) -> tuple[StatusKindSpec, ...]:
     specs: list[StatusKindSpec] = []
     loaded_status_kinds: set[str] = set()
@@ -137,6 +146,7 @@ def _load_status_kind_specs(
                 status_kind=str(entry.get("status_kind") or "").strip(),
                 fragment_path=fragment_path,
                 dnadesign_root=dnadesign_root,
+                expected_prefix=(provider_prefixes or {}).get(fragment_path.resolve()),
             )
             spec = StatusKindSpec(
                 status_kind=str(entry.get("status_kind") or "").strip(),
@@ -190,8 +200,12 @@ def _validate_provider_ref_location(
     status_kind: str,
     fragment_path: Path,
     dnadesign_root: Path,
+    expected_prefix: str | None = None,
 ) -> None:
-    expected_prefix = _expected_provider_ref_prefix(fragment_path=fragment_path, dnadesign_root=dnadesign_root)
+    expected_prefix = expected_prefix or _expected_provider_ref_prefix(
+        fragment_path=fragment_path,
+        dnadesign_root=dnadesign_root,
+    )
     if expected_prefix is None:
         return
     module_name = provider_ref.split(":", maxsplit=1)[0]
@@ -242,6 +256,33 @@ def load_status_kind_spec(status_kind: str) -> StatusKindSpec:
 def _iter_status_registry_fragment_paths() -> tuple[Path, ...]:
     dnadesign_root = Path(__file__).resolve().parents[2]
     return _iter_status_registry_fragment_paths_for_root(dnadesign_root=dnadesign_root)
+
+
+def _load_external_status_registry_fragments() -> tuple[tuple[Path, str], ...]:
+    fragments: list[tuple[Path, str]] = []
+    seen_paths: set[Path] = set()
+    discovered = entry_points(group=_STATUS_REGISTRY_ENTRY_POINT_GROUP)
+    for entry_point in sorted(discovered, key=lambda item: (item.name, item.value)):
+        loader = entry_point.load()
+        if not callable(loader):
+            raise ValueError(f"status registry entry point must resolve to a callable: {entry_point.name}")
+        raw_paths = loader()
+        if isinstance(raw_paths, (str, Path)):
+            raw_paths = (raw_paths,)
+        if not isinstance(raw_paths, (list, tuple)):
+            raise ValueError(f"status registry entry point must return paths: {entry_point.name}")
+        provider_prefix = entry_point.value.partition(":")[0].partition(".")[0] + "."
+        for raw_path in raw_paths:
+            path = Path(raw_path).expanduser().resolve()
+            if path.name != _STATUS_REGISTRY_FILENAME or not path.is_file():
+                raise ValueError(
+                    f"status registry entry point returned an invalid registry path: {entry_point.name}: {path}"
+                )
+            if path in seen_paths:
+                raise ValueError(f"status registry path registered more than once: {path}")
+            seen_paths.add(path)
+            fragments.append((path, provider_prefix))
+    return tuple(fragments)
 
 
 def _iter_status_registry_fragment_paths_for_root(*, dnadesign_root: Path) -> tuple[Path, ...]:

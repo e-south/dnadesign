@@ -8,7 +8,7 @@ Folding owns backend preflight, prediction, parsing, and plot publication.
 
 - [Docs index](docs/README.md): command routes, artifact flow, backend policy,
   and boundaries.
-- [Composition handoff](../../../docs/dev/plans/cross-tool/linear-ssdna-composition/2026-05-13-generic-linear-ssdna-composition.md):
+- [Composition handoff](../../../docs/architecture/decisions/adr-0002-generic-linear-ssdna-composition.md):
   design rationale for Construct/Folding/BaseRender handoffs.
 - [Repository docs index](../../../docs/README.md): cross-tool routing for
   workspace tools, stateless services, and shared contracts.

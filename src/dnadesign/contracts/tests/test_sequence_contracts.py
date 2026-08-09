@@ -38,7 +38,7 @@ def _rt_part_publication_payload() -> dict[str, object]:
         "owner_study_id": "literature_rt_parts",
         "publication_id": "literature_rt_parts_v1",
         "provenance": {
-            "source_ref": "docs/studies/literature_rt_parts/record/source.yaml",
+            "source_ref": "/path/to/study/record/source.yaml",
             "source_contract": "curated_rt_source_v1",
             "source_sha256": _sha256("curated-source"),
         },

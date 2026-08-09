@@ -28,7 +28,6 @@ PACKAGED_WORKSPACE_IDS = (
     "demo_dense_array_showcase",
     "demo_sampling_baseline",
     "study_constitutive_sigma_panel",
-    "study_stress_ethanol_cipro",
 )
 
 WORKSPACE_TUTORIAL_PATHS = {
@@ -36,13 +35,11 @@ WORKSPACE_TUTORIAL_PATHS = {
     "demo_dense_array_showcase": "src/dnadesign/densegen/docs/tutorials/demo_dense_array_showcase.md",
     "demo_sampling_baseline": "src/dnadesign/densegen/docs/tutorials/demo_sampling_baseline.md",
     "study_constitutive_sigma_panel": "src/dnadesign/densegen/docs/tutorials/study_constitutive_sigma_panel.md",
-    "study_stress_ethanol_cipro": "src/dnadesign/densegen/docs/tutorials/study_stress_ethanol_cipro.md",
 }
 
 USR_WORKSPACE_IDS = (
     "demo_sampling_baseline",
     "study_constitutive_sigma_panel",
-    "study_stress_ethanol_cipro",
 )
 
 
@@ -372,61 +369,10 @@ def test_packaged_workspace_plan_constraints_surface_min_total_sites_key() -> No
             )
 
 
-def test_stress_workspace_sets_min_total_sites_to_three_for_all_plans() -> None:
-    cfg_path = _demo_config_path("study_stress_ethanol_cipro")
-    payload = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    plans = payload["densegen"]["generation"]["plan"]
-    values = [int(plan["regulator_constraints"]["min_total_sites"]) for plan in plans]
-    assert values == [3, 3, 3, 3]
-
-
-def test_stress_workspace_uses_four_equal_base_plan_quotas() -> None:
-    cfg_path = _demo_config_path("study_stress_ethanol_cipro")
-    payload = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    plans = payload["densegen"]["generation"]["plan"]
-    assert [plan["name"] for plan in plans] == [
-        "background_only",
-        "ethanol",
-        "ciprofloxacin",
-        "ethanol_ciprofloxacin",
-    ]
-    assert [int(plan["sequences"]) for plan in plans] == [250000, 250000, 250000, 250000]
-
-    by_name = {str(plan["name"]): plan for plan in plans}
-    assert by_name["background_only"]["regulator_constraints"]["groups"] == []
-    assert by_name["ethanol"]["regulator_constraints"]["groups"] == [
-        {
-            "name": "ethanol_response",
-            "members": ["cpxR_MANWWHTTTAM", "baeR_TTTCTSCVHNA"],
-            "min_required": 1,
-        }
-    ]
-    assert by_name["ciprofloxacin"]["regulator_constraints"]["groups"] == [
-        {
-            "name": "ciprofloxacin_response",
-            "members": ["lexA_CTGTATAWAWWHACA"],
-            "min_required": 1,
-        }
-    ]
-    assert by_name["ethanol_ciprofloxacin"]["regulator_constraints"]["groups"] == [
-        {
-            "name": "ethanol_response",
-            "members": ["cpxR_MANWWHTTTAM", "baeR_TTTCTSCVHNA"],
-            "min_required": 1,
-        },
-        {
-            "name": "ciprofloxacin_response",
-            "members": ["lexA_CTGTATAWAWWHACA"],
-            "min_required": 1,
-        },
-    ]
-
-
 def test_packaged_workspace_semantic_ids_align_to_workspace_name() -> None:
     explicit_shared_dataset_ids = {
         "demo_sampling_baseline": "densegen_demo_sampling_baseline",
         "study_constitutive_sigma_panel": "densegen_study_constitutive_sigma_panel",
-        "study_stress_ethanol_cipro": "densegen_prom_eth_cip_source",
     }
     for workspace_id in PACKAGED_WORKSPACE_IDS:
         cfg_path = _demo_config_path(workspace_id)
@@ -455,7 +401,6 @@ def test_packaged_motif_artifact_manifests_are_workspace_local_and_current() -> 
     workspace_ids = (
         "demo_sampling_baseline",
         "study_constitutive_sigma_panel",
-        "study_stress_ethanol_cipro",
     )
     for workspace_id in workspace_ids:
         manifest_path = _demo_config_path(workspace_id).parent / "inputs" / "motif_artifacts" / "artifact_manifest.json"
@@ -478,7 +423,6 @@ def test_packaged_motif_artifact_manifests_are_workspace_local_and_current() -> 
 def test_packaged_motif_artifact_manifests_use_active_cruncher_workspaces() -> None:
     expected_config_paths = {
         "demo_sampling_baseline": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
-        "study_stress_ethanol_cipro": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
         "study_constitutive_sigma_panel": "src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml",
     }
     for workspace_id, expected_config in expected_config_paths.items():
@@ -496,22 +440,18 @@ def test_gitignore_workspaces_allowlist_matches_packaged_workspace_names() -> No
     assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/" in gitignore
-    assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/README.md" in gitignore
-    assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/README.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.md" in gitignore
-    assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.sh" in gitignore
-    assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.sh" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_binding_sites/" not in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/" not in gitignore
 
@@ -624,7 +564,6 @@ def test_packaged_workspace_plot_defaults_cover_full_notebook_surface() -> None:
         "demo_dense_array_showcase": dense_array_showcase_surface,
         "demo_sampling_baseline": expected_notebook_surface,
         "study_constitutive_sigma_panel": expected_notebook_surface,
-        "study_stress_ethanol_cipro": expected_notebook_surface,
     }
     for workspace_id, expected in expected_defaults.items():
         cfg = load_config(_demo_config_path(workspace_id))
@@ -633,15 +572,8 @@ def test_packaged_workspace_plot_defaults_cover_full_notebook_surface() -> None:
         assert set(plots.default) == expected
 
 
-def test_study_stress_ethanol_cipro_retains_opt_in_video_configuration() -> None:
-    cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
-    plots = cfg.root.plots
-    assert plots is not None
-    assert plots.video.enabled is True
-
-
 def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
-    for workspace_id in ("study_constitutive_sigma_panel", "study_stress_ethanol_cipro"):
+    for workspace_id in ("study_constitutive_sigma_panel",):
         cfg = load_config(_demo_config_path(workspace_id))
         plots = cfg.root.plots
         assert plots is not None
@@ -653,97 +585,10 @@ def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
         assert int(tfbs_opts.get("max_plans", 0)) == 12
 
 
-def test_stress_study_defaults_match_full_notebook_surface() -> None:
-    stress_cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
-    stress_plots = stress_cfg.root.plots
-    assert stress_plots is not None
-    assert stress_plots.default == notebook_visible_plot_ids()
-
-
-def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
-    cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
-    output = cfg.root.densegen.output
-    solver = cfg.root.densegen.solver
-    assert output.targets == ["parquet", "usr"]
-    assert output.usr is not None
-    assert output.usr.dataset == "densegen_prom_eth_cip_source"
-    assert output.usr.root == "src/dnadesign/usr/datasets"
-    assert output.usr.root_scope == "git_common_repo_root"
-    assert float(output.usr.health_event_interval_seconds) > 0
-    assert solver.backend == "GUROBI"
-    assert solver.strategy == "iterate"
-
-    input_types = [inp.type for inp in cfg.root.densegen.inputs]
-    assert input_types.count("pwm_artifact") == 3
-    assert input_types.count("background_pool") == 1
-    plan_names = [item.name for item in cfg.root.densegen.generation.plan]
-    assert len(plan_names) == 20
-    assert len([name for name in plan_names if name.startswith("background_only__sig35=")]) == 5
-    assert len([name for name in plan_names if name.startswith("ethanol__sig35=")]) == 5
-    assert len([name for name in plan_names if name.startswith("ciprofloxacin__sig35=")]) == 5
-    assert len([name for name in plan_names if name.startswith("ethanol_ciprofloxacin__sig35=")]) == 5
-    assert all("__sig35=" in name for name in plan_names)
-
-    pwm_inputs = [inp for inp in cfg.root.densegen.inputs if inp.type == "pwm_artifact"]
-    assert len(pwm_inputs) == 3
-    for inp in pwm_inputs:
-        assert inp.sampling.n_sites == 500
-        assert inp.sampling.mining.batch_size == 5000
-        assert inp.sampling.mining.budget.mode == "fixed_candidates"
-        assert inp.sampling.mining.budget.candidates == 1_000_000
-        assert inp.sampling.selection.policy == "mmr"
-        assert inp.sampling.selection.pool is not None
-        assert inp.sampling.selection.pool.min_score_norm is None
-        assert inp.sampling.selection.pool.max_candidates == 10_000
-
-    background = next(inp for inp in cfg.root.densegen.inputs if inp.type == "background_pool")
-    assert background.sampling.n_sites == 500
-    assert background.sampling.mining.batch_size == 20000
-    assert background.sampling.mining.budget.mode == "fixed_candidates"
-    assert background.sampling.mining.budget.candidates == 1_000_000
-    sampling = cfg.root.densegen.generation.sampling
-    assert sampling.library_size == 25
-    assert cfg.root.densegen.runtime.max_accepted_per_library == 100
-    assert cfg.root.densegen.generation.expansion.max_plans == 64
-    quotas_by_base = {
-        "background_only": [
-            item.sequences
-            for item in cfg.root.densegen.generation.plan
-            if item.name.startswith("background_only__sig35=")
-        ],
-        "ethanol": [
-            item.sequences for item in cfg.root.densegen.generation.plan if item.name.startswith("ethanol__sig35=")
-        ],
-        "ciprofloxacin": [
-            item.sequences
-            for item in cfg.root.densegen.generation.plan
-            if item.name.startswith("ciprofloxacin__sig35=")
-        ],
-        "ethanol_ciprofloxacin": [
-            item.sequences
-            for item in cfg.root.densegen.generation.plan
-            if item.name.startswith("ethanol_ciprofloxacin__sig35=")
-        ],
-    }
-    assert set(quotas_by_base["background_only"]) == {50_000}
-    assert set(quotas_by_base["ethanol"]) == {50_000}
-    assert set(quotas_by_base["ciprofloxacin"]) == {50_000}
-    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {50_000}
-    assert cfg.root.densegen.generation.total_quota() == 1_000_000
-    assert cfg.root.densegen.generation.sequence_constraints is not None
-    assert "validate_final_sequence" not in cfg.root.densegen.postprocess.model_dump(exclude_none=False)
-
-
-def test_study_stress_ethanol_cipro_uses_campaign_checkpoint_cadence() -> None:
-    cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
-    assert cfg.root.densegen.runtime.checkpoint_every == 2000
-
-
 def test_packaged_workspace_stage_a_length_policy_is_range_16_20() -> None:
     workspace_ids = (
         "demo_sampling_baseline",
         "study_constitutive_sigma_panel",
-        "study_stress_ethanol_cipro",
     )
     stage_a_sampling_input_types = {
         "background_pool",
@@ -766,7 +611,7 @@ def test_packaged_workspace_stage_a_length_policy_is_range_16_20() -> None:
 
 
 def test_packaged_sampling_workspace_regulator_constraints_match_packaged_pwm_artifacts() -> None:
-    workspace_ids = ("demo_sampling_baseline", "study_stress_ethanol_cipro")
+    workspace_ids = ("demo_sampling_baseline",)
     for workspace_id in workspace_ids:
         cfg_path = _demo_config_path(workspace_id)
         cfg = load_config(cfg_path)
@@ -792,7 +637,7 @@ def test_packaged_sampling_workspace_regulator_constraints_match_packaged_pwm_ar
 
 
 def test_packaged_sampling_workspaces_allow_bounded_failed_solutions() -> None:
-    for workspace_id in ("demo_sampling_baseline", "study_stress_ethanol_cipro"):
+    for workspace_id in ("demo_sampling_baseline",):
         cfg = load_config(_demo_config_path(workspace_id))
         assert cfg.root.densegen.runtime.max_failed_solutions >= 1
         assert cfg.root.densegen.runtime.max_failed_solutions_per_target > 0
@@ -901,21 +746,18 @@ def test_packaged_workspace_runbook_scripts_use_shared_helper_with_workspace_pol
         "demo_dense_array_showcase": "uv",
         "demo_sampling_baseline": "pixi",
         "study_constitutive_sigma_panel": "pixi",
-        "study_stress_ethanol_cipro": "pixi",
     }
     expected_usr_registry_by_workspace = {
         "demo_tfbs_baseline": "false",
         "demo_dense_array_showcase": "false",
         "demo_sampling_baseline": "true",
         "study_constitutive_sigma_panel": "true",
-        "study_stress_ethanol_cipro": "true",
     }
     expected_fimo_by_workspace = {
         "demo_tfbs_baseline": "false",
         "demo_dense_array_showcase": "false",
         "demo_sampling_baseline": "true",
         "study_constitutive_sigma_panel": "true",
-        "study_stress_ethanol_cipro": "true",
     }
     for workspace_id in PACKAGED_WORKSPACE_IDS:
         script_path = workspace_root / workspace_id / "runbook.sh"
@@ -960,7 +802,6 @@ def test_usr_workspace_tutorials_reference_existing_cruncher_configs() -> None:
     expected_config_paths = {
         "demo_sampling_baseline": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
         "study_constitutive_sigma_panel": "src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml",
-        "study_stress_ethanol_cipro": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
     }
     for workspace_id, expected_path in expected_config_paths.items():
         tutorial_path = repo_root / WORKSPACE_TUTORIAL_PATHS[workspace_id]

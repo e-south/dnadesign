@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-08-08
 
 ## At a glance
 This document defines reliability intent for runtime behavior, CI behavior, and operator workflows.
@@ -35,9 +35,9 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - USR event logs (`.events.log`) are the primary integration signal stream for watcher workflows.
 - Cursor/spool state in notifier workflows must be explicit, restart-safe, and scoped to the intended workspace/run.
 - Failures should include actionable context, not generic error wrappers.
-- Checked-in study records under `docs/studies/<study-id>/` plus the active
-  selector `docs/studies/index.yaml` are the authoritative record-plane signal
-  for live-study posture.
+- External study workspaces own their record-plane state. Dnadesign observes
+  only explicit inputs or providers registered by an installed study package;
+  it has no active-study selector.
 - Status outputs should carry plane and summary-scope metadata so operators can
   distinguish repo snapshots from host-local readiness evidence.
 

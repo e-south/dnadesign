@@ -1,7 +1,7 @@
 ## Cruncher to DenseGen PWM handoff
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-08
 
 
 This how-to guide explains the current handoff contract from Cruncher motif artifacts into DenseGen PWM-driven workspaces. Read it when you need a reproducible path from motif discovery to Stage-A pools, Stage-B libraries, and solve-to-quota outputs.
@@ -9,7 +9,8 @@ This how-to guide explains the current handoff contract from Cruncher motif arti
 ### Current contract summary
 This section states the concrete behavior operators should expect from packaged workspaces.
 
-The packaged `demo_sampling_baseline` workspace currently uses three PWM artifact inputs (`lexA`, `cpxR`, `baeR`) plus background and runs two plans (`ethanol`, `ciprofloxacin`). The larger `study_stress_ethanol_cipro` workspace is the path for three-plan campaign behavior including `ethanol_ciprofloxacin`.
+The packaged `demo_sampling_baseline` workspace shows three PWM artifact inputs
+plus a background input and two independent plans.
 The packaged `study_constitutive_sigma_panel` workspace includes committed `lacI`/`araC` artifacts and uses strict background exclusion (`allow_zero_hit_only=true`) against those PWMs.
 
 ### Step 1: Prepare PWM artifacts
@@ -26,8 +27,6 @@ For packaged workspace refresh from Cruncher:
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 # Export Cruncher motif artifacts into the DenseGen workspace.
 uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_multitf --densegen-workspace demo_sampling_baseline -c "$REPO_ROOT/src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml"
-# Export Cruncher motif artifacts into the DenseGen workspace.
-uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_multitf --densegen-workspace study_stress_ethanol_cipro -c "$REPO_ROOT/src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml"
 # Export Cruncher motif artifacts into the DenseGen workspace.
 uv run cruncher catalog export-densegen --set 1 --densegen-workspace study_constitutive_sigma_panel -c "$REPO_ROOT/src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml"
 ```
