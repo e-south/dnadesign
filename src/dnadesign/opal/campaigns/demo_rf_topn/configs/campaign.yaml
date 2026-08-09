@@ -36,7 +36,7 @@ model:
   name: random_forest
   params:
     n_estimators: 64
-    criterion: "friedman_mse"
+    criterion: "squared_error"
     bootstrap: true
     oob_score: true
     random_state: 7
