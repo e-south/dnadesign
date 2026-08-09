@@ -40,6 +40,15 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _fake_distribution(name: str, *owned_paths: Path) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=name,
+        files=tuple(owned_paths),
+        locate_file=lambda path: Path(path),
+        read_text=lambda filename: None,
+    )
+
+
 def test_load_runbook_catalog_reads_shared_registry() -> None:
     catalog = load_runbook_catalog(repo_root=_repo_root())
 
@@ -164,7 +173,7 @@ summary: Run the local procedure.
     entry_point = SimpleNamespace(
         name="research-studies",
         value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
-        dist=SimpleNamespace(name="research-studies"),
+        dist=_fake_distribution("research-studies", metadata_path, doc_path),
         load=lambda: lambda: (metadata_path,),
     )
     monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
@@ -322,7 +331,7 @@ def test_external_catalog_registry_entry_point_rejects_path_outside_package(
     entry_point = SimpleNamespace(
         name="research-studies",
         value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
-        dist=SimpleNamespace(name="research-studies"),
+        dist=_fake_distribution("research-studies", external_metadata),
         load=lambda: lambda: (external_metadata,),
     )
     monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
@@ -336,6 +345,62 @@ def test_external_catalog_registry_entry_point_rejects_path_outside_package(
     )
 
     with pytest.raises(ValueError, match="path must stay under its entry-point package"):
+        provider_sources.discover_external_catalog_registry_sources()
+
+
+def test_external_catalog_registry_rejects_a_sibling_namespace_provider_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    namespace_root = tmp_path / "shared_namespace"
+    provider_module = namespace_root / "provider_a" / "registry.py"
+    sibling_doc = namespace_root / "provider_b" / "status.md"
+    sibling_metadata = sibling_doc.with_suffix(".registry.yaml")
+    _write(provider_module, "def catalog_registry_paths(): return ()\n")
+    _write(sibling_doc, "# Sibling status\n")
+    _write(sibling_metadata, "schema_version: 1\n")
+    entry_point = SimpleNamespace(
+        name="provider-a",
+        value="shared_namespace.provider_a.registry:catalog_registry_paths",
+        dist=_fake_distribution("provider-a", provider_module),
+        load=lambda: lambda: (sibling_metadata,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda module: SimpleNamespace(submodule_search_locations=None, origin=str(provider_module)),
+    )
+
+    with pytest.raises(ValueError, match="artifact must belong to its entry-point distribution"):
+        provider_sources.discover_external_catalog_registry_sources()
+
+
+def test_external_catalog_registry_requires_distribution_owned_documentation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "provider_a"
+    provider_module = package_root / "registry.py"
+    doc_path = package_root / "status.md"
+    metadata_path = doc_path.with_suffix(".registry.yaml")
+    _write(provider_module, "def catalog_registry_paths(): return ()\n")
+    _write(doc_path, "# Provider status\n")
+    _write(metadata_path, "schema_version: 1\n")
+    entry_point = SimpleNamespace(
+        name="provider-a",
+        value="provider_a.registry:catalog_registry_paths",
+        dist=_fake_distribution("provider-a", provider_module, metadata_path),
+        load=lambda: lambda: (metadata_path,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda module: SimpleNamespace(submodule_search_locations=None, origin=str(provider_module)),
+    )
+
+    with pytest.raises(ValueError, match="artifact must belong to its entry-point distribution"):
         provider_sources.discover_external_catalog_registry_sources()
 
 

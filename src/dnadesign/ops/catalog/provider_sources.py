@@ -11,12 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from importlib.metadata import EntryPoint, entry_points
 from importlib.util import find_spec
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from .constants import REGISTRY_METADATA_SUFFIX
+from .paths import resolve_doc_path_for_metadata
 
 _CATALOG_REGISTRY_ENTRY_POINT_GROUP = "dnadesign.ops.catalog_registries"
 
@@ -42,6 +45,7 @@ def discover_external_catalog_registry_sources() -> tuple[CatalogRegistrySource,
             raise ValueError(f"catalog registry entry point must resolve to a callable: {entry_point.name}")
         provider_id = _entry_point_provider_id(entry_point=entry_point)
         package_root = _entry_point_package_root(entry_point=entry_point)
+        owned_files, owned_roots = _entry_point_owned_paths(entry_point=entry_point)
         raw_paths = loader()
         if isinstance(raw_paths, (str, Path)):
             raw_paths = (raw_paths,)
@@ -58,6 +62,13 @@ def discover_external_catalog_registry_sources() -> tuple[CatalogRegistrySource,
                     "catalog registry path must stay under its entry-point package: "
                     f"{entry_point.name}: {path} package_root={package_root}"
                 )
+            doc_path = resolve_doc_path_for_metadata(metadata_path=path, repo_root=package_root)
+            for owned_path in (path, doc_path):
+                if owned_path not in owned_files and not any(owned_path.is_relative_to(root) for root in owned_roots):
+                    raise ValueError(
+                        "catalog registry artifact must belong to its entry-point distribution: "
+                        f"{entry_point.name}: {owned_path}"
+                    )
             if path in seen_paths:
                 raise ValueError(f"catalog registry path registered more than once: {path}")
             seen_paths.add(path)
@@ -66,12 +77,36 @@ def discover_external_catalog_registry_sources() -> tuple[CatalogRegistrySource,
 
 
 def _entry_point_provider_id(*, entry_point: EntryPoint) -> str:
-    module_name = entry_point.value.partition(":")[0].strip()
     distribution = getattr(entry_point, "dist", None)
-    owner = str(getattr(distribution, "name", "") or module_name.partition(".")[0]).strip()
+    owner = str(getattr(distribution, "name", "") or "").strip()
     if not owner:
-        raise ValueError(f"catalog registry entry point has no provider identity: {entry_point.name}")
+        raise ValueError(f"catalog registry entry point has no owning distribution: {entry_point.name}")
     return f"{owner}:{entry_point.name}"
+
+
+def _entry_point_owned_paths(*, entry_point: EntryPoint) -> tuple[frozenset[Path], tuple[Path, ...]]:
+    distribution = getattr(entry_point, "dist", None)
+    if distribution is None:
+        raise ValueError(f"catalog registry entry point has no owning distribution: {entry_point.name}")
+    files = tuple(getattr(distribution, "files", None) or ())
+    locate_file = getattr(distribution, "locate_file", None)
+    if not callable(locate_file):
+        raise ValueError(f"catalog registry distribution cannot locate installed files: {entry_point.name}")
+    owned_files = frozenset(Path(locate_file(path)).expanduser().resolve() for path in files)
+    owned_roots: list[Path] = []
+    read_text = getattr(distribution, "read_text", None)
+    raw_direct_url = read_text("direct_url.json") if callable(read_text) else None
+    if raw_direct_url:
+        try:
+            direct_url = json.loads(raw_direct_url)
+        except json.JSONDecodeError:
+            raise ValueError(f"catalog registry distribution has invalid direct_url.json: {entry_point.name}") from None
+        parsed = urlparse(str(direct_url.get("url", "")))
+        if parsed.scheme == "file" and direct_url.get("dir_info", {}).get("editable") is True:
+            owned_roots.append(Path(unquote(parsed.path)).expanduser().resolve())
+    if not owned_files and not owned_roots:
+        raise ValueError(f"catalog registry distribution exposes no owned files: {entry_point.name}")
+    return owned_files, tuple(owned_roots)
 
 
 def _entry_point_package_root(*, entry_point: EntryPoint) -> Path:
