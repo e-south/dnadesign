@@ -447,6 +447,20 @@ def test_runbook_default_templates_fall_back_to_packaged_qsub_templates_when_rep
     assert "runbooks/templates" in infer_runbook.infer.qsub_template.as_posix()
 
 
+def test_runbook_template_discovery_does_not_claim_a_consumer_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dnadesign.ops.runbooks import runbook_paths
+
+    consumer_root = tmp_path / "consumer"
+    consumer_root.mkdir()
+    (consumer_root / "pyproject.toml").write_text("[project]\nname = 'consumer'\n", encoding="utf-8")
+    installed_module = consumer_root / ".venv/lib/python3.12/site-packages/dnadesign/ops/runbooks/runbook_paths.py"
+    monkeypatch.setattr(runbook_paths, "__file__", str(installed_module))
+
+    assert runbook_paths._resolve_repo_root_from_module() is None
+
+
 def test_packaged_qsub_templates_match_repo_docs_templates() -> None:
     repo_root = Path(__file__).resolve()
     for parent in repo_root.parents:

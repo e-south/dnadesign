@@ -48,7 +48,8 @@ def _resolve_path_from_runbook_base(path_value: Path, *, runbook_base_dir: Path)
 def _resolve_repo_root_from_module() -> Path | None:
     current = Path(__file__).resolve()
     for parent in current.parents:
-        if (parent / "pyproject.toml").exists():
+        source_module = parent / "src/dnadesign/ops/runbooks/runbook_paths.py"
+        if (parent / "pyproject.toml").exists() and source_module.resolve() == current:
             return parent
     return None
 
